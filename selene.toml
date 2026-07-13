@@ -1,0 +1,5 @@
+std = "roblox"
+exclude = ["**/*.spec.luau"]
+
+[lints]
+unused_variable = "allow"

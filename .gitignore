@@ -1,0 +1,17 @@
+# Project place file
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+# Wally
+/Packages
+/wally.lock
+
+# CI build artifact
+/dist.rbxl
+
+#misc
+/stylua.toml
+/sourcemap.json
+/.DS_Store
