@@ -1,5 +1,5 @@
 {
-  "name": "wabp",
+  "name": "ouch-proto",
   "serveAddress": "0.0.0.0",
   "tree": {
     "$className": "DataModel",
@@ -8,7 +8,7 @@
         "$path": "src/shared"
       },
       "Packages": {
-        "$path": "/Packages"
+        "$path": "Packages"
       },
       "Config": {
         "$path": "src/config"

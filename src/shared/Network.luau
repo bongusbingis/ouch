@@ -1,0 +1,140 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local IS_SERVER = RunService:IsServer()
+
+local folder
+if IS_SERVER then
+	folder = Instance.new("Folder")
+	folder.Name = "Remotes"
+	folder.Parent = ReplicatedStorage
+else
+	folder = ReplicatedStorage:WaitForChild("Remotes")
+end
+
+local definitions = {}
+local rateLimitCounters = {}
+
+local function checkRateLimit(player, name, limit)
+	local userId = player.UserId
+	rateLimitCounters[userId] = rateLimitCounters[userId] or {}
+	local counter = rateLimitCounters[userId][name]
+	local now = os.clock()
+	if not counter or now > counter.resetTime then
+		rateLimitCounters[userId][name] = { count = 1, resetTime = now + 1 }
+		return true
+	end
+	if counter.count >= limit then
+		return false
+	end
+	counter.count += 1
+	return true
+end
+
+local REMOTE_CLASS = {
+	["function"] = "RemoteFunction",
+	["event"] = "RemoteEvent",
+	["unreliable"] = "UnreliableRemoteEvent",
+}
+
+if IS_SERVER then
+	for name, kind in definitions do
+		local remote = Instance.new(REMOTE_CLASS[kind] or "RemoteEvent")
+		remote.Name = name
+		remote.Parent = folder
+	end
+
+	game:GetService("Players").PlayerRemoving:Connect(function(player)
+		rateLimitCounters[player.UserId] = nil
+	end)
+end
+
+local Network = {}
+
+-- Composable middleware: wrap handlers rather than threading a middleware
+-- config object.
+
+function Network.withRateLimit(limit, handler)
+	return function(player, ...)
+		if not checkRateLimit(player, "rl", limit) then
+			warn(("[Network] Rate limited: %s"):format(player.Name))
+			return nil, "rate_limited"
+		end
+		return handler(player, ...)
+	end
+end
+
+function Network.withValidation(validate, handler)
+	return function(player, ...)
+		local ok, reason = validate(player, ...)
+		if not ok then
+			warn(("[Network] Validation failed for %s — %s"):format(player.Name, reason or "?"))
+			return nil, "invalid_args"
+		end
+		return handler(player, ...)
+	end
+end
+
+function Network.withLogging(handler)
+	return function(player, ...)
+		print(("[Network] called by %s"):format(player.Name))
+		return handler(player, ...)
+	end
+end
+
+-- Sugar over Network.handle for callers that pass a middleware table.
+function Network.handleProtected(name, middleware, callback)
+	assert(IS_SERVER, "[Network] handleProtected can only be called on the server")
+	local handler = callback
+	if middleware.rateLimit then
+		handler = Network.withRateLimit(middleware.rateLimit, handler)
+	end
+	if middleware.validate then
+		handler = Network.withValidation(middleware.validate, handler)
+	end
+	if middleware.logging then
+		handler = Network.withLogging(handler)
+	end
+	Network.handle(name, handler)
+end
+
+function Network.handle(name, callback)
+	assert(IS_SERVER, "[Network] handle can only be called on the server")
+	local remote = folder:WaitForChild(name)
+	if remote:IsA("RemoteFunction") then
+		remote.OnServerInvoke = callback
+	else
+		remote.OnServerEvent:Connect(callback)
+	end
+end
+
+function Network.call(name, ...)
+	assert(not IS_SERVER, "[Network] call can only be called on the client")
+	local remote = folder:WaitForChild(name, 5)
+	return remote:InvokeServer(...)
+end
+
+-- nil target = fire to all clients (without passing nil as a payload arg)
+function Network.fire(name, target, ...)
+	assert(IS_SERVER, "[Network] fire can only be called on the server")
+	local remote = folder:WaitForChild(name)
+	if typeof(target) == "Instance" and target:IsA("Player") then
+		remote:FireClient(target, ...)
+	else
+		remote:FireAllClients(...)
+	end
+end
+
+-- Client-side fire-and-forget for event remotes (call() is for RemoteFunctions)
+function Network.fireServer(name, ...)
+	assert(not IS_SERVER, "[Network] fireServer can only be called on the client")
+	local remote = folder:WaitForChild(name, 5)
+	remote:FireServer(...)
+end
+
+function Network.on(name, callback)
+	assert(not IS_SERVER, "[Network] on can only be called on the client")
+	local remote = folder:WaitForChild(name, 5)
+	remote.OnClientEvent:Connect(callback)
+end
+
+return Network

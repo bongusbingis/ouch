@@ -1,0 +1,4 @@
+return {
+    Template = {},
+	Leaderstats = {},
+}
