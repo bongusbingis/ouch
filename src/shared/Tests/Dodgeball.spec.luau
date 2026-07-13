@@ -176,8 +176,8 @@ T.describe("Dodgeball kit", function()
 		local world = arena()
 		local state = stateWithHeldBall(world)
 		SimCore.step(state, { throwCommand() }, world, DT)
-		-- Let the ball travel out of instant-repossess range before recalling.
-		for _ = 1, 30 do
+		-- Let the throw release, then travel out of instant-repossess range before recalling.
+		for _ = 1, math.ceil(Combat.Dodgeball.WindupDuration / DT) + 15 do
 			SimCore.step(state, {}, world, DT)
 		end
 

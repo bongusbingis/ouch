@@ -12,9 +12,15 @@ return {
 		ThrowCooldown = 0.6,
 		ThrowOriginMaxOffset = 6, -- max distance of throw origin from character center
 		MaxFlightTime = 2,
-		WindupDuration = 0.12,
+		-- This should line up with the authored throw/release moment in
+		-- Assets.Animations.Throw. The current clip is about 0.75s, so 0.38s
+		-- leaves enough follow-through after the projectile releases.
+		WindupDuration = 0.3,
+		ThrowAnimationName = "Throw",
 		MomentumInheritance = 0.3,
 		ReleaseForwardOffset = 0.35,
+		HeldVisualHandOffset = vector.create(0.08, -0.28, -0.35),
+		OverhandReleaseRootOffset = vector.create(0.85, 2.15, -1.05),
 
 		HomingTurnRateDeg = 72,
 		HomingBreakAngleDeg = 55, -- lock fully broken at this angular error
@@ -30,17 +36,49 @@ return {
 		PickupRadius = 4,
 		BounceRestitution = 0.52,
 		BounceFriction = 0.22,
-		MaxBounces = 3,
+		MaxBounces = 5,
 		SettleSpeed = 10,
 		SettleVerticalSpeed = 5,
 		ContactSeparation = 0.08,
 		MinBounceNormalSpeed = 1.5,
 		MaxBounceContactsPerStep = 4,
+		RollFriction = 18,
+		RollSettleSpeed = 1.5,
+		RollGroundSnap = 3,
+		RollSpinScale = 1,
 		SpinRate = 16,
 		RemoteSmoothing = 18,
 
 		SpawnCadence = 5, -- seconds between world ball spawns per spawn point
 		SpawnSearchRadius = 3, -- spawn suppressed while a Free ball sits within this radius
+	},
+
+	Hammer = {
+		Cooldown = 0.8,
+		ActiveDuration = 0.18,
+		MissRecovery = 0.5,
+		HitRecovery = 0.18,
+		Range = 7,
+		Width = 4,
+		Height = 5,
+		KnockbackSpeed = 85,
+		KnockbackUpSpeed = 25,
+		LineOfSightRadius = 0.35,
+		AnimationName = "Swing",
+		VisualHandOffset = vector.create(0.15, -0.55, -1.1),
+		VisualRotationDeg = vector.create(0, 180, 90),
+	},
+
+	DamageFeedback = {
+		ShakeMagnitude = 1.6,
+		ShakeRoughness = 18,
+		ShakeFadeIn = 0,
+		ShakeFadeOut = 0.16,
+		ShakePositionInfluence = vector.create(0.08, 0.08, 0.08),
+		ShakeRotationInfluence = vector.create(1.2, 0.8, 0.45),
+		FlashInTime = 0.035,
+		FlashOutTime = 0.28,
+		FlashPeakTransparency = 0.42,
 	},
 
 	-- Simplified hit capsule applied to every character (never per-limb).

@@ -142,30 +142,30 @@ local function handleThrow(
 	command: InputCommand,
 	world: WorldSnapshot,
 	events: { SimEvent }
-)
+): boolean
 	if kitState.throwCooldown > 0 then
-		return
+		return false
 	end
 	local character = world.characters[command.playerId]
 	if character == nil or not character.alive then
-		return
+		return false
 	end
 	local ball = findHeldBall(state, command.playerId)
 	if ball == nil then
-		return
+		return false
 	end
 
 	local cfg = config()
 	local aimOrigin = command.aimOrigin
 	local aimDir = command.aimDir
 	if aimOrigin == nil or aimDir == nil then
-		return
+		return false
 	end
 	if vector.magnitude(aimOrigin - character.position) > cfg.ThrowOriginMaxOffset then
-		return
+		return false
 	end
 	if vector.magnitude(aimDir) <= 1e-6 then
-		return
+		return false
 	end
 	aimDir = vector.normalize(aimDir)
 
@@ -190,6 +190,7 @@ local function handleThrow(
 		playerId = command.playerId,
 		targetId = ball.releaseTargetId,
 	})
+	return true
 end
 
 local function handleRecall(
@@ -198,22 +199,22 @@ local function handleRecall(
 	command: InputCommand,
 	world: WorldSnapshot,
 	events: { SimEvent }
-)
+): boolean
 	if kitState.recallCooldown > 0 then
-		return
+		return false
 	end
 	local character = world.characters[command.playerId]
 	if character == nil or not character.alive then
-		return
+		return false
 	end
 	local ball = findRecallableBall(state, command.playerId)
 	if ball == nil then
-		return
+		return false
 	end
 
 	local cfg = config()
 	if vector.magnitude(ball.position - character.position) > cfg.RecallMaxDistance then
-		return
+		return false
 	end
 
 	ball.phase = "Recalling"
@@ -225,6 +226,7 @@ local function handleRecall(
 		projectileId = ball.id,
 		playerId = command.playerId,
 	})
+	return true
 end
 
 function Dodgeball.init(): KitState
@@ -237,12 +239,13 @@ function Dodgeball.handleInput(
 	command: InputCommand,
 	world: WorldSnapshot,
 	events: { SimEvent }
-)
+): boolean
 	if command.kind == "Throw" then
-		handleThrow(kitState, state, command, world, events)
+		return handleThrow(kitState, state, command, world, events)
 	elseif command.kind == "Recall" then
-		handleRecall(kitState, state, command, world, events)
+		return handleRecall(kitState, state, command, world, events)
 	end
+	return false
 end
 
 function Dodgeball.tickPlayer(

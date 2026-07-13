@@ -3,13 +3,25 @@
 -- Temporary diagnostics; all default off for real playtests.
 
 return {
-	-- Prints combat commands, sim events, and static sweep hits (with the part
-	-- that was hit) on both client and server, tagged [C]/[S].
-	CombatTrace = true,
-	PhaseLabels = false,
-	Trajectory = false,
-	CollisionRadius = false,
-	SelectedTarget = false,
-	BounceNormals = false,
-	PredictionGhost = false,
+	-- Master gate for client-only debug geometry. The visualizer also requires
+	-- RunService:IsStudio(), so these never render in normal live servers.
+	StudioVisuals = false,
+	VisualUpdateHz = 12,
+
+	-- Console tracing. CollisionTrace is intentionally separate because sphere
+	-- sweep hits can print hundreds of lines per second.
+	CombatTrace = false,
+	CollisionTrace = false,
+
+	AimAssistCones = true,
+	AimAssistTargetRange = true,
+	ThrowOriginMaxOffset = true,
+	PickupRadius = true,
+	RecallRange = true,
+	PhaseLabels = true,
+	Trajectory = true,
+	CollisionRadius = true,
+	SelectedTarget = true,
+	BounceNormals = true,
+	PredictionGhost = true,
 }

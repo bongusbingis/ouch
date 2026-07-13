@@ -19,6 +19,21 @@ export type Node = any
 
 local Loader = {}
 
+local fakeCFrameMeta = {}
+function fakeCFrameMeta.__mul(left, _right)
+	return left
+end
+
+local FakeCFrame = {
+	new = function(position: vector?)
+		return setmetatable({ Position = position or vector.zero }, fakeCFrameMeta)
+	end,
+	Angles = function(_x: number, _y: number, _z: number)
+		return setmetatable({ Position = vector.zero }, fakeCFrameMeta)
+	end,
+	identity = setmetatable({ Position = vector.zero }, fakeCFrameMeta),
+}
+
 function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
 	local moduleCache: { [Node]: any } = {}
@@ -111,6 +126,7 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 				script = node,
 				require = requireImpl,
 				vector = vector,
+				CFrame = FakeCFrame,
 			},
 			injectGlobals = true,
 		})

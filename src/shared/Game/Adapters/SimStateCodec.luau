@@ -21,16 +21,18 @@ local PHASE_TO_NUMBER: { [SimTypes.ProjectilePhase]: number } = {
 	Windup = 1,
 	InFlight = 2,
 	Bouncing = 3,
-	Recalling = 4,
-	Free = 5,
+	Rolling = 4,
+	Recalling = 5,
+	Free = 6,
 }
 local NUMBER_TO_PHASE: { [number]: SimTypes.ProjectilePhase } = {
 	[0] = "Held",
 	[1] = "Windup",
 	[2] = "InFlight",
 	[3] = "Bouncing",
-	[4] = "Recalling",
-	[5] = "Free",
+	[4] = "Rolling",
+	[5] = "Recalling",
+	[6] = "Free",
 }
 
 local DEFAULT_EFFECTIVE_RADIUS = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness
@@ -51,6 +53,7 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			continue
 		end
 		local velocity = ball:GetAttribute("vel")
+		local hasVelocity = typeof(velocity) == "Vector3" or typeof(velocity) == "vector"
 		state.projectiles[ball.Name] = {
 			id = ball.Name,
 			archetype = "Dodgeball",
@@ -58,7 +61,7 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			heldBy = ball:GetAttribute("hb") :: string?,
 			phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 5] or "Free",
 			position = ball.CFrame.Position,
-			velocity = if typeof(velocity) == "Vector3" then velocity else vector.zero,
+			velocity = if hasVelocity then velocity else vector.zero,
 			targetId = ball:GetAttribute("tg") :: string?,
 			effectiveRadius = (ball:GetAttribute("er") :: number?) or DEFAULT_EFFECTIVE_RADIUS,
 			flightTime = (ball:GetAttribute("ft") :: number?) or 0,
@@ -79,6 +82,13 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 				Dodgeball = {
 					throwCooldown = (model:GetAttribute("dbTc") :: number?) or 0,
 					recallCooldown = (model:GetAttribute("dbRc") :: number?) or 0,
+				},
+				Hammer = {
+					cooldown = (model:GetAttribute("hmCd") :: number?) or 0,
+					activeRemaining = (model:GetAttribute("hmAc") :: number?) or 0,
+					recoveryRemaining = (model:GetAttribute("hmRc") :: number?) or 0,
+					direction = model:GetAttribute("hmDr") :: Vector3?,
+					hitTargetId = model:GetAttribute("hmHt") :: string?,
 				},
 			},
 		}
@@ -118,7 +128,12 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(ball, "rt", projectile.releaseTargetId)
 		setAttributeIfChanged(ball, "rd", projectile.releaseDeviceClass)
 		local velocity = projectile.velocity
-		if projectile.phase ~= "InFlight" and projectile.phase ~= "Recalling" then
+		if
+			projectile.phase ~= "InFlight"
+			and projectile.phase ~= "Bouncing"
+			and projectile.phase ~= "Rolling"
+			and projectile.phase ~= "Recalling"
+		then
 			velocity = vector.zero
 		end
 		setAttributeIfChanged(ball, "vel", velocity)
@@ -132,6 +147,12 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		local kitState = player.weapons.Dodgeball
 		setAttributeIfChanged(model, "dbTc", kitState.throwCooldown)
 		setAttributeIfChanged(model, "dbRc", kitState.recallCooldown)
+		local hammerState = player.weapons.Hammer
+		setAttributeIfChanged(model, "hmCd", hammerState.cooldown)
+		setAttributeIfChanged(model, "hmAc", hammerState.activeRemaining)
+		setAttributeIfChanged(model, "hmRc", hammerState.recoveryRemaining)
+		setAttributeIfChanged(model, "hmDr", hammerState.direction)
+		setAttributeIfChanged(model, "hmHt", hammerState.hitTargetId)
 	end
 end
 

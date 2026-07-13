@@ -19,7 +19,7 @@ export type WeaponKit = {
 		command: SimTypes.InputCommand,
 		world: SimTypes.WorldSnapshot,
 		events: { SimTypes.SimEvent }
-	) -> (),
+	) -> boolean,
 	-- Per-tick per-player update (cooldowns etc.).
 	tickPlayer: (
 		kitState: any,

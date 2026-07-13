@@ -260,6 +260,152 @@ T.describe("Projectiles", function()
 		end)
 	end)
 
+	T.it("rolls after the final floor bounce before settling", function()
+		withConfig({
+			Gravity = 80,
+			MaxBounces = 1,
+			BounceRestitution = 0.2,
+			BounceFriction = 0.1,
+			SettleSpeed = 0,
+			SettleVerticalSpeed = 0,
+			RollFriction = 20,
+			RollSettleSpeed = 2,
+		}, function()
+			local state = SimTypes.newState()
+			local world = MockWorld.snapshot({}, { MockWorld.ground() })
+			local ball = makeBall(state, {
+				position = vector.create(0, 5, 0),
+				velocity = vector.create(35, -45, 0),
+			})
+			local events: { SimTypes.SimEvent } = {}
+
+			for _ = 1, 60 do
+				Projectiles.step(state, world, DT, events)
+				if ball.phase == "Rolling" then
+					break
+				end
+			end
+
+			T.expect(ball.phase):toEqual("Rolling")
+			T.expect(ball.velocity.x > 0):toBeTruthy()
+			T.expect(math.abs(ball.velocity.y)):toBeNear(0, 1e-5)
+			local rollingX = ball.position.x
+
+			for _ = 1, 10 do
+				Projectiles.step(state, world, DT, events)
+			end
+			T.expect(ball.position.x > rollingX):toBeTruthy()
+
+			for _ = 1, 180 do
+				Projectiles.step(state, world, DT, events)
+				if ball.phase == "Free" then
+					break
+				end
+			end
+
+			local rolled = false
+			local settled = false
+			for _, event in events do
+				if event.kind == "BallRolled" then
+					rolled = true
+				elseif event.kind == "BallSettled" then
+					settled = true
+				end
+			end
+
+			T.expect(ball.phase):toEqual("Free")
+			T.expect(rolled):toBeTruthy()
+			T.expect(settled):toBeTruthy()
+		end)
+	end)
+
+	T.it("clears the floor on steep downward overhand release", function()
+		withConfig({
+			Gravity = 50,
+			BounceRestitution = 0.55,
+			BounceFriction = 0.1,
+			MaxBounces = 3,
+		}, function()
+			local state = SimTypes.newState()
+			local owner = MockWorld.character(vector.create(0, 2.5, 0), {
+				handPosition = vector.create(0, 1.2, 0),
+				throwPosition = vector.create(0, 1.2, 0),
+			})
+			local world = MockWorld.snapshot({ owner = owner }, { MockWorld.ground() })
+			local aim = vector.normalize(vector.create(0.25, -1, 0))
+			local ball = makeBall(state, {
+				phase = "Windup",
+				heldBy = "owner",
+				ownerId = "owner",
+				position = owner.handPosition,
+				releaseAim = aim,
+				windupRemaining = 0,
+			})
+			local events: { SimTypes.SimEvent } = {}
+
+			Projectiles.step(state, world, DT, events)
+			T.expect(ball.phase):toEqual("InFlight")
+			T.expect(ball.position.y >= Combat.Dodgeball.Radius):toBeTruthy()
+
+			for _ = 1, 10 do
+				Projectiles.step(state, world, DT, events)
+				if ball.bounceCount > 0 then
+					break
+				end
+			end
+
+			T.expect(ball.bounceCount > 0):toBeTruthy()
+			T.expect(ball.phase == "Bouncing" or ball.phase == "Rolling"):toBeTruthy()
+		end)
+	end)
+
+	T.it("holds at the fake held socket during windup", function()
+		local state = SimTypes.newState()
+		local owner = MockWorld.character(vector.create(0, 2.5, 0), {
+			handPosition = vector.create(2, 3, -1),
+			throwPosition = vector.create(2, 5, -1),
+		})
+		local world = MockWorld.snapshot({ owner = owner })
+		local ball = makeBall(state, {
+			phase = "Windup",
+			heldBy = "owner",
+			ownerId = "owner",
+			position = vector.zero,
+			releaseAim = vector.create(1, 0, 0),
+			windupRemaining = 0.2,
+		})
+
+		Projectiles.step(state, world, DT, {})
+
+		T.expect(ball.phase):toEqual("Windup")
+		T.expect(ball.position):toEqual(owner.handPosition)
+	end)
+
+	T.it("releases from the overhand socket with the configured forward offset", function()
+		withConfig({ Gravity = 0, ReleaseForwardOffset = 1.25 }, function()
+			local state = SimTypes.newState()
+			local owner = MockWorld.character(vector.create(0, 2.5, 0), {
+				handPosition = vector.create(2, 4, -1),
+				throwPosition = vector.create(2, 6, -1),
+			})
+			local world = MockWorld.snapshot({ owner = owner })
+			local aim = vector.create(1, 0, 0)
+			local ball = makeBall(state, {
+				phase = "Windup",
+				heldBy = "owner",
+				ownerId = "owner",
+				position = owner.handPosition,
+				releaseAim = aim,
+				windupRemaining = 0,
+			})
+
+			Projectiles.step(state, world, DT, {})
+
+			T.expect(ball.phase):toEqual("InFlight")
+			T.expect(ball.position):toEqual(owner.throwPosition + aim * 1.25)
+		end)
+	end)
+
 	T.it("eliminates a character in the flight path exactly once", function()
 		withConfig({ Gravity = 0 }, function()
 			local state = SimTypes.newState()

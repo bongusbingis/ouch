@@ -7,7 +7,8 @@ export type Vec = vector
 
 export type CharacterSnapshot = {
 	position: Vec, -- capsule center
-	handPosition: Vec,
+	handPosition: Vec, -- fake held-ball visual socket
+	throwPosition: Vec, -- authoritative overhand release socket
 	velocity: Vec,
 	height: number,
 	radius: number,
@@ -31,7 +32,7 @@ export type WorldSnapshot = {
 	ballSpawns: { Vec },
 }
 
-export type ProjectilePhase = "Held" | "Windup" | "InFlight" | "Bouncing" | "Recalling" | "Free"
+export type ProjectilePhase = "Held" | "Windup" | "InFlight" | "Bouncing" | "Rolling" | "Recalling" | "Free"
 
 export type ProjectileState = {
 	id: string,
@@ -86,6 +87,7 @@ export type SimEvent = {
 	targetId: string?,
 	position: Vec?,
 	normal: Vec?,
+	direction: Vec?,
 }
 
 local SimTypes = {}

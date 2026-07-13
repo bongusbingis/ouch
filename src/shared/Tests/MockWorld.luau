@@ -86,6 +86,7 @@ function MockWorld.character(position: Vec, overrides: { [string]: any }?): Char
 	local character: CharacterSnapshot = {
 		position = position,
 		handPosition = position + vector.create(0.9, 0.4, -0.25),
+		throwPosition = position + vector.create(0.6, 1.6, -0.55),
 		velocity = vector.zero,
 		height = 5,
 		radius = 1.5,

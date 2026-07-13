@@ -55,9 +55,12 @@ function SimCore.step(state: SimState, commands: { InputCommand }, world: WorldS
 
 	for _, command in commands do
 		local player = state.players[command.playerId]
-		local kit = WeaponRegistry.forCommand(command.kind)
-		if player and kit then
-			kit.handleInput(player.weapons[kit.kind], state, command, world, events)
+		if player then
+			for _, kit in WeaponRegistry.forCommand(command.kind) do
+				if kit.handleInput(player.weapons[kit.kind], state, command, world, events) then
+					break
+				end
+			end
 		end
 	end
 

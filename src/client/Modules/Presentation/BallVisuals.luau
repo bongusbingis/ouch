@@ -6,11 +6,52 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local WorldAudio = require(script.Parent.WorldAudio)
 
 local BallVisuals = {}
 
 local visuals: { [BasePart]: BasePart } = {}
 local seen: { [string]: boolean } = {}
+
+local function cframeOffset(offset: vector): CFrame
+	return CFrame.new(offset.x, offset.y, offset.z)
+end
+
+local function characterForPlayerId(playerId: string?): Model?
+	if playerId == nil then
+		return nil
+	end
+	for _, player in Players:GetPlayers() do
+		if tostring(player.UserId) == playerId then
+			return player.Character
+		end
+	end
+	return nil
+end
+
+local function rightHand(character: Model?): BasePart?
+	if character == nil then
+		return nil
+	end
+	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+	if hand and hand:IsA("BasePart") then
+		return hand
+	end
+	return nil
+end
+
+local function heldVisualCFrame(ball: BasePart): CFrame?
+	local character = characterForPlayerId(ball:GetAttribute("hb") :: string?)
+	local hand = rightHand(character)
+	if hand then
+		return hand.CFrame * cframeOffset(Combat.Dodgeball.HeldVisualHandOffset)
+	end
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		return root.CFrame
+	end
+	return nil
+end
 
 local function setEnabled(root: Instance, className: string, enabled: boolean)
 	for _, child in root:GetDescendants() do
@@ -21,28 +62,10 @@ local function setEnabled(root: Instance, className: string, enabled: boolean)
 end
 
 local function playOptional(ball: BasePart, name: string)
-	local sound = ball:FindFirstChild(name, true)
-	if sound and sound:IsA("Sound") then
-		sound:Play()
-	end
+	WorldAudio.play("Dodgeball", name, ball)
 	local emitter = ball:FindFirstChild(name, true)
 	if emitter and emitter:IsA("ParticleEmitter") then
 		emitter:Emit(emitter:GetAttribute("BurstCount") or 8)
-	end
-end
-
-local function playAnimation(name: string)
-	local character = Players.LocalPlayer.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local assets = ReplicatedStorage:FindFirstChild("Assets")
-	local animations = assets and assets:FindFirstChild("CombatAnimations")
-	local animation = animations and animations:FindFirstChild(name)
-	if humanoid == nil or animation == nil or not animation:IsA("Animation") then
-		return
-	end
-	local animator = humanoid:FindFirstChildOfClass("Animator")
-	if animator then
-		animator:LoadAnimation(animation):Play(0.04)
 	end
 end
 
@@ -94,13 +117,6 @@ function BallVisuals.onEvent(event: any)
 	if effect then
 		playOptional(visual, effect)
 	end
-	if event.playerId == tostring(Players.LocalPlayer.UserId) then
-		if event.kind == "BallWindup" then
-			playAnimation("DodgeballWindup")
-		elseif event.kind == "BallReleased" then
-			playAnimation("DodgeballRelease")
-		end
-	end
 end
 
 function BallVisuals.start()
@@ -130,9 +146,11 @@ function BallVisuals.start()
 				continue
 			end
 			local phase = ball:GetAttribute("ph")
+			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
-			visual.CFrame = if immediate then ball.CFrame else visual.CFrame:Lerp(ball.CFrame, alpha)
-			setEnabled(visual, "Trail", phase == 2 or phase == 3 or phase == 4)
+			local targetCFrame = heldCFrame or ball.CFrame
+			visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
+			setEnabled(visual, "Trail", phase == 2 or phase == 3 or phase == 5)
 		end
 	end)
 end

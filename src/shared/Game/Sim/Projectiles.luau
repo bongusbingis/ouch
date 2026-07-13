@@ -52,8 +52,30 @@ local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, pos
 	projectile.spinRate = 0
 end
 
+local function horizontalOf(v: Vec): Vec
+	return vector.create(v.x, 0, v.z)
+end
+
+local function beginRolling(projectile: ProjectileState, config: typeof(Combat.Dodgeball), position: Vec)
+	local horizontalVelocity = horizontalOf(projectile.velocity)
+	projectile.phase = "Rolling"
+	projectile.position = position
+	projectile.velocity = horizontalVelocity
+	projectile.targetId = nil
+	projectile.spinRate = vector.magnitude(horizontalVelocity) / math.max(config.Radius, 0.1) * config.RollSpinScale
+end
+
 local function chestPosition(character: SimTypes.CharacterSnapshot): Vec
 	return character.position
+end
+
+local function releasePosition(world: WorldSnapshot, from: Vec, aim: Vec, config: typeof(Combat.Dodgeball)): Vec
+	local displacement = aim * config.ReleaseForwardOffset
+	local hit = world.collision.sweepSphere(from, displacement, config.Radius)
+	if hit then
+		return hit.position + hit.normal * config.ContactSeparation
+	end
+	return from + displacement
 end
 
 local function steer(
@@ -142,7 +164,7 @@ local function stepWindup(
 	local aim = vector.normalize(projectile.releaseAim)
 	projectile.phase = "InFlight"
 	projectile.heldBy = nil
-	projectile.position = holder.handPosition + aim * config.ReleaseForwardOffset
+	projectile.position = releasePosition(world, holder.throwPosition, aim, config)
 	projectile.velocity = aim * config.ThrowSpeed + holder.velocity * config.MomentumInheritance
 	projectile.targetId = projectile.releaseTargetId
 	projectile.effectiveRadius = config.Radius + config.HitForgiveness + row.MagnetismRadius
@@ -167,6 +189,24 @@ local function maybeSettleAfterBounce(
 	events: { SimEvent }
 )
 	local speed = vector.magnitude(projectile.velocity)
+	local horizontalSpeed = vector.magnitude(horizontalOf(projectile.velocity))
+	local shouldRoll = hit.normal.y > 0.6
+		and horizontalSpeed > config.RollSettleSpeed
+		and (
+			projectile.bounceCount >= config.MaxBounces
+			or speed <= config.SettleSpeed
+			or math.abs(projectile.velocity.y) <= config.SettleVerticalSpeed
+		)
+	if shouldRoll then
+		beginRolling(projectile, config, projectile.position)
+		pushEvent(
+			events,
+			state,
+			{ kind = "BallRolled", tick = 0, projectileId = projectile.id, position = projectile.position }
+		)
+		return
+	end
+
 	if
 		projectile.bounceCount >= config.MaxBounces
 		or speed <= config.SettleSpeed
@@ -179,6 +219,16 @@ local function maybeSettleAfterBounce(
 			{ kind = "BallSettled", tick = 0, projectileId = projectile.id, position = projectile.position }
 		)
 	end
+end
+
+local function decelerateHorizontal(velocity: Vec, decel: number, dt: number): Vec
+	local horizontalVelocity = horizontalOf(velocity)
+	local speed = vector.magnitude(horizontalVelocity)
+	if speed <= 1e-6 then
+		return vector.zero
+	end
+	local nextSpeed = math.max(speed - decel * dt, 0)
+	return vector.normalize(horizontalVelocity) * nextSpeed
 end
 
 local function bounce(
@@ -212,6 +262,21 @@ local function bounce(
 		normal = hit.normal,
 	})
 	return true
+end
+
+local function settleRolling(
+	projectile: ProjectileState,
+	state: SimState,
+	world: WorldSnapshot,
+	config: typeof(Combat.Dodgeball),
+	events: { SimEvent }
+)
+	becomeFree(projectile, world, projectile.position)
+	pushEvent(
+		events,
+		state,
+		{ kind = "BallSettled", tick = 0, projectileId = projectile.id, position = projectile.position }
+	)
 end
 
 local function advanceBouncing(
@@ -268,6 +333,45 @@ local function advanceBouncing(
 				break
 			end
 		end
+	end
+end
+
+local function stepRolling(
+	projectile: ProjectileState,
+	state: SimState,
+	world: WorldSnapshot,
+	config: typeof(Combat.Dodgeball),
+	dt: number,
+	events: { SimEvent }
+)
+	projectile.flightTime += dt
+	projectile.velocity = decelerateHorizontal(projectile.velocity, config.RollFriction, dt)
+	local speed = vector.magnitude(projectile.velocity)
+	projectile.spinRate = speed / math.max(config.Radius, 0.1) * config.RollSpinScale
+	if speed <= config.RollSettleSpeed then
+		settleRolling(projectile, state, world, config, events)
+		return
+	end
+
+	local displacement = projectile.velocity * dt
+	local hit = world.collision.sweepSphere(projectile.position, displacement, config.Radius)
+	if hit then
+		if hit.normal.y > 0.6 then
+			projectile.position = hit.position + hit.normal * config.ContactSeparation
+		else
+			local normalSpeed = vector.dot(projectile.velocity, hit.normal)
+			local tangentVelocity = projectile.velocity - hit.normal * normalSpeed
+			projectile.velocity = tangentVelocity * math.max(0, 1 - config.BounceFriction)
+			projectile.position = hit.position + hit.normal * config.ContactSeparation
+		end
+	else
+		projectile.position += displacement
+	end
+
+	local snapHit =
+		world.collision.sweepSphere(projectile.position, vector.create(0, -config.RollGroundSnap, 0), config.Radius)
+	if snapHit and snapHit.normal.y > 0.6 then
+		projectile.position = snapHit.position + snapHit.normal * config.ContactSeparation
 	end
 end
 
@@ -423,10 +527,17 @@ function Projectiles.step(state: SimState, world: WorldSnapshot, dt: number, eve
 			stepInFlight(projectile, state, world, config, dt, events)
 		elseif projectile.phase == "Bouncing" then
 			stepBouncing(projectile, state, world, config, dt, events)
+		elseif projectile.phase == "Rolling" then
+			stepRolling(projectile, state, world, config, dt, events)
 		elseif projectile.phase == "Recalling" then
 			stepRecalling(projectile, state, world, config, dt, events)
 		end
-		if projectile.phase == "InFlight" or projectile.phase == "Bouncing" or projectile.phase == "Recalling" then
+		if
+			projectile.phase == "InFlight"
+			or projectile.phase == "Bouncing"
+			or projectile.phase == "Rolling"
+			or projectile.phase == "Recalling"
+		then
 			projectile.spinAngle = (projectile.spinAngle + projectile.spinRate * dt) % (math.pi * 2)
 		end
 	end

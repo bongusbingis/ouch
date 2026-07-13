@@ -43,10 +43,13 @@ end
 local function dispatch(events: { SimEvent })
 	for _, event in events do
 		for _, listener in listeners do
-			local ok, err = pcall(listener, event)
-			if not ok then
-				warn(`[ServerAuthAdapter] event listener error: {err}`)
-			end
+			local eventCopy = table.clone(event)
+			task.defer(function()
+				local ok, err = pcall(listener, eventCopy)
+				if not ok then
+					warn(`[ServerAuthAdapter] event listener error: {err}`)
+				end
+			end)
 		end
 	end
 end
@@ -79,16 +82,24 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 	return entries, excluded
 end
 
-local function handPosition(entry: CharacterEntry): Vector3
+local function socketPosition(entry: CharacterEntry, offset: vector): Vector3
+	return (entry.root.CFrame * CFrame.new(offset.x, offset.y, offset.z)).Position
+end
+
+local function heldBallPosition(entry: CharacterEntry): Vector3
 	local hand = entry.model:FindFirstChild("RightHand") or entry.model:FindFirstChild("Right Arm")
 	if hand and hand:IsA("BasePart") then
-		local grip = hand:FindFirstChild("DodgeballGrip")
-		if grip and grip:IsA("Attachment") then
-			return grip.WorldPosition
-		end
-		return (hand.CFrame * CFrame.new(0, -0.65, 0)).Position
+		return hand.CFrame.Position
 	end
-	return (entry.root.CFrame * CFrame.new(0.9, 0.4, -0.25)).Position
+	return entry.root.CFrame.Position
+end
+
+local function throwPosition(entry: CharacterEntry): Vector3
+	local release = entry.model:FindFirstChild("DodgeballReleaseSocket", true)
+	if release and release:IsA("Attachment") then
+		return release.WorldPosition
+	end
+	return socketPosition(entry, Combat.Dodgeball.OverhandReleaseRootOffset)
 end
 
 local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { Instance }): SimTypes.WorldSnapshot
@@ -98,7 +109,8 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 		local humanoid = entry.model:FindFirstChildOfClass("Humanoid")
 		characters[id] = {
 			position = entry.root.CFrame.Position,
-			handPosition = handPosition(entry),
+			handPosition = heldBallPosition(entry),
+			throwPosition = throwPosition(entry),
 			velocity = entry.root.AssemblyLinearVelocity,
 			height = capsule.Height,
 			radius = capsule.Radius,
@@ -123,7 +135,9 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 			if result == nil then
 				return nil
 			end
-			trace(`sweep hit {result.Instance:GetFullName()} at d={result.Distance}`)
+			if Debug.CollisionTrace then
+				trace(`sweep hit {result.Instance:GetFullName()} at d={result.Distance}`)
+			end
 			-- SweepHit.position is the sphere center at contact, matching the
 			-- mock-world semantics the sim is tested against.
 			return {
