@@ -1,0 +1,252 @@
+--!strict
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
+local SimCore = require(script.Parent.Parent.Sim.SimCore)
+local SimStateCodec = require(script.Parent.SimStateCodec)
+local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
+local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Input)
+local Debug = require(script.Parent.Parent.Parent.Parent.Config.Debug)
+
+type SimEvent = SimTypes.SimEvent
+type InputCommand = SimTypes.InputCommand
+
+-- Server-authority backend: one BindToSimulation callback, initialized on both
+-- client and server, that decodes SimState from predicted instances, reads
+-- InputActions, runs the pure SimCore step, and encodes the result back.
+-- The engine owns prediction, rollback, and resimulation.
+
+local ServerAuthAdapter = {}
+
+local BALLS_FOLDER_NAME = "Balls"
+
+local listeners: { (SimEvent) -> () } = {}
+local started = false
+
+local function sideTag(): string
+	return if RunService:IsServer() then "S" else "C"
+end
+
+local function trace(message: string)
+	if Debug.CombatTrace then
+		print(`[Combat/{sideTag()}] {message}`)
+	end
+end
+
+function ServerAuthAdapter.onEvent(listener: (SimEvent) -> ())
+	table.insert(listeners, listener)
+end
+
+local function dispatch(events: { SimEvent })
+	for _, event in events do
+		for _, listener in listeners do
+			local ok, err = pcall(listener, event)
+			if not ok then
+				warn(`[ServerAuthAdapter] event listener error: {err}`)
+			end
+		end
+	end
+end
+
+local function playerKey(player: Player): string
+	return tostring(player.UserId)
+end
+
+type CharacterEntry = {
+	model: Model,
+	root: BasePart,
+	player: Player,
+}
+
+local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
+	local entries: { [string]: CharacterEntry } = {}
+	local excluded: { Instance } = {}
+	for _, player in Players:GetPlayers() do
+		local model = player.Character
+		if model == nil then
+			continue
+		end
+		local root = model:FindFirstChild("HumanoidRootPart")
+		if root == nil or not root:IsA("BasePart") then
+			continue
+		end
+		entries[playerKey(player)] = { model = model, root = root, player = player }
+		table.insert(excluded, model)
+	end
+	return entries, excluded
+end
+
+local function handPosition(entry: CharacterEntry): Vector3
+	local hand = entry.model:FindFirstChild("RightHand") or entry.model:FindFirstChild("Right Arm")
+	if hand and hand:IsA("BasePart") then
+		local grip = hand:FindFirstChild("DodgeballGrip")
+		if grip and grip:IsA("Attachment") then
+			return grip.WorldPosition
+		end
+		return (hand.CFrame * CFrame.new(0, -0.65, 0)).Position
+	end
+	return (entry.root.CFrame * CFrame.new(0.9, 0.4, -0.25)).Position
+end
+
+local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { Instance }): SimTypes.WorldSnapshot
+	local capsule = Combat.CharacterCapsule
+	local characters: { [string]: SimTypes.CharacterSnapshot } = {}
+	for id, entry in entries do
+		local humanoid = entry.model:FindFirstChildOfClass("Humanoid")
+		characters[id] = {
+			position = entry.root.CFrame.Position,
+			handPosition = handPosition(entry),
+			velocity = entry.root.AssemblyLinearVelocity,
+			height = capsule.Height,
+			radius = capsule.Radius,
+			alive = humanoid ~= nil and humanoid.Health > 0,
+		}
+	end
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = excluded
+	-- Gameplay traces ignore non-collidable geometry (invisible markers,
+	-- decorative no-clip parts); raycasts hit them by default otherwise.
+	params.RespectCanCollide = true
+
+	local collision: SimTypes.CollisionWorld = {
+		sweepSphere = function(origin, displacement, radius)
+			local distance = vector.magnitude(displacement)
+			if distance <= 1e-6 then
+				return nil
+			end
+			local result = Workspace:Spherecast(origin, radius, displacement, params)
+			if result == nil then
+				return nil
+			end
+			trace(`sweep hit {result.Instance:GetFullName()} at d={result.Distance}`)
+			-- SweepHit.position is the sphere center at contact, matching the
+			-- mock-world semantics the sim is tested against.
+			return {
+				distance = result.Distance,
+				position = origin + (displacement / distance) * result.Distance,
+				normal = result.Normal,
+			}
+		end,
+	}
+
+	-- World ball spawning happens outside the sim (BallSpawner); the sim never
+	-- sees spawn points under this backend.
+	return { characters = characters, collision = collision, ballSpawns = {} }
+end
+
+local function applyAuthoritativeEvents(events: { SimEvent }, entries: { [string]: CharacterEntry })
+	if not RunService:IsServer() then
+		return
+	end
+	for _, event in events do
+		if event.kind ~= "Elim" or event.targetId == nil then
+			continue
+		end
+		local entry = entries[event.targetId]
+		if entry then
+			local humanoid = entry.model:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				humanoid.Health = 0
+			end
+		end
+	end
+end
+
+-- Bool action edges are detected against the previous tick's state, stored as
+-- attributes on the character so rollback restores them correctly.
+local function readEdge(action: InputAction, model: Model, attrName: string): boolean
+	local now = action:GetState() == true
+	local previous = model:GetAttribute(attrName) == true
+	if model:GetAttribute(attrName) ~= now then
+		model:SetAttribute(attrName, now)
+	end
+	return now and not previous
+end
+
+local function collectCommands(entries: { [string]: CharacterEntry }): { InputCommand }
+	local commands: { InputCommand } = {}
+	for id, entry in entries do
+		local context = entry.player:FindFirstChild(InputConfig.ContextName)
+		if context == nil then
+			continue
+		end
+		local throwAction = context:FindFirstChild("Throw")
+		local recallAction = context:FindFirstChild("Recall")
+		local aimAction = context:FindFirstChild("Aim")
+		if throwAction == nil or recallAction == nil or aimAction == nil then
+			continue
+		end
+
+		local throwEdge = readEdge(throwAction :: InputAction, entry.model, "prevThrow")
+		local recallEdge = readEdge(recallAction :: InputAction, entry.model, "prevRecall")
+
+		if throwEdge then
+			local aimDir = (aimAction :: InputAction):GetState()
+			if typeof(aimDir) == "Vector3" and vector.magnitude(aimDir) > 1e-6 then
+				aimDir = vector.normalize(aimDir)
+				-- Throw origin is derived, not client-supplied: nothing to spoof.
+				local aimOrigin = entry.root.CFrame.Position + aimDir * 2
+				table.insert(commands, {
+					playerId = id,
+					kind = "Throw" :: SimTypes.CommandKind,
+					aimOrigin = aimOrigin,
+					aimDir = aimDir,
+					targetId = nil,
+					deviceClass = "Mouse",
+				})
+			end
+		end
+		if recallEdge then
+			table.insert(commands, { playerId = id, kind = "Recall" :: SimTypes.CommandKind })
+		end
+	end
+	return commands
+end
+
+local function step(dt: number)
+	local ballsFolder = Workspace:FindFirstChild(BALLS_FOLDER_NAME)
+	if ballsFolder == nil then
+		-- Client before first replication, or server before BallSpawner ran.
+		return
+	end
+
+	local entries, excluded = collectCharacters()
+	table.insert(excluded, ballsFolder)
+
+	local characterModels: { [string]: Model } = {}
+	for id, entry in entries do
+		characterModels[id] = entry.model
+	end
+
+	local snapshot = buildSnapshot(entries, excluded)
+	local state = SimStateCodec.decode(ballsFolder, characterModels)
+	local commands = collectCommands(entries)
+
+	local events = SimCore.step(state, commands, snapshot, dt)
+
+	SimStateCodec.encode(state, ballsFolder, characterModels)
+	applyAuthoritativeEvents(events, entries)
+	dispatch(events)
+end
+
+function ServerAuthAdapter.start()
+	if started then
+		return
+	end
+	started = true
+
+	local runService: any = RunService
+	if typeof(runService.BindToSimulation) ~= "function" then
+		warn("[ServerAuthAdapter] BindToSimulation unavailable — enable the Server Authority settings in Studio")
+		return
+	end
+	runService:BindToSimulation(step)
+	print(`[ServerAuthAdapter] simulation bound ({if RunService:IsServer() then "server" else "client"})`)
+end
+
+return ServerAuthAdapter

@@ -1,4 +1,4 @@
 return {
-    Template = {},
+	Template = {},
 	Leaderstats = {},
 }

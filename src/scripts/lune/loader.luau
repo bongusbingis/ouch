@@ -1,0 +1,128 @@
+--!strict
+
+-- Sourcemap-based module loader: builds a fake Instance tree from Rojo's
+-- sourcemap.json so ModuleScripts written with Roblox-style requires
+-- (`require(script.Parent.X)`) run headlessly under Lune.
+
+local fs = require("@lune/fs")
+local luau = require("@lune/luau")
+local serde = require("@lune/serde")
+
+type SourcemapEntry = {
+	name: string,
+	className: string,
+	filePaths: { string }?,
+	children: { SourcemapEntry }?,
+}
+
+export type Node = any
+
+local Loader = {}
+
+function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
+	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
+	local moduleCache: { [Node]: any } = {}
+
+	local function fullName(node: Node): string
+		local parts = {}
+		local current = node
+		while current do
+			table.insert(parts, 1, rawget(current, "Name"))
+			current = rawget(current, "Parent")
+		end
+		return table.concat(parts, ".")
+	end
+
+	local nodeMeta = {}
+	nodeMeta.__index = function(self: Node, key: string): any
+		local child = rawget(self, "_children")[key]
+		if child then
+			return child
+		end
+		if key == "FindFirstChild" or key == "WaitForChild" then
+			return function(node: Node, name: string)
+				local found = rawget(node, "_children")[name]
+				if key == "WaitForChild" and found == nil then
+					error(`WaitForChild: no child "{name}" under {fullName(node)}`)
+				end
+				return found
+			end
+		end
+		if key == "GetChildren" then
+			return function(node: Node)
+				local out = {}
+				for _, c in rawget(node, "_children") do
+					table.insert(out, c)
+				end
+				table.sort(out, function(a, b)
+					return rawget(a, "Name") < rawget(b, "Name")
+				end)
+				return out
+			end
+		end
+		if key == "IsA" then
+			return function(node: Node, className: string)
+				return rawget(node, "ClassName") == className
+			end
+		end
+		return nil
+	end
+	nodeMeta.__tostring = fullName
+
+	local function makeNode(entry: SourcemapEntry, parent: Node?): Node
+		local node = setmetatable({
+			Name = entry.name,
+			ClassName = entry.className,
+			Parent = parent,
+			_children = {},
+			_filePaths = entry.filePaths,
+		}, nodeMeta)
+		for _, childEntry in entry.children or {} do
+			node._children[childEntry.name] = makeNode(childEntry, node)
+		end
+		return node
+	end
+
+	local root = makeNode(map, nil)
+
+	local function moduleSourcePath(node: Node): string?
+		for _, path in (rawget(node, "_filePaths") :: { string }?) or {} do
+			if string.match(path, "%.luau$") or string.match(path, "%.lua$") then
+				return path
+			end
+		end
+		return nil
+	end
+
+	local function requireImpl(node: Node): any
+		if type(node) ~= "table" or rawget(node, "ClassName") ~= "ModuleScript" then
+			error(`require target is not a ModuleScript node: {tostring(node)}`)
+		end
+		if moduleCache[node] ~= nil then
+			return moduleCache[node]
+		end
+		local path = moduleSourcePath(node)
+		if path == nil then
+			error(`no source file for module {fullName(node)}`)
+		end
+		local fn = luau.load(luau.compile(fs.readFile(path)), {
+			debugName = fullName(node),
+			environment = {
+				script = node,
+				require = requireImpl,
+				vector = vector,
+			},
+			injectGlobals = true,
+		})
+		local result = fn()
+		if result == nil then
+			error(`module {fullName(node)} returned nil`)
+		end
+		moduleCache[node] = result
+		return result
+	end
+
+	return root, requireImpl
+end
+
+return Loader

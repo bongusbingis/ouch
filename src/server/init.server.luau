@@ -4,6 +4,5 @@ local Modules = script.Modules
 local PlayerData = require(Modules.PlayerData)
 
 Players.PlayerAdded:Connect(function(player)
-    PlayerData.load(player)
+	PlayerData.load(player)
 end)
-

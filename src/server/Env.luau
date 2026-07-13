@@ -1,3 +1,3 @@
 return {
-	PrimaryDataKey = "STAGING_000"
+	PrimaryDataKey = "STAGING_000",
 }

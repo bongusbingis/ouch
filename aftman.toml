@@ -3,10 +3,10 @@
 
 # To add a new tool, add an entry to this table.
 [tools]
-rojo = "rojo-rbx/rojo@7.7.0-rc.1"
-# rojo = "rojo-rbx/rojo@7.7.0-rc.1"
+rojo = "rojo-rbx/rojo@7.7.0"
+# rojo = "rojo-rbx/rojo@7.7.0"
 wally = "UpliftGames/wally@0.3.2"
-lune = "lune-org/lune@0.10.4"
+lune = "lune-org/lune@0.10.5"
 stylua = "johnnymorganz/stylua@2.5.2"
 selene = "Kampfkarren/selene@0.31.0"
 rbxcloud = "Sleitnick/rbxcloud@0.17.0"
