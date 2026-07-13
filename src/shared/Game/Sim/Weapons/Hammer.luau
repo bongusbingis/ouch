@@ -75,7 +75,7 @@ local function findHitTarget(playerId: string, origin: Vec, direction: Vec, worl
 			continue
 		end
 		local target = world.characters[targetId]
-		if not target.alive then
+		if not target.alive or target.invulnerable then
 			continue
 		end
 

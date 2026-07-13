@@ -54,7 +54,12 @@ function TargetingUI.start()
 			end
 			local root = player.Character:FindFirstChild("HumanoidRootPart")
 			local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-			if root == nil or not root:IsA("BasePart") or humanoid == nil or humanoid.Health <= 0 then
+			if
+				root == nil
+				or not root:IsA("BasePart")
+				or humanoid == nil
+				or player.Character:GetAttribute("CombatAlive") == false
+			then
 				continue
 			end
 			local offset = root.Position - camera.CFrame.Position

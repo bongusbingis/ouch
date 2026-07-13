@@ -106,7 +106,6 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 	local capsule = Combat.CharacterCapsule
 	local characters: { [string]: SimTypes.CharacterSnapshot } = {}
 	for id, entry in entries do
-		local humanoid = entry.model:FindFirstChildOfClass("Humanoid")
 		characters[id] = {
 			position = entry.root.CFrame.Position,
 			handPosition = heldBallPosition(entry),
@@ -114,7 +113,11 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 			velocity = entry.root.AssemblyLinearVelocity,
 			height = capsule.Height,
 			radius = capsule.Radius,
-			alive = humanoid ~= nil and humanoid.Health > 0,
+			-- CombatAlive is the single source of truth for aliveness (custom
+			-- elimination flow; native Humanoid health is not used).
+			alive = entry.model:GetAttribute("CombatAlive") ~= false,
+			-- Spawn protection flag, set by MatchService on the character model.
+			invulnerable = entry.model:GetAttribute("minv") == true,
 		}
 	end
 
@@ -153,24 +156,6 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 	return { characters = characters, collision = collision, ballSpawns = {} }
 end
 
-local function applyAuthoritativeEvents(events: { SimEvent }, entries: { [string]: CharacterEntry })
-	if not RunService:IsServer() then
-		return
-	end
-	for _, event in events do
-		if event.kind ~= "Elim" or event.targetId == nil then
-			continue
-		end
-		local entry = entries[event.targetId]
-		if entry then
-			local humanoid = entry.model:FindFirstChildOfClass("Humanoid")
-			if humanoid and humanoid.Health > 0 then
-				humanoid.Health = 0
-			end
-		end
-	end
-end
-
 -- Bool action edges are detected against the previous tick's state, stored as
 -- attributes on the character so rollback restores them correctly.
 local function readEdge(action: InputAction, model: Model, attrName: string): boolean
@@ -185,6 +170,9 @@ end
 local function collectCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
 	for id, entry in entries do
+		if entry.model:GetAttribute("CombatAlive") == false then
+			continue
+		end
 		local context = entry.player:FindFirstChild(InputConfig.ContextName)
 		if context == nil then
 			continue
@@ -244,7 +232,6 @@ local function step(dt: number)
 	local events = SimCore.step(state, commands, snapshot, dt)
 
 	SimStateCodec.encode(state, ballsFolder, characterModels)
-	applyAuthoritativeEvents(events, entries)
 	dispatch(events)
 end
 

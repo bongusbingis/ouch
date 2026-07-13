@@ -6,13 +6,12 @@ type MenuId = MenuTypes.MenuId
 type MenuDefinition = MenuTypes.MenuDefinition
 
 local MenuRegistry: { [MenuId]: MenuDefinition } = {
-	Shop = {
-		id = "Shop",
-		viewName = "Shop",
-	},
-	Inventory = {
-		id = "Inventory",
-		viewName = "Inventory",
+	Quests = {
+		id = "Quests",
+		viewName = "Quests",
+		label = "Quests",
+		color = { r = 0.22, g = 0.44, b = 0.95 },
+		sidebarOrder = 10,
 	},
 }
 

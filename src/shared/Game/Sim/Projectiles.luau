@@ -119,7 +119,7 @@ local function sweepCharacters(
 	local best: CharacterHit? = nil
 	for _, characterId in SimUtil.sortedKeys(world.characters) do
 		local character = world.characters[characterId]
-		if characterId == skipId or not character.alive then
+		if characterId == skipId or not character.alive or character.invulnerable then
 			continue
 		end
 		local capA, capB = CollisionWorld.capsuleEndpoints(character)
@@ -391,7 +391,7 @@ local function stepInFlight(
 	end
 
 	local target = projectile.targetId and world.characters[projectile.targetId :: string]
-	if target ~= nil and not target.alive then
+	if target ~= nil and (not target.alive or target.invulnerable) then
 		target = nil
 		projectile.targetId = nil
 	end
@@ -434,6 +434,10 @@ local function stepInFlight(
 				projectileId = projectile.id,
 				sourceId = projectile.ownerId,
 				targetId = characterHit.characterId,
+				position = characterHit.position,
+				direction = if vector.magnitude(projectile.velocity) > 1e-6
+					then vector.normalize(projectile.velocity)
+					else nil,
 			})
 			becomeFree(projectile, world, characterHit.position)
 			return

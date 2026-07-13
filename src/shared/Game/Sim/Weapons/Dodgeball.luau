@@ -83,7 +83,7 @@ local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrig
 			continue
 		end
 		local character = world.characters[characterId]
-		if not character.alive then
+		if not character.alive or character.invulnerable then
 			continue
 		end
 		local toTarget = character.position - aimOrigin
@@ -116,7 +116,7 @@ local function validateTarget(command: InputCommand, world: WorldSnapshot, aimOr
 		return nil
 	end
 	local target = world.characters[targetId]
-	if target == nil or not target.alive then
+	if target == nil or not target.alive or target.invulnerable then
 		return nil
 	end
 

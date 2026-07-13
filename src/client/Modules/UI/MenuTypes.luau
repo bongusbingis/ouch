@@ -1,6 +1,12 @@
 --!strict
 
-export type MenuId = "Shop" | "Inventory"
+export type MenuId = "Quests"
+
+export type ColorValue = {
+	r: number,
+	g: number,
+	b: number,
+}
 
 export type CloseReason = "Api" | "Escape" | "Toggle" | "Switch" | "Startup" | "MissingView"
 
@@ -12,6 +18,10 @@ export type MenuState = {
 export type MenuDefinition = {
 	id: MenuId,
 	viewName: string,
+	label: string?,
+	color: ColorValue?,
+	sidebarOrder: number?,
+	showInSidebar: boolean?,
 	onOpen: ((view: GuiObject) -> ())?,
 	onClose: ((view: GuiObject, reason: CloseReason) -> ())?,
 }

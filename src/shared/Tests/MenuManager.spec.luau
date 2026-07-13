@@ -4,6 +4,7 @@ local T = require(script.Parent.TestKit)
 
 local Client = script.Parent.Parent.Parent.Parent.StarterPlayer.StarterPlayerScripts.Client
 local MenuManager = require(Client.Modules.UI.MenuManager)
+local MenuRegistry = require(Client.Modules.UI.MenuRegistry)
 
 type FakeGui = {
 	Name: string,
@@ -34,7 +35,8 @@ local function fakeGui(name: string, className: string): FakeGui
 	end
 
 	function gui:IsA(className: string): boolean
-		return self.ClassName == className or (className == "GuiObject" and self.ClassName == "Frame")
+		return self.ClassName == className
+			or (className == "GuiObject" and (self.ClassName == "Frame" or self.ClassName == "CanvasGroup"))
 	end
 
 	return gui :: FakeGui
@@ -46,79 +48,115 @@ local function addChild(parent: FakeGui, child: FakeGui): FakeGui
 	return child
 end
 
-local function makeViews(includeInventory: boolean?): (FakeGui, FakeGui, FakeGui?)
+local function registeredMenus()
+	local entries = {}
+	for menuId, definition in MenuRegistry do
+		table.insert(entries, {
+			id = menuId,
+			viewName = definition.viewName,
+		})
+	end
+	table.sort(entries, function(left, right)
+		return left.id < right.id
+	end)
+	return entries
+end
+
+local function makeViews(omitMenuId: string?): (FakeGui, { [string]: FakeGui })
 	local views = fakeGui("Views", "Folder")
-	local shop = addChild(views, fakeGui("Shop", "Frame"))
-	local inventory = if includeInventory == false then nil else addChild(views, fakeGui("Inventory", "Frame"))
-	return views, shop, inventory
+	local byId = {}
+	for _, entry in registeredMenus() do
+		if entry.id ~= omitMenuId then
+			byId[entry.id] = addChild(views, fakeGui(entry.viewName, "Frame"))
+		end
+	end
+	return views, byId
 end
 
 T.describe("MenuManager", function()
 	T.it("start hides all registered menu frames", function()
 		MenuManager._resetForTest()
-		local views, shop, inventory = makeViews()
+		local views, byId = makeViews()
 
 		MenuManager.start(views :: any)
 
-		T.expect(shop.Visible):toEqual(false)
-		T.expect((inventory :: FakeGui).Visible):toEqual(false)
+		for _, view in byId do
+			T.expect(view.Visible):toEqual(false)
+		end
 		T.expect(MenuManager.isOpen()):toEqual(false)
 	end)
 
 	T.it("opens one menu at a time", function()
 		MenuManager._resetForTest()
-		local views, shop, inventory = makeViews()
+		local menus = registeredMenus()
+		local first = menus[1].id
+		local second = if menus[2] then menus[2].id else nil
+		local views, byId = makeViews()
 		MenuManager.start(views :: any)
 
-		T.expect(MenuManager.open("Shop")):toEqual(true)
-		T.expect(shop.Visible):toEqual(true)
-		T.expect((inventory :: FakeGui).Visible):toEqual(false)
-		T.expect(MenuManager.getOpenMenu()):toEqual("Shop")
+		T.expect(MenuManager.open(first)):toEqual(true)
+		T.expect(byId[first].Visible):toEqual(true)
+		T.expect(MenuManager.getOpenMenu()):toEqual(first)
 
-		T.expect(MenuManager.open("Inventory")):toEqual(true)
-		T.expect(shop.Visible):toEqual(false)
-		T.expect((inventory :: FakeGui).Visible):toEqual(true)
-		T.expect(MenuManager.getOpenMenu()):toEqual("Inventory")
+		if second then
+			T.expect(MenuManager.open(second)):toEqual(true)
+			T.expect(byId[first].Visible):toEqual(false)
+			T.expect(byId[second].Visible):toEqual(true)
+			T.expect(MenuManager.getOpenMenu()):toEqual(second)
+		end
 	end)
 
 	T.it("opening the active menu toggles it closed", function()
 		MenuManager._resetForTest()
-		local views, shop = makeViews()
+		local first = registeredMenus()[1].id
+		local views, byId = makeViews()
 		MenuManager.start(views :: any)
 
-		T.expect(MenuManager.open("Shop")):toEqual(true)
-		T.expect(MenuManager.open("Shop")):toEqual(false)
+		T.expect(MenuManager.open(first)):toEqual(true)
+		T.expect(MenuManager.open(first)):toEqual(false)
 
-		T.expect(shop.Visible):toEqual(false)
+		T.expect(byId[first].Visible):toEqual(false)
 		T.expect(MenuManager.getOpenMenu()):toBeNil()
 	end)
 
 	T.it("close is idempotent", function()
 		MenuManager._resetForTest()
-		local views, shop = makeViews()
+		local first = registeredMenus()[1].id
+		local views, byId = makeViews()
 		MenuManager.start(views :: any)
 
 		T.expect(MenuManager.close()):toEqual(false)
-		MenuManager.open("Shop")
+		MenuManager.open(first)
 		T.expect(MenuManager.close()):toEqual(true)
 		T.expect(MenuManager.close()):toEqual(false)
-		T.expect(shop.Visible):toEqual(false)
+		T.expect(byId[first].Visible):toEqual(false)
 	end)
 
 	T.it("missing registered views fail without corrupting state", function()
 		MenuManager._resetForTest()
-		local views, shop = makeViews(false)
+		local menus = registeredMenus()
+		local first = menus[1].id
+		local missing = if menus[2] then menus[2].id else first
+		local views, byId = makeViews(missing)
 		MenuManager.start(views :: any)
 
-		T.expect(MenuManager.open("Shop")):toEqual(true)
-		T.expect(MenuManager.open("Inventory")):toEqual(false)
+		if missing ~= first then
+			T.expect(MenuManager.open(first)):toEqual(true)
+			T.expect(MenuManager.open(missing)):toEqual(false)
 
-		T.expect(shop.Visible):toEqual(true)
-		T.expect(MenuManager.getOpenMenu()):toEqual("Shop")
+			T.expect(byId[first].Visible):toEqual(true)
+			T.expect(MenuManager.getOpenMenu()):toEqual(first)
+		else
+			T.expect(MenuManager.open(first)):toEqual(false)
+			T.expect(MenuManager.getOpenMenu()):toBeNil()
+		end
 	end)
 
 	T.it("onChanged fires once for each real transition", function()
 		MenuManager._resetForTest()
+		local menus = registeredMenus()
+		local first = menus[1].id
+		local second = if menus[2] then menus[2].id else nil
 		local views = makeViews()
 		MenuManager.start(views :: any)
 		local events = {}
@@ -130,20 +168,30 @@ T.describe("MenuManager", function()
 			})
 		end)
 
-		MenuManager.open("Shop")
-		MenuManager.open("Inventory")
-		MenuManager.open("Inventory")
+		MenuManager.open(first)
+		if second then
+			MenuManager.open(second)
+			MenuManager.open(second)
+		else
+			MenuManager.open(first)
+		end
 		MenuManager.close()
 
-		T.expect(#events):toEqual(3)
-		T.expect(events[1].newMenu):toEqual("Shop")
+		T.expect(#events):toEqual(if second then 3 else 2)
+		T.expect(events[1].newMenu):toEqual(first)
 		T.expect(events[1].oldMenu):toBeNil()
-		T.expect(events[2].newMenu):toEqual("Inventory")
-		T.expect(events[2].oldMenu):toEqual("Shop")
-		T.expect(events[2].reason):toEqual("Switch")
-		T.expect(events[3].newMenu):toBeNil()
-		T.expect(events[3].oldMenu):toEqual("Inventory")
-		T.expect(events[3].reason):toEqual("Toggle")
+		if second then
+			T.expect(events[2].newMenu):toEqual(second)
+			T.expect(events[2].oldMenu):toEqual(first)
+			T.expect(events[2].reason):toEqual("Switch")
+			T.expect(events[3].newMenu):toBeNil()
+			T.expect(events[3].oldMenu):toEqual(second)
+			T.expect(events[3].reason):toEqual("Toggle")
+		else
+			T.expect(events[2].newMenu):toBeNil()
+			T.expect(events[2].oldMenu):toEqual(first)
+			T.expect(events[2].reason):toEqual("Toggle")
+		end
 	end)
 end)
 

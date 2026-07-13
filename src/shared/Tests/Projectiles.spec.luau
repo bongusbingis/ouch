@@ -426,9 +426,30 @@ T.describe("Projectiles", function()
 					elims += 1
 					T.expect(event.targetId):toEqual("dummy")
 					T.expect(event.sourceId):toEqual("shooter")
+					T.expect(event.direction):toEqual(vector.create(1, 0, 0))
 				end
 			end
 			T.expect(elims):toEqual(1)
+		end)
+	end)
+
+	T.it("passes through invulnerable characters without eliminating them", function()
+		withConfig({ Gravity = 0 }, function()
+			local state = SimTypes.newState()
+			local target = MockWorld.character(vector.create(20, 3, 0), { invulnerable = true })
+			local world = MockWorld.snapshot({ dummy = target }, { MockWorld.ground() })
+			makeBall(state, {
+				position = vector.create(0, 3, 0),
+				velocity = vector.create(80, 0, 0),
+				ownerId = "shooter",
+			})
+			local events: { SimTypes.SimEvent } = {}
+			for _ = 1, 60 do
+				Projectiles.step(state, world, DT, events)
+			end
+			for _, event in events do
+				T.expect(event.kind == "Elim"):toEqual(false)
+			end
 		end)
 	end)
 

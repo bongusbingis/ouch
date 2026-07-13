@@ -13,6 +13,8 @@ export type CharacterSnapshot = {
 	height: number,
 	radius: number,
 	alive: boolean,
+	-- Spawn protection: still moves/throws/holds, but cannot be hit or targeted.
+	invulnerable: boolean,
 }
 
 export type SweepHit = {

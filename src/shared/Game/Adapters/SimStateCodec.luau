@@ -59,7 +59,7 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			archetype = "Dodgeball",
 			ownerId = ball:GetAttribute("ow") :: string?,
 			heldBy = ball:GetAttribute("hb") :: string?,
-			phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 5] or "Free",
+			phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 6] or "Free",
 			position = ball.CFrame.Position,
 			velocity = if hasVelocity then velocity else vector.zero,
 			targetId = ball:GetAttribute("tg") :: string?,

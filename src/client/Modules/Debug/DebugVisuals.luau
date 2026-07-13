@@ -252,7 +252,12 @@ local function findSelectedTarget(camera: Camera, character: Model?, balls: Inst
 		end
 		local root = target:FindFirstChild("HumanoidRootPart")
 		local humanoid = target:FindFirstChildOfClass("Humanoid")
-		if root == nil or not root:IsA("BasePart") or humanoid == nil or humanoid.Health <= 0 then
+		if
+			root == nil
+			or not root:IsA("BasePart")
+			or humanoid == nil
+			or target:GetAttribute("CombatAlive") == false
+		then
 			continue
 		end
 		local offset = root.Position - camera.CFrame.Position

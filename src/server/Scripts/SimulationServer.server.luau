@@ -4,7 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = ServerScriptService:WaitForChild("Server"):WaitForChild("Modules")
 local InputSetup = require(Modules:WaitForChild("InputSetup"))
-local BallSpawner = require(Modules:WaitForChild("BallSpawner"))
+local BallService = require(Modules:WaitForChild("BallService"))
+local MatchService = require(Modules:WaitForChild("MatchService"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
@@ -12,6 +13,20 @@ local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Co
 
 local playedAnimationEvents = {}
 local retainedTracks = {}
+local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+if remotes == nil then
+	remotes = Instance.new("Folder")
+	remotes.Name = "Remotes"
+	remotes.Parent = ReplicatedStorage
+end
+
+local damageFeedbackRemote = remotes:FindFirstChild("DamageFeedback")
+if damageFeedbackRemote == nil then
+	damageFeedbackRemote = Instance.new("RemoteEvent")
+	damageFeedbackRemote.Name = "DamageFeedback"
+	damageFeedbackRemote.Parent = remotes
+end
+assert(damageFeedbackRemote:IsA("RemoteEvent"), "[Combat] Remotes.DamageFeedback must be a RemoteEvent")
 
 local function findAnimation(name)
 	local animation = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations"):WaitForChild(name)
@@ -64,7 +79,7 @@ local function playThrowAnimation(event)
 	local player = playerFromEvent(event)
 	local character = player and player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid == nil or humanoid.Health <= 0 then
+	if character == nil or humanoid == nil or character:GetAttribute("CombatAlive") == false then
 		return
 	end
 
@@ -102,7 +117,7 @@ local function playHammerAnimation(event)
 	local player = playerFromEvent(event)
 	local character = player and player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid == nil or humanoid.Health <= 0 then
+	if character == nil or humanoid == nil or character:GetAttribute("CombatAlive") == false then
 		return
 	end
 
@@ -142,15 +157,38 @@ local function applyHammerMotion(event)
 	end
 end
 
-InputSetup.start()
-BallSpawner.start()
+local function forwardDamageFeedback(event)
+	if event.kind ~= "Elim" or event.targetId == nil then
+		return
+	end
 
--- Server-side events are authoritative; this is the hook match/score logic
--- attaches to later. Prints suffice for the M2 exit check.
+	local target = playerFromId(event.targetId)
+	if target == nil then
+		return
+	end
+
+	damageFeedbackRemote:FireClient(target, {
+		kind = "Elim",
+		tick = event.tick,
+		projectileId = event.projectileId,
+		sourceId = tostring(event.sourceId or ""),
+		targetId = tostring(event.targetId),
+	})
+end
+
+InputSetup.start()
+BallService.start()
+MatchService.start()
+
+-- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)
 	playThrowAnimation(event)
 	playHammerAnimation(event)
 	applyHammerMotion(event)
+	local acceptedElim = MatchService.handleCombatEvent(event)
+	if acceptedElim then
+		forwardDamageFeedback(event)
+	end
 
 	if event.kind == "Elim" then
 		print(`[Combat] {event.sourceId} eliminated {event.targetId} ({event.projectileId})`)
