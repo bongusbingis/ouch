@@ -4,12 +4,16 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
 -- Materializes the declarative input map as an InputContext under each Player.
 -- InputContexts must be descendants of a Player so the engine knows ownership
--- and replicates action state into the shared simulation timeline.
+-- and replicates action state into the shared simulation timeline. Also owns
+-- the client-reported DeviceClass attribute the adapter stamps onto commands.
 
 local InputSetup = {}
+
+local VALID_DEVICE_CLASSES = { Mouse = true, Touch = true }
 
 local function buildContext(player: Player)
 	if player:FindFirstChild(InputConfig.ContextName) then
@@ -41,6 +45,18 @@ local function buildContext(player: Player)
 end
 
 function InputSetup.start()
+	Network.handleProtected("ReportDeviceClass", {
+		rateLimit = 5,
+		validate = function(_player, deviceClass)
+			if typeof(deviceClass) ~= "string" or not VALID_DEVICE_CLASSES[deviceClass] then
+				return false, "invalid device class"
+			end
+			return true
+		end,
+	}, function(player, deviceClass)
+		player:SetAttribute("DeviceClass", deviceClass)
+	end)
+
 	Players.PlayerAdded:Connect(buildContext)
 	for _, player in Players:GetPlayers() do
 		buildContext(player)

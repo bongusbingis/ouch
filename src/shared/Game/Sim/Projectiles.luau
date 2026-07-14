@@ -103,6 +103,15 @@ local function steer(
 	return CollisionWorld.rotateToward(currentDir, desiredDir, maxTurn) * speed
 end
 
+local function sameTeam(world: WorldSnapshot, a: string?, b: string?): boolean
+	if a == nil or b == nil then
+		return false
+	end
+	local ca = world.characters[a]
+	local cb = world.characters[b]
+	return ca ~= nil and cb ~= nil and ca.teamId ~= nil and ca.teamId == cb.teamId
+end
+
 type CharacterHit = {
 	fraction: number,
 	position: Vec,
@@ -119,7 +128,12 @@ local function sweepCharacters(
 	local best: CharacterHit? = nil
 	for _, characterId in SimUtil.sortedKeys(world.characters) do
 		local character = world.characters[characterId]
-		if characterId == skipId or not character.alive or character.invulnerable then
+		if
+			characterId == skipId
+			or sameTeam(world, skipId, characterId)
+			or not character.alive
+			or character.invulnerable
+		then
 			continue
 		end
 		local capA, capB = CollisionWorld.capsuleEndpoints(character)
@@ -391,7 +405,10 @@ local function stepInFlight(
 	end
 
 	local target = projectile.targetId and world.characters[projectile.targetId :: string]
-	if target ~= nil and (not target.alive or target.invulnerable) then
+	if
+		target ~= nil
+		and (not target.alive or target.invulnerable or sameTeam(world, projectile.ownerId, projectile.targetId))
+	then
 		target = nil
 		projectile.targetId = nil
 	end

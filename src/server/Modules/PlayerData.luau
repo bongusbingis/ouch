@@ -14,6 +14,17 @@ Data._profiles = {}
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
 
+export type ProgressionDelta = {
+	Elims: number?,
+	Deaths: number?,
+	Catches: number?,
+	Wins: number?,
+	Losses: number?,
+	MatchesPlayed: number?,
+	XP: number?,
+	Cash: number?,
+}
+
 local function _wrapProxy(data, profileReplica, path)
 	local proxy = {}
 	setmetatable(proxy, {
@@ -55,6 +66,33 @@ local function _wrapProxy(data, profileReplica, path)
 	return proxy
 end
 
+local function _subscribeWhenReady(player, entry)
+	local function subscribe()
+		if Data._profiles[player.UserId] ~= entry then
+			return
+		end
+		if not player:IsDescendantOf(PlayersService) then
+			return
+		end
+		if entry.ReadyConnection then
+			entry.ReadyConnection:Disconnect()
+			entry.ReadyConnection = nil
+		end
+		entry.Replica:Subscribe(player)
+	end
+
+	if Replica.ReadyPlayers[player] then
+		subscribe()
+		return
+	end
+
+	entry.ReadyConnection = Replica.NewReadyPlayer:Connect(function(readyPlayer)
+		if readyPlayer == player then
+			subscribe()
+		end
+	end)
+end
+
 local function _loadPlayerData(player)
 	return Promise.new(function(resolve, reject)
 		local profile = _dataStore:StartSessionAsync(`Player_{player.UserId}`, {
@@ -82,6 +120,10 @@ local function _loadPlayerData(player)
 			if not Data._profiles[player.UserId] then
 				return
 			end
+			if Data._profiles[player.UserId].ReadyConnection then
+				Data._profiles[player.UserId].ReadyConnection:Disconnect()
+				Data._profiles[player.UserId].ReadyConnection = nil
+			end
 			Data._profiles[player.UserId].Replica:Destroy()
 			Data._profiles[player.UserId] = nil
 			if player:IsDescendantOf(PlayersService) then
@@ -99,30 +141,25 @@ local function _loadPlayerData(player)
 			Data = profile.Data,
 		})
 
-		repeat
-			task.wait()
-		until profileReplica.ReadyPlayers[player] or player == nil or profile == nil
-
-		if player == nil or profile == nil then
-			reject(`Replica load failed for: {player.Name}`)
-			return
-		end
-
-		Data._profiles[player.UserId] = {
+		local entry = {
 			Profile = profile,
 			Data = _wrapProxy(profile.Data, profileReplica),
 			Replica = profileReplica,
 		}
-		Data._profiles[player.UserId].Replica:Subscribe(player)
+		Data._profiles[player.UserId] = entry
+		_subscribeWhenReady(player, entry)
 		resolve(true)
 	end)
 end
 
 local function _buildLeaderStats(player)
 	return Promise.new(function(resolve)
-		local leaderStats = Instance.new("Folder")
-		leaderStats.Name = "leaderstats"
-		leaderStats.Parent = player
+		local leaderStats = player:FindFirstChild("leaderstats")
+		if leaderStats == nil then
+			leaderStats = Instance.new("Folder")
+			leaderStats.Name = "leaderstats"
+			leaderStats.Parent = player
+		end
 
 		local entry = Data._profiles[player.UserId]
 		if not entry then
@@ -132,14 +169,49 @@ local function _buildLeaderStats(player)
 		end
 
 		for _, info in ipairs(DataConfig.Leaderstats) do
-			local value = Instance.new(info.Type)
-			value.Name = info.Name
-			value.Parent = leaderStats
+			local value = leaderStats:FindFirstChild(info.Name)
+			if value == nil or not value:IsA(info.Type) then
+				value = Instance.new(info.Type)
+				value.Name = info.Name
+				value.Parent = leaderStats
+			end
 			value.Value = info._Build(player, entry)
 		end
 
 		resolve(true)
 	end)
+end
+
+local function _setProgressionAttributes(player, data)
+	local progression = data.Progression
+	player:SetAttribute("XP", data.Level.Points)
+	player:SetAttribute("CareerElims", progression.Elims)
+	player:SetAttribute("Deaths", progression.Deaths)
+	player:SetAttribute("Catches", progression.Catches)
+	player:SetAttribute("Wins", progression.Wins)
+	player:SetAttribute("Losses", progression.Losses)
+	player:SetAttribute("MatchesPlayed", progression.MatchesPlayed)
+	player:SetAttribute("KDR", progression.KDR)
+end
+
+local function _syncLeaderStats(player)
+	local entry = Data._profiles[player.UserId]
+	local leaderStats = player:FindFirstChild("leaderstats")
+	if entry == nil or leaderStats == nil then
+		return
+	end
+	for _, info in ipairs(DataConfig.Leaderstats) do
+		local value = leaderStats:FindFirstChild(info.Name)
+		if value and value:IsA(info.Type) then
+			value.Value = info._Build(player, entry)
+		end
+	end
+	_setProgressionAttributes(player, entry.Data)
+end
+
+local function _recalculateKDR(data)
+	local progression = data.Progression
+	progression.KDR = if progression.Deaths > 0 then progression.Elims / progression.Deaths else progression.Elims
 end
 
 function Data.get(player)
@@ -158,13 +230,39 @@ function Data.addXP(player, amount)
 	local d = Data.get(player)
 	if d then
 		d.Level.Points = d.Level.Points + amount
+		_syncLeaderStats(player)
 	end
+end
+
+function Data.applyProgression(player, delta: ProgressionDelta)
+	local d = Data.get(player)
+	if not d then
+		return false
+	end
+
+	local progression = d.Progression
+	progression.Elims += delta.Elims or 0
+	progression.Deaths += delta.Deaths or 0
+	progression.Catches += delta.Catches or 0
+	progression.Wins += delta.Wins or 0
+	progression.Losses += delta.Losses or 0
+	progression.MatchesPlayed += delta.MatchesPlayed or 0
+	d.Level.Points += delta.XP or 0
+	d.Cash += delta.Cash or 0
+	_recalculateKDR(d)
+	_syncLeaderStats(player)
+	return true
 end
 
 function Data.load(player)
 	return _loadPlayerData(player)
 		:andThen(function()
 			_buildLeaderStats(player):await()
+			local d = Data.get(player)
+			if d then
+				_recalculateKDR(d)
+				_syncLeaderStats(player)
+			end
 		end)
 		:andThen(function()
 			print(`[Data] Loaded profile for {player.Name} ({player.UserId})`)
@@ -180,6 +278,10 @@ function Data.save(player)
 		return
 	end
 	Data._profiles[player.UserId] = nil
+	if entry.ReadyConnection then
+		entry.ReadyConnection:Disconnect()
+		entry.ReadyConnection = nil
+	end
 	entry.Replica:Destroy()
 	entry.Profile:EndSession()
 end

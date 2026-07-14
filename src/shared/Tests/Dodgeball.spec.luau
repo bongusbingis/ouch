@@ -134,6 +134,20 @@ T.describe("Dodgeball kit", function()
 		end
 	end)
 
+	T.it("does not auto-select teammates", function()
+		local world = arena({
+			teammate = MockWorld.character(vector.create(30, 2.5, 0), { teamId = "Red" }),
+		})
+		world.characters.p1.teamId = "Red"
+		local state = stateWithHeldBall(world)
+		local events = SimCore.step(state, { throwCommand() }, world, DT)
+		for _, event in events do
+			if event.kind == "BallWindup" then
+				T.expect(event.targetId):toBeNil()
+			end
+		end
+	end)
+
 	T.it("accepts a valid soft-lock target", function()
 		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
 		local state = stateWithHeldBall(world)
@@ -157,6 +171,27 @@ T.describe("Dodgeball kit", function()
 		end
 	end)
 
+	T.it("applies the wider Touch validation cone per device class", function()
+		-- ~20 degrees off the aim ray: outside Mouse validation (16), inside Touch (24).
+		local dummyPosition = vector.create(30, 2.5, 10.9)
+
+		local function windupTarget(deviceClass: string): string?
+			local world = arena({ dummy = MockWorld.character(dummyPosition) })
+			local state = stateWithHeldBall(world)
+			local events =
+				SimCore.step(state, { throwCommand({ targetId = "dummy", deviceClass = deviceClass }) }, world, DT)
+			for _, event in events do
+				if event.kind == "BallWindup" then
+					return event.targetId
+				end
+			end
+			return nil
+		end
+
+		T.expect(windupTarget("Mouse")):toBeNil()
+		T.expect(windupTarget("Touch")):toEqual("dummy")
+	end)
+
 	T.it("fails open to unguided when the target is occluded", function()
 		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 0)) })
 		local blocked = MockWorld.snapshot(world.characters, {
@@ -172,42 +207,97 @@ T.describe("Dodgeball kit", function()
 		end
 	end)
 
-	T.it("recall transitions an in-flight ball and respects max distance", function()
+	T.it("throw input catches an incoming opponent ball before hammer swing", function()
 		local world = arena()
-		local state = stateWithHeldBall(world)
-		SimCore.step(state, { throwCommand() }, world, DT)
-		-- Let the throw release, then travel out of instant-repossess range before recalling.
-		for _ = 1, math.ceil(Combat.Dodgeball.WindupDuration / DT) + 15 do
-			SimCore.step(state, {}, world, DT)
-		end
+		local state = SimCore.newState()
+		state.projectiles.ball_0001 = {
+			id = "ball_0001",
+			archetype = "Dodgeball",
+			ownerId = "p2",
+			heldBy = nil,
+			phase = "InFlight",
+			position = vector.create(2.5, 2.5, 0),
+			velocity = vector.create(-80, 0, 0),
+			targetId = nil,
+			effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
+			flightTime = 0,
+			windupRemaining = 0,
+			bounceCount = 0,
+			spinAngle = 0,
+			spinRate = 0,
+			releaseAim = nil,
+			releaseTargetId = nil,
+			releaseDeviceClass = nil,
+		}
 
-		local recallCommand: InputCommand = { playerId = "p1", kind = "Recall" }
-		SimCore.step(state, { recallCommand }, world, DT)
-		local recalling = 0
-		for _, projectile in state.projectiles do
-			if projectile.phase == "Recalling" then
-				recalling += 1
-			end
-		end
-		T.expect(recalling):toEqual(1)
+		local events = SimCore.step(state, { throwCommand() }, world, DT)
+
+		T.expect(countEvents(events, "BallCaught")):toEqual(1)
+		T.expect(countEvents(events, "HammerSwing")):toEqual(0)
+		T.expect(state.projectiles.ball_0001.phase):toEqual("Held")
+		T.expect(state.projectiles.ball_0001.heldBy):toEqual("p1")
+		T.expect(state.projectiles.ball_0001.ownerId):toEqual("p1")
 	end)
 
-	T.it("recall is rejected beyond max distance", function()
+	T.it("catch uses the configured strict distance window", function()
 		local world = arena()
-		local state = stateWithHeldBall(world)
-		SimCore.step(state, { throwCommand() }, world, DT)
-		for _ = 1, math.ceil(Combat.Dodgeball.WindupDuration / DT) + 1 do
-			SimCore.step(state, {}, world, DT)
-		end
-		for _, projectile in state.projectiles do
-			if projectile.phase == "InFlight" then
-				projectile.position = vector.create(Combat.Dodgeball.RecallMaxDistance + 50, 2, 0)
-			end
-		end
-		SimCore.step(state, { { playerId = "p1", kind = "Recall" } :: InputCommand }, world, DT)
-		for _, projectile in state.projectiles do
-			T.expect(projectile.phase == "Recalling"):toEqual(false)
-		end
+		local state = SimCore.newState()
+		state.projectiles.ball_0001 = {
+			id = "ball_0001",
+			archetype = "Dodgeball",
+			ownerId = "p2",
+			heldBy = nil,
+			phase = "InFlight",
+			position = vector.create(Combat.Dodgeball.CatchDistance + 0.2, 2.5, 0),
+			velocity = vector.create(-1, 0, 0),
+			targetId = nil,
+			effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
+			flightTime = 0,
+			windupRemaining = 0,
+			bounceCount = 0,
+			spinAngle = 0,
+			spinRate = 0,
+			releaseAim = nil,
+			releaseTargetId = nil,
+			releaseDeviceClass = nil,
+		}
+
+		local events = SimCore.step(state, { throwCommand() }, world, DT)
+
+		T.expect(countEvents(events, "BallCaught")):toEqual(0)
+		T.expect(countEvents(events, "HammerSwing")):toEqual(1)
+		T.expect(state.projectiles.ball_0001.phase):toEqual("InFlight")
+	end)
+
+	T.it("cannot catch a teammate's thrown ball", function()
+		local world = arena()
+		world.characters.p1.teamId = "Red"
+		world.characters.p2 = MockWorld.character(vector.create(10, 2.5, 0), { teamId = "Red" })
+		local state = SimCore.newState()
+		state.projectiles.ball_0001 = {
+			id = "ball_0001",
+			archetype = "Dodgeball",
+			ownerId = "p2",
+			heldBy = nil,
+			phase = "InFlight",
+			position = vector.create(2.5, 2.5, 0),
+			velocity = vector.create(-80, 0, 0),
+			targetId = nil,
+			effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
+			flightTime = 0,
+			windupRemaining = 0,
+			bounceCount = 0,
+			spinAngle = 0,
+			spinRate = 0,
+			releaseAim = nil,
+			releaseTargetId = nil,
+			releaseDeviceClass = nil,
+		}
+
+		local events = SimCore.step(state, { throwCommand() }, world, DT)
+
+		T.expect(countEvents(events, "BallCaught")):toEqual(0)
+		T.expect(countEvents(events, "HammerSwing")):toEqual(1)
 	end)
 end)
 

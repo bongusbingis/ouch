@@ -5,6 +5,7 @@ local T = require(script.Parent.TestKit)
 local Client = script.Parent.Parent.Parent.Parent.StarterPlayer.StarterPlayerScripts.Client
 local ElementHandle = require(Client.Modules.UI.Elements.ElementHandle)
 local ButtonElement = require(Client.Modules.UI.Elements.ButtonElement)
+local QuestCardElement = require(Client.Modules.UI.Elements.QuestCardElement)
 local TextSizer = require(Client.Modules.UI.TextSizer)
 
 type FakeSignal = {
@@ -73,13 +74,24 @@ local function fakeGui(name: string, className: string): any
 		Text = "",
 		Active = true,
 		AutoButtonColor = true,
+		LayoutOrder = 0,
+		AnchorPoint = { X = 0, Y = 0 },
+		Position = { X = { Scale = 0, Offset = 0 }, Y = { Scale = 0, Offset = 0 } },
+		Size = { X = { Scale = 0, Offset = 0 }, Y = { Scale = 0, Offset = 0 } },
+		Rotation = 0,
+		Color = nil,
+		FillRatio = nil,
 		destroyed = false,
 		_children = {},
+		_order = {},
 	}
 
 	function gui:IsA(targetClass: string): boolean
 		return self.ClassName == targetClass
-			or (targetClass == "GuiObject" and (self.ClassName == "Frame" or self.ClassName == "ImageButton"))
+			or (
+				targetClass == "GuiObject"
+				and (self.ClassName == "Frame" or self.ClassName == "ImageButton" or self.ClassName == "ScrollingFrame")
+			)
 	end
 
 	function gui:WaitForChild(childName: string)
@@ -90,11 +102,21 @@ local function fakeGui(name: string, className: string): any
 		return child
 	end
 
+	function gui:GetChildren()
+		return self._order
+	end
+
 	function gui:Clone()
 		local clone = fakeGui(self.Name, self.ClassName)
 		for childName, child in self._children do
-			clone._children[childName] = child:Clone()
+			local childClone = child:Clone()
+			clone._children[childName] = childClone
+			table.insert(clone._order, childClone)
 		end
+		clone.Position = self.Position
+		clone.Size = self.Size
+		clone.AnchorPoint = self.AnchorPoint
+		clone.Rotation = self.Rotation
 		if self.ClassName == "ImageButton" then
 			clone.MouseEnter = signal()
 			clone.MouseLeave = signal()
@@ -113,9 +135,15 @@ local function fakeGui(name: string, className: string): any
 	return gui
 end
 
+local function addChild(parent: any, child: any): any
+	parent._children[child.Name] = child
+	table.insert(parent._order, child)
+	return child
+end
+
 local function buttonTemplate(): any
 	local button = fakeGui("ButtonTemplate", "ImageButton")
-	button._children.Label = fakeGui("Label", "TextLabel")
+	addChild(button, fakeGui("Label", "TextLabel"))
 	button.MouseEnter = signal()
 	button.MouseLeave = signal()
 	button.MouseButton1Down = signal()
@@ -123,6 +151,21 @@ local function buttonTemplate(): any
 	button.MouseButton1Click = signal()
 	button.Activated = signal()
 	return button
+end
+
+local function questCardTemplate(): any
+	local card = fakeGui("QuestCard", "Frame")
+	addChild(card, fakeGui("Title", "TextLabel"))
+	addChild(card, fakeGui("Count", "TextLabel"))
+	addChild(card, fakeGui("Rewards", "TextLabel"))
+	local progress = addChild(card, fakeGui("Progress", "Frame"))
+	addChild(progress, fakeGui("UIGradient", "UIGradient"))
+	for index = 1, 4 do
+		local divider = addChild(progress, fakeGui(`Frame{index}`, "Frame"))
+		divider.Rotation = 15
+		divider.Position = { X = { Scale = index / 5, Offset = 0 }, Y = { Scale = 0.5, Offset = 0 } }
+	end
+	return card
 end
 
 T.describe("UI element handles", function()
@@ -202,8 +245,10 @@ T.describe("ButtonElement", function()
 		local label = button:WaitForChild("Label")
 
 		T.expect(button.Parent):toEqual(parent)
+		T.expect(button.Visible):toEqual(true)
 		T.expect(button.Name):toEqual("ShopButton")
 		T.expect(button.LayoutOrder):toEqual(10)
+		T.expect(label.Visible):toEqual(true)
 		T.expect(label.Text):toEqual("Shop")
 		T.expect(button.ImageColor3.r):toBeNear(0.1)
 		T.expect(textBound):toEqual(true)
@@ -224,6 +269,135 @@ T.describe("ButtonElement", function()
 		T.expect(button.destroyed):toEqual(true)
 		T.expect(scaleDestroyed):toEqual(true)
 		T.expect(tweenCancels > 0):toEqual(true)
+	end)
+end)
+
+T.describe("QuestCardElement", function()
+	T.it("mounts quest data, progress dividers, and claim button", function()
+		local parent = fakeGui("Holder", "ScrollingFrame")
+		local claimed = nil :: string?
+		local mountedButtons = 0
+		local lastButton = nil :: any
+
+		local handle = QuestCardElement.mount(parent, {
+			data = {
+				slot = 1,
+				questId = "elims_5",
+				title = "Get 5 eliminations",
+				progress = 2,
+				goal = 5,
+				steps = 5,
+				claimed = false,
+				completed = false,
+				reward = { kind = "Cash", amount = 150 },
+			},
+			claim = function(questId)
+				claimed = questId
+			end,
+		}, {
+			template = questCardTemplate(),
+			config = {
+				Progress = {
+					FillColor = { r = 0, g = 1, b = 0 },
+					EmptyColor = { r = 0, g = 0, b = 0 },
+				},
+				Button = {
+					EnabledColor = { r = 0.38, g = 0.72, b = 0.2 },
+					DisabledColor = { r = 0.48, g = 0.48, b = 0.48 },
+					ClaimedColor = { r = 0.35, g = 0.35, b = 0.35 },
+					Position = { x = 0.814, y = 0.835 },
+					Size = { x = 0.28, y = 0.3 },
+				},
+			},
+			buttonElement = {
+				mount = function(parentInstance, props)
+					mountedButtons += 1
+					local button = buttonTemplate()
+					button.Name = props.name
+					button.Parent = parentInstance
+					button._children.Label.Text = props.text
+					lastButton = button
+					local buttonHandle = {
+						instance = button,
+						enabled = true,
+						destroyed = false,
+					}
+					function buttonHandle:setSelected(_selected: boolean) end
+					function buttonHandle:setEnabled(enabled: boolean)
+						self.enabled = enabled
+						button.enabled = enabled
+					end
+					function buttonHandle:add(cleanup)
+						return cleanup
+					end
+					function buttonHandle:destroy()
+						self.destroyed = true
+					end
+					function buttonHandle:isDestroyed()
+						return self.destroyed
+					end
+					return buttonHandle
+				end,
+			},
+		})
+
+		local card = handle.instance :: any
+		local progress = card:WaitForChild("Progress")
+		local gradient = progress:WaitForChild("UIGradient")
+
+		T.expect(card:WaitForChild("Title").Text):toEqual("1. Get 5 eliminations")
+		T.expect(card:WaitForChild("Count").Text):toEqual("2/5")
+		T.expect(card:WaitForChild("Rewards").Text):toEqual("150 coins")
+		T.expect(gradient.Rotation):toEqual(15)
+		T.expect(gradient.FillRatio):toBeNear(0.4)
+		T.expect(gradient.GradientStop):toBeNear(0.421132)
+		T.expect(#progress:GetChildren()):toEqual(5)
+		T.expect(mountedButtons):toEqual(1)
+		T.expect(lastButton._children.Label.Text):toEqual("Claim")
+		T.expect(lastButton.enabled):toEqual(false)
+		T.expect(lastButton.AnchorPoint.X):toEqual(1)
+		T.expect(lastButton.AnchorPoint.Y):toEqual(1)
+		T.expect(lastButton.Position.X.Scale):toBeNear(0.814)
+		T.expect(lastButton.Position.Y.Scale):toBeNear(0.835)
+		T.expect(lastButton.Size.X.Scale):toBeNear(0.28)
+		T.expect(lastButton.Size.Y.Scale):toBeNear(0.3)
+		T.expect(progress:WaitForChild("Frame1").AnchorPoint.Y):toBeNear(0.5)
+		T.expect(progress:WaitForChild("Frame1").Position.Y.Scale):toBeNear(0.5)
+		T.expect(claimed):toBeNil()
+
+		handle:setData({
+			slot = 1,
+			questId = "throws_10",
+			title = "Throw 10 dodgeballs",
+			progress = 1,
+			goal = 10,
+			steps = 5,
+			claimed = false,
+			completed = false,
+			reward = { kind = "Cash", amount = 125 },
+		})
+
+		T.expect(card:WaitForChild("Count").Text):toEqual("1/10")
+		T.expect(gradient.FillRatio):toBeNear(0.2)
+		T.expect(gradient.GradientStop):toBeNear(0.263397)
+
+		handle:setData({
+			slot = 1,
+			questId = "elims_5",
+			title = "Get 5 eliminations",
+			progress = 5,
+			goal = 5,
+			steps = 5,
+			claimed = false,
+			completed = true,
+			reward = { kind = "Cash", amount = 150 },
+		})
+
+		T.expect(mountedButtons):toEqual(3)
+		T.expect(lastButton._children.Label.Text):toEqual("Claim")
+		T.expect(lastButton.enabled):toEqual(true)
+		handle:destroy()
+		T.expect(card.destroyed):toEqual(true)
 	end)
 end)
 

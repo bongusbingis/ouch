@@ -55,6 +55,12 @@ local function horizontal(direction: Vec): Vec?
 	return flat / magnitude
 end
 
+local function sameTeam(world: WorldSnapshot, a: string, b: string): boolean
+	local ca = world.characters[a]
+	local cb = world.characters[b]
+	return ca ~= nil and cb ~= nil and ca.teamId ~= nil and ca.teamId == cb.teamId
+end
+
 local function hasLineOfSight(world: WorldSnapshot, from: Vec, target: SimTypes.CharacterSnapshot): boolean
 	local toTarget = target.position - from
 	local distance = vector.magnitude(toTarget)
@@ -71,7 +77,7 @@ local function findHitTarget(playerId: string, origin: Vec, direction: Vec, worl
 	local bestForward = math.huge
 
 	for _, targetId in SimUtil.sortedKeys(world.characters) do
-		if targetId == playerId then
+		if targetId == playerId or sameTeam(world, playerId, targetId) then
 			continue
 		end
 		local target = world.characters[targetId]

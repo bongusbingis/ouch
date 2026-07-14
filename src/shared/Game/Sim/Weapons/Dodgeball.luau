@@ -24,7 +24,7 @@ type KitState = {
 
 local Dodgeball = {}
 Dodgeball.kind = "Dodgeball"
-Dodgeball.commands = { Throw = true, Recall = true } :: { [SimTypes.CommandKind]: boolean }
+Dodgeball.commands = { Throw = true } :: { [SimTypes.CommandKind]: boolean }
 
 local function config()
 	return Combat.Dodgeball
@@ -39,6 +39,15 @@ local function deviceRow(deviceClass: string?): AimAssist.DeviceRow
 	return AimAssist[deviceClass or "Mouse"] or AimAssist.Mouse
 end
 
+local function sameTeam(world: WorldSnapshot, a: string?, b: string?): boolean
+	if a == nil or b == nil then
+		return false
+	end
+	local ca = world.characters[a]
+	local cb = world.characters[b]
+	return ca ~= nil and cb ~= nil and ca.teamId ~= nil and ca.teamId == cb.teamId
+end
+
 local function findHeldBall(state: SimState, playerId: string): ProjectileState?
 	for _, id in SimUtil.sortedKeys(state.projectiles) do
 		local projectile = state.projectiles[id]
@@ -49,17 +58,17 @@ local function findHeldBall(state: SimState, playerId: string): ProjectileState?
 	return nil
 end
 
-local function findRecallableBall(state: SimState, playerId: string): ProjectileState?
+local function hasHandBall(state: SimState, playerId: string): boolean
 	for _, id in SimUtil.sortedKeys(state.projectiles) do
 		local projectile = state.projectiles[id]
 		if
-			projectile.ownerId == playerId
-			and (projectile.phase == "InFlight" or projectile.phase == "Bouncing" or projectile.phase == "Free")
+			(projectile.phase == "Held" or projectile.phase == "Windup")
+			and (projectile.heldBy == playerId or projectile.ownerId == playerId)
 		then
-			return projectile
+			return true
 		end
 	end
-	return nil
+	return false
 end
 
 local function hasLineOfSight(world: WorldSnapshot, aimOrigin: Vec, target: SimTypes.CharacterSnapshot): boolean
@@ -79,7 +88,7 @@ local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrig
 	local bestScore = math.huge
 
 	for _, characterId in SimUtil.sortedKeys(world.characters) do
-		if characterId == command.playerId then
+		if characterId == command.playerId or sameTeam(world, command.playerId, characterId) then
 			continue
 		end
 		local character = world.characters[characterId]
@@ -112,7 +121,7 @@ end
 -- unguided throw rather than rejecting the input.
 local function validateTarget(command: InputCommand, world: WorldSnapshot, aimOrigin: Vec, aimDir: Vec): string?
 	local targetId = command.targetId
-	if targetId == nil or targetId == command.playerId then
+	if targetId == nil or targetId == command.playerId or sameTeam(world, command.playerId, targetId) then
 		return nil
 	end
 	local target = world.characters[targetId]
@@ -193,38 +202,80 @@ local function handleThrow(
 	return true
 end
 
-local function handleRecall(
-	kitState: KitState,
+local function findCatchableBall(
+	state: SimState,
+	world: WorldSnapshot,
+	playerId: string,
+	character: SimTypes.CharacterSnapshot
+): ProjectileState?
+	local bestBall: ProjectileState? = nil
+	local bestDistance = config().CatchDistance
+
+	for _, id in SimUtil.sortedKeys(state.projectiles) do
+		local projectile = state.projectiles[id]
+		if
+			projectile.phase ~= "InFlight"
+			or projectile.ownerId == nil
+			or projectile.ownerId == playerId
+			or sameTeam(world, playerId, projectile.ownerId)
+		then
+			continue
+		end
+
+		local offset = character.position - projectile.position
+		local distance = vector.magnitude(offset)
+		if distance > bestDistance then
+			continue
+		end
+		if vector.magnitude(projectile.velocity) <= 1e-6 or vector.dot(projectile.velocity, offset) <= 0 then
+			continue
+		end
+
+		bestBall = projectile
+		bestDistance = distance
+	end
+
+	return bestBall
+end
+
+local function handleCatch(
+	_kitState: KitState,
 	state: SimState,
 	command: InputCommand,
 	world: WorldSnapshot,
 	events: { SimEvent }
 ): boolean
-	if kitState.recallCooldown > 0 then
-		return false
-	end
 	local character = world.characters[command.playerId]
-	if character == nil or not character.alive then
+	if character == nil or not character.alive or hasHandBall(state, command.playerId) then
 		return false
 	end
-	local ball = findRecallableBall(state, command.playerId)
+
+	local ball = findCatchableBall(state, world, command.playerId, character)
 	if ball == nil then
 		return false
 	end
 
-	local cfg = config()
-	if vector.magnitude(ball.position - character.position) > cfg.RecallMaxDistance then
-		return false
-	end
-
-	ball.phase = "Recalling"
+	local previousOwner = ball.ownerId
+	ball.phase = "Held"
+	ball.heldBy = command.playerId
+	ball.ownerId = command.playerId
+	ball.position = character.handPosition
+	ball.velocity = vector.zero
 	ball.targetId = nil
-	kitState.recallCooldown = cfg.RecallCooldown
+	ball.windupRemaining = 0
+	ball.bounceCount = 0
+	ball.flightTime = 0
+	ball.releaseAim = nil
+	ball.releaseTargetId = nil
+
 	pushEvent(events, state, {
-		kind = "BallRecallStarted",
+		kind = "BallCaught",
 		tick = 0,
 		projectileId = ball.id,
 		playerId = command.playerId,
+		sourceId = command.playerId,
+		targetId = previousOwner,
+		position = ball.position,
 	})
 	return true
 end
@@ -242,8 +293,7 @@ function Dodgeball.handleInput(
 ): boolean
 	if command.kind == "Throw" then
 		return handleThrow(kitState, state, command, world, events)
-	elseif command.kind == "Recall" then
-		return handleRecall(kitState, state, command, world, events)
+			or handleCatch(kitState, state, command, world, events)
 	end
 	return false
 end
@@ -257,7 +307,6 @@ function Dodgeball.tickPlayer(
 	_events: { SimEvent }
 )
 	kitState.throwCooldown = math.max(kitState.throwCooldown - dt, 0)
-	kitState.recallCooldown = math.max(kitState.recallCooldown - dt, 0)
 end
 
 local function tickPickups(state: SimState, world: WorldSnapshot, events: { SimEvent })

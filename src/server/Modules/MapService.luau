@@ -16,6 +16,8 @@ export type ActiveMap = {
 	instance: Instance,
 	ballSpawns: { BasePart },
 	playerSpawns: { BasePart },
+	ballSpawnsByTeam: { [string]: { BasePart } },
+	playerSpawnsByTeam: { [string]: { BasePart } },
 }
 
 local active: ActiveMap? = nil
@@ -29,6 +31,37 @@ local function partsOf(folder: Instance): { BasePart }
 		end
 	end
 	return parts
+end
+
+local function teamPartsOf(folder: Instance): { [string]: { BasePart } }
+	local teamsFolder = folder:FindFirstChild("Teams")
+	if teamsFolder == nil then
+		return {}
+	end
+
+	local byTeam = {}
+	for _, teamFolder in teamsFolder:GetChildren() do
+		byTeam[teamFolder.Name] = partsOf(teamFolder)
+	end
+	return byTeam
+end
+
+local function directPartsOf(folder: Instance): { BasePart }
+	local direct = partsOf(folder)
+	local ffaFolder = folder:FindFirstChild("FFA")
+	if #direct == 0 and ffaFolder then
+		return partsOf(ffaFolder)
+	end
+	return direct
+end
+
+local function hasAnyTeamPart(byTeam: { [string]: { BasePart } }): boolean
+	for _, parts in byTeam do
+		if #parts > 0 then
+			return true
+		end
+	end
+	return false
 end
 
 local function pickEntry(): Maps.MapEntry
@@ -57,13 +90,20 @@ function MapService.spawnRandom(): ActiveMap
 	clone.Parent = Workspace
 
 	local scriptables = clone:WaitForChild("Scriptables")
+	local ballSpawns = scriptables:WaitForChild("BallSpawns")
+	local playerSpawns = scriptables:WaitForChild("PlayerSpawns")
 	local map: ActiveMap = {
 		id = entry.Id,
 		instance = clone,
-		ballSpawns = partsOf(scriptables:WaitForChild("BallSpawns")),
-		playerSpawns = partsOf(scriptables:WaitForChild("PlayerSpawns")),
+		ballSpawns = directPartsOf(ballSpawns),
+		playerSpawns = directPartsOf(playerSpawns),
+		ballSpawnsByTeam = teamPartsOf(ballSpawns),
+		playerSpawnsByTeam = teamPartsOf(playerSpawns),
 	}
-	assert(#map.playerSpawns > 0, `[MapService] map "{entry.Id}" has no PlayerSpawns parts`)
+	assert(
+		#map.playerSpawns > 0 or hasAnyTeamPart(map.playerSpawnsByTeam),
+		`[MapService] map "{entry.Id}" has no PlayerSpawns parts`
+	)
 	active = map
 	return map
 end
@@ -79,9 +119,12 @@ function MapService.despawn()
 	end
 end
 
-function MapService.teleport(character: Model)
+function MapService.teleport(character: Model, teamId: string?)
 	local map = assert(active, "[MapService] teleport with no active map")
-	local spawnPart = map.playerSpawns[math.random(#map.playerSpawns)]
+	local teamSpawns = if teamId then map.playerSpawnsByTeam[teamId] else nil
+	local spawns = if teamSpawns and #teamSpawns > 0 then teamSpawns else map.playerSpawns
+	assert(#spawns > 0, `[MapService] no spawn points available for team "{teamId or "none"}"`)
+	local spawnPart = spawns[math.random(#spawns)]
 	character:WaitForChild("HumanoidRootPart")
 	character:PivotTo(CFrame.new(spawnPart.Position + Vector3.new(0, 3.5, 0)) * spawnPart.CFrame.Rotation)
 end

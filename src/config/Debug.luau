@@ -13,11 +13,15 @@ return {
 	CombatTrace = false,
 	CollisionTrace = false,
 
+	-- Studio-only: grants every catalog cosmetic on join so equips are
+	-- testable before the locker UI exists.
+	CosmeticsGrantAll = true,
+
 	AimAssistCones = true,
 	AimAssistTargetRange = true,
 	ThrowOriginMaxOffset = true,
 	PickupRadius = true,
-	RecallRange = true,
+	RecallRange = false,
 	PhaseLabels = true,
 	Trajectory = true,
 	CollisionRadius = true,

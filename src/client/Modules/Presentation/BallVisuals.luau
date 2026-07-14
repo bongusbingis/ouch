@@ -6,11 +6,16 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local WorldAudio = require(script.Parent.WorldAudio)
 
 local BallVisuals = {}
 
+local FREE_PHASE = 6
+
 local visuals: { [BasePart]: BasePart } = {}
+local appliedSkins: { [BasePart]: string } = {}
+local skinTemplates: { [string]: BasePart } = {}
 local seen: { [string]: boolean } = {}
 
 local function cframeOffset(offset: vector): CFrame
@@ -69,19 +74,54 @@ local function playOptional(ball: BasePart, name: string)
 	end
 end
 
-local function addBall(ball: BasePart)
-	if visuals[ball] then
-		return
+-- The ball renders its current owner's equipped skin while possessed (any
+-- phase but Free); the default ball look otherwise. Profile truth replicates
+-- through the owner's Equip_BallSkin attribute projection.
+local function effectiveSkinId(ball: BasePart): string
+	if ball:GetAttribute("ph") == FREE_PHASE then
+		return ""
 	end
-	local visual = ball:Clone()
+	local ownerId = ball:GetAttribute("ow") :: string?
+	local userId = if ownerId then tonumber(ownerId) else nil
+	local owner = if userId then Players:GetPlayerByUserId(userId) else nil
+	if owner == nil then
+		return ""
+	end
+	local itemId = (owner:GetAttribute("Equip_BallSkin") :: string?) or ""
+	return if skinTemplates[itemId] ~= nil then itemId else ""
+end
+
+local function buildVisual(ball: BasePart, skinId: string): BasePart
+	local template = skinTemplates[skinId]
+	local visual: BasePart
+	if template then
+		visual = template:Clone()
+		-- Effect children (emitters/sounds/trails) live on the base ball
+		-- template; carry them onto the skinned shell.
+		for _, child in ball:GetChildren() do
+			child:Clone().Parent = visual
+		end
+	else
+		visual = ball:Clone()
+	end
 	visual.Name = `{ball.Name}_Visual`
 	visual.Anchored = true
 	visual.CanCollide = false
 	visual.CanQuery = false
 	visual.CanTouch = false
 	visual.Parent = Workspace.CurrentCamera
+	return visual
+end
+
+local function addBall(ball: BasePart)
+	if visuals[ball] then
+		return
+	end
+	local skinId = effectiveSkinId(ball)
+	local visual = buildVisual(ball, skinId)
 	ball.LocalTransparencyModifier = 1
 	visuals[ball] = visual
+	appliedSkins[ball] = skinId
 end
 
 local function removeBall(ball: BasePart)
@@ -90,6 +130,22 @@ local function removeBall(ball: BasePart)
 		visual:Destroy()
 	end
 	visuals[ball] = nil
+	appliedSkins[ball] = nil
+end
+
+local function refreshSkin(ball: BasePart)
+	local skinId = effectiveSkinId(ball)
+	if appliedSkins[ball] == skinId then
+		return
+	end
+	local previous = visuals[ball]
+	local visual = buildVisual(ball, skinId)
+	if previous then
+		visual.CFrame = previous.CFrame
+		previous:Destroy()
+	end
+	visuals[ball] = visual
+	appliedSkins[ball] = skinId
 end
 
 function BallVisuals.onEvent(event: any)
@@ -110,6 +166,7 @@ function BallVisuals.onEvent(event: any)
 		BallBounced = "Bounce",
 		BallSettled = "Landing",
 		BallPickedUp = "Pickup",
+		BallCaught = "Pickup",
 		BallRecallStarted = "Recall",
 		Elim = "Hit",
 	}
@@ -120,6 +177,17 @@ function BallVisuals.onEvent(event: any)
 end
 
 function BallVisuals.start()
+	local skinsFolder = ReplicatedStorage:WaitForChild("Assets")
+		:WaitForChild("Cosmetics")
+		:WaitForChild(Cosmetics.CategoryFolders.BallSkin)
+	for itemId, item in Cosmetics.Items do
+		if item.Category == "BallSkin" then
+			local template = skinsFolder:WaitForChild(item.AssetName)
+			assert(template:IsA("BasePart"), `[BallVisuals] skin template {item.AssetName} must be a BasePart`)
+			skinTemplates[itemId] = template
+		end
+	end
+
 	local folder = Workspace:WaitForChild("Balls")
 	for _, child in folder:GetChildren() do
 		if child:IsA("BasePart") then
@@ -145,6 +213,8 @@ function BallVisuals.start()
 				removeBall(ball)
 				continue
 			end
+			refreshSkin(ball)
+			visual = visuals[ball] :: BasePart
 			local phase = ball:GetAttribute("ph")
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1

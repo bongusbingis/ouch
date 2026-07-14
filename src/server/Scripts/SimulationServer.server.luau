@@ -6,6 +6,11 @@ local Modules = ServerScriptService:WaitForChild("Server"):WaitForChild("Modules
 local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local BallService = require(Modules:WaitForChild("BallService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
+local ProgressionService = require(Modules:WaitForChild("ProgressionService"))
+local QuestService = require(Modules:WaitForChild("QuestService"))
+local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
+local CrateService = require(Modules:WaitForChild("CrateService"))
+local MonetizationService = require(Modules:WaitForChild("MonetizationService"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
@@ -56,6 +61,18 @@ local function rootForPlayer(player)
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
 		return root
+	end
+	return nil
+end
+
+local function eventDirection(event): Vector3?
+	local direction = event.direction
+	if typeof(direction) == "Vector3" then
+		local flat = Vector3.new(direction.X, 0, direction.Z)
+		return if flat.Magnitude > 1e-6 then flat.Unit else nil
+	elseif typeof(direction) == "vector" then
+		local flat = Vector3.new(direction.x, 0, direction.z)
+		return if flat.Magnitude > 1e-6 then flat.Unit else nil
 	end
 	return nil
 end
@@ -139,20 +156,28 @@ local function playHammerAnimation(event)
 end
 
 local function applyHammerMotion(event)
-	if event.direction == nil then
+	local direction = eventDirection(event)
+	if direction == nil then
 		return
 	end
 
-	if event.kind == "HammerHit" and event.targetId ~= nil then
+	if event.kind == "HammerSwing" then
+		local root = rootForPlayer(playerFromEvent(event))
+		if root == nil then
+			return
+		end
+		local current = root.AssemblyLinearVelocity
+		root.AssemblyLinearVelocity =
+			Vector3.new(direction.X * Combat.Hammer.DashSpeed, current.Y, direction.Z * Combat.Hammer.DashSpeed)
+	elseif event.kind == "HammerHit" and event.targetId ~= nil then
 		local root = rootForPlayer(playerFromId(event.targetId))
 		if root == nil then
 			return
 		end
-		local direction = event.direction
 		root.AssemblyLinearVelocity = Vector3.new(
-			direction.x * Combat.Hammer.KnockbackSpeed,
+			direction.X * Combat.Hammer.KnockbackSpeed,
 			Combat.Hammer.KnockbackUpSpeed,
-			direction.z * Combat.Hammer.KnockbackSpeed
+			direction.Z * Combat.Hammer.KnockbackSpeed
 		)
 	end
 end
@@ -179,6 +204,11 @@ end
 InputSetup.start()
 BallService.start()
 MatchService.start()
+ProgressionService.start(MatchService)
+QuestService.start(MatchService)
+CosmeticsService.start()
+CrateService.start()
+MonetizationService.start()
 
 -- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)
@@ -187,7 +217,10 @@ ServerAuthAdapter.onEvent(function(event)
 	applyHammerMotion(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
 	if acceptedElim then
+		QuestService.handleCombatEvent(event)
 		forwardDamageFeedback(event)
+	elseif event.kind ~= "Elim" then
+		QuestService.handleCombatEvent(event)
 	end
 
 	if event.kind == "Elim" then

@@ -1,12 +1,14 @@
 --!strict
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("AimAssist"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Client = Players.LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
+local AimDirector = require(Client:WaitForChild("Modules"):WaitForChild("Input"):WaitForChild("AimDirector"))
+
+-- Pure renderer: AimDirector owns target selection; the highlight shows only
+-- while the local player is holding a ball to throw.
 
 local TargetingUI = {}
 
@@ -17,66 +19,31 @@ highlight.FillTransparency = 0.88
 highlight.OutlineTransparency = 0.25
 highlight.Enabled = false
 
+local function holdingBall(): boolean
+	local balls = Workspace:FindFirstChild("Balls")
+	if balls == nil then
+		return false
+	end
+	local localId = tostring(Players.LocalPlayer.UserId)
+	for _, ball in balls:GetChildren() do
+		if ball:GetAttribute("hb") == localId then
+			return true
+		end
+	end
+	return false
+end
+
 function TargetingUI.start()
 	highlight.Parent = Workspace.CurrentCamera
 	RunService.RenderStepped:Connect(function()
-		local camera = Workspace.CurrentCamera
-		local character = Players.LocalPlayer.Character
-		if camera == nil or character == nil then
+		local target = AimDirector.currentTarget()
+		if target == nil or not holdingBall() then
 			highlight.Enabled = false
+			highlight.Adornee = nil
 			return
 		end
-		local balls = Workspace:FindFirstChild("Balls")
-		local hasBall = false
-		if balls then
-			for _, ball in balls:GetChildren() do
-				if ball:GetAttribute("hb") == tostring(Players.LocalPlayer.UserId) then
-					hasBall = true
-					break
-				end
-			end
-		end
-		if not hasBall then
-			highlight.Enabled = false
-			return
-		end
-		local rayParams = RaycastParams.new()
-		rayParams.FilterType = Enum.RaycastFilterType.Exclude
-		rayParams.FilterDescendantsInstances = { character, balls :: any }
-		rayParams.RespectCanCollide = true
-
-		local best: Model? = nil
-		local bestAngle = math.huge
-		local look = camera.CFrame.LookVector
-		for _, player in Players:GetPlayers() do
-			if player == Players.LocalPlayer or player.Character == nil then
-				continue
-			end
-			local root = player.Character:FindFirstChild("HumanoidRootPart")
-			local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-			if
-				root == nil
-				or not root:IsA("BasePart")
-				or humanoid == nil
-				or player.Character:GetAttribute("CombatAlive") == false
-			then
-				continue
-			end
-			local offset = root.Position - camera.CFrame.Position
-			local distance = offset.Magnitude
-			if distance <= 0 or distance > Combat.Dodgeball.TargetSelectRange then
-				continue
-			end
-			local angle = math.deg(math.acos(math.clamp(look:Dot(offset.Unit), -1, 1)))
-			local obstruction = Workspace:Raycast(camera.CFrame.Position, offset, rayParams)
-			local visible = obstruction == nil or obstruction.Instance:IsDescendantOf(player.Character)
-			if visible and angle <= AimAssist.Mouse.SelectionConeDeg and angle < bestAngle then
-				best = player.Character
-				bestAngle = angle
-			end
-		end
-		highlight.Adornee = best
-		highlight.Enabled = best ~= nil
+		highlight.Adornee = target
+		highlight.Enabled = true
 	end)
 end
 

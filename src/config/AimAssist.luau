@@ -1,14 +1,18 @@
 --!strict
 
--- Per-device aim assist rows. SelectionCone is the client-side soft-lock cone;
+-- Per-device aim assist rows. SelectionCone is the sim's soft-lock cone;
 -- ValidationCone is the wider server-side re-check (fail-open to unguided).
--- Touch values are stubs until mobile tuning (M4+).
+-- AcquireCone/StickyCone drive the client AimDirector: how far off camera
+-- center a target can be acquired, and how far the current lock may drift
+-- before it drops (hysteresis).
 
 export type DeviceRow = {
 	SelectionConeDeg: number,
 	ValidationConeDeg: number,
 	HomingTurnScale: number,
 	MagnetismRadius: number,
+	AcquireConeDeg: number,
+	StickyConeDeg: number,
 }
 
 local AimAssist: { [string]: DeviceRow } = {
@@ -17,12 +21,16 @@ local AimAssist: { [string]: DeviceRow } = {
 		ValidationConeDeg = 16,
 		HomingTurnScale = 0.65,
 		MagnetismRadius = 0,
+		AcquireConeDeg = 8,
+		StickyConeDeg = 8,
 	},
 	Touch = {
 		SelectionConeDeg = 14,
 		ValidationConeDeg = 24,
 		HomingTurnScale = 1.6,
 		MagnetismRadius = 0.6,
+		AcquireConeDeg = 60,
+		StickyConeDeg = 75,
 	},
 }
 

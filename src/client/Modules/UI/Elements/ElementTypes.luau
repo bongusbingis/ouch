@@ -37,4 +37,32 @@ export type ButtonHandle = ElementHandle & {
 	setEnabled: (self: ButtonHandle, enabled: boolean) -> (),
 }
 
+export type RewardPayload = {
+	kind: string,
+	amount: number?,
+	itemId: string?,
+}
+
+export type QuestCardData = {
+	slot: number,
+	questId: string,
+	title: string,
+	progress: number,
+	goal: number,
+	steps: number,
+	claimed: boolean,
+	completed: boolean,
+	reward: RewardPayload,
+}
+
+export type QuestCardProps = {
+	data: QuestCardData,
+	claim: ((questId: string) -> ())?,
+}
+
+export type QuestCardHandle = ElementHandle & {
+	instance: GuiObject,
+	setData: (self: QuestCardHandle, data: QuestCardData) -> (),
+}
+
 return {}

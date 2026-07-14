@@ -24,13 +24,8 @@ return {
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
 				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton },
-			},
-		},
-		{
-			Name = "Recall",
-			Type = Enum.InputActionType.Bool,
-			Bindings = {
-				{ Name = "Key", KeyCode = Enum.KeyCode.R },
+				-- Pulsed by InputRouter on non-GUI screen taps (touch devices).
+				{ Name = "TouchFeed", Scriptable = true },
 			},
 		},
 		{

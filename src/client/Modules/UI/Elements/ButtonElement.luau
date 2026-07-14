@@ -157,8 +157,10 @@ function ButtonElement.mount(parent: Instance, props: ButtonProps, options: Moun
 	local selectedColor = props.selectedColor or config.SelectedColor
 
 	imageButton.Name = props.name or props.text
+	imageButton.Visible = true
 	imageButton.ImageColor3 = toRobloxColor(if selected then selectedColor else baseColor)
 	imageButton.LayoutOrder = props.layoutOrder or 0
+	label.Visible = true
 	label.Text = props.text
 	scale.Scale = if selected then config.SelectedScale else config.DefaultScale
 	handle:add((if options and options.textSizer then options.textSizer else TextSizer).bind(label, label, {

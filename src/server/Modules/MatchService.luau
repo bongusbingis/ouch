@@ -42,10 +42,17 @@ local stateFolder: Folder? = nil
 local spawnedThisMatch: { [string]: boolean } = {}
 -- Bumping a player's generation cancels their pending scheduled respawn.
 local respawnGeneration: { [string]: number } = {}
+local playerMatchElims: { [string]: number } = {}
+local pendingWaveRespawns: { [string]: Player } = {}
+local waveTimer = 0
 local started = false
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
 	table.insert(listeners, listener)
+end
+
+function MatchService.phase(): MatchSim.MatchPhase
+	return state.phase
 end
 
 local function dispatch(event: { [string]: any })
@@ -92,6 +99,94 @@ local function playerFromId(playerId: string?): Player?
 	return Players:GetPlayerByUserId(userId)
 end
 
+local function scoreScope(): GameMode.ScoreScope
+	return mode.scoreScope or "Player"
+end
+
+local function teamIds(): { string }
+	return mode.teams or {}
+end
+
+local function teamAttrName(teamId: string): string
+	return `TeamScore_{teamId}`
+end
+
+local function playerTeam(player: Player): string?
+	return player:GetAttribute("TeamId") :: string?
+end
+
+local function setPlayerTeam(player: Player, teamId: string?)
+	player:SetAttribute("TeamId", teamId)
+	local character = player.Character
+	if character then
+		character:SetAttribute("TeamId", teamId)
+	end
+end
+
+local function clearTeams()
+	for _, player in Players:GetPlayers() do
+		setPlayerTeam(player, nil)
+	end
+end
+
+local function assignTeams()
+	local teams = teamIds()
+	if #teams == 0 then
+		clearTeams()
+		return
+	end
+
+	local counts: { [string]: number } = {}
+	for _, teamId in teams do
+		counts[teamId] = 0
+	end
+
+	local players = Players:GetPlayers()
+	table.sort(players, function(a, b)
+		return a.UserId < b.UserId
+	end)
+
+	for _, player in players do
+		local bestTeam = teams[1]
+		for _, teamId in teams do
+			if counts[teamId] < counts[bestTeam] then
+				bestTeam = teamId
+			end
+		end
+		setPlayerTeam(player, bestTeam)
+		counts[bestTeam] += 1
+	end
+end
+
+local function assignLateJoinTeam(player: Player)
+	local teams = teamIds()
+	if #teams == 0 then
+		setPlayerTeam(player, nil)
+		return
+	end
+
+	local counts: { [string]: number } = {}
+	for _, teamId in teams do
+		counts[teamId] = 0
+	end
+	for _, existing in Players:GetPlayers() do
+		if existing ~= player then
+			local teamId = playerTeam(existing)
+			if teamId and counts[teamId] ~= nil then
+				counts[teamId] += 1
+			end
+		end
+	end
+
+	local bestTeam = teams[1]
+	for _, teamId in teams do
+		if counts[teamId] < counts[bestTeam] then
+			bestTeam = teamId
+		end
+	end
+	setPlayerTeam(player, bestTeam)
+end
+
 local function ensureLeaderstats(player: Player): IntValue
 	local statsFolder = player:FindFirstChild("leaderstats")
 	if statsFolder == nil then
@@ -113,16 +208,31 @@ local function setScore(player: Player, score: number)
 	ensureLeaderstats(player).Value = score
 end
 
+local function setTeamScore(teamId: string, score: number)
+	setStateAttribute(teamAttrName(teamId), score)
+end
+
 local function resetAllScores()
 	for _, player in Players:GetPlayers() do
-		setScore(player, state.scores[playerKey(player)] or 0)
+		local key = playerKey(player)
+		playerMatchElims[key] = 0
+		setScore(player, if scoreScope() == "Team" then 0 else state.scores[key] or 0)
+	end
+	for _, teamId in teamIds() do
+		setTeamScore(teamId, state.scores[teamId] or 0)
 	end
 end
 
 local function syncPlayers()
 	local present: { [string]: boolean } = {}
-	for _, player in Players:GetPlayers() do
-		present[playerKey(player)] = true
+	if scoreScope() == "Team" then
+		for _, teamId in teamIds() do
+			present[teamId] = true
+		end
+	else
+		for _, player in Players:GetPlayers() do
+			present[playerKey(player)] = true
+		end
 	end
 	MatchSim.setPlayers(state, present)
 end
@@ -133,6 +243,8 @@ local function modeContext(): GameMode.ModeContext
 		map = {
 			ballSpawns = map.ballSpawns,
 			playerSpawns = map.playerSpawns,
+			ballSpawnsByTeam = map.ballSpawnsByTeam,
+			playerSpawnsByTeam = map.playerSpawnsByTeam,
 		},
 		balls = {
 			startGroundSpawns = BallService.startGroundSpawns,
@@ -143,6 +255,7 @@ local function modeContext(): GameMode.ModeContext
 		getPlayers = function()
 			return Players:GetPlayers()
 		end,
+		getPlayerTeam = playerTeam,
 	}
 end
 
@@ -158,6 +271,10 @@ end
 local function startMatch(events: { MatchSim.MatchEvent })
 	local map = MapService.spawnRandom()
 	table.clear(spawnedThisMatch)
+	table.clear(playerMatchElims)
+	table.clear(pendingWaveRespawns)
+	waveTimer = mode.rules.WaveRespawnSeconds or 0
+	assignTeams()
 
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
@@ -168,7 +285,7 @@ local function startMatch(events: { MatchSim.MatchEvent })
 			respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 			EliminationService.up(player)
 			spawnedThisMatch[key] = true
-			MapService.teleport(character)
+			MapService.teleport(character, playerTeam(player))
 			grantSpawnProtection(character)
 		end
 	end
@@ -191,13 +308,20 @@ end
 local function handleMatchEvents(events: { MatchSim.MatchEvent })
 	for _, event in events do
 		if event.kind == "ScoreChanged" then
-			local player = playerFromId(event.playerId)
-			if player then
-				setScore(player, event.score or 0)
+			if scoreScope() == "Team" and event.playerId ~= nil then
+				setTeamScore(event.playerId, event.score or 0)
+			else
+				local player = playerFromId(event.playerId)
+				if player then
+					setScore(player, event.score or 0)
+				end
 			end
 		elseif event.kind == "MatchStarted" then
 			resetAllScores()
 			setStateAttribute("winnerId", "")
+			for _, teamId in teamIds() do
+				setTeamScore(teamId, state.scores[teamId] or 0)
+			end
 			local map = MapService.active()
 			print(`[Match] started — {mode.id} on {if map then map.id else "?"}`)
 		elseif event.kind == "MatchEnded" then
@@ -208,19 +332,27 @@ local function handleMatchEvents(events: { MatchSim.MatchEvent })
 			cleanupMatch()
 			setStateAttribute("winnerId", "")
 			setStateAttribute("mapId", "")
+			for _, teamId in teamIds() do
+				setTeamScore(teamId, 0)
+			end
 		end
 		dispatch(event)
 	end
 	setStateAttribute("phase", state.phase)
 end
 
+local function syncCharacterTeam(player: Player, character: Model)
+	character:SetAttribute("TeamId", playerTeam(player))
+end
+
 local function onCharacterAdded(player: Player, character: Model)
+	syncCharacterTeam(player, character)
 	EliminationService.up(player)
 	grantSpawnProtection(character)
 	if state.phase ~= "Active" or MapService.active() == nil then
 		return
 	end
-	MapService.teleport(character)
+	MapService.teleport(character, playerTeam(player))
 
 	local key = playerKey(player)
 	local isFirstSpawn = not spawnedThisMatch[key]
@@ -229,6 +361,9 @@ local function onCharacterAdded(player: Player, character: Model)
 end
 
 local function watchPlayer(player: Player)
+	if scoreScope() == "Team" and playerTeam(player) == nil then
+		assignLateJoinTeam(player)
+	end
 	setScore(player, 0)
 	syncPlayers()
 	player.CharacterAdded:Connect(function(character)
@@ -252,12 +387,36 @@ local function respawnPlayer(player: Player)
 		return
 	end
 	if state.phase == "Active" and MapService.active() ~= nil then
-		MapService.teleport(character)
+		MapService.teleport(character, playerTeam(player))
 	end
 	grantSpawnProtection(character)
 	if state.phase == "Active" and MapService.active() ~= nil then
 		mode.onPlayerSpawned(modeContext(), player, false)
 	end
+end
+
+local function scoreIdForElim(sourceId: string?): string?
+	if sourceId == nil then
+		return nil
+	end
+	if scoreScope() ~= "Team" then
+		return sourceId
+	end
+	local source = playerFromId(sourceId)
+	return if source then playerTeam(source) else nil
+end
+
+local function incrementPlayerElim(sourceId: string?)
+	if sourceId == nil then
+		return
+	end
+	local source = playerFromId(sourceId)
+	if source == nil then
+		return
+	end
+	local key = playerKey(source)
+	playerMatchElims[key] = (playerMatchElims[key] or 0) + 1
+	setScore(source, playerMatchElims[key])
 end
 
 local function knockbackVelocity(event: { [string]: any }): Vector3?
@@ -291,16 +450,50 @@ local function eliminateVictim(targetId: string?, event: { [string]: any }): boo
 	local key = playerKey(player)
 	local generation = (respawnGeneration[key] or 0) + 1
 	respawnGeneration[key] = generation
-	task.delay(mode.rules.RespawnSeconds, function()
-		if respawnGeneration[key] == generation then
-			respawnPlayer(player)
-		end
-	end)
+	if mode.rules.WaveRespawnSeconds then
+		pendingWaveRespawns[key] = player
+	else
+		task.delay(mode.rules.RespawnSeconds, function()
+			if respawnGeneration[key] == generation then
+				respawnPlayer(player)
+			end
+		end)
+	end
 	return true
+end
+
+-- Waves tick on a fixed cadence from match start so respawns come in
+-- synchronized batches; the timer keeps running while anyone is pending so
+-- deaths during Results still resolve.
+local function tickWaveRespawns(dt: number)
+	local waveSeconds = mode.rules.WaveRespawnSeconds
+	if waveSeconds == nil then
+		return
+	end
+	if state.phase ~= "Active" and next(pendingWaveRespawns) == nil then
+		return
+	end
+
+	waveTimer -= dt
+	if waveTimer > 0 then
+		return
+	end
+	waveTimer = waveSeconds
+
+	local pending = pendingWaveRespawns
+	pendingWaveRespawns = {}
+	for _, player in pending do
+		respawnPlayer(player)
+	end
 end
 
 -- Called with authoritative (server-side) sim events from the adapter.
 function MatchService.handleCombatEvent(event: { [string]: any }): boolean
+	if event.kind == "BallCaught" then
+		dispatch(table.clone(event))
+		return false
+	end
+
 	if event.kind ~= "Elim" then
 		return false
 	end
@@ -309,12 +502,13 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	end
 
 	local events: { MatchSim.MatchEvent } = {}
-	MatchSim.applyElim(state, mode.rules, event.sourceId, event.targetId, events)
+	MatchSim.applyElim(state, mode.rules, scoreIdForElim(event.sourceId), event.targetId, events)
+	dispatch(table.clone(event))
+	incrementPlayerElim(event.sourceId)
 	if state.phase == "Active" and MapService.active() ~= nil then
 		mode.onElim(modeContext(), event.sourceId, event.targetId)
 	end
 	handleMatchEvents(events)
-	dispatch({ kind = "Elim", sourceId = event.sourceId, targetId = event.targetId })
 	return true
 end
 
@@ -330,6 +524,7 @@ function MatchService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		local key = playerKey(player)
 		respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
+		pendingWaveRespawns[key] = nil
 		task.defer(syncPlayers)
 	end)
 	for _, player in Players:GetPlayers() do
@@ -345,6 +540,7 @@ function MatchService.start()
 
 		MatchSim.tick(state, mode.rules, dt, events)
 		handleMatchEvents(events)
+		tickWaveRespawns(dt)
 		setStateAttribute("timeRemaining", math.floor(state.timeRemaining + 0.5))
 	end)
 end

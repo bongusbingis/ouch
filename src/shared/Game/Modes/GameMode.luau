@@ -10,13 +10,20 @@ export type MatchRules = {
 	TimeCapSeconds: number,
 	ResultsSeconds: number,
 	RespawnSeconds: number,
+	-- When set, deaths respawn in synchronized waves on this cadence instead
+	-- of individually after RespawnSeconds (GDD §4.2 TDM push/retreat rhythm).
+	WaveRespawnSeconds: number?,
 	SpawnInvulnSeconds: number,
 }
+
+export type ScoreScope = "Player" | "Team"
 
 export type ModeContext = {
 	map: {
 		ballSpawns: { BasePart },
 		playerSpawns: { BasePart },
+		ballSpawnsByTeam: { [string]: { BasePart } },
+		playerSpawnsByTeam: { [string]: { BasePart } },
 	},
 	balls: {
 		startGroundSpawns: (points: { BasePart }) -> (),
@@ -25,12 +32,15 @@ export type ModeContext = {
 		clearAll: () -> (),
 	},
 	getPlayers: () -> { Player },
+	getPlayerTeam: (player: Player) -> string?,
 }
 
 export type GameMode = {
 	id: string,
 	displayName: string,
 	rules: MatchRules,
+	scoreScope: ScoreScope?,
+	teams: { string }?,
 
 	onMatchStart: (ctx: ModeContext) -> (),
 	-- isFirstSpawn is true the first time a player spawns in the current

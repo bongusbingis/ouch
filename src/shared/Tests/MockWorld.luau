@@ -91,6 +91,7 @@ function MockWorld.character(position: Vec, overrides: { [string]: any }?): Char
 		height = 5,
 		radius = 1.5,
 		alive = true,
+		teamId = nil,
 		invulnerable = false,
 	}
 	if overrides then

@@ -31,7 +31,7 @@ local function winnerText(winnerId: string): string
 		return "It's a tie!"
 	end
 	local player = Players:GetPlayerByUserId(tonumber(winnerId) or 0)
-	local name = if player then player.DisplayName else "Player"
+	local name = if player then player.DisplayName else winnerId
 	return `{name} wins!`
 end
 

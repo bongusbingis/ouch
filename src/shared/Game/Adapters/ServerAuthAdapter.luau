@@ -116,6 +116,7 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 			-- CombatAlive is the single source of truth for aliveness (custom
 			-- elimination flow; native Humanoid health is not used).
 			alive = entry.model:GetAttribute("CombatAlive") ~= false,
+			teamId = entry.model:GetAttribute("TeamId") :: string?,
 			-- Spawn protection flag, set by MatchService on the character model.
 			invulnerable = entry.model:GetAttribute("minv") == true,
 		}
@@ -178,14 +179,12 @@ local function collectCommands(entries: { [string]: CharacterEntry }): { InputCo
 			continue
 		end
 		local throwAction = context:FindFirstChild("Throw")
-		local recallAction = context:FindFirstChild("Recall")
 		local aimAction = context:FindFirstChild("Aim")
-		if throwAction == nil or recallAction == nil or aimAction == nil then
+		if throwAction == nil or aimAction == nil then
 			continue
 		end
 
 		local throwEdge = readEdge(throwAction :: InputAction, entry.model, "prevThrow")
-		local recallEdge = readEdge(recallAction :: InputAction, entry.model, "prevRecall")
 
 		if throwEdge then
 			local aimDir = (aimAction :: InputAction):GetState()
@@ -199,12 +198,9 @@ local function collectCommands(entries: { [string]: CharacterEntry }): { InputCo
 					aimOrigin = aimOrigin,
 					aimDir = aimDir,
 					targetId = nil,
-					deviceClass = "Mouse",
+					deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse",
 				})
 			end
-		end
-		if recallEdge then
-			table.insert(commands, { playerId = id, kind = "Recall" :: SimTypes.CommandKind })
 		end
 	end
 	return commands

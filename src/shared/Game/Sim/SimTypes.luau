@@ -13,6 +13,7 @@ export type CharacterSnapshot = {
 	height: number,
 	radius: number,
 	alive: boolean,
+	teamId: string?,
 	-- Spawn protection: still moves/throws/holds, but cannot be hit or targeted.
 	invulnerable: boolean,
 }
@@ -69,7 +70,7 @@ export type SimState = {
 	spawnTimers: { number }, -- one per WorldSnapshot.ballSpawns index
 }
 
-export type CommandKind = "Throw" | "Recall"
+export type CommandKind = "Throw"
 
 export type InputCommand = {
 	playerId: string,

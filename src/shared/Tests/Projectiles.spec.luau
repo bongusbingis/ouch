@@ -453,6 +453,33 @@ T.describe("Projectiles", function()
 		end)
 	end)
 
+	T.it("passes through teammates without eliminating them", function()
+		withConfig({ Gravity = 0 }, function()
+			local state = SimTypes.newState()
+			local owner = MockWorld.character(vector.create(0, 3, 0), { teamId = "Red" })
+			local teammate = MockWorld.character(vector.create(20, 3, 0), { teamId = "Red" })
+			local enemy = MockWorld.character(vector.create(40, 3, 0), { teamId = "Blue" })
+			local world = MockWorld.snapshot(
+				{ shooter = owner, teammate = teammate, enemy = enemy },
+				{ MockWorld.ground() }
+			)
+			makeBall(state, {
+				position = vector.create(0, 3, 0),
+				velocity = vector.create(80, 0, 0),
+				ownerId = "shooter",
+			})
+			local events: { SimTypes.SimEvent } = {}
+			for _ = 1, 60 do
+				Projectiles.step(state, world, DT, events)
+			end
+			for _, event in events do
+				if event.kind == "Elim" then
+					T.expect(event.targetId):toEqual("enemy")
+				end
+			end
+		end)
+	end)
+
 	T.it("never hits its own thrower while in flight", function()
 		withConfig({ Gravity = 0 }, function()
 			local state = SimTypes.newState()

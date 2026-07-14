@@ -245,9 +245,13 @@ local function findSelectedTarget(camera: Camera, character: Model?, balls: Inst
 	local best: Model? = nil
 	local bestAngle = math.huge
 	local look = camera.CFrame.LookVector
+	local localTeamId = character:GetAttribute("TeamId")
 	for _, player in Players:GetPlayers() do
 		local target = player.Character
 		if player == Players.LocalPlayer or target == nil then
+			continue
+		end
+		if localTeamId ~= nil and target:GetAttribute("TeamId") == localTeamId then
 			continue
 		end
 		local root = target:FindFirstChild("HumanoidRootPart")

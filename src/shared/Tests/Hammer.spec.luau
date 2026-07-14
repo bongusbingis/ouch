@@ -108,6 +108,23 @@ T.describe("Hammer kit", function()
 		end
 	end)
 
+	T.it("does not hit teammates", function()
+		local arena = world({
+			teammate = MockWorld.character(vector.create(4, 2.5, 0), { teamId = "Red" }),
+			enemy = MockWorld.character(vector.create(6, 2.5, 0), { teamId = "Blue" }),
+		})
+		arena.characters.p1.teamId = "Red"
+		local state = SimCore.newState()
+		local events = SimCore.step(state, { command() }, arena, DT)
+
+		T.expect(countEvents(events, "HammerHit")):toEqual(1)
+		for _, event in events do
+			if event.kind == "HammerHit" then
+				T.expect(event.targetId):toEqual("enemy")
+			end
+		end
+	end)
+
 	T.it("miss enters recovery and blocks immediate repeated swings", function()
 		local arena = world()
 		local state = SimCore.newState()

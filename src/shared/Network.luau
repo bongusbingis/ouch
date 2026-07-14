@@ -4,14 +4,25 @@ local IS_SERVER = RunService:IsServer()
 
 local folder
 if IS_SERVER then
-	folder = Instance.new("Folder")
-	folder.Name = "Remotes"
-	folder.Parent = ReplicatedStorage
+	folder = ReplicatedStorage:FindFirstChild("Remotes")
+	if folder == nil then
+		folder = Instance.new("Folder")
+		folder.Name = "Remotes"
+		folder.Parent = ReplicatedStorage
+	end
 else
 	folder = ReplicatedStorage:WaitForChild("Remotes")
 end
 
-local definitions = {}
+local definitions = {
+	EquipCosmetic = "function",
+	OpenCrate = "function",
+	CrateOpened = "event",
+	ReportDeviceClass = "event",
+	GetQuestState = "function",
+	ClaimQuest = "function",
+	QuestStateChanged = "event",
+}
 local rateLimitCounters = {}
 
 local function checkRateLimit(player, name, limit)
@@ -38,9 +49,14 @@ local REMOTE_CLASS = {
 
 if IS_SERVER then
 	for name, kind in definitions do
-		local remote = Instance.new(REMOTE_CLASS[kind] or "RemoteEvent")
-		remote.Name = name
-		remote.Parent = folder
+		local className = REMOTE_CLASS[kind] or "RemoteEvent"
+		local remote = folder:FindFirstChild(name)
+		if remote == nil then
+			remote = Instance.new(className)
+			remote.Name = name
+			remote.Parent = folder
+		end
+		assert(remote:IsA(className), `[Network] Remotes.{name} must be a {className}`)
 	end
 
 	game:GetService("Players").PlayerRemoving:Connect(function(player)
