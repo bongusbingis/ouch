@@ -107,14 +107,20 @@ T.describe("MatchSim", function()
 		T.expect((ended :: MatchEvent).winnerId):toBeNil()
 	end)
 
-	T.it("returns to Idle after the results dwell", function()
+	T.it("passes through Intermission between Results and Idle", function()
 		local state, _ = activeMatch({ "p1", "p2" })
 		local events: { MatchEvent } = {}
 		MatchSim.tick(state, RULES, RULES.TimeCapSeconds + 1, events)
 		T.expect(state.phase):toEqual("Results")
+
 		MatchSim.tick(state, RULES, RULES.ResultsSeconds + 1, events)
-		T.expect(state.phase):toEqual("Idle")
+		T.expect(state.phase):toEqual("Intermission")
+		T.expect(state.intermissionRemaining):toEqual(RULES.IntermissionSeconds)
 		T.expect(lastEvent(events, "MatchReset") ~= nil):toBeTruthy()
+
+		MatchSim.tick(state, RULES, RULES.IntermissionSeconds + 1, events)
+		T.expect(state.phase):toEqual("Idle")
+		T.expect(lastEvent(events, "IntermissionEnded") ~= nil):toBeTruthy()
 	end)
 
 	T.it("drops leavers' scores and admits joiners at zero mid-match", function()

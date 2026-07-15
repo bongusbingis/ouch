@@ -12,18 +12,19 @@ local MatchSim = {}
 
 type MatchRules = GameMode.MatchRules
 
-export type MatchPhase = "Idle" | "Active" | "Results"
+export type MatchPhase = "Idle" | "Active" | "Results" | "Intermission"
 
 export type MatchState = {
 	phase: MatchPhase,
 	timeRemaining: number,
 	resultsRemaining: number,
+	intermissionRemaining: number,
 	scores: { [string]: number },
 	winnerId: string?,
 }
 
 export type MatchEvent = {
-	kind: string, -- MatchStarted | ScoreChanged | MatchEnded | MatchReset
+	kind: string, -- MatchStarted | ScoreChanged | MatchEnded | MatchReset | IntermissionEnded
 	playerId: string?,
 	score: number?,
 	winnerId: string?,
@@ -35,6 +36,7 @@ function MatchSim.newState(): MatchState
 		phase = "Idle",
 		timeRemaining = 0,
 		resultsRemaining = 0,
+		intermissionRemaining = 0,
 		scores = {},
 		winnerId = nil,
 	}
@@ -128,9 +130,16 @@ function MatchSim.tick(state: MatchState, rules: MatchRules, dt: number, events:
 	elseif state.phase == "Results" then
 		state.resultsRemaining = math.max(state.resultsRemaining - dt, 0)
 		if state.resultsRemaining <= 0 then
-			state.phase = "Idle"
+			state.phase = "Intermission"
+			state.intermissionRemaining = rules.IntermissionSeconds
 			state.winnerId = nil
 			table.insert(events, { kind = "MatchReset" })
+		end
+	elseif state.phase == "Intermission" then
+		state.intermissionRemaining = math.max(state.intermissionRemaining - dt, 0)
+		if state.intermissionRemaining <= 0 then
+			state.phase = "Idle"
+			table.insert(events, { kind = "IntermissionEnded" })
 		end
 	end
 end

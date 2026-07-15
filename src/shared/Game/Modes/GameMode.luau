@@ -9,6 +9,7 @@ export type MatchRules = {
 	ScoreTarget: number,
 	TimeCapSeconds: number,
 	ResultsSeconds: number,
+	IntermissionSeconds: number, -- lobby dwell after results before the next match may start
 	RespawnSeconds: number,
 	-- When set, deaths respawn in synchronized waves on this cadence instead
 	-- of individually after RespawnSeconds (GDD §4.2 TDM push/retreat rhythm).
@@ -22,8 +23,6 @@ export type ModeContext = {
 	map: {
 		ballSpawns: { BasePart },
 		playerSpawns: { BasePart },
-		ballSpawnsByTeam: { [string]: { BasePart } },
-		playerSpawnsByTeam: { [string]: { BasePart } },
 	},
 	balls: {
 		startGroundSpawns: (points: { BasePart }) -> (),

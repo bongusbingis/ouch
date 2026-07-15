@@ -12,30 +12,29 @@ TDM.rules = {
 	ScoreTarget = 40,
 	TimeCapSeconds = 360,
 	ResultsSeconds = 8,
+	IntermissionSeconds = 15,
 	RespawnSeconds = 3,
 	WaveRespawnSeconds = 4.5,
 	SpawnInvulnSeconds = 1.5,
 } :: GameMode.MatchRules
 
+-- Every player starts holding a ball (and late joiners get one on their
+-- first spawn), so per-team ball counts always match team sizes — no ground
+-- spawns to contest.
 function TDM.onMatchStart(ctx: GameMode.ModeContext)
-	local points = {}
-	for _, teamId in TDM.teams do
-		for _, point in ctx.map.ballSpawnsByTeam[teamId] or {} do
-			table.insert(points, point)
-		end
+	for _, player in ctx.getPlayers() do
+		ctx.balls.grantHeldBall(player)
 	end
-	if #points == 0 then
-		points = ctx.map.ballSpawns
-	end
-	ctx.balls.startGroundSpawns(points)
 end
 
-function TDM.onPlayerSpawned(_ctx: GameMode.ModeContext, _player: Player, _isFirstSpawn: boolean) end
+function TDM.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, isFirstSpawn: boolean)
+	if isFirstSpawn then
+		ctx.balls.grantHeldBall(player)
+	end
+end
 
 function TDM.onElim(_ctx: GameMode.ModeContext, _sourceId: string?, _targetId: string?) end
 
-function TDM.onMatchEnd(ctx: GameMode.ModeContext)
-	ctx.balls.stopGroundSpawns()
-end
+function TDM.onMatchEnd(_ctx: GameMode.ModeContext) end
 
 return (TDM :: any) :: GameMode.GameMode

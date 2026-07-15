@@ -6,6 +6,7 @@ local Modules = ServerScriptService:WaitForChild("Server"):WaitForChild("Modules
 local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local BallService = require(Modules:WaitForChild("BallService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
+local MapFeatureService = require(Modules:WaitForChild("MapFeatureService"))
 local ProgressionService = require(Modules:WaitForChild("ProgressionService"))
 local QuestService = require(Modules:WaitForChild("QuestService"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
@@ -203,6 +204,7 @@ end
 
 InputSetup.start()
 BallService.start()
+MapFeatureService.start()
 MatchService.start()
 ProgressionService.start(MatchService)
 QuestService.start(MatchService)

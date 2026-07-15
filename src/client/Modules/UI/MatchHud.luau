@@ -55,6 +55,9 @@ function MatchHud.start()
 		elseif phase == "Results" then
 			roundLabel.Text = winnerText(winnerId)
 			timerLabel.Text = "--:--"
+		elseif phase == "Intermission" then
+			roundLabel.Text = "Next match starting…"
+			timerLabel.Text = formatTime(timeRemaining)
 		else
 			roundLabel.Text = "Waiting for players…"
 			timerLabel.Text = "--:--"

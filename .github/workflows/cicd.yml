@@ -1,0 +1,169 @@
+name: CI checks + deployment #todo: remove refs to roblox_place_id legacy secret
+
+on:
+  pull_request:
+    branches: [main, prod]
+  push:
+    branches: [main]
+
+env:
+  BASE_PLACE_FILE: game.rbxl
+
+jobs:
+  install-tools:
+    name: Install tools
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+        with:
+          lfs: true
+
+      - name: Force LFS pull
+        run: git lfs pull
+
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v0.4.2
+
+      - name: Cache Aftman tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.aftman
+          key: tools-${{ hashFiles('aftman.toml') }}
+
+  linting:
+    name: Lint with Selene
+    runs-on: ubuntu-latest
+    needs: [install-tools]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v0.4.2
+
+      - name: Restore cached Aftman tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.aftman
+          key: tools-${{ hashFiles('aftman.toml') }}
+
+      - name: Lint
+        run: bash src/Scripts/Shell/lint.sh src/Game
+
+  formatting:
+    name: Format with StyLua
+    runs-on: ubuntu-latest
+    needs: [install-tools]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v0.4.2
+
+      - name: Restore cached Aftman tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.aftman
+          key: tools-${{ hashFiles('aftman.toml') }}
+
+      - name: Check format
+        run: bash src/Scripts/Shell/check-format.sh src/Game
+
+  lune-tests:
+    name: Run Lune tests
+    runs-on: ubuntu-latest
+    needs: [install-tools]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v0.4.2
+
+      - name: Restore cached Aftman tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.aftman
+          key: tools-${{ hashFiles('aftman.toml') }}
+
+      - name: Install Wally packages
+        run: wally install
+
+      # The runner regenerates sourcemap.json via rojo and exits nonzero on
+      # any failing spec.
+      - name: Run tests
+        run: lune run src/scripts/lune/run-tests.luau
+
+  # luau-tests:
+  #   name: Run Luau tests via Open Cloud
+  #   runs-on: ubuntu-latest
+  #   needs: [install-tools]
+  #   concurrency:
+  #     group: luau-execution
+  #     cancel-in-progress: false
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3.3.0
+  #       with:
+  #         lfs: true
+
+  #     - name: Force LFS pull
+  #       run: git lfs pull
+
+  #     - name: Install Aftman
+  #       uses: ok-nick/setup-aftman@v0.4.2
+
+  #     - name: Restore cached Aftman tools
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/.aftman
+  #         key: tools-${{ hashFiles('aftman.toml') }}
+
+  #     - name: Build, merge and run tests
+  #       run: |
+  #         set +e
+  #         bash src/Scripts/Shell/test.sh default.project.json "$BASE_PLACE_FILE" "$TEST_TASK_FILE"
+  #         code=$?
+  #         set -e
+  #         if [ "$code" -eq 2 ]; then
+  #           echo "::warning::Roblox Open Cloud was busy after retries; scenario tests were skipped for this run."
+  #           exit 0
+  #         fi
+  #         exit "$code"
+  #       env:
+  #         ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+  #         ROBLOX_UNIVERSE_ID: ${{ secrets.ROBLOX_STAGING_UNIVERSE_ID }}
+  #         ROBLOX_PLACE_ID: ${{ secrets.ROBLOX_STAGING_PLACE_ID }}
+  #         TEST_TASK_FILE: src/Tests/RunTests.luau
+
+  deployment:
+    name: Deployment
+    runs-on: ubuntu-latest
+    needs: [install-tools, linting, formatting, lune-tests] # Open Cloud luau-tests intentionally remains commented out above.
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+        with:
+          lfs: true
+
+      - name: Force LFS pull
+        run: git lfs pull
+
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v0.4.2
+
+      - name: Restore cached Aftman tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.aftman
+          key: tools-${{ hashFiles('aftman.toml') }}
+
+      - name: Build, merge and publish
+        run: bash src/Scripts/Shell/publish.sh default.project.json "$BASE_PLACE_FILE"
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          ROBLOX_UNIVERSE_ID: ${{ secrets.ROBLOX_STAGING_UNIVERSE_ID }}
+          ROBLOX_PLACE_ID: ${{ secrets.ROBLOX_STAGING_PLACE_ID }}

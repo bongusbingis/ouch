@@ -8,12 +8,15 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local MatchSim = require(Game:WaitForChild("Sim"):WaitForChild("MatchSim"))
+local TeamSpawns = require(Game:WaitForChild("Maps"):WaitForChild("TeamSpawns"))
 local GameMode = require(Game:WaitForChild("Modes"):WaitForChild("GameMode"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 
 local MapService = require(script.Parent.MapService)
 local BallService = require(script.Parent.BallService)
 local EliminationService = require(script.Parent.EliminationService)
+local LobbyService = require(script.Parent.LobbyService)
+local MapFeatureService = require(script.Parent.MapFeatureService)
 
 -- Server orchestration of the match loop: drives MatchSim with the active
 -- mode's rules, owns match lifecycle (map spawn, teleports, ball
@@ -243,8 +246,6 @@ local function modeContext(): GameMode.ModeContext
 		map = {
 			ballSpawns = map.ballSpawns,
 			playerSpawns = map.playerSpawns,
-			ballSpawnsByTeam = map.ballSpawnsByTeam,
-			playerSpawnsByTeam = map.playerSpawnsByTeam,
 		},
 		balls = {
 			startGroundSpawns = BallService.startGroundSpawns,
@@ -276,6 +277,24 @@ local function startMatch(events: { MatchSim.MatchEvent })
 	waveTimer = mode.rules.WaveRespawnSeconds or 0
 	assignTeams()
 
+	local teams = teamIds()
+	if #teams > 0 then
+		local positions = table.create(#map.playerSpawns)
+		for index, part in map.playerSpawns do
+			positions[index] = part.Position
+		end
+		local assignment = TeamSpawns.split(positions, teams)
+		local byTeam: { [string]: { BasePart } } = {}
+		for teamId, indices in assignment do
+			local parts = table.create(#indices)
+			for _, index in indices do
+				table.insert(parts, map.playerSpawns[index])
+			end
+			byTeam[teamId] = parts
+		end
+		MapService.assignTeamSpawns(byTeam)
+	end
+
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		-- Absent characters are handled by the CharacterAdded path, which
@@ -291,6 +310,7 @@ local function startMatch(events: { MatchSim.MatchEvent })
 	end
 
 	syncPlayers()
+	MapFeatureService.bind(map.bouncePads, map.foamPits)
 	mode.onMatchStart(modeContext())
 	MatchSim.start(state, mode.rules, events)
 	setStateAttribute("modeId", mode.id)
@@ -298,11 +318,22 @@ local function startMatch(events: { MatchSim.MatchEvent })
 end
 
 local function cleanupMatch()
+	MapFeatureService.unbind()
 	BallService.stopGroundSpawns()
 	BallService.clearAll()
+
+	for _, player in Players:GetPlayers() do
+		local key = playerKey(player)
+		respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
+		pendingWaveRespawns[key] = nil
+		local character = player.Character
+		if character then
+			EliminationService.up(player)
+			LobbyService.teleport(character)
+		end
+	end
+
 	MapService.despawn()
-	-- TODO(lobby): teleport players back to the lobby here; for now the engine
-	-- respawns them at the lobby SpawnLocation when the map despawns under them.
 end
 
 local function handleMatchEvents(events: { MatchSim.MatchEvent })
@@ -541,7 +572,10 @@ function MatchService.start()
 		MatchSim.tick(state, mode.rules, dt, events)
 		handleMatchEvents(events)
 		tickWaveRespawns(dt)
-		setStateAttribute("timeRemaining", math.floor(state.timeRemaining + 0.5))
+		local displaySeconds = if state.phase == "Intermission"
+			then state.intermissionRemaining
+			else state.timeRemaining
+		setStateAttribute("timeRemaining", math.floor(displaySeconds + 0.5))
 	end)
 end
 
