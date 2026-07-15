@@ -1,0 +1,10 @@
+{
+    "luau-lsp.studioPlugin.enabled": true,
+    "workbench.editor.customLabels.enabled": true,
+    "workbench.editor.customLabels.patterns": {
+        "**/__Source__.luau": "${dirname}",
+        "**/__Source__.lua": "${dirname}"
+    },
+    "luau-lsp.sourcemap.useVSCodeWatcher": false,
+    "luau-lsp.sourcemap.rojoPath": "/home/jackc714/.cargo/bin/rojo"
+}
