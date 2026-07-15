@@ -49,7 +49,7 @@ jobs:
           key: tools-${{ hashFiles('aftman.toml') }}
 
       - name: Lint
-        run: bash src/Scripts/Shell/lint.sh src/Game
+        run: bash src/scripts/shell/lint.sh src
 
   formatting:
     name: Format with StyLua
@@ -69,7 +69,7 @@ jobs:
           key: tools-${{ hashFiles('aftman.toml') }}
 
       - name: Check format
-        run: bash src/Scripts/Shell/check-format.sh src/Game
+        run: bash src/scripts/shell/check-format.sh src
 
   lune-tests:
     name: Run Lune tests
