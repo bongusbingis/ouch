@@ -28,24 +28,6 @@ local function config()
 	return Combat.Hammer
 end
 
-local function pushEvent(events: { SimEvent }, state: SimState, event: SimEvent)
-	event.tick = state.tick
-	table.insert(events, event)
-end
-
-local function hasHeldBall(state: SimState, playerId: string): boolean
-	for _, id in SimUtil.sortedKeys(state.projectiles) do
-		local projectile = state.projectiles[id]
-		if
-			(projectile.phase == "Held" or projectile.phase == "Windup")
-			and (projectile.heldBy == playerId or projectile.ownerId == playerId)
-		then
-			return true
-		end
-	end
-	return false
-end
-
 local function horizontal(direction: Vec): Vec?
 	local flat = vector.create(direction.x, 0, direction.z)
 	local magnitude = vector.magnitude(flat)
@@ -55,29 +37,13 @@ local function horizontal(direction: Vec): Vec?
 	return flat / magnitude
 end
 
-local function sameTeam(world: WorldSnapshot, a: string, b: string): boolean
-	local ca = world.characters[a]
-	local cb = world.characters[b]
-	return ca ~= nil and cb ~= nil and ca.teamId ~= nil and ca.teamId == cb.teamId
-end
-
-local function hasLineOfSight(world: WorldSnapshot, from: Vec, target: SimTypes.CharacterSnapshot): boolean
-	local toTarget = target.position - from
-	local distance = vector.magnitude(toTarget)
-	if distance <= 1e-6 then
-		return true
-	end
-	local hit = world.collision.sweepSphere(from, toTarget, config().LineOfSightRadius)
-	return hit == nil or hit.distance >= distance - target.radius
-end
-
 local function findHitTarget(playerId: string, origin: Vec, direction: Vec, world: WorldSnapshot): string?
 	local cfg = config()
 	local bestId: string? = nil
 	local bestForward = math.huge
 
 	for _, targetId in SimUtil.sortedKeys(world.characters) do
-		if targetId == playerId or sameTeam(world, playerId, targetId) then
+		if targetId == playerId or SimUtil.sameTeam(world, playerId, targetId) then
 			continue
 		end
 		local target = world.characters[targetId]
@@ -99,7 +65,7 @@ local function findHitTarget(playerId: string, origin: Vec, direction: Vec, worl
 		if math.abs(offset.y) > cfg.Height * 0.5 then
 			continue
 		end
-		if not hasLineOfSight(world, origin, target) then
+		if not SimUtil.hasLineOfSight(world, origin, target, cfg.LineOfSightRadius) then
 			continue
 		end
 		if forward < bestForward then
@@ -134,7 +100,7 @@ function Hammer.handleInput(
 	if kitState.cooldown > 0 or kitState.activeRemaining > 0 or kitState.recoveryRemaining > 0 then
 		return true
 	end
-	if hasHeldBall(state, command.playerId) then
+	if SimUtil.hasHandBall(state, command.playerId) then
 		return false
 	end
 
@@ -156,7 +122,7 @@ function Hammer.handleInput(
 	kitState.direction = direction
 	kitState.hitTargetId = nil
 
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "HammerSwing",
 		tick = 0,
 		projectileId = nil,
@@ -193,7 +159,7 @@ local function resolveHit(
 	kitState.activeRemaining = 0
 	kitState.recoveryRemaining = config().HitRecovery
 
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "HammerHit",
 		tick = 0,
 		projectileId = nil,
@@ -204,7 +170,7 @@ local function resolveHit(
 		normal = nil,
 		direction = direction,
 	})
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "Elim",
 		tick = 0,
 		projectileId = nil,
@@ -240,7 +206,7 @@ function Hammer.tickPlayer(
 	kitState.activeRemaining = math.max(kitState.activeRemaining - dt, 0)
 	if kitState.activeRemaining <= 0 then
 		kitState.recoveryRemaining = config().MissRecovery
-		pushEvent(events, state, {
+		SimUtil.pushEvent(events, state, {
 			kind = "HammerMiss",
 			tick = 0,
 			projectileId = nil,

@@ -37,6 +37,12 @@ export type ButtonHandle = ElementHandle & {
 	setEnabled: (self: ButtonHandle, enabled: boolean) -> (),
 }
 
+export type MenuButtonHandle = ElementHandle & {
+	instance: GuiButton,
+	setSelected: (self: MenuButtonHandle, selected: boolean) -> (),
+	setEnabled: (self: MenuButtonHandle, enabled: boolean) -> (),
+}
+
 export type RewardPayload = {
 	kind: string,
 	amount: number?,
@@ -63,6 +69,26 @@ export type QuestCardProps = {
 export type QuestCardHandle = ElementHandle & {
 	instance: GuiObject,
 	setData: (self: QuestCardHandle, data: QuestCardData) -> (),
+}
+
+export type EconomyItemData = {
+	id: string,
+	title: string,
+	details: string,
+	state: string,
+	actionText: string,
+	actionEnabled: boolean,
+	layoutOrder: number,
+}
+
+export type EconomyItemProps = {
+	data: EconomyItemData,
+	activated: ((itemId: string) -> ())?,
+}
+
+export type EconomyItemHandle = ElementHandle & {
+	instance: GuiObject,
+	setData: (self: EconomyItemHandle, data: EconomyItemData) -> (),
 }
 
 return {}

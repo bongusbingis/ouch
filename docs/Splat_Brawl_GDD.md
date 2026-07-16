@@ -3,7 +3,7 @@
 **Game Design Document — v0.2**
 Roblox PvP Arena Brawler — Dodgeball & Inflatable Hammer Combat
 
-> v0.2 (2026-07-16): converted from PDF to markdown; rebalanced §3.1–3.3 — hammer is now less forgiving (longer swing cooldown + slight post-swing self-stun) so it cannot be spammed and stays in balance with the dodgeball.
+> v0.2 (2026-07-16): converted from PDF to markdown; rebalanced §3.1–3.3 — hammer is now less forgiving (longer swing cooldown + slight self-stun on missed swings) so it cannot be spammed and stays in balance with the dodgeball.
 
 ## 1. High Concept
 
@@ -36,9 +36,9 @@ Splat Brawl is a fast, skill-based PvP arena game built around two asymmetric we
 - Direct hit = elimination + knockback (useful for ring-out map variants later).
 - Miss = a 0.4–0.6s recovery window where the player is vulnerable — this is the whiff-punish window that keeps hammer play from dominating dodgeball.
 - **Swing cooldown (v0.2):** lengthened to ~1.5s between swings (previously ~0.8s). Each swing is a commitment, not something to spam while closing distance.
-- **Post-swing self-stun (v0.2):** every swing ends with a very slight self-stun (~0.25s — briefly locked out of moving and dashing). Deliberately subtle: barely felt after a clean hit, but stacked with the miss-recovery window it makes a whiffed swing decisively punishable and kills swing-spam as an approach strategy.
+- **Whiff self-stun (v0.2):** a missed swing ends with a very slight self-stun (~0.25s at ~25% move speed), stacked on top of the miss-recovery window. Deliberately subtle — a stagger, not a freeze — and it never triggers on a clean hit, so good hammer play stays fluid while a whiffed swing is decisively punishable.
 
-**Balance intent (v0.2):** the hammer keeps its up-close lethality and dash mobility, but is less forgiving — a hammer player must pick their moment. Spamming swings now loses to a dodgeball player who keeps range and punishes the whiff.
+**Balance intent (v0.2):** the hammer keeps its up-close lethality and dash mobility, but is less forgiving — a hammer player must pick their moment. Spamming swings now loses to a dodgeball player who keeps range: every whiff means a long cooldown plus a slow, punishable recovery.
 
 ### 3.3 The Combat Triangle
 
@@ -47,7 +47,7 @@ This triangle is the entire balance foundation and should not be diluted with ad
 | Situation | Advantage | Why |
 |---|---|---|
 | Hammer vs. Dodgeball up close | Hammer | When you click your hammer, it's a dash hit — but only one attempt per cooldown; a miss is punishable. |
-| Dodgeball vs. Hammer rusher | Dodgeball | Range beats melee approach, and the v0.2 cooldown + self-stun mean a rusher can't mask bad approaches with swing spam. |
+| Dodgeball vs. Hammer rusher | Dodgeball | Range beats melee approach, and the v0.2 cooldown + whiff-stun mean a rusher can't mask bad approaches with swing spam. |
 
 ## 4. Game Modes
 
@@ -64,6 +64,15 @@ This triangle is the entire balance foundation and should not be diluted with ad
 - Win condition: score cap (e.g. 40) or higher score at time cap (6 min).
 - Respawn: wave-based every 4–5s to preserve team push/retreat rhythm.
 - Team-based ammo balance: dodgeball spawns are mirrored on each side of the map to avoid one team controlling all ranged options.
+
+### 4.3 Match Loop and Intermission Lobby
+
+- Match arenas are templates under `ReplicatedStorage.Assets.Maps` and are cloned into `Workspace` only for an active match and its results presentation.
+- `Workspace.Lobby` is a permanent, Studio-authored intermission area. It is never cloned, reparented, or destroyed by the match/map lifecycle.
+- When Results ends, players who participated in that match return to `Workspace.Lobby.PlayerSpawns`; match balls and terrain bindings are cleared, then the arena clone is destroyed.
+- New arrivals are not sent to the lobby. They remain at their normal arrival location until admitted into a match.
+- Returning participants remain in the lobby through intermission and any subsequent wait for enough players. The next match teleports all admitted players to the newly cloned arena.
+- Shops, crate opening, and other lobby interactions will live in this permanent area but are outside the current gameplay pass.
 
 ## 5. Map Design
 
@@ -90,9 +99,9 @@ CRATES!!!!!!
 
 | Item Type | Examples | Price Tier (Robux) |
 |---|---|---|
-| Hammer skins | Banana hammer, boxing glove, candy cane | 150–350 |
+| Hammer assets | Banana hammer, boxing glove, candy cane | 150–350 |
 | Dodgeball trail/impact VFX | Confetti splat, neon trail, sound packs | 99–250 |
-| Character/inflatable costumes | Full-body skins | 250–600 |
+| Character/inflatable costumes | Full-body assets | 250–600 |
 | Elimination taunts/emotes | Victory animations | 75–150 |
 | Battle Pass (seasonal) | Tiered unlock track | 799 flat |
 

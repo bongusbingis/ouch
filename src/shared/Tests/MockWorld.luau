@@ -14,6 +14,16 @@ export type Box = { min: Vec, max: Vec }
 
 local MockWorld = {}
 
+function MockWorld.countEvents(events: { SimTypes.SimEvent }, kind: string): number
+	local count = 0
+	for _, event in events do
+		if event.kind == kind then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function axisComponents(v: Vec): (number, number, number)
 	return v.x, v.y, v.z
 end

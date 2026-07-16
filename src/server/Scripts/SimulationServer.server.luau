@@ -1,4 +1,3 @@
-local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -7,6 +6,7 @@ local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local BallService = require(Modules:WaitForChild("BallService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
 local MapFeatureService = require(Modules:WaitForChild("MapFeatureService"))
+local MovementSpeedService = require(Modules:WaitForChild("MovementSpeedService"))
 local ProgressionService = require(Modules:WaitForChild("ProgressionService"))
 local QuestService = require(Modules:WaitForChild("QuestService"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
@@ -15,33 +15,19 @@ local MonetizationService = require(Modules:WaitForChild("MonetizationService"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
+local EventDedup = require(Adapters:WaitForChild("EventDedup"))
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 
-local playedAnimationEvents = {}
+local playedAnimations = EventDedup.new(4096)
+local appliedStuns = EventDedup.new(4096)
 local retainedTracks = {}
 
 local function findAnimation(name)
 	local animation = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations"):WaitForChild(name)
 	assert(animation:IsA("Animation"), `[Combat] Assets.Animations.{name} must be an Animation`)
 	return animation
-end
-
-local function playerFromEvent(event)
-	local playerId = event.playerId or event.sourceId
-	local userId = if playerId then tonumber(playerId) else nil
-	if userId == nil then
-		return nil
-	end
-	return Players:GetPlayerByUserId(userId)
-end
-
-local function playerFromId(playerId)
-	local userId = if playerId then tonumber(playerId) else nil
-	if userId == nil then
-		return nil
-	end
-	return Players:GetPlayerByUserId(userId)
 end
 
 local function rootForPlayer(player)
@@ -65,23 +51,20 @@ local function eventDirection(event): Vector3?
 	return nil
 end
 
-local function playThrowAnimation(event)
-	if event.kind ~= "BallWindup" then
+-- Which sim events play a character animation, and how. New animated events
+-- add a row here rather than a new handler.
+local eventAnimations = {
+	BallWindup = { animationName = Combat.Dodgeball.ThrowAnimationName, fadeTime = 0.04, retainSeconds = 3 },
+	HammerSwing = { animationName = Combat.Hammer.AnimationName, fadeTime = 0.03, retainSeconds = 2 },
+}
+
+local function playEventAnimation(event)
+	local spec = eventAnimations[event.kind]
+	if spec == nil or not playedAnimations.markSeen(event) then
 		return
 	end
 
-	local key = `{event.kind}:{event.tick}:{event.projectileId or ""}`
-	if playedAnimationEvents[key] then
-		return
-	end
-	playedAnimationEvents[key] = true
-	task.delay(5, function()
-		playedAnimationEvents[key] = nil
-	end)
-
-	local animation = findAnimation(Combat.Dodgeball.ThrowAnimationName)
-
-	local player = playerFromEvent(event)
+	local player = PlayerIds.fromEvent(event)
 	local character = player and player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if character == nil or humanoid == nil or character:GetAttribute("CombatAlive") == false then
@@ -91,51 +74,13 @@ local function playThrowAnimation(event)
 	local animator = humanoid:WaitForChild("Animator")
 	assert(animator:IsA("Animator"), "[Combat] Humanoid.Animator must be an Animator")
 
-	local track = animator:LoadAnimation(animation)
+	local track = animator:LoadAnimation(findAnimation(spec.animationName))
 	track.Priority = Enum.AnimationPriority.Action4
 	track.Looped = false
-	track:Play(0.04)
+	track:Play(spec.fadeTime)
 
 	table.insert(retainedTracks, track)
-	task.delay(3, function()
-		local index = table.find(retainedTracks, track)
-		if index then
-			table.remove(retainedTracks, index)
-		end
-	end)
-end
-
-local function playHammerAnimation(event)
-	if event.kind ~= "HammerSwing" then
-		return
-	end
-
-	local key = `{event.kind}:{event.tick}:{event.playerId or ""}`
-	if playedAnimationEvents[key] then
-		return
-	end
-	playedAnimationEvents[key] = true
-	task.delay(5, function()
-		playedAnimationEvents[key] = nil
-	end)
-
-	local player = playerFromEvent(event)
-	local character = player and player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if character == nil or humanoid == nil or character:GetAttribute("CombatAlive") == false then
-		return
-	end
-
-	local animator = humanoid:WaitForChild("Animator")
-	assert(animator:IsA("Animator"), "[Combat] Humanoid.Animator must be an Animator")
-
-	local track = animator:LoadAnimation(findAnimation(Combat.Hammer.AnimationName))
-	track.Priority = Enum.AnimationPriority.Action4
-	track.Looped = false
-	track:Play(0.03)
-
-	table.insert(retainedTracks, track)
-	task.delay(2, function()
+	task.delay(spec.retainSeconds, function()
 		local index = table.find(retainedTracks, track)
 		if index then
 			table.remove(retainedTracks, index)
@@ -150,7 +95,7 @@ local function applyHammerMotion(event)
 	end
 
 	if event.kind == "HammerSwing" then
-		local root = rootForPlayer(playerFromEvent(event))
+		local root = rootForPlayer(PlayerIds.fromEvent(event))
 		if root == nil then
 			return
 		end
@@ -158,7 +103,7 @@ local function applyHammerMotion(event)
 		root.AssemblyLinearVelocity =
 			Vector3.new(direction.X * Combat.Hammer.DashSpeed, current.Y, direction.Z * Combat.Hammer.DashSpeed)
 	elseif event.kind == "HammerHit" and event.targetId ~= nil then
-		local root = rootForPlayer(playerFromId(event.targetId))
+		local root = rootForPlayer(PlayerIds.fromId(event.targetId))
 		if root == nil then
 			return
 		end
@@ -170,12 +115,35 @@ local function applyHammerMotion(event)
 	end
 end
 
+local function applyHammerMissStun(event)
+	if event.kind ~= "HammerMiss" then
+		return
+	end
+
+	if not appliedStuns.markSeen(event) then
+		return
+	end
+
+	local player = PlayerIds.fromEvent(event)
+	local character = player and player.Character
+	if player == nil or character == nil or character:GetAttribute("CombatAlive") == false then
+		return
+	end
+
+	MovementSpeedService.applyTimedModifier(
+		player,
+		"hammerStun",
+		Combat.Hammer.MissStunWalkSpeedScale,
+		Combat.Hammer.MissStunDuration
+	)
+end
+
 local function forwardDamageFeedback(event)
 	if event.kind ~= "Elim" or event.targetId == nil then
 		return
 	end
 
-	local target = playerFromId(event.targetId)
+	local target = PlayerIds.fromId(event.targetId)
 	if target == nil then
 		return
 	end
@@ -191,6 +159,7 @@ end
 
 InputSetup.start()
 BallService.start()
+MovementSpeedService.start()
 MapFeatureService.start()
 MatchService.start()
 ProgressionService.start(MatchService)
@@ -201,9 +170,9 @@ MonetizationService.start()
 
 -- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)
-	playThrowAnimation(event)
-	playHammerAnimation(event)
+	playEventAnimation(event)
 	applyHammerMotion(event)
+	applyHammerMissStun(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
 	if acceptedElim then
 		QuestService.handleCombatEvent(event)

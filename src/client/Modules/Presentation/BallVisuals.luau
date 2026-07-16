@@ -7,6 +7,10 @@ local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local EventDedup = require(Adapters:WaitForChild("EventDedup"))
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local CharacterRig = require(script.Parent.CharacterRig)
 local WorldAudio = require(script.Parent.WorldAudio)
 
 local BallVisuals = {}
@@ -14,45 +18,27 @@ local BallVisuals = {}
 local FREE_PHASE = 6
 
 local visuals: { [BasePart]: BasePart } = {}
-local appliedSkins: { [BasePart]: string } = {}
-local skinTemplates: { [string]: BasePart } = {}
-local seen: { [string]: boolean } = {}
+local appliedAssets: { [BasePart]: string } = {}
+local assetTemplates: { [string]: BasePart } = {}
+local seen = EventDedup.new(4096)
 
 local function cframeOffset(offset: vector): CFrame
 	return CFrame.new(offset.x, offset.y, offset.z)
 end
 
 local function characterForPlayerId(playerId: string?): Model?
-	if playerId == nil then
-		return nil
-	end
-	for _, player in Players:GetPlayers() do
-		if tostring(player.UserId) == playerId then
-			return player.Character
-		end
-	end
-	return nil
-end
-
-local function rightHand(character: Model?): BasePart?
-	if character == nil then
-		return nil
-	end
-	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
-	if hand and hand:IsA("BasePart") then
-		return hand
-	end
-	return nil
+	local player = PlayerIds.fromId(playerId)
+	return player and player.Character
 end
 
 local function heldVisualCFrame(ball: BasePart): CFrame?
 	local character = characterForPlayerId(ball:GetAttribute("hb") :: string?)
-	local hand = rightHand(character)
+	local hand = CharacterRig.rightHand(character)
 	if hand then
 		return hand.CFrame * cframeOffset(Combat.Dodgeball.HeldVisualHandOffset)
 	end
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
+	local root = CharacterRig.rootPart(character)
+	if root then
 		return root.CFrame
 	end
 	return nil
@@ -74,10 +60,10 @@ local function playOptional(ball: BasePart, name: string)
 	end
 end
 
--- The ball renders its current owner's equipped skin while possessed (any
+-- The ball renders its current owner's equipped asset while possessed (any
 -- phase but Free); the default ball look otherwise. Profile truth replicates
--- through the owner's Equip_BallSkin attribute projection.
-local function effectiveSkinId(ball: BasePart): string
+-- through the owner's Equip_BallAssets attribute projection.
+local function effectiveAssetId(ball: BasePart): string
 	if ball:GetAttribute("ph") == FREE_PHASE then
 		return ""
 	end
@@ -87,12 +73,12 @@ local function effectiveSkinId(ball: BasePart): string
 	if owner == nil then
 		return ""
 	end
-	local itemId = (owner:GetAttribute("Equip_BallSkin") :: string?) or ""
-	return if skinTemplates[itemId] ~= nil then itemId else ""
+	local itemId = (owner:GetAttribute("Equip_BallAssets") :: string?) or ""
+	return if assetTemplates[itemId] ~= nil then itemId else ""
 end
 
-local function buildVisual(ball: BasePart, skinId: string): BasePart
-	local template = skinTemplates[skinId]
+local function buildVisual(ball: BasePart, assetId: string): BasePart
+	local template = assetTemplates[assetId]
 	local visual: BasePart
 	if template then
 		visual = template:Clone()
@@ -117,11 +103,11 @@ local function addBall(ball: BasePart)
 	if visuals[ball] then
 		return
 	end
-	local skinId = effectiveSkinId(ball)
-	local visual = buildVisual(ball, skinId)
+	local assetId = effectiveAssetId(ball)
+	local visual = buildVisual(ball, assetId)
 	ball.LocalTransparencyModifier = 1
 	visuals[ball] = visual
-	appliedSkins[ball] = skinId
+	appliedAssets[ball] = assetId
 end
 
 local function removeBall(ball: BasePart)
@@ -130,30 +116,28 @@ local function removeBall(ball: BasePart)
 		visual:Destroy()
 	end
 	visuals[ball] = nil
-	appliedSkins[ball] = nil
+	appliedAssets[ball] = nil
 end
 
-local function refreshSkin(ball: BasePart)
-	local skinId = effectiveSkinId(ball)
-	if appliedSkins[ball] == skinId then
+local function refreshAsset(ball: BasePart)
+	local assetId = effectiveAssetId(ball)
+	if appliedAssets[ball] == assetId then
 		return
 	end
 	local previous = visuals[ball]
-	local visual = buildVisual(ball, skinId)
+	local visual = buildVisual(ball, assetId)
 	if previous then
 		visual.CFrame = previous.CFrame
 		previous:Destroy()
 	end
 	visuals[ball] = visual
-	appliedSkins[ball] = skinId
+	appliedAssets[ball] = assetId
 end
 
 function BallVisuals.onEvent(event: any)
-	local key = `{event.tick}:{event.kind}:{event.projectileId or ""}`
-	if seen[key] then
+	if not seen.markSeen(event) then
 		return
 	end
-	seen[key] = true
 	local folder = Workspace:FindFirstChild("Balls")
 	local ball = folder and event.projectileId and folder:FindFirstChild(event.projectileId)
 	local visual = if ball and ball:IsA("BasePart") then visuals[ball] else nil
@@ -177,14 +161,14 @@ function BallVisuals.onEvent(event: any)
 end
 
 function BallVisuals.start()
-	local skinsFolder = ReplicatedStorage:WaitForChild("Assets")
+	local assetsFolder = ReplicatedStorage:WaitForChild("Assets")
 		:WaitForChild("Cosmetics")
-		:WaitForChild(Cosmetics.CategoryFolders.BallSkin)
+		:WaitForChild(Cosmetics.CategoryFolders.BallAssets)
 	for itemId, item in Cosmetics.Items do
-		if item.Category == "BallSkin" then
-			local template = skinsFolder:WaitForChild(item.AssetName)
-			assert(template:IsA("BasePart"), `[BallVisuals] skin template {item.AssetName} must be a BasePart`)
-			skinTemplates[itemId] = template
+		if item.Category == "BallAssets" then
+			local template = assetsFolder:WaitForChild(item.AssetName)
+			assert(template:IsA("BasePart"), `[BallVisuals] asset template {item.AssetName} must be a BasePart`)
+			assetTemplates[itemId] = template
 		end
 	end
 
@@ -213,7 +197,7 @@ function BallVisuals.start()
 				removeBall(ball)
 				continue
 			end
-			refreshSkin(ball)
+			refreshAsset(ball)
 			visual = visuals[ball] :: BasePart
 			local phase = ball:GetAttribute("ph")
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil

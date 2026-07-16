@@ -8,10 +8,10 @@ local ElementTypes = require(script.Parent.Elements.ElementTypes)
 
 type MenuId = MenuTypes.MenuId
 type MenuDefinition = MenuTypes.MenuDefinition
-type ButtonHandle = ElementTypes.ButtonHandle
+type MenuButtonHandle = ElementTypes.MenuButtonHandle
 
 type ButtonElementLike = {
-	mount: (parent: Instance, props: ElementTypes.ButtonProps, options: any?) -> ButtonHandle,
+	mount: (parent: Instance, props: ElementTypes.ButtonProps, options: any?) -> MenuButtonHandle,
 }
 
 type StartOptions = {
@@ -22,7 +22,7 @@ type StartOptions = {
 local SidebarController = {}
 
 local started = false
-local handles: { [MenuId]: ButtonHandle } = {}
+local handles: { [MenuId]: MenuButtonHandle } = {}
 local menuDisconnect: (() -> ())? = nil
 
 local function resolveSidebar(): Frame

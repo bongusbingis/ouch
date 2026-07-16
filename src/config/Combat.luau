@@ -57,10 +57,12 @@ return {
 	},
 
 	Hammer = {
-		Cooldown = 0.8,
+		Cooldown = 1.5,
 		ActiveDuration = 0.18,
 		MissRecovery = 0.5,
 		HitRecovery = 0.18,
+		MissStunDuration = 0.25,
+		MissStunWalkSpeedScale = 0.25,
 		Range = 7,
 		Width = 4,
 		Height = 5,

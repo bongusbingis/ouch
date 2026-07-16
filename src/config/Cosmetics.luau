@@ -25,24 +25,24 @@ local Rarities: { [string]: RarityDef } = {
 }
 
 local Slots = {
-	BallSkin = true,
-	HammerSkin = true,
-	Trail = true,
-	Emote = true,
-	Costume = true,
+	BallAssets = true,
+	HammerAssets = true,
+	TrailAssets = true,
+	EmoteAssets = true,
+	CostumeAssets = true,
 }
 
 local CategoryFolders = {
-	BallSkin = "BallSkins",
-	HammerSkin = "HammerSkins",
-	Trail = "Trails",
-	Emote = "Emotes",
-	Costume = "Costumes",
+	BallAssets = "BallAssets",
+	HammerAssets = "HammerAssets",
+	TrailAssets = "TrailAssets",
+	EmoteAssets = "EmoteAssets",
+	CostumeAssets = "CostumeAssets",
 }
 
-local function ballSkin(displayName: string, assetName: string): ItemDef
+local function ballAsset(displayName: string, assetName: string): ItemDef
 	return {
-		Category = "BallSkin",
+		Category = "BallAssets",
 		Rarity = "Common",
 		DisplayName = displayName,
 		AssetName = assetName,
@@ -51,15 +51,15 @@ local function ballSkin(displayName: string, assetName: string): ItemDef
 end
 
 local Items: { [string]: ItemDef } = {
-	BallRed = ballSkin("Red Ball", "RedDodgeball"),
-	BallBlue = ballSkin("Blue Ball", "BlueDodgeball"),
-	BallWhite = ballSkin("White Ball", "WhiteDodgeball"),
-	BallBlack = ballSkin("Black Ball", "BlackDodgeball"),
-	BallOrange = ballSkin("Orange Ball", "OrangeDodgeball"),
-	BallGreen = ballSkin("Green Ball", "GreenDodgeball"),
-	BallPink = ballSkin("Pink Ball", "PinkDodgeball"),
-	BallPurple = ballSkin("Purple Ball", "PurpleDodgeball"),
-	BallYellow = ballSkin("Yellow Ball", "YellowDodgeball"),
+	BallRed = ballAsset("Red Ball", "RedDodgeball"),
+	BallBlue = ballAsset("Blue Ball", "BlueDodgeball"),
+	BallWhite = ballAsset("White Ball", "WhiteDodgeball"),
+	BallBlack = ballAsset("Black Ball", "BlackDodgeball"),
+	BallOrange = ballAsset("Orange Ball", "OrangeDodgeball"),
+	BallGreen = ballAsset("Green Ball", "GreenDodgeball"),
+	BallPink = ballAsset("Pink Ball", "PinkDodgeball"),
+	BallPurple = ballAsset("Purple Ball", "PurpleDodgeball"),
+	BallYellow = ballAsset("Yellow Ball", "YellowDodgeball"),
 }
 
 return {

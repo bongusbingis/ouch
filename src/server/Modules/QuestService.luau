@@ -8,6 +8,9 @@ local QuestLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Quests"):WaitForChild("QuestLogic")
 )
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local EventDedup = require(Adapters:WaitForChild("EventDedup"))
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local PlayerData = require(script.Parent.PlayerData)
 local RewardService = require(script.Parent.RewardService)
 
@@ -19,32 +22,9 @@ local QuestService = {}
 
 local definitions = QuestsConfig.Definitions :: { QuestDefinition }
 local definitionsById = QuestLogic.definitionsById(definitions)
-local seenEvents: { [string]: boolean } = {}
-local seenCount = 0
+local seenEvents = EventDedup.new(4096)
 local started = false
 local PROFILE_WAIT_SECONDS = 15
-
-local function playerId(player: Player): string
-	return tostring(player.UserId)
-end
-
-local function eventKey(event: { [string]: any }): string
-	return `{event.kind}:{event.tick or ""}:{event.projectileId or ""}:{event.playerId or ""}:{event.sourceId or ""}:{event.targetId or ""}`
-end
-
-local function markSeen(event: { [string]: any }): boolean
-	local key = eventKey(event)
-	if seenEvents[key] then
-		return false
-	end
-	seenEvents[key] = true
-	seenCount += 1
-	if seenCount > 4096 then
-		table.clear(seenEvents)
-		seenCount = 0
-	end
-	return true
-end
 
 local function activeEntries(data: any): { QuestEntry }
 	if data.Quests == nil or data.Quests.Active == nil then
@@ -162,7 +142,7 @@ local function playerWon(player: Player, winnerId: string?): boolean
 	if winnerId == nil or winnerId == "" then
 		return false
 	end
-	return winnerId == playerId(player) or player:GetAttribute("TeamId") == winnerId
+	return winnerId == PlayerIds.toId(player) or player:GetAttribute("TeamId") == winnerId
 end
 
 local function handleMatchEnded(event: { [string]: any })
@@ -170,7 +150,7 @@ local function handleMatchEnded(event: { [string]: any })
 	local winnerId = event.winnerId :: string?
 	for _, player in Players:GetPlayers() do
 		local changed = applyEventToPlayer(player, event, {
-			playerId = playerId(player),
+			playerId = PlayerIds.toId(player),
 			modeId = currentModeId,
 			playerWon = playerWon(player, winnerId),
 		})
@@ -181,7 +161,7 @@ local function handleMatchEnded(event: { [string]: any })
 end
 
 function QuestService.handleCombatEvent(event: { [string]: any })
-	if not markSeen(event) then
+	if not seenEvents.markSeen(event) then
 		return
 	end
 
@@ -196,7 +176,7 @@ function QuestService.handleCombatEvent(event: { [string]: any })
 	end
 
 	local changed = applyEventToPlayer(source, event, {
-		playerId = playerId(source),
+		playerId = PlayerIds.toId(source),
 	})
 	if changed then
 		fireState(source)

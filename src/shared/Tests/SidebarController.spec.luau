@@ -119,6 +119,15 @@ T.describe("SidebarController", function()
 		local first = entries[1]
 
 		T.expect(#mounted):toEqual(#entries)
+		local mountedByName = {}
+		for _, handle in mounted do
+			mountedByName[handle.instance.Name] = handle
+			T.expect(handle.instance:IsA("ImageButton")):toEqual(true)
+		end
+		T.expect(mountedByName.QuestsButton ~= nil):toEqual(true)
+		T.expect(mountedByName.ShopButton ~= nil):toEqual(true)
+		T.expect(mountedByName.InventoryButton ~= nil):toEqual(true)
+
 		T.expect(mounted[1].props.text):toEqual(first.definition.label or first.definition.id)
 		T.expect(mounted[1].props.layoutOrder):toEqual(first.definition.sidebarOrder)
 

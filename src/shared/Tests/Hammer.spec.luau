@@ -11,15 +11,7 @@ type SimEvent = SimTypes.SimEvent
 
 local DT = 1 / 60
 
-local function countEvents(events: { SimEvent }, kind: string): number
-	local count = 0
-	for _, event in events do
-		if event.kind == kind then
-			count += 1
-		end
-	end
-	return count
-end
+local countEvents = MockWorld.countEvents
 
 local function command(overrides: { [string]: any }?): InputCommand
 	local input: InputCommand = {
@@ -142,6 +134,29 @@ T.describe("Hammer kit", function()
 			end
 		end
 		T.expect(sawMiss):toBeTruthy()
+	end)
+
+	T.it("cooldown blocks repeated swings until it fully elapses", function()
+		local arena = world()
+		local state = SimCore.newState()
+		local first = SimCore.step(state, { command() }, arena, DT)
+		T.expect(countEvents(first, "HammerSwing")):toEqual(1)
+
+		local elapsed = DT
+		while elapsed < Combat.Hammer.Cooldown - DT * 2 do
+			local events = SimCore.step(state, { command() }, arena, DT)
+			T.expect(countEvents(events, "HammerSwing")):toEqual(0)
+			elapsed += DT
+		end
+
+		local swung = false
+		for _ = 1, 6 do
+			if countEvents(SimCore.step(state, { command() }, arena, DT), "HammerSwing") > 0 then
+				swung = true
+				break
+			end
+		end
+		T.expect(swung):toBeTruthy()
 	end)
 end)
 

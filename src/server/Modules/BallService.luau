@@ -6,6 +6,9 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local PlayerIds = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
+)
 
 -- Sole creator of ball instances. Balls enter the world here (outside the
 -- deterministic sim — spawning is not input-driven) and join the sim as
@@ -89,8 +92,8 @@ function BallService.grantHeldBall(player: Player): boolean
 	end
 	local ball = spawnBall(root.CFrame)
 	ball:SetAttribute("ph", 0)
-	ball:SetAttribute("hb", tostring(player.UserId))
-	ball:SetAttribute("ow", tostring(player.UserId))
+	ball:SetAttribute("hb", PlayerIds.toId(player))
+	ball:SetAttribute("ow", PlayerIds.toId(player))
 	ball.Parent = ballsFolder()
 	return true
 end

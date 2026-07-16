@@ -24,11 +24,6 @@ local DEFAULT_MAX_CONTACTS_PER_STEP = 4
 local DEFAULT_MIN_BOUNCE_NORMAL_SPEED = 1.5
 local SETTLE_DROP = 50
 
-local function pushEvent(events: { SimEvent }, state: SimState, event: SimEvent)
-	event.tick = state.tick
-	table.insert(events, event)
-end
-
 local function settle(world: WorldSnapshot, position: Vec, radius: number): Vec
 	local drop = vector.create(0, -SETTLE_DROP, 0)
 	local hit = world.collision.sweepSphere(position, drop, radius)
@@ -103,15 +98,6 @@ local function steer(
 	return CollisionWorld.rotateToward(currentDir, desiredDir, maxTurn) * speed
 end
 
-local function sameTeam(world: WorldSnapshot, a: string?, b: string?): boolean
-	if a == nil or b == nil then
-		return false
-	end
-	local ca = world.characters[a]
-	local cb = world.characters[b]
-	return ca ~= nil and cb ~= nil and ca.teamId ~= nil and ca.teamId == cb.teamId
-end
-
 type CharacterHit = {
 	fraction: number,
 	position: Vec,
@@ -130,7 +116,7 @@ local function sweepCharacters(
 		local character = world.characters[characterId]
 		if
 			characterId == skipId
-			or sameTeam(world, skipId, characterId)
+			or SimUtil.sameTeam(world, skipId, characterId)
 			or not character.alive
 			or character.invulnerable
 		then
@@ -184,7 +170,7 @@ local function stepWindup(
 	projectile.effectiveRadius = config.Radius + config.HitForgiveness + row.MagnetismRadius
 	projectile.spinRate = config.SpinRate
 	projectile.flightTime = 0
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "BallReleased",
 		tick = 0,
 		projectileId = projectile.id,
@@ -213,7 +199,7 @@ local function maybeSettleAfterBounce(
 		)
 	if shouldRoll then
 		beginRolling(projectile, config, projectile.position)
-		pushEvent(
+		SimUtil.pushEvent(
 			events,
 			state,
 			{ kind = "BallRolled", tick = 0, projectileId = projectile.id, position = projectile.position }
@@ -227,7 +213,7 @@ local function maybeSettleAfterBounce(
 		or (hit.normal.y > 0.6 and math.abs(projectile.velocity.y) <= config.SettleVerticalSpeed)
 	then
 		becomeFree(projectile, world, projectile.position)
-		pushEvent(
+		SimUtil.pushEvent(
 			events,
 			state,
 			{ kind = "BallSettled", tick = 0, projectileId = projectile.id, position = projectile.position }
@@ -268,7 +254,7 @@ local function bounce(
 	projectile.bounceCount += 1
 	projectile.targetId = nil
 	projectile.phase = "Bouncing"
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "BallBounced",
 		tick = 0,
 		projectileId = projectile.id,
@@ -286,7 +272,7 @@ local function settleRolling(
 	events: { SimEvent }
 )
 	becomeFree(projectile, world, projectile.position)
-	pushEvent(
+	SimUtil.pushEvent(
 		events,
 		state,
 		{ kind = "BallSettled", tick = 0, projectileId = projectile.id, position = projectile.position }
@@ -400,14 +386,18 @@ local function stepInFlight(
 	projectile.flightTime += dt
 	if projectile.flightTime > config.MaxFlightTime then
 		becomeFree(projectile, world, projectile.position)
-		pushEvent(events, state, { kind = "BallLanded", tick = 0, projectileId = projectile.id })
+		SimUtil.pushEvent(events, state, { kind = "BallLanded", tick = 0, projectileId = projectile.id })
 		return
 	end
 
 	local target = projectile.targetId and world.characters[projectile.targetId :: string]
 	if
 		target ~= nil
-		and (not target.alive or target.invulnerable or sameTeam(world, projectile.ownerId, projectile.targetId))
+		and (
+			not target.alive
+			or target.invulnerable
+			or SimUtil.sameTeam(world, projectile.ownerId, projectile.targetId)
+		)
 	then
 		target = nil
 		projectile.targetId = nil
@@ -445,7 +435,7 @@ local function stepInFlight(
 		local characterFraction = if characterHit then characterHit.fraction else math.huge
 
 		if characterFraction <= staticFraction and characterHit then
-			pushEvent(events, state, {
+			SimUtil.pushEvent(events, state, {
 				kind = "Elim",
 				tick = 0,
 				projectileId = projectile.id,
@@ -511,7 +501,7 @@ local function stepRecalling(
 		projectile.position = ownerPos
 		projectile.velocity = vector.zero
 		projectile.targetId = nil
-		pushEvent(
+		SimUtil.pushEvent(
 			events,
 			state,
 			{ kind = "BallRecalled", tick = 0, projectileId = projectile.id, playerId = projectile.ownerId }

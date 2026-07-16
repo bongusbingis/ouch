@@ -11,11 +11,11 @@ local RARITIES = {
 }
 
 local ITEMS = {
-	CommonA = { Category = "BallSkin", Rarity = "Common" },
-	CommonB = { Category = "BallSkin", Rarity = "Common" },
-	RareA = { Category = "BallSkin", Rarity = "Rare" },
-	LegendaryA = { Category = "BallSkin", Rarity = "Legendary" },
-	ExclusiveA = { Category = "BallSkin", Rarity = "Exclusive" },
+	CommonA = { Category = "BallAssets", Rarity = "Common" },
+	CommonB = { Category = "BallAssets", Rarity = "Common" },
+	RareA = { Category = "BallAssets", Rarity = "Rare" },
+	LegendaryA = { Category = "BallAssets", Rarity = "Legendary" },
+	ExclusiveA = { Category = "BallAssets", Rarity = "Exclusive" },
 }
 
 local CRATE = { ItemPool = { "CommonA", "CommonB", "RareA", "LegendaryA", "ExclusiveA" } }

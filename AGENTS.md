@@ -47,7 +47,7 @@ Entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only
 
 `SimCore.step` is a pure fixed-tick function run identically by client prediction and server authority. It owns no engine state: characters and geometry arrive in a `WorldSnapshot`, time is the tick counter, results leave as mutated `SimState` plus an ordered `SimEvent` list.
 
-- **Determinism rules:** no `Instance` access, no wall clock, no unordered iteration — always `SimUtil.sortedKeys` over keyed tables. Input commands are canonically sorted so server resimulation agrees with the predicting client regardless of arrival order.
+- **Determinism rules:** no `Instance` access, no wall clock, no unordered iteration — always `SimUtil.sortedKeys` over keyed tables. Predicates shared across weapons and projectiles (`sameTeam`, `hasLineOfSight`, `hasHandBall`, `pushEvent`) live in `SimUtil` so every module applies identical rules — don't re-implement them locally. Input commands are canonically sorted so server resimulation agrees with the predicting client regardless of arrival order.
 - **Weapons** implement the `WeaponKit` interface (`kind`, `commands` routing set, `init`, `handleInput`, `tickPlayer`, optional `tickWorld`) and register in `WeaponRegistry`. Adding a weapon = one kit module + one registry entry; sim core, adapter, and netcode do not change.
 - `Weapons/Dodgeball.luau`: ball possession has exactly one source of truth — `ProjectileState` (`phase == "Held"` + `heldBy`). Kit state holds only cooldowns. Aim assist / homing parameters come from `Config.AimAssist`, keyed by device class (Mouse/Touch).
 - `Weapons/Hammer.luau`: kit state is a small phase machine (cooldown → active dash → recovery). The recovery window is the GDD's whiff-punish mechanic — do not remove it.
@@ -57,6 +57,8 @@ Entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only
 ### Netcode / adapters — `src/shared/Game/Adapters/`
 
 `ServerAuthAdapter` is the single bridge between the sim and the engine: one BindToSimulation callback initialized on both client and server that decodes `SimState` from predicted instances, reads `InputAction` state, runs `SimCore.step`, and encodes back. The engine owns prediction, rollback, and resimulation — never hand-roll any of those.
+
+`PlayerIds` is the single owner of the sim player-id convention (UserId as string): every translation between a `Player` and a sim/event id goes through `toId`/`fromId`/`fromEvent` — never `tostring(player.UserId)` inline. `EventDedup` is the shared dedup guard for sim/match event consumers (`EventDedup.new(cap?)` → `markSeen(event)`/`clear()`); every event consumer that must not double-apply a side effect uses it instead of a hand-rolled seen-table.
 
 `SimStateCodec`: attributes on predicted instances are the between-tick source of truth (the engine rolls them back on misprediction). Attribute names are deliberately short (`ph`, `hb`, `ow`, `er`, `ft`, `vel`) because of replication limits (first 64 attributes, ≤50-char names). Ball position is *not* an attribute — it lives in the part's CFrame, which has Simulation Access and is predicted natively.
 
@@ -69,8 +71,9 @@ Entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only
 - **EliminationService**: the `CombatAlive` character attribute is the single source of truth for alive/dead (nil/true = alive, false = eliminated). It never touches native Humanoid health or `LoadCharacter`. Also owns the ragdoll (BallSocket constraints with per-joint limits) and restore.
 - **BallService**: the *sole* creator of ball instances — clones the Studio-authored `ReplicatedStorage.Assets.Dodgeball` template into `Workspace.Balls`. Two provisioning strategies driven by mode hooks: cadence ground spawns at map points, and direct held grants. Spawning is outside the deterministic sim (not input-driven); balls join the sim as replicated instances.
 - **MapService**: picks, clones, and despawns Studio-authored maps (authored at final world position, so spawning is a plain clone). Spawn pools are flat: every BasePart under the map's `BallSpawns`/`PlayerSpawns` folders counts. Team ownership is not authored — MatchService assigns it per match via `TeamSpawns`.
-- **MapFeatureService**: server-side terrain features — bounce pads launch along the pad's UpVector (server-set velocity, predicts cleanly), foam pits scale WalkSpeed while a root is inside the volume.
-- **LobbyService**: teleports characters to `Workspace.Lobby.PlayerSpawns` (same invisible-spawn-parts convention as maps).
+- **MovementSpeedService**: the *sole* writer of `Humanoid.WalkSpeed` — named multiplicative modifiers (`setModifier`/`clearModifier`/`applyTimedModifier`) compose over a captured base speed; never set WalkSpeed directly elsewhere.
+- **MapFeatureService**: server-side terrain features — bounce pads launch along the pad's UpVector (server-set velocity, predicts cleanly), foam pits slow movement while a root is inside the volume (via a MovementSpeedService modifier).
+- **LobbyService**: validates the permanent Studio-authored `Workspace.Lobby` and teleports returning match participants to its `PlayerSpawns` for intermission. It never clones, reparents, or destroys the lobby, and new arrivals are never routed there.
 - **InputSetup**: materializes the declarative map in `Config.Input` as an `InputContext`/`InputAction`/`InputBinding` tree under each Player (contexts must be Player descendants for engine ownership/replication). Owns the validated `DeviceClass` attribute the adapter stamps onto commands.
 
 ### Data & economy — `src/server/Modules/`
@@ -87,7 +90,7 @@ Entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only
 ### Client — `src/client/Modules/`
 
 - **Input/**: `InputRouter` feeds `AimDirector`'s aim into the `Aim` InputAction every frame, pulses `Throw` on touch taps, reports device class. `AimDirector` owns aim/soft-lock target selection.
-- **Presentation/** (BallVisuals, HammerVisuals, DamageFeedback, DeathEffects, TargetingUI, WorldAudio): rendering and audio feedback *only* — they react to sim events, attributes, and remotes and hold no gameplay authority. Effects on the ball template (trails, emitters, sounds) are Studio-authored and enabled/disabled by phase; must not replay during rollback corrections (test at 0/100/150/200 ms latency per `docs/dodgeball-studio-setup.md`).
+- **Presentation/** (BallVisuals, HammerVisuals, DamageFeedback, DeathEffects, TargetingUI, WorldAudio; CharacterRig owns rig-name lookups like the R15/R6 right-hand fallback): rendering and audio feedback *only* — they react to sim events, attributes, and remotes and hold no gameplay authority. Effects on the ball template (trails, emitters, sounds) are Studio-authored and enabled/disabled by phase; must not replay during rollback corrections (test at 0/100/150/200 ms latency per `docs/dodgeball-studio-setup.md`).
 - **UI/**: `MenuManager` owns which menu is open (single `currentMenu`, tweened open/close, escape handling); menus are declared in `MenuRegistry` and rendered from Studio-authored views looked up by `viewName`. Dynamic elements are cloned from Studio templates through `Elements/ElementFactory.cloneMount`, which returns the clone plus an `ElementHandle` for cleanup. `MatchHud` reads the `MatchState` attributes. React/react-roblox is available in Packages but current UI is template-clone based — ask before switching paradigms.
 
 ### Networking — `src/shared/Network.luau`

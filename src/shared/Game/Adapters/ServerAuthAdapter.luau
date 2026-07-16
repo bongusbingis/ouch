@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Sim.SimCore)
 local SimStateCodec = require(script.Parent.SimStateCodec)
+local PlayerIds = require(script.Parent.PlayerIds)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Debug)
@@ -54,10 +55,6 @@ local function dispatch(events: { SimEvent })
 	end
 end
 
-local function playerKey(player: Player): string
-	return tostring(player.UserId)
-end
-
 type CharacterEntry = {
 	model: Model,
 	root: BasePart,
@@ -76,7 +73,7 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		if root == nil or not root:IsA("BasePart") then
 			continue
 		end
-		entries[playerKey(player)] = { model = model, root = root, player = player }
+		entries[PlayerIds.toId(player)] = { model = model, root = root, player = player }
 		table.insert(excluded, model)
 	end
 	return entries, excluded

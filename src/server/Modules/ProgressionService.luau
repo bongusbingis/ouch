@@ -4,6 +4,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Data"))
+local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local EventDedup = require(Adapters:WaitForChild("EventDedup"))
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local PlayerData = require(script.Parent.PlayerData)
 
 type MatchEvent = { [string]: any }
@@ -22,7 +25,7 @@ type MatchProgress = {
 local ProgressionService = {}
 
 local progressByPlayerId: { [string]: MatchProgress } = {}
-local seenEvents: { [string]: boolean } = {}
+local seenEvents = EventDedup.new()
 local started = false
 
 local function blank(): MatchProgress
@@ -38,18 +41,6 @@ local function blank(): MatchProgress
 	}
 end
 
-local function playerId(player: Player): string
-	return tostring(player.UserId)
-end
-
-local function playerFromId(id: string?): Player?
-	local userId = if id then tonumber(id) else nil
-	if userId == nil then
-		return nil
-	end
-	return Players:GetPlayerByUserId(userId)
-end
-
 local function progressFor(id: string): MatchProgress
 	local progress = progressByPlayerId[id]
 	if progress == nil then
@@ -61,23 +52,10 @@ end
 
 local function resetMatch()
 	table.clear(progressByPlayerId)
-	table.clear(seenEvents)
+	seenEvents.clear()
 	for _, player in Players:GetPlayers() do
-		progressFor(playerId(player))
+		progressFor(PlayerIds.toId(player))
 	end
-end
-
-local function eventKey(event: MatchEvent): string
-	return `{event.kind}:{event.tick or ""}:{event.projectileId or ""}:{event.playerId or ""}:{event.sourceId or ""}:{event.targetId or ""}`
-end
-
-local function markSeen(event: MatchEvent): boolean
-	local key = eventKey(event)
-	if seenEvents[key] then
-		return false
-	end
-	seenEvents[key] = true
-	return true
 end
 
 local function addRewards(progress: MatchProgress, rewardKey: string)
@@ -86,7 +64,7 @@ local function addRewards(progress: MatchProgress, rewardKey: string)
 end
 
 local function trackElim(event: MatchEvent)
-	if not markSeen(event) then
+	if not seenEvents.markSeen(event) then
 		return
 	end
 
@@ -105,7 +83,7 @@ local function trackElim(event: MatchEvent)
 end
 
 local function trackCatch(event: MatchEvent)
-	if not markSeen(event) then
+	if not seenEvents.markSeen(event) then
 		return
 	end
 
@@ -121,7 +99,7 @@ end
 
 local function includeCurrentPlayers()
 	for _, player in Players:GetPlayers() do
-		progressFor(playerId(player))
+		progressFor(PlayerIds.toId(player))
 	end
 end
 
@@ -130,7 +108,7 @@ local function commitMatch(event: MatchEvent)
 
 	local winnerId = event.winnerId :: string?
 	for id, progress in progressByPlayerId do
-		local player = playerFromId(id)
+		local player = PlayerIds.fromId(id)
 		local playerWon = player ~= nil and (id == winnerId or player:GetAttribute("TeamId") == winnerId)
 
 		progress.MatchesPlayed += 1

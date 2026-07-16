@@ -2,18 +2,31 @@
 
 local Workspace = game:GetService("Workspace")
 
--- Teleports characters to the Studio-authored lobby. Spawn points follow the
--- same convention as maps: invisible parts inside Workspace.Lobby.PlayerSpawns.
+-- Teleports returning match participants to the permanent Studio-authored
+-- intermission area at Workspace.Lobby. New arrivals are not routed here.
+-- Spawn points are invisible parts inside Workspace.Lobby.PlayerSpawns.
 
 local LobbyService = {}
 
+local lobby: Instance? = nil
 local spawnParts: { BasePart }? = nil
 
+local function lobbyRoot(): Instance
+	if lobby then
+		assert(lobby.Parent == Workspace, "[LobbyService] Workspace.Lobby must remain parented to Workspace")
+		return lobby
+	end
+	local root = Workspace:WaitForChild("Lobby")
+	lobby = root
+	return root
+end
+
 local function lobbySpawns(): { BasePart }
+	local root = lobbyRoot()
 	if spawnParts then
 		return spawnParts
 	end
-	local folder = Workspace:WaitForChild("Lobby"):WaitForChild("PlayerSpawns")
+	local folder = root:WaitForChild("PlayerSpawns")
 	local parts = {}
 	for _, child in folder:GetChildren() do
 		if child:IsA("BasePart") then
@@ -23,6 +36,10 @@ local function lobbySpawns(): { BasePart }
 	assert(#parts > 0, "[LobbyService] Workspace.Lobby.PlayerSpawns has no parts")
 	spawnParts = parts
 	return parts
+end
+
+function LobbyService.start()
+	lobbySpawns()
 end
 
 function LobbyService.teleport(character: Model)

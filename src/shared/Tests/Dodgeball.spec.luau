@@ -11,15 +11,7 @@ type SimEvent = SimTypes.SimEvent
 
 local DT = 1 / 60
 
-local function countEvents(events: { SimEvent }, kind: string): number
-	local count = 0
-	for _, event in events do
-		if event.kind == kind then
-			count += 1
-		end
-	end
-	return count
-end
+local countEvents = MockWorld.countEvents
 
 local function stateWithHeldBall(world: SimTypes.WorldSnapshot): SimTypes.SimState
 	local state = SimCore.newState()

@@ -44,14 +44,7 @@ type MountOptions = {
 local ButtonElement = {}
 
 local function resolveTemplate(): ImageButton
-	local replicatedStorage = game:GetService("ReplicatedStorage")
-	local template = replicatedStorage
-		:WaitForChild("Assets")
-		:WaitForChild("UI")
-		:WaitForChild("Templates")
-		:WaitForChild("ButtonTemplate")
-	assert(template:IsA("ImageButton"), "[ButtonElement] Assets.UI.Templates.ButtonTemplate must be an ImageButton")
-	return template
+	return ElementFactory.resolveTemplate("ButtonTemplate", "ImageButton") :: ImageButton
 end
 
 local function resolveConfig(): (ButtonConfig, ButtonTweens)

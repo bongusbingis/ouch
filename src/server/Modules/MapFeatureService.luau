@@ -5,18 +5,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
+local MovementSpeedService = require(script.Parent.MovementSpeedService)
 
 -- Applies the active map's terrain features server-side: bounce pads launch
 -- along their UpVector (same server-set velocity pattern as hammer knockback,
--- which predicts cleanly), foam pits scale WalkSpeed while a character's root
--- is inside the pit volume.
+-- which predicts cleanly), foam pits slow movement while a character's root
+-- is inside the pit volume (via MovementSpeedService, which owns WalkSpeed).
 
 local MapFeatureService = {}
 
 local bouncePads: { BasePart } = {}
 local foamPits: { BasePart } = {}
 local padCooldowns: { [Player]: { [BasePart]: number } } = {}
-local slowedBaseSpeed: { [Player]: number } = {}
+local slowed: { [Player]: boolean } = {}
 local connection: RBXScriptConnection? = nil
 
 local function rootInPart(root: BasePart, part: BasePart): boolean
@@ -55,11 +56,6 @@ local function stepPads(player: Player, root: BasePart, now: number)
 end
 
 local function stepPits(player: Player, root: BasePart)
-	local humanoid = root.Parent and (root.Parent :: Instance):FindFirstChildOfClass("Humanoid")
-	if humanoid == nil then
-		return
-	end
-
 	local inPit = false
 	for _, pit in foamPits do
 		if rootInPart(root, pit) then
@@ -68,25 +64,20 @@ local function stepPits(player: Player, root: BasePart)
 		end
 	end
 
-	local baseSpeed = slowedBaseSpeed[player]
-	if inPit and baseSpeed == nil then
-		slowedBaseSpeed[player] = humanoid.WalkSpeed
-		humanoid.WalkSpeed = humanoid.WalkSpeed * MapFeatures.FoamPit.WalkSpeedScale
-	elseif not inPit and baseSpeed ~= nil then
-		humanoid.WalkSpeed = baseSpeed
-		slowedBaseSpeed[player] = nil
+	if inPit and not slowed[player] then
+		slowed[player] = true
+		MovementSpeedService.setModifier(player, "foamPit", MapFeatures.FoamPit.WalkSpeedScale)
+	elseif not inPit and slowed[player] then
+		slowed[player] = nil
+		MovementSpeedService.clearModifier(player, "foamPit")
 	end
 end
 
 local function restoreSlowed()
-	for player, baseSpeed in slowedBaseSpeed do
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.WalkSpeed = baseSpeed
-		end
+	for player in slowed do
+		MovementSpeedService.clearModifier(player, "foamPit")
 	end
-	table.clear(slowedBaseSpeed)
+	table.clear(slowed)
 end
 
 function MapFeatureService.bind(pads: { BasePart }, pits: { BasePart })
@@ -124,7 +115,7 @@ end
 function MapFeatureService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		padCooldowns[player] = nil
-		slowedBaseSpeed[player] = nil
+		slowed[player] = nil
 	end)
 end
 

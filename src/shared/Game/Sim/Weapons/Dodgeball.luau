@@ -30,22 +30,8 @@ local function config()
 	return Combat.Dodgeball
 end
 
-local function pushEvent(events: { SimEvent }, state: SimState, event: SimEvent)
-	event.tick = state.tick
-	table.insert(events, event)
-end
-
 local function deviceRow(deviceClass: string?): AimAssist.DeviceRow
 	return AimAssist[deviceClass or "Mouse"] or AimAssist.Mouse
-end
-
-local function sameTeam(world: WorldSnapshot, a: string?, b: string?): boolean
-	if a == nil or b == nil then
-		return false
-	end
-	local ca = world.characters[a]
-	local cb = world.characters[b]
-	return ca ~= nil and cb ~= nil and ca.teamId ~= nil and ca.teamId == cb.teamId
 end
 
 local function findHeldBall(state: SimState, playerId: string): ProjectileState?
@@ -58,24 +44,7 @@ local function findHeldBall(state: SimState, playerId: string): ProjectileState?
 	return nil
 end
 
-local function hasHandBall(state: SimState, playerId: string): boolean
-	for _, id in SimUtil.sortedKeys(state.projectiles) do
-		local projectile = state.projectiles[id]
-		if
-			(projectile.phase == "Held" or projectile.phase == "Windup")
-			and (projectile.heldBy == playerId or projectile.ownerId == playerId)
-		then
-			return true
-		end
-	end
-	return false
-end
-
-local function hasLineOfSight(world: WorldSnapshot, aimOrigin: Vec, target: SimTypes.CharacterSnapshot): boolean
-	local toTarget = target.position - aimOrigin
-	local occlusion = world.collision.sweepSphere(aimOrigin, toTarget, 0.2)
-	return occlusion == nil or occlusion.distance >= vector.magnitude(toTarget) - target.radius
-end
+local AIM_LINE_OF_SIGHT_RADIUS = 0.2
 
 -- Deterministic in-sim soft-lock: best candidate in the device's selection
 -- cone with line of sight, scored by angular offset with a small distance
@@ -88,7 +57,7 @@ local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrig
 	local bestScore = math.huge
 
 	for _, characterId in SimUtil.sortedKeys(world.characters) do
-		if characterId == command.playerId or sameTeam(world, command.playerId, characterId) then
+		if characterId == command.playerId or SimUtil.sameTeam(world, command.playerId, characterId) then
 			continue
 		end
 		local character = world.characters[characterId]
@@ -104,7 +73,7 @@ local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrig
 		if dot < cosCone then
 			continue
 		end
-		if not hasLineOfSight(world, aimOrigin, character) then
+		if not SimUtil.hasLineOfSight(world, aimOrigin, character, AIM_LINE_OF_SIGHT_RADIUS) then
 			continue
 		end
 		local score = math.acos(math.clamp(dot, -1, 1)) + distance * 1e-3
@@ -121,7 +90,7 @@ end
 -- unguided throw rather than rejecting the input.
 local function validateTarget(command: InputCommand, world: WorldSnapshot, aimOrigin: Vec, aimDir: Vec): string?
 	local targetId = command.targetId
-	if targetId == nil or targetId == command.playerId or sameTeam(world, command.playerId, targetId) then
+	if targetId == nil or targetId == command.playerId or SimUtil.sameTeam(world, command.playerId, targetId) then
 		return nil
 	end
 	local target = world.characters[targetId]
@@ -139,7 +108,7 @@ local function validateTarget(command: InputCommand, world: WorldSnapshot, aimOr
 		return nil
 	end
 
-	if not hasLineOfSight(world, aimOrigin, target) then
+	if not SimUtil.hasLineOfSight(world, aimOrigin, target, AIM_LINE_OF_SIGHT_RADIUS) then
 		return nil
 	end
 	return targetId
@@ -192,7 +161,7 @@ local function handleThrow(
 	ball.flightTime = 0
 
 	kitState.throwCooldown = cfg.ThrowCooldown
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "BallWindup",
 		tick = 0,
 		projectileId = ball.id,
@@ -217,7 +186,7 @@ local function findCatchableBall(
 			projectile.phase ~= "InFlight"
 			or projectile.ownerId == nil
 			or projectile.ownerId == playerId
-			or sameTeam(world, playerId, projectile.ownerId)
+			or SimUtil.sameTeam(world, playerId, projectile.ownerId)
 		then
 			continue
 		end
@@ -246,7 +215,7 @@ local function handleCatch(
 	events: { SimEvent }
 ): boolean
 	local character = world.characters[command.playerId]
-	if character == nil or not character.alive or hasHandBall(state, command.playerId) then
+	if character == nil or not character.alive or SimUtil.hasHandBall(state, command.playerId) then
 		return false
 	end
 
@@ -268,7 +237,7 @@ local function handleCatch(
 	ball.releaseAim = nil
 	ball.releaseTargetId = nil
 
-	pushEvent(events, state, {
+	SimUtil.pushEvent(events, state, {
 		kind = "BallCaught",
 		tick = 0,
 		projectileId = ball.id,
@@ -338,7 +307,7 @@ local function tickPickups(state: SimState, world: WorldSnapshot, events: { SimE
 			bestBall.position = character.handPosition
 			bestBall.windupRemaining = 0
 			bestBall.bounceCount = 0
-			pushEvent(
+			SimUtil.pushEvent(
 				events,
 				state,
 				{ kind = "BallPickedUp", tick = 0, projectileId = bestBall.id, playerId = playerId }

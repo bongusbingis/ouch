@@ -6,6 +6,10 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local EventDedup = require(Adapters:WaitForChild("EventDedup"))
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local CharacterRig = require(script.Parent.CharacterRig)
 local WorldAudio = require(script.Parent.WorldAudio)
 
 local HammerVisuals = {}
@@ -15,7 +19,7 @@ assert(template:IsA("BasePart"), "[HammerVisuals] Assets.Hammer must be a BasePa
 
 local visuals: { [Player]: BasePart } = {}
 local ballsFolder = Workspace:WaitForChild("Balls")
-local seenEvents: { [string]: boolean } = {}
+local seenEvents = EventDedup.new(4096)
 
 local function offsetCFrame(): CFrame
 	local offset = Combat.Hammer.VisualHandOffset
@@ -24,24 +28,8 @@ local function offsetCFrame(): CFrame
 		* CFrame.Angles(math.rad(rotation.x), math.rad(rotation.y), math.rad(rotation.z))
 end
 
-local function rightHand(character: Model): BasePart?
-	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
-	if hand and hand:IsA("BasePart") then
-		return hand
-	end
-	return nil
-end
-
-local function rootPart(character: Model): BasePart?
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		return root
-	end
-	return nil
-end
-
 local function hasBall(player: Player): boolean
-	local playerId = tostring(player.UserId)
+	local playerId = PlayerIds.toId(player)
 	for _, ball in ballsFolder:GetChildren() do
 		if ball:IsA("BasePart") and ball:GetAttribute("hb") == playerId then
 			local phase = ball:GetAttribute("ph")
@@ -80,22 +68,17 @@ end
 
 local function audioParentFor(playerId: string): Instance?
 	for player, visual in visuals do
-		if tostring(player.UserId) == playerId then
+		if PlayerIds.toId(player) == playerId then
 			return visual
 		end
 	end
 
-	for _, player in Players:GetPlayers() do
-		if tostring(player.UserId) ~= playerId then
-			continue
-		end
-		local character = player.Character
-		if character == nil then
-			return nil
-		end
-		return rightHand(character) or rootPart(character)
+	local player = PlayerIds.fromId(playerId)
+	local character = player and player.Character
+	if character == nil then
+		return nil
 	end
-	return nil
+	return CharacterRig.rightHand(character) or CharacterRig.rootPart(character)
 end
 
 function HammerVisuals.start()
@@ -110,7 +93,7 @@ function HammerVisuals.start()
 				continue
 			end
 
-			local hand = rightHand(character)
+			local hand = CharacterRig.rightHand(character)
 			if hand == nil or hasBall(player) then
 				remove(player)
 				continue
@@ -132,11 +115,9 @@ function HammerVisuals.onEvent(event: any)
 		return
 	end
 
-	local key = `{event.tick}:{event.kind}:{event.playerId or ""}:{event.targetId or ""}`
-	if seenEvents[key] then
+	if not seenEvents.markSeen(event) then
 		return
 	end
-	seenEvents[key] = true
 
 	local playerId = event.playerId or event.sourceId
 	if playerId == nil then

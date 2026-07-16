@@ -8,6 +8,9 @@ local Workspace = game:GetService("Workspace")
 local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("AimAssist"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local PlayerIds = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
+)
 
 type SimEvent = {
 	kind: string,
@@ -224,7 +227,7 @@ local function hasHeldBall(balls: Instance?): boolean
 	if balls == nil then
 		return false
 	end
-	local localId = tostring(Players.LocalPlayer.UserId)
+	local localId = PlayerIds.toId(Players.LocalPlayer)
 	for _, ball in balls:GetChildren() do
 		if ball:GetAttribute("hb") == localId then
 			return true

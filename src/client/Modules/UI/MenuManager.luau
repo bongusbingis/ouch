@@ -58,6 +58,11 @@ local function definitionFor(menuId: MenuId): MenuDefinition?
 	return MenuRegistry[menuId]
 end
 
+local function shouldAnimate(menuId: MenuId): boolean
+	local definition = definitionFor(menuId)
+	return animationsEnabled and (definition == nil or definition.prototype ~= true)
+end
+
 local function uiConfig()
 	if cachedUIConfig == nil then
 		cachedUIConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"):WaitForChild("UI"))
@@ -147,8 +152,9 @@ local function hideMenu(menuId: MenuId, reason: CloseReason)
 	end
 
 	cancelTween(menuId)
-	local canvas = if animationsEnabled then canvasFor(menuId, view) else nil
-	local scale = if animationsEnabled then scaleFor(menuId, view) else nil
+	local animate = shouldAnimate(menuId)
+	local canvas = if animate then canvasFor(menuId, view) else nil
+	local scale = if animate then scaleFor(menuId, view) else nil
 
 	local function finishClose()
 		view.Visible = false
@@ -157,7 +163,7 @@ local function hideMenu(menuId: MenuId, reason: CloseReason)
 		end
 	end
 
-	if not animationsEnabled then
+	if not animate then
 		finishClose()
 		return
 	end
@@ -199,12 +205,13 @@ local function showMenu(menuId: MenuId): boolean
 		return false
 	end
 	cancelTween(menuId)
-	local canvas = if animationsEnabled then canvasFor(menuId, view) else nil
-	local scale = if animationsEnabled then scaleFor(menuId, view) else nil
+	local animate = shouldAnimate(menuId)
+	local canvas = if animate then canvasFor(menuId, view) else nil
+	local scale = if animate then scaleFor(menuId, view) else nil
 
 	local openPosition = openPositions[menuId] or view.Position
 	openPositions[menuId] = openPosition
-	if animationsEnabled then
+	if animate then
 		local closedPosition = closedPositionFor(menuId)
 		if closedPosition then
 			view.Position = closedPosition
@@ -218,7 +225,7 @@ local function showMenu(menuId: MenuId): boolean
 		definition.onOpen(view)
 	end
 
-	if animationsEnabled then
+	if animate then
 		local positionTween = game:GetService("TweenService"):Create(view, tweenInfo(uiConfig().Tweens.Menu.Open), {
 			Position = openPosition,
 		})
@@ -260,7 +267,7 @@ local function validateAndHideRegisteredViews()
 		end
 		local guiView = view :: GuiObject
 		openPositions[menuId] = guiView.Position
-		if animationsEnabled then
+		if shouldAnimate(menuId) then
 			local canvas = guiView :: CanvasGroup
 			assert(canvas:IsA("CanvasGroup"), `[MenuManager] menu view "{menuId}" must be a CanvasGroup`)
 			canvas.GroupTransparency = 1

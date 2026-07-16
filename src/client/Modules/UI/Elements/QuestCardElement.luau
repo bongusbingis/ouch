@@ -19,11 +19,7 @@ type MountOptions = {
 local QuestCardElement = {}
 
 local function resolveTemplate(): GuiObject
-	local replicatedStorage = game:GetService("ReplicatedStorage")
-	local template =
-		replicatedStorage:WaitForChild("Assets"):WaitForChild("UI"):WaitForChild("Templates"):WaitForChild("QuestCard")
-	assert(template:IsA("GuiObject"), "[QuestCardElement] Assets.UI.Templates.QuestCard must be a GuiObject")
-	return template
+	return ElementFactory.resolveTemplate("QuestCard", "GuiObject") :: GuiObject
 end
 
 local function resolveConfig(options: MountOptions?): any
