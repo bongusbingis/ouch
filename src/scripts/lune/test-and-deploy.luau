@@ -8,7 +8,7 @@
 -- With --test-only, skips both uploads and runs the suite against the current
 -- version of the place.
 -- Usage (from repo root):
---   lune run src/scripts/lune/test-and-deploy.luau -- <place.rbxl> <task-script.luau> [--test-only]
+--   lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only]
 -- Env: ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID, ROBLOX_PLACE_ID
 -- Exit codes: 0 = tests green (and published unless --test-only);
 --             1 = tests failed or a step errored (nothing published);
@@ -36,9 +36,12 @@ local function requireEnv(name: string): string
 	return value :: string
 end
 
-local args = process.args
+local args = table.clone(process.args)
+if args[1] == "--" then
+	table.remove(args, 1)
+end
 if #args < 2 or #args > 3 or (args[3] ~= nil and args[3] ~= "--test-only") then
-	fail(1, "usage: lune run src/scripts/lune/test-and-deploy.luau -- <place.rbxl> <task-script.luau> [--test-only]")
+	fail(1, "usage: lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only]")
 end
 local placeFile, taskFile = args[1], args[2]
 local testOnly = args[3] == "--test-only"

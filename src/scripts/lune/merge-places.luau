@@ -7,7 +7,7 @@
 -- Each mapped tree is deleted from the base copy (clearing stale leftovers)
 -- and replaced by the rojo-built one. The base place file is never written.
 -- Usage (from repo root):
---   lune run src/scripts/lune/merge-places.luau -- <project.json> <base.rbxl> <build.rbxl> <out.rbxl>
+--   lune run src/scripts/lune/merge-places.luau <project.json> <base.rbxl> <build.rbxl> <out.rbxl>
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -18,11 +18,14 @@ type Mapping = { string }
 
 local function usageError(message: string): never
 	print(`error: {message}`)
-	print("usage: lune run src/scripts/lune/merge-places.luau -- <project.json> <base.rbxl> <build.rbxl> <out.rbxl>")
+	print("usage: lune run src/scripts/lune/merge-places.luau <project.json> <base.rbxl> <build.rbxl> <out.rbxl>")
 	return process.exit(1)
 end
 
-local args = process.args
+local args = table.clone(process.args)
+if args[1] == "--" then
+	table.remove(args, 1)
+end
 if #args ~= 4 then
 	usageError(`expected 4 arguments, got {#args}`)
 end

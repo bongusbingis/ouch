@@ -16,7 +16,7 @@ MODE="${3:-}"
 TASK_FILE="src/scripts/cloud/RunTests.luau"
 
 if [ "$MODE" = "--test-only" ]; then
-    lune run src/scripts/lune/test-and-deploy.luau -- dist.rbxl "$TASK_FILE" --test-only
+    lune run src/scripts/lune/test-and-deploy.luau dist.rbxl "$TASK_FILE" --test-only
     exit 0
 fi
 
@@ -26,5 +26,5 @@ if [ -n "$MODE" ]; then
 fi
 
 rojo build "$PROJECT" --output build.rbxl
-lune run src/scripts/lune/merge-places.luau -- "$PROJECT" "$BASE_PLACE" build.rbxl dist.rbxl
-lune run src/scripts/lune/test-and-deploy.luau -- dist.rbxl "$TASK_FILE"
+lune run src/scripts/lune/merge-places.luau "$PROJECT" "$BASE_PLACE" build.rbxl dist.rbxl
+lune run src/scripts/lune/test-and-deploy.luau dist.rbxl "$TASK_FILE"

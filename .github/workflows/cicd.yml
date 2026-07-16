@@ -103,7 +103,7 @@ jobs:
     name: Test and deploy via Open Cloud
     runs-on: ubuntu-latest
     needs: [install-tools, linting, formatting, lune-tests]
-    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' }}
+  # if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' }}
     concurrency:
       group: luau-execution
       cancel-in-progress: false
@@ -140,5 +140,5 @@ jobs:
           exit "$code"
         env:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
-          ROBLOX_UNIVERSE_ID: ${{ secrets.ROBLOX_STAGING_UNIVERSE_ID }}
-          ROBLOX_PLACE_ID: ${{ secrets.ROBLOX_STAGING_PLACE_ID }}
+          ROBLOX_UNIVERSE_ID: ${{ vars.ROBLOX_STAGING_UNIVERSE_ID }}
+          ROBLOX_PLACE_ID: ${{ vars.ROBLOX_STAGING_PLACE_ID }}
