@@ -8,8 +8,9 @@
 /Packages
 /wally.lock
 
-# CI build artifact
+# CI build artifacts
 /dist.rbxl
+/build.rbxl
 
 #misc
 /stylua.toml
