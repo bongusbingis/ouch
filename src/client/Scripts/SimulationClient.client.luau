@@ -22,8 +22,7 @@ local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
-local DamageFeedbackRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DamageFeedback")
-assert(DamageFeedbackRemote:IsA("RemoteEvent"), "[Combat] Remotes.DamageFeedback must be a RemoteEvent")
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
 Replica.RequestData()
 InputRouter.start()
@@ -54,7 +53,7 @@ ServerAuthAdapter.onEvent(function(event)
 	end
 end)
 
-DamageFeedbackRemote.OnClientEvent:Connect(function(event)
+Network.on("DamageFeedback", function(event)
 	DamageFeedback.onEvent(event)
 	DeathEffects.notifyElim(event)
 end)

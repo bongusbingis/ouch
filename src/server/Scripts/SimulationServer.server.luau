@@ -15,24 +15,11 @@ local MonetizationService = require(Modules:WaitForChild("MonetizationService"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 
 local playedAnimationEvents = {}
 local retainedTracks = {}
-local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-if remotes == nil then
-	remotes = Instance.new("Folder")
-	remotes.Name = "Remotes"
-	remotes.Parent = ReplicatedStorage
-end
-
-local damageFeedbackRemote = remotes:FindFirstChild("DamageFeedback")
-if damageFeedbackRemote == nil then
-	damageFeedbackRemote = Instance.new("RemoteEvent")
-	damageFeedbackRemote.Name = "DamageFeedback"
-	damageFeedbackRemote.Parent = remotes
-end
-assert(damageFeedbackRemote:IsA("RemoteEvent"), "[Combat] Remotes.DamageFeedback must be a RemoteEvent")
 
 local function findAnimation(name)
 	local animation = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations"):WaitForChild(name)
@@ -193,7 +180,7 @@ local function forwardDamageFeedback(event)
 		return
 	end
 
-	damageFeedbackRemote:FireClient(target, {
+	Network.fire("DamageFeedback", target, {
 		kind = "Elim",
 		tick = event.tick,
 		projectileId = event.projectileId,
