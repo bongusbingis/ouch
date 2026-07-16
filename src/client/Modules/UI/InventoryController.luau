@@ -18,6 +18,15 @@ type StartOptions = {
 	runAsync: ((callback: () -> ()) -> ())?,
 }
 
+type InventoryEntry = {
+	id: string,
+	itemId: string?,
+	category: string,
+	displayName: string,
+	rarity: string,
+	isDefault: boolean,
+}
+
 local InventoryController = {}
 
 local started = false
@@ -42,6 +51,7 @@ local busy: { [string]: boolean } = {}
 local viewOpen = false
 local storeDisconnect: (() -> ())? = nil
 local menuDisconnect: (() -> ())? = nil
+local statusMessage = "Inventory data is loading."
 
 local function replicatedStorage(): ReplicatedStorage
 	return game:GetService("ReplicatedStorage")
@@ -84,31 +94,60 @@ local function destroyItems()
 end
 
 local function setStatus(message: string)
+	statusMessage = message
 	if statusLabel then
 		statusLabel.Text = message
 	end
 end
 
-local function sortedOwnedIds(): { string }
-	local ids = {}
+local function sortedEntries(): { InventoryEntry }
+	local entries = {}
+	for category, defaultItem in activeCosmetics.Defaults or {} do
+		table.insert(entries, {
+			id = `Default_{category}`,
+			itemId = nil,
+			category = category,
+			displayName = defaultItem.DisplayName,
+			rarity = "Default",
+			isDefault = true,
+		})
+	end
 	local owned = currentData.Cosmetics.Owned
 	for itemId, isOwned in owned do
-		if isOwned and activeCosmetics.Items[itemId] then
-			table.insert(ids, itemId)
+		local item = activeCosmetics.Items[itemId]
+		if isOwned and item then
+			table.insert(entries, {
+				id = itemId,
+				itemId = itemId,
+				category = item.Category,
+				displayName = item.DisplayName,
+				rarity = item.Rarity,
+				isDefault = false,
+			})
 		end
 	end
-	table.sort(ids, function(left, right)
-		local leftItem = activeCosmetics.Items[left]
-		local rightItem = activeCosmetics.Items[right]
-		if leftItem.Category ~= rightItem.Category then
-			return leftItem.Category < rightItem.Category
+	table.sort(entries, function(left, right)
+		if left.category ~= right.category then
+			return left.category < right.category
 		end
-		if leftItem.DisplayName ~= rightItem.DisplayName then
-			return leftItem.DisplayName < rightItem.DisplayName
+		if left.isDefault ~= right.isDefault then
+			return left.isDefault
 		end
-		return left < right
+		if left.displayName ~= right.displayName then
+			return left.displayName < right.displayName
+		end
+		return left.id < right.id
 	end)
-	return ids
+	return entries
+end
+
+local function entryForId(entryId: string): InventoryEntry?
+	for _, entry in sortedEntries() do
+		if entry.id == entryId then
+			return entry
+		end
+	end
+	return nil
 end
 
 local function errorMessage(reason: any): string
@@ -126,29 +165,37 @@ end
 
 local render: () -> ()
 
-local function toggleEquip(itemId: string)
-	if busy[itemId] or currentData == nil then
+local function toggleEquip(entryId: string)
+	if busy[entryId] or currentData == nil then
 		return
 	end
-	local item = activeCosmetics.Items[itemId]
-	if item == nil then
+	local entry = entryForId(entryId)
+	if entry == nil then
 		return
 	end
-	local equipped = currentData.Cosmetics.Equipped[item.Category] == itemId
-	busy[itemId] = true
-	setStatus(if equipped then "Unequipping item..." else "Equipping item...")
+	local equippedId = currentData.Cosmetics.Equipped[entry.category]
+	local equipped = if entry.isDefault then equippedId == nil or equippedId == "" else equippedId == entry.itemId
+	if entry.isDefault and equipped then
+		return
+	end
+	local nextItemId = if entry.isDefault or equipped then nil else entry.itemId
+	busy[entryId] = true
+	setStatus(if nextItemId == nil then "Equipping default item..." else "Equipping item...")
 	render()
 
 	activeRunAsync(function()
-		local callOk, accepted, reason =
-			pcall(activeNetwork.call, "EquipCosmetic", item.Category, if equipped then nil else itemId)
-		busy[itemId] = nil
+		local callOk, accepted, reason = pcall(activeNetwork.call, "EquipCosmetic", entry.category, nextItemId)
+		busy[entryId] = nil
 		if not callOk then
 			setStatus("Equip failed: network error.")
 		elseif not accepted then
 			setStatus(errorMessage(reason))
 		else
-			setStatus(if equipped then `Unequipped {item.DisplayName}.` else `Equipped {item.DisplayName}.`)
+			local defaultItem = (activeCosmetics.Defaults or {})[entry.category]
+			local equippedName = if nextItemId == nil and defaultItem
+				then defaultItem.DisplayName
+				else entry.displayName
+			setStatus(`Equipped {equippedName}.`)
 		end
 		render()
 	end)
@@ -163,25 +210,30 @@ render = function()
 		setStatus("Inventory data is loading.")
 		return
 	end
+	if statusMessage == "Inventory data is loading." then
+		setStatus("Select an item to equip.")
+	end
 
-	local ids = sortedOwnedIds()
-	if #ids == 0 then
+	local entries = sortedEntries()
+	if #entries == 0 then
 		setStatus("No owned items.")
 		return
 	end
-	for order, itemId in ids do
-		local item = activeCosmetics.Items[itemId]
-		local equipped = currentData.Cosmetics.Equipped[item.Category] == itemId
+	for order, entry in entries do
+		local equippedId = currentData.Cosmetics.Equipped[entry.category]
+		local equipped = if entry.isDefault then equippedId == nil or equippedId == "" else equippedId == entry.itemId
 		table.insert(
 			handles,
 			activeItemElement.mount(holder, {
 				data = {
-					id = itemId,
-					title = item.DisplayName,
-					details = `Category: {item.Category}  Rarity: {item.Rarity}`,
-					state = if equipped then "Equipped" else "Owned",
-					actionText = if equipped then "Unequip" else "Equip",
-					actionEnabled = not busy[itemId],
+					id = entry.id,
+					title = entry.displayName,
+					details = `Category: {entry.category}  Rarity: {entry.rarity}`,
+					state = if equipped then "Equipped" else if entry.isDefault then "Available" else "Owned",
+					actionText = if equipped
+						then if entry.isDefault then "Equipped" else "Use Default"
+						else if entry.isDefault then "Use Default" else "Equip",
+					actionEnabled = not busy[entry.id] and not (entry.isDefault and equipped),
 					layoutOrder = order,
 				},
 				activated = toggleEquip,
@@ -252,6 +304,7 @@ function InventoryController._resetForTest()
 	viewOpen = false
 	storeDisconnect = nil
 	menuDisconnect = nil
+	statusMessage = "Inventory data is loading."
 end
 
 return InventoryController

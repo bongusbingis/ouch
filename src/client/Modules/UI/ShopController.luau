@@ -46,6 +46,7 @@ local busy: { [string]: boolean } = {}
 local viewOpen = false
 local storeDisconnect: (() -> ())? = nil
 local menuDisconnect: (() -> ())? = nil
+local statusMessage = "Economy data is loading."
 
 local function replicatedStorage(): ReplicatedStorage
 	return game:GetService("ReplicatedStorage")
@@ -90,6 +91,7 @@ local function destroyItems()
 end
 
 local function setStatus(message: string)
+	statusMessage = message
 	if statusLabel then
 		statusLabel.Text = message
 	end
@@ -169,6 +171,9 @@ render = function()
 	if currentData == nil then
 		setStatus("Economy data is loading.")
 		return
+	end
+	if statusMessage == "Economy data is loading." then
+		setStatus("Select a crate to open.")
 	end
 
 	local ids = sortedCrateIds()
@@ -267,6 +272,7 @@ function ShopController._resetForTest()
 	viewOpen = false
 	storeDisconnect = nil
 	menuDisconnect = nil
+	statusMessage = "Economy data is loading."
 end
 
 return ShopController

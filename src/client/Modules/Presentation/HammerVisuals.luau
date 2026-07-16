@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
@@ -14,8 +15,12 @@ local WorldAudio = require(script.Parent.WorldAudio)
 
 local HammerVisuals = {}
 
-local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Hammer")
-assert(template:IsA("BasePart"), "[HammerVisuals] Assets.Hammer must be a BasePart")
+local default = Cosmetics.Defaults.HammerAssets
+local template = ReplicatedStorage:WaitForChild("Assets")
+	:WaitForChild("Cosmetics")
+	:WaitForChild(Cosmetics.CategoryFolders.HammerAssets)
+	:WaitForChild(default.AssetName)
+assert(template:IsA("BasePart"), "[HammerVisuals] default HammerAssets asset must be a BasePart")
 
 local visuals: { [Player]: BasePart } = {}
 local ballsFolder = Workspace:WaitForChild("Balls")

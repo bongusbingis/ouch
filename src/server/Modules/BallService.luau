@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local PlayerIds = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
 )
@@ -44,8 +45,12 @@ end
 
 local function ballTemplate(): BasePart
 	if template == nil then
-		local asset = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Dodgeball")
-		assert(asset:IsA("BasePart"), "[BallService] Assets.Dodgeball must be a BasePart")
+		local default = Cosmetics.Defaults.BallAssets
+		local asset = ReplicatedStorage:WaitForChild("Assets")
+			:WaitForChild("Cosmetics")
+			:WaitForChild(Cosmetics.CategoryFolders.BallAssets)
+			:WaitForChild(default.AssetName)
+		assert(asset:IsA("BasePart"), "[BallService] default BallAssets asset must be a BasePart")
 		template = asset
 	end
 	return template :: BasePart

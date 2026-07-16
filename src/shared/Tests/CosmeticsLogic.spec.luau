@@ -2,6 +2,7 @@
 
 local T = require(script.Parent.TestKit)
 local CosmeticsLogic = require(script.Parent.Parent.Game.Economy.CosmeticsLogic)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
 
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },
@@ -11,6 +12,11 @@ local ITEMS = {
 local SLOTS = { BallAssets = true, HammerAssets = true }
 
 T.describe("CosmeticsLogic", function()
+	T.it("configures category-folder defaults", function()
+		T.expect(Cosmetics.Defaults.BallAssets.AssetName):toEqual("DefaultDodgeball")
+		T.expect(Cosmetics.Defaults.HammerAssets.AssetName):toEqual("DefaultHammer")
+	end)
+
 	T.it("allows equipping an owned item into its matching slot", function()
 		local ok, reason = CosmeticsLogic.canEquip(ITEMS, SLOTS, { BallRed = true }, "BallAssets", "BallRed")
 		T.expect(ok):toEqual(true)

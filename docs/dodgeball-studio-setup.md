@@ -4,7 +4,7 @@ Apply these changes manually in Studio. Repository tooling must not rewrite `gam
 
 ## Dodgeball template
 
-1. Open `ReplicatedStorage > Assets > Dodgeball`. It must remain a single anchored `BasePart` with `CanCollide`, `CanTouch`, and `CanQuery` disabled.
+1. Open `ReplicatedStorage > Assets > Cosmetics > BallAssets > DefaultDodgeball`. It must remain a single anchored `BasePart` with `CanCollide`, `CanTouch`, and `CanQuery` disabled. This is both the authoritative ball template and the default visual.
 2. Add attachments named `TrailTop` and `TrailBottom`, placed on opposite sides of the ball.
 3. Add a disabled `Trail` named `FlightTrail`, wired to those attachments. The client enables it only during flight, bounce, and recall phases.
 4. Add disabled `ParticleEmitter` children named `Bounce`, `Landing`, `Pickup`, and `Hit`. Give each a numeric `BurstCount` attribute; a starting value of 8 is suitable.

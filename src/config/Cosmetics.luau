@@ -17,6 +17,11 @@ export type ItemDef = {
 	Thumbnail: string,
 }
 
+export type DefaultDef = {
+	DisplayName: string,
+	AssetName: string,
+}
+
 local Rarities: { [string]: RarityDef } = {
 	Common = { Weight = 70, DupeCash = 50 },
 	Rare = { Weight = 24, DupeCash = 150 },
@@ -38,6 +43,17 @@ local CategoryFolders = {
 	TrailAssets = "TrailAssets",
 	EmoteAssets = "EmoteAssets",
 	CostumeAssets = "CostumeAssets",
+}
+
+local Defaults: { [string]: DefaultDef } = {
+	BallAssets = {
+		DisplayName = "Default Dodgeball",
+		AssetName = "DefaultDodgeball",
+	},
+	HammerAssets = {
+		DisplayName = "Default Hammer",
+		AssetName = "DefaultHammer",
+	},
 }
 
 local function ballAsset(displayName: string, assetName: string): ItemDef
@@ -66,5 +82,6 @@ return {
 	Rarities = Rarities,
 	Slots = Slots,
 	CategoryFolders = CategoryFolders,
+	Defaults = Defaults,
 	Items = Items,
 }

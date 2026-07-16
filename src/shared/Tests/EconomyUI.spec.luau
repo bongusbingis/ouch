@@ -359,6 +359,7 @@ T.describe("ShopController", function()
 
 		menu:setOpen("Shop")
 		T.expect(#mounted):toEqual(1)
+		T.expect(statusLabel.Text):toEqual("Select a crate to open.")
 		T.expect(mounted[1].props.data.actionText):toEqual("Open - 500 Cash")
 		mounted[1].props.activated("BallCrate")
 		T.expect(calls[#calls].name):toEqual("OpenCrate")
@@ -391,6 +392,9 @@ T.describe("InventoryController", function()
 		}
 		local statusLabel = { Text = "" }
 		local cosmetics = {
+			Defaults = {
+				BallAssets = { DisplayName = "Default Dodgeball" },
+			},
 			Items = {
 				BallBlue = { DisplayName = "Blue Ball", Category = "BallAssets", Rarity = "Common" },
 				BallRed = { DisplayName = "Red Ball", Category = "BallAssets", Rarity = "Common" },
@@ -407,20 +411,64 @@ T.describe("InventoryController", function()
 			runAsync = immediate,
 		})
 		menu:setOpen("Inventory")
-		T.expect(#mounted):toEqual(2)
-		T.expect(mounted[1].props.data.title):toEqual("Blue Ball")
-		T.expect(mounted[1].props.data.actionText):toEqual("Equip")
-		T.expect(mounted[2].props.data.actionText):toEqual("Unequip")
+		T.expect(#mounted):toEqual(3)
+		T.expect(statusLabel.Text):toEqual("Select an item to equip.")
+		T.expect(mounted[1].props.data.title):toEqual("Default Dodgeball")
+		T.expect(mounted[1].props.data.actionText):toEqual("Use Default")
+		T.expect(mounted[2].props.data.title):toEqual("Blue Ball")
+		T.expect(mounted[2].props.data.actionText):toEqual("Equip")
+		T.expect(mounted[3].props.data.actionText):toEqual("Use Default")
 
-		mounted[1].props.activated("BallBlue")
+		mounted[2].props.activated("BallBlue")
 		T.expect(calls[#calls].name):toEqual("EquipCosmetic")
 		T.expect(calls[#calls].args[1]):toEqual("BallAssets")
 		T.expect(calls[#calls].args[2]):toEqual("BallBlue")
 
-		local redHandle = mounted[2]
+		local redHandle = mounted[3]
 		redHandle.props.activated("BallRed")
 		T.expect(calls[#calls].args[1]):toEqual("BallAssets")
 		T.expect(calls[#calls].args[2]):toBeNil()
+		T.expect(statusLabel.Text):toEqual("Equipped Default Dodgeball.")
+		InventoryController._resetForTest()
+	end)
+
+	T.it("shows the equipped default dodgeball when no cosmetics are owned", function()
+		InventoryController._resetForTest()
+		local store = fakeStore({
+			Cash = 0,
+			Cosmetics = { Owned = {}, Equipped = {} },
+		})
+		local menu = fakeMenu()
+		local itemElement, mounted = fakeItemElement()
+		local calls = 0
+		InventoryController.start({
+			store = store,
+			network = {
+				call = function()
+					calls += 1
+					return true
+				end,
+			},
+			menuManager = menu,
+			itemElement = itemElement,
+			cosmetics = {
+				Defaults = {
+					BallAssets = { DisplayName = "Default Dodgeball" },
+				},
+				Items = {},
+			},
+			holder = { Name = "Holder" } :: any,
+			statusLabel = { Text = "" } :: any,
+			runAsync = immediate,
+		})
+
+		menu:setOpen("Inventory")
+		T.expect(#mounted):toEqual(1)
+		T.expect(mounted[1].props.data.title):toEqual("Default Dodgeball")
+		T.expect(mounted[1].props.data.state):toEqual("Equipped")
+		T.expect(mounted[1].props.data.actionEnabled):toEqual(false)
+		mounted[1].props.activated("Default_BallAssets")
+		T.expect(calls):toEqual(0)
 		InventoryController._resetForTest()
 	end)
 end)
