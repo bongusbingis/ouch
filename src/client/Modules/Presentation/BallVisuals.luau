@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
@@ -73,6 +74,48 @@ local function playOptional(ball: BasePart, name: string)
 	if emitter and emitter:IsA("ParticleEmitter") then
 		emitter:Emit(emitter:GetAttribute("BurstCount") or 8)
 	end
+end
+
+local function playRestPulse(visual: BasePart)
+	local config = Combat.Dodgeball.RestPulse
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "RestGoldPulse"
+	highlight.Adornee = visual
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.FillColor = config.FillColor
+	highlight.OutlineColor = config.OutlineColor
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 1
+	highlight.Parent = visual
+
+	local rise = TweenService:Create(
+		highlight,
+		TweenInfo.new(config.RiseTime, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+		{
+			FillTransparency = config.PeakFillTransparency,
+			OutlineTransparency = config.PeakOutlineTransparency,
+		}
+	)
+	local fade = TweenService:Create(
+		highlight,
+		TweenInfo.new(config.FadeTime, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+		{
+			FillTransparency = 1,
+			OutlineTransparency = 1,
+		}
+	)
+
+	rise.Completed:Once(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed or highlight.Parent == nil then
+			highlight:Destroy()
+			return
+		end
+		fade:Play()
+	end)
+	fade.Completed:Once(function()
+		highlight:Destroy()
+	end)
+	rise:Play()
 end
 
 -- The ball renders its current owner's equipped asset while possessed (any
@@ -192,7 +235,13 @@ function BallVisuals.onEvent(event: any)
 	end
 	local folder = Workspace:FindFirstChild("Balls")
 	local ball = folder and event.projectileId and folder:FindFirstChild(event.projectileId)
-	local visual = if ball and ball:IsA("BasePart") then visuals[ball] else nil
+	if ball == nil or not ball:IsA("BasePart") then
+		return
+	end
+	if event.kind == "BallSettled" then
+		refreshAsset(ball)
+	end
+	local visual = visuals[ball]
 	if visual == nil then
 		return
 	end
@@ -209,6 +258,9 @@ function BallVisuals.onEvent(event: any)
 	local effect = effectNames[event.kind]
 	if effect then
 		playOptional(visual, effect)
+	end
+	if event.kind == "BallSettled" and ball:GetAttribute("ph") == FREE_PHASE then
+		playRestPulse(visual)
 	end
 end
 
