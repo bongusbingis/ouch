@@ -28,7 +28,6 @@ local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):W
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
-Replica.RequestData()
 InputRouter.start()
 BallVisuals.start()
 DamageFeedback.start()
@@ -44,6 +43,8 @@ ShopController.start()
 InventoryController.start()
 MatchHud.start()
 DebugVisuals.start()
+
+Replica.RequestData()
 
 -- TODO(ui): scoreboard — per-player scores replicate as a `MatchScore`
 -- attribute on each Player (plus leaderstats.Elims). TODO(ui): killfeed —
