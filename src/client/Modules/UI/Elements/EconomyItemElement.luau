@@ -1,11 +1,12 @@
 --!strict
 
 -- PROTOTYPE: Functional, unstyled economy list row shared by Shop and
--- Inventory. Presentation comes from the Studio-authored EconomyItem template.
+-- Inventory. Presentation comes from the runtime-generated EconomyItem template.
 
 local ElementFactory = require(script.Parent.ElementFactory)
 local ElementTypes = require(script.Parent.ElementTypes)
 local EconomyPrototypeLayout = require(script.Parent.Parent.EconomyPrototypeLayout)
+local EconomyPrototypeUI = require(script.Parent.Parent.EconomyPrototypeUI)
 
 type EconomyItemData = ElementTypes.EconomyItemData
 type EconomyItemProps = ElementTypes.EconomyItemProps
@@ -18,7 +19,7 @@ type MountOptions = {
 local EconomyItemElement = {}
 
 local function resolveTemplate(): GuiObject
-	return ElementFactory.resolveTemplate("EconomyItem", "GuiObject") :: GuiObject
+	return EconomyPrototypeUI.getItemTemplate()
 end
 
 local function waitLabel(parent: Instance, name: string): TextLabel
