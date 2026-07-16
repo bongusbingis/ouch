@@ -8,6 +8,8 @@ local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Sim.SimCore)
 local SimStateCodec = require(script.Parent.SimStateCodec)
 local PlayerIds = require(script.Parent.PlayerIds)
+local MovementSpeedService = require(script.Parent.MovementSpeedService)
+local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Debug)
@@ -25,6 +27,7 @@ local ServerAuthAdapter = {}
 local BALLS_FOLDER_NAME = "Balls"
 
 local listeners: { (SimEvent) -> () } = {}
+local pendingWeaponResets: { [string]: boolean } = {}
 local started = false
 
 local function sideTag(): string
@@ -220,12 +223,32 @@ local function step(dt: number)
 
 	local snapshot = buildSnapshot(entries, excluded)
 	local state = SimStateCodec.decode(ballsFolder, characterModels)
+	if RunService:IsServer() then
+		for playerId in pendingWeaponResets do
+			local playerState = state.players[playerId]
+			if playerState then
+				for _, kit in WeaponRegistry.all() do
+					playerState.weapons[kit.kind] = kit.init()
+				end
+				pendingWeaponResets[playerId] = nil
+			end
+		end
+	end
 	local commands = collectCommands(entries)
 
 	local events = SimCore.step(state, commands, snapshot, dt)
 
+	MovementSpeedService.step(state, characterModels, events)
 	SimStateCodec.encode(state, ballsFolder, characterModels)
 	dispatch(events)
+end
+
+function ServerAuthAdapter.resetWeaponsForTesting(player: Player): boolean
+	if not RunService:IsServer() or player.Parent ~= Players then
+		return false
+	end
+	pendingWeaponResets[PlayerIds.toId(player)] = true
+	return true
 end
 
 function ServerAuthAdapter.start()
@@ -233,6 +256,11 @@ function ServerAuthAdapter.start()
 		return
 	end
 	started = true
+	if RunService:IsServer() then
+		Players.PlayerRemoving:Connect(function(player)
+			pendingWeaponResets[PlayerIds.toId(player)] = nil
+		end)
+	end
 
 	local runService: any = RunService
 	if typeof(runService.BindToSimulation) ~= "function" then

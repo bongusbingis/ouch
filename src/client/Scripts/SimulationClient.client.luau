@@ -21,12 +21,34 @@ local EconomyStore = require(UI:WaitForChild("EconomyStore"))
 local ShopController = require(UI:WaitForChild("ShopController"))
 local InventoryController = require(UI:WaitForChild("InventoryController"))
 local MatchHud = require(UI:WaitForChild("MatchHud"))
+local CooldownIndicator = require(UI:WaitForChild("CooldownIndicator"))
 local DebugModules = Client:WaitForChild("Modules"):WaitForChild("Debug")
 local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+
+local function startCmdr()
+	local player = Players.LocalPlayer
+	while player:GetAttribute("CmdrAccess") == nil do
+		task.wait()
+	end
+	if player:GetAttribute("CmdrAccess") ~= true then
+		return
+	end
+
+	local root = ReplicatedStorage:WaitForChild("CmdrClient")
+	while root:GetAttribute("SplatBrawlReady") ~= true do
+		task.wait()
+	end
+	local cmdr = require(root)
+	cmdr.Registry:RegisterHook("BeforeRun", function()
+		return nil
+	end)
+	cmdr:SetActivationKeys({ Enum.KeyCode.F2 })
+	cmdr:SetPlaceName("Splat Brawl")
+end
 
 InputRouter.start()
 BallVisuals.start()
@@ -42,7 +64,9 @@ QuestsController.start()
 ShopController.start()
 InventoryController.start()
 MatchHud.start()
+CooldownIndicator.start()
 DebugVisuals.start()
+task.spawn(startCmdr)
 
 Replica.RequestData()
 

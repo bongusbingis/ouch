@@ -25,6 +25,15 @@ export type ProgressionDelta = {
 	Cash: number?,
 }
 
+local EDITABLE_PROGRESSION_FIELDS = {
+	Elims = true,
+	Deaths = true,
+	Catches = true,
+	Wins = true,
+	Losses = true,
+	MatchesPlayed = true,
+}
+
 local function _wrapProxy(data, profileReplica, path)
 	local proxy = {}
 	setmetatable(proxy, {
@@ -252,6 +261,48 @@ function Data.applyProgression(player, delta: ProgressionDelta)
 	_recalculateKDR(d)
 	_syncLeaderStats(player)
 	return true
+end
+
+function Data.setFieldForTesting(player, field, value)
+	local d = Data.get(player)
+	if not d or typeof(value) ~= "number" or value ~= value or math.abs(value) == math.huge then
+		return false
+	end
+
+	local nextValue = math.max(math.floor(value), 0)
+	if field == "Cash" then
+		d.Cash = nextValue
+	elseif field == "XP" then
+		d.Level.Points = nextValue
+	elseif EDITABLE_PROGRESSION_FIELDS[field] then
+		d.Progression[field] = nextValue
+	else
+		return false
+	end
+
+	_recalculateKDR(d)
+	_syncLeaderStats(player)
+	return true
+end
+
+function Data.addFieldForTesting(player, field, amount)
+	local d = Data.get(player)
+	if not d or typeof(amount) ~= "number" or amount ~= amount or math.abs(amount) == math.huge then
+		return false
+	end
+
+	local current
+	if field == "Cash" then
+		current = d.Cash
+	elseif field == "XP" then
+		current = d.Level.Points
+	elseif EDITABLE_PROGRESSION_FIELDS[field] then
+		current = d.Progression[field]
+	else
+		return false
+	end
+
+	return Data.setFieldForTesting(player, field, current + amount)
 end
 
 function Data.load(player)

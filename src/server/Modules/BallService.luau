@@ -51,6 +51,9 @@ local function ballTemplate(): BasePart
 			:WaitForChild(Cosmetics.CategoryFolders.BallAssets)
 			:WaitForChild(default.AssetName)
 		assert(asset:IsA("BasePart"), "[BallService] default BallAssets asset must be a BasePart")
+		assert(not asset.CanCollide, "[BallService] default BallAssets asset must have CanCollide disabled")
+		assert(not asset.CanTouch, "[BallService] default BallAssets asset must have CanTouch disabled")
+		assert(not asset.CanQuery, "[BallService] default BallAssets asset must have CanQuery disabled")
 		template = asset
 	end
 	return template :: BasePart
@@ -89,8 +92,24 @@ function BallService.stopGroundSpawns()
 	activePoints = nil
 end
 
+function BallService.hasHeldBall(player: Player): boolean
+	local playerId = PlayerIds.toId(player)
+	for _, ball in ballsFolder():GetChildren() do
+		if ball:IsA("BasePart") and ball:GetAttribute("ph") == 0 and ball:GetAttribute("hb") == playerId then
+			return true
+		end
+	end
+	return false
+end
+
 function BallService.grantHeldBall(player: Player): boolean
+	if BallService.hasHeldBall(player) then
+		return false
+	end
 	local character = player.Character
+	if character and character:GetAttribute("CombatAlive") == false then
+		return false
+	end
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root == nil or not root:IsA("BasePart") then
 		return false

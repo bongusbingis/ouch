@@ -11,6 +11,7 @@ local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):W
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local CharacterRig = require(script.Parent.CharacterRig)
+local TrailVisuals = require(script.Parent.TrailVisuals)
 local WorldAudio = require(script.Parent.WorldAudio)
 
 local BallVisuals = {}
@@ -19,6 +20,8 @@ local FREE_PHASE = 6
 
 local visuals: { [BasePart]: BasePart } = {}
 local appliedAssets: { [BasePart]: string } = {}
+local appliedTrails: { [BasePart]: string } = {}
+local trailHandles: { [BasePart]: TrailVisuals.Handle } = {}
 local assetTemplates: { [string]: BasePart } = {}
 local seen = EventDedup.new(4096)
 
@@ -46,10 +49,16 @@ end
 
 local function setEnabled(root: Instance, className: string, enabled: boolean)
 	for _, child in root:GetDescendants() do
-		if child:IsA(className) then
+		if child:IsA(className) and child:GetAttribute("ProceduralTrailCosmetic") ~= true then
 			(child :: any).Enabled = enabled
 		end
 	end
+end
+
+local function ownerFor(ball: BasePart): Player?
+	local ownerId = ball:GetAttribute("ow") :: string?
+	local userId = if ownerId then tonumber(ownerId) else nil
+	return if userId then Players:GetPlayerByUserId(userId) else nil
 end
 
 local function playOptional(ball: BasePart, name: string)
@@ -67,14 +76,47 @@ local function effectiveAssetId(ball: BasePart): string
 	if ball:GetAttribute("ph") == FREE_PHASE then
 		return ""
 	end
-	local ownerId = ball:GetAttribute("ow") :: string?
-	local userId = if ownerId then tonumber(ownerId) else nil
-	local owner = if userId then Players:GetPlayerByUserId(userId) else nil
+	local owner = ownerFor(ball)
 	if owner == nil then
 		return ""
 	end
 	local itemId = (owner:GetAttribute("Equip_BallAssets") :: string?) or ""
 	return if assetTemplates[itemId] ~= nil then itemId else ""
+end
+
+local function effectiveTrailId(ball: BasePart): (string, string?)
+	local owner = ownerFor(ball)
+	if owner == nil then
+		return "", nil
+	end
+	local itemId = (owner:GetAttribute("Equip_TrailAssets") :: string?) or ""
+	local item = Cosmetics.Items[itemId]
+	if item == nil or item.Category ~= "TrailAssets" or item.EffectId == nil then
+		return "", nil
+	end
+	return itemId, item.EffectId
+end
+
+local function destroyTrail(ball: BasePart)
+	local handle = trailHandles[ball]
+	if handle then
+		handle:destroy()
+	end
+	trailHandles[ball] = nil
+	appliedTrails[ball] = nil
+end
+
+local function refreshTrail(ball: BasePart, force: boolean?)
+	local itemId, effectId = effectiveTrailId(ball)
+	if not force and appliedTrails[ball] == itemId then
+		return
+	end
+	destroyTrail(ball)
+	appliedTrails[ball] = itemId
+	local visual = visuals[ball]
+	if visual and effectId then
+		trailHandles[ball] = TrailVisuals.mount(visual, effectId)
+	end
 end
 
 local function buildVisual(ball: BasePart, assetId: string): BasePart
@@ -108,9 +150,11 @@ local function addBall(ball: BasePart)
 	ball.LocalTransparencyModifier = 1
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
+	refreshTrail(ball, true)
 end
 
 local function removeBall(ball: BasePart)
+	destroyTrail(ball)
 	local visual = visuals[ball]
 	if visual then
 		visual:Destroy()
@@ -125,6 +169,7 @@ local function refreshAsset(ball: BasePart)
 		return
 	end
 	local previous = visuals[ball]
+	destroyTrail(ball)
 	local visual = buildVisual(ball, assetId)
 	if previous then
 		visual.CFrame = previous.CFrame
@@ -132,6 +177,7 @@ local function refreshAsset(ball: BasePart)
 	end
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
+	refreshTrail(ball, true)
 end
 
 function BallVisuals.onEvent(event: any)
@@ -198,6 +244,7 @@ function BallVisuals.start()
 				continue
 			end
 			refreshAsset(ball)
+			refreshTrail(ball)
 			visual = visuals[ball] :: BasePart
 			local phase = ball:GetAttribute("ph")
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
@@ -205,6 +252,10 @@ function BallVisuals.start()
 			local targetCFrame = heldCFrame or ball.CFrame
 			visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
 			setEnabled(visual, "Trail", phase == 2 or phase == 3 or phase == 5)
+			local trailHandle = trailHandles[ball]
+			if trailHandle then
+				trailHandle:setEnabled(phase == 2)
+			end
 		end
 	end)
 end

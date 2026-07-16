@@ -15,22 +15,29 @@ local WorldAudio = require(script.Parent.WorldAudio)
 
 local HammerVisuals = {}
 
-local default = Cosmetics.Defaults.HammerAssets
-local template = ReplicatedStorage:WaitForChild("Assets")
+local assetsFolder = ReplicatedStorage:WaitForChild("Assets")
 	:WaitForChild("Cosmetics")
 	:WaitForChild(Cosmetics.CategoryFolders.HammerAssets)
-	:WaitForChild(default.AssetName)
-assert(template:IsA("BasePart"), "[HammerVisuals] default HammerAssets asset must be a BasePart")
+local default = Cosmetics.Defaults.HammerAssets
+local defaultTemplate = assetsFolder:WaitForChild(default.AssetName)
+assert(defaultTemplate:IsA("BasePart"), "[HammerVisuals] default HammerAssets asset must be a BasePart")
 
 local visuals: { [Player]: BasePart } = {}
+local appliedAssets: { [Player]: string } = {}
+local assetTemplates: { [string]: BasePart } = {}
 local ballsFolder = Workspace:WaitForChild("Balls")
 local seenEvents = EventDedup.new(4096)
 
-local function offsetCFrame(): CFrame
+local function handCFrame(template: BasePart): CFrame
 	local offset = Combat.Hammer.VisualHandOffset
 	local rotation = Combat.Hammer.VisualRotationDeg
+	local gripY = -template.Size.Y * (0.5 - Combat.Hammer.VisualGripInsetScale)
+	local grip = CFrame.new(0, gripY, 0)
 	return CFrame.new(offset.x, offset.y, offset.z)
+		* CFrame.Angles(0, math.rad(Combat.Hammer.VisualHandYawDeg), 0)
 		* CFrame.Angles(math.rad(rotation.x), math.rad(rotation.y), math.rad(rotation.z))
+		* CFrame.Angles(0, math.rad(Combat.Hammer.VisualGripTwistDeg), 0)
+		* grip:Inverse()
 end
 
 local function hasBall(player: Player): boolean
@@ -52,12 +59,26 @@ local function remove(player: Player)
 		visual:Destroy()
 	end
 	visuals[player] = nil
+	appliedAssets[player] = nil
+end
+
+local function effectiveAsset(player: Player): (string, BasePart)
+	local itemId = (player:GetAttribute("Equip_HammerAssets") :: string?) or ""
+	local template = assetTemplates[itemId]
+	if template then
+		return itemId, template
+	end
+	return "", defaultTemplate
 end
 
 local function visualFor(player: Player): BasePart
+	local assetId, template = effectiveAsset(player)
 	local visual = visuals[player]
-	if visual then
+	if visual and appliedAssets[player] == assetId then
 		return visual
+	end
+	if visual then
+		visual:Destroy()
 	end
 
 	visual = template:Clone()
@@ -68,6 +89,7 @@ local function visualFor(player: Player): BasePart
 	visual.CanTouch = false
 	visual.Parent = Workspace.CurrentCamera
 	visuals[player] = visual
+	appliedAssets[player] = assetId
 	return visual
 end
 
@@ -87,10 +109,17 @@ local function audioParentFor(playerId: string): Instance?
 end
 
 function HammerVisuals.start()
+	for itemId, item in Cosmetics.Items do
+		if item.Category == "HammerAssets" then
+			local asset = assetsFolder:WaitForChild(item.AssetName)
+			assert(asset:IsA("BasePart"), `[HammerVisuals] asset template {item.AssetName} must be a BasePart`)
+			assetTemplates[itemId] = asset
+		end
+	end
+
 	Players.PlayerRemoving:Connect(remove)
 
 	RunService.RenderStepped:Connect(function()
-		local grip = offsetCFrame()
 		for _, player in Players:GetPlayers() do
 			local character = player.Character
 			if character == nil then
@@ -104,7 +133,8 @@ function HammerVisuals.start()
 				continue
 			end
 
-			visualFor(player).CFrame = hand.CFrame * grip
+			local visual = visualFor(player)
+			visual.CFrame = hand.CFrame * handCFrame(visual)
 		end
 	end)
 end

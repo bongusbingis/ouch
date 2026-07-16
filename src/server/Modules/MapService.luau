@@ -69,10 +69,17 @@ local function pickEntry(): Maps.MapEntry
 	return candidates[math.random(#candidates)]
 end
 
--- TODO(voting): replace pickEntry with the winning vote when map voting lands.
-function MapService.spawnRandom(): ActiveMap
+local function entryById(mapId: string): Maps.MapEntry?
+	for _, entry in Maps.Pool do
+		if entry.Id == mapId then
+			return entry
+		end
+	end
+	return nil
+end
+
+local function spawnEntry(entry: Maps.MapEntry): ActiveMap
 	MapService.despawn()
-	local entry = pickEntry()
 	lastMapId = entry.Id
 
 	local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Maps"):WaitForChild(entry.AssetName)
@@ -91,6 +98,20 @@ function MapService.spawnRandom(): ActiveMap
 	assert(#map.playerSpawns > 0, `[MapService] map "{entry.Id}" has no PlayerSpawns parts`)
 	active = map
 	return map
+end
+
+-- TODO(voting): replace pickEntry with the winning vote when map voting lands.
+function MapService.spawnRandom(): ActiveMap
+	return spawnEntry(pickEntry())
+end
+
+function MapService.spawnById(mapId: string): ActiveMap?
+	local entry = entryById(mapId)
+	return if entry then spawnEntry(entry) else nil
+end
+
+function MapService.hasMap(mapId: string): boolean
+	return entryById(mapId) ~= nil
 end
 
 function MapService.active(): ActiveMap?

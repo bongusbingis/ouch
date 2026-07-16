@@ -231,7 +231,7 @@ render = function()
 					details = `Category: {entry.category}  Rarity: {entry.rarity}`,
 					state = if equipped then "Equipped" else if entry.isDefault then "Available" else "Owned",
 					actionText = if equipped
-						then if entry.isDefault then "Equipped" else "Use Default"
+						then if entry.isDefault then "Equipped" else "Unequip"
 						else if entry.isDefault then "Use Default" else "Equip",
 					actionEnabled = not busy[entry.id] and not (entry.isDefault and equipped),
 					layoutOrder = order,

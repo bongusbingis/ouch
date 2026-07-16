@@ -6,12 +6,12 @@ local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local BallService = require(Modules:WaitForChild("BallService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
 local MapFeatureService = require(Modules:WaitForChild("MapFeatureService"))
-local MovementSpeedService = require(Modules:WaitForChild("MovementSpeedService"))
 local ProgressionService = require(Modules:WaitForChild("ProgressionService"))
 local QuestService = require(Modules:WaitForChild("QuestService"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CrateService = require(Modules:WaitForChild("CrateService"))
 local MonetizationService = require(Modules:WaitForChild("MonetizationService"))
+local CmdrService = require(Modules:WaitForChild("CmdrService"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
@@ -21,34 +21,12 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 
 local playedAnimations = EventDedup.new(4096)
-local appliedStuns = EventDedup.new(4096)
 local retainedTracks = {}
 
 local function findAnimation(name)
 	local animation = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations"):WaitForChild(name)
 	assert(animation:IsA("Animation"), `[Combat] Assets.Animations.{name} must be an Animation`)
 	return animation
-end
-
-local function rootForPlayer(player)
-	local character = player and player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		return root
-	end
-	return nil
-end
-
-local function eventDirection(event): Vector3?
-	local direction = event.direction
-	if typeof(direction) == "Vector3" then
-		local flat = Vector3.new(direction.X, 0, direction.Z)
-		return if flat.Magnitude > 1e-6 then flat.Unit else nil
-	elseif typeof(direction) == "vector" then
-		local flat = Vector3.new(direction.x, 0, direction.z)
-		return if flat.Magnitude > 1e-6 then flat.Unit else nil
-	end
-	return nil
 end
 
 -- Which sim events play a character animation, and how. New animated events
@@ -88,56 +66,6 @@ local function playEventAnimation(event)
 	end)
 end
 
-local function applyHammerMotion(event)
-	local direction = eventDirection(event)
-	if direction == nil then
-		return
-	end
-
-	if event.kind == "HammerSwing" then
-		local root = rootForPlayer(PlayerIds.fromEvent(event))
-		if root == nil then
-			return
-		end
-		local current = root.AssemblyLinearVelocity
-		root.AssemblyLinearVelocity =
-			Vector3.new(direction.X * Combat.Hammer.DashSpeed, current.Y, direction.Z * Combat.Hammer.DashSpeed)
-	elseif event.kind == "HammerHit" and event.targetId ~= nil then
-		local root = rootForPlayer(PlayerIds.fromId(event.targetId))
-		if root == nil then
-			return
-		end
-		root.AssemblyLinearVelocity = Vector3.new(
-			direction.X * Combat.Hammer.KnockbackSpeed,
-			Combat.Hammer.KnockbackUpSpeed,
-			direction.Z * Combat.Hammer.KnockbackSpeed
-		)
-	end
-end
-
-local function applyHammerMissStun(event)
-	if event.kind ~= "HammerMiss" then
-		return
-	end
-
-	if not appliedStuns.markSeen(event) then
-		return
-	end
-
-	local player = PlayerIds.fromEvent(event)
-	local character = player and player.Character
-	if player == nil or character == nil or character:GetAttribute("CombatAlive") == false then
-		return
-	end
-
-	MovementSpeedService.applyTimedModifier(
-		player,
-		"hammerStun",
-		Combat.Hammer.MissStunWalkSpeedScale,
-		Combat.Hammer.MissStunDuration
-	)
-end
-
 local function forwardDamageFeedback(event)
 	if event.kind ~= "Elim" or event.targetId == nil then
 		return
@@ -159,7 +87,6 @@ end
 
 InputSetup.start()
 BallService.start()
-MovementSpeedService.start()
 MapFeatureService.start()
 MatchService.start()
 ProgressionService.start(MatchService)
@@ -167,12 +94,11 @@ QuestService.start(MatchService)
 CosmeticsService.start()
 CrateService.start()
 MonetizationService.start()
+CmdrService.start()
 
 -- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)
 	playEventAnimation(event)
-	applyHammerMotion(event)
-	applyHammerMissStun(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
 	if acceptedElim then
 		QuestService.handleCombatEvent(event)

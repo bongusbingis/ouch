@@ -25,6 +25,7 @@ local Quests = {
 	Progress = {
 		FillColor = Color3.fromRGB(154, 233, 91),
 		EmptyColor = Color3.fromRGB(255, 255, 255),
+		MaxSteps = 5,
 	},
 	Button = {
 		EnabledColor = { r = 0.38, g = 0.72, b = 0.2 },
@@ -110,7 +111,7 @@ local Quests = {
 			id = "throws_10",
 			title = "Throw 10 dodgeballs",
 			goal = 10,
-			steps = 5,
+			steps = 10,
 			reward = { kind = "Cash", amount = 125 },
 			track = { kind = "BallThrow" },
 		},

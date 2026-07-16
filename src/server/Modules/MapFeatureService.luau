@@ -5,7 +5,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
-local MovementSpeedService = require(script.Parent.MovementSpeedService)
+local MovementSpeedService = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Adapters")
+		:WaitForChild("MovementSpeedService")
+)
 
 -- Applies the active map's terrain features server-side: bounce pads launch
 -- along their UpVector (same server-set velocity pattern as hammer knockback,
@@ -116,6 +121,7 @@ function MapFeatureService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		padCooldowns[player] = nil
 		slowed[player] = nil
+		MovementSpeedService.forget(player)
 	end)
 end
 

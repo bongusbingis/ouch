@@ -17,6 +17,19 @@ T.describe("CosmeticsLogic", function()
 		T.expect(Cosmetics.Defaults.HammerAssets.AssetName):toEqual("DefaultHammer")
 	end)
 
+	T.it("registers five trail cosmetics per rarity", function()
+		local counts = { Common = 0, Rare = 0, Legendary = 0, Exclusive = 0 }
+		for _, item in Cosmetics.Items do
+			if item.Category == "TrailAssets" then
+				counts[item.Rarity] += 1
+				T.expect(item.EffectId ~= nil):toBeTruthy()
+			end
+		end
+		for _, count in counts do
+			T.expect(count):toEqual(5)
+		end
+	end)
+
 	T.it("allows equipping an owned item into its matching slot", function()
 		local ok, reason = CosmeticsLogic.canEquip(ITEMS, SLOTS, { BallRed = true }, "BallAssets", "BallRed")
 		T.expect(ok):toEqual(true)

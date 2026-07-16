@@ -16,6 +16,7 @@ type KitState = {
 	cooldown: number,
 	activeRemaining: number,
 	recoveryRemaining: number,
+	stunRemaining: number,
 	direction: Vec?,
 	hitTargetId: string?,
 }
@@ -82,6 +83,7 @@ function Hammer.init(): KitState
 		cooldown = 0,
 		activeRemaining = 0,
 		recoveryRemaining = 0,
+		stunRemaining = 0,
 		direction = nil,
 		hitTargetId = nil,
 	}
@@ -119,6 +121,7 @@ function Hammer.handleInput(
 	kitState.cooldown = cfg.Cooldown
 	kitState.activeRemaining = cfg.ActiveDuration
 	kitState.recoveryRemaining = 0
+	kitState.stunRemaining = 0
 	kitState.direction = direction
 	kitState.hitTargetId = nil
 
@@ -193,6 +196,7 @@ function Hammer.tickPlayer(
 )
 	kitState.cooldown = math.max(kitState.cooldown - dt, 0)
 	kitState.recoveryRemaining = math.max(kitState.recoveryRemaining - dt, 0)
+	kitState.stunRemaining = math.max(kitState.stunRemaining - dt, 0)
 
 	if kitState.activeRemaining <= 0 then
 		return
@@ -206,6 +210,7 @@ function Hammer.tickPlayer(
 	kitState.activeRemaining = math.max(kitState.activeRemaining - dt, 0)
 	if kitState.activeRemaining <= 0 then
 		kitState.recoveryRemaining = config().MissRecovery
+		kitState.stunRemaining = config().MissStunDuration
 		SimUtil.pushEvent(events, state, {
 			kind = "HammerMiss",
 			tick = 0,

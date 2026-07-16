@@ -34,6 +34,40 @@ local FakeCFrame = {
 	identity = setmetatable({ Position = vector.zero }, fakeCFrameMeta),
 }
 
+local FakeColor3 = {
+	new = function(red: number, green: number, blue: number)
+		return { R = red, G = green, B = blue, r = red, g = green, b = blue }
+	end,
+	fromRGB = function(red: number, green: number, blue: number)
+		return {
+			R = red / 255,
+			G = green / 255,
+			B = blue / 255,
+			r = red / 255,
+			g = green / 255,
+			b = blue / 255,
+		}
+	end,
+}
+
+local FakeVector2 = {
+	new = function(x: number, y: number)
+		return { X = x, Y = y }
+	end,
+}
+
+local FakeVector3 = {
+	new = function(x: number, y: number, z: number)
+		return { X = x, Y = y, Z = z }
+	end,
+}
+
+local FakeNumberRange = {
+	new = function(minimum: number, maximum: number?)
+		return { Min = minimum, Max = maximum or minimum }
+	end,
+}
+
 function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
 	local moduleCache: { [Node]: any } = {}
@@ -127,6 +161,10 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 				require = requireImpl,
 				vector = vector,
 				CFrame = FakeCFrame,
+				Color3 = FakeColor3,
+				Vector2 = FakeVector2,
+				Vector3 = FakeVector3,
+				NumberRange = FakeNumberRange,
 			},
 			injectGlobals = true,
 		})

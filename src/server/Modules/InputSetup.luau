@@ -15,6 +15,14 @@ local InputSetup = {}
 
 local VALID_DEVICE_CLASSES = { Mouse = true, Touch = true }
 
+function InputSetup.setDeviceClass(player: Player, deviceClass: string): boolean
+	if not VALID_DEVICE_CLASSES[deviceClass] then
+		return false
+	end
+	player:SetAttribute("DeviceClass", deviceClass)
+	return true
+end
+
 local function buildContext(player: Player)
 	if player:FindFirstChild(InputConfig.ContextName) then
 		return
@@ -54,7 +62,7 @@ function InputSetup.start()
 			return true
 		end,
 	}, function(player, deviceClass)
-		player:SetAttribute("DeviceClass", deviceClass)
+		InputSetup.setDeviceClass(player, deviceClass)
 	end)
 
 	Players.PlayerAdded:Connect(buildContext)
