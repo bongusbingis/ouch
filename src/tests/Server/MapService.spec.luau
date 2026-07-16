@@ -8,7 +8,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
-local MapService = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MapService"))
+local MapService =
+	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MapService"))
 local Maps = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Maps"))
 local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))

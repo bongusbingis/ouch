@@ -9,7 +9,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local CrateRolls = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CrateRolls"))
-local ScriptedRandom = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("ScriptedRandom"))
+local ScriptedRandom =
+	require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("ScriptedRandom"))
 
 local RARITIES = {
 	Common = { Weight = 70, DupeCash = 50 },
