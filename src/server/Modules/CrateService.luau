@@ -76,6 +76,14 @@ function CrateService.openFromReceipt(player: Player, crateId: string): boolean
 	return rollAndGrant(player, crateId) ~= nil
 end
 
+function CrateService.openForTesting(player: Player, crateId: string): (OpenResult?, string?)
+	if Crates[crateId] == nil then
+		return nil, "invalid_crate"
+	end
+	local result = rollAndGrant(player, crateId)
+	return result, if result then nil else "no_profile"
+end
+
 function CrateService.start()
 	Network.handleProtected("OpenCrate", {
 		rateLimit = 2,

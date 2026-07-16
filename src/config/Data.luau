@@ -1,6 +1,6 @@
 return {
 	Template = {
-		Cash = 0,
+		Cash = 2500,
 		Level = {
 			Points = 0,
 		},
@@ -47,13 +47,13 @@ return {
 				return entry.Data.Progression.Wins
 			end,
 		},
-		{
-			Name = "CareerElims",
-			Type = "IntValue",
-			_Build = function(_player, entry)
-				return entry.Data.Progression.Elims
-			end,
-		},
+		-- {
+		-- 	Name = "CareerElims",
+		-- 	Type = "IntValue",
+		-- 	_Build = function(_player, entry)
+		-- 		return entry.Data.Progression.Elims
+		-- 	end,
+		-- },
 		{
 			Name = "Catches",
 			Type = "IntValue",

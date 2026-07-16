@@ -93,6 +93,14 @@ local function endMatch(state: MatchState, rules: MatchRules, reason: string, ev
 	table.insert(events, { kind = "MatchEnded", winnerId = state.winnerId, reason = reason })
 end
 
+function MatchSim.finish(state: MatchState, rules: MatchRules, reason: string, events: { MatchEvent }): boolean
+	if state.phase ~= "Active" then
+		return false
+	end
+	endMatch(state, rules, reason, events)
+	return true
+end
+
 -- One point per elimination. Environmental deaths (no source, or self) and
 -- eliminations outside an active match score nothing.
 function MatchSim.applyElim(

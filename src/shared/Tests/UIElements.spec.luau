@@ -300,6 +300,7 @@ T.describe("QuestCardElement", function()
 				Progress = {
 					FillColor = { r = 0, g = 1, b = 0 },
 					EmptyColor = { r = 0, g = 0, b = 0 },
+					MaxSteps = 5,
 				},
 				Button = {
 					EnabledColor = { r = 0.38, g = 0.72, b = 0.2 },
@@ -350,7 +351,8 @@ T.describe("QuestCardElement", function()
 		T.expect(card:WaitForChild("Rewards").Text):toEqual("150 coins")
 		T.expect(gradient.Rotation):toEqual(15)
 		T.expect(gradient.FillRatio):toBeNear(0.4)
-		T.expect(gradient.GradientStop):toBeNear(0.421132)
+		T.expect(gradient.GradientStop):toBeNear(0.5)
+		T.expect(gradient.Offset.X):toBeNear(-0.1)
 		T.expect(#progress:GetChildren()):toEqual(5)
 		T.expect(mountedButtons):toEqual(1)
 		T.expect(lastButton._children.Label.Text):toEqual("Claim")
@@ -371,15 +373,66 @@ T.describe("QuestCardElement", function()
 			title = "Throw 10 dodgeballs",
 			progress = 1,
 			goal = 10,
-			steps = 5,
+			steps = 10,
 			claimed = false,
 			completed = false,
 			reward = { kind = "Cash", amount = 125 },
 		})
 
 		T.expect(card:WaitForChild("Count").Text):toEqual("1/10")
-		T.expect(gradient.FillRatio):toBeNear(0.2)
-		T.expect(gradient.GradientStop):toBeNear(0.263397)
+		T.expect(gradient.FillRatio):toBeNear(0.1)
+		T.expect(gradient.GradientStop):toBeNear(0.5)
+		T.expect(gradient.Offset.X):toBeNear(-0.4)
+		for index = 1, 4 do
+			local divider = progress:WaitForChild(`Frame{index}`)
+			T.expect(divider.Visible):toEqual(true)
+			T.expect(divider.Position.X.Scale):toBeNear(index / 5)
+		end
+
+		handle:setData({
+			slot = 1,
+			questId = "throws_10",
+			title = "Throw 10 dodgeballs",
+			progress = 4,
+			goal = 10,
+			steps = 10,
+			claimed = false,
+			completed = false,
+			reward = { kind = "Cash", amount = 125 },
+		})
+		T.expect(gradient.FillRatio):toBeNear(0.4)
+		T.expect(gradient.GradientStop):toBeNear(0.5)
+		T.expect(gradient.Offset.X):toBeNear(-0.1)
+
+		handle:setData({
+			slot = 1,
+			questId = "throws_10",
+			title = "Throw 10 dodgeballs",
+			progress = 5,
+			goal = 10,
+			steps = 10,
+			claimed = false,
+			completed = false,
+			reward = { kind = "Cash", amount = 125 },
+		})
+		T.expect(gradient.FillRatio):toBeNear(0.5)
+		T.expect(gradient.GradientStop):toBeNear(0.5)
+		T.expect(gradient.Offset.X):toBeNear(0)
+
+		handle:setData({
+			slot = 1,
+			questId = "throws_10",
+			title = "Throw 10 dodgeballs",
+			progress = 9,
+			goal = 10,
+			steps = 10,
+			claimed = false,
+			completed = false,
+			reward = { kind = "Cash", amount = 125 },
+		})
+		T.expect(gradient.FillRatio):toBeNear(0.9)
+		T.expect(gradient.GradientStop):toBeNear(0.5)
+		T.expect(gradient.Offset.X):toBeNear(0.4)
 
 		handle:setData({
 			slot = 1,
@@ -393,7 +446,7 @@ T.describe("QuestCardElement", function()
 			reward = { kind = "Cash", amount = 150 },
 		})
 
-		T.expect(mountedButtons):toEqual(3)
+		T.expect(mountedButtons):toEqual(6)
 		T.expect(lastButton._children.Label.Text):toEqual("Claim")
 		T.expect(lastButton.enabled):toEqual(true)
 		handle:destroy()

@@ -134,6 +134,12 @@ T.describe("Hammer kit", function()
 			end
 		end
 		T.expect(sawMiss):toBeTruthy()
+		T.expect(state.players.p1.weapons.Hammer.stunRemaining > 0):toBeTruthy()
+
+		for _ = 1, math.ceil(Combat.Hammer.MissStunDuration / DT) + 1 do
+			SimCore.step(state, {}, arena, DT)
+		end
+		T.expect(state.players.p1.weapons.Hammer.stunRemaining):toEqual(0)
 	end)
 
 	T.it("cooldown blocks repeated swings until it fully elapses", function()

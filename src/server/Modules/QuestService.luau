@@ -227,6 +227,54 @@ function QuestService.claim(player: Player, questId: string): (boolean, any)
 	return false, "not_active"
 end
 
+function QuestService.stateForTesting(player: Player): { [string]: any }?
+	return stateFor(player, true)
+end
+
+function QuestService.resetForTesting(player: Player): boolean
+	local data = ensureData(player, nil, true)
+	if data == nil then
+		return false
+	end
+	assignDaily(data, player, os.time())
+	fireState(player)
+	return true
+end
+
+function QuestService.setProgressForTesting(player: Player, questId: string, progress: number): (boolean, string?)
+	if progress ~= progress or math.abs(progress) == math.huge then
+		return false, "invalid_progress"
+	end
+	local data = ensureData(player, nil, true)
+	if data == nil then
+		return false, "profile_not_ready"
+	end
+	local definition = definitionsById[questId]
+	if definition == nil then
+		return false, "unknown_quest"
+	end
+
+	local entries = activeEntries(data)
+	for _, entry in entries do
+		if entry.id == questId then
+			entry.progress = math.clamp(math.floor(progress), 0, definition.goal)
+			entry.claimed = false
+			data.Quests.Active = entries
+			fireState(player)
+			return true
+		end
+	end
+	return false, "not_active"
+end
+
+function QuestService.completeForTesting(player: Player, questId: string): (boolean, string?)
+	local definition = definitionsById[questId]
+	if definition == nil then
+		return false, "unknown_quest"
+	end
+	return QuestService.setProgressForTesting(player, questId, definition.goal)
+end
+
 local function waitForProfile(player: Player)
 	while player.Parent ~= nil and PlayerData.get(player) == nil do
 		task.wait()

@@ -4,6 +4,8 @@
 -- ReplicatedStorage.Assets.Cosmetics.<CategoryFolders[Category]>.
 -- DisplayName/Thumbnail are for UI rendering (locker/shop later).
 
+local TrailCosmetics = require(script.Parent.TrailCosmetics)
+
 export type RarityDef = {
 	Weight: number, -- crate roll weight; 0 = never drops (grant-only)
 	DupeCash: number, -- Cash refunded when a crate rolls an owned item
@@ -13,7 +15,8 @@ export type ItemDef = {
 	Category: string, -- equip slot this item occupies
 	Rarity: string,
 	DisplayName: string,
-	AssetName: string,
+	AssetName: string?,
+	EffectId: string?,
 	Thumbnail: string,
 }
 
@@ -77,6 +80,16 @@ local Items: { [string]: ItemDef } = {
 	BallPurple = ballAsset("Purple Ball", "PurpleDodgeball"),
 	BallYellow = ballAsset("Yellow Ball", "YellowDodgeball"),
 }
+
+for itemId, definition in TrailCosmetics do
+	Items[itemId] = {
+		Category = "TrailAssets",
+		Rarity = definition.Rarity,
+		DisplayName = definition.DisplayName,
+		EffectId = itemId,
+		Thumbnail = "",
+	}
+end
 
 return {
 	Rarities = Rarities,

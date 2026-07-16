@@ -58,10 +58,37 @@ function CosmeticsService.equip(player: Player, slot: string, itemId: string?): 
 	return true
 end
 
-local function grantAllForTesting(player: Player)
+function CosmeticsService.grantAllForTesting(player: Player): number
+	local granted = 0
 	for itemId in Cosmetics.Items do
-		CosmeticsService.grant(player, itemId)
+		if CosmeticsService.grant(player, itemId) then
+			granted += 1
+		end
 	end
+	return granted
+end
+
+function CosmeticsService.revokeForTesting(player: Player, itemId: string): (boolean, string?)
+	local data = PlayerData.get(player)
+	local item = Cosmetics.Items[itemId]
+	if data == nil then
+		return false, "no_profile"
+	end
+	if item == nil then
+		return false, "unknown_item"
+	end
+	if data.Cosmetics.Owned[itemId] ~= true then
+		return false, "not_owned"
+	end
+
+	if data.Cosmetics.Equipped[item.Category] == itemId then
+		local ok, reason = CosmeticsService.equip(player, item.Category, nil)
+		if not ok then
+			return false, reason
+		end
+	end
+	data.Cosmetics.Owned[itemId] = nil
+	return true
 end
 
 local function onProfileReady(player: Player)
@@ -73,7 +100,7 @@ local function onProfileReady(player: Player)
 			return
 		end
 		if Debug.CosmeticsGrantAll and RunService:IsStudio() then
-			grantAllForTesting(player)
+			CosmeticsService.grantAllForTesting(player)
 		end
 		applyEquipAttributes(player)
 	end)

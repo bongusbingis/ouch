@@ -50,6 +50,7 @@ local respawnGeneration: { [string]: number } = {}
 local playerMatchElims: { [string]: number } = {}
 local pendingWaveRespawns: { [string]: Player } = {}
 local waveTimer = 0
+local testingEventSequence = 0
 local started = false
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
@@ -259,8 +260,8 @@ local function grantSpawnProtection(character: Model)
 	end)
 end
 
-local function startMatch(events: { MatchSim.MatchEvent })
-	local map = MapService.spawnRandom()
+local function startMatch(events: { MatchSim.MatchEvent }, mapId: string?)
+	local map = if mapId then assert(MapService.spawnById(mapId)) else MapService.spawnRandom()
 	table.clear(spawnedThisMatch)
 	table.clear(intermissionPlayers)
 	table.clear(playerMatchElims)
@@ -542,6 +543,109 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	return true
 end
 
+function MatchService.stateForTesting(): { [string]: any }
+	local map = MapService.active()
+	return {
+		phase = state.phase,
+		modeId = mode.id,
+		mapId = if map then map.id else nil,
+		timeRemaining = state.timeRemaining,
+		resultsRemaining = state.resultsRemaining,
+		intermissionRemaining = state.intermissionRemaining,
+		winnerId = state.winnerId,
+		scoreTarget = mode.rules.ScoreTarget,
+		scores = table.clone(state.scores),
+	}
+end
+
+function MatchService.restartForTesting(modeId: string?, mapId: string?): (boolean, string?)
+	local nextMode = if modeId then ModeRegistry.get(modeId) else mode
+	if nextMode == nil then
+		return false, "unknown_mode"
+	end
+	if mapId ~= nil and not MapService.hasMap(mapId) then
+		return false, "unknown_map"
+	end
+
+	local previousTeams = teamIds()
+	if MapService.active() ~= nil then
+		if state.phase == "Active" then
+			mode.onMatchEnd(modeContext())
+		end
+		cleanupMatch()
+	end
+	for _, teamId in previousTeams do
+		setStateAttribute(teamAttrName(teamId), nil)
+	end
+
+	mode = nextMode
+	state = MatchSim.newState()
+	local events: { MatchSim.MatchEvent } = {}
+	startMatch(events, mapId)
+	handleMatchEvents(events)
+	return true
+end
+
+function MatchService.endForTesting(): (boolean, string?)
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.finish(state, mode.rules, "Developer", events) then
+		return false, "match_not_active"
+	end
+	handleMatchEvents(events)
+	return true
+end
+
+function MatchService.setTimeForTesting(seconds: number): (boolean, string?)
+	if state.phase ~= "Active" then
+		return false, "match_not_active"
+	end
+	if seconds < 0 or seconds ~= seconds or math.abs(seconds) == math.huge then
+		return false, "invalid_time"
+	end
+	state.timeRemaining = seconds
+	setStateAttribute("timeRemaining", math.floor(state.timeRemaining + 0.5))
+	return true
+end
+
+function MatchService.eliminateForTesting(source: Player?, target: Player): (boolean, { [string]: any })
+	testingEventSequence += 1
+	local event = {
+		kind = "Elim",
+		tick = -testingEventSequence,
+		sourceId = if source then PlayerIds.toId(source) else nil,
+		targetId = PlayerIds.toId(target),
+		direction = Vector3.zero,
+	}
+	return MatchService.handleCombatEvent(event), event
+end
+
+function MatchService.reviveForTesting(player: Player): (boolean, string?)
+	local character = player.Character
+	if character == nil then
+		return false, "no_character"
+	end
+	if not EliminationService.isDown(character) then
+		return false, "not_eliminated"
+	end
+	local key = PlayerIds.toId(player)
+	respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
+	pendingWaveRespawns[key] = nil
+	respawnPlayer(player)
+	return true
+end
+
+function MatchService.teleportToSpawnForTesting(player: Player): (boolean, string?)
+	if MapService.active() == nil then
+		return false, "no_active_map"
+	end
+	local character = player.Character
+	if character == nil then
+		return false, "no_character"
+	end
+	MapService.teleport(character, playerTeam(player))
+	return true
+end
+
 function MatchService.start()
 	if started then
 		return
@@ -568,7 +672,7 @@ function MatchService.start()
 		local events: { MatchSim.MatchEvent } = {}
 
 		if state.phase == "Idle" and #Players:GetPlayers() >= mode.rules.MinPlayers then
-			startMatch(events)
+			startMatch(events, nil)
 		end
 
 		MatchSim.tick(state, mode.rules, dt, events)

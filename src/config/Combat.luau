@@ -61,7 +61,7 @@ return {
 		ActiveDuration = 0.18,
 		MissRecovery = 0.5,
 		HitRecovery = 0.18,
-		MissStunDuration = 0.25,
+		MissStunDuration = 0.75,
 		MissStunWalkSpeedScale = 0.25,
 		Range = 7,
 		Width = 4,
@@ -72,7 +72,10 @@ return {
 		LineOfSightRadius = 0.35,
 		AnimationName = "Swing",
 		VisualHandOffset = vector.create(0.15, -0.55, -1.1),
+		VisualHandYawDeg = 90,
 		VisualRotationDeg = vector.create(0, 180, 90),
+		VisualGripTwistDeg = -90,
+		VisualGripInsetScale = 0.12,
 	},
 
 	Elimination = {

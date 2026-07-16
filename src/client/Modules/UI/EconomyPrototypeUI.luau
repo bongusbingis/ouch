@@ -118,7 +118,7 @@ local function shopView(): NodeSpec
 		name = "Shop",
 		properties = { Visible = false },
 		children = {
-			textLabel("Title", "Shop (PROTOTYPE)"),
+			textLabel("Title", "Shop"),
 			textLabel("Cash", "Cash: loading"),
 			textLabel("Status", "Economy data is loading."),
 			holder(),
@@ -133,7 +133,7 @@ local function inventoryView(): NodeSpec
 		name = "Inventory",
 		properties = { Visible = false },
 		children = {
-			textLabel("Title", "Inventory (PROTOTYPE)"),
+			textLabel("Title", "Inventory"),
 			textLabel("Status", "Economy data is loading."),
 			holder(),
 			viewConstraint(),

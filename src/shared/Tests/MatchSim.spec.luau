@@ -107,6 +107,17 @@ T.describe("MatchSim", function()
 		T.expect((ended :: MatchEvent).winnerId):toBeNil()
 	end)
 
+	T.it("can finish an active match through the orchestration hook", function()
+		local state, _ = activeMatch({ "p1", "p2" })
+		local events: { MatchEvent } = {}
+		MatchSim.applyElim(state, RULES, "p1", "p2", events)
+		T.expect(MatchSim.finish(state, RULES, "Developer", events)):toBeTruthy()
+		T.expect(MatchSim.finish(state, RULES, "Developer", events)):toEqual(false)
+		local ended = lastEvent(events, "MatchEnded")
+		T.expect((ended :: MatchEvent).winnerId):toEqual("p1")
+		T.expect((ended :: MatchEvent).reason):toEqual("Developer")
+	end)
+
 	T.it("passes through Intermission between Results and Idle", function()
 		local state, _ = activeMatch({ "p1", "p2" })
 		local events: { MatchEvent } = {}

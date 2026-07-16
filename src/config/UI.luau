@@ -73,4 +73,15 @@ return {
 		ClosedScale = 0.96,
 		OpenScale = 1,
 	},
+
+	Hud = {
+		DelayIndicator = {
+			FullSize = {
+				xScale = 0.35,
+				xOffset = 0,
+				yScale = 0.002,
+				yOffset = 0,
+			},
+		},
+	},
 }

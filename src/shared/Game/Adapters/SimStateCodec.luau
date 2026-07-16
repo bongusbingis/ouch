@@ -87,6 +87,7 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 					cooldown = (model:GetAttribute("hmCd") :: number?) or 0,
 					activeRemaining = (model:GetAttribute("hmAc") :: number?) or 0,
 					recoveryRemaining = (model:GetAttribute("hmRc") :: number?) or 0,
+					stunRemaining = (model:GetAttribute("hmSt") :: number?) or 0,
 					direction = model:GetAttribute("hmDr") :: Vector3?,
 					hitTargetId = model:GetAttribute("hmHt") :: string?,
 				},
@@ -151,6 +152,7 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(model, "hmCd", hammerState.cooldown)
 		setAttributeIfChanged(model, "hmAc", hammerState.activeRemaining)
 		setAttributeIfChanged(model, "hmRc", hammerState.recoveryRemaining)
+		setAttributeIfChanged(model, "hmSt", hammerState.stunRemaining)
 		setAttributeIfChanged(model, "hmDr", hammerState.direction)
 		setAttributeIfChanged(model, "hmHt", hammerState.hitTargetId)
 	end

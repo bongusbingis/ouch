@@ -97,6 +97,7 @@ T.describe("SimStateCodec", function()
 					cooldown = 0.4,
 					activeRemaining = 0.08,
 					recoveryRemaining = 0,
+					stunRemaining = 0.12,
 					direction = vector.create(1, 0, 0),
 					hitTargetId = "p2",
 				},
@@ -109,6 +110,7 @@ T.describe("SimStateCodec", function()
 
 		T.expect(hammer.cooldown):toEqual(0.4)
 		T.expect(hammer.activeRemaining):toEqual(0.08)
+		T.expect(hammer.stunRemaining):toEqual(0.12)
 		T.expect(hammer.direction):toEqual(vector.create(1, 0, 0))
 		T.expect(hammer.hitTargetId):toEqual("p2")
 	end)

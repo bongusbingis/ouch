@@ -417,7 +417,7 @@ T.describe("InventoryController", function()
 		T.expect(mounted[1].props.data.actionText):toEqual("Use Default")
 		T.expect(mounted[2].props.data.title):toEqual("Blue Ball")
 		T.expect(mounted[2].props.data.actionText):toEqual("Equip")
-		T.expect(mounted[3].props.data.actionText):toEqual("Use Default")
+		T.expect(mounted[3].props.data.actionText):toEqual("Unequip")
 
 		mounted[2].props.activated("BallBlue")
 		T.expect(calls[#calls].name):toEqual("EquipCosmetic")

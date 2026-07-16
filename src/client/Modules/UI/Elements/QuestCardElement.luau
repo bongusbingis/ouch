@@ -89,38 +89,22 @@ local function scalePosition(x: number, y: number): UDim2
 	return UDim2.fromScale(x, y)
 end
 
-local function visualFillRatio(data: QuestCardData, steps: number): number
-	local raw = math.clamp(data.progress / math.max(data.goal, 1), 0, 1)
-	if raw <= 0 then
-		return 0
-	end
-	return math.clamp(math.ceil(raw * steps) / steps, 0, 1)
+local function visualFillRatio(data: QuestCardData): number
+	return math.clamp(data.progress / math.max(data.goal, 1), 0, 1)
 end
 
-local function gradientStopForVisualRatio(ratio: number, rotation: number): number
-	local radians = math.rad(rotation)
-	local xWeight = math.abs(math.cos(radians))
-	local yWeight = math.abs(math.sin(radians))
-	local span = xWeight + yWeight
-	if span <= 0 then
-		return ratio
-	end
-	return math.clamp(0.5 + (ratio - 0.5) * (xWeight / span), 0, 1)
+local function visualSteps(data: QuestCardData, config): number
+	local maxSteps = math.max(math.floor(config.Progress.MaxSteps or 5), 1)
+	return math.clamp(math.floor(data.steps), 1, maxSteps)
 end
 
-local function setGradientFill(
-	gradient: UIGradient,
-	ratio: number,
-	rotation: number,
-	fillColor: Color3,
-	emptyColor: Color3
-)
+local function setGradientFill(gradient: UIGradient, ratio: number, fillColor: Color3, emptyColor: Color3)
 	local clamped = math.clamp(ratio, 0, 1)
-	local edge = gradientStopForVisualRatio(clamped, rotation)
+	gradient.Offset = vector2(clamped - 0.5, 0)
 	if ColorSequence == nil or typeof(fillColor) ~= "Color3" or typeof(emptyColor) ~= "Color3" then
 		local gradientAny = gradient :: any
 		gradientAny.FillRatio = clamped
-		gradientAny.GradientStop = edge
+		gradientAny.GradientStop = 0.5
 		return
 	end
 	if clamped <= 0 then
@@ -128,11 +112,10 @@ local function setGradientFill(
 	elseif clamped >= 1 then
 		gradient.Color = ColorSequence.new(fillColor)
 	else
-		edge = math.clamp(edge, 0.001, 0.999)
 		gradient.Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, fillColor),
-			ColorSequenceKeypoint.new(edge, fillColor),
-			ColorSequenceKeypoint.new(edge + 0.001, emptyColor),
+			ColorSequenceKeypoint.new(0.4995, fillColor),
+			ColorSequenceKeypoint.new(0.5005, emptyColor),
 			ColorSequenceKeypoint.new(1, emptyColor),
 		})
 	end
@@ -220,7 +203,7 @@ function QuestCardElement.mount(parent: Instance, props: QuestCardProps, options
 		count.Text = `{math.min(data.progress, data.goal)}/{data.goal}`
 		rewards.Text = rewardLabelText(data)
 
-		local steps = math.max(math.floor(data.steps), 1)
+		local steps = visualSteps(data, config)
 		local dividers = ensureDividers(steps)
 		for index, divider in dividers do
 			local visible = index <= steps - 1
@@ -232,13 +215,7 @@ function QuestCardElement.mount(parent: Instance, props: QuestCardProps, options
 		end
 
 		gradient.Rotation = dividerTemplate.Rotation
-		setGradientFill(
-			gradient,
-			visualFillRatio(data, steps),
-			gradient.Rotation,
-			config.Progress.FillColor,
-			config.Progress.EmptyColor
-		)
+		setGradientFill(gradient, visualFillRatio(data), config.Progress.FillColor, config.Progress.EmptyColor)
 
 		if buttonHandle then
 			buttonHandle:destroy()
