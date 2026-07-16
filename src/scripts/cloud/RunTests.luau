@@ -6,8 +6,11 @@
 
 local ServerStorage = game:GetService("ServerStorage")
 
+print("[cloud-tests] loading TestEZ runner")
 local runSuite = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Runner"))
+print("[cloud-tests] running suite")
 local summary = runSuite()
+print("[cloud-tests] suite returned")
 
 print(string.format("cloud tests: %d passed, %d failed, %d skipped", summary.passed, summary.failed, summary.skipped))
 

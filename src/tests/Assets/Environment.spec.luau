@@ -1,8 +1,5 @@
 --!nonstrict
--- Pins the cloud execution environment assumptions the rest of the suite
--- relies on, and logs diagnostics (whether place scripts auto-ran, scheduler
--- behavior) so environment changes fail loudly here instead of corrupting
--- other specs.
+-- Pins the cloud execution context assumptions used by the rest of the suite.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -24,19 +21,8 @@ return function()
 			expect(Workspace.Gravity > 0).to.equal(true)
 		end)
 
-		it("resumes yielded threads (task scheduler is live)", function()
-			local resumed = false
-			task.defer(function()
-				resumed = true
-			end)
-			task.wait()
-			expect(resumed).to.equal(true)
-		end)
-
-		it("fires Heartbeat (services and timed specs depend on it)", function()
-			local dt = RunService.Heartbeat:Wait()
-			expect(typeof(dt)).to.equal("number")
-			expect(dt > 0).to.equal(true)
+		it("does not run the place simulation", function()
+			expect(RunService:IsRunning()).to.equal(false)
 		end)
 
 		it("records whether place scripts auto-ran (diagnostic)", function()

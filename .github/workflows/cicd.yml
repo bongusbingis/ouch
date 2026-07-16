@@ -102,6 +102,7 @@ jobs:
   test-and-deploy:
     name: Test and deploy via Open Cloud
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [install-tools, linting, formatting, lune-tests]
   # if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' }}
     concurrency:

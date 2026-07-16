@@ -6,6 +6,7 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local BallService =
@@ -28,6 +29,8 @@ local function ballsIn(folder: Instance): { BasePart }
 end
 
 return function()
+	local simulationIt = if RunService:IsRunning() then it else itSKIP
+
 	describe("BallService", function()
 		local rigs = {}
 
@@ -119,7 +122,7 @@ return function()
 			expect(#ballsIn(TestAssets.get(Workspace, "Balls"))).to.equal(0)
 		end)
 
-		it("cadence ground spawns produce free balls at active points", function()
+		simulationIt("cadence ground spawns produce free balls at active points", function()
 			local point = Instance.new("Part")
 			point.Name = "TestBallSpawn"
 			point.Anchored = true

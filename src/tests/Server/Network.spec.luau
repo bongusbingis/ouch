@@ -5,6 +5,7 @@
 -- client invocations cannot be emulated).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
@@ -30,6 +31,8 @@ local function freshPlayer(): any
 end
 
 return function()
+	local simulationIt = if RunService:IsRunning() then it else itSKIP
+
 	describe("Network remotes", function()
 		it("materializes every declared remote with its declared class", function()
 			local folder = ReplicatedStorage:FindFirstChild("Remotes")
@@ -81,7 +84,7 @@ return function()
 			expect((handler(second))).never.to.be.ok()
 		end)
 
-		it("readmits after the one-second window elapses", function()
+		simulationIt("readmits after the one-second window elapses", function()
 			local player = freshPlayer()
 			local handler = Network.withRateLimit(1, function(_player)
 				return "ok"

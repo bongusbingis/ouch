@@ -22,16 +22,37 @@ local task = require("@lune/task")
 
 local POLL_SECONDS = 3
 local POLL_TIMEOUT_SECONDS = 600
+local TASK_EXECUTION_TIMEOUT = "300s"
 local CREATE_RETRIES = 5
 local CREATE_RETRY_SECONDS = 20
 local REQUEST_RETRIES = 5
+local REQUEST_TIMEOUT_SECONDS = 30
+local REQUEST_WATCH_SECONDS = 0.05
 local REQUEST_RETRY_MAX_SECONDS = 15
+local LOG_TIMEOUT_SECONDS = 90
+local MAX_LOG_PAGES = 20
 local RETRYABLE_STATUS_CODES = {
 	[429] = true,
 	[500] = true,
 	[502] = true,
 	[503] = true,
 	[504] = true,
+}
+
+type RequestResult = {
+	ok: boolean,
+	response: any,
+	error: string,
+	elapsedSeconds: number,
+}
+
+type GetResult = {
+	ok: boolean,
+	body: string,
+	error: string,
+	elapsedSeconds: number,
+	statusCode: number?,
+	attempts: number,
 }
 
 local function fail(code: number, message: string): never
@@ -84,25 +105,90 @@ local function decodeJson(stdout: string, context: string): { [string]: any }
 	return decoded :: any
 end
 
-local function openCloudGet(path: string, query: { [string]: string }?): (boolean, string, string)
+local function formatSeconds(value: number): string
+	return string.format("%.1fs", math.max(value, 0))
+end
+
+local function requestWithTimeout(config: any, timeoutSeconds: number): RequestResult
+	local startedAt = os.clock()
+	local completed = false
+	local requestOk = false
+	local response: any = nil
+	local worker = task.spawn(function()
+		requestOk, response = pcall(function()
+			return net.request(config)
+		end)
+		completed = true
+	end)
+	local deadline = startedAt + timeoutSeconds
+
+	while not completed and os.clock() < deadline do
+		task.wait(math.min(REQUEST_WATCH_SECONDS, math.max(deadline - os.clock(), 0)))
+	end
+
+	local elapsedSeconds = os.clock() - startedAt
+	if not completed then
+		pcall(function()
+			task.cancel(worker)
+		end)
+		return {
+			ok = false,
+			response = nil,
+			error = `request timed out after {formatSeconds(timeoutSeconds)}`,
+			elapsedSeconds = elapsedSeconds,
+		}
+	end
+	if not requestOk then
+		return {
+			ok = false,
+			response = nil,
+			error = tostring(response),
+			elapsedSeconds = elapsedSeconds,
+		}
+	end
+	return {
+		ok = true,
+		response = response,
+		error = "",
+		elapsedSeconds = elapsedSeconds,
+	}
+end
+
+local function openCloudGet(path: string, query: { [string]: string }?, context: string, deadline: number?): GetResult
+	local startedAt = os.clock()
 	local lastBody = ""
 	local lastError = "request failed"
+	local lastStatusCode: number? = nil
+	local attempts = 0
 	for attempt = 1, REQUEST_RETRIES do
-		local requestOk, response = pcall(function()
-			return net.request({
-				url = `https://apis.roblox.com/cloud/v2/{path}`,
-				method = "GET",
-				headers = {
-					["x-api-key"] = apiKey,
-					Accept = "application/json",
-				},
-				query = query,
-			})
-		end)
-		if requestOk then
-			local fetchResponse = response :: any
+		attempts = attempt
+		local remainingSeconds = if deadline then deadline - os.clock() else REQUEST_TIMEOUT_SECONDS
+		if remainingSeconds <= 0 then
+			lastError = `{context} exceeded its deadline`
+			break
+		end
+
+		local requestResult = requestWithTimeout({
+			url = `https://apis.roblox.com/cloud/v2/{path}`,
+			method = "GET",
+			headers = {
+				["x-api-key"] = apiKey,
+				Accept = "application/json",
+			},
+			query = query,
+		}, math.min(REQUEST_TIMEOUT_SECONDS, remainingSeconds))
+		if requestResult.ok then
+			local fetchResponse = requestResult.response :: any
+			lastStatusCode = fetchResponse.statusCode
 			if fetchResponse.ok then
-				return true, fetchResponse.body, ""
+				return {
+					ok = true,
+					body = fetchResponse.body or "",
+					error = "",
+					elapsedSeconds = os.clock() - startedAt,
+					statusCode = lastStatusCode,
+					attempts = attempt,
+				}
 			end
 			lastBody = fetchResponse.body or ""
 			lastError = `http {tostring(fetchResponse.statusCode)}: {tostring(fetchResponse.statusMessage)}`
@@ -110,14 +196,33 @@ local function openCloudGet(path: string, query: { [string]: string }?): (boolea
 				break
 			end
 		else
-			lastError = tostring(response)
+			lastError = requestResult.error
 		end
 
 		if attempt < REQUEST_RETRIES then
-			task.wait(math.min(2 ^ (attempt - 1), REQUEST_RETRY_MAX_SECONDS))
+			local retrySeconds = math.min(2 ^ (attempt - 1), REQUEST_RETRY_MAX_SECONDS)
+			if deadline then
+				retrySeconds = math.min(retrySeconds, math.max(deadline - os.clock(), 0))
+			end
+			if retrySeconds <= 0 then
+				break
+			end
+			print(
+				`[Open Cloud] {context}: attempt {attempt}/{REQUEST_RETRIES} failed ({lastError}); retrying in {formatSeconds(
+					retrySeconds
+				)}`
+			)
+			task.wait(retrySeconds)
 		end
 	end
-	return false, lastBody, lastError
+	return {
+		ok = false,
+		body = lastBody,
+		error = lastError,
+		elapsedSeconds = os.clock() - startedAt,
+		statusCode = lastStatusCode,
+		attempts = attempts,
+	}
 end
 
 local function looksBusy(stderr: string): boolean
@@ -163,6 +268,8 @@ local function createTask(versionId: string?): { [string]: any }
 		placeId,
 		"--filepath",
 		taskFile,
+		"--timeout",
+		TASK_EXECUTION_TIMEOUT,
 	}
 	if versionId then
 		table.insert(createArgs, "--version-id")
@@ -186,31 +293,81 @@ local function createTask(versionId: string?): { [string]: any }
 end
 
 local function pollTask(taskPath: string): { [string]: any }
-	local maxPolls = math.ceil(POLL_TIMEOUT_SECONDS / POLL_SECONDS)
-	for attempt = 1, maxPolls do
-		local ok, stdout, stderr = openCloudGet(taskPath, { view = "BASIC" })
-		if not ok then
-			if looksBusy(stderr) then
-				fail(2, `task poll was rate-limited after retries:\n{stderr}\n{stdout}`)
-			end
-			fail(1, `task poll failed:\n{stderr}\n{stdout}`)
+	local startedAt = os.clock()
+	local deadline = startedAt + POLL_TIMEOUT_SECONDS
+	local pollCount = 0
+	local lastState: string? = nil
+	print(
+		`[Open Cloud] polling every {POLL_SECONDS}s for up to {POLL_TIMEOUT_SECONDS}s; each HTTP request is capped at {REQUEST_TIMEOUT_SECONDS}s`
+	)
+
+	while true do
+		local remainingSeconds = deadline - os.clock()
+		if remainingSeconds <= 0 then
+			fail(
+				1,
+				`task did not finish within {POLL_TIMEOUT_SECONDS}s after {pollCount} polls (last state: {lastState or "not observed"})`
+			)
 		end
-		local taskInfo = decodeJson(stdout, "task poll")
+
+		pollCount += 1
+		print(
+			`[Open Cloud] poll {pollCount}: requesting state (elapsed {formatSeconds(os.clock() - startedAt)}, remaining {formatSeconds(
+				remainingSeconds
+			)})`
+		)
+		local result = openCloudGet(taskPath, { view = "BASIC" }, `task poll {pollCount}`, deadline)
+		if not result.ok then
+			if looksBusy(result.error) then
+				fail(2, `task poll was rate-limited after retries:\n{result.error}\n{result.body}`)
+			end
+			fail(1, `task poll failed after {formatSeconds(result.elapsedSeconds)}:\n{result.error}\n{result.body}`)
+		end
+		local taskInfo = decodeJson(result.body, "task poll")
 		local state = taskInfo.state
+		if typeof(state) ~= "string" then
+			fail(1, `task poll returned no state:\n{result.body}`)
+		end
+
+		local stateLabel = if lastState and lastState ~= state then `{lastState} -> {state}` else tostring(state)
+		lastState = state
+		print(
+			`[Open Cloud] poll {pollCount}: HTTP {tostring(result.statusCode)}, state {stateLabel}, request {formatSeconds(
+				result.elapsedSeconds
+			)}, attempts {result.attempts}, elapsed {formatSeconds(os.clock() - startedAt)}`
+		)
+
 		if state ~= "QUEUED" and state ~= "PROCESSING" then
+			print(`[Open Cloud] task reached terminal state {state} after {pollCount} polls`)
 			return taskInfo
 		end
-		if attempt < maxPolls then
-			task.wait(POLL_SECONDS)
+
+		local waitSeconds = math.min(POLL_SECONDS, math.max(deadline - os.clock(), 0))
+		if waitSeconds > 0 then
+			task.wait(waitSeconds)
 		end
 	end
-	return fail(1, `task did not finish within {POLL_TIMEOUT_SECONDS} seconds`)
 end
 
 local function printLogs(taskPath: string)
 	print("---- cloud test logs ----")
+	local startedAt = os.clock()
+	local deadline = startedAt + LOG_TIMEOUT_SECONDS
 	local pageToken: string? = nil
-	repeat
+	local seenPageTokens: { [string]: boolean } = {}
+	local pageCount = 0
+	local messageCount = 0
+	while true do
+		if pageCount >= MAX_LOG_PAGES then
+			print(`warning: stopped fetching task logs after {MAX_LOG_PAGES} pages`)
+			break
+		end
+		if os.clock() >= deadline then
+			print(`warning: stopped fetching task logs after {LOG_TIMEOUT_SECONDS}s`)
+			break
+		end
+
+		pageCount += 1
 		local query = {
 			view = "FLAT",
 			maxPageSize = "10000",
@@ -218,24 +375,43 @@ local function printLogs(taskPath: string)
 		if pageToken then
 			query.pageToken = pageToken
 		end
-		local ok, stdout, stderr = openCloudGet(`{taskPath}/logs`, query)
-		if not ok then
-			print(`warning: could not fetch task logs:\n{stderr}`)
-			return
+		print(`[Open Cloud] requesting task log page {pageCount}`)
+		local result = openCloudGet(`{taskPath}/logs`, query, `task logs page {pageCount}`, deadline)
+		if not result.ok then
+			print(`warning: could not fetch task log page {pageCount}:\n{result.error}`)
+			break
 		end
-		local logs = decodeJson(stdout, "task logs")
+		local logs = decodeJson(result.body, "task logs")
+		local pageMessageCount = 0
 		for _, page in (logs.luauExecutionSessionTaskLogs or {}) :: { any } do
 			for _, message in (page.messages or {}) :: { any } do
 				print(message)
+				pageMessageCount += 1
 			end
 		end
+		messageCount += pageMessageCount
+		print(
+			`[Open Cloud] task log page {pageCount}: HTTP {tostring(result.statusCode)}, {pageMessageCount} messages, request {formatSeconds(
+				result.elapsedSeconds
+			)}`
+		)
 		local nextPageToken = logs.nextPageToken
 		if typeof(nextPageToken) == "string" and nextPageToken ~= "" then
+			if seenPageTokens[nextPageToken] then
+				print("warning: task logs returned a repeated page token; stopping pagination")
+				break
+			end
+			seenPageTokens[nextPageToken] = true
 			pageToken = nextPageToken
 		else
-			pageToken = nil
+			break
 		end
-	until pageToken == nil
+	end
+	print(
+		`[Open Cloud] fetched {messageCount} task log messages across {pageCount} pages in {formatSeconds(
+			os.clock() - startedAt
+		)}`
+	)
 	print("---- end cloud test logs ----")
 end
 
@@ -246,7 +422,7 @@ else
 	versionId = upload("saved")
 end
 
-print("creating Luau execution task...")
+print(`creating Luau execution task (timeout {TASK_EXECUTION_TIMEOUT})...`)
 local createdTask = createTask(versionId)
 local taskPath = createdTask.path
 if typeof(taskPath) ~= "string" then
