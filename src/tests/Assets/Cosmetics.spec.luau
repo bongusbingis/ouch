@@ -1,20 +1,31 @@
 --!nonstrict
--- Validates the Studio-authored cosmetics catalog against Config.Cosmetics and
--- Config.Crates (the single sources of truth): every referenced template must
--- exist under ReplicatedStorage.Assets.Cosmetics with the right type. This is
--- exactly the setup drift the runtime would only surface as infinite yields.
+-- Validates authored cosmetic templates, procedural effects, and crate pools
+-- against their config sources of truth.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
+local TrailCosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("TrailCosmetics"))
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 
 return function()
 	describe("Cosmetics assets", function()
-		it("has a folder for every configured category", function()
-			for _, folderName in Cosmetics.CategoryFolders do
+		it("has a folder for every Studio-authored category", function()
+			local authoredCategories = {}
+			for category in Cosmetics.Defaults do
+				authoredCategories[category] = true
+			end
+			for _, item in Cosmetics.Items do
+				if item.AssetName ~= nil then
+					authoredCategories[item.Category] = true
+				end
+			end
+
+			for category in authoredCategories do
+				local folderName = Cosmetics.CategoryFolders[category]
+				expect(folderName).to.be.ok()
 				TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folderName)
 			end
 		end)
@@ -31,12 +42,22 @@ return function()
 		end)
 
 		it("has a template for every catalog item", function()
-			for itemId, item in Cosmetics.Items do
-				local folderName = Cosmetics.CategoryFolders[item.Category]
-				expect(folderName).to.be.ok()
-				local asset = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folderName, item.AssetName)
-				if item.Category == "BallAssets" then
-					expect(asset:IsA("BasePart")).to.equal(true)
+			for _, item in Cosmetics.Items do
+				if item.AssetName ~= nil then
+					local folderName = Cosmetics.CategoryFolders[item.Category]
+					expect(folderName).to.be.ok()
+					local asset = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folderName, item.AssetName)
+					if item.Category == "BallAssets" then
+						expect(asset:IsA("BasePart")).to.equal(true)
+					end
+				end
+			end
+		end)
+
+		it("has a procedural definition for every effect-backed item", function()
+			for _, item in Cosmetics.Items do
+				if item.EffectId ~= nil then
+					expect(TrailCosmetics[item.EffectId]).to.be.ok()
 				end
 			end
 		end)

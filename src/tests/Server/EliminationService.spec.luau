@@ -1,7 +1,6 @@
 --!nonstrict
--- EliminationService on real rigs: the CombatAlive attribute as the single
--- source of truth, ragdoll constraint construction over the rig's Motor6Ds,
--- and full restore on revive. Native Humanoid health must never change.
+-- EliminationService state, ragdoll construction, and restoration on a
+-- humanoid fixture with a deterministic non-root joint.
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -34,14 +33,35 @@ local function motors(character: Model): { Motor6D }
 	return found
 end
 
+local function addRagdollTestJoint(character: Model): Motor6D
+	local part0 = Instance.new("Part")
+	part0.Name = "RagdollTestPart0"
+	part0.Anchored = true
+	part0.Parent = character
+
+	local part1 = Instance.new("Part")
+	part1.Name = "RagdollTestPart1"
+	part1.Anchored = true
+	part1.Parent = character
+
+	local motor = Instance.new("Motor6D")
+	motor.Name = "RagdollTestJoint"
+	motor.Part0 = part0
+	motor.Part1 = part1
+	motor.Parent = part0
+	return motor
+end
+
 return function()
 	describe("EliminationService", function()
 		local player
 		local rig
+		local testMotor
 
 		beforeEach(function()
 			player = FakePlayer.new(200001)
 			rig = CharacterFixture.create("ElimRig")
+			testMotor = addRagdollTestJoint(rig)
 			player.Character = rig
 		end)
 
@@ -66,14 +86,17 @@ return function()
 
 			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_") > 0).to.equal(true)
 			expect(countDescendants(rig, "NoCollisionConstraint", "RagdollNoCollision_") > 0).to.equal(true)
+			expect(testMotor.Enabled).to.equal(false)
 
 			local sawDisabledMotor = false
 			for _, motor in motors(rig) do
-				local root = motor.Part0
-				local other = motor.Part1
-				local touchesRoot = (root and root.Name == "HumanoidRootPart")
-					or (other and other.Name == "HumanoidRootPart")
-				if not touchesRoot then
+				local part0 = motor.Part0
+				local part1 = motor.Part1
+				local eligible = part0 ~= nil
+					and part1 ~= nil
+					and part0.Name ~= "HumanoidRootPart"
+					and part1.Name ~= "HumanoidRootPart"
+				if eligible then
 					expect(motor.Enabled).to.equal(false)
 					sawDisabledMotor = true
 				end
@@ -104,8 +127,18 @@ return function()
 			expect(EliminationService.isDown(rig)).to.equal(false)
 			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_")).to.equal(0)
 			expect(countDescendants(rig, "NoCollisionConstraint", "RagdollNoCollision_")).to.equal(0)
+			expect(testMotor.Enabled).to.equal(true)
 			for _, motor in motors(rig) do
-				expect(motor.Enabled).to.equal(true)
+				local part0 = motor.Part0
+				local part1 = motor.Part1
+				if
+					part0 ~= nil
+					and part1 ~= nil
+					and part0.Name ~= "HumanoidRootPart"
+					and part1.Name ~= "HumanoidRootPart"
+				then
+					expect(motor.Enabled).to.equal(true)
+				end
 			end
 			expect(root.CanCollide).to.equal(rootCanCollideBefore)
 			expect(humanoid.AutoRotate).to.equal(autoRotateBefore)

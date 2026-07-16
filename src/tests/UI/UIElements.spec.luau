@@ -327,14 +327,12 @@ return function()
 			local gradient = progress:FindFirstChild("UIGradient")
 			expect(gradient).to.be.ok()
 
-			-- Partial fill renders a 4-keypoint sequence: fill color up to the
-			-- rotation-corrected edge, empty color after it.
 			local keypoints = gradient.Color.Keypoints
 			expect(#keypoints).to.equal(4)
 			expect(keypoints[1].Value).to.equal(QuestsConfig.Progress.FillColor)
 			expect(keypoints[4].Value).to.equal(QuestsConfig.Progress.EmptyColor)
-			local partialEdge = keypoints[2].Time
-			expect(partialEdge > 0 and partialEdge < 1).to.equal(true)
+			local partialOffset = gradient.Offset.X
+			expect(partialOffset).to.be.near(-0.1)
 
 			local visibleDividers = 0
 			for _, child in progress:GetChildren() do
@@ -353,8 +351,9 @@ return function()
 			expect(claimed).never.to.be.ok()
 
 			handle:setData(questData({ progress = 4 }))
-			local grownEdge = gradient.Color.Keypoints[2].Time
-			expect(grownEdge > partialEdge).to.equal(true)
+			local grownOffset = gradient.Offset.X
+			expect(grownOffset).to.be.near(0.3)
+			expect(grownOffset > partialOffset).to.equal(true)
 
 			handle:setData(questData({ progress = 5, completed = true }))
 			local lastButton = mountedButtons[#mountedButtons]

@@ -99,17 +99,24 @@ return function()
 		end)
 
 		it("assigns unique sequential ball names", function()
-			local player = FakePlayer.new(100004)
-			rigFor(player)
+			local firstPlayer = FakePlayer.new(100004)
+			local secondPlayer = FakePlayer.new(100014)
+			rigFor(firstPlayer)
+			rigFor(secondPlayer)
 
-			expect(BallService.grantHeldBall(player)).to.equal(true)
-			expect(BallService.grantHeldBall(player)).to.equal(true)
+			expect(BallService.grantHeldBall(firstPlayer)).to.equal(true)
+			expect(BallService.grantHeldBall(secondPlayer)).to.equal(true)
 
 			local names = {}
+			local sequences = {}
 			for _, ball in ballsIn(TestAssets.get(Workspace, "Balls")) do
 				expect(names[ball.Name]).never.to.be.ok()
 				names[ball.Name] = true
+				table.insert(sequences, tonumber(string.match(ball.Name, "^ball_(%d%d%d%d)$")))
 			end
+			expect(#sequences).to.equal(2)
+			table.sort(sequences)
+			expect(sequences[2]).to.equal(sequences[1] + 1)
 		end)
 
 		it("clearAll empties the balls folder", function()
