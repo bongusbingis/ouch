@@ -3,7 +3,7 @@
 -- Save → test → publish, gated on the cloud test suite:
 --   1. uploads the merged place as a Saved (unpublished) version,
 --   2. runs the TestEZ suite via the Open Cloud Luau Execution API against
---      that exact version (rbxcloud CLI does the API calls),
+--      that exact version,
 --   3. publishes the same artifact only when the suite is green.
 -- With --test-only, skips both uploads and runs the suite against the current
 -- version of the place.
@@ -15,13 +15,24 @@
 --             2 = Open Cloud busy/rate-limited after retries (nothing published).
 
 local fs = require("@lune/fs")
+local net = require("@lune/net")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 local task = require("@lune/task")
 
 local POLL_SECONDS = 3
+local POLL_TIMEOUT_SECONDS = 600
 local CREATE_RETRIES = 5
 local CREATE_RETRY_SECONDS = 20
+local REQUEST_RETRIES = 5
+local REQUEST_RETRY_MAX_SECONDS = 15
+local RETRYABLE_STATUS_CODES = {
+	[429] = true,
+	[500] = true,
+	[502] = true,
+	[503] = true,
+	[504] = true,
+}
 
 local function fail(code: number, message: string): never
 	print(`error: {message}`)
@@ -68,9 +79,45 @@ end
 local function decodeJson(stdout: string, context: string): { [string]: any }
 	local ok, decoded = pcall(serde.decode, "json" :: any, stdout)
 	if not ok or typeof(decoded) ~= "table" then
-		fail(1, `{context}: could not parse rbxcloud output as JSON:\n{stdout}`)
+		fail(1, `{context}: could not parse JSON response:\n{stdout}`)
 	end
 	return decoded :: any
+end
+
+local function openCloudGet(path: string, query: { [string]: string }?): (boolean, string, string)
+	local lastBody = ""
+	local lastError = "request failed"
+	for attempt = 1, REQUEST_RETRIES do
+		local requestOk, response = pcall(function()
+			return net.request({
+				url = `https://apis.roblox.com/cloud/v2/{path}`,
+				method = "GET",
+				headers = {
+					["x-api-key"] = apiKey,
+					Accept = "application/json",
+				},
+				query = query,
+			})
+		end)
+		if requestOk then
+			local fetchResponse = response :: any
+			if fetchResponse.ok then
+				return true, fetchResponse.body, ""
+			end
+			lastBody = fetchResponse.body or ""
+			lastError = `http {tostring(fetchResponse.statusCode)}: {tostring(fetchResponse.statusMessage)}`
+			if not RETRYABLE_STATUS_CODES[fetchResponse.statusCode] then
+				break
+			end
+		else
+			lastError = tostring(response)
+		end
+
+		if attempt < REQUEST_RETRIES then
+			task.wait(math.min(2 ^ (attempt - 1), REQUEST_RETRY_MAX_SECONDS))
+		end
+	end
+	return false, lastBody, lastError
 end
 
 local function looksBusy(stderr: string): boolean
@@ -138,49 +185,14 @@ local function createTask(versionId: string?): { [string]: any }
 	return fail(2, "Open Cloud is still busy after retries; nothing was published")
 end
 
-type TaskLocator = {
-	versionId: string?,
-	sessionId: string,
-	taskId: string,
-}
-
-local function locatorFromPath(taskPath: string): TaskLocator
-	local versionId = string.match(taskPath, "places/[^/]+/versions/([^/]+)/luau%-execution%-sessions/")
-	local sessionId, taskId = string.match(taskPath, "luau%-execution%-sessions/([^/]+)/tasks/([^/]+)")
-	if sessionId == nil or taskId == nil then
-		fail(1, `could not parse session/task ids from task path: {taskPath}`)
-	end
-	return {
-		versionId = versionId,
-		sessionId = sessionId :: string,
-		taskId = taskId :: string,
-	}
-end
-
-local function taskCommand(command: string, locator: TaskLocator): { string }
-	local commandArgs = {
-		"luau",
-		command,
-		"--universe-id",
-		universeId,
-		"--place-id",
-		placeId,
-		"--session-id",
-		locator.sessionId,
-		"--task-id",
-		locator.taskId,
-	}
-	if locator.versionId then
-		table.insert(commandArgs, "--version-id")
-		table.insert(commandArgs, locator.versionId)
-	end
-	return commandArgs
-end
-
-local function pollTask(locator: TaskLocator): { [string]: any }
-	while true do
-		local ok, stdout, stderr = rbxcloud(taskCommand("get-task", locator))
+local function pollTask(taskPath: string): { [string]: any }
+	local maxPolls = math.ceil(POLL_TIMEOUT_SECONDS / POLL_SECONDS)
+	for attempt = 1, maxPolls do
+		local ok, stdout, stderr = openCloudGet(taskPath, { view = "BASIC" })
 		if not ok then
+			if looksBusy(stderr) then
+				fail(2, `task poll was rate-limited after retries:\n{stderr}\n{stdout}`)
+			end
 			fail(1, `task poll failed:\n{stderr}\n{stdout}`)
 		end
 		local taskInfo = decodeJson(stdout, "task poll")
@@ -188,26 +200,42 @@ local function pollTask(locator: TaskLocator): { [string]: any }
 		if state ~= "QUEUED" and state ~= "PROCESSING" then
 			return taskInfo
 		end
-		task.wait(POLL_SECONDS)
-	end
-end
-
-local function printLogs(locator: TaskLocator)
-	local commandArgs = taskCommand("get-logs", locator)
-	table.insert(commandArgs, "--view")
-	table.insert(commandArgs, "flat")
-	local ok, stdout, stderr = rbxcloud(commandArgs)
-	if not ok then
-		print(`warning: could not fetch task logs:\n{stderr}`)
-		return
-	end
-	local logs = decodeJson(stdout, "task logs")
-	print("---- cloud test logs ----")
-	for _, page in (logs.luauExecutionSessionTaskLogs or {}) :: { any } do
-		for _, message in (page.messages or {}) :: { any } do
-			print(message)
+		if attempt < maxPolls then
+			task.wait(POLL_SECONDS)
 		end
 	end
+	return fail(1, `task did not finish within {POLL_TIMEOUT_SECONDS} seconds`)
+end
+
+local function printLogs(taskPath: string)
+	print("---- cloud test logs ----")
+	local pageToken: string? = nil
+	repeat
+		local query = {
+			view = "FLAT",
+			maxPageSize = "10000",
+		}
+		if pageToken then
+			query.pageToken = pageToken
+		end
+		local ok, stdout, stderr = openCloudGet(`{taskPath}/logs`, query)
+		if not ok then
+			print(`warning: could not fetch task logs:\n{stderr}`)
+			return
+		end
+		local logs = decodeJson(stdout, "task logs")
+		for _, page in (logs.luauExecutionSessionTaskLogs or {}) :: { any } do
+			for _, message in (page.messages or {}) :: { any } do
+				print(message)
+			end
+		end
+		local nextPageToken = logs.nextPageToken
+		if typeof(nextPageToken) == "string" and nextPageToken ~= "" then
+			pageToken = nextPageToken
+		else
+			pageToken = nil
+		end
+	until pageToken == nil
 	print("---- end cloud test logs ----")
 end
 
@@ -226,9 +254,8 @@ if typeof(taskPath) ~= "string" then
 end
 print(`task created: {taskPath}`)
 
-local taskLocator = locatorFromPath(taskPath :: string)
-local finishedTask = pollTask(taskLocator)
-printLogs(taskLocator)
+local finishedTask = pollTask(taskPath :: string)
+printLogs(taskPath :: string)
 
 local state = finishedTask.state
 if state ~= "COMPLETE" then
