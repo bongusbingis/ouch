@@ -17,6 +17,12 @@ local WorldAudio = require(script.Parent.WorldAudio)
 local BallVisuals = {}
 
 local FREE_PHASE = 6
+local TRAIL_ACTIVE_PHASES = {
+	[2] = true,
+	[3] = true,
+	[4] = true,
+	[5] = true,
+}
 
 local visuals: { [BasePart]: BasePart } = {}
 local appliedAssets: { [BasePart]: string } = {}
@@ -251,10 +257,11 @@ function BallVisuals.start()
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
 			local targetCFrame = heldCFrame or ball.CFrame
 			visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
-			setEnabled(visual, "Trail", phase == 2 or phase == 3 or phase == 5)
+			local trailActive = TRAIL_ACTIVE_PHASES[phase] == true
+			setEnabled(visual, "Trail", trailActive)
 			local trailHandle = trailHandles[ball]
 			if trailHandle then
-				trailHandle:setEnabled(phase == 2)
+				trailHandle:setEnabled(trailActive)
 			end
 		end
 	end)
