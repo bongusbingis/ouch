@@ -15,7 +15,7 @@ return {
 
 	-- Studio-only: grants every catalog cosmetic on join so equips are
 	-- testable before the locker UI exists.
-	CosmeticsGrantAll = true,
+	CosmeticsGrantAll = false,
 
 	AimAssistCones = true,
 	AimAssistTargetRange = true,
