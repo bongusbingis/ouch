@@ -3,7 +3,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
@@ -25,10 +24,16 @@ local TRAIL_ACTIVE_PHASES = {
 	[5] = true,
 }
 
+type RestPulseState = {
+	highlight: Highlight,
+	elapsed: number,
+}
+
 local visuals: { [BasePart]: BasePart } = {}
 local appliedAssets: { [BasePart]: string } = {}
 local appliedTrails: { [BasePart]: string } = {}
 local trailHandles: { [BasePart]: TrailVisuals.Handle } = {}
+local restPulses: { [BasePart]: RestPulseState } = {}
 local assetTemplates: { [string]: BasePart } = {}
 local seen = EventDedup.new(4096)
 
@@ -76,46 +81,44 @@ local function playOptional(ball: BasePart, name: string)
 	end
 end
 
-local function playRestPulse(visual: BasePart)
+local function destroyRestPulse(ball: BasePart)
+	local state = restPulses[ball]
+	if state then
+		state.highlight:Destroy()
+	end
+	restPulses[ball] = nil
+end
+
+local function updateRestPulse(ball: BasePart, visual: BasePart, active: boolean, dt: number)
+	if not active then
+		destroyRestPulse(ball)
+		return
+	end
+
 	local config = Combat.Dodgeball.RestPulse
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "RestGoldPulse"
-	highlight.Adornee = visual
-	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
-	highlight.FillColor = config.FillColor
-	highlight.OutlineColor = config.OutlineColor
-	highlight.FillTransparency = 1
-	highlight.OutlineTransparency = 1
-	highlight.Parent = visual
-
-	local rise = TweenService:Create(
-		highlight,
-		TweenInfo.new(config.RiseTime, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		{
-			FillTransparency = config.PeakFillTransparency,
-			OutlineTransparency = config.PeakOutlineTransparency,
+	local state = restPulses[ball]
+	if state == nil or state.highlight.Parent ~= visual then
+		destroyRestPulse(ball)
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "RestGoldPulse"
+		highlight.Adornee = visual
+		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+		highlight.FillColor = config.FillColor
+		highlight.OutlineColor = config.OutlineColor
+		highlight.Parent = visual
+		state = {
+			highlight = highlight,
+			elapsed = 0,
 		}
-	)
-	local fade = TweenService:Create(
-		highlight,
-		TweenInfo.new(config.FadeTime, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-		{
-			FillTransparency = 1,
-			OutlineTransparency = 1,
-		}
-	)
+		restPulses[ball] = state
+	end
 
-	rise.Completed:Once(function(playbackState)
-		if playbackState ~= Enum.PlaybackState.Completed or highlight.Parent == nil then
-			highlight:Destroy()
-			return
-		end
-		fade:Play()
-	end)
-	fade.Completed:Once(function()
-		highlight:Destroy()
-	end)
-	rise:Play()
+	state.elapsed += dt
+	local wave = (math.sin(state.elapsed * config.CyclesPerSecond * math.pi * 2 - math.pi * 0.5) + 1) * 0.5
+	state.highlight.FillTransparency = config.DimFillTransparency
+		+ (config.BrightFillTransparency - config.DimFillTransparency) * wave
+	state.highlight.OutlineTransparency = config.DimOutlineTransparency
+		+ (config.BrightOutlineTransparency - config.DimOutlineTransparency) * wave
 end
 
 -- The ball renders its current owner's equipped asset while possessed (any
@@ -203,6 +206,7 @@ local function addBall(ball: BasePart)
 end
 
 local function removeBall(ball: BasePart)
+	destroyRestPulse(ball)
 	destroyTrail(ball)
 	local visual = visuals[ball]
 	if visual then
@@ -218,6 +222,7 @@ local function refreshAsset(ball: BasePart)
 		return
 	end
 	local previous = visuals[ball]
+	destroyRestPulse(ball)
 	destroyTrail(ball)
 	local visual = buildVisual(ball, assetId)
 	if previous then
@@ -258,9 +263,6 @@ function BallVisuals.onEvent(event: any)
 	local effect = effectNames[event.kind]
 	if effect then
 		playOptional(visual, effect)
-	end
-	if event.kind == "BallSettled" and ball:GetAttribute("ph") == FREE_PHASE then
-		playRestPulse(visual)
 	end
 end
 
@@ -309,6 +311,7 @@ function BallVisuals.start()
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
 			local targetCFrame = heldCFrame or ball.CFrame
 			visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
+			updateRestPulse(ball, visual, phase == FREE_PHASE, dt)
 			local trailActive = TRAIL_ACTIVE_PHASES[phase] == true
 			setEnabled(visual, "Trail", trailActive)
 			local trailHandle = trailHandles[ball]

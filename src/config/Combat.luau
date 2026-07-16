@@ -54,10 +54,11 @@ return {
 		RestPulse = {
 			FillColor = Color3.fromRGB(255, 181, 38),
 			OutlineColor = Color3.fromRGB(255, 244, 176),
-			PeakFillTransparency = 0.16,
-			PeakOutlineTransparency = 0.02,
-			RiseTime = 0.12,
-			FadeTime = 0.48,
+			BrightFillTransparency = 0.12,
+			DimFillTransparency = 0.72,
+			BrightOutlineTransparency = 0,
+			DimOutlineTransparency = 0.5,
+			CyclesPerSecond = 1.25,
 		},
 
 		SpawnCadence = 5, -- seconds between world ball spawns per spawn point
