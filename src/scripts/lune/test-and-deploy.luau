@@ -138,28 +138,48 @@ local function createTask(versionId: string?): { [string]: any }
 	return fail(2, "Open Cloud is still busy after retries; nothing was published")
 end
 
-local function idsFromPath(taskPath: string): (string, string)
+type TaskLocator = {
+	versionId: string?,
+	sessionId: string,
+	taskId: string,
+}
+
+local function locatorFromPath(taskPath: string): TaskLocator
+	local versionId = string.match(taskPath, "places/[^/]+/versions/([^/]+)/luau%-execution%-sessions/")
 	local sessionId, taskId = string.match(taskPath, "luau%-execution%-sessions/([^/]+)/tasks/([^/]+)")
 	if sessionId == nil or taskId == nil then
 		fail(1, `could not parse session/task ids from task path: {taskPath}`)
 	end
-	return sessionId :: string, taskId :: string
+	return {
+		versionId = versionId,
+		sessionId = sessionId :: string,
+		taskId = taskId :: string,
+	}
 end
 
-local function pollTask(sessionId: string, taskId: string): { [string]: any }
+local function taskCommand(command: string, locator: TaskLocator): { string }
+	local commandArgs = {
+		"luau",
+		command,
+		"--universe-id",
+		universeId,
+		"--place-id",
+		placeId,
+		"--session-id",
+		locator.sessionId,
+		"--task-id",
+		locator.taskId,
+	}
+	if locator.versionId then
+		table.insert(commandArgs, "--version-id")
+		table.insert(commandArgs, locator.versionId)
+	end
+	return commandArgs
+end
+
+local function pollTask(locator: TaskLocator): { [string]: any }
 	while true do
-		local ok, stdout, stderr = rbxcloud({
-			"luau",
-			"get-task",
-			"--universe-id",
-			universeId,
-			"--place-id",
-			placeId,
-			"--session-id",
-			sessionId,
-			"--task-id",
-			taskId,
-		})
+		local ok, stdout, stderr = rbxcloud(taskCommand("get-task", locator))
 		if not ok then
 			fail(1, `task poll failed:\n{stderr}\n{stdout}`)
 		end
@@ -172,21 +192,11 @@ local function pollTask(sessionId: string, taskId: string): { [string]: any }
 	end
 end
 
-local function printLogs(sessionId: string, taskId: string)
-	local ok, stdout, stderr = rbxcloud({
-		"luau",
-		"get-logs",
-		"--universe-id",
-		universeId,
-		"--place-id",
-		placeId,
-		"--session-id",
-		sessionId,
-		"--task-id",
-		taskId,
-		"--view",
-		"flat",
-	})
+local function printLogs(locator: TaskLocator)
+	local commandArgs = taskCommand("get-logs", locator)
+	table.insert(commandArgs, "--view")
+	table.insert(commandArgs, "flat")
+	local ok, stdout, stderr = rbxcloud(commandArgs)
 	if not ok then
 		print(`warning: could not fetch task logs:\n{stderr}`)
 		return
@@ -216,9 +226,9 @@ if typeof(taskPath) ~= "string" then
 end
 print(`task created: {taskPath}`)
 
-local sessionId, taskId = idsFromPath(taskPath :: string)
-local finishedTask = pollTask(sessionId, taskId)
-printLogs(sessionId, taskId)
+local taskLocator = locatorFromPath(taskPath :: string)
+local finishedTask = pollTask(taskLocator)
+printLogs(taskLocator)
 
 local state = finishedTask.state
 if state ~= "COMPLETE" then
