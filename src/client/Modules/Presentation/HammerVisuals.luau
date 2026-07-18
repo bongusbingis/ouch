@@ -10,6 +10,8 @@ local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local Util = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util")
+local Spring = require(Util:WaitForChild("Spring"))
 local CharacterRig = require(script.Parent.CharacterRig)
 local WorldAudio = require(script.Parent.WorldAudio)
 
@@ -23,8 +25,10 @@ local defaultTemplate = assetsFolder:WaitForChild(default.AssetName)
 assert(defaultTemplate:IsA("BasePart"), "[HammerVisuals] default HammerAssets asset must be a BasePart")
 
 local visuals: { [Player]: BasePart } = {}
-local appliedAssets: { [Player]: string } = {}
-local assetTemplates: { [string]: BasePart } = {}
+-- Springs outlive the visual (hidden while holding a ball, rebuilt on respawn)
+-- so a mid-wobble hammer resumes naturally; cleared only on PlayerRemoving.
+local springs: { [Player]: Spring.Spring } = {}
+local baseSize = template.Size
 local ballsFolder = Workspace:WaitForChild("Balls")
 local seenEvents = EventDedup.new(4096)
 
@@ -36,8 +40,29 @@ local function handCFrame(template: BasePart): CFrame
 	return CFrame.new(offset.x, offset.y, offset.z)
 		* CFrame.Angles(0, math.rad(Combat.Hammer.VisualHandYawDeg), 0)
 		* CFrame.Angles(math.rad(rotation.x), math.rad(rotation.y), math.rad(rotation.z))
-		* CFrame.Angles(0, math.rad(Combat.Hammer.VisualGripTwistDeg), 0)
-		* grip:Inverse()
+end
+
+local function springFor(player: Player): Spring.Spring
+	local spring = springs[player]
+	if spring == nil then
+		spring = Spring.new(0)
+		springs[player] = spring
+	end
+	return spring
+end
+
+local function scaleFor(stretch: number): Vector3
+	local along = 1 + stretch
+	-- Volume-preserving: cross-axes thin as the hammer stretches and fatten
+	-- as it squashes.
+	local cross = 1 / math.sqrt(along)
+	local axis = Combat.HammerFeel.StretchAxis
+	if axis == "X" then
+		return Vector3.new(along, cross, cross)
+	elseif axis == "Z" then
+		return Vector3.new(cross, cross, along)
+	end
+	return Vector3.new(cross, along, cross)
 end
 
 local function hasBall(player: Player): boolean
@@ -109,17 +134,16 @@ local function audioParentFor(playerId: string): Instance?
 end
 
 function HammerVisuals.start()
-	for itemId, item in Cosmetics.Items do
-		if item.Category == "HammerAssets" then
-			local asset = assetsFolder:WaitForChild(item.AssetName)
-			assert(asset:IsA("BasePart"), `[HammerVisuals] asset template {item.AssetName} must be a BasePart`)
-			assetTemplates[itemId] = asset
-		end
-	end
+	Players.PlayerRemoving:Connect(function(player)
+		remove(player)
+		springs[player] = nil
+	end)
 
-	Players.PlayerRemoving:Connect(remove)
-
-	RunService.RenderStepped:Connect(function()
+	RunService.RenderStepped:Connect(function(dt)
+		local feel = Combat.HammerFeel
+		local grip = offsetCFrame()
+		local gripLocal = grip:Inverse().Position
+		local now = os.clock()
 		for _, player in Players:GetPlayers() do
 			local character = player.Character
 			if character == nil then
@@ -133,8 +157,21 @@ function HammerVisuals.start()
 				continue
 			end
 
+			local spring = springFor(player)
+			Spring.step(spring, feel.SpringFrequencyHz, feel.SpringDampingRatio, dt)
+			-- Per-player phase offset desyncs idle wobble between hammers.
+			local phase = (player.UserId % 100) * 0.618
+			local wobble = feel.IdleWobbleAmplitude * math.sin((now + phase) * feel.IdleWobbleHz * 2 * math.pi)
+			local stretch = math.clamp(spring.position + wobble, feel.MinStretch, feel.MaxStretch)
+			local scale = scaleFor(stretch)
+
 			local visual = visualFor(player)
-			visual.CFrame = hand.CFrame * handCFrame(visual)
+			visual.Size = Vector3.new(baseSize.X * scale.X, baseSize.Y * scale.Y, baseSize.Z * scale.Z)
+			-- Size scales the mesh about the part center; the translation maps
+			-- the scaled grip point back onto the hand so the handle stays put.
+			visual.CFrame = hand.CFrame
+				* grip
+				* CFrame.new(gripLocal.X * (1 - scale.X), gripLocal.Y * (1 - scale.Y), gripLocal.Z * (1 - scale.Z))
 		end
 	end)
 end
@@ -158,6 +195,20 @@ function HammerVisuals.onEvent(event: any)
 	if playerId == nil then
 		return
 	end
+
+	local player = PlayerIds.fromId(playerId)
+	if player then
+		local feel = Combat.HammerFeel
+		local spring = springFor(player)
+		if event.kind == "HammerSwing" then
+			Spring.impulse(spring, feel.SwingStretchImpulse)
+		elseif event.kind == "HammerHit" then
+			Spring.impulse(spring, feel.HitSquashImpulse)
+		elseif event.kind == "HammerMiss" then
+			spring.position -= feel.MissDeflateAmount
+		end
+	end
+
 	local parent = audioParentFor(playerId)
 	if parent then
 		WorldAudio.play("Hammer", soundName, parent)

@@ -258,7 +258,6 @@ function BallVisuals.onEvent(event: any)
 		BallPickedUp = "Pickup",
 		BallCaught = "Pickup",
 		BallRecallStarted = "Recall",
-		Elim = "Hit",
 	}
 	local effect = effectNames[event.kind]
 	if effect then

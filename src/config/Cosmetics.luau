@@ -18,11 +18,13 @@ export type ItemDef = {
 	AssetName: string?,
 	EffectId: string?,
 	Thumbnail: string,
+	SplatColor: Color3?, -- BallAssets only: tints the elimination splat emitters
 }
 
 export type DefaultDef = {
 	DisplayName: string,
 	AssetName: string,
+	SplatColor: Color3?,
 }
 
 local Rarities: { [string]: RarityDef } = {
@@ -52,6 +54,7 @@ local Defaults: { [string]: DefaultDef } = {
 	BallAssets = {
 		DisplayName = "Default Dodgeball",
 		AssetName = "DefaultDodgeball",
+		SplatColor = Color3.fromRGB(205, 65, 55),
 	},
 	HammerAssets = {
 		DisplayName = "Default Hammer",
@@ -59,26 +62,27 @@ local Defaults: { [string]: DefaultDef } = {
 	},
 }
 
-local function ballAsset(displayName: string, assetName: string): ItemDef
+local function ballAsset(displayName: string, assetName: string, splatColor: Color3): ItemDef
 	return {
 		Category = "BallAssets",
 		Rarity = "Common",
 		DisplayName = displayName,
 		AssetName = assetName,
 		Thumbnail = "",
+		SplatColor = splatColor,
 	}
 end
 
 local Items: { [string]: ItemDef } = {
-	BallRed = ballAsset("Red Ball", "RedDodgeball"),
-	BallBlue = ballAsset("Blue Ball", "BlueDodgeball"),
-	BallWhite = ballAsset("White Ball", "WhiteDodgeball"),
-	BallBlack = ballAsset("Black Ball", "BlackDodgeball"),
-	BallOrange = ballAsset("Orange Ball", "OrangeDodgeball"),
-	BallGreen = ballAsset("Green Ball", "GreenDodgeball"),
-	BallPink = ballAsset("Pink Ball", "PinkDodgeball"),
-	BallPurple = ballAsset("Purple Ball", "PurpleDodgeball"),
-	BallYellow = ballAsset("Yellow Ball", "YellowDodgeball"),
+	BallRed = ballAsset("Red Ball", "RedDodgeball", Color3.fromRGB(235, 60, 60)),
+	BallBlue = ballAsset("Blue Ball", "BlueDodgeball", Color3.fromRGB(65, 120, 235)),
+	BallWhite = ballAsset("White Ball", "WhiteDodgeball", Color3.fromRGB(240, 240, 240)),
+	BallBlack = ballAsset("Black Ball", "BlackDodgeball", Color3.fromRGB(45, 45, 45)),
+	BallOrange = ballAsset("Orange Ball", "OrangeDodgeball", Color3.fromRGB(240, 140, 40)),
+	BallGreen = ballAsset("Green Ball", "GreenDodgeball", Color3.fromRGB(90, 200, 80)),
+	BallPink = ballAsset("Pink Ball", "PinkDodgeball", Color3.fromRGB(240, 120, 190)),
+	BallPurple = ballAsset("Purple Ball", "PurpleDodgeball", Color3.fromRGB(150, 80, 220)),
+	BallYellow = ballAsset("Yellow Ball", "YellowDodgeball", Color3.fromRGB(240, 210, 60)),
 }
 
 for itemId, definition in TrailCosmetics do

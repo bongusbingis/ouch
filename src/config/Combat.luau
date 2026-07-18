@@ -87,6 +87,28 @@ return {
 		VisualGripInsetScale = 0.12,
 	},
 
+	-- Client-only inflatable feel for the hammer visual. Stretch values are
+	-- fractions of the template size along StretchAxis (the part-local axis
+	-- running handle-to-head); MinStretch must stay above -1.
+	HammerFeel = {
+		IdleWobbleAmplitude = 0.035,
+		IdleWobbleHz = 1.1,
+		SpringFrequencyHz = 5.5,
+		SpringDampingRatio = 0.32, -- underdamped so squashes visibly rebound
+		SwingStretchImpulse = 4.0,
+		HitSquashImpulse = -10.0,
+		MissDeflateAmount = 0.4,
+		MaxStretch = 0.6,
+		MinStretch = -0.55,
+		StretchAxis = "Y",
+	},
+
+	-- World-space paint splat played on dodgeball eliminations.
+	Splat = {
+		Lifetime = 3,
+		SoundName = "Splat", -- SoundService.CombatAudio.Dodgeball.<name>
+	},
+
 	Elimination = {
 		MaxHealth = 1,
 		AngularImpulseY = 12,
