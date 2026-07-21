@@ -96,6 +96,39 @@ jobs:
       - name: Run tests
         run: lune run src/scripts/lune/run-tests.luau
 
+  fetch-live-place:
+    name: Fetch live published place
+    runs-on: ubuntu-latest
+    needs: [install-tools]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v0.4.2
+
+      - name: Restore cached Aftman tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.aftman
+          key: tools-${{ hashFiles('aftman.toml') }}
+
+      # Downloads whatever place is currently live via Open Cloud's Asset
+      # Delivery API, independent of this run's own test/publish outcome, so
+      # agents can pull the artifact and inspect the real published place.
+      - name: Fetch live place
+        run: bash src/scripts/shell/fetch-live-place.sh live-place.rbxl
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          ROBLOX_PLACE_ID: ${{ vars.ROBLOX_PLACE_ID }}
+
+      - name: Upload live place artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-place
+          path: live-place.rbxl
+          retention-days: 14
+
   # PRs into prod run the full sequence: rojo build -> merge into game.rbxl ->
   # upload as a Saved version -> run the cloud TestEZ suite against that exact
   # version via the Open Cloud Luau Execution API -> publish only on green.
