@@ -25,10 +25,12 @@ local defaultTemplate = assetsFolder:WaitForChild(default.AssetName)
 assert(defaultTemplate:IsA("BasePart"), "[HammerVisuals] default HammerAssets asset must be a BasePart")
 
 local visuals: { [Player]: BasePart } = {}
+local appliedAssets: { [Player]: string } = {}
+local assetTemplates: { [string]: BasePart } = {}
 -- Springs outlive the visual (hidden while holding a ball, rebuilt on respawn)
 -- so a mid-wobble hammer resumes naturally; cleared only on PlayerRemoving.
 local springs: { [Player]: Spring.Spring } = {}
-local baseSize = template.Size
+local baseSize = defaultTemplate.Size
 local ballsFolder = Workspace:WaitForChild("Balls")
 local seenEvents = EventDedup.new(4096)
 
@@ -40,6 +42,7 @@ local function handCFrame(template: BasePart): CFrame
 	return CFrame.new(offset.x, offset.y, offset.z)
 		* CFrame.Angles(0, math.rad(Combat.Hammer.VisualHandYawDeg), 0)
 		* CFrame.Angles(math.rad(rotation.x), math.rad(rotation.y), math.rad(rotation.z))
+		* grip
 end
 
 local function springFor(player: Player): Spring.Spring
@@ -134,6 +137,14 @@ local function audioParentFor(playerId: string): Instance?
 end
 
 function HammerVisuals.start()
+	for itemId, item in Cosmetics.Items do
+		if item.Category == "HammerAssets" then
+			local asset = assetsFolder:WaitForChild(item.AssetName)
+			assert(asset:IsA("BasePart"), `[HammerVisuals] asset template {item.AssetName} must be a BasePart`)
+			assetTemplates[itemId] = asset
+		end
+	end
+
 	Players.PlayerRemoving:Connect(function(player)
 		remove(player)
 		springs[player] = nil
@@ -141,7 +152,7 @@ function HammerVisuals.start()
 
 	RunService.RenderStepped:Connect(function(dt)
 		local feel = Combat.HammerFeel
-		local grip = offsetCFrame()
+		local grip = handCFrame(defaultTemplate)
 		local gripLocal = grip:Inverse().Position
 		local now = os.clock()
 		for _, player in Players:GetPlayers() do

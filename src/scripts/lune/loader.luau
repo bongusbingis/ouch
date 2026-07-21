@@ -49,6 +49,24 @@ local FakeColor3 = {
 	end,
 }
 
+local FakeVector3 = {
+	new = function(x: number?, y: number?, z: number?)
+		return { X = x or 0, Y = y or 0, Z = z or 0 }
+	end,
+}
+
+local FakeVector2 = {
+	new = function(x: number?, y: number?)
+		return { X = x or 0, Y = y or 0 }
+	end,
+}
+
+local FakeNumberRange = {
+	new = function(min: number, max: number?)
+		return { Min = min, Max = max or min }
+	end,
+}
+
 function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
 	local moduleCache: { [Node]: any } = {}
@@ -143,6 +161,9 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 				vector = vector,
 				CFrame = FakeCFrame,
 				Color3 = FakeColor3,
+				Vector3 = FakeVector3,
+				Vector2 = FakeVector2,
+				NumberRange = FakeNumberRange,
 			},
 			injectGlobals = true,
 		})
