@@ -2,7 +2,7 @@
 
 -- Downloads the currently-published place file via Open Cloud's Asset
 -- Delivery API (a place's placeId doubles as an assetId). Two-step fetch:
---   1. GET /asset-delivery-api/v1/assetId/{placeId} -> signed CDN location(s)
+--   1. GET /asset-delivery-api/v1/assetId/{placeId} -> a signed CDN location
 --   2. GET that location -> the actual .rbxl bytes
 -- The API key needs the legacy-asset:manage scope granted for this place.
 -- Usage (from repo root):
@@ -93,8 +93,7 @@ if not ok or typeof(metadata) ~= "table" then
 	fail(`could not parse asset delivery response as JSON:\n{metadataBody}`)
 end
 
-local locations = (metadata :: any).locations
-local location = typeof(locations) == "table" and typeof(locations[1]) == "table" and locations[1].location or nil
+local location = (metadata :: any).location
 if typeof(location) ~= "string" then
 	fail(`asset delivery response had no download location:\n{metadataBody}`)
 end
