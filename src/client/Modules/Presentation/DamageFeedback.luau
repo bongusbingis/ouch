@@ -7,11 +7,13 @@ local Workspace = game:GetService("Workspace")
 
 local CameraShaker = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("camera-shaker"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 
 local DamageFeedback = {}
 
 local localPlayer = Players.LocalPlayer
-local seenEvents: { [string]: boolean } = {}
+local seen = EventDedup.new(4096)
 local cameraShake: any = nil
 local impulseFrame: Frame? = nil
 local impulseGradient: UIGradient? = nil
@@ -117,11 +119,9 @@ function DamageFeedback.onEvent(event: any)
 		return
 	end
 
-	local key = `{event.tick}:{event.kind}:{event.sourceId or ""}:{event.targetId or ""}:{event.projectileId or ""}`
-	if seenEvents[key] then
+	if not seen.markSeen(event) then
 		return
 	end
-	seenEvents[key] = true
 
 	shake()
 	flash()

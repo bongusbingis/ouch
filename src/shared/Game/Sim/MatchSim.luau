@@ -45,7 +45,7 @@ end
 -- Reconciles the score table with the currently present players. Joiners
 -- enter at 0 mid-match; leavers forfeit their score.
 function MatchSim.setPlayers(state: MatchState, playerIds: { [string]: boolean })
-	for playerId in playerIds do
+	for _, playerId in SimUtil.sortedKeys(playerIds) do
 		if state.scores[playerId] == nil then
 			state.scores[playerId] = 0
 		end

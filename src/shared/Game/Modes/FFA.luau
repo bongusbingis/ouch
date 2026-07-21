@@ -13,7 +13,7 @@ FFA.rules = {
 	TimeCapSeconds = 300,
 	ResultsSeconds = 8,
 	IntermissionSeconds = 15,
-	RespawnSeconds = 3,
+	RespawnSeconds = 0,
 	SpawnInvulnSeconds = 1.5,
 } :: GameMode.MatchRules
 

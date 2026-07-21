@@ -33,7 +33,23 @@ local function activeEntries(data: any): { QuestEntry }
 	return QuestLogic.copyEntries(data.Quests.Active)
 end
 
+-- A quest completed but not claimed before reset would otherwise be silently
+-- discarded when Active is replaced below; grant it here so finishing a
+-- quest never loses its reward to timing.
+local function grantCompletedUnclaimed(data: any, player: Player)
+	for _, entry in ipairs(activeEntries(data)) do
+		if entry.claimed then
+			continue
+		end
+		local definition = definitionsById[entry.id]
+		if definition and entry.progress >= definition.goal then
+			RewardService.grant(player, definition.reward)
+		end
+	end
+end
+
 local function assignDaily(data: any, player: Player, now: number)
+	grantCompletedUnclaimed(data, player)
 	local state = QuestLogic.createDailyEntries(player.UserId, now, definitions, QuestsConfig.DailyCount)
 	data.Quests.DailyKey = state.dailyKey
 	data.Quests.ResetAt = state.resetAt

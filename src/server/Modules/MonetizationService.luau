@@ -12,32 +12,18 @@ local PlayerData = require(script.Parent.PlayerData)
 -- (retries after grant return PurchaseGranted without re-granting); unknown
 -- products and failures return NotProcessedYet so Roblox retries/refunds.
 -- New product types (battle pass) register a handler here.
+--
+-- Receipts are kept for the life of the profile, never pruned: Roblox may
+-- retry ProcessReceipt for an already-granted purchase at any point in the
+-- future, and evicting a receipt would make that retry re-grant for free.
 
 local MonetizationService = {}
-
-local MAX_RECEIPTS = 50
 
 local handlers: { [string]: (player: Player, def: any) -> boolean } = {
 	Crate = function(player, def)
 		return CrateService.openFromReceipt(player, def.CrateId)
 	end,
 }
-
-local function pruneReceipts(receipts: any)
-	local keys = {}
-	for key in receipts do
-		table.insert(keys, key)
-	end
-	if #keys <= MAX_RECEIPTS then
-		return
-	end
-	table.sort(keys, function(a, b)
-		return receipts[a] < receipts[b]
-	end)
-	for index = 1, #keys - MAX_RECEIPTS do
-		receipts[keys[index]] = nil
-	end
-end
 
 local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
 	local def = Products[receiptInfo.ProductId]
@@ -71,7 +57,6 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 	end
 
 	data.Receipts[receiptKey] = os.time()
-	pruneReceipts(data.Receipts)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 

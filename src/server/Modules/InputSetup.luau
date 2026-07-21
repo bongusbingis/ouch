@@ -14,6 +14,7 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local InputSetup = {}
 
 local VALID_DEVICE_CLASSES = { Mouse = true, Touch = true }
+local started = false
 
 function InputSetup.setDeviceClass(player: Player, deviceClass: string): boolean
 	if not VALID_DEVICE_CLASSES[deviceClass] then
@@ -53,6 +54,11 @@ local function buildContext(player: Player)
 end
 
 function InputSetup.start()
+	if started then
+		return
+	end
+	started = true
+
 	Network.handleProtected("ReportDeviceClass", {
 		rateLimit = 5,
 		validate = function(_player, deviceClass)

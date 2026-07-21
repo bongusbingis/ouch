@@ -68,8 +68,19 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 		return nil, "insufficient_cash"
 	end
 
+	-- Roll before charging: a misconfigured crate pool (e.g. all-zero-weight)
+	-- asserts inside CrateRolls, and that must not cost the player cash.
+	local ok, result = pcall(rollAndGrant, player, crateId)
+	if not ok then
+		warn(`[CrateService] rollAndGrant failed for crate "{crateId}": {result}`)
+		return nil, "crate_roll_failed"
+	end
+	if result == nil then
+		return nil, "invalid_crate"
+	end
+
 	data.Cash -= crate.CashPrice
-	return rollAndGrant(player, crateId), nil
+	return result, nil
 end
 
 function CrateService.openFromReceipt(player: Player, crateId: string): boolean

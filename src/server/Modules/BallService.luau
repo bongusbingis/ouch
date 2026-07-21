@@ -26,6 +26,7 @@ local template: BasePart? = nil
 local activePoints: { BasePart }? = nil
 local timers: { [BasePart]: number } = {}
 local sequence = 0
+local started = false
 
 local function ballsFolder(): Folder
 	if folder then
@@ -127,6 +128,11 @@ function BallService.clearAll()
 end
 
 function BallService.start()
+	if started then
+		return
+	end
+	started = true
+
 	ballsFolder()
 
 	RunService.Heartbeat:Connect(function(dt: number)

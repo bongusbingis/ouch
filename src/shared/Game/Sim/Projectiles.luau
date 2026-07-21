@@ -109,10 +109,11 @@ local function sweepCharacters(
 	from: Vec,
 	to: Vec,
 	projectile: ProjectileState,
-	skipId: string?
+	skipId: string?,
+	characterIds: { string }?
 ): CharacterHit?
 	local best: CharacterHit? = nil
-	for _, characterId in SimUtil.sortedKeys(world.characters) do
+	for _, characterId in characterIds or SimUtil.sortedKeys(world.characters) do
 		local character = world.characters[characterId]
 		if
 			characterId == skipId
@@ -390,23 +391,26 @@ local function stepInFlight(
 		return
 	end
 
-	local target = projectile.targetId and world.characters[projectile.targetId :: string]
-	if
-		target ~= nil
-		and (
-			not target.alive
-			or target.invulnerable
+	local target: SimTypes.CharacterSnapshot? = nil
+	if projectile.targetId then
+		local candidate = world.characters[projectile.targetId :: string]
+		if
+			candidate == nil
+			or not candidate.alive
+			or candidate.invulnerable
 			or SimUtil.sameTeam(world, projectile.ownerId, projectile.targetId)
-		)
-	then
-		target = nil
-		projectile.targetId = nil
+		then
+			projectile.targetId = nil
+		else
+			target = candidate
+		end
 	end
 
 	local speed = vector.magnitude(projectile.velocity)
 	local substeps = math.clamp(math.ceil(speed * dt / math.max(config.Radius, 0.5)), 1, MAX_SUBSTEPS)
 	local subDt = dt / substeps
 	local gravity = vector.create(0, -config.Gravity, 0)
+	local characterIds = SimUtil.sortedKeys(world.characters)
 
 	for substepIndex = 1, substeps do
 		projectile.velocity += gravity * subDt
@@ -427,7 +431,7 @@ local function stepInFlight(
 		local displacement = to - from
 
 		local staticHit = world.collision.sweepSphere(from, displacement, config.Radius)
-		local characterHit = sweepCharacters(world, from, to, projectile, projectile.ownerId)
+		local characterHit = sweepCharacters(world, from, to, projectile, projectile.ownerId, characterIds)
 
 		local staticFraction = if staticHit
 			then staticHit.distance / math.max(vector.magnitude(displacement), 1e-9)

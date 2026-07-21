@@ -280,6 +280,7 @@ end
 
 local function tickPickups(state: SimState, world: WorldSnapshot, events: { SimEvent })
 	local cfg = config()
+	local projectileIds = SimUtil.sortedKeys(state.projectiles)
 	for _, playerId in SimUtil.sortedKeys(world.characters) do
 		local character = world.characters[playerId]
 		if not character.alive or findHeldBall(state, playerId) ~= nil then
@@ -288,7 +289,7 @@ local function tickPickups(state: SimState, world: WorldSnapshot, events: { SimE
 
 		local bestBall: ProjectileState? = nil
 		local bestDistance = cfg.PickupRadius
-		for _, id in SimUtil.sortedKeys(state.projectiles) do
+		for _, id in projectileIds do
 			local projectile = state.projectiles[id]
 			if projectile.phase ~= "Free" then
 				continue

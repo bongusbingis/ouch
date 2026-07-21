@@ -24,6 +24,7 @@ local foamPits: { BasePart } = {}
 local padCooldowns: { [Player]: { [BasePart]: number } } = {}
 local slowed: { [Player]: boolean } = {}
 local connection: RBXScriptConnection? = nil
+local started = false
 
 local function rootInPart(root: BasePart, part: BasePart): boolean
 	local offset = part.CFrame:PointToObjectSpace(root.Position)
@@ -118,6 +119,11 @@ function MapFeatureService.unbind()
 end
 
 function MapFeatureService.start()
+	if started then
+		return
+	end
+	started = true
+
 	Players.PlayerRemoving:Connect(function(player)
 		padCooldowns[player] = nil
 		slowed[player] = nil

@@ -20,6 +20,7 @@ function RewardService.grant(player: Player, reward: Reward): (boolean, string?)
 		return true, nil
 	end
 
+	warn(`[RewardService] unsupported reward kind "{reward.kind}" for {player.Name}`)
 	return false, "unsupported_reward"
 end
 

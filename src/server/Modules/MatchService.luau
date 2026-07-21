@@ -52,6 +52,7 @@ local pendingWaveRespawns: { [string]: Player } = {}
 local waveTimer = 0
 local testingEventSequence = 0
 local started = false
+local startingMatch = false
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
 	table.insert(listeners, listener)
@@ -528,6 +529,9 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.kind ~= "Elim" then
 		return false
 	end
+	if state.phase ~= "Active" then
+		return false
+	end
 	if not eliminateVictim(event.targetId, event) then
 		return false
 	end
@@ -671,8 +675,13 @@ function MatchService.start()
 	RunService.Heartbeat:Connect(function(dt: number)
 		local events: { MatchSim.MatchEvent } = {}
 
-		if state.phase == "Idle" and #Players:GetPlayers() >= mode.rules.MinPlayers then
-			startMatch(events, nil)
+		if not startingMatch and state.phase == "Idle" and #Players:GetPlayers() >= mode.rules.MinPlayers then
+			startingMatch = true
+			local ok, err = pcall(startMatch, events)
+			startingMatch = false
+			if not ok then
+				warn(`[MatchService] startMatch failed: {err}`)
+			end
 		end
 
 		MatchSim.tick(state, mode.rules, dt, events)
