@@ -4,7 +4,9 @@ local MenuManager = require(script.Parent.MenuManager)
 local MenuRegistry = require(script.Parent.MenuRegistry)
 local MenuTypes = require(script.Parent.MenuTypes)
 local ButtonElement = require(script.Parent.Elements.ButtonElement)
+local ElementFactory = require(script.Parent.Elements.ElementFactory)
 local ElementTypes = require(script.Parent.Elements.ElementTypes)
+local QuestsController = require(script.Parent.QuestsController)
 
 type MenuId = MenuTypes.MenuId
 type MenuDefinition = MenuTypes.MenuDefinition
@@ -24,6 +26,8 @@ local SidebarController = {}
 local started = false
 local handles: { [MenuId]: MenuButtonHandle } = {}
 local menuDisconnect: (() -> ())? = nil
+local questDisconnect: (() -> ())? = nil
+local questBadgeHandle: ElementTypes.ElementHandle? = nil
 
 local function resolveSidebar(): Frame
 	local players = game:GetService("Players")
@@ -89,6 +93,21 @@ function SidebarController.start(sidebarOverride: Instance?, options: StartOptio
 		}, if options then options.buttonOptions else nil)
 	end
 
+	local questsButton = handles.Quests
+	if questsButton and not (options and options.buttonElement) then
+		local template = ElementFactory.resolveTemplate("NotificationBadge", "ImageLabel") :: ImageLabel
+		local badge, badgeHandle = ElementFactory.cloneMount(template, questsButton.instance)
+		assert(badge:IsA("ImageLabel"), "[SidebarController] NotificationBadge must be an ImageLabel")
+		badge.AnchorPoint = Vector2.new(0.5, 0.5)
+		badge.Position = UDim2.fromScale(0.86, 0.16)
+		badge.Size = UDim2.fromScale(0.3, 0.3)
+		badge.ZIndex = questsButton.instance.ZIndex + 2
+		questBadgeHandle = badgeHandle
+		questDisconnect = QuestsController.onClaimableChanged(function(claimable)
+			badge.Visible = claimable
+		end)
+	end
+
 	menuDisconnect = MenuManager.onChanged(function(newMenu)
 		syncSelected(newMenu)
 	end)
@@ -99,12 +118,20 @@ function SidebarController._resetForTest()
 	if menuDisconnect then
 		menuDisconnect()
 	end
+	if questDisconnect then
+		questDisconnect()
+	end
+	if questBadgeHandle then
+		questBadgeHandle:destroy()
+	end
 	for _, handle in handles do
 		handle:destroy()
 	end
 	started = false
 	handles = {}
 	menuDisconnect = nil
+	questDisconnect = nil
+	questBadgeHandle = nil
 end
 
 return SidebarController

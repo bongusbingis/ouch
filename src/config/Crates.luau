@@ -3,7 +3,7 @@
 -- Crate definitions. A crate rolls a rarity by weight (Config.Cosmetics
 -- Rarities), then uniformly among the pool's items of that rarity.
 -- CashPrice = openable with earned Cash; Robux crates map through
--- Config.Products developer products.
+-- Config.Products.ById developer products.
 
 export type CrateDef = {
 	DisplayName: string,

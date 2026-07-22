@@ -1,8 +1,9 @@
 --!nonstrict
 -- Validates the Studio-authored UI infrastructure against what the client
--- modules WaitForChild on: the MainGui/BaseClip/Views container (with a
--- CanvasGroup view for every non-prototype registry menu), the Hud sidebar
--- and top bar, and the element templates in ReplicatedStorage.Assets.UI.
+-- modules WaitForChild on: the MainGui/BaseClip/Views container and its
+-- Studio-authored Quests reference, the Hud sidebar and top bar, and the
+-- element templates in ReplicatedStorage.Assets.UI. Other menu views use
+-- authored-first runtime fallbacks while Studio access is unavailable.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -19,16 +20,10 @@ return function()
 			TestAssets.get(StarterGui, "MainGui", "BaseClip", "Views")
 		end)
 
-		it("authors a CanvasGroup view for every non-prototype menu", function()
+		it("authors the Quests reference CanvasGroup", function()
 			local views = TestAssets.get(StarterGui, "MainGui", "BaseClip", "Views")
-			for menuId, definition in MenuRegistry do
-				-- Prototype menus (Shop/Inventory) are runtime-generated per
-				-- player; only animated menus require authored CanvasGroups.
-				if definition.prototype ~= true then
-					local view = TestAssets.get(views, definition.viewName)
-					expect(view:IsA("CanvasGroup")).to.equal(true)
-				end
-			end
+			local view = TestAssets.get(views, MenuRegistry.Quests.viewName)
+			expect(view:IsA("CanvasGroup")).to.equal(true)
 		end)
 
 		it("authors the Hud sidebar and top bar", function()

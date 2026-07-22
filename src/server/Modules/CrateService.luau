@@ -8,8 +8,10 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local CrateRolls = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CrateRolls")
 )
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 -- Crate opening: Cash path via the OpenCrate remote, Robux path via
 -- MonetizationService receipts. Both share one roll-and-grant routine; every
@@ -40,8 +42,21 @@ local function rollAndGrant(player: Player, crateId: string): OpenResult?
 	local result = CrateRolls.roll(crate, Cosmetics.Items, Cosmetics.Rarities, data.Cosmetics.Owned, rng)
 	if result.isDupe then
 		data.Cash += result.cashRefund
+		AnalyticsService.logEconomyEvent(
+			player,
+			"Source",
+			"Cash",
+			result.cashRefund,
+			data.Cash,
+			AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+			crateId
+		)
 	else
 		CosmeticsService.grant(player, result.itemId)
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
+			itemId = result.itemId,
+			source = "Crate",
+		})
 	end
 
 	local payload: OpenResult = {
@@ -51,35 +66,64 @@ local function rollAndGrant(player: Player, crateId: string): OpenResult?
 		isDupe = result.isDupe,
 		cashRefund = result.cashRefund,
 	}
+	local steps = AnalyticsConfig.ShopFunnelSteps.Completed
+	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
+		crateId = crateId,
+		rarity = result.rarity,
+		isDupe = result.isDupe,
+	})
 	Network.fire("CrateOpened", player, payload)
 	return payload
+end
+
+local function logCrateFailure(player: Player, reason: string)
+	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CratePurchaseFailed, 1, { reason = reason })
 end
 
 function CrateService.openWithCash(player: Player, crateId: string): (OpenResult?, string?)
 	local crate = Crates[crateId]
 	if crate == nil or crate.CashPrice == nil then
+		logCrateFailure(player, "invalid_crate")
 		return nil, "invalid_crate"
 	end
 	local data = PlayerData.get(player)
 	if data == nil then
+		logCrateFailure(player, "no_profile")
 		return nil, "no_profile"
 	end
 	if data.Cash < crate.CashPrice then
+		logCrateFailure(player, "insufficient_cash")
 		return nil, "insufficient_cash"
 	end
+
+	local steps = AnalyticsConfig.ShopFunnelSteps.Attempted
+	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
+		crateId = crateId,
+	})
 
 	-- Roll before charging: a misconfigured crate pool (e.g. all-zero-weight)
 	-- asserts inside CrateRolls, and that must not cost the player cash.
 	local ok, result = pcall(rollAndGrant, player, crateId)
 	if not ok then
 		warn(`[CrateService] rollAndGrant failed for crate "{crateId}": {result}`)
+		logCrateFailure(player, "crate_roll_failed")
 		return nil, "crate_roll_failed"
 	end
 	if result == nil then
+		logCrateFailure(player, "invalid_crate")
 		return nil, "invalid_crate"
 	end
 
 	data.Cash -= crate.CashPrice
+	AnalyticsService.logEconomyEvent(
+		player,
+		"Sink",
+		"Cash",
+		crate.CashPrice,
+		data.Cash,
+		AnalyticsConfig.EconomyTransactionTypes.Shop,
+		crateId
+	)
 	return result, nil
 end
 

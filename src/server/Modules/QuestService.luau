@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local QuestsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Quests"))
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
 local QuestLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Quests"):WaitForChild("QuestLogic")
 )
@@ -13,6 +14,7 @@ local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local PlayerData = require(script.Parent.PlayerData)
 local RewardService = require(script.Parent.RewardService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 type QuestEntry = QuestLogic.QuestEntry
 type QuestDefinition = QuestLogic.QuestDefinition
@@ -232,6 +234,20 @@ function QuestService.claim(player: Player, questId: string): (boolean, any)
 
 			entry.claimed = true
 			data.Quests.Active = entries
+
+			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.QuestClaimed, 1, { questId = questId })
+			if definition.reward.kind == "Cash" then
+				AnalyticsService.logEconomyEvent(
+					player,
+					"Source",
+					"Cash",
+					definition.reward.amount or 0,
+					data.Cash,
+					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+					questId
+				)
+			end
+
 			local state = stateFor(player)
 			if state then
 				Network.fire("QuestStateChanged", player, state)

@@ -6,11 +6,13 @@ local RunService = game:GetService("RunService")
 
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CosmeticsLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
 )
 local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 -- The only writer of profile Cosmetics.*. The profile is the source of truth
 -- (replicated to the owning client via Replica); Equip_<Slot> player
@@ -55,6 +57,12 @@ function CosmeticsService.equip(player: Player, slot: string, itemId: string?): 
 	end
 	data.Cosmetics.Equipped[slot] = itemId
 	player:SetAttribute(`Equip_{slot}`, itemId or "")
+	if itemId ~= nil then
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CosmeticEquipped, 1, {
+			itemId = itemId,
+			slot = slot,
+		})
+	end
 	return true
 end
 

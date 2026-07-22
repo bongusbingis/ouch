@@ -5,8 +5,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
 local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 -- Owns ProcessReceipt. Receipts are recorded in the profile for idempotency
 -- (retries after grant return PurchaseGranted without re-granting); unknown
@@ -23,10 +25,17 @@ local handlers: { [string]: (player: Player, def: any) -> boolean } = {
 	Crate = function(player, def)
 		return CrateService.openFromReceipt(player, def.CrateId)
 	end,
+	Cash = function(player, def)
+		if type(def.CashAmount) ~= "number" or def.CashAmount <= 0 or def.CashAmount % 1 ~= 0 then
+			return false
+		end
+		PlayerData.addCash(player, def.CashAmount)
+		return true
+	end,
 }
 
 local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
-	local def = Products[receiptInfo.ProductId]
+	local def = Products.ById[receiptInfo.ProductId]
 	if def == nil then
 		warn(`[Monetization] receipt for unmapped product {receiptInfo.ProductId}`)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -57,6 +66,16 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 	end
 
 	data.Receipts[receiptKey] = os.time()
+	AnalyticsService.logEconomyEvent(
+		player,
+		"Source",
+		"Robux",
+		(receiptInfo.CurrencySpent :: number?) or 0,
+		0,
+		AnalyticsConfig.EconomyTransactionTypes.IAP,
+		tostring(receiptInfo.ProductId),
+		{ productType = def.Type }
+	)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 

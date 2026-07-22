@@ -17,14 +17,17 @@ local UI = Client:WaitForChild("Modules"):WaitForChild("UI")
 local MenuManager = require(UI:WaitForChild("MenuManager"))
 local SidebarController = require(UI:WaitForChild("SidebarController"))
 local QuestsController = require(UI:WaitForChild("QuestsController"))
-local EconomyPrototypeUI = require(UI:WaitForChild("EconomyPrototypeUI"))
+local UIResolver = require(UI:WaitForChild("UIResolver"))
 local EconomyStore = require(UI:WaitForChild("EconomyStore"))
 local ShopController = require(UI:WaitForChild("ShopController"))
 local InventoryController = require(UI:WaitForChild("InventoryController"))
+local LeaderboardController = require(UI:WaitForChild("LeaderboardController"))
 local MatchHud = require(UI:WaitForChild("MatchHud"))
 local CooldownIndicator = require(UI:WaitForChild("CooldownIndicator"))
 local DebugModules = Client:WaitForChild("Modules"):WaitForChild("Debug")
 local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
+local AnalyticsModules = Client:WaitForChild("Modules"):WaitForChild("Analytics")
+local AnalyticsReporter = require(AnalyticsModules:WaitForChild("AnalyticsReporter"))
 
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
@@ -58,13 +61,15 @@ DeathEffects.start()
 HammerVisuals.start()
 SplatEffects.start()
 TargetingUI.start()
-EconomyPrototypeUI.mount()
+UIResolver.mount()
 MenuManager.start()
+AnalyticsReporter.start()
 SidebarController.start()
 EconomyStore.start()
 QuestsController.start()
 ShopController.start()
 InventoryController.start()
+LeaderboardController.start()
 MatchHud.start()
 CooldownIndicator.start()
 DebugVisuals.start()
@@ -72,9 +77,8 @@ task.spawn(startCmdr)
 
 Replica.RequestData()
 
--- TODO(ui): scoreboard — per-player scores replicate as a `MatchScore`
--- attribute on each Player (plus leaderstats.Elims). TODO(ui): killfeed —
--- subscribe MatchService.onEvent server-side and forward via a remote.
+-- TODO(ui): killfeed — subscribe MatchService.onEvent server-side and forward
+-- via a remote.
 
 -- Tentative feedback only: client events can replay during resimulation, so
 -- anything user-facing built on them must deduplicate (M3).

@@ -1,10 +1,9 @@
 --!strict
 
--- PROTOTYPE: Functional, unstyled cash-crate shop. Direct cosmetic purchases
--- are not shown because the current server economy exposes only OpenCrate.
+-- Cash-crate shop. Direct cosmetic purchases are not shown because the
+-- current server economy exposes only OpenCrate.
 
 local EconomyItemElement = require(script.Parent.Elements.EconomyItemElement)
-local EconomyPrototypeLayout = require(script.Parent.EconomyPrototypeLayout)
 local EconomyStore = require(script.Parent.EconomyStore)
 
 type StartOptions = {
@@ -72,8 +71,7 @@ local function resolveView(): (ScrollingFrame, TextLabel, TextLabel)
 	local Players = game:GetService("Players")
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local view = playerGui:WaitForChild("MainGui"):WaitForChild("BaseClip"):WaitForChild("Views"):WaitForChild("Shop")
-	assert(view:IsA("GuiObject"), "[ShopController] Views.Shop must be a GuiObject")
-	EconomyPrototypeLayout.applyShop(view)
+	assert(view:IsA("CanvasGroup"), "[ShopController] Views.Shop must be a CanvasGroup")
 	local holderInstance = view:WaitForChild("Holder")
 	local cashInstance = view:WaitForChild("Cash")
 	local statusInstance = view:WaitForChild("Status")

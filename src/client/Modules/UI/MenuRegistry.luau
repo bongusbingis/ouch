@@ -17,15 +17,31 @@ local MenuRegistry: { [MenuId]: MenuDefinition } = {
 		id = "Shop",
 		viewName = "Shop",
 		label = "Shop",
+		color = { r = 0.96, g = 0.16, b = 0.52 },
 		sidebarOrder = 20,
-		prototype = true,
 	},
 	Inventory = {
 		id = "Inventory",
 		viewName = "Inventory",
 		label = "Inventory",
+		color = { r = 0.48, g = 0.82, b = 0.12 },
 		sidebarOrder = 30,
-		prototype = true,
+	},
+	Leaderboard = {
+		id = "Leaderboard",
+		viewName = "Leaderboard",
+		label = "Leaderboard",
+		color = { r = 1, g = 0.62, b = 0.08 },
+		sidebarOrder = 40,
+		showInSidebar = true,
+	},
+	Settings = {
+		id = "Settings",
+		viewName = "Settings",
+		label = "Settings",
+		color = { r = 0.12, g = 0.68, b = 0.92 },
+		sidebarOrder = 50,
+		showInSidebar = true,
 	},
 }
 

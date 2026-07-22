@@ -1,10 +1,9 @@
 --!strict
 
--- PROTOTYPE: Functional, unstyled cosmetic inventory. Owned/equipped profile
--- data is read from Replica; equip mutations use the authoritative remote.
+-- Cosmetic inventory. Owned/equipped profile data is read from Replica;
+-- equip mutations use the authoritative remote.
 
 local EconomyItemElement = require(script.Parent.Elements.EconomyItemElement)
-local EconomyPrototypeLayout = require(script.Parent.EconomyPrototypeLayout)
 local EconomyStore = require(script.Parent.EconomyStore)
 
 type StartOptions = {
@@ -74,8 +73,7 @@ local function resolveView(): (ScrollingFrame, TextLabel)
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local view =
 		playerGui:WaitForChild("MainGui"):WaitForChild("BaseClip"):WaitForChild("Views"):WaitForChild("Inventory")
-	assert(view:IsA("GuiObject"), "[InventoryController] Views.Inventory must be a GuiObject")
-	EconomyPrototypeLayout.applyInventory(view)
+	assert(view:IsA("CanvasGroup"), "[InventoryController] Views.Inventory must be a CanvasGroup")
 	local holderInstance = view:WaitForChild("Holder")
 	local statusInstance = view:WaitForChild("Status")
 	assert(

@@ -1,6 +1,6 @@
 --!strict
 
-export type MenuId = "Quests" | "Shop" | "Inventory"
+export type MenuId = "Quests" | "Shop" | "Inventory" | "Leaderboard" | "Settings"
 
 export type ColorValue = {
 	r: number,
@@ -22,7 +22,6 @@ export type MenuDefinition = {
 	color: ColorValue?,
 	sidebarOrder: number?,
 	showInSidebar: boolean?,
-	prototype: boolean?,
 	onOpen: ((view: GuiObject) -> ())?,
 	onClose: ((view: GuiObject, reason: CloseReason) -> ())?,
 }

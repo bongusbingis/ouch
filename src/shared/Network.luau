@@ -23,6 +23,7 @@ local definitions = {
 	ClaimQuest = "function",
 	QuestStateChanged = "event",
 	DamageFeedback = "event",
+	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}
 

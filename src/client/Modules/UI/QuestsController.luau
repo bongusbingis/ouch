@@ -35,6 +35,8 @@ local activeMenuManager: any = nil
 local menuDisconnect: (() -> ())? = nil
 local viewOpen = false
 local fetching = false
+local claimableCallbacks: { (boolean) -> () } = {}
+local lastClaimable = false
 
 local function resolveNetwork(): any
 	if defaultNetwork == nil then
@@ -88,6 +90,35 @@ local function updateResetLabel()
 	label.Text = `Quests reset in: {formatSeconds(state.resetAt - os.time())}`
 end
 
+local function hasClaimableQuest(): boolean
+	local state = currentState
+	if state == nil then
+		return false
+	end
+	for _, quest in state.quests do
+		if quest.completed and not quest.claimed then
+			return true
+		end
+	end
+	return false
+end
+
+local function notifyClaimable()
+	local claimable = hasClaimableQuest()
+	if claimable == lastClaimable then
+		return
+	end
+	lastClaimable = claimable
+	for _, callback in claimableCallbacks do
+		local ok, err = pcall(callback, claimable)
+		if not ok then
+			warn(`[QuestsController] claimable callback failed: {err}`)
+		end
+	end
+end
+
+local setState: (QuestState?) -> ()
+
 local function mountCards()
 	destroyCards()
 
@@ -109,9 +140,7 @@ local function mountCards()
 				claim = function(questId: string)
 					local ok, claimState = activeNetwork.call("ClaimQuest", questId)
 					if ok and claimState then
-						currentState = claimState
-						mountCards()
-						updateResetLabel()
+						setState(claimState)
 					end
 				end,
 			})
@@ -119,10 +148,11 @@ local function mountCards()
 	end
 end
 
-local function setState(state: QuestState?)
+setState = function(state: QuestState?)
 	currentState = state
 	mountCards()
 	updateResetLabel()
+	notifyClaimable()
 end
 
 local function runAsync(callback: () -> ())
@@ -197,6 +227,26 @@ function QuestsController.start(options: StartOptions?)
 	end
 end
 
+function QuestsController.hasClaimableQuest(): boolean
+	return hasClaimableQuest()
+end
+
+function QuestsController.onClaimableChanged(callback: (boolean) -> ()): () -> ()
+	table.insert(claimableCallbacks, callback)
+	callback(hasClaimableQuest())
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(claimableCallbacks, callback)
+		if index then
+			table.remove(claimableCallbacks, index)
+		end
+	end
+end
+
 function QuestsController._resetForTest()
 	if menuDisconnect then
 		menuDisconnect()
@@ -212,6 +262,8 @@ function QuestsController._resetForTest()
 	menuDisconnect = nil
 	viewOpen = false
 	fetching = false
+	claimableCallbacks = {}
+	lastClaimable = false
 end
 
 return QuestsController

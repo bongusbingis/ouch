@@ -59,8 +59,7 @@ local function definitionFor(menuId: MenuId): MenuDefinition?
 end
 
 local function shouldAnimate(menuId: MenuId): boolean
-	local definition = definitionFor(menuId)
-	return animationsEnabled and (definition == nil or definition.prototype ~= true)
+	return animationsEnabled
 end
 
 local function uiConfig()

@@ -10,6 +10,7 @@ return {
 	CollisionTrace = false,
 
 	CosmeticsGrantAll = false,
+	AnalyticsVerbose = false,
 
 	AimAssistCones = true,
 	AimAssistTargetRange = true,
