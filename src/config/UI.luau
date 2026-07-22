@@ -83,5 +83,9 @@ return {
 				yOffset = 0,
 			},
 		},
+		LiveScoreboard = {
+			FfaRows = 3,
+			TeamRows = 2,
+		},
 	},
 }

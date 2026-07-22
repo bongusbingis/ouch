@@ -1301,6 +1301,294 @@ local function resolveSettingsView(views: Instance): CanvasGroup
 	return view
 end
 
+local LIVE_RANK_COLORS = {
+	Color3.fromRGB(255, 199, 58),
+	Color3.fromRGB(82, 211, 210),
+	Color3.fromRGB(238, 111, 168),
+}
+
+local function resolveLiveScoreRow(
+	parent: Instance,
+	name: string,
+	y: number,
+	height: number,
+	accentColor: Color3,
+	zIndex: number
+): Frame
+	local row = resolveNativePanel(
+		parent,
+		name,
+		0,
+		y,
+		1,
+		height,
+		zIndex,
+		Color3.fromRGB(23, 27, 52),
+		Color3.fromRGB(42, 47, 82),
+		Color3.fromRGB(18, 21, 42),
+		Color3.fromRGB(8, 10, 25),
+		0.18
+	)
+	row.BackgroundTransparency = 0.08
+
+	local accent = resolveAccent(row, "Accent", accentColor, 0.012, 0.13, 0.012, 0.74)
+	accent.ZIndex = zIndex + 2
+
+	local rankMount = resolveContainer(row, "RankMount", 0.035, 0.11, 0.13, 0.78, zIndex + 1)
+	local rankBubble = resolveNativePanel(
+		rankMount,
+		"Bubble",
+		0,
+		0,
+		1,
+		1,
+		zIndex + 2,
+		accentColor,
+		accentColor:Lerp(Color3.new(1, 1, 1), 0.2),
+		accentColor:Lerp(Color3.new(0, 0, 0), 0.18),
+		Color3.fromRGB(8, 10, 25),
+		0.5
+	)
+	centered(rankBubble, 0.5, 0.5, 1, 1, zIndex + 2)
+	ensureAspect(rankBubble, 1)
+	local rank = resolveText(rankBubble, "Rank", "1", 0, 0, 1, 1, 11, 19, zIndex + 3, Enum.TextXAlignment.Center)
+	rank.TextColor3 = Color3.fromRGB(19, 17, 28)
+
+	local playerName = resolveText(row, "PlayerName", "Player", 0.19, 0.1, 0.48, 0.46, 11, 19, zIndex + 2, nil)
+	playerName.TextColor3 = Color3.fromRGB(250, 248, 239)
+	playerName.TextTruncate = Enum.TextTruncate.AtEnd
+	playerName.TextWrapped = false
+
+	local youPill = resolveNativePanel(
+		row,
+		"YouPill",
+		0.19,
+		0.55,
+		0.17,
+		0.25,
+		zIndex + 2,
+		Color3.fromRGB(81, 230, 197),
+		Color3.fromRGB(116, 250, 216),
+		Color3.fromRGB(38, 184, 169),
+		Color3.fromRGB(8, 10, 25),
+		0.5
+	)
+	local you = resolveText(youPill, "Label", "YOU", 0, 0, 1, 1, 8, 12, zIndex + 3, Enum.TextXAlignment.Center)
+	you.TextColor3 = Color3.fromRGB(15, 29, 38)
+	youPill.Visible = false
+
+	local score = resolveText(row, "Score", "0", 0.72, 0.08, 0.23, 0.5, 15, 25, zIndex + 2, Enum.TextXAlignment.Right)
+	score.TextColor3 = Color3.fromRGB(255, 247, 205)
+	local caption =
+		resolveText(row, "ScoreCaption", "ELIMS", 0.72, 0.53, 0.23, 0.25, 8, 11, zIndex + 2, Enum.TextXAlignment.Right)
+	caption.TextColor3 = Color3.fromRGB(178, 187, 214)
+
+	local progress = resolveAccent(row, "Progress", Color3.fromRGB(10, 13, 31), 0.39, 0.67, 0.28, 0.09)
+	progress.BackgroundTransparency = 0.18
+	progress.ClipsDescendants = true
+	progress.ZIndex = zIndex + 2
+	local fill = resolveAccent(progress, "Fill", accentColor, 0, 0, 0, 1)
+	fill.ZIndex = zIndex + 3
+	return row
+end
+
+local function resolveFfaScoreboard(shell: Frame, zIndex: number): Frame
+	local panel = resolveContainer(shell, "FFA", 0.035, 0.25, 0.93, 0.715, zIndex)
+	local rowCount = uiConfig().Hud.LiveScoreboard.FfaRows
+	local rowHeight = 0.205
+	local gap = 0.027
+	for rank = 1, rowCount do
+		resolveLiveScoreRow(
+			panel,
+			`Row{rank}`,
+			(rank - 1) * (rowHeight + gap),
+			rowHeight,
+			LIVE_RANK_COLORS[rank] or LIVE_RANK_COLORS[#LIVE_RANK_COLORS],
+			zIndex + 1
+		)
+	end
+	resolveLiveScoreRow(panel, "LocalRow", 0.735, rowHeight, Color3.fromRGB(81, 230, 197), zIndex + 1)
+	return panel
+end
+
+local function resolveTeamPanel(parent: Instance, name: string, x: number, color: Color3, zIndex: number): Frame
+	local panel = resolveNativePanel(
+		parent,
+		name,
+		x,
+		0,
+		0.485,
+		1,
+		zIndex,
+		color:Lerp(Color3.fromRGB(15, 18, 39), 0.72),
+		color:Lerp(Color3.fromRGB(54, 60, 94), 0.55),
+		Color3.fromRGB(17, 20, 42),
+		color:Lerp(Color3.fromRGB(255, 255, 255), 0.2),
+		0.1
+	)
+	panel.BackgroundTransparency = 0.04
+	local marker = resolveAccent(panel, "Marker", color, 0.04, 0.055, 0.04, 0.25)
+	marker.ZIndex = zIndex + 2
+	local teamName = resolveText(panel, "TeamName", "RED", 0.11, 0.035, 0.5, 0.16, 10, 17, zIndex + 2, nil)
+	teamName.TextColor3 = Color3.fromRGB(250, 248, 239)
+	local score =
+		resolveText(panel, "Score", "0", 0.63, 0.025, 0.28, 0.22, 18, 30, zIndex + 2, Enum.TextXAlignment.Right)
+	score.TextColor3 = color:Lerp(Color3.fromRGB(255, 255, 255), 0.3)
+	local target =
+		resolveText(panel, "Target", "/ 40", 0.64, 0.215, 0.27, 0.1, 8, 11, zIndex + 2, Enum.TextXAlignment.Right)
+	target.TextColor3 = Color3.fromRGB(188, 193, 214)
+
+	local progress = resolveAccent(panel, "Progress", Color3.fromRGB(9, 12, 29), 0.06, 0.31, 0.88, 0.035)
+	progress.BackgroundTransparency = 0.15
+	progress.ClipsDescendants = true
+	progress.ZIndex = zIndex + 2
+	local fill = resolveAccent(progress, "Fill", color, 0, 0, 0, 1)
+	fill.ZIndex = zIndex + 3
+
+	local rows = resolveContainer(panel, "Rows", 0.055, 0.39, 0.89, 0.56, zIndex + 1)
+	local rowCount = uiConfig().Hud.LiveScoreboard.TeamRows
+	local rowHeight = 0.45
+	for rank = 1, rowCount do
+		resolveLiveScoreRow(rows, `Row{rank}`, (rank - 1) * 0.52, rowHeight, color, zIndex + 2)
+	end
+	return panel
+end
+
+local function resolveTeamScoreboard(shell: Frame, zIndex: number): Frame
+	local panel = resolveContainer(shell, "Teams", 0.035, 0.25, 0.93, 0.715, zIndex)
+	resolveTeamPanel(panel, "TeamA", 0, Color3.fromRGB(255, 83, 110), zIndex + 1)
+	resolveTeamPanel(panel, "TeamB", 0.515, Color3.fromRGB(72, 166, 255), zIndex + 1)
+	panel.Visible = false
+	return panel
+end
+
+local function populateLiveScoreboard(view: CanvasGroup, hud: ScreenGui)
+	view.AnchorPoint = Vector2.new(1, 0)
+	view.BackgroundTransparency = 1
+	view.ClipsDescendants = false
+	view.GroupTransparency = 0
+	view.Position = UDim2.fromScale(0.985, 0.09)
+	view.Size = UDim2.fromScale(0.275, 0.36)
+	view.Visible = false
+	view.ZIndex = 30
+	local viewAspect = ensureAspect(view, 1.28)
+
+	local shadow = resolveNativePanel(
+		view,
+		"Shadow",
+		0.018,
+		0.025,
+		0.982,
+		0.975,
+		30,
+		Color3.fromRGB(3, 5, 17),
+		Color3.fromRGB(3, 5, 17),
+		Color3.fromRGB(3, 5, 17),
+		Color3.fromRGB(3, 5, 17),
+		0.065
+	)
+	shadow.BackgroundTransparency = 0.48
+
+	local shell = resolveNativePanel(
+		view,
+		"Shell",
+		0,
+		0,
+		0.982,
+		0.975,
+		31,
+		Color3.fromRGB(16, 19, 42),
+		Color3.fromRGB(44, 50, 91),
+		Color3.fromRGB(12, 15, 34),
+		Color3.fromRGB(248, 232, 177),
+		0.065
+	)
+	shell.BackgroundTransparency = 0.06
+	shell.ClipsDescendants = true
+
+	local header = resolveNativePanel(
+		shell,
+		"Header",
+		0.035,
+		0.035,
+		0.93,
+		0.18,
+		32,
+		Color3.fromRGB(21, 121, 139),
+		Color3.fromRGB(56, 218, 199),
+		Color3.fromRGB(17, 86, 125),
+		Color3.fromRGB(8, 10, 25),
+		0.24
+	)
+	local live = resolveNativePanel(
+		header,
+		"LivePill",
+		0.035,
+		0.18,
+		0.18,
+		0.64,
+		33,
+		Color3.fromRGB(255, 94, 126),
+		Color3.fromRGB(255, 137, 104),
+		Color3.fromRGB(226, 49, 112),
+		Color3.fromRGB(8, 10, 25),
+		0.5
+	)
+	local liveText = resolveText(live, "Label", "LIVE", 0, 0, 1, 1, 9, 13, 34, Enum.TextXAlignment.Center)
+	liveText.TextColor3 = Color3.fromRGB(255, 251, 230)
+	local title = resolveText(header, "Title", "STANDINGS", 0.245, 0.12, 0.45, 0.44, 11, 20, 34, nil)
+	title.TextColor3 = Color3.fromRGB(255, 252, 230)
+	local goal =
+		resolveText(header, "Goal", "FIRST TO 15", 0.57, 0.54, 0.38, 0.28, 8, 12, 34, Enum.TextXAlignment.Right)
+	goal.TextColor3 = Color3.fromRGB(215, 255, 241)
+
+	resolveFfaScoreboard(shell, 32)
+	resolveTeamScoreboard(shell, 32)
+
+	local function refreshLayout()
+		local viewport = hud.AbsoluteSize
+		local portrait = viewport.Y > viewport.X
+		local compactLandscape = not portrait and (viewport.X < 1100 or viewport.Y < 720)
+		if portrait then
+			viewAspect.AspectRatio = 1.55
+			view.Position = UDim2.fromScale(0.985, 0.09)
+			view.Size = UDim2.fromScale(0.92, 0.3)
+		elseif compactLandscape then
+			viewAspect.AspectRatio = 1.35
+			view.Position = UDim2.fromScale(0.985, 0.12)
+			view.Size = UDim2.fromScale(0.42, 0.58)
+		else
+			viewAspect.AspectRatio = 1.28
+			view.Position = UDim2.fromScale(0.985, 0.09)
+			view.Size = UDim2.fromScale(0.275, 0.36)
+		end
+	end
+	refreshLayout()
+	local connection = hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshLayout)
+	table.insert(cleanups, function()
+		connection:Disconnect()
+	end)
+end
+
+-- FindFirstChild is deliberate: this temporary Instance.new exception was
+-- directed by the user while Studio is unavailable. The replacement is a
+-- Hud.LiveScoreboard CanvasGroup with Shadow and Shell. Shell contains Header,
+-- FFA rows, and mirrored Teams.TeamA/TeamB score panels with fixed row slots.
+local function resolveLiveScoreboard(hud: ScreenGui): CanvasGroup
+	local authored = hud:FindFirstChild("LiveScoreboard")
+	local view: CanvasGroup
+	if authored then
+		assert(authored:IsA("CanvasGroup"), "[UIResolver] Hud.LiveScoreboard must be a CanvasGroup")
+		view = authored
+	else
+		view = Instance.new("CanvasGroup")
+		view.Name = "LiveScoreboard"
+		view.Parent = hud
+	end
+	populateLiveScoreboard(view, hud)
+	return view
+end
+
 function UIResolver.mount()
 	if mounted then
 		return
@@ -1308,6 +1596,8 @@ function UIResolver.mount()
 	mounted = true
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local views = playerGui:WaitForChild("MainGui"):WaitForChild("BaseClip"):WaitForChild("Views")
+	local hud = playerGui:WaitForChild("Hud")
+	assert(hud:IsA("ScreenGui"), "[UIResolver] PlayerGui.Hud must be a ScreenGui")
 	local templates = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("UI"):WaitForChild("Templates")
 
 	resolveButtonTemplate(templates)
@@ -1319,6 +1609,7 @@ function UIResolver.mount()
 	resolveInventoryView(views)
 	resolveLeaderboardView(views)
 	resolveSettingsView(views)
+	resolveLiveScoreboard(hud)
 end
 
 return UIResolver
