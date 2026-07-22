@@ -19,9 +19,24 @@ local SETTINGS_IMAGE = "rbxassetid://84958958438571"
 local NOTIFICATION_IMAGE = "rbxassetid://128975504294668"
 local LEADERBOARD_ROW_IMAGE = "rbxassetid://139613458882714"
 local ECONOMY_CARD_ASPECT = 2.08
-local INVENTORY_ART_OFFSET = Vector2.new(298, 204)
-local INVENTORY_ART_SIZE = Vector2.new(1612, 1142)
+local SHOP_ASPECT = 1.4415
+local INVENTORY_NATIVE_ASPECT = 4 / 3
 local INVENTORY_ART_ASPECT = 1612 / 1142
+local INVENTORY_PANEL_WIDTH = INVENTORY_ART_ASPECT / SHOP_ASPECT
+local INVENTORY_ART_INSET = 0.012
+local INVENTORY_ART_SCALE = 1 - INVENTORY_ART_INSET * 2
+local INVENTORY_IMAGE_X = INVENTORY_ART_INSET - INVENTORY_ART_SCALE * 298 / 1612
+local INVENTORY_IMAGE_Y = INVENTORY_ART_INSET - INVENTORY_ART_SCALE * 204 / 1142
+local INVENTORY_IMAGE_WIDTH = INVENTORY_ART_SCALE * 2160 / 1612
+local INVENTORY_IMAGE_HEIGHT = INVENTORY_ART_SCALE * 1620 / 1142
+
+local INVENTORY_TABS = {
+	{ id = "BallAssets", label = "BALLS" },
+	{ id = "HammerAssets", label = "HAMMERS" },
+	{ id = "TrailAssets", label = "TRAILS" },
+	{ id = "CostumeAssets", label = "OUTFITS" },
+	{ id = "EmoteAssets", label = "EMOTES" },
+}
 
 local PAPER_TEXT = Color3.fromRGB(42, 28, 22)
 local MUTED_TEXT = Color3.fromRGB(102, 65, 45)
@@ -263,6 +278,32 @@ local function resolveNativePanel(
 	return panel
 end
 
+local function resolveContainer(
+	parent: Instance,
+	name: string,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	zIndex: number
+): Frame
+	local existing = parent:FindFirstChild(name)
+	local frame: Frame
+	if existing then
+		assert(existing:IsA("Frame"), `[UIResolver] {parent.Name}.{name} must be a Frame`)
+		frame = existing
+	else
+		frame = Instance.new("Frame")
+		frame.Name = name
+		frame.Parent = parent
+	end
+	frame.BackgroundTransparency = 1
+	frame.BorderSizePixel = 0
+	frame.Visible = true
+	topLeft(frame, x, y, width, height, zIndex)
+	return frame
+end
+
 local function hideLegacyGui(parent: Instance, name: string)
 	local legacy = parent:FindFirstChild(name)
 	if legacy and legacy:IsA("GuiObject") then
@@ -407,6 +448,35 @@ local function resolveEconomyHolder(
 	table.insert(cleanups, function()
 		connection:Disconnect()
 	end)
+	return holder
+end
+
+local function resolveCrateShelf(parent: Instance, x: number, y: number, width: number, height: number): ScrollingFrame
+	local holder = resolveScroll(parent, x, y, width, height)
+	holder.AutomaticCanvasSize = Enum.AutomaticSize.X
+	holder.ScrollingDirection = Enum.ScrollingDirection.X
+	holder.ScrollBarThickness = 3
+
+	local oldGrid = holder:FindFirstChild("Grid") or holder:FindFirstChildWhichIsA("UIGridLayout")
+	if oldGrid then
+		oldGrid:Destroy()
+	end
+	local existing = holder:FindFirstChild("Shelf") or holder:FindFirstChildWhichIsA("UIListLayout")
+	local layout: UIListLayout
+	if existing then
+		assert(existing:IsA("UIListLayout"), `[UIResolver] {parent.Name}.Holder.Shelf must be a UIListLayout`)
+		layout = existing
+		layout.Name = "Shelf"
+	else
+		layout = Instance.new("UIListLayout")
+		layout.Name = "Shelf"
+		layout.Parent = holder
+	end
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	layout.Padding = UDim.new(0.025, 0)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
 	return holder
 end
 
@@ -556,6 +626,176 @@ local function resolveEconomyItemTemplate(templates: Instance): CanvasGroup
 	return row
 end
 
+local function populateCrateCard(card: CanvasGroup)
+	card.AnchorPoint = Vector2.zero
+	card.BackgroundTransparency = 0.02
+	card.BorderSizePixel = 0
+	card.ClipsDescendants = false
+	card.GroupTransparency = 0
+	card.Position = UDim2.fromScale(0, 0)
+	card.Size = UDim2.fromScale(1, 1)
+	card.ZIndex = 13
+	card.Visible = false
+	styleNativePanel(
+		card,
+		Color3.fromRGB(255, 231, 164),
+		Color3.fromRGB(255, 249, 215),
+		Color3.fromRGB(255, 183, 105),
+		Color3.fromRGB(75, 37, 38),
+		0.13
+	)
+
+	local preview = resolveNativePanel(
+		card,
+		"Preview",
+		0.025,
+		0.08,
+		0.2,
+		0.84,
+		14,
+		Color3.fromRGB(122, 68, 191),
+		Color3.fromRGB(206, 115, 255),
+		Color3.fromRGB(85, 45, 169),
+		Color3.fromRGB(63, 31, 74),
+		0.18
+	)
+	resolveNativePanel(
+		preview,
+		"CrateBody",
+		0.17,
+		0.31,
+		0.66,
+		0.48,
+		15,
+		Color3.fromRGB(255, 165, 43),
+		Color3.fromRGB(255, 221, 89),
+		Color3.fromRGB(239, 96, 52),
+		Color3.fromRGB(69, 36, 38),
+		0.12
+	)
+	local lid = resolveNativePanel(
+		preview,
+		"CrateLid",
+		0.1,
+		0.23,
+		0.8,
+		0.2,
+		16,
+		Color3.fromRGB(91, 226, 205),
+		Color3.fromRGB(174, 255, 225),
+		Color3.fromRGB(42, 177, 175),
+		Color3.fromRGB(55, 42, 48),
+		0.18
+	)
+	lid.Rotation = -3
+	local glyph = resolveText(preview, "Glyph", "?", 0.3, 0.36, 0.4, 0.38, 18, 38, 17, Enum.TextXAlignment.Center)
+	glyph.TextColor3 = Color3.fromRGB(74, 37, 51)
+	local previewLabel = resolveText(
+		preview,
+		"PreviewLabel",
+		"MYSTERY DROP",
+		0.1,
+		0.78,
+		0.8,
+		0.14,
+		8,
+		12,
+		17,
+		Enum.TextXAlignment.Center
+	)
+	previewLabel.TextColor3 = Color3.fromRGB(255, 250, 226)
+
+	local badge = resolveNativePanel(
+		card,
+		"BadgeChip",
+		0.245,
+		0.08,
+		0.2,
+		0.17,
+		14,
+		Color3.fromRGB(255, 82, 157),
+		Color3.fromRGB(255, 143, 198),
+		Color3.fromRGB(225, 55, 135),
+		Color3.fromRGB(89, 43, 56),
+		0.4
+	)
+	badge.BackgroundTransparency = 0
+	local badgeLabel =
+		resolveText(card, "Badge", "CRATE DROP", 0.255, 0.095, 0.18, 0.13, 8, 12, 15, Enum.TextXAlignment.Center)
+	badgeLabel.TextColor3 = Color3.fromRGB(255, 247, 224)
+	resolveText(card, "ItemName", "Crate", 0.245, 0.25, 0.43, 0.22, 13, 24, 14, nil)
+	local highlight = resolveText(card, "Highlight", "Featured cosmetic", 0.245, 0.47, 0.44, 0.17, 9, 15, 14, nil)
+	highlight.TextColor3 = Color3.fromRGB(106, 53, 57)
+	local odds = resolveText(card, "Odds", "Odds", 0.245, 0.67, 0.49, 0.17, 8, 13, 14, nil)
+	odds.TextColor3 = Color3.fromRGB(92, 57, 57)
+
+	local existingMount = card:FindFirstChild("ActionMount")
+	local actionMount: Frame
+	if existingMount then
+		assert(existingMount:IsA("Frame"), "[UIResolver] CrateCard.ActionMount must be a Frame")
+		actionMount = existingMount
+	else
+		actionMount = Instance.new("Frame")
+		actionMount.Name = "ActionMount"
+		actionMount.Parent = card
+	end
+	actionMount.BackgroundTransparency = 1
+	topLeft(actionMount, 0.72, 0.27, 0.25, 0.48, 14)
+end
+
+-- FindFirstChild is deliberate: this temporary Instance.new exception was
+-- directed by the user while Studio is unavailable. The replacement is an
+-- Assets.UI.Templates.CrateCard CanvasGroup with Preview/CrateBody/CrateLid,
+-- Glyph, PreviewLabel, BadgeChip, Badge, ItemName, Highlight, Odds, and ActionMount.
+local function resolveCrateCardTemplate(templates: Instance): CanvasGroup
+	local authored = templates:FindFirstChild("CrateCard")
+	local card: CanvasGroup
+	if authored then
+		assert(authored:IsA("CanvasGroup"), "[UIResolver] Assets.UI.Templates.CrateCard must be a CanvasGroup")
+		card = authored
+	else
+		card = Instance.new("CanvasGroup")
+		card.Name = "CrateCard"
+		card.Parent = templates
+	end
+	populateCrateCard(card)
+	return card
+end
+
+local function resolveInventoryTab(parent: Instance, name: string, labelText: string, order: number): TextButton
+	local existing = parent:FindFirstChild(name)
+	local button: TextButton
+	if existing then
+		assert(existing:IsA("TextButton"), `[UIResolver] Inventory.Tabs.{name} must be a TextButton`)
+		button = existing
+	else
+		button = Instance.new("TextButton")
+		button.Name = name
+		button.Parent = parent
+	end
+	button.AnchorPoint = Vector2.zero
+	button.AutoButtonColor = false
+	button.BackgroundTransparency = 0
+	button.BorderSizePixel = 0
+	button.LayoutOrder = order
+	button.Position = UDim2.fromScale(0, 0)
+	button.Size = UDim2.fromScale(0.19, 0.78)
+	button.Text = ""
+	button.Visible = true
+	button.ZIndex = 14
+	styleNativePanel(
+		button,
+		Color3.fromRGB(242, 232, 189),
+		Color3.fromRGB(255, 249, 218),
+		Color3.fromRGB(222, 196, 138),
+		Color3.fromRGB(63, 70, 43),
+		0.3
+	)
+	local label = resolveText(button, "Label", labelText, 0.06, 0.08, 0.88, 0.84, 8, 15, 15, Enum.TextXAlignment.Center)
+	label.TextColor3 = Color3.fromRGB(54, 46, 34)
+	return button
+end
+
 local function populateNotificationBadge(badge: ImageLabel)
 	styleImage(badge, NOTIFICATION_IMAGE, 1.2581, 0.5, 0.5, 0.24, 0.24, 20, nil)
 	centered(badge, 0.5, 0.5, 0.24, 0.24, 20)
@@ -614,21 +854,21 @@ local function resolveLeaderboardRowTemplate(templates: Instance): ImageLabel
 end
 
 local function populateShop(view: CanvasGroup)
-	styleMenuRoot(view, 1.4415)
+	styleMenuRoot(view, SHOP_ASPECT)
 	local legacyTitle = view:FindFirstChild("Title")
 	if legacyTitle and legacyTitle:IsA("GuiObject") then
 		legacyTitle.Visible = false
 	end
-	resolveImage(view, "Background", SHOP_IMAGE, 1.4415, 0, 0, 1, 1, 10, nil)
+	resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil)
 	hideLegacyGui(view, "StatusPlate")
 	hideLegacyGui(view, "CashPlate")
 	resolveNativePanel(
 		view,
 		"StatusCard",
-		0.1,
+		0.09,
 		0.2,
-		0.45,
-		0.13,
+		0.44,
+		0.12,
 		11,
 		Color3.fromRGB(255, 238, 220),
 		Color3.fromRGB(255, 249, 235),
@@ -636,14 +876,14 @@ local function populateShop(view: CanvasGroup)
 		Color3.fromRGB(92, 43, 52),
 		0.28
 	)
-	resolveAccent(view, "StatusAccent", Color3.fromRGB(255, 75, 153), 0.122, 0.233, 0.012, 0.064)
+	resolveAccent(view, "StatusAccent", Color3.fromRGB(255, 75, 153), 0.112, 0.228, 0.012, 0.06)
 	resolveNativePanel(
 		view,
 		"CashCard",
-		0.66,
+		0.67,
 		0.19,
-		0.23,
-		0.14,
+		0.22,
+		0.13,
 		11,
 		Color3.fromRGB(255, 204, 65),
 		Color3.fromRGB(255, 231, 120),
@@ -666,29 +906,100 @@ local function populateShop(view: CanvasGroup)
 		0.07
 	)
 	contentWell.BackgroundTransparency = 0.42
+	local promo = resolveNativePanel(
+		view,
+		"PromoStrip",
+		0.09,
+		0.355,
+		0.82,
+		0.1,
+		12,
+		Color3.fromRGB(105, 51, 151),
+		Color3.fromRGB(183, 93, 220),
+		Color3.fromRGB(75, 38, 132),
+		Color3.fromRGB(255, 188, 224),
+		0.18
+	)
+	promo.BackgroundTransparency = 0.05
+	local promoTitle = resolveText(view, "PromoTitle", "FRESH DROPS", 0.115, 0.372, 0.25, 0.065, 11, 20, 13, nil)
+	promoTitle.TextColor3 = Color3.fromRGB(255, 248, 219)
+	local promoDetail = resolveText(
+		view,
+		"PromoDetail",
+		"COSMETICS ONLY  •  NO GAMEPLAY ADVANTAGE",
+		0.36,
+		0.372,
+		0.52,
+		0.065,
+		8,
+		14,
+		13,
+		Enum.TextXAlignment.Right
+	)
+	promoDetail.TextColor3 = Color3.fromRGB(255, 226, 242)
+
+	local featuredMount = resolveContainer(view, "FeaturedMount", 0.09, 0.475, 0.82, 0.22, 12)
+	featuredMount.ClipsDescendants = false
+	local shelfTitle = resolveText(view, "ShelfTitle", "MORE CRATES", 0.1, 0.71, 0.46, 0.05, 9, 14, 13, nil)
+	shelfTitle.TextColor3 = Color3.fromRGB(255, 235, 218)
+	resolveCrateShelf(view, 0.09, 0.765, 0.5, 0.14)
+
+	local passTeaser = resolveNativePanel(
+		view,
+		"PassTeaser",
+		0.62,
+		0.71,
+		0.29,
+		0.195,
+		12,
+		Color3.fromRGB(46, 177, 202),
+		Color3.fromRGB(96, 227, 231),
+		Color3.fromRGB(44, 126, 192),
+		Color3.fromRGB(47, 45, 72),
+		0.16
+	)
+	passTeaser.BackgroundTransparency = 0.03
+	local passTitle =
+		resolveText(view, "PassTitle", "GAME PASSES", 0.65, 0.735, 0.23, 0.065, 10, 17, 13, Enum.TextXAlignment.Center)
+	passTitle.TextColor3 = Color3.fromRGB(31, 45, 63)
+	local passStatus = resolveText(
+		view,
+		"PassStatus",
+		"NEW COLLECTIONS\nCOMING SOON",
+		0.65,
+		0.8,
+		0.23,
+		0.08,
+		8,
+		13,
+		13,
+		Enum.TextXAlignment.Center
+	)
+	passStatus.TextColor3 = Color3.fromRGB(39, 55, 71)
 	local cash =
-		resolveText(view, "Cash", "Cash: loading", 0.68, 0.218, 0.19, 0.085, 12, 20, 12, Enum.TextXAlignment.Center)
+		resolveText(view, "Cash", "Cash: loading", 0.69, 0.212, 0.18, 0.078, 12, 20, 12, Enum.TextXAlignment.Center)
 	cash.TextColor3 = Color3.fromRGB(48, 32, 20)
 	resolveText(
 		view,
 		"Status",
 		"Economy data is loading.",
-		0.15,
-		0.222,
-		0.37,
-		0.085,
+		0.145,
+		0.215,
+		0.34,
+		0.078,
 		10,
 		17,
 		12,
 		Enum.TextXAlignment.Center
 	)
-	resolveEconomyHolder(view, 0.09, 0.365, 0.82, 0.525)
 end
 
 -- FindFirstChild is deliberate: this temporary Instance.new exception was
 -- directed by the user while Studio is unavailable. The replacement is a
 -- MainGui.BaseClip.Views.Shop CanvasGroup with Background, StatusCard,
--- StatusAccent, CashCard, ContentWell, Cash, Status, Holder, and Holder.Grid.
+-- StatusAccent, CashCard, ContentWell, PromoStrip, PromoTitle, PromoDetail,
+-- FeaturedMount, ShelfTitle, Holder/Shelf, PassTeaser, PassTitle, PassStatus,
+-- Cash, and Status.
 local function resolveShopView(views: Instance): CanvasGroup
 	local authored = views:FindFirstChild("Shop")
 	local view: CanvasGroup
@@ -703,23 +1014,49 @@ local function resolveShopView(views: Instance): CanvasGroup
 end
 
 local function populateInventory(view: CanvasGroup)
-	styleMenuRoot(view, 1.4415)
+	styleMenuRoot(view, SHOP_ASPECT)
 	local legacyTitle = view:FindFirstChild("Title")
 	if legacyTitle and legacyTitle:IsA("GuiObject") then
 		legacyTitle.Visible = false
 	end
-	local background = resolveImage(view, "Background", INVENTORY_IMAGE, INVENTORY_ART_ASPECT, 0, 0, 1, 1, 10, nil)
-	background.ImageRectOffset = INVENTORY_ART_OFFSET
-	background.ImageRectSize = INVENTORY_ART_SIZE
-	centered(background, 0.5, 0.5, 1, 1, 10)
-	hideLegacyGui(view, "StatusPlate")
-	resolveNativePanel(
-		view,
+	for _, legacyName in
+		{
+			"Background",
+			"StatusPlate",
+			"StatusCard",
+			"StatusAccent",
+			"ContentWell",
+			"Status",
+			"Holder",
+			"Tabs",
+		}
+	do
+		hideLegacyGui(view, legacyName)
+	end
+
+	local panel = resolveContainer(view, "PanelBounds", 0, 0, INVENTORY_PANEL_WIDTH, 1, 10)
+	centered(panel, 0.5, 0.5, INVENTORY_PANEL_WIDTH, 1, 10)
+	panel.ClipsDescendants = true
+	ensureAspect(panel, INVENTORY_ART_ASPECT)
+	resolveImage(
+		panel,
+		"Background",
+		INVENTORY_IMAGE,
+		INVENTORY_NATIVE_ASPECT,
+		INVENTORY_IMAGE_X,
+		INVENTORY_IMAGE_Y,
+		INVENTORY_IMAGE_WIDTH,
+		INVENTORY_IMAGE_HEIGHT,
+		10,
+		nil
+	)
+	local statusCard = resolveNativePanel(
+		panel,
 		"StatusCard",
-		0.2,
-		0.17,
-		0.6,
-		0.13,
+		0.16,
+		0.18,
+		0.68,
+		0.115,
 		11,
 		Color3.fromRGB(241, 255, 221),
 		Color3.fromRGB(253, 255, 239),
@@ -727,14 +1064,68 @@ local function populateInventory(view: CanvasGroup)
 		Color3.fromRGB(52, 75, 38),
 		0.28
 	)
-	resolveAccent(view, "StatusAccent", Color3.fromRGB(106, 210, 62), 0.225, 0.203, 0.012, 0.064)
+	local statusAccent = resolveAccent(panel, "StatusAccent", Color3.fromRGB(106, 210, 62), 0.185, 0.205, 0.012, 0.06)
+	local status = resolveText(
+		panel,
+		"Status",
+		"Inventory data is loading.",
+		0.22,
+		0.198,
+		0.56,
+		0.075,
+		10,
+		17,
+		12,
+		Enum.TextXAlignment.Center
+	)
+
+	local tabs = resolveNativePanel(
+		panel,
+		"Tabs",
+		0.075,
+		0.315,
+		0.85,
+		0.105,
+		12,
+		Color3.fromRGB(74, 131, 45),
+		Color3.fromRGB(129, 198, 69),
+		Color3.fromRGB(56, 103, 42),
+		Color3.fromRGB(217, 255, 174),
+		0.2
+	)
+	tabs.BackgroundTransparency = 0.12
+	tabs.ClipsDescendants = false
+	local oldGrid = tabs:FindFirstChildWhichIsA("UIGridLayout")
+	if oldGrid then
+		oldGrid:Destroy()
+	end
+	local existingLayout = tabs:FindFirstChild("Layout") or tabs:FindFirstChildWhichIsA("UIListLayout")
+	local tabLayout: UIListLayout
+	if existingLayout then
+		assert(existingLayout:IsA("UIListLayout"), "[UIResolver] Inventory.Tabs.Layout must be a UIListLayout")
+		tabLayout = existingLayout
+		tabLayout.Name = "Layout"
+	else
+		tabLayout = Instance.new("UIListLayout")
+		tabLayout.Name = "Layout"
+		tabLayout.Parent = tabs
+	end
+	tabLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	tabLayout.Padding = UDim.new(0.012, 0)
+	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	for order, definition in INVENTORY_TABS do
+		resolveInventoryTab(tabs, definition.id, definition.label, order)
+	end
+
 	local contentWell = resolveNativePanel(
-		view,
+		panel,
 		"ContentWell",
 		0.065,
-		0.315,
+		0.44,
 		0.87,
-		0.6,
+		0.475,
 		11,
 		Color3.fromRGB(109, 180, 42),
 		Color3.fromRGB(187, 250, 104),
@@ -743,26 +1134,58 @@ local function populateInventory(view: CanvasGroup)
 		0.07
 	)
 	contentWell.BackgroundTransparency = 0.46
-	resolveText(
-		view,
-		"Status",
-		"Inventory data is loading.",
-		0.25,
-		0.192,
-		0.5,
-		0.085,
-		10,
-		17,
-		12,
+	local categoryTitle =
+		resolveText(contentWell, "CategoryTitle", "DODGEBALLS", 0.04, 0.025, 0.52, 0.12, 11, 19, 13, nil)
+	categoryTitle.TextColor3 = Color3.fromRGB(242, 255, 218)
+	local itemCount =
+		resolveText(contentWell, "ItemCount", "0 ITEMS", 0.66, 0.025, 0.29, 0.12, 9, 14, 13, Enum.TextXAlignment.Right)
+	itemCount.TextColor3 = Color3.fromRGB(225, 255, 191)
+	resolveEconomyHolder(contentWell, 0.025, 0.155, 0.95, 0.815)
+	local empty = resolveText(
+		contentWell,
+		"Empty",
+		"No owned items in this category yet.",
+		0.18,
+		0.39,
+		0.64,
+		0.22,
+		11,
+		18,
+		14,
 		Enum.TextXAlignment.Center
 	)
-	resolveEconomyHolder(view, 0.09, 0.34, 0.82, 0.55)
+	empty.TextColor3 = Color3.fromRGB(237, 255, 213)
+	empty.Visible = false
+
+	local function refreshLayout()
+		local compact = panel.AbsoluteSize.X > 0 and panel.AbsoluteSize.X < 600
+		if compact then
+			topLeft(statusCard, 0.12, 0.16, 0.76, 0.13, 11)
+			topLeft(statusAccent, 0.15, 0.193, 0.014, 0.064, 15)
+			topLeft(status, 0.19, 0.18, 0.62, 0.09, 12)
+			topLeft(tabs, 0.06, 0.305, 0.88, 0.18, 12)
+			topLeft(contentWell, 0.055, 0.505, 0.89, 0.405, 11)
+		else
+			topLeft(statusCard, 0.16, 0.18, 0.68, 0.115, 11)
+			topLeft(statusAccent, 0.185, 0.205, 0.012, 0.06, 15)
+			topLeft(status, 0.22, 0.198, 0.56, 0.075, 12)
+			topLeft(tabs, 0.075, 0.315, 0.85, 0.105, 12)
+			topLeft(contentWell, 0.065, 0.44, 0.87, 0.475, 11)
+		end
+	end
+	refreshLayout()
+	local connection = panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshLayout)
+	table.insert(cleanups, function()
+		connection:Disconnect()
+	end)
 end
 
 -- FindFirstChild is deliberate: this temporary Instance.new exception was
 -- directed by the user while Studio is unavailable. The replacement is a
--- MainGui.BaseClip.Views.Inventory CanvasGroup with Background, StatusCard,
--- StatusAccent, ContentWell, Status, Holder, and Holder.Grid.
+-- MainGui.BaseClip.Views.Inventory CanvasGroup with a clipped PanelBounds Frame.
+-- PanelBounds contains the full native Background image, StatusCard/StatusAccent/
+-- Status, Tabs with the five category TextButtons, and ContentWell containing
+-- CategoryTitle, ItemCount, Empty, and Holder/Grid.
 local function resolveInventoryView(views: Instance): CanvasGroup
 	local authored = views:FindFirstChild("Inventory")
 	local view: CanvasGroup
@@ -889,6 +1312,7 @@ function UIResolver.mount()
 
 	resolveButtonTemplate(templates)
 	resolveEconomyItemTemplate(templates)
+	resolveCrateCardTemplate(templates)
 	resolveNotificationTemplate(templates)
 	resolveLeaderboardRowTemplate(templates)
 	resolveShopView(views)

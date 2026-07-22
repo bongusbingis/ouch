@@ -14,6 +14,11 @@ type StartOptions = {
 	cosmetics: any?,
 	holder: ScrollingFrame?,
 	statusLabel: TextLabel?,
+	tabs: { [string]: TextButton }?,
+	tabLabels: { [string]: TextLabel }?,
+	categoryTitle: TextLabel?,
+	itemCount: TextLabel?,
+	emptyLabel: TextLabel?,
 	runAsync: ((callback: () -> ()) -> ())?,
 }
 
@@ -26,11 +31,32 @@ type InventoryEntry = {
 	isDefault: boolean,
 }
 
+local CATEGORY_ORDER = { "BallAssets", "HammerAssets", "TrailAssets", "CostumeAssets", "EmoteAssets" }
+local CATEGORY_LABELS = {
+	BallAssets = "BALLS",
+	HammerAssets = "HAMMERS",
+	TrailAssets = "TRAILS",
+	CostumeAssets = "OUTFITS",
+	EmoteAssets = "EMOTES",
+}
+local CATEGORY_TITLES = {
+	BallAssets = "DODGEBALLS",
+	HammerAssets = "HAMMERS",
+	TrailAssets = "TRAIL EFFECTS",
+	CostumeAssets = "OUTFITS",
+	EmoteAssets = "EMOTES",
+}
+
 local InventoryController = {}
 
 local started = false
 local holder: ScrollingFrame? = nil
 local statusLabel: TextLabel? = nil
+local tabButtons: { [string]: TextButton } = {}
+local tabLabels: { [string]: TextLabel } = {}
+local categoryTitle: TextLabel? = nil
+local itemCount: TextLabel? = nil
+local emptyLabel: TextLabel? = nil
 local activeStore: any = EconomyStore
 local activeNetwork: any = nil
 local activeMenuManager: any = nil
@@ -50,7 +76,9 @@ local busy: { [string]: boolean } = {}
 local viewOpen = false
 local storeDisconnect: (() -> ())? = nil
 local menuDisconnect: (() -> ())? = nil
+local tabConnections: { any } = {}
 local statusMessage = "Inventory data is loading."
+local selectedCategory: string? = nil
 
 local function replicatedStorage(): ReplicatedStorage
 	return game:GetService("ReplicatedStorage")
@@ -68,20 +96,54 @@ local function resolveMenuManager(): any
 	return require(script.Parent.MenuManager)
 end
 
-local function resolveView(): (ScrollingFrame, TextLabel)
+local function resolveView(): (
+	ScrollingFrame,
+	TextLabel,
+	{ [string]: TextButton },
+	{ [string]: TextLabel },
+	TextLabel,
+	TextLabel,
+	TextLabel
+)
 	local Players = game:GetService("Players")
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local view =
 		playerGui:WaitForChild("MainGui"):WaitForChild("BaseClip"):WaitForChild("Views"):WaitForChild("Inventory")
 	assert(view:IsA("CanvasGroup"), "[InventoryController] Views.Inventory must be a CanvasGroup")
-	local holderInstance = view:WaitForChild("Holder")
-	local statusInstance = view:WaitForChild("Status")
+	local panel = view:WaitForChild("PanelBounds")
+	assert(panel:IsA("Frame"), "[InventoryController] Views.Inventory.PanelBounds must be a Frame")
+	local tabsInstance = panel:WaitForChild("Tabs")
+	local content = panel:WaitForChild("ContentWell")
+	assert(tabsInstance:IsA("Frame"), "[InventoryController] Views.Inventory.PanelBounds.Tabs must be a Frame")
+	assert(content:IsA("Frame"), "[InventoryController] Views.Inventory.PanelBounds.ContentWell must be a Frame")
+	local holderInstance = content:WaitForChild("Holder")
+	local statusInstance = panel:WaitForChild("Status")
+	local categoryTitleInstance = content:WaitForChild("CategoryTitle")
+	local itemCountInstance = content:WaitForChild("ItemCount")
+	local emptyInstance = content:WaitForChild("Empty")
 	assert(
 		holderInstance:IsA("ScrollingFrame"),
-		"[InventoryController] Views.Inventory.Holder must be a ScrollingFrame"
+		"[InventoryController] Views.Inventory.PanelBounds.ContentWell.Holder must be a ScrollingFrame"
 	)
-	assert(statusInstance:IsA("TextLabel"), "[InventoryController] Views.Inventory.Status must be a TextLabel")
-	return holderInstance, statusInstance
+	assert(
+		statusInstance:IsA("TextLabel"),
+		"[InventoryController] Views.Inventory.PanelBounds.Status must be a TextLabel"
+	)
+	assert(categoryTitleInstance:IsA("TextLabel"), "[InventoryController] Inventory.CategoryTitle must be a TextLabel")
+	assert(itemCountInstance:IsA("TextLabel"), "[InventoryController] Inventory.ItemCount must be a TextLabel")
+	assert(emptyInstance:IsA("TextLabel"), "[InventoryController] Inventory.Empty must be a TextLabel")
+
+	local buttons: { [string]: TextButton } = {}
+	local labels: { [string]: TextLabel } = {}
+	for _, category in CATEGORY_ORDER do
+		local button = tabsInstance:WaitForChild(category)
+		assert(button:IsA("TextButton"), `[InventoryController] Inventory.Tabs.{category} must be a TextButton`)
+		local label = button:WaitForChild("Label")
+		assert(label:IsA("TextLabel"), `[InventoryController] Inventory.Tabs.{category}.Label must be a TextLabel`)
+		buttons[category] = button
+		labels[category] = label
+	end
+	return holderInstance, statusInstance, buttons, labels, categoryTitleInstance, itemCountInstance, emptyInstance
 end
 
 local function destroyItems()
@@ -98,22 +160,24 @@ local function setStatus(message: string)
 	end
 end
 
-local function sortedEntries(): { InventoryEntry }
+local function sortedEntries(categoryFilter: string?): { InventoryEntry }
 	local entries = {}
 	for category, defaultItem in activeCosmetics.Defaults or {} do
-		table.insert(entries, {
-			id = `Default_{category}`,
-			itemId = nil,
-			category = category,
-			displayName = defaultItem.DisplayName,
-			rarity = "Default",
-			isDefault = true,
-		})
+		if categoryFilter == nil or category == categoryFilter then
+			table.insert(entries, {
+				id = `Default_{category}`,
+				itemId = nil,
+				category = category,
+				displayName = defaultItem.DisplayName,
+				rarity = "Default",
+				isDefault = true,
+			})
+		end
 	end
 	local owned = currentData.Cosmetics.Owned
 	for itemId, isOwned in owned do
 		local item = activeCosmetics.Items[itemId]
-		if isOwned and item then
+		if isOwned and item and (categoryFilter == nil or item.Category == categoryFilter) then
 			table.insert(entries, {
 				id = itemId,
 				itemId = itemId,
@@ -139,8 +203,42 @@ local function sortedEntries(): { InventoryEntry }
 	return entries
 end
 
+local function availableCategories(): { string }
+	local present: { [string]: boolean } = {}
+	for category in activeCosmetics.Slots or {} do
+		present[category] = true
+	end
+	for category in activeCosmetics.Defaults or {} do
+		present[category] = true
+	end
+	for _, item in activeCosmetics.Items or {} do
+		present[item.Category] = true
+	end
+
+	local categories = {}
+	for _, category in CATEGORY_ORDER do
+		if present[category] then
+			table.insert(categories, category)
+			present[category] = nil
+		end
+	end
+	local remaining = {}
+	for category in present do
+		table.insert(remaining, category)
+	end
+	table.sort(remaining)
+	for _, category in remaining do
+		table.insert(categories, category)
+	end
+	return categories
+end
+
+local function categoryName(category: string): string
+	return CATEGORY_LABELS[category] or string.upper(category:gsub("Assets$", ""))
+end
+
 local function entryForId(entryId: string): InventoryEntry?
-	for _, entry in sortedEntries() do
+	for _, entry in sortedEntries(nil) do
 		if entry.id == entryId then
 			return entry
 		end
@@ -162,6 +260,71 @@ local function errorMessage(reason: any): string
 end
 
 local render: () -> ()
+
+local function setTabVisual(category: string, selected: boolean, count: number)
+	local button = tabButtons[category]
+	if button == nil then
+		return
+	end
+	local light = if selected then Color3.fromRGB(191, 255, 91) else Color3.fromRGB(255, 245, 211)
+	local dark = if selected then Color3.fromRGB(91, 194, 55) else Color3.fromRGB(218, 188, 125)
+	button.BackgroundColor3 = light
+	local gradient = button:WaitForChild("ColorWash")
+	local outline = button:WaitForChild("Outline")
+	assert(gradient:IsA("UIGradient"), `[InventoryController] Inventory.Tabs.{category}.ColorWash must be a UIGradient`)
+	assert(outline:IsA("UIStroke"), `[InventoryController] Inventory.Tabs.{category}.Outline must be a UIStroke`)
+	if ColorSequence ~= nil then
+		gradient.Color = ColorSequence.new(light, dark)
+	end
+	outline.Color = if selected then Color3.fromRGB(47, 83, 34) else Color3.fromRGB(92, 70, 48)
+	outline.Thickness = if selected then 3.5 else 2.5
+	local label = tabLabels[category]
+	if label then
+		label.Text = `{categoryName(category)}  {count}`
+		label.TextColor3 = if selected then Color3.fromRGB(34, 62, 29) else Color3.fromRGB(62, 47, 34)
+	end
+end
+
+local function ensureSelectedCategory()
+	local categories = availableCategories()
+	if #categories == 0 then
+		selectedCategory = nil
+		return
+	end
+	for _, category in categories do
+		if category == selectedCategory then
+			return
+		end
+	end
+	selectedCategory = categories[1]
+end
+
+local function selectCategory(category: string)
+	if selectedCategory == category then
+		return
+	end
+	for _, available in availableCategories() do
+		if available == category then
+			selectedCategory = category
+			if currentData then
+				setStatus("Select an item to equip.")
+			end
+			render()
+			return
+		end
+	end
+end
+
+local function bindTabs()
+	for category, button in tabButtons do
+		table.insert(
+			tabConnections,
+			button.Activated:Connect(function()
+				selectCategory(category)
+			end)
+		)
+	end
+end
 
 local function toggleEquip(entryId: string)
 	if busy[entryId] or currentData == nil then
@@ -212,9 +375,38 @@ render = function()
 		setStatus("Select an item to equip.")
 	end
 
-	local entries = sortedEntries()
+	ensureSelectedCategory()
+	local allEntries = sortedEntries(nil)
+	local counts: { [string]: number } = {}
+	for _, entry in allEntries do
+		counts[entry.category] = (counts[entry.category] or 0) + 1
+	end
+	local categories = availableCategories()
+	for category, button in tabButtons do
+		button.Visible = table.find(categories, category) ~= nil
+		setTabVisual(category, category == selectedCategory, counts[category] or 0)
+	end
+
+	local category = selectedCategory
+	if category == nil then
+		if emptyLabel then
+			emptyLabel.Visible = true
+			emptyLabel.Text = "No inventory categories are configured."
+		end
+		return
+	end
+	local entries = sortedEntries(category)
+	if categoryTitle then
+		categoryTitle.Text = CATEGORY_TITLES[category] or categoryName(category)
+	end
+	if itemCount then
+		itemCount.Text = `{#entries} {if #entries == 1 then "ITEM" else "ITEMS"}`
+	end
+	if emptyLabel then
+		emptyLabel.Visible = #entries == 0
+		emptyLabel.Text = `No owned {string.lower(categoryName(category))} yet.`
+	end
 	if #entries == 0 then
-		setStatus("No owned items.")
 		return
 	end
 	for order, entry in entries do
@@ -226,8 +418,9 @@ render = function()
 				data = {
 					id = entry.id,
 					title = entry.displayName,
-					details = `Category: {entry.category}  Rarity: {entry.rarity}`,
-					state = if equipped then "Equipped" else if entry.isDefault then "Available" else "Owned",
+					details = `{string.upper(entry.rarity)} COSMETIC`,
+					rarity = entry.rarity,
+					state = if equipped then "Equipped" else if entry.isDefault then "Default" else "Owned",
 					actionText = if equipped
 						then if entry.isDefault then "Equipped" else "Unequip"
 						else if entry.isDefault then "Use Default" else "Equip",
@@ -263,9 +456,15 @@ function InventoryController.start(options: StartOptions?)
 	if options and options.holder and options.statusLabel then
 		holder = options.holder
 		statusLabel = options.statusLabel
+		tabButtons = options.tabs or {}
+		tabLabels = options.tabLabels or {}
+		categoryTitle = options.categoryTitle
+		itemCount = options.itemCount
+		emptyLabel = options.emptyLabel
 	else
-		holder, statusLabel = resolveView()
+		holder, statusLabel, tabButtons, tabLabels, categoryTitle, itemCount, emptyLabel = resolveView()
 	end
+	bindTabs()
 
 	activeStore.start()
 	currentData = activeStore.snapshot()
@@ -287,10 +486,19 @@ function InventoryController._resetForTest()
 	if menuDisconnect then
 		menuDisconnect()
 	end
+	for _, connection in tabConnections do
+		connection:Disconnect()
+	end
+	table.clear(tabConnections)
 	destroyItems()
 	started = false
 	holder = nil
 	statusLabel = nil
+	tabButtons = {}
+	tabLabels = {}
+	categoryTitle = nil
+	itemCount = nil
+	emptyLabel = nil
 	activeStore = EconomyStore
 	activeNetwork = nil
 	activeMenuManager = nil
@@ -303,6 +511,7 @@ function InventoryController._resetForTest()
 	storeDisconnect = nil
 	menuDisconnect = nil
 	statusMessage = "Inventory data is loading."
+	selectedCategory = nil
 end
 
 return InventoryController

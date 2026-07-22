@@ -61,8 +61,25 @@ local function stateColors(state: string): (Color3, Color3)
 		return Color3.fromRGB(255, 224, 126), Color3.fromRGB(242, 174, 64)
 	elseif state == "Opening" then
 		return Color3.fromRGB(255, 170, 207), Color3.fromRGB(239, 95, 164)
+	elseif state == "Default" then
+		return Color3.fromRGB(205, 242, 153), Color3.fromRGB(116, 190, 75)
 	end
 	return Color3.fromRGB(255, 232, 170), Color3.fromRGB(237, 183, 89)
+end
+
+local function rarityColor(rarity: string?): Color3
+	if rarity == "Rare" then
+		return Color3.fromRGB(70, 139, 235)
+	elseif rarity == "Epic" then
+		return Color3.fromRGB(204, 76, 221)
+	elseif rarity == "Legendary" then
+		return Color3.fromRGB(244, 151, 39)
+	elseif rarity == "Exclusive" then
+		return Color3.fromRGB(143, 88, 226)
+	elseif rarity == "Default" then
+		return Color3.fromRGB(113, 194, 72)
+	end
+	return Color3.fromRGB(48, 187, 178)
 end
 
 function EconomyItemElement.mount(parent: Instance, props: EconomyItemProps, options: MountOptions?): EconomyItemHandle
@@ -127,10 +144,12 @@ function EconomyItemElement.mount(parent: Instance, props: EconomyItemProps, opt
 		stateLabel.Text = data.state
 		if styled then
 			local lightColor, darkColor = stateColors(data.state)
+			local rarityAccent = rarityColor(data.rarity)
 			local chip = stateChip :: Frame
 			local accentBar = accent :: Frame
 			chip.BackgroundColor3 = lightColor
-			accentBar.BackgroundColor3 = darkColor
+			accentBar.BackgroundColor3 = rarityAccent
+			detailsLabel.TextColor3 = rarityAccent
 			local gradient = stateGradient :: UIGradient
 			gradient.Color = ColorSequence.new(lightColor, darkColor)
 			if actionHandle then

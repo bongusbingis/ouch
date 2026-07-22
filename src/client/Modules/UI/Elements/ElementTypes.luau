@@ -75,6 +75,7 @@ export type EconomyItemData = {
 	id: string,
 	title: string,
 	details: string,
+	rarity: string?,
 	state: string,
 	actionText: string,
 	actionEnabled: boolean,
@@ -89,6 +90,27 @@ export type EconomyItemProps = {
 export type EconomyItemHandle = ElementHandle & {
 	instance: GuiObject,
 	setData: (self: EconomyItemHandle, data: EconomyItemData) -> (),
+}
+
+export type CrateCardData = {
+	id: string,
+	title: string,
+	highlight: string,
+	odds: string,
+	actionText: string,
+	actionEnabled: boolean,
+	layoutOrder: number,
+	featured: boolean,
+}
+
+export type CrateCardProps = {
+	data: CrateCardData,
+	activated: ((crateId: string) -> ())?,
+}
+
+export type CrateCardHandle = ElementHandle & {
+	instance: GuiObject,
+	setData: (self: CrateCardHandle, data: CrateCardData) -> (),
 }
 
 return {}

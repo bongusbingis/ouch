@@ -1,9 +1,10 @@
 --!strict
 
--- Cash-crate shop. Direct cosmetic purchases are not shown because the
--- current server economy exposes only OpenCrate.
+-- Cash-crate storefront. Merchandising copy derives from configured pools;
+-- purchases still route only through the authoritative OpenCrate remote.
 
-local EconomyItemElement = require(script.Parent.Elements.EconomyItemElement)
+local CrateCardElement = require(script.Parent.Elements.CrateCardElement)
+local CratePresentation = require(script.Parent.CratePresentation)
 local EconomyStore = require(script.Parent.EconomyStore)
 
 type StartOptions = {
@@ -11,9 +12,11 @@ type StartOptions = {
 	network: any?,
 	menuManager: any?,
 	itemElement: any?,
+	crateElement: any?,
 	crates: any?,
 	cosmetics: any?,
 	holder: ScrollingFrame?,
+	featuredMount: Frame?,
 	cashLabel: TextLabel?,
 	statusLabel: TextLabel?,
 	runAsync: ((callback: () -> ()) -> ())?,
@@ -23,12 +26,13 @@ local ShopController = {}
 
 local started = false
 local holder: ScrollingFrame? = nil
+local featuredMount: Frame? = nil
 local cashLabel: TextLabel? = nil
 local statusLabel: TextLabel? = nil
 local activeStore: any = EconomyStore
 local activeNetwork: any = nil
 local activeMenuManager: any = nil
-local activeItemElement: any = EconomyItemElement
+local activeCrateElement: any = CrateCardElement
 local activeCrates: any = nil
 local activeCosmetics: any = nil
 local function runAsyncDefault(callback: () -> ())
@@ -67,18 +71,20 @@ local function resolveMenuManager(): any
 	return require(script.Parent.MenuManager)
 end
 
-local function resolveView(): (ScrollingFrame, TextLabel, TextLabel)
+local function resolveView(): (ScrollingFrame, Frame, TextLabel, TextLabel)
 	local Players = game:GetService("Players")
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local view = playerGui:WaitForChild("MainGui"):WaitForChild("BaseClip"):WaitForChild("Views"):WaitForChild("Shop")
 	assert(view:IsA("CanvasGroup"), "[ShopController] Views.Shop must be a CanvasGroup")
 	local holderInstance = view:WaitForChild("Holder")
+	local featuredInstance = view:WaitForChild("FeaturedMount")
 	local cashInstance = view:WaitForChild("Cash")
 	local statusInstance = view:WaitForChild("Status")
 	assert(holderInstance:IsA("ScrollingFrame"), "[ShopController] Views.Shop.Holder must be a ScrollingFrame")
+	assert(featuredInstance:IsA("Frame"), "[ShopController] Views.Shop.FeaturedMount must be a Frame")
 	assert(cashInstance:IsA("TextLabel"), "[ShopController] Views.Shop.Cash must be a TextLabel")
 	assert(statusInstance:IsA("TextLabel"), "[ShopController] Views.Shop.Status must be a TextLabel")
-	return holderInstance, cashInstance, statusInstance
+	return holderInstance, featuredInstance, cashInstance, statusInstance
 end
 
 local function destroyItems()
@@ -118,6 +124,30 @@ local function resultMessage(result: any): string
 		return `Duplicate {displayName}; refunded {result.cashRefund or 0} Cash.`
 	end
 	return `Opened {displayName}.`
+end
+
+local function presentationFor(crate: any): any
+	if activeCosmetics.Rarities == nil then
+		return {
+			highlight = `{#crate.ItemPool} COSMETICS INSIDE`,
+			odds = "ODDS SHOWN BEFORE PURCHASE",
+			rarityCount = 0,
+		}
+	end
+	return CratePresentation.forCrate(crate, activeCosmetics)
+end
+
+local function featuredCrateId(ids: { string }): string?
+	local selected: string? = nil
+	local selectedRarityCount = -1
+	for _, crateId in ids do
+		local rarityCount = presentationFor(activeCrates[crateId]).rarityCount
+		if rarityCount > selectedRarityCount then
+			selected = crateId
+			selectedRarityCount = rarityCount
+		end
+	end
+	return selected
 end
 
 local function errorMessage(reason: any): string
@@ -179,25 +209,31 @@ render = function()
 		setStatus("No crates are configured.")
 		return
 	end
+	local featuredId = if featuredMount then featuredCrateId(ids) else nil
 	for order, crateId in ids do
 		local crate = activeCrates[crateId]
 		local price = crate.CashPrice
 		local actionText = if price then `Open - {price} Cash` else "Cash purchase unavailable"
-		table.insert(
-			handles,
-			activeItemElement.mount(holder, {
-				data = {
-					id = crateId,
-					title = crate.DisplayName or crateId,
-					details = `Items: {#crate.ItemPool}`,
-					state = if busy[crateId] then "Opening" else "Available",
-					actionText = actionText,
-					actionEnabled = price ~= nil and not busy[crateId],
-					layoutOrder = order,
-				},
-				activated = openCrate,
-			})
-		)
+		local presentation = presentationFor(crate)
+		local isFeatured = crateId == featuredId
+		local parent = if isFeatured then featuredMount else holder
+		local handle = activeCrateElement.mount(parent, {
+			data = {
+				id = crateId,
+				title = crate.DisplayName or crateId,
+				highlight = presentation.highlight,
+				odds = presentation.odds,
+				actionText = if busy[crateId] then "Opening..." else actionText,
+				actionEnabled = price ~= nil and not busy[crateId],
+				layoutOrder = order,
+				featured = isFeatured,
+			},
+			activated = openCrate,
+		})
+		if handle.instance then
+			handle.instance.Size = if isFeatured then UDim2.fromScale(1, 1) else UDim2.fromScale(0.94, 0.94)
+		end
+		table.insert(handles, handle)
 	end
 end
 
@@ -217,17 +253,20 @@ function ShopController.start(options: StartOptions?)
 	activeStore = if options and options.store then options.store else EconomyStore
 	activeNetwork = if options and options.network then options.network else resolveNetwork()
 	activeMenuManager = if options and options.menuManager then options.menuManager else resolveMenuManager()
-	activeItemElement = if options and options.itemElement then options.itemElement else EconomyItemElement
+	activeCrateElement = if options and options.crateElement
+		then options.crateElement
+		else if options and options.itemElement then options.itemElement else CrateCardElement
 	activeCrates = if options and options.crates then options.crates else resolveCrates()
 	activeCosmetics = if options and options.cosmetics then options.cosmetics else resolveCosmetics()
 	activeRunAsync = if options and options.runAsync then options.runAsync else runAsyncDefault
 
 	if options and options.holder and options.cashLabel and options.statusLabel then
 		holder = options.holder
+		featuredMount = options.featuredMount
 		cashLabel = options.cashLabel
 		statusLabel = options.statusLabel
 	else
-		holder, cashLabel, statusLabel = resolveView()
+		holder, featuredMount, cashLabel, statusLabel = resolveView()
 	end
 
 	activeStore.start()
@@ -256,12 +295,13 @@ function ShopController._resetForTest()
 	destroyItems()
 	started = false
 	holder = nil
+	featuredMount = nil
 	cashLabel = nil
 	statusLabel = nil
 	activeStore = EconomyStore
 	activeNetwork = nil
 	activeMenuManager = nil
-	activeItemElement = EconomyItemElement
+	activeCrateElement = CrateCardElement
 	activeCrates = nil
 	activeCosmetics = nil
 	activeRunAsync = runAsyncDefault

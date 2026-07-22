@@ -63,6 +63,9 @@ local function fakeGui(name: string, className: string): any
 		end
 		return child
 	end
+	function gui:FindFirstChild(childName: string)
+		return self._children[childName]
+	end
 	function gui:GetChildren()
 		return self._order
 	end
@@ -368,6 +371,55 @@ T.describe("ShopController", function()
 		T.expect(listeners.CrateOpened ~= nil):toBeTruthy()
 		ShopController._resetForTest()
 	end)
+
+	T.it("features the crate with the broadest rarity selection", function()
+		ShopController._resetForTest()
+		local store = fakeStore({ Cash = 2000, Cosmetics = { Owned = {}, Equipped = {} } })
+		local menu = fakeMenu()
+		local crateElement, mounted = fakeItemElement()
+		local holder = { Name = "Holder" }
+		local featuredMount = { Name = "FeaturedMount" }
+		ShopController.start({
+			store = store,
+			network = {
+				on = function() end,
+				call = function()
+					return nil
+				end,
+			},
+			menuManager = menu,
+			crateElement = crateElement,
+			crates = {
+				BallCrate = { DisplayName = "Ball Crate", CashPrice = 500, ItemPool = { "BallRed" } },
+				TrailCrate = {
+					DisplayName = "Trail Crate",
+					CashPrice = 1000,
+					ItemPool = { "TrailMint", "TrailSolar" },
+				},
+			},
+			cosmetics = {
+				Rarities = { Common = { Weight = 70 }, Legendary = { Weight = 6 } },
+				Items = {
+					BallRed = { DisplayName = "Red Ball", Rarity = "Common" },
+					TrailMint = { DisplayName = "Mint Mist", Rarity = "Common" },
+					TrailSolar = { DisplayName = "Solar Flare", Rarity = "Legendary" },
+				},
+			},
+			holder = holder :: any,
+			featuredMount = featuredMount :: any,
+			cashLabel = { Text = "" } :: any,
+			statusLabel = { Text = "" } :: any,
+			runAsync = immediate,
+		})
+
+		menu:setOpen("Shop")
+		T.expect(#mounted):toEqual(2)
+		local featured = if mounted[1].props.data.featured then mounted[1] else mounted[2]
+		T.expect(featured.parent):toEqual(featuredMount)
+		T.expect(featured.props.data.title):toEqual("Trail Crate")
+		T.expect(featured.props.data.odds):toEqual("ODDS  COMMON 92.1%  •  LEGENDARY 7.9%")
+		ShopController._resetForTest()
+	end)
 end)
 
 T.describe("InventoryController", function()
@@ -469,6 +521,82 @@ T.describe("InventoryController", function()
 		T.expect(mounted[1].props.data.actionEnabled):toEqual(false)
 		mounted[1].props.activated("Default_BallAssets")
 		T.expect(calls):toEqual(0)
+		InventoryController._resetForTest()
+	end)
+
+	T.it("shows only the selected asset category", function()
+		InventoryController._resetForTest()
+		local store = fakeStore({
+			Cash = 0,
+			Cosmetics = {
+				Owned = { BallRed = true, TrailMint = true },
+				Equipped = {},
+			},
+		})
+		local menu = fakeMenu()
+		local itemElement, mounted = fakeItemElement()
+		local tabs = {
+			BallAssets = fakeGui("BallAssets", "TextButton"),
+			HammerAssets = fakeGui("HammerAssets", "TextButton"),
+			TrailAssets = fakeGui("TrailAssets", "TextButton"),
+		}
+		for _, button in tabs do
+			addChild(button, fakeGui("ColorWash", "UIGradient"))
+			addChild(button, fakeGui("Outline", "UIStroke"))
+		end
+		local tabLabels = {
+			BallAssets = fakeGui("Label", "TextLabel"),
+			HammerAssets = fakeGui("Label", "TextLabel"),
+			TrailAssets = fakeGui("Label", "TextLabel"),
+		}
+		local categoryTitle = fakeGui("CategoryTitle", "TextLabel")
+		local itemCount = fakeGui("ItemCount", "TextLabel")
+		local emptyLabel = fakeGui("Empty", "TextLabel")
+
+		InventoryController.start({
+			store = store,
+			network = {
+				call = function()
+					return true
+				end,
+			},
+			menuManager = menu,
+			itemElement = itemElement,
+			cosmetics = {
+				Slots = { BallAssets = true, HammerAssets = true, TrailAssets = true },
+				Defaults = { BallAssets = { DisplayName = "Default Dodgeball" } },
+				Items = {
+					BallRed = { DisplayName = "Red Ball", Category = "BallAssets", Rarity = "Common" },
+					TrailMint = { DisplayName = "Mint Mist", Category = "TrailAssets", Rarity = "Rare" },
+				},
+			},
+			holder = { Name = "Holder" } :: any,
+			statusLabel = { Text = "" } :: any,
+			tabs = tabs :: any,
+			tabLabels = tabLabels :: any,
+			categoryTitle = categoryTitle,
+			itemCount = itemCount,
+			emptyLabel = emptyLabel,
+			runAsync = immediate,
+		})
+
+		menu:setOpen("Inventory")
+		T.expect(#mounted):toEqual(2)
+		T.expect(mounted[1].props.data.title):toEqual("Default Dodgeball")
+		T.expect(mounted[2].props.data.title):toEqual("Red Ball")
+		T.expect(categoryTitle.Text):toEqual("DODGEBALLS")
+		T.expect(itemCount.Text):toEqual("2 ITEMS")
+
+		tabs.TrailAssets.Activated:Fire()
+		T.expect(mounted[#mounted].props.data.title):toEqual("Mint Mist")
+		T.expect(mounted[#mounted].props.data.rarity):toEqual("Rare")
+		T.expect(categoryTitle.Text):toEqual("TRAIL EFFECTS")
+		T.expect(itemCount.Text):toEqual("1 ITEM")
+
+		tabs.HammerAssets.Activated:Fire()
+		T.expect(emptyLabel.Visible):toEqual(true)
+		T.expect(categoryTitle.Text):toEqual("HAMMERS")
+		T.expect(itemCount.Text):toEqual("0 ITEMS")
 		InventoryController._resetForTest()
 	end)
 end)
