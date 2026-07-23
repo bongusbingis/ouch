@@ -16,6 +16,21 @@ function CharacterRig.rightHand(character: Model?): BasePart?
 	return nil
 end
 
+-- R15 characters carry a built-in "RightGripAttachment" on RightHand (the
+-- same reference frame Roblox's own Tool grip alignment uses); R6 and custom
+-- avatars may not have one, so callers must handle nil.
+function CharacterRig.rightHandGripCFrame(character: Model?): CFrame?
+	local hand = CharacterRig.rightHand(character)
+	if hand == nil then
+		return nil
+	end
+	local attachment = hand:FindFirstChild("RightGripAttachment")
+	if attachment and attachment:IsA("Attachment") then
+		return hand.CFrame * attachment.CFrame
+	end
+	return nil
+end
+
 function CharacterRig.rootPart(character: Model?): BasePart?
 	if character == nil then
 		return nil

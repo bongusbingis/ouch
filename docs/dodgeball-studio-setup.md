@@ -30,6 +30,14 @@ This section is optional: when `ReplicatedStorage > Assets > Effects > Splat` is
 3. Create `ReplicatedStorage > Assets > CombatAnimations`.
 4. Add `Animation` children named `DodgeballWindup` and `DodgeballRelease`, each with its published animation ID. Author them for the rig type used by the prototype.
 
+## Hammer grip
+
+`HammerVisuals` aligns each hammer skin against the hand using a `GripAttachment` child on the skin's `BasePart`, matched against the character's own grip reference frame (R15's built-in `RightGripAttachment` on `RightHand`, or a small config-driven fallback for R6/custom avatars). No `GripAttachment` exists in Studio today: `HammerVisuals` seeds one at runtime from `Config.Combat.Hammer.GripOffset`/`GripRotationDeg` on any cloned hammer part that lacks its own.
+
+1. To author placement directly instead of iterating the config numbers: for each hammer skin under `ReplicatedStorage > Assets > Cosmetics > HammerAssets`, add an `Attachment` named `GripAttachment` on the part. A Studio-authored one always takes precedence over the config-seeded default.
+2. Because the mesh is a symmetric, double-headed inflatable hammer, one `GripAttachment` roughly 3/4 down the shaft (from either head) should read correctly held from both orientations — no separate top/bottom variant needed.
+3. Verify by equipping the hammer and checking it sits naturally in the hand at rest, mid-swing, and mid-squash (the stretch animation keeps the `GripAttachment` point anchored to the hand; only the visible mesh stretches around it).
+
 ## Intermission lobby
 
 1. Keep the Studio-authored lobby permanently at `Workspace > Lobby`. Do not place it under `ReplicatedStorage > Assets > Maps`; runtime map cleanup must never move or destroy it.

@@ -34,15 +34,37 @@ local baseSize = defaultTemplate.Size
 local ballsFolder = Workspace:WaitForChild("Balls")
 local seenEvents = EventDedup.new(4096)
 
-local function handCFrame(template: BasePart): CFrame
-	local offset = Combat.Hammer.VisualHandOffset
-	local rotation = Combat.Hammer.VisualRotationDeg
-	local gripY = -template.Size.Y * (0.5 - Combat.Hammer.VisualGripInsetScale)
-	local grip = CFrame.new(0, gripY, 0)
+local defaultGripCFrame = (function(): CFrame
+	local offset = Combat.Hammer.GripOffset
+	local rotation = Combat.Hammer.GripRotationDeg
 	return CFrame.new(offset.x, offset.y, offset.z)
-		* CFrame.Angles(0, math.rad(Combat.Hammer.VisualHandYawDeg), 0)
 		* CFrame.Angles(math.rad(rotation.x), math.rad(rotation.y), math.rad(rotation.z))
-		* grip
+end)()
+
+-- The GripAttachment is where/how the hand holds the mesh: its CFrame is
+-- aligned against the hand's own grip reference frame (CharacterRig
+-- .rightHandGripCFrame), so any hammer skin gets correct placement just by
+-- carrying its own GripAttachment child. Seeded here for skins that don't
+-- author one yet.
+local function gripAttachmentFor(visual: BasePart): Attachment
+	local existing = visual:FindFirstChild("GripAttachment")
+	if existing and existing:IsA("Attachment") then
+		return existing
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "GripAttachment"
+	attachment.CFrame = defaultGripCFrame
+	attachment.Parent = visual
+	return attachment
+end
+
+local function handGripCFrame(character: Model, hand: BasePart): CFrame
+	local rigGrip = CharacterRig.rightHandGripCFrame(character)
+	if rigGrip then
+		return rigGrip
+	end
+	local fallback = Combat.Hammer.HandGripFallbackOffset
+	return hand.CFrame * CFrame.new(fallback.x, fallback.y, fallback.z)
 end
 
 local function springFor(player: Player): Spring.Spring
@@ -152,8 +174,6 @@ function HammerVisuals.start()
 
 	RunService.RenderStepped:Connect(function(dt)
 		local feel = Combat.HammerFeel
-		local grip = handCFrame(defaultTemplate)
-		local gripLocal = grip:Inverse().Position
 		local now = os.clock()
 		for _, player in Players:GetPlayers() do
 			local character = player.Character
@@ -177,11 +197,17 @@ function HammerVisuals.start()
 			local scale = scaleFor(stretch)
 
 			local visual = visualFor(player)
+			local attachment = gripAttachmentFor(visual)
+			local itemGrip = attachment.CFrame
+			local gripLocal = attachment.Position
+			local handWorld = handGripCFrame(character, hand)
+
 			visual.Size = Vector3.new(baseSize.X * scale.X, baseSize.Y * scale.Y, baseSize.Z * scale.Z)
-			-- Size scales the mesh about the part center; the translation maps
-			-- the scaled grip point back onto the hand so the handle stays put.
-			visual.CFrame = hand.CFrame
-				* grip
+			-- Size scales the mesh about the part center, but GripAttachment's
+			-- Position doesn't rescale with it; the translation maps the
+			-- scaled grip point back onto the hand so the handle stays put.
+			visual.CFrame = handWorld
+				* itemGrip:Inverse()
 				* CFrame.new(gripLocal.X * (1 - scale.X), gripLocal.Y * (1 - scale.Y), gripLocal.Z * (1 - scale.Z))
 		end
 	end)

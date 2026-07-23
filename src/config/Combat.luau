@@ -80,11 +80,16 @@ return {
 		DashSpeed = 58,
 		LineOfSightRadius = 0.35,
 		AnimationName = "Swing",
-		VisualHandOffset = vector.create(0.15, -0.55, -1.1),
-		VisualHandYawDeg = 90,
-		VisualRotationDeg = vector.create(0, 180, 90),
-		VisualGripTwistDeg = -90,
-		VisualGripInsetScale = 0.12,
+		-- Local-to-part CFrame (position + rotation, degrees) for the
+		-- "GripAttachment" HammerVisuals seeds onto any cloned hammer part
+		-- that doesn't already carry one of its own. A Studio-authored
+		-- per-skin GripAttachment always wins once one exists — iterate
+		-- these two numbers in-game rather than adding another offset layer.
+		GripOffset = vector.create(0, -0.6, 0),
+		GripRotationDeg = vector.create(0, 0, 90),
+		-- Used only when the character's hand has no built-in
+		-- RightGripAttachment (R6, or a custom avatar missing one).
+		HandGripFallbackOffset = vector.create(0, 0, -0.05),
 	},
 
 	-- Client-only inflatable feel for the hammer visual. Stretch values are
