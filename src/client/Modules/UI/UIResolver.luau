@@ -1329,7 +1329,10 @@ local function resolveLiveScoreRow(
 		Color3.fromRGB(8, 10, 25),
 		0.18
 	)
-	row.BackgroundTransparency = 0.08
+	row.BackgroundTransparency = 0.42
+	local rowOutline = row:FindFirstChild("Outline")
+	assert(rowOutline and rowOutline:IsA("UIStroke"), `[UIResolver] {row.Name}.Outline must be a UIStroke`)
+	rowOutline.Transparency = 0.62
 
 	local accent = resolveAccent(row, "Accent", accentColor, 0.012, 0.13, 0.012, 0.74)
 	accent.ZIndex = zIndex + 2
@@ -1426,7 +1429,10 @@ local function resolveTeamPanel(parent: Instance, name: string, x: number, color
 		color:Lerp(Color3.fromRGB(255, 255, 255), 0.2),
 		0.1
 	)
-	panel.BackgroundTransparency = 0.04
+	panel.BackgroundTransparency = 0.48
+	local panelOutline = panel:FindFirstChild("Outline")
+	assert(panelOutline and panelOutline:IsA("UIStroke"), `[UIResolver] {panel.Name}.Outline must be a UIStroke`)
+	panelOutline.Transparency = 0.6
 	local marker = resolveAccent(panel, "Marker", color, 0.04, 0.055, 0.04, 0.25)
 	marker.ZIndex = zIndex + 2
 	local teamName = resolveText(panel, "TeamName", "RED", 0.11, 0.035, 0.5, 0.16, 10, 17, zIndex + 2, nil)
@@ -1487,7 +1493,7 @@ local function populateLiveScoreboard(view: CanvasGroup, hud: ScreenGui)
 		Color3.fromRGB(3, 5, 17),
 		0.065
 	)
-	shadow.BackgroundTransparency = 0.48
+	shadow.Visible = false
 
 	local shell = resolveNativePanel(
 		view,
@@ -1503,8 +1509,14 @@ local function populateLiveScoreboard(view: CanvasGroup, hud: ScreenGui)
 		Color3.fromRGB(248, 232, 177),
 		0.065
 	)
-	shell.BackgroundTransparency = 0.06
-	shell.ClipsDescendants = true
+	shell.BackgroundTransparency = 1
+	shell.ClipsDescendants = false
+	local shellOutline = shell:FindFirstChild("Outline")
+	assert(
+		shellOutline and shellOutline:IsA("UIStroke"),
+		"[UIResolver] LiveScoreboard.Shell.Outline must be a UIStroke"
+	)
+	shellOutline.Transparency = 1
 
 	local header = resolveNativePanel(
 		shell,
@@ -1520,6 +1532,13 @@ local function populateLiveScoreboard(view: CanvasGroup, hud: ScreenGui)
 		Color3.fromRGB(8, 10, 25),
 		0.24
 	)
+	header.BackgroundTransparency = 0.38
+	local headerOutline = header:FindFirstChild("Outline")
+	assert(
+		headerOutline and headerOutline:IsA("UIStroke"),
+		"[UIResolver] LiveScoreboard.Header.Outline must be a UIStroke"
+	)
+	headerOutline.Transparency = 0.58
 	local live = resolveNativePanel(
 		header,
 		"LivePill",
@@ -1534,6 +1553,7 @@ local function populateLiveScoreboard(view: CanvasGroup, hud: ScreenGui)
 		Color3.fromRGB(8, 10, 25),
 		0.5
 	)
+	live.BackgroundTransparency = 0.18
 	local liveText = resolveText(live, "Label", "LIVE", 0, 0, 1, 1, 9, 13, 34, Enum.TextXAlignment.Center)
 	liveText.TextColor3 = Color3.fromRGB(255, 251, 230)
 	local title = resolveText(header, "Title", "STANDINGS", 0.245, 0.12, 0.45, 0.44, 11, 20, 34, nil)
@@ -1554,13 +1574,13 @@ local function populateLiveScoreboard(view: CanvasGroup, hud: ScreenGui)
 			view.Position = UDim2.fromScale(0.985, 0.09)
 			view.Size = UDim2.fromScale(0.92, 0.3)
 		elseif compactLandscape then
-			viewAspect.AspectRatio = 1.35
-			view.Position = UDim2.fromScale(0.985, 0.12)
-			view.Size = UDim2.fromScale(0.42, 0.58)
+			viewAspect.AspectRatio = 1.45
+			view.Position = UDim2.fromScale(0.985, 0.11)
+			view.Size = UDim2.fromScale(0.38, 0.55)
 		else
-			viewAspect.AspectRatio = 1.28
-			view.Position = UDim2.fromScale(0.985, 0.09)
-			view.Size = UDim2.fromScale(0.275, 0.36)
+			viewAspect.AspectRatio = 1.35
+			view.Position = UDim2.fromScale(0.985, 0.085)
+			view.Size = UDim2.fromScale(0.225, 0.3)
 		end
 	end
 	refreshLayout()
