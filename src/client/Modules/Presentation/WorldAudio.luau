@@ -3,6 +3,8 @@
 local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
 
+local ClientAudio = require(script.Parent.ClientAudio)
+
 local WorldAudio = {}
 
 local combatAudio = SoundService:WaitForChild("CombatAudio")
@@ -45,7 +47,7 @@ function WorldAudio.play(
 	end
 
 	local player = template:Clone()
-	player.Volume *= volumeScale or 1
+	player.Volume = ClientAudio.effectiveVolume("Effects", player.Volume * (volumeScale or 1))
 	player.PlaybackSpeed *= speedScale or 1
 	local wire = Instance.new("Wire")
 	player.Parent = parent
