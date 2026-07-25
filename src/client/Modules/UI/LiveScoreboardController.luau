@@ -48,6 +48,9 @@ local matchState: Instance? = nil
 local refs: ViewRefs? = nil
 local connections: { RBXScriptConnection } = {}
 local playerConnections: { [Player]: { RBXScriptConnection } } = {}
+local teamHighlights: { [Player]: Highlight } = {}
+
+local TEAM_COLORS = UIConfig.Hud.LiveScoreboard.TeamColors
 
 local function frameChild(parent: Instance, name: string): Frame
 	local child = parent:WaitForChild(name)
@@ -147,7 +150,7 @@ local function renderFfa(view: ViewRefs, target: number)
 	local model = LiveScoreboardModel.ffa(entries(), UIConfig.Hud.LiveScoreboard.FfaRows)
 	view.ffa.Visible = true
 	view.teams.Visible = false
-	view.title.Text = "LIVE STANDINGS"
+	view.title.Text = "SCOREBOARD"
 	view.goal.Text = `FIRST TO {target}`
 	for index, row in view.ffaRows do
 		renderRow(row, model.rows[index], target)
@@ -179,6 +182,39 @@ local function renderTeam(view: ViewRefs, target: number, teamIds: { string }, s
 	end
 end
 
+local function clearTeamHighlight(player: Player)
+	local highlight = teamHighlights[player]
+	if highlight then
+		highlight:Destroy()
+		teamHighlights[player] = nil
+	end
+end
+
+local function renderTeamHighlights(active: boolean, isTeamMode: boolean)
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local color = TEAM_COLORS[player:GetAttribute("TeamId") :: string]
+		if not active or not isTeamMode or character == nil or color == nil then
+			clearTeamHighlight(player)
+			continue
+		end
+		local highlight = teamHighlights[player]
+		if highlight == nil or highlight.Parent ~= character then
+			clearTeamHighlight(player)
+			highlight = Instance.new("Highlight")
+			highlight.Name = "MatchTeamOutline"
+			highlight.Adornee = character
+			highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+			highlight.FillTransparency = 0.92
+			highlight.OutlineTransparency = 0.12
+			highlight.Parent = character
+			teamHighlights[player] = highlight
+		end
+		highlight.FillColor = color
+		highlight.OutlineColor = color
+	end
+end
+
 local function render()
 	local view = refs
 	local state = matchState
@@ -188,12 +224,14 @@ local function render()
 	local active = state:GetAttribute("phase") == "Active"
 	view.root.Visible = active
 	if not active then
+		renderTeamHighlights(false, false)
 		return
 	end
 
 	local modeId = (state:GetAttribute("modeId") :: string?) or ""
 	local mode = ModeRegistry.get(modeId) or ModeRegistry.default()
 	local target = mode.rules.ScoreTarget
+	renderTeamHighlights(active, mode.scoreScope == "Team")
 	if mode.scoreScope == "Team" then
 		renderTeam(view, target, mode.teams or {}, state)
 	else
@@ -202,6 +240,7 @@ local function render()
 end
 
 local function disconnectPlayer(player: Player)
+	clearTeamHighlight(player)
 	local list = playerConnections[player]
 	if list then
 		for _, connection in list do
@@ -217,6 +256,9 @@ local function connectPlayer(player: Player)
 		player:GetAttributeChangedSignal("MatchScore"):Connect(render),
 		player:GetAttributeChangedSignal("TeamId"):Connect(render),
 		player:GetPropertyChangedSignal("DisplayName"):Connect(render),
+		player.CharacterAdded:Connect(function()
+			task.defer(render)
+		end),
 	}
 	playerConnections[player] = list
 end
@@ -269,6 +311,7 @@ function LiveScoreboardController._resetForTest()
 	refs = nil
 	connections = {}
 	playerConnections = {}
+	teamHighlights = {}
 end
 
 return LiveScoreboardController

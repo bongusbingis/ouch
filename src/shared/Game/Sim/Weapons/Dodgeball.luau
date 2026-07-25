@@ -16,15 +16,18 @@ type SimEvent = SimTypes.SimEvent
 
 type KitState = {
 	throwCooldown: number,
-	recallCooldown: number,
+	catchCooldown: number,
+	catchRemaining: number,
+	catchDirection: Vec?,
 }
 
 -- Ball possession has exactly one source of truth: ProjectileState
--- (phase == "Held" and heldBy). Kit state holds only cooldowns.
+-- (phase == "Held" and heldBy). Kit state owns cooldowns plus the transient
+-- directional catch window.
 
 local Dodgeball = {}
 Dodgeball.kind = "Dodgeball"
-Dodgeball.commands = { Throw = true } :: { [SimTypes.CommandKind]: boolean }
+Dodgeball.commands = { Throw = true, Catch = true } :: { [SimTypes.CommandKind]: boolean }
 
 local function config()
 	return Combat.Dodgeball
@@ -175,10 +178,13 @@ local function findCatchableBall(
 	state: SimState,
 	world: WorldSnapshot,
 	playerId: string,
-	character: SimTypes.CharacterSnapshot
+	character: SimTypes.CharacterSnapshot,
+	catchDirection: Vec,
+	lookahead: number
 ): ProjectileState?
+	local cfg = config()
 	local bestBall: ProjectileState? = nil
-	local bestDistance = config().CatchDistance
+	local bestDistance = cfg.CatchDistance
 
 	for _, id in SimUtil.sortedKeys(state.projectiles) do
 		local projectile = state.projectiles[id]
@@ -191,13 +197,40 @@ local function findCatchableBall(
 			continue
 		end
 
-		local offset = character.position - projectile.position
-		local distance = vector.magnitude(offset)
+		local toPlayer = character.position - projectile.position
+		local speed = vector.magnitude(projectile.velocity)
+		if speed <= 1e-6 or vector.dot(projectile.velocity, toPlayer) <= 0 then
+			continue
+		end
+
+		local toBall = -toPlayer
+		local displacement = projectile.velocity * math.max(lookahead, 0)
+		local displacementSq = vector.dot(displacement, displacement)
+		local alpha = if displacementSq > 1e-9
+			then math.clamp(-vector.dot(toBall, displacement) / displacementSq, 0, 1)
+			else 0
+		local sampledToBall = toBall + displacement * alpha
+		local distance = vector.magnitude(sampledToBall)
 		if distance > bestDistance then
 			continue
 		end
-		if vector.magnitude(projectile.velocity) <= 1e-6 or vector.dot(projectile.velocity, offset) <= 0 then
+
+		local coneVector = if distance > 1e-6 then sampledToBall else toBall
+		if vector.magnitude(coneVector) <= 1e-6 then
 			continue
+		end
+		local coneCos = math.cos(math.rad(cfg.CatchConeDeg * 0.5))
+		if vector.dot(catchDirection, vector.normalize(coneVector)) < coneCos then
+			continue
+		end
+
+		local travel = displacement * alpha
+		local travelDistance = vector.magnitude(travel)
+		if travelDistance > 1e-6 then
+			local hit = world.collision.sweepSphere(projectile.position, travel, cfg.Radius)
+			if hit and hit.distance < travelDistance - cfg.ContactSeparation then
+				continue
+			end
 		end
 
 		bestBall = projectile
@@ -207,27 +240,29 @@ local function findCatchableBall(
 	return bestBall
 end
 
-local function handleCatch(
-	_kitState: KitState,
+local function tryCatch(
+	kitState: KitState,
 	state: SimState,
-	command: InputCommand,
+	playerId: string,
 	world: WorldSnapshot,
-	events: { SimEvent }
+	events: { SimEvent },
+	lookahead: number
 ): boolean
-	local character = world.characters[command.playerId]
-	if character == nil or not character.alive or SimUtil.hasHandBall(state, command.playerId) then
+	local character = world.characters[playerId]
+	local catchDirection = kitState.catchDirection
+	if character == nil or not character.alive or catchDirection == nil or SimUtil.hasHandBall(state, playerId) then
 		return false
 	end
 
-	local ball = findCatchableBall(state, world, command.playerId, character)
+	local ball = findCatchableBall(state, world, playerId, character, catchDirection, lookahead)
 	if ball == nil then
 		return false
 	end
 
 	local previousOwner = ball.ownerId
 	ball.phase = "Held"
-	ball.heldBy = command.playerId
-	ball.ownerId = command.playerId
+	ball.heldBy = playerId
+	ball.ownerId = playerId
 	ball.position = character.handPosition
 	ball.velocity = vector.zero
 	ball.targetId = nil
@@ -236,21 +271,52 @@ local function handleCatch(
 	ball.flightTime = 0
 	ball.releaseAim = nil
 	ball.releaseTargetId = nil
+	kitState.catchRemaining = 0
+	kitState.catchDirection = nil
 
 	SimUtil.pushEvent(events, state, {
 		kind = "BallCaught",
 		tick = 0,
 		projectileId = ball.id,
-		playerId = command.playerId,
-		sourceId = command.playerId,
+		playerId = playerId,
+		sourceId = playerId,
 		targetId = previousOwner,
 		position = ball.position,
 	})
 	return true
 end
 
+local function beginCatch(
+	kitState: KitState,
+	state: SimState,
+	command: InputCommand,
+	world: WorldSnapshot,
+	events: { SimEvent }
+): boolean
+	if kitState.catchCooldown > 0 or SimUtil.hasHandBall(state, command.playerId) then
+		return false
+	end
+	local character = world.characters[command.playerId]
+	local aimDir = command.aimDir
+	if character == nil or not character.alive or aimDir == nil or vector.magnitude(aimDir) <= 1e-6 then
+		return false
+	end
+
+	kitState.catchCooldown = config().CatchCooldown
+	kitState.catchRemaining = config().CatchWindow
+	kitState.catchDirection = vector.normalize(aimDir)
+	SimUtil.pushEvent(events, state, {
+		kind = "CatchStarted",
+		tick = 0,
+		playerId = command.playerId,
+		direction = kitState.catchDirection,
+	})
+	tryCatch(kitState, state, command.playerId, world, events, 0)
+	return true
+end
+
 function Dodgeball.init(): KitState
-	return { throwCooldown = 0, recallCooldown = 0 }
+	return { throwCooldown = 0, catchCooldown = 0, catchRemaining = 0, catchDirection = nil }
 end
 
 function Dodgeball.handleInput(
@@ -262,20 +328,34 @@ function Dodgeball.handleInput(
 ): boolean
 	if command.kind == "Throw" then
 		return handleThrow(kitState, state, command, world, events)
-			or handleCatch(kitState, state, command, world, events)
+	elseif command.kind == "Catch" then
+		return beginCatch(kitState, state, command, world, events)
 	end
 	return false
 end
 
 function Dodgeball.tickPlayer(
 	kitState: KitState,
-	_playerId: string,
-	_state: SimState,
-	_world: WorldSnapshot,
+	playerId: string,
+	state: SimState,
+	world: WorldSnapshot,
 	dt: number,
-	_events: { SimEvent }
+	events: { SimEvent }
 )
 	kitState.throwCooldown = math.max(kitState.throwCooldown - dt, 0)
+	kitState.catchCooldown = math.max(kitState.catchCooldown - dt, 0)
+	if kitState.catchRemaining <= 0 then
+		return
+	end
+	if tryCatch(kitState, state, playerId, world, events, dt) then
+		return
+	end
+	local previous = kitState.catchRemaining
+	kitState.catchRemaining = math.max(previous - dt, 0)
+	if previous > 0 and kitState.catchRemaining <= 0 then
+		kitState.catchDirection = nil
+		SimUtil.pushEvent(events, state, { kind = "CatchMissed", tick = 0, playerId = playerId })
+	end
 end
 
 local function tickPickups(state: SimState, world: WorldSnapshot, events: { SimEvent })

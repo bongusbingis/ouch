@@ -44,7 +44,6 @@ local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, pos
 	projectile.windupRemaining = 0
 	projectile.releaseAim = nil
 	projectile.releaseTargetId = nil
-	projectile.spinRate = 0
 end
 
 local function horizontalOf(v: Vec): Vec
@@ -57,7 +56,6 @@ local function beginRolling(projectile: ProjectileState, config: typeof(Combat.D
 	projectile.position = position
 	projectile.velocity = horizontalVelocity
 	projectile.targetId = nil
-	projectile.spinRate = vector.magnitude(horizontalVelocity) / math.max(config.Radius, 0.1) * config.RollSpinScale
 end
 
 local function chestPosition(character: SimTypes.CharacterSnapshot): Vec
@@ -169,7 +167,6 @@ local function stepWindup(
 	projectile.velocity = aim * config.ThrowSpeed + holder.velocity * config.MomentumInheritance
 	projectile.targetId = projectile.releaseTargetId
 	projectile.effectiveRadius = config.Radius + config.HitForgiveness + row.MagnetismRadius
-	projectile.spinRate = config.SpinRate
 	projectile.flightTime = 0
 	SimUtil.pushEvent(events, state, {
 		kind = "BallReleased",
@@ -250,6 +247,7 @@ local function bounce(
 
 	local normalVelocity = hit.normal * normalSpeed
 	local tangentVelocity = projectile.velocity - normalVelocity
+	local impactSpeed = -normalSpeed
 	projectile.velocity = tangentVelocity * (1 - config.BounceFriction) - normalVelocity * config.BounceRestitution
 	projectile.position = hit.position + hit.normal * config.ContactSeparation
 	projectile.bounceCount += 1
@@ -261,6 +259,7 @@ local function bounce(
 		projectileId = projectile.id,
 		position = projectile.position,
 		normal = hit.normal,
+		magnitude = impactSpeed,
 	})
 	return true
 end
@@ -348,7 +347,6 @@ local function stepRolling(
 	projectile.flightTime += dt
 	projectile.velocity = decelerateHorizontal(projectile.velocity, config.RollFriction, dt)
 	local speed = vector.magnitude(projectile.velocity)
-	projectile.spinRate = speed / math.max(config.Radius, 0.1) * config.RollSpinScale
 	if speed <= config.RollSettleSpeed then
 		settleRolling(projectile, state, world, config, events)
 		return
@@ -484,52 +482,6 @@ local function stepBouncing(
 	advanceBouncing(projectile, state, world, config, dt, events, true)
 end
 
-local function stepRecalling(
-	projectile: ProjectileState,
-	state: SimState,
-	world: WorldSnapshot,
-	config: typeof(Combat.Dodgeball),
-	dt: number,
-	events: { SimEvent }
-)
-	local owner = projectile.ownerId and world.characters[projectile.ownerId :: string]
-	if owner == nil or not owner.alive then
-		becomeFree(projectile, world, projectile.position)
-		return
-	end
-
-	local ownerPos = owner.handPosition
-	if vector.magnitude(ownerPos - projectile.position) <= config.PickupRadius then
-		projectile.phase = "Held"
-		projectile.heldBy = projectile.ownerId
-		projectile.position = ownerPos
-		projectile.velocity = vector.zero
-		projectile.targetId = nil
-		SimUtil.pushEvent(
-			events,
-			state,
-			{ kind = "BallRecalled", tick = 0, projectileId = projectile.id, playerId = projectile.ownerId }
-		)
-		return
-	end
-
-	local toOwner = ownerPos - projectile.position
-	local desired = vector.normalize(toOwner) * config.RecallSpeed
-	local delta = desired - projectile.velocity
-	local maxDelta = config.RecallAcceleration * dt
-	projectile.velocity += if vector.magnitude(delta) > maxDelta then vector.normalize(delta) * maxDelta else delta
-	-- Recalling balls pass through everything; interception is a playtest toggle.
-	if config.RecallInterceptable then
-		local to = projectile.position + projectile.velocity * dt
-		local hit = sweepCharacters(world, projectile.position, to, projectile, projectile.ownerId)
-		if hit then
-			becomeFree(projectile, world, hit.position)
-			return
-		end
-	end
-	projectile.position += projectile.velocity * dt
-end
-
 function Projectiles.step(state: SimState, world: WorldSnapshot, dt: number, events: { SimEvent })
 	local config = Combat.Dodgeball
 	for _, id in SimUtil.sortedKeys(state.projectiles) do
@@ -544,16 +496,6 @@ function Projectiles.step(state: SimState, world: WorldSnapshot, dt: number, eve
 			stepBouncing(projectile, state, world, config, dt, events)
 		elseif projectile.phase == "Rolling" then
 			stepRolling(projectile, state, world, config, dt, events)
-		elseif projectile.phase == "Recalling" then
-			stepRecalling(projectile, state, world, config, dt, events)
-		end
-		if
-			projectile.phase == "InFlight"
-			or projectile.phase == "Bouncing"
-			or projectile.phase == "Rolling"
-			or projectile.phase == "Recalling"
-		then
-			projectile.spinAngle = (projectile.spinAngle + projectile.spinRate * dt) % (math.pi * 2)
 		end
 	end
 end

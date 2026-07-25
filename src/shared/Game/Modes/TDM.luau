@@ -13,7 +13,8 @@ TDM.rules = {
 	TimeCapSeconds = 360,
 	ResultsSeconds = 8,
 	IntermissionSeconds = 15,
-	RespawnSeconds = 3,
+	StartingSeconds = 3,
+	RespawnSeconds = 1,
 	WaveRespawnSeconds = 4.5,
 	SpawnInvulnSeconds = 1.5,
 } :: GameMode.MatchRules

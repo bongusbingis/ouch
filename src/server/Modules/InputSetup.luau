@@ -13,7 +13,7 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 
 local InputSetup = {}
 
-local VALID_DEVICE_CLASSES = { Mouse = true, Touch = true }
+local VALID_DEVICE_CLASSES = { Mouse = true, Touch = true, Gamepad = true }
 local started = false
 
 function InputSetup.setDeviceClass(player: Player, deviceClass: string): boolean

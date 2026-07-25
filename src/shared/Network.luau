@@ -19,6 +19,9 @@ local definitions = {
 	OpenCrate = "function",
 	CrateOpened = "event",
 	ReportDeviceClass = "event",
+	SubmitMatchVote = "event",
+	CombatFeed = "event",
+	MatchSummary = "event",
 	GetQuestState = "function",
 	ClaimQuest = "function",
 	QuestStateChanged = "event",
@@ -127,7 +130,8 @@ end
 
 function Network.call(name, ...)
 	assert(not IS_SERVER, "[Network] call can only be called on the client")
-	local remote = folder:WaitForChild(name, 5)
+	local remote = folder:WaitForChild(name)
+	assert(remote:IsA("RemoteFunction"), `[Network] Remotes.{name} must be a RemoteFunction`)
 	return remote:InvokeServer(...)
 end
 
@@ -145,13 +149,21 @@ end
 -- Client-side fire-and-forget for event remotes (call() is for RemoteFunctions)
 function Network.fireServer(name, ...)
 	assert(not IS_SERVER, "[Network] fireServer can only be called on the client")
-	local remote = folder:WaitForChild(name, 5)
+	local remote = folder:WaitForChild(name)
+	assert(
+		remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent"),
+		`[Network] Remotes.{name} must be an event remote`
+	)
 	remote:FireServer(...)
 end
 
 function Network.on(name, callback)
 	assert(not IS_SERVER, "[Network] on can only be called on the client")
-	local remote = folder:WaitForChild(name, 5)
+	local remote = folder:WaitForChild(name)
+	assert(
+		remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent"),
+		`[Network] Remotes.{name} must be an event remote`
+	)
 	remote.OnClientEvent:Connect(callback)
 end
 

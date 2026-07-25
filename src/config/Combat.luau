@@ -21,6 +21,9 @@ return {
 		KnockbackSpeed = 70,
 		KnockbackUpSpeed = 20,
 		CatchDistance = 3.25,
+		CatchWindow = 0.18,
+		CatchCooldown = 0.65,
+		CatchConeDeg = 110,
 		ReleaseForwardOffset = 0.35,
 		HeldVisualHandOffset = vector.create(0.08, -0.28, -0.35),
 		OverhandReleaseRootOffset = vector.create(0.85, 2.15, -1.05),
@@ -28,13 +31,6 @@ return {
 		HomingTurnRateDeg = 72,
 		HomingBreakAngleDeg = 55, -- lock fully broken at this angular error
 		TargetSelectRange = 100, -- max soft-lock distance
-
-		RecallSpeed = 110,
-		RecallAcceleration = 420,
-		RecallTurnRateDeg = 720,
-		RecallCooldown = 2,
-		RecallMaxDistance = 120,
-		RecallInterceptable = false, -- playtest toggle: can a recalling ball be blocked/caught
 
 		PickupRadius = 4,
 		BounceRestitution = 0.52,
@@ -48,9 +44,19 @@ return {
 		RollFriction = 18,
 		RollSettleSpeed = 1.5,
 		RollGroundSnap = 3,
-		RollSpinScale = 1,
-		SpinRate = 16,
 		RemoteSmoothing = 18,
+		BallFeel = {
+			FlightStretchPerSpeed = 0.001,
+			MaxFlightStretch = 0.16,
+			ImpactImpulseScale = 0.018,
+			MaxImpactSquash = 0.42,
+			SpringFrequencyHz = 9,
+			SpringDampingRatio = 0.34,
+			RollWobbleScale = 0.045,
+			RollWobbleHz = 5,
+			LightImpactSpeed = 18,
+			HeavyImpactSpeed = 75,
+		},
 		RestPulse = {
 			FillColor = Color3.fromRGB(255, 181, 38),
 			OutlineColor = Color3.fromRGB(255, 244, 176),
@@ -70,7 +76,7 @@ return {
 		ActiveDuration = 0.18,
 		MissRecovery = 0.5,
 		HitRecovery = 0.18,
-		MissStunDuration = 0.75,
+		MissStunDuration = 0.25,
 		MissStunWalkSpeedScale = 0.25,
 		Range = 7,
 		Width = 4,
@@ -133,6 +139,8 @@ return {
 		FlashInTime = 0.035,
 		FlashOutTime = 0.28,
 		FlashPeakTransparency = 0.42,
+		ConfirmHoldTime = 0.2,
+		ConfirmFadeTime = 0.18,
 	},
 
 	-- Simplified hit capsule applied to every character (never per-limb).

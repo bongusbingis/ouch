@@ -12,10 +12,11 @@ local MatchSim = {}
 
 type MatchRules = GameMode.MatchRules
 
-export type MatchPhase = "Idle" | "Active" | "Results" | "Intermission"
+export type MatchPhase = "Idle" | "Starting" | "Active" | "Results" | "Intermission"
 
 export type MatchState = {
 	phase: MatchPhase,
+	startingRemaining: number,
 	timeRemaining: number,
 	resultsRemaining: number,
 	intermissionRemaining: number,
@@ -24,7 +25,7 @@ export type MatchState = {
 }
 
 export type MatchEvent = {
-	kind: string, -- MatchStarted | ScoreChanged | MatchEnded | MatchReset | IntermissionEnded
+	kind: string, -- MatchPreparing | MatchStarted | ScoreChanged | MatchEnded | MatchReset | IntermissionEnded
 	playerId: string?,
 	score: number?,
 	winnerId: string?,
@@ -34,6 +35,7 @@ export type MatchEvent = {
 function MatchSim.newState(): MatchState
 	return {
 		phase = "Idle",
+		startingRemaining = 0,
 		timeRemaining = 0,
 		resultsRemaining = 0,
 		intermissionRemaining = 0,
@@ -58,14 +60,15 @@ function MatchSim.setPlayers(state: MatchState, playerIds: { [string]: boolean }
 end
 
 function MatchSim.start(state: MatchState, rules: MatchRules, events: { MatchEvent })
-	state.phase = "Active"
+	state.phase = "Starting"
+	state.startingRemaining = rules.StartingSeconds
 	state.timeRemaining = rules.TimeCapSeconds
 	state.resultsRemaining = 0
 	state.winnerId = nil
 	for _, playerId in SimUtil.sortedKeys(state.scores) do
 		state.scores[playerId] = 0
 	end
-	table.insert(events, { kind = "MatchStarted" })
+	table.insert(events, { kind = "MatchPreparing" })
 end
 
 -- Highest score wins; a tie yields no winner.
@@ -130,7 +133,13 @@ function MatchSim.applyElim(
 end
 
 function MatchSim.tick(state: MatchState, rules: MatchRules, dt: number, events: { MatchEvent })
-	if state.phase == "Active" then
+	if state.phase == "Starting" then
+		state.startingRemaining = math.max(state.startingRemaining - dt, 0)
+		if state.startingRemaining <= 0 then
+			state.phase = "Active"
+			table.insert(events, { kind = "MatchStarted" })
+		end
+	elseif state.phase == "Active" then
 		state.timeRemaining = math.max(state.timeRemaining - dt, 0)
 		if state.timeRemaining <= 0 then
 			endMatch(state, rules, "TimeCap", events)

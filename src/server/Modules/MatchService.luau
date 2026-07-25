@@ -3,15 +3,19 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Config = ReplicatedStorage:WaitForChild("Config")
+local Combat = require(Config:WaitForChild("Combat"))
+local Maps = require(Config:WaitForChild("Maps"))
 local MatchSim = require(Game:WaitForChild("Sim"):WaitForChild("MatchSim"))
 local TeamSpawns = require(Game:WaitForChild("Maps"):WaitForChild("TeamSpawns"))
 local GameMode = require(Game:WaitForChild("Modes"):WaitForChild("GameMode"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local PlayerIds = require(Game:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
+local Network = require(Shared:WaitForChild("Network"))
 
 local MapService = require(script.Parent.MapService)
 local BallService = require(script.Parent.BallService)
@@ -19,19 +23,9 @@ local EliminationService = require(script.Parent.EliminationService)
 local LobbyService = require(script.Parent.LobbyService)
 local MapFeatureService = require(script.Parent.MapFeatureService)
 
--- Server orchestration of the match loop: drives MatchSim with the active
--- mode's rules, owns match lifecycle (map spawn, teleports, ball
--- provisioning via mode hooks), and applies elimination consequences.
---
--- UI hook points (no UI exists yet, intentionally):
---   * ReplicatedStorage.MatchState attributes: `phase`, `timeRemaining`
---     (whole seconds), `winnerId` ("" if none), `modeId`, `mapId`.
---     TODO(ui): HUD elements subscribe via GetAttributeChangedSignal; look up
---     display data in Config.Maps / the mode's displayName via ModeRegistry.
---   * Per-player `MatchScore` attribute plus leaderstats "Elims".
---     TODO(ui): scoreboard reads MatchScore attributes across Players.
---   * MatchService.onEvent(listener): MatchSim events plus re-emitted Elims.
---     TODO(ui): killfeed subscribes here (forward via remote).
+-- Server orchestration of the match loop: drives MatchSim, owns map and
+-- participant lifecycle, applies combat consequences, and projects match,
+-- voting, score, respawn, and feed state to clients.
 
 local MatchService = {}
 
@@ -39,7 +33,6 @@ local STATE_FOLDER_NAME = "MatchState"
 
 local state = MatchSim.newState()
 local mode: GameMode.GameMode = ModeRegistry.default()
--- TODO(voting): mode voting replaces this fixed selection.
 
 local listeners: { (event: { [string]: any }) -> () } = {}
 local stateFolder: Folder? = nil
@@ -47,12 +40,25 @@ local spawnedThisMatch: { [string]: boolean } = {}
 local intermissionPlayers: { [string]: boolean } = {}
 -- Bumping a player's generation cancels their pending scheduled respawn.
 local respawnGeneration: { [string]: number } = {}
+local spawnProtectionGeneration: { [Model]: number } = {}
 local playerMatchElims: { [string]: number } = {}
 local pendingWaveRespawns: { [string]: Player } = {}
 local waveTimer = 0
 local testingEventSequence = 0
 local started = false
 local startingMatch = false
+
+type VoteCandidate = {
+	modeId: string,
+	mapId: string,
+}
+
+local voteCandidates: { VoteCandidate } = {}
+local votesByPlayer: { [string]: number } = {}
+local voteOpen = false
+local voteEndsAt = 0
+local pendingModeId: string? = nil
+local pendingMapId: string? = nil
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
 	table.insert(listeners, listener)
@@ -82,6 +88,8 @@ local function ensureStateFolder(): Folder
 	created:SetAttribute("winnerId", "")
 	created:SetAttribute("modeId", mode.id)
 	created:SetAttribute("mapId", "")
+	created:SetAttribute("voteOpen", false)
+	created:SetAttribute("voteEndsAt", 0)
 	created.Parent = ReplicatedStorage
 	stateFolder = created
 	return created
@@ -94,12 +102,108 @@ local function setStateAttribute(name: string, value: any)
 	end
 end
 
+local function voteCounts(): { number }
+	local counts = table.create(#voteCandidates, 0)
+	for _, optionIndex in votesByPlayer do
+		if counts[optionIndex] ~= nil then
+			counts[optionIndex] += 1
+		end
+	end
+	return counts
+end
+
+local function replicateVote()
+	local counts = voteCounts()
+	setStateAttribute("voteOpen", voteOpen)
+	setStateAttribute("voteEndsAt", voteEndsAt)
+	for index = 1, Maps.Voting.CandidateCount do
+		local candidate = voteCandidates[index]
+		setStateAttribute(`Vote{index}ModeId`, if candidate then candidate.modeId else "")
+		setStateAttribute(`Vote{index}MapId`, if candidate then candidate.mapId else "")
+		setStateAttribute(`Vote{index}Count`, counts[index] or 0)
+	end
+end
+
+local function shuffledCandidates(previousModeId: string?, previousMapId: string?): { VoteCandidate }
+	local candidates: { VoteCandidate } = {}
+	for _, candidateMode in ModeRegistry.all() do
+		for _, mapEntry in MapService.entriesForMode(candidateMode.id) do
+			if candidateMode.id ~= previousModeId or mapEntry.Id ~= previousMapId then
+				table.insert(candidates, { modeId = candidateMode.id, mapId = mapEntry.Id })
+			end
+		end
+	end
+	if #candidates == 0 and previousModeId and previousMapId then
+		table.insert(candidates, { modeId = previousModeId, mapId = previousMapId })
+	end
+	for index = #candidates, 2, -1 do
+		local swapIndex = math.random(index)
+		candidates[index], candidates[swapIndex] = candidates[swapIndex], candidates[index]
+	end
+	while #candidates > Maps.Voting.CandidateCount do
+		table.remove(candidates)
+	end
+	return candidates
+end
+
+local function openVote(previousModeId: string?, previousMapId: string?)
+	voteCandidates = shuffledCandidates(previousModeId, previousMapId)
+	assert(#voteCandidates > 0, "[MatchService] no enabled mode and map combinations")
+	table.clear(votesByPlayer)
+	for _, player in Players:GetPlayers() do
+		player:SetAttribute("MatchVoteOption", nil)
+	end
+	voteOpen = true
+	voteEndsAt = Workspace:GetServerTimeNow() + Maps.Voting.DurationSeconds
+	replicateVote()
+end
+
+local function closeVote()
+	if not voteOpen then
+		return
+	end
+	voteOpen = false
+	local counts = voteCounts()
+	local bestCount = -1
+	local tied = {}
+	for index in voteCandidates do
+		local count = counts[index] or 0
+		if count > bestCount then
+			bestCount = count
+			tied = { index }
+		elseif count == bestCount then
+			table.insert(tied, index)
+		end
+	end
+	local winner = voteCandidates[tied[math.random(#tied)]]
+	pendingModeId = winner.modeId
+	pendingMapId = winner.mapId
+	replicateVote()
+end
+
+function MatchService.submitVote(player: Player, optionIndex: number): boolean
+	if not voteOpen or state.phase ~= "Intermission" or optionIndex % 1 ~= 0 then
+		return false
+	end
+	if voteCandidates[optionIndex] == nil then
+		return false
+	end
+	votesByPlayer[PlayerIds.toId(player)] = optionIndex
+	player:SetAttribute("MatchVoteOption", optionIndex)
+	replicateVote()
+	return true
+end
+
 local function scoreScope(): GameMode.ScoreScope
 	return mode.scoreScope or "Player"
 end
 
 local function teamIds(): { string }
 	return mode.teams or {}
+end
+
+local function isArenaJoinPhase(): boolean
+	return startingMatch or state.phase == "Starting" or state.phase == "Active"
 end
 
 local function teamAttrName(teamId: string): string
@@ -253,8 +357,14 @@ local function modeContext(): GameMode.ModeContext
 end
 
 local function grantSpawnProtection(character: Model)
+	local generation = (spawnProtectionGeneration[character] or 0) + 1
+	spawnProtectionGeneration[character] = generation
 	character:SetAttribute("minv", true)
 	task.delay(mode.rules.SpawnInvulnSeconds, function()
+		if spawnProtectionGeneration[character] ~= generation then
+			return
+		end
+		spawnProtectionGeneration[character] = nil
 		if character.Parent ~= nil then
 			character:SetAttribute("minv", nil)
 		end
@@ -262,7 +372,17 @@ local function grantSpawnProtection(character: Model)
 end
 
 local function startMatch(events: { MatchSim.MatchEvent }, mapId: string?)
-	local map = if mapId then assert(MapService.spawnById(mapId)) else MapService.spawnRandom()
+	local selectedMapId = mapId
+	if selectedMapId == nil then
+		local entries = MapService.entriesForMode(mode.id)
+		assert(#entries > 0, `[MatchService] no enabled maps support {mode.id}`)
+		selectedMapId = entries[math.random(#entries)].Id
+	end
+	assert(
+		MapService.isCompatible(selectedMapId, mode.id),
+		`[MatchService] map {selectedMapId} does not support {mode.id}`
+	)
+	local map = assert(MapService.spawnById(selectedMapId))
 	table.clear(spawnedThisMatch)
 	table.clear(intermissionPlayers)
 	table.clear(playerMatchElims)
@@ -303,6 +423,7 @@ local function startMatch(events: { MatchSim.MatchEvent }, mapId: string?)
 	end
 
 	syncPlayers()
+	BallService.configureRecovery(map.ballSpawns, map.recoveryY)
 	MapFeatureService.bind(map.bouncePads, map.foamPits)
 	mode.onMatchStart(modeContext())
 	MatchSim.start(state, mode.rules, events)
@@ -313,11 +434,13 @@ end
 local function cleanupMatch()
 	MapFeatureService.unbind()
 	BallService.stopGroundSpawns()
+	BallService.clearRecovery()
 	BallService.clearAll()
 	table.clear(intermissionPlayers)
 
 	for _, player in Players:GetPlayers() do
 		local key = PlayerIds.toId(player)
+		player:SetAttribute("MatchRespawnAt", nil)
 		if not spawnedThisMatch[key] then
 			continue
 		end
@@ -345,12 +468,13 @@ local function handleMatchEvents(events: { MatchSim.MatchEvent })
 					setScore(player, event.score or 0)
 				end
 			end
-		elseif event.kind == "MatchStarted" then
+		elseif event.kind == "MatchPreparing" then
 			resetAllScores()
 			setStateAttribute("winnerId", "")
 			for _, teamId in teamIds() do
 				setTeamScore(teamId, state.scores[teamId] or 0)
 			end
+		elseif event.kind == "MatchStarted" then
 			local map = MapService.active()
 			print(`[Match] started — {mode.id} on {if map then map.id else "?"}`)
 		elseif event.kind == "MatchEnded" then
@@ -358,12 +482,18 @@ local function handleMatchEvents(events: { MatchSim.MatchEvent })
 			setStateAttribute("winnerId", event.winnerId or "")
 			print(`[Match] ended ({event.reason}) — winner: {event.winnerId or "none (tie)"}`)
 		elseif event.kind == "MatchReset" then
+			local previousMap = MapService.active()
+			local previousMapId = if previousMap then previousMap.id else nil
+			local previousModeId = mode.id
 			cleanupMatch()
 			setStateAttribute("winnerId", "")
 			setStateAttribute("mapId", "")
 			for _, teamId in teamIds() do
 				setTeamScore(teamId, 0)
 			end
+			openVote(previousModeId, previousMapId)
+		elseif event.kind == "IntermissionEnded" then
+			closeVote()
 		end
 		dispatch(event)
 	end
@@ -377,15 +507,15 @@ end
 local function onCharacterAdded(player: Player, character: Model)
 	syncCharacterTeam(player, character)
 	EliminationService.up(player)
-	grantSpawnProtection(character)
 	local key = PlayerIds.toId(player)
-	if state.phase ~= "Active" or MapService.active() == nil then
+	if not isArenaJoinPhase() or MapService.active() == nil then
 		if intermissionPlayers[key] then
 			LobbyService.teleport(character)
 		end
 		return
 	end
 	MapService.teleport(character, playerTeam(player))
+	grantSpawnProtection(character)
 
 	local isFirstSpawn = not spawnedThisMatch[key]
 	spawnedThisMatch[key] = true
@@ -414,6 +544,7 @@ local function respawnPlayer(player: Player)
 	if not EliminationService.up(player) then
 		return
 	end
+	player:SetAttribute("MatchRespawnAt", nil)
 	local character = player.Character
 	if character == nil then
 		return
@@ -484,7 +615,9 @@ local function eliminateVictim(targetId: string?, event: { [string]: any }): boo
 	respawnGeneration[key] = generation
 	if mode.rules.WaveRespawnSeconds then
 		pendingWaveRespawns[key] = player
+		player:SetAttribute("MatchRespawnAt", Workspace:GetServerTimeNow() + math.max(waveTimer, 0))
 	else
+		player:SetAttribute("MatchRespawnAt", Workspace:GetServerTimeNow() + mode.rules.RespawnSeconds)
 		task.delay(mode.rules.RespawnSeconds, function()
 			if respawnGeneration[key] == generation then
 				respawnPlayer(player)
@@ -523,6 +656,13 @@ end
 function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.kind == "BallCaught" then
 		dispatch(table.clone(event))
+		Network.fire("CombatFeed", nil, {
+			kind = "BallCaught",
+			tick = event.tick,
+			projectileId = event.projectileId,
+			sourceId = event.sourceId,
+			targetId = event.targetId,
+		})
 		return false
 	end
 
@@ -539,6 +679,13 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	local events: { MatchSim.MatchEvent } = {}
 	MatchSim.applyElim(state, mode.rules, scoreIdForElim(event.sourceId), event.targetId, events)
 	dispatch(table.clone(event))
+	Network.fire("CombatFeed", nil, {
+		kind = "Elim",
+		tick = event.tick,
+		projectileId = event.projectileId,
+		sourceId = event.sourceId,
+		targetId = event.targetId,
+	})
 	incrementPlayerElim(event.sourceId)
 	if state.phase == "Active" and MapService.active() ~= nil then
 		mode.onElim(modeContext(), event.sourceId, event.targetId)
@@ -554,6 +701,7 @@ function MatchService.stateForTesting(): { [string]: any }
 		modeId = mode.id,
 		mapId = if map then map.id else nil,
 		timeRemaining = state.timeRemaining,
+		startingRemaining = state.startingRemaining,
 		resultsRemaining = state.resultsRemaining,
 		intermissionRemaining = state.intermissionRemaining,
 		winnerId = state.winnerId,
@@ -569,6 +717,9 @@ function MatchService.restartForTesting(modeId: string?, mapId: string?): (boole
 	end
 	if mapId ~= nil and not MapService.hasMap(mapId) then
 		return false, "unknown_map"
+	end
+	if mapId ~= nil and not MapService.isCompatible(mapId, nextMode.id) then
+		return false, "incompatible_map"
 	end
 
 	local previousTeams = teamIds()
@@ -658,6 +809,15 @@ function MatchService.start()
 
 	LobbyService.start()
 	ensureStateFolder()
+	Network.handleProtected("SubmitMatchVote", {
+		rateLimit = 4,
+		validate = function(_player, optionIndex)
+			return typeof(optionIndex) == "number" and optionIndex >= 1 and optionIndex <= Maps.Voting.CandidateCount,
+				"invalid option"
+		end,
+	}, function(player, optionIndex)
+		MatchService.submitVote(player, optionIndex)
+	end)
 
 	Players.PlayerAdded:Connect(watchPlayer)
 	Players.PlayerRemoving:Connect(function(player)
@@ -666,6 +826,10 @@ function MatchService.start()
 		pendingWaveRespawns[key] = nil
 		spawnedThisMatch[key] = nil
 		intermissionPlayers[key] = nil
+		votesByPlayer[key] = nil
+		if voteOpen then
+			replicateVote()
+		end
 		task.defer(syncPlayers)
 	end)
 	for _, player in Players:GetPlayers() do
@@ -675,13 +839,28 @@ function MatchService.start()
 	RunService.Heartbeat:Connect(function(dt: number)
 		local events: { MatchSim.MatchEvent } = {}
 
-		if not startingMatch and state.phase == "Idle" and #Players:GetPlayers() >= mode.rules.MinPlayers then
-			startingMatch = true
-			local ok, err = pcall(startMatch, events)
-			startingMatch = false
-			if not ok then
-				warn(`[MatchService] startMatch failed: {err}`)
+		if not startingMatch and state.phase == "Idle" then
+			if pendingModeId then
+				mode = assert(
+					ModeRegistry.get(pendingModeId),
+					`[MatchService] voted mode {pendingModeId} is not registered`
+				)
 			end
+			if #Players:GetPlayers() >= mode.rules.MinPlayers then
+				startingMatch = true
+				local mapId = pendingMapId
+				pendingModeId = nil
+				pendingMapId = nil
+				local ok, err = pcall(startMatch, events, mapId)
+				startingMatch = false
+				if not ok then
+					warn(`[MatchService] startMatch failed: {err}`)
+				end
+			end
+		end
+
+		if voteOpen and Workspace:GetServerTimeNow() >= voteEndsAt then
+			closeVote()
 		end
 
 		MatchSim.tick(state, mode.rules, dt, events)
@@ -689,7 +868,7 @@ function MatchService.start()
 		tickWaveRespawns(dt)
 		local displaySeconds = if state.phase == "Intermission"
 			then state.intermissionRemaining
-			else state.timeRemaining
+			else if state.phase == "Starting" then state.startingRemaining else state.timeRemaining
 		setStateAttribute("timeRemaining", math.floor(displaySeconds + 0.5))
 	end)
 end

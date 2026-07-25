@@ -9,6 +9,7 @@ local CameraShaker = require(ReplicatedStorage:WaitForChild("Packages"):WaitForC
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 
 local DamageFeedback = {}
 
@@ -18,6 +19,9 @@ local cameraShake: any = nil
 local impulseFrame: Frame? = nil
 local impulseGradient: UIGradient? = nil
 local activeTween: Tween? = nil
+local confirmTween: Tween? = nil
+local confirmLabel: TextLabel? = nil
+local confirmGeneration = 0
 
 local EDGE_TRANSPARENCY = NumberSequence.new({
 	NumberSequenceKeypoint.new(0, 0),
@@ -52,6 +56,11 @@ local function setupImpulseGui()
 
 	impulseFrame = frame
 	impulseGradient = gradient
+
+	local matchFlow = hud:WaitForChild("MatchFlow")
+	local label = matchFlow:WaitForChild("ActionFeedback")
+	assert(label:IsA("TextLabel"), "[DamageFeedback] Hud.MatchFlow.ActionFeedback must be a TextLabel")
+	confirmLabel = label
 end
 
 local function flash()
@@ -109,22 +118,67 @@ local function shake()
 	)
 end
 
+local function confirm(text: string, color: Color3)
+	local label = confirmLabel
+	if label == nil then
+		return
+	end
+	if confirmTween then
+		confirmTween:Cancel()
+		confirmTween = nil
+	end
+	confirmGeneration += 1
+	local generation = confirmGeneration
+	label.Text = text
+	label.TextColor3 = color
+	label.TextTransparency = 0
+	label.Visible = true
+	task.delay(Combat.DamageFeedback.ConfirmHoldTime, function()
+		if generation ~= confirmGeneration or label.Parent == nil then
+			return
+		end
+		local tween = TweenService:Create(
+			label,
+			TweenInfo.new(Combat.DamageFeedback.ConfirmFadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ TextTransparency = 1 }
+		)
+		confirmTween = tween
+		tween.Completed:Once(function()
+			if generation == confirmGeneration then
+				confirmTween = nil
+				label.Visible = false
+			end
+		end)
+		tween:Play()
+	end)
+end
+
 function DamageFeedback.start()
 	setupCameraShake()
 	setupImpulseGui()
 end
 
 function DamageFeedback.onEvent(event: any)
-	if event.kind ~= "Elim" or event.targetId ~= tostring(localPlayer.UserId) then
+	local localId = PlayerIds.toId(localPlayer)
+	local relevant = event.targetId == localId or event.sourceId == localId or event.playerId == localId
+	if not relevant or not seen.markSeen(event) then
 		return
 	end
 
-	if not seen.markSeen(event) then
-		return
+	if event.kind == "Elim" then
+		if event.targetId == localId then
+			shake()
+			flash()
+		elseif event.sourceId == localId then
+			confirm("SPLAT!", Color3.fromRGB(255, 101, 139))
+		end
+	elseif event.kind == "BallCaught" and (event.playerId == localId or event.sourceId == localId) then
+		confirm("CAUGHT!", Color3.fromRGB(74, 239, 190))
+	elseif event.kind == "CatchStarted" then
+		confirm("CATCH!", Color3.fromRGB(255, 232, 123))
+	elseif event.kind == "CatchMissed" then
+		confirm("MISSED", Color3.fromRGB(255, 159, 87))
 	end
-
-	shake()
-	flash()
 end
 
 return DamageFeedback

@@ -29,8 +29,6 @@ local function runScenario(): { string }
 		flightTime = 0,
 		windupRemaining = 0,
 		bounceCount = 0,
-		spinAngle = 0,
-		spinRate = 0,
 		releaseAim = nil,
 		releaseTargetId = nil,
 		releaseDeviceClass = nil,

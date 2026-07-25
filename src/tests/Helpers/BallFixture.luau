@@ -23,8 +23,6 @@ function BallFixture.make(fields: { [string]: any }): any
 		flightTime = fields.flightTime or 0,
 		windupRemaining = fields.windupRemaining or 0,
 		bounceCount = fields.bounceCount or 0,
-		spinAngle = fields.spinAngle or 0,
-		spinRate = fields.spinRate or 0,
 		releaseAim = fields.releaseAim,
 		releaseTargetId = fields.releaseTargetId,
 		releaseDeviceClass = fields.releaseDeviceClass,

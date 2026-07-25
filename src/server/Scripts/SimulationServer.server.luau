@@ -68,22 +68,35 @@ local function playEventAnimation(event)
 end
 
 local function forwardDamageFeedback(event)
-	if event.kind ~= "Elim" or event.targetId == nil then
+	local recipients = {}
+	if event.kind == "Elim" and event.targetId ~= nil then
+		local target = PlayerIds.fromId(event.targetId)
+		local source = PlayerIds.fromId(event.sourceId)
+		if target then
+			table.insert(recipients, target)
+		end
+		if source and source ~= target then
+			table.insert(recipients, source)
+		end
+	elseif event.kind == "BallCaught" then
+		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
+		if catcher then
+			table.insert(recipients, catcher)
+		end
+	else
 		return
 	end
 
-	local target = PlayerIds.fromId(event.targetId)
-	if target == nil then
-		return
+	for _, recipient in recipients do
+		Network.fire("DamageFeedback", recipient, {
+			kind = event.kind,
+			tick = event.tick,
+			projectileId = event.projectileId,
+			playerId = event.playerId,
+			sourceId = event.sourceId,
+			targetId = event.targetId,
+		})
 	end
-
-	Network.fire("DamageFeedback", target, {
-		kind = "Elim",
-		tick = event.tick,
-		projectileId = event.projectileId,
-		sourceId = tostring(event.sourceId or ""),
-		targetId = tostring(event.targetId),
-	})
 end
 
 InputSetup.start()
@@ -104,9 +117,11 @@ ServerAuthAdapter.onEvent(function(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
 	if acceptedElim then
 		QuestService.handleCombatEvent(event)
-		forwardDamageFeedback(event)
 	elseif event.kind ~= "Elim" then
 		QuestService.handleCombatEvent(event)
+	end
+	if acceptedElim or event.kind == "BallCaught" then
+		forwardDamageFeedback(event)
 	end
 
 	if event.kind == "Elim" then

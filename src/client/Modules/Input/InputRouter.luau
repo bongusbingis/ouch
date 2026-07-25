@@ -11,7 +11,7 @@ local AimDirector = require(script.Parent.AimDirector)
 
 -- Client side of the input layer. Hardware actions are handled by their
 -- InputBindings; the router feeds AimDirector's aim into the Aim action every
--- frame, pulses the Throw action on non-GUI screen taps (touch), and reports
+-- frame, pulses touch Throw and Catch controls, and reports
 -- the device class to the server.
 
 local InputRouter = {}
@@ -33,20 +33,41 @@ end
 
 local function bindTouchControls(context: Instance)
 	local throwFeed = context:WaitForChild("Throw"):WaitForChild("TouchFeed") :: InputBinding
+	local catchFeed = context:WaitForChild("Catch"):WaitForChild("TouchFeed") :: InputBinding
+	local catchButton = Players.LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("Hud"):WaitForChild("CatchButton")
+	assert(catchButton:IsA("ImageButton"), "[InputRouter] Hud.CatchButton must be an ImageButton")
+	local matchState = ReplicatedStorage:WaitForChild("MatchState")
+	assert(matchState:IsA("Folder"), "[InputRouter] ReplicatedStorage.MatchState must be a Folder")
 
-	local pulseGeneration = 0
+	local generations = { Throw = 0, Catch = 0 }
+	local function pulse(name: "Throw" | "Catch", binding: InputBinding)
+		generations[name] += 1
+		local generation = generations[name]
+		binding:Fire(true)
+		task.delay(TAP_PULSE_SECONDS, function()
+			if generations[name] == generation then
+				binding:Fire(false)
+			end
+		end)
+	end
+
+	local function updateVisibility()
+		catchButton.Visible = AimDirector.deviceClass() == "Touch" and matchState:GetAttribute("phase") == "Active"
+	end
+	UserInputService.LastInputTypeChanged:Connect(updateVisibility)
+	matchState:GetAttributeChangedSignal("phase"):Connect(updateVisibility)
+	updateVisibility()
+
+	catchButton.Activated:Connect(function()
+		if AimDirector.deviceClass() == "Touch" then
+			pulse("Catch", catchFeed)
+		end
+	end)
 	UserInputService.TouchTap:Connect(function(_positions, gameProcessedEvent)
 		if gameProcessedEvent or AimDirector.deviceClass() ~= "Touch" then
 			return
 		end
-		pulseGeneration += 1
-		local generation = pulseGeneration
-		throwFeed:Fire(true)
-		task.delay(TAP_PULSE_SECONDS, function()
-			if pulseGeneration == generation then
-				throwFeed:Fire(false)
-			end
-		end)
+		pulse("Throw", throwFeed)
 	end)
 end
 

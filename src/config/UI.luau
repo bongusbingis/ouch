@@ -86,6 +86,10 @@ return {
 		LiveScoreboard = {
 			FfaRows = 3,
 			TeamRows = 2,
+			TeamColors = {
+				Red = Color3.fromRGB(255, 83, 110),
+				Blue = Color3.fromRGB(72, 166, 255),
+			},
 		},
 	},
 }

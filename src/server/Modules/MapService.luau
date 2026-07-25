@@ -22,6 +22,7 @@ export type ActiveMap = {
 	playerSpawns: { BasePart },
 	bouncePads: { BasePart },
 	foamPits: { BasePart },
+	recoveryY: number,
 }
 
 local active: ActiveMap? = nil
@@ -55,7 +56,12 @@ local function optionalPartsOf(parent: Instance, folderName: string): { BasePart
 end
 
 local function pickEntry(): Maps.MapEntry
-	local pool = Maps.Pool
+	local pool = {}
+	for _, entry in Maps.Pool do
+		if entry.Enabled then
+			table.insert(pool, entry)
+		end
+	end
 	assert(#pool > 0, "[MapService] Maps.Pool is empty")
 	local candidates = {}
 	for _, entry in pool do
@@ -94,24 +100,41 @@ local function spawnEntry(entry: Maps.MapEntry): ActiveMap
 		playerSpawns = allPartsOf(scriptables:WaitForChild("PlayerSpawns")),
 		bouncePads = optionalPartsOf(scriptables, "BouncePads"),
 		foamPits = optionalPartsOf(scriptables, "FoamPits"),
+		recoveryY = entry.RecoveryY,
 	}
+	assert(#map.ballSpawns > 0, `[MapService] map "{entry.Id}" has no BallSpawns parts`)
 	assert(#map.playerSpawns > 0, `[MapService] map "{entry.Id}" has no PlayerSpawns parts`)
 	active = map
 	return map
 end
 
--- TODO(voting): replace pickEntry with the winning vote when map voting lands.
 function MapService.spawnRandom(): ActiveMap
 	return spawnEntry(pickEntry())
 end
 
 function MapService.spawnById(mapId: string): ActiveMap?
 	local entry = entryById(mapId)
-	return if entry then spawnEntry(entry) else nil
+	return if entry and entry.Enabled then spawnEntry(entry) else nil
 end
 
 function MapService.hasMap(mapId: string): boolean
-	return entryById(mapId) ~= nil
+	local entry = entryById(mapId)
+	return entry ~= nil and entry.Enabled
+end
+
+function MapService.isCompatible(mapId: string, modeId: string): boolean
+	local entry = entryById(mapId)
+	return entry ~= nil and entry.Enabled and table.find(entry.ModeIds, modeId) ~= nil
+end
+
+function MapService.entriesForMode(modeId: string): { Maps.MapEntry }
+	local entries = {}
+	for _, entry in Maps.Pool do
+		if entry.Enabled and table.find(entry.ModeIds, modeId) then
+			table.insert(entries, entry)
+		end
+	end
+	return entries
 end
 
 function MapService.active(): ActiveMap?

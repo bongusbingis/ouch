@@ -15,6 +15,7 @@ Scramble.rules = {
 	TimeCapSeconds = 300,
 	ResultsSeconds = 8,
 	IntermissionSeconds = 15,
+	StartingSeconds = 3,
 	RespawnSeconds = 1,
 	SpawnInvulnSeconds = 1.5,
 } :: GameMode.MatchRules

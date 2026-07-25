@@ -66,8 +66,6 @@ T.describe("SimStateCodec", function()
 			flightTime = 0.25,
 			windupRemaining = 0,
 			bounceCount = 1,
-			spinAngle = 0.5,
-			spinRate = Combat.Dodgeball.SpinRate,
 			releaseAim = nil,
 			releaseTargetId = nil,
 			releaseDeviceClass = nil,
@@ -90,8 +88,10 @@ T.describe("SimStateCodec", function()
 			id = "p1",
 			weapons = {
 				Dodgeball = {
-					throwCooldown = 0,
-					recallCooldown = 0,
+					throwCooldown = 0.2,
+					catchCooldown = 0.5,
+					catchRemaining = 0.1,
+					catchDirection = vector.create(1, 0, 0),
 				},
 				Hammer = {
 					cooldown = 0.4,
@@ -107,6 +107,12 @@ T.describe("SimStateCodec", function()
 		SimStateCodec.encode(state, ballsFolder :: any, { p1 = character :: any })
 		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
 		local hammer = decoded.players.p1.weapons.Hammer
+		local dodgeball = decoded.players.p1.weapons.Dodgeball
+
+		T.expect(dodgeball.throwCooldown):toEqual(0.2)
+		T.expect(dodgeball.catchCooldown):toEqual(0.5)
+		T.expect(dodgeball.catchRemaining):toEqual(0.1)
+		T.expect(dodgeball.catchDirection):toEqual(vector.create(1, 0, 0))
 
 		T.expect(hammer.cooldown):toEqual(0.4)
 		T.expect(hammer.activeRemaining):toEqual(0.08)

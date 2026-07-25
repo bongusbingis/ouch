@@ -20,7 +20,7 @@ return function()
 
 		beforeEach(function()
 			player = FakePlayer.new(300001)
-			playerId = tostring(player.UserId)
+			playerId = PlayerIds.toId(player)
 			model = Instance.new("Model")
 			humanoid = Instance.new("Humanoid")
 			humanoid.WalkSpeed = 20

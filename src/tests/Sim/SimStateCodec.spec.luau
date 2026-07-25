@@ -1,7 +1,7 @@
 --!nonstrict
 -- Cloud version of the SimStateCodec spec. Unlike the Lune port, this runs
 -- against real Instances: real attribute storage/typing, real CFrame math for
--- ball position + authored rotation + spin (a no-op under the Lune loader's
+-- ball position + authored rotation (a no-op under the Lune loader's
 -- CFrame stub), and the replication limits the codec's short names exist for.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -57,8 +57,6 @@ return function()
 				velocity = vector.create(-80, -5, 12),
 				flightTime = 0.25,
 				bounceCount = 1,
-				spinAngle = 0.5,
-				spinRate = Combat.Dodgeball.SpinRate,
 			})
 
 			SimStateCodec.encode(state, folder, {})
@@ -69,7 +67,6 @@ return function()
 			expect(decodedBall.velocity).to.equal(vector.create(-80, -5, 12))
 			expect(decodedBall.bounceCount).to.equal(1)
 			expect(decodedBall.flightTime).to.be.near(0.25)
-			expect(decodedBall.spinAngle).to.be.near(0.5)
 		end)
 
 		it("stores ball position in the part CFrame, not an attribute", function()
@@ -98,25 +95,23 @@ return function()
 			)
 		end)
 
-		it("applies authored rotation and spin to the encoded CFrame", function()
+		it("applies authored rotation without simulation-owned cosmetic spin", function()
 			local folder, balls = makeBallsFolder({ "ball_0001" })
 			track(folder)
 			local ball = balls.ball_0001
 			local authored = CFrame.Angles(0, math.rad(90), 0)
 			ball:SetAttribute("ar", authored)
 
-			local spinAngle = 0.75
 			local state = SimTypes.newState()
 			state.projectiles.ball_0001 = BallFixture.make({
 				phase = "InFlight",
 				position = vector.create(5, 5, 5),
 				velocity = vector.create(10, 0, 0),
-				spinAngle = spinAngle,
 			})
 
 			SimStateCodec.encode(state, folder, {})
 
-			local expected = CFrame.new(5, 5, 5) * authored * CFrame.Angles(spinAngle, 0, 0)
+			local expected = CFrame.new(5, 5, 5) * authored
 			local delta = ball.CFrame:ToObjectSpace(expected)
 			expect(delta.Position.Magnitude).to.be.near(0, 1e-4)
 			local axisAngle = select(2, delta:ToAxisAngle())
@@ -151,7 +146,9 @@ return function()
 				weapons = {
 					Dodgeball = {
 						throwCooldown = 0,
-						recallCooldown = 0,
+						catchCooldown = 0,
+						catchRemaining = 0,
+						catchDirection = nil,
 					},
 					Hammer = {
 						cooldown = 0.4,
@@ -205,7 +202,7 @@ return function()
 			state.players.p1 = {
 				id = "p1",
 				weapons = {
-					Dodgeball = { throwCooldown = 1, recallCooldown = 1 },
+					Dodgeball = { throwCooldown = 1, catchCooldown = 1, catchRemaining = 0, catchDirection = nil },
 					Hammer = {
 						cooldown = 1,
 						activeRemaining = 1,

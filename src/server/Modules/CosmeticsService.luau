@@ -18,9 +18,6 @@ local AnalyticsService = require(script.Parent.AnalyticsService)
 -- (replicated to the owning client via Replica); Equip_<Slot> player
 -- attributes are a read-only projection so every client can render other
 -- players' equips.
---
--- TODO(ui): the locker reads own inventory from the GameProfile replica and
--- calls the EquipCosmetic remote; other-player displays read the attributes.
 
 local CosmeticsService = {}
 

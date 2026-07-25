@@ -22,8 +22,13 @@ return {
 			ResetAt = 0,
 			Active = {},
 		},
+		Tutorial = {
+			Version = 0,
+		},
 		Receipts = {}, -- { [purchaseId]: unix time } for ProcessReceipt idempotency
 	},
+
+	TutorialVersion = 1,
 
 	ProgressionXP = {
 		MatchComplete = 25,

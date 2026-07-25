@@ -35,7 +35,7 @@ export type WorldSnapshot = {
 	ballSpawns: { Vec },
 }
 
-export type ProjectilePhase = "Held" | "Windup" | "InFlight" | "Bouncing" | "Rolling" | "Recalling" | "Free"
+export type ProjectilePhase = "Held" | "Windup" | "InFlight" | "Bouncing" | "Rolling" | "Free"
 
 export type ProjectileState = {
 	id: string,
@@ -50,8 +50,6 @@ export type ProjectileState = {
 	flightTime: number,
 	windupRemaining: number,
 	bounceCount: number,
-	spinAngle: number,
-	spinRate: number,
 	releaseAim: Vec?,
 	releaseTargetId: string?,
 	releaseDeviceClass: string?,
@@ -70,7 +68,7 @@ export type SimState = {
 	spawnTimers: { number }, -- one per WorldSnapshot.ballSpawns index
 }
 
-export type CommandKind = "Throw"
+export type CommandKind = "Throw" | "Catch"
 
 export type InputCommand = {
 	playerId: string,
@@ -91,6 +89,7 @@ export type SimEvent = {
 	position: Vec?,
 	normal: Vec?,
 	direction: Vec?,
+	magnitude: number?,
 }
 
 local SimTypes = {}

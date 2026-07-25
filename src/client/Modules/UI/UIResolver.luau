@@ -1462,8 +1462,9 @@ end
 
 local function resolveTeamScoreboard(shell: Frame, zIndex: number): Frame
 	local panel = resolveContainer(shell, "Teams", 0.035, 0.25, 0.93, 0.715, zIndex)
-	resolveTeamPanel(panel, "TeamA", 0, Color3.fromRGB(255, 83, 110), zIndex + 1)
-	resolveTeamPanel(panel, "TeamB", 0.515, Color3.fromRGB(72, 166, 255), zIndex + 1)
+	local colors = uiConfig().Hud.LiveScoreboard.TeamColors
+	resolveTeamPanel(panel, "TeamA", 0, colors.Red, zIndex + 1)
+	resolveTeamPanel(panel, "TeamB", 0.515, colors.Blue, zIndex + 1)
 	panel.Visible = false
 	return panel
 end
@@ -1609,6 +1610,200 @@ local function resolveLiveScoreboard(hud: ScreenGui): CanvasGroup
 	return view
 end
 
+-- FindFirstChild is deliberate: this temporary Instance.new exception was
+-- directed by the user while Studio is unavailable. The replacement is a
+-- Hud.CatchButton ImageButton with Label, Corner, Outline, and Gradient.
+local function resolveCatchButton(hud: ScreenGui): ImageButton
+	local authored = hud:FindFirstChild("CatchButton")
+	if authored then
+		assert(authored:IsA("ImageButton"), "[UIResolver] Hud.CatchButton must be an ImageButton")
+		return authored
+	end
+
+	local button = Instance.new("ImageButton")
+	button.Name = "CatchButton"
+	button.AnchorPoint = Vector2.new(0.5, 0.5)
+	button.Position = UDim2.fromScale(0.88, 0.78)
+	button.Size = UDim2.fromScale(0.13, 0.075)
+	button.BackgroundColor3 = Color3.fromRGB(26, 205, 167)
+	button.BackgroundTransparency = 0.08
+	button.AutoButtonColor = false
+	button.Visible = false
+	button.ZIndex = 80
+	button.Parent = hud
+
+	local aspect = Instance.new("UIAspectRatioConstraint")
+	aspect.Name = "AspectRatio"
+	aspect.AspectRatio = 1.85
+	aspect.AspectType = Enum.AspectType.FitWithinMaxSize
+	aspect.Parent = button
+
+	local corner = Instance.new("UICorner")
+	corner.Name = "Corner"
+	corner.CornerRadius = UDim.new(0.28, 0)
+	corner.Parent = button
+
+	local outline = Instance.new("UIStroke")
+	outline.Name = "Outline"
+	outline.Color = Color3.fromRGB(18, 24, 34)
+	outline.Thickness = 3
+	outline.Transparency = 0.08
+	outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	outline.Parent = button
+
+	local gradient = Instance.new("UIGradient")
+	gradient.Name = "Gradient"
+	gradient.Color = ColorSequence.new(Color3.fromRGB(80, 244, 194), Color3.fromRGB(11, 159, 161))
+	gradient.Rotation = 90
+	gradient.Parent = button
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.fromScale(0.5, 0.5)
+	label.Size = UDim2.fromScale(0.88, 0.72)
+	label.BackgroundTransparency = 1
+	label.FontFace = uiConfig().Text.DefaultFont
+	label.Text = "CATCH"
+	label.TextColor3 = Color3.fromRGB(255, 255, 239)
+	label.TextStrokeColor3 = Color3.fromRGB(20, 35, 40)
+	label.TextStrokeTransparency = 0.35
+	label.ZIndex = 81
+	label.Parent = button
+	table.insert(cleanups, TextSizer.bind(label, label, { minSize = 13, maxSize = 30 }))
+	return button
+end
+
+-- FindFirstChild is deliberate: this temporary Instance.new exception was
+-- directed by the user while Studio is unavailable. The replacement is a
+-- Hud.MatchFlow Frame containing Vote, Respawn, Tutorial, ActionFeedback, CombatFeed, and Summary. Vote
+-- contains Option1 through Option3 TextButtons with Mode, Map, and Count labels.
+local function resolveMatchFlow(hud: ScreenGui): Frame
+	local authored = hud:FindFirstChild("MatchFlow")
+	local root: Frame
+	if authored then
+		assert(authored:IsA("Frame"), "[UIResolver] Hud.MatchFlow must be a Frame")
+		root = authored
+	else
+		root = Instance.new("Frame")
+		root.Name = "MatchFlow"
+		root.Parent = hud
+	end
+	root.AnchorPoint = Vector2.zero
+	root.Position = UDim2.fromScale(0, 0)
+	root.Size = UDim2.fromScale(1, 1)
+	root.BackgroundTransparency = 1
+	root.Visible = true
+	root.ZIndex = 90
+
+	local respawn = resolveText(root, "Respawn", "", 0.36, 0.78, 0.28, 0.055, 14, 28, 92, Enum.TextXAlignment.Center)
+	respawn.TextColor3 = Color3.fromRGB(255, 248, 210)
+	respawn.TextStrokeColor3 = Color3.fromRGB(20, 24, 42)
+	respawn.TextStrokeTransparency = 0.15
+	respawn.Visible = false
+
+	local tutorial = resolveText(root, "Tutorial", "", 0.25, 0.86, 0.5, 0.055, 12, 23, 92, Enum.TextXAlignment.Center)
+	tutorial.TextColor3 = Color3.fromRGB(255, 248, 210)
+	tutorial.TextStrokeColor3 = Color3.fromRGB(20, 24, 42)
+	tutorial.TextStrokeTransparency = 0.15
+	tutorial.Visible = false
+
+	local actionFeedback =
+		resolveText(root, "ActionFeedback", "", 0.39, 0.43, 0.22, 0.07, 16, 34, 93, Enum.TextXAlignment.Center)
+	actionFeedback.TextStrokeColor3 = Color3.fromRGB(12, 16, 32)
+	actionFeedback.TextStrokeTransparency = 0.18
+	actionFeedback.Visible = false
+
+	local feed = resolveContainer(root, "CombatFeed", 0.32, 0.115, 0.36, 0.11, 91)
+	for index = 1, 3 do
+		local label =
+			resolveText(feed, `Line{index}`, "", 0, (index - 1) * 0.33, 1, 0.3, 10, 18, 92, Enum.TextXAlignment.Center)
+		label.TextColor3 = Color3.fromRGB(255, 248, 218)
+		label.TextStrokeColor3 = Color3.fromRGB(9, 12, 28)
+		label.TextStrokeTransparency = 0.22
+		label.Visible = false
+	end
+
+	local vote = resolveNativePanel(
+		root,
+		"Vote",
+		0.2,
+		0.66,
+		0.6,
+		0.25,
+		94,
+		Color3.fromRGB(25, 32, 67),
+		Color3.fromRGB(48, 69, 127),
+		Color3.fromRGB(19, 24, 57),
+		Color3.fromRGB(255, 235, 167),
+		0.08
+	)
+	vote.BackgroundTransparency = 0.12
+	vote.Visible = false
+	local voteTitle = resolveText(vote, "Title", "VOTE FOR THE NEXT MATCH", 0.04, 0.05, 0.72, 0.16, 13, 25, 95, nil)
+	voteTitle.TextColor3 = Color3.fromRGB(255, 247, 205)
+	local voteTimer = resolveText(vote, "Timer", "10", 0.82, 0.05, 0.14, 0.16, 15, 28, 95, Enum.TextXAlignment.Right)
+	voteTimer.TextColor3 = Color3.fromRGB(255, 167, 68)
+	local options = resolveContainer(vote, "Options", 0.035, 0.25, 0.93, 0.67, 95)
+	for index = 1, 3 do
+		local existing = options:FindFirstChild(`Option{index}`)
+		local button: TextButton
+		if existing then
+			assert(existing:IsA("TextButton"), `[UIResolver] MatchFlow.Vote.Options.Option{index} must be a TextButton`)
+			button = existing
+		else
+			button = Instance.new("TextButton")
+			button.Name = `Option{index}`
+			button.Parent = options
+		end
+		topLeft(button, (index - 1) * 0.34, 0, 0.32, 1, 96)
+		button.AutoButtonColor = false
+		button.Text = ""
+		styleNativePanel(
+			button,
+			Color3.fromRGB(251, 222, 160),
+			Color3.fromRGB(255, 244, 202),
+			Color3.fromRGB(235, 169, 100),
+			Color3.fromRGB(55, 37, 35),
+			0.1
+		)
+		local modeLabel =
+			resolveText(button, "Mode", "MODE", 0.08, 0.08, 0.84, 0.28, 11, 20, 97, Enum.TextXAlignment.Center)
+		modeLabel.TextColor3 = PAPER_TEXT
+		local mapLabel =
+			resolveText(button, "Map", "MAP", 0.08, 0.39, 0.84, 0.22, 9, 16, 97, Enum.TextXAlignment.Center)
+		mapLabel.TextColor3 = MUTED_TEXT
+		local countLabel =
+			resolveText(button, "Count", "0 VOTES", 0.08, 0.69, 0.84, 0.18, 9, 15, 97, Enum.TextXAlignment.Center)
+		countLabel.TextColor3 = Color3.fromRGB(14, 126, 119)
+	end
+
+	local summary = resolveNativePanel(
+		root,
+		"Summary",
+		0.34,
+		0.34,
+		0.32,
+		0.22,
+		94,
+		Color3.fromRGB(248, 219, 158),
+		Color3.fromRGB(255, 244, 204),
+		Color3.fromRGB(229, 164, 95),
+		Color3.fromRGB(52, 34, 31),
+		0.08
+	)
+	summary.BackgroundTransparency = 0.04
+	summary.Visible = false
+	local summaryTitle =
+		resolveText(summary, "Title", "MATCH COMPLETE", 0.08, 0.08, 0.84, 0.23, 15, 28, 95, Enum.TextXAlignment.Center)
+	summaryTitle.TextColor3 = PAPER_TEXT
+	resolveText(summary, "Stats", "", 0.08, 0.37, 0.84, 0.2, 11, 20, 95, Enum.TextXAlignment.Center)
+	local rewards = resolveText(summary, "Rewards", "", 0.08, 0.64, 0.84, 0.2, 12, 22, 95, Enum.TextXAlignment.Center)
+	rewards.TextColor3 = Color3.fromRGB(27, 126, 105)
+
+	return root
+end
+
 function UIResolver.mount()
 	if mounted then
 		return
@@ -1630,6 +1825,8 @@ function UIResolver.mount()
 	resolveLeaderboardView(views)
 	resolveSettingsView(views)
 	resolveLiveScoreboard(hud)
+	resolveCatchButton(hud)
+	resolveMatchFlow(hud)
 end
 
 return UIResolver

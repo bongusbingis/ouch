@@ -31,7 +31,13 @@ local function emitterFor(parent: Instance): AudioEmitter?
 	return created
 end
 
-function WorldAudio.play(groupName: string, soundName: string, parent: Instance)
+function WorldAudio.play(
+	groupName: string,
+	soundName: string,
+	parent: Instance,
+	volumeScale: number?,
+	speedScale: number?
+)
 	local template = findAudioPlayer(groupName, soundName)
 	local emitter = emitterFor(parent)
 	if template == nil or emitter == nil then
@@ -39,6 +45,8 @@ function WorldAudio.play(groupName: string, soundName: string, parent: Instance)
 	end
 
 	local player = template:Clone()
+	player.Volume *= volumeScale or 1
+	player.PlaybackSpeed *= speedScale or 1
 	local wire = Instance.new("Wire")
 	player.Parent = parent
 	wire.Parent = player

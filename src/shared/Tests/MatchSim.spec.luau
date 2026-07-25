@@ -17,6 +17,7 @@ local function activeMatch(playerIds: { string }): (MatchSim.MatchState, { Match
 	MatchSim.setPlayers(state, present)
 	local events: { MatchEvent } = {}
 	MatchSim.start(state, RULES, events)
+	MatchSim.tick(state, RULES, RULES.StartingSeconds, events)
 	return state, events
 end
 
@@ -31,8 +32,16 @@ local function lastEvent(events: { MatchEvent }, kind: string): MatchEvent?
 end
 
 T.describe("MatchSim", function()
-	T.it("starts Active with reset scores and the full time cap", function()
-		local state, events = activeMatch({ "p1", "p2" })
+	T.it("counts down Starting before activating with reset scores", function()
+		local state = MatchSim.newState()
+		MatchSim.setPlayers(state, { p1 = true, p2 = true })
+		local events: { MatchEvent } = {}
+		MatchSim.start(state, RULES, events)
+		T.expect(state.phase):toEqual("Starting")
+		T.expect(state.startingRemaining):toEqual(RULES.StartingSeconds)
+		T.expect(lastEvent(events, "MatchPreparing") ~= nil):toBeTruthy()
+
+		MatchSim.tick(state, RULES, RULES.StartingSeconds, events)
 		T.expect(state.phase):toEqual("Active")
 		T.expect(state.timeRemaining):toEqual(RULES.TimeCapSeconds)
 		T.expect(state.scores.p1):toEqual(0)
@@ -55,6 +64,7 @@ T.describe("MatchSim", function()
 		MatchSim.setPlayers(state, { Red = true, Blue = true })
 		local events: { MatchEvent } = {}
 		MatchSim.start(state, RULES, events)
+		MatchSim.tick(state, RULES, RULES.StartingSeconds, events)
 		MatchSim.applyElim(state, RULES, "Red", "p2", events)
 		T.expect(state.scores.Red):toEqual(1)
 		local changed = lastEvent(events, "ScoreChanged")

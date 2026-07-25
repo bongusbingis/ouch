@@ -55,6 +55,7 @@ local function startCmdr()
 	cmdr:SetPlaceName("Splat Brawl")
 end
 
+UIResolver.mount()
 InputRouter.start()
 BallVisuals.start()
 DamageFeedback.start()
@@ -62,7 +63,6 @@ DeathEffects.start()
 HammerVisuals.start()
 SplatEffects.start()
 TargetingUI.start()
-UIResolver.mount()
 MenuManager.start()
 AnalyticsReporter.start()
 SidebarController.start()
@@ -79,14 +79,13 @@ task.spawn(startCmdr)
 
 Replica.RequestData()
 
--- TODO(ui): killfeed — subscribe MatchService.onEvent server-side and forward
--- via a remote.
-
 -- Tentative feedback only: client events can replay during resimulation, so
 -- anything user-facing built on them must deduplicate (M3).
 ServerAuthAdapter.onEvent(function(event)
 	BallVisuals.onEvent(event)
-	DamageFeedback.onEvent(event)
+	if event.kind == "CatchStarted" or event.kind == "CatchMissed" then
+		DamageFeedback.onEvent(event)
+	end
 	HammerVisuals.onEvent(event)
 	SplatEffects.onEvent(event)
 	DebugVisuals.onEvent(event)

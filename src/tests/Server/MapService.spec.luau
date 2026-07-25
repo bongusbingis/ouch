@@ -17,9 +17,22 @@ local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
 local function poolIds(): { [string]: boolean }
 	local ids = {}
 	for _, entry in Maps.Pool do
+		if not entry.Enabled then
+			continue
+		end
 		ids[entry.Id] = true
 	end
 	return ids
+end
+
+local function enabledCount(): number
+	local count = 0
+	for _, entry in Maps.Pool do
+		if entry.Enabled then
+			count += 1
+		end
+	end
+	return count
 end
 
 return function()
@@ -53,7 +66,7 @@ return function()
 		end)
 
 		it("does not repeat the previous map when the pool allows it", function()
-			if #Maps.Pool < 2 then
+			if enabledCount() < 2 then
 				return
 			end
 			local firstId = MapService.spawnRandom().id

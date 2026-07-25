@@ -24,6 +24,8 @@ return function()
 			expect(stateFolder:GetAttribute("mapId")).to.equal("")
 			expect(stateFolder:GetAttribute("modeId")).to.equal(ModeRegistry.default().id)
 			expect(typeof(stateFolder:GetAttribute("timeRemaining"))).to.equal("number")
+			expect(stateFolder:GetAttribute("voteOpen")).to.equal(false)
+			expect(typeof(stateFolder:GetAttribute("voteEndsAt"))).to.equal("number")
 
 			expect(MatchService.phase()).to.equal("Idle")
 

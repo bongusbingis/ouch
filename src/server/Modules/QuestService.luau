@@ -149,10 +149,8 @@ local function applyEventToPlayer(player: Player, event: { [string]: any }, cont
 end
 
 local function modeId(): string?
-	local matchState = ReplicatedStorage:WaitForChild("MatchState", 5)
-	if matchState == nil then
-		return nil
-	end
+	local matchState = ReplicatedStorage:WaitForChild("MatchState")
+	assert(matchState:IsA("Folder"), "[QuestService] ReplicatedStorage.MatchState must be a Folder")
 	return matchState:GetAttribute("modeId") :: string?
 end
 
@@ -188,7 +186,7 @@ function QuestService.handleCombatEvent(event: { [string]: any })
 		return
 	end
 
-	local source = Players:GetPlayerByUserId(tonumber(sourceId) or 0)
+	local source = PlayerIds.fromId(sourceId)
 	if source == nil then
 		return
 	end

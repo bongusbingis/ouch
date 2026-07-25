@@ -22,8 +22,7 @@ local PHASE_TO_NUMBER: { [SimTypes.ProjectilePhase]: number } = {
 	InFlight = 2,
 	Bouncing = 3,
 	Rolling = 4,
-	Recalling = 5,
-	Free = 6,
+	Free = 5,
 }
 local NUMBER_TO_PHASE: { [number]: SimTypes.ProjectilePhase } = {
 	[0] = "Held",
@@ -31,8 +30,7 @@ local NUMBER_TO_PHASE: { [number]: SimTypes.ProjectilePhase } = {
 	[2] = "InFlight",
 	[3] = "Bouncing",
 	[4] = "Rolling",
-	[5] = "Recalling",
-	[6] = "Free",
+	[5] = "Free",
 }
 
 local DEFAULT_EFFECTIVE_RADIUS = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness
@@ -59,7 +57,7 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			archetype = "Dodgeball",
 			ownerId = ball:GetAttribute("ow") :: string?,
 			heldBy = ball:GetAttribute("hb") :: string?,
-			phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 6] or "Free",
+			phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 5] or "Free",
 			position = ball.CFrame.Position,
 			velocity = if hasVelocity then velocity else vector.zero,
 			targetId = ball:GetAttribute("tg") :: string?,
@@ -67,8 +65,6 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			flightTime = (ball:GetAttribute("ft") :: number?) or 0,
 			windupRemaining = (ball:GetAttribute("wu") :: number?) or 0,
 			bounceCount = (ball:GetAttribute("bc") :: number?) or 0,
-			spinAngle = (ball:GetAttribute("sa") :: number?) or 0,
-			spinRate = (ball:GetAttribute("sr") :: number?) or 0,
 			releaseAim = ball:GetAttribute("ra") :: Vector3?,
 			releaseTargetId = ball:GetAttribute("rt") :: string?,
 			releaseDeviceClass = ball:GetAttribute("rd") :: string?,
@@ -81,7 +77,9 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			weapons = {
 				Dodgeball = {
 					throwCooldown = (model:GetAttribute("dbTc") :: number?) or 0,
-					recallCooldown = (model:GetAttribute("dbRc") :: number?) or 0,
+					catchCooldown = (model:GetAttribute("dbCc") :: number?) or 0,
+					catchRemaining = (model:GetAttribute("dbCr") :: number?) or 0,
+					catchDirection = model:GetAttribute("dbCd") :: Vector3?,
 				},
 				Hammer = {
 					cooldown = (model:GetAttribute("hmCd") :: number?) or 0,
@@ -111,7 +109,7 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		end
 		local authoredRotation = ball:GetAttribute("ar")
 		local rotation = if typeof(authoredRotation) == "CFrame" then authoredRotation else CFrame.identity
-		local targetCFrame = CFrame.new(projectile.position) * rotation * CFrame.Angles(projectile.spinAngle, 0, 0)
+		local targetCFrame = CFrame.new(projectile.position) * rotation
 		if ball.CFrame ~= targetCFrame then
 			ball.CFrame = targetCFrame
 		end
@@ -123,18 +121,11 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(ball, "ft", projectile.flightTime)
 		setAttributeIfChanged(ball, "wu", projectile.windupRemaining)
 		setAttributeIfChanged(ball, "bc", projectile.bounceCount)
-		setAttributeIfChanged(ball, "sa", projectile.spinAngle)
-		setAttributeIfChanged(ball, "sr", projectile.spinRate)
 		setAttributeIfChanged(ball, "ra", projectile.releaseAim)
 		setAttributeIfChanged(ball, "rt", projectile.releaseTargetId)
 		setAttributeIfChanged(ball, "rd", projectile.releaseDeviceClass)
 		local velocity = projectile.velocity
-		if
-			projectile.phase ~= "InFlight"
-			and projectile.phase ~= "Bouncing"
-			and projectile.phase ~= "Rolling"
-			and projectile.phase ~= "Recalling"
-		then
+		if projectile.phase ~= "InFlight" and projectile.phase ~= "Bouncing" and projectile.phase ~= "Rolling" then
 			velocity = vector.zero
 		end
 		setAttributeIfChanged(ball, "vel", velocity)
@@ -147,7 +138,9 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		end
 		local kitState = player.weapons.Dodgeball
 		setAttributeIfChanged(model, "dbTc", kitState.throwCooldown)
-		setAttributeIfChanged(model, "dbRc", kitState.recallCooldown)
+		setAttributeIfChanged(model, "dbCc", kitState.catchCooldown)
+		setAttributeIfChanged(model, "dbCr", kitState.catchRemaining)
+		setAttributeIfChanged(model, "dbCd", kitState.catchDirection)
 		local hammerState = player.weapons.Hammer
 		setAttributeIfChanged(model, "hmCd", hammerState.cooldown)
 		setAttributeIfChanged(model, "hmAc", hammerState.activeRemaining)

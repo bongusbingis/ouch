@@ -1,6 +1,7 @@
 --!strict
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -28,6 +29,7 @@ local BALLS_FOLDER_NAME = "Balls"
 
 local listeners: { (SimEvent) -> () } = {}
 local pendingWeaponResets: { [string]: boolean } = {}
+local matchState: Folder? = nil
 local started = false
 
 local function sideTag(): string
@@ -170,6 +172,7 @@ end
 
 local function collectCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
+	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
 	for id, entry in entries do
 		if entry.model:GetAttribute("CombatAlive") == false then
 			continue
@@ -179,28 +182,42 @@ local function collectCommands(entries: { [string]: CharacterEntry }): { InputCo
 			continue
 		end
 		local throwAction = context:FindFirstChild("Throw")
+		local catchAction = context:FindFirstChild("Catch")
 		local aimAction = context:FindFirstChild("Aim")
-		if throwAction == nil or aimAction == nil then
+		if throwAction == nil or catchAction == nil or aimAction == nil then
 			continue
 		end
 
 		local throwEdge = readEdge(throwAction :: InputAction, entry.model, "prevThrow")
+		local catchEdge = readEdge(catchAction :: InputAction, entry.model, "prevCatch")
+		if not active then
+			continue
+		end
+		if not throwEdge and not catchEdge then
+			continue
+		end
 
+		local aimDir = (aimAction :: InputAction):GetState()
+		if typeof(aimDir) ~= "Vector3" or vector.magnitude(aimDir) <= 1e-6 then
+			continue
+		end
+		aimDir = vector.normalize(aimDir)
+		local aimOrigin = entry.root.CFrame.Position + aimDir * 2
+		local function append(kind: SimTypes.CommandKind)
+			table.insert(commands, {
+				playerId = id,
+				kind = kind,
+				aimOrigin = aimOrigin,
+				aimDir = aimDir,
+				targetId = nil,
+				deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse",
+			})
+		end
 		if throwEdge then
-			local aimDir = (aimAction :: InputAction):GetState()
-			if typeof(aimDir) == "Vector3" and vector.magnitude(aimDir) > 1e-6 then
-				aimDir = vector.normalize(aimDir)
-				-- Throw origin is derived, not client-supplied: nothing to spoof.
-				local aimOrigin = entry.root.CFrame.Position + aimDir * 2
-				table.insert(commands, {
-					playerId = id,
-					kind = "Throw" :: SimTypes.CommandKind,
-					aimOrigin = aimOrigin,
-					aimDir = aimDir,
-					targetId = nil,
-					deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse",
-				})
-			end
+			append("Throw")
+		end
+		if catchEdge then
+			append("Catch")
 		end
 	end
 	return commands
@@ -256,6 +273,9 @@ function ServerAuthAdapter.start()
 		return
 	end
 	started = true
+	local resolvedMatchState = ReplicatedStorage:WaitForChild("MatchState")
+	assert(resolvedMatchState:IsA("Folder"), "[ServerAuthAdapter] ReplicatedStorage.MatchState must be a Folder")
+	matchState = resolvedMatchState
 	if RunService:IsServer() then
 		Players.PlayerRemoving:Connect(function(player)
 			pendingWeaponResets[PlayerIds.toId(player)] = nil

@@ -7,6 +7,7 @@ local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local PlayerData = require(script.Parent.PlayerData)
 
 type MatchEvent = { [string]: any }
@@ -97,15 +98,7 @@ local function trackCatch(event: MatchEvent)
 	addRewards(progress, "Catch")
 end
 
-local function includeCurrentPlayers()
-	for _, player in Players:GetPlayers() do
-		progressFor(PlayerIds.toId(player))
-	end
-end
-
 local function commitMatch(event: MatchEvent)
-	includeCurrentPlayers()
-
 	local winnerId = event.winnerId :: string?
 	for id, progress in progressByPlayerId do
 		local player = PlayerIds.fromId(id)
@@ -125,6 +118,15 @@ local function commitMatch(event: MatchEvent)
 
 		if player then
 			PlayerData.applyProgression(player, progress)
+			PlayerData.completeTutorial(player)
+			Network.fire("MatchSummary", player, {
+				won = playerWon,
+				elims = progress.Elims,
+				deaths = progress.Deaths,
+				catches = progress.Catches,
+				xp = progress.XP,
+				cash = progress.Cash,
+			})
 		end
 	end
 end
@@ -148,6 +150,12 @@ function ProgressionService.start(matchService: any)
 	started = true
 	resetMatch()
 	matchService.onEvent(handleEvent)
+	Players.PlayerAdded:Connect(function(player)
+		local phase = matchService.phase()
+		if phase == "Starting" or phase == "Active" then
+			progressFor(PlayerIds.toId(player))
+		end
+	end)
 end
 
 return ProgressionService

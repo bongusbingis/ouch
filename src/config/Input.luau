@@ -1,8 +1,7 @@
 --!strict
 
 -- Declarative input map, materialized as InputContext/InputAction/InputBinding
--- instances under each Player by InputSetup. Console/gamepad support later is
--- additional binding rows here — no code changes.
+-- instances under each Player by InputSetup.
 
 export type BindingDef = {
 	Name: string?,
@@ -24,7 +23,18 @@ return {
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
 				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton },
+				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonR2 },
 				-- Pulsed by InputRouter on non-GUI screen taps (touch devices).
+				{ Name = "TouchFeed", Scriptable = true },
+			},
+		},
+		{
+			Name = "Catch",
+			Type = Enum.InputActionType.Bool,
+			Bindings = {
+				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseButton2 },
+				{ Name = "Keyboard", KeyCode = Enum.KeyCode.F },
+				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonL2 },
 				{ Name = "TouchFeed", Scriptable = true },
 			},
 		},

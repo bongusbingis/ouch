@@ -40,8 +40,6 @@ local function makeBall(state: SimTypes.SimState, fields: { [string]: any }): Pr
 		flightTime = 0,
 		windupRemaining = fields.windupRemaining or 0,
 		bounceCount = fields.bounceCount or 0,
-		spinAngle = fields.spinAngle or 0,
-		spinRate = fields.spinRate or 0,
 		releaseAim = fields.releaseAim,
 		releaseTargetId = fields.releaseTargetId,
 		releaseDeviceClass = fields.releaseDeviceClass,
@@ -500,28 +498,29 @@ T.describe("Projectiles", function()
 		end)
 	end)
 
-	T.it("recalls back to the owner and re-enters Held", function()
-		local state = SimTypes.newState()
-		local owner = MockWorld.character(vector.create(0, 2.5, 0))
-		local world = MockWorld.snapshot({ owner = owner }, { MockWorld.ground() })
-		local ball = makeBall(state, {
-			phase = "Recalling",
-			position = vector.create(60, 1, 0),
-			ownerId = "owner",
-		})
-		local events: { SimTypes.SimEvent } = {}
-		for _ = 1, 120 do
-			Projectiles.step(state, world, DT, events)
-		end
-		T.expect(ball.phase):toEqual("Held")
-		T.expect(ball.heldBy):toEqual("owner")
-		local recalled = false
-		for _, event in events do
-			if event.kind == "BallRecalled" then
-				recalled = true
+	T.it("reports impact speed on bounce events for presentation intensity", function()
+		withConfig({ Gravity = 0 }, function()
+			local state = SimTypes.newState()
+			local wall = {
+				min = vector.create(5, -10, -10),
+				max = vector.create(6, 10, 10),
+			}
+			makeBall(state, {
+				position = vector.create(0, 2, 0),
+				velocity = vector.create(60, 0, 0),
+			})
+			local events: { SimTypes.SimEvent } = {}
+			for _ = 1, 10 do
+				Projectiles.step(state, MockWorld.snapshot({}, { wall }), DT, events)
 			end
-		end
-		T.expect(recalled):toBeTruthy()
+			local magnitude = 0
+			for _, event in events do
+				if event.kind == "BallBounced" then
+					magnitude = event.magnitude or 0
+				end
+			end
+			T.expect(magnitude):toBeNear(60, 1e-3)
+		end)
 	end)
 end)
 

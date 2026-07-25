@@ -16,7 +16,6 @@ return {
 	AimAssistTargetRange = true,
 	ThrowOriginMaxOffset = true,
 	PickupRadius = true,
-	RecallRange = false,
 	PhaseLabels = true,
 	Trajectory = true,
 	CollisionRadius = true,

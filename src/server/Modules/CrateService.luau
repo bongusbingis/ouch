@@ -16,9 +16,6 @@ local AnalyticsService = require(script.Parent.AnalyticsService)
 -- Crate opening: Cash path via the OpenCrate remote, Robux path via
 -- MonetizationService receipts. Both share one roll-and-grant routine; every
 -- open fires CrateOpened to the buyer.
---
--- TODO(ui): the crate-reveal animation subscribes to the CrateOpened remote
--- ({ crateId, itemId, rarity, isDupe, cashRefund }).
 
 local CrateService = {}
 

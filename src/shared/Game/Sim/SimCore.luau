@@ -53,11 +53,13 @@ function SimCore.step(state: SimState, commands: { InputCommand }, world: WorldS
 	syncPlayers(state, world)
 	sortCommands(commands)
 
+	local handledPlayers: { [string]: boolean } = {}
 	for _, command in commands do
 		local player = state.players[command.playerId]
-		if player then
+		if player and not handledPlayers[command.playerId] then
 			for _, kit in WeaponRegistry.forCommand(command.kind) do
 				if kit.handleInput(player.weapons[kit.kind], state, command, world, events) then
+					handledPlayers[command.playerId] = true
 					break
 				end
 			end

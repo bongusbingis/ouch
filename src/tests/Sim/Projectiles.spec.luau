@@ -486,28 +486,26 @@ return function()
 			end)
 		end)
 
-		it("recalls back to the owner and re-enters Held", function()
-			local state = SimTypes.newState()
-			local owner = MockWorld.character(vector.create(0, 2.5, 0))
-			local world = MockWorld.snapshot({ owner = owner }, { MockWorld.ground() })
-			local ball = makeBall(state, {
-				phase = "Recalling",
-				position = vector.create(60, 1, 0),
-				ownerId = "owner",
-			})
-			local events = {}
-			for _ = 1, 120 do
-				Projectiles.step(state, world, DT, events)
-			end
-			expect(ball.phase).to.equal("Held")
-			expect(ball.heldBy).to.equal("owner")
-			local recalled = false
-			for _, event in events do
-				if event.kind == "BallRecalled" then
-					recalled = true
+		it("reports impact speed on bounce events", function()
+			withConfig({ Gravity = 0 }, function()
+				local state = SimTypes.newState()
+				local wall = { min = vector.create(5, -10, -10), max = vector.create(6, 10, 10) }
+				makeBall(state, {
+					position = vector.create(0, 2, 0),
+					velocity = vector.create(60, 0, 0),
+				})
+				local events = {}
+				for _ = 1, 10 do
+					Projectiles.step(state, MockWorld.snapshot({}, { wall }), DT, events)
 				end
-			end
-			expect(recalled).to.equal(true)
+				local magnitude = 0
+				for _, event in events do
+					if event.kind == "BallBounced" then
+						magnitude = event.magnitude or 0
+					end
+				end
+				expect(magnitude).to.be.near(60, 1e-3)
+			end)
 		end)
 	end)
 end

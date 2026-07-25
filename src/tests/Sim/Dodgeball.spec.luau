@@ -45,6 +45,12 @@ local function throwCommand(overrides)
 	return command
 end
 
+local function catchCommand(overrides)
+	local command = throwCommand(overrides)
+	command.kind = "Catch"
+	return command
+end
+
 local function arena(extraCharacters)
 	local characters = {
 		p1 = MockWorld.character(vector.create(0, 2.5, 0)),
@@ -176,7 +182,7 @@ return function()
 			expect(windupTargetIn(events)).never.to.be.ok()
 		end)
 
-		it("throw input catches an incoming opponent ball before hammer swing", function()
+		it("explicit catch input catches an incoming opponent ball", function()
 			local world = arena()
 			local state = SimCore.newState()
 			BallFixture.insert(state, {
@@ -186,13 +192,28 @@ return function()
 				velocity = vector.create(-80, 0, 0),
 			})
 
-			local events = SimCore.step(state, { throwCommand() }, world, DT)
+			local events = SimCore.step(state, { catchCommand() }, world, DT)
 
 			expect(countEvents(events, "BallCaught")).to.equal(1)
-			expect(countEvents(events, "HammerSwing")).to.equal(0)
 			expect(state.projectiles.ball_0001.phase).to.equal("Held")
 			expect(state.projectiles.ball_0001.heldBy).to.equal("p1")
 			expect(state.projectiles.ball_0001.ownerId).to.equal("p1")
+		end)
+
+		it("catches a fast ball crossing the catch volume within one simulation tick", function()
+			local world = arena()
+			local state = SimCore.newState()
+			BallFixture.insert(state, {
+				ownerId = "p2",
+				phase = "InFlight",
+				position = vector.create(5, 2.5, 0),
+				velocity = vector.create(-200, 0, 0),
+			})
+
+			local events = SimCore.step(state, { catchCommand() }, world, DT)
+
+			expect(countEvents(events, "BallCaught")).to.equal(1)
+			expect(countEvents(events, "Elim")).to.equal(0)
 		end)
 
 		it("catch uses the configured strict distance window", function()
@@ -205,10 +226,9 @@ return function()
 				velocity = vector.create(-1, 0, 0),
 			})
 
-			local events = SimCore.step(state, { throwCommand() }, world, DT)
+			local events = SimCore.step(state, { catchCommand() }, world, DT)
 
 			expect(countEvents(events, "BallCaught")).to.equal(0)
-			expect(countEvents(events, "HammerSwing")).to.equal(1)
 			expect(state.projectiles.ball_0001.phase).to.equal("InFlight")
 		end)
 
@@ -224,10 +244,9 @@ return function()
 				velocity = vector.create(-80, 0, 0),
 			})
 
-			local events = SimCore.step(state, { throwCommand() }, world, DT)
+			local events = SimCore.step(state, { catchCommand() }, world, DT)
 
 			expect(countEvents(events, "BallCaught")).to.equal(0)
-			expect(countEvents(events, "HammerSwing")).to.equal(1)
 		end)
 	end)
 end

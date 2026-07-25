@@ -1,9 +1,9 @@
 # SPLAT BRAWL
 
-**Game Design Document — v0.2**
+**Game Design Document — v0.3**
 Roblox PvP Arena Brawler — Dodgeball & Inflatable Hammer Combat
 
-> v0.2 (2026-07-16): converted from PDF to markdown; rebalanced §3.1–3.3 — hammer is now less forgiving (longer swing cooldown + slight self-stun on missed swings) so it cannot be spammed and stays in balance with the dodgeball.
+> v0.3 (2026-07-24): recall removed; added a dedicated timed catch, persistent contested match balls, a pre-match countdown, combined mode/map voting, late-join rules, and exact respawn timing.
 
 ## 1. High Concept
 
@@ -17,17 +17,18 @@ Splat Brawl is a fast, skill-based PvP arena game built around two asymmetric we
 ## 2. Core Pillars
 
 - **No power creep** — cosmetics only. Skill determines outcomes, not spending.
-- **Fast respawn, fast re-engagement** — dead time under 2 seconds in both modes.
+- **Fast respawn, fast re-engagement** — FFA returns players in 1 second; TDM uses readable 4.5-second team waves.
 - **Bright, tactile, bouncy** — every surface, effect, and hit reaction reinforces the inflatable/foam fantasy. (Not needed)
 
 ## 3. Core Mechanics
 
 ### 3.1 Dodgeball (Ranged)
 
-- The player starts with a dodgeball in hand, throws it, and can recall it.
-- The ball has an aim assist to help players and can kind of curve to players (makes it satisfying).
+- Every entrant receives one persistent dodgeball for the match. Thrown balls remain in the arena as contested objects; any player without a ball can automatically pick up a resting ball. Lost balls are moved back to an authored recovery point without creating a replacement. There is no recall.
+- Aim assist can curve a valid throw toward a target inside the device-specific selection and validation cones.
 - Direct hit = elimination.
-- **Tempo (balance baseline):** the dodgeball is the pacing reference the hammer is balanced against — ~0.6s between throws, ~2s recall cooldown. These stay unchanged in v0.2; the hammer is brought down to meet them, not the other way around.
+- A dedicated catch input opens a short, directional catch window. Only an approaching opponent ball inside the configured distance and cone can be caught; successful catches transfer possession.
+- **Tempo (balance baseline):** ~0.6s between throws, a 0.18s catch window, and a 0.65s catch cooldown. Ball scarcity and positioning replace recall as the ranged loop.
 
 ### 3.2 Inflatable Hammer (Melee)
 
@@ -55,18 +56,21 @@ This triangle is the entire balance foundation and should not be diluted with ad
 
 - 8 players, small-to-medium arena.
 - Win condition: first to elimination target (e.g. 15) or highest score at time cap (5 min).
-- Respawn: immediate, 1.5s spawn invulnerability.
+- Respawn: 1 second, followed by 1.5 seconds of spawn invulnerability.
 - Scoring: 1 pt per elimination; no team bonuses.
 
 ### 4.2 Team Deathmatch (TDM)
 
 - 2 teams, 4–6 players each, color-coded uniforms/inflatables.
 - Win condition: score cap (e.g. 40) or higher score at time cap (6 min).
-- Respawn: wave-based every 4–5s to preserve team push/retreat rhythm.
-- Team-based ammo balance: dodgeball spawns are mirrored on each side of the map to avoid one team controlling all ranged options.
+- Respawn: synchronized 4.5-second waves with an exact server-time countdown, preserving team push/retreat rhythm.
+- Ball supply: one persistent ball per entrant. Late joiners receive one ball on their first arena spawn; respawns do not create more.
 
 ### 4.3 Match Loop and Intermission Lobby
 
+- A 3-second `Starting` phase follows arena teleport. Combat inputs are suppressed until it reaches `Active`.
+- During the first 10 seconds of Intermission, players vote among up to three compatible mode/map pairs. The highest count wins; ties resolve randomly on the server.
+- Players joining during `Starting` or `Active` enter immediately. TDM assigns them to the smaller team, with deterministic team-order tie breaking.
 - Match arenas are templates under `ReplicatedStorage.Assets.Maps` and are cloned into `Workspace` only for an active match and its results presentation.
 - `Workspace.Lobby` is a permanent, Studio-authored intermission area. It is never cloned, reparented, or destroyed by the match/map lifecycle.
 - When Results ends, players who participated in that match return to `Workspace.Lobby.PlayerSpawns`; match balls and terrain bindings are cleared, then the arena clone is destroyed.
@@ -80,8 +84,8 @@ Launch with 3 maps, each testing a different balance of the combat triangle:
 
 | Map | Mode Focus | Key Feature |
 |---|---|---|
-| The Pit | FFA | Small, chaotic, single dodgeball spawn in center — forces constant hammer contact |
-| Foam Court | TDM | Symmetric 3-lane layout, mirrored ammo spawns, mid control platform |
+| The Pit | FFA | Small, chaotic arena with short recovery routes that force constant hammer contact |
+| Foam Court | TDM | Symmetric 3-lane layout with fair team spawns, foam pits, and a mid control platform |
 | Sky Bounce | TDM / FFA | Two-level map — hammer-favored upper walkways, dodgeball-favored ground floor, bounce pads for repositioning |
 
 Shared design rules: no sightline longer than ~25 studs (keeps dodgeball from becoming a pure sniping tool), bounce pads and foam pits used as terrain-based mobility/dodge tools, symmetric layouts for TDM to keep team spawns fair.
@@ -108,7 +112,7 @@ CRATES!!!!!!
 ## 8. Technical Notes (Roblox-Specific)
 
 - Server-authoritative hit detection for both dodgeball and hammer to prevent client-side exploiting — do not trust client RaycastResult for eliminations.
-- Catch window validated server-side using timestamp of throw vs. block input, with reasonable latency compensation (favor-the-shooter within ~100ms).
+- Catch windows are deterministic sim state driven by the dedicated Catch input; validation of direction, distance, ownership, team, and approach happens in the server-authoritative simulation.
 - Respawn waves (TDM) handled via a server-side timer service, not per-client.
 - StreamingEnabled recommended if Sky Bounce map grows beyond a single streamable region.
 - Reuse your existing DataStore persistence pattern (as in Pizza Shift) for stats, XP, and cosmetic ownership.

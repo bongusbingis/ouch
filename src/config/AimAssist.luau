@@ -32,6 +32,14 @@ local AimAssist: { [string]: DeviceRow } = {
 		AcquireConeDeg = 60,
 		StickyConeDeg = 75,
 	},
+	Gamepad = {
+		SelectionConeDeg = 11,
+		ValidationConeDeg = 20,
+		HomingTurnScale = 1.1,
+		MagnetismRadius = 0.3,
+		AcquireConeDeg = 24,
+		StickyConeDeg = 32,
+	},
 }
 
 return AimAssist

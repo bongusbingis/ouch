@@ -1,7 +1,7 @@
 --!nonstrict
 -- BallService against the real Studio-authored default ball template: direct
 -- held grants, template cloning into Workspace.Balls, codec attribute seeding,
--- and the cadence ground-spawn path (Heartbeat-driven).
+-- recovery, and cadence ground spawning.
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -43,6 +43,7 @@ return function()
 
 		afterEach(function()
 			BallService.stopGroundSpawns()
+			BallService.clearRecovery()
 			BallService.clearAll()
 			for _, rig in rigs do
 				CharacterFixture.destroy(rig)
@@ -129,6 +130,43 @@ return function()
 			expect(#ballsIn(TestAssets.get(Workspace, "Balls"))).to.equal(0)
 		end)
 
+		simulationIt("recycles an out-of-bounds ball without replacing its instance", function()
+			local player = FakePlayer.new(100006)
+			rigFor(player)
+			BallService.grantHeldBall(player)
+
+			local folder = TestAssets.get(Workspace, "Balls")
+			local ball = ballsIn(folder)[1]
+			local originalName = ball.Name
+			ball.CFrame = CFrame.new(0, -100, 0)
+			ball:SetAttribute("ph", 5)
+
+			local point = Instance.new("Part")
+			point.Name = "RecoveryPoint"
+			point.Anchored = true
+			point.Position = Vector3.new(25, 6, -9)
+			point.Parent = Workspace
+			BallService.configureRecovery({ point }, -40)
+			BallService.start()
+
+			for _ = 1, 30 do
+				if ball.CFrame.Position.Y > -40 then
+					break
+				end
+				task.wait()
+			end
+
+			expect(ball.Parent).to.equal(folder)
+			expect(ball.Name).to.equal(originalName)
+			local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
+			expect((ball.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
+			expect(ball:GetAttribute("ph")).to.equal(5)
+			expect(ball:GetAttribute("hb")).never.to.be.ok()
+			expect(ball:GetAttribute("ow")).never.to.be.ok()
+			expect(ball:GetAttribute("er")).to.be.near(Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness)
+			point:Destroy()
+		end)
+
 		simulationIt("cadence ground spawns produce free balls at active points", function()
 			local point = Instance.new("Part")
 			point.Name = "TestBallSpawn"
@@ -151,7 +189,7 @@ return function()
 			end
 
 			expect(spawned).to.be.ok()
-			expect(spawned:GetAttribute("ph")).to.equal(6)
+			expect(spawned:GetAttribute("ph")).to.equal(5)
 			local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
 			expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
 

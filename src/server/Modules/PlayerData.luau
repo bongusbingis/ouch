@@ -201,6 +201,7 @@ local function _setProgressionAttributes(player, data)
 	player:SetAttribute("Losses", progression.Losses)
 	player:SetAttribute("MatchesPlayed", progression.MatchesPlayed)
 	player:SetAttribute("KDR", progression.KDR)
+	player:SetAttribute("TutorialVersion", data.Tutorial.Version)
 end
 
 local function _syncLeaderStats(player)
@@ -260,6 +261,16 @@ function Data.applyProgression(player, delta: ProgressionDelta)
 	d.Cash += delta.Cash or 0
 	_recalculateKDR(d)
 	_syncLeaderStats(player)
+	return true
+end
+
+function Data.completeTutorial(player): boolean
+	local d = Data.get(player)
+	if not d or d.Tutorial.Version >= DataConfig.TutorialVersion then
+		return false
+	end
+	d.Tutorial.Version = DataConfig.TutorialVersion
+	player:SetAttribute("TutorialVersion", d.Tutorial.Version)
 	return true
 end
 

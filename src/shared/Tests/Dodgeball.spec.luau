@@ -29,8 +29,6 @@ local function stateWithHeldBall(world: SimTypes.WorldSnapshot): SimTypes.SimSta
 		flightTime = 0,
 		windupRemaining = 0,
 		bounceCount = 0,
-		spinAngle = 0,
-		spinRate = 0,
 		releaseAim = nil,
 		releaseTargetId = nil,
 		releaseDeviceClass = nil,
@@ -51,6 +49,32 @@ local function throwCommand(overrides: { [string]: any }?): InputCommand
 		(command :: any)[key] = value
 	end
 	return command
+end
+
+local function catchCommand(overrides: { [string]: any }?): InputCommand
+	local command = throwCommand(overrides)
+	command.kind = "Catch"
+	return command
+end
+
+local function addIncomingBall(state: SimTypes.SimState, position: vector, velocity: vector)
+	state.projectiles.ball_0001 = {
+		id = "ball_0001",
+		archetype = "Dodgeball",
+		ownerId = "p2",
+		heldBy = nil,
+		phase = "InFlight",
+		position = position,
+		velocity = velocity,
+		targetId = nil,
+		effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
+		flightTime = 0,
+		windupRemaining = 0,
+		bounceCount = 0,
+		releaseAim = nil,
+		releaseTargetId = nil,
+		releaseDeviceClass = nil,
+	}
 end
 
 T.describe("Dodgeball kit", function()
@@ -199,7 +223,7 @@ T.describe("Dodgeball kit", function()
 		end
 	end)
 
-	T.it("throw input catches an incoming opponent ball before hammer swing", function()
+	T.it("catches an incoming opponent ball during the explicit catch window", function()
 		local world = arena()
 		local state = SimCore.newState()
 		state.projectiles.ball_0001 = {
@@ -215,56 +239,21 @@ T.describe("Dodgeball kit", function()
 			flightTime = 0,
 			windupRemaining = 0,
 			bounceCount = 0,
-			spinAngle = 0,
-			spinRate = 0,
 			releaseAim = nil,
 			releaseTargetId = nil,
 			releaseDeviceClass = nil,
 		}
 
-		local events = SimCore.step(state, { throwCommand() }, world, DT)
+		local events = SimCore.step(state, { catchCommand() }, world, DT)
 
+		T.expect(countEvents(events, "CatchStarted")):toEqual(1)
 		T.expect(countEvents(events, "BallCaught")):toEqual(1)
-		T.expect(countEvents(events, "HammerSwing")):toEqual(0)
 		T.expect(state.projectiles.ball_0001.phase):toEqual("Held")
 		T.expect(state.projectiles.ball_0001.heldBy):toEqual("p1")
-		T.expect(state.projectiles.ball_0001.ownerId):toEqual("p1")
 	end)
 
-	T.it("catch uses the configured strict distance window", function()
+	T.it("accepts only one handled action per player in a simulation tick", function()
 		local world = arena()
-		local state = SimCore.newState()
-		state.projectiles.ball_0001 = {
-			id = "ball_0001",
-			archetype = "Dodgeball",
-			ownerId = "p2",
-			heldBy = nil,
-			phase = "InFlight",
-			position = vector.create(Combat.Dodgeball.CatchDistance + 0.2, 2.5, 0),
-			velocity = vector.create(-1, 0, 0),
-			targetId = nil,
-			effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
-			flightTime = 0,
-			windupRemaining = 0,
-			bounceCount = 0,
-			spinAngle = 0,
-			spinRate = 0,
-			releaseAim = nil,
-			releaseTargetId = nil,
-			releaseDeviceClass = nil,
-		}
-
-		local events = SimCore.step(state, { throwCommand() }, world, DT)
-
-		T.expect(countEvents(events, "BallCaught")):toEqual(0)
-		T.expect(countEvents(events, "HammerSwing")):toEqual(1)
-		T.expect(state.projectiles.ball_0001.phase):toEqual("InFlight")
-	end)
-
-	T.it("cannot catch a teammate's thrown ball", function()
-		local world = arena()
-		world.characters.p1.teamId = "Red"
-		world.characters.p2 = MockWorld.character(vector.create(10, 2.5, 0), { teamId = "Red" })
 		local state = SimCore.newState()
 		state.projectiles.ball_0001 = {
 			id = "ball_0001",
@@ -279,17 +268,105 @@ T.describe("Dodgeball kit", function()
 			flightTime = 0,
 			windupRemaining = 0,
 			bounceCount = 0,
-			spinAngle = 0,
-			spinRate = 0,
+			releaseAim = nil,
+			releaseTargetId = nil,
+			releaseDeviceClass = nil,
+		}
+		local events = SimCore.step(state, { throwCommand(), catchCommand() }, world, DT)
+		T.expect(countEvents(events, "BallCaught")):toEqual(1)
+		T.expect(countEvents(events, "BallWindup")):toEqual(0)
+		T.expect(countEvents(events, "HammerSwing")):toEqual(0)
+		T.expect(state.projectiles.ball_0001.phase):toEqual("Held")
+	end)
+
+	T.it("catches a fast ball crossing the catch volume within the current tick", function()
+		local world = arena()
+		local state = SimCore.newState()
+		addIncomingBall(state, vector.create(5, 2.5, 0), vector.create(-200, 0, 0))
+
+		local events = SimCore.step(state, { catchCommand() }, world, DT)
+
+		T.expect(countEvents(events, "BallCaught")):toEqual(1)
+		T.expect(countEvents(events, "Elim")):toEqual(0)
+	end)
+
+	T.it("does not catch a fast ball through static geometry", function()
+		local baseWorld = arena()
+		local world = MockWorld.snapshot(baseWorld.characters, {
+			MockWorld.ground(),
+			{ min = vector.create(3.6, 0, -3), max = vector.create(3.8, 6, 3) },
+		}, baseWorld.ballSpawns)
+		local state = SimCore.newState()
+		addIncomingBall(state, vector.create(5, 2.5, 0), vector.create(-200, 0, 0))
+
+		local events = SimCore.step(state, { catchCommand() }, world, DT)
+
+		T.expect(countEvents(events, "BallCaught")):toEqual(0)
+	end)
+
+	T.it("keeps the catch window active until an incoming ball enters range", function()
+		local world = arena()
+		local state = SimCore.newState()
+		state.projectiles.ball_0001 = {
+			id = "ball_0001",
+			archetype = "Dodgeball",
+			ownerId = "p2",
+			heldBy = nil,
+			phase = "InFlight",
+			position = vector.create(Combat.Dodgeball.CatchDistance + 0.6, 2.5, 0),
+			velocity = vector.create(-20, 0, 0),
+			targetId = nil,
+			effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
+			flightTime = 0,
+			windupRemaining = 0,
+			bounceCount = 0,
 			releaseAim = nil,
 			releaseTargetId = nil,
 			releaseDeviceClass = nil,
 		}
 
-		local events = SimCore.step(state, { throwCommand() }, world, DT)
+		local first = SimCore.step(state, { catchCommand() }, world, DT)
+		T.expect(countEvents(first, "BallCaught")):toEqual(0)
+		local caught = false
+		for _ = 1, math.ceil(Combat.Dodgeball.CatchWindow / DT) do
+			local events = SimCore.step(state, {}, world, DT)
+			if countEvents(events, "BallCaught") > 0 then
+				caught = true
+				break
+			end
+		end
+		T.expect(caught):toBeTruthy()
+	end)
 
-		T.expect(countEvents(events, "BallCaught")):toEqual(0)
-		T.expect(countEvents(events, "HammerSwing")):toEqual(1)
+	T.it("rejects catches outside the aim cone and on the same team", function()
+		local world = arena({ p2 = MockWorld.character(vector.create(10, 2.5, 0), { teamId = "Red" }) })
+		world.characters.p1.teamId = "Red"
+		local state = SimCore.newState()
+		state.projectiles.ball_0001 = {
+			id = "ball_0001",
+			archetype = "Dodgeball",
+			ownerId = "p2",
+			heldBy = nil,
+			phase = "InFlight",
+			position = vector.create(2.5, 2.5, 0),
+			velocity = vector.create(-80, 0, 0),
+			targetId = nil,
+			effectiveRadius = Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness,
+			flightTime = 0,
+			windupRemaining = 0,
+			bounceCount = 0,
+			releaseAim = nil,
+			releaseTargetId = nil,
+			releaseDeviceClass = nil,
+		}
+
+		local teammateEvents = SimCore.step(state, { catchCommand() }, world, DT)
+		T.expect(countEvents(teammateEvents, "BallCaught")):toEqual(0)
+		world.characters.p2.teamId = "Blue"
+		state.players.p1.weapons.Dodgeball.catchCooldown = 0
+		state.players.p1.weapons.Dodgeball.catchRemaining = 0
+		local awayEvents = SimCore.step(state, { catchCommand({ aimDir = vector.create(-1, 0, 0) }) }, world, DT)
+		T.expect(countEvents(awayEvents, "BallCaught")):toEqual(0)
 	end)
 end)
 

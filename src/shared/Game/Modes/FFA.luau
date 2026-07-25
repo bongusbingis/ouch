@@ -2,7 +2,7 @@
 
 local GameMode = require(script.Parent.GameMode)
 
--- Classic FFA: balls spawn on the ground at the map's BallSpawns points.
+-- Classic FFA: each entrant receives one persistent contested ball.
 
 local FFA = {}
 FFA.id = "FFA"
@@ -13,20 +13,25 @@ FFA.rules = {
 	TimeCapSeconds = 300,
 	ResultsSeconds = 8,
 	IntermissionSeconds = 15,
-	RespawnSeconds = 0,
+	StartingSeconds = 3,
+	RespawnSeconds = 1,
 	SpawnInvulnSeconds = 1.5,
 } :: GameMode.MatchRules
 
 function FFA.onMatchStart(ctx: GameMode.ModeContext)
-	ctx.balls.startGroundSpawns(ctx.map.ballSpawns)
+	for _, player in ctx.getPlayers() do
+		ctx.balls.grantHeldBall(player)
+	end
 end
 
-function FFA.onPlayerSpawned(_ctx: GameMode.ModeContext, _player: Player, _isFirstSpawn: boolean) end
+function FFA.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, isFirstSpawn: boolean)
+	if isFirstSpawn then
+		ctx.balls.grantHeldBall(player)
+	end
+end
 
 function FFA.onElim(_ctx: GameMode.ModeContext, _sourceId: string?, _targetId: string?) end
 
-function FFA.onMatchEnd(ctx: GameMode.ModeContext)
-	ctx.balls.stopGroundSpawns()
-end
+function FFA.onMatchEnd(_ctx: GameMode.ModeContext) end
 
 return (FFA :: any) :: GameMode.GameMode

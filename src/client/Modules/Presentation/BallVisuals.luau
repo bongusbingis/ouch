@@ -10,18 +10,27 @@ local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local Util = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util")
+local Spring = require(Util:WaitForChild("Spring"))
 local CharacterRig = require(script.Parent.CharacterRig)
 local TrailVisuals = require(script.Parent.TrailVisuals)
 local WorldAudio = require(script.Parent.WorldAudio)
 
 local BallVisuals = {}
 
-local FREE_PHASE = 6
+local FREE_PHASE = 5
 local TRAIL_ACTIVE_PHASES = {
 	[2] = true,
 	[3] = true,
 	[4] = true,
-	[5] = true,
+}
+
+type FeelState = {
+	spring: Spring.Spring,
+	baseSize: Vector3,
+	impactNormal: Vector3?,
+	spinAngle: number,
+	elapsed: number,
 }
 
 type RestPulseState = {
@@ -34,6 +43,7 @@ local appliedAssets: { [BasePart]: string } = {}
 local appliedTrails: { [BasePart]: string } = {}
 local trailHandles: { [BasePart]: TrailVisuals.Handle } = {}
 local restPulses: { [BasePart]: RestPulseState } = {}
+local feelStates: { [BasePart]: FeelState } = {}
 local assetTemplates: { [string]: BasePart } = {}
 local seen = EventDedup.new(4096)
 
@@ -48,6 +58,10 @@ end
 
 local function heldVisualCFrame(ball: BasePart): CFrame?
 	local character = characterForPlayerId(ball:GetAttribute("hb") :: string?)
+	local grip = CharacterRig.dodgeballGripCFrame(character)
+	if grip then
+		return grip
+	end
 	local hand = CharacterRig.rightHand(character)
 	if hand then
 		return hand.CFrame * cframeOffset(Combat.Dodgeball.HeldVisualHandOffset)
@@ -68,16 +82,22 @@ local function setEnabled(root: Instance, className: string, enabled: boolean)
 end
 
 local function ownerFor(ball: BasePart): Player?
-	local ownerId = ball:GetAttribute("ow") :: string?
-	local userId = if ownerId then tonumber(ownerId) else nil
-	return if userId then Players:GetPlayerByUserId(userId) else nil
+	return PlayerIds.fromId(ball:GetAttribute("ow") :: string?)
 end
 
-local function playOptional(ball: BasePart, name: string)
-	WorldAudio.play("Dodgeball", name, ball)
+local function playOptional(ball: BasePart, name: string, intensity: number?)
+	local strength = intensity or 1
+	WorldAudio.play(
+		"Dodgeball",
+		name,
+		ball,
+		math.clamp(strength, 0.65, 1.35),
+		0.96 + math.clamp(strength, 0, 1.5) * 0.08
+	)
 	local emitter = ball:FindFirstChild(name, true)
 	if emitter and emitter:IsA("ParticleEmitter") then
-		emitter:Emit(emitter:GetAttribute("BurstCount") or 8)
+		local count = (emitter:GetAttribute("BurstCount") :: number?) or 8
+		emitter:Emit(math.max(2, math.floor(count * strength + 0.5)))
 	end
 end
 
@@ -121,13 +141,9 @@ local function updateRestPulse(ball: BasePart, visual: BasePart, active: boolean
 		+ (config.BrightOutlineTransparency - config.DimOutlineTransparency) * wave
 end
 
--- The ball renders its current owner's equipped asset while possessed (any
--- phase but Free); the default ball look otherwise. Profile truth replicates
--- through the owner's Equip_BallAssets attribute projection.
+-- The ball keeps its last owner's equipped asset after release and settlement.
+-- Recovery clears ownership, returning genuinely neutral balls to the default.
 local function effectiveAssetId(ball: BasePart): string
-	if ball:GetAttribute("ph") == FREE_PHASE then
-		return ""
-	end
 	local owner = ownerFor(ball)
 	if owner == nil then
 		return ""
@@ -147,6 +163,36 @@ local function effectiveTrailId(ball: BasePart): (string, string?)
 		return "", nil
 	end
 	return itemId, item.EffectId
+end
+
+local function feelFor(ball: BasePart, visual: BasePart): FeelState
+	local state = feelStates[ball]
+	if state == nil then
+		state = {
+			spring = Spring.new(0),
+			baseSize = visual.Size,
+			impactNormal = nil,
+			spinAngle = 0,
+			elapsed = 0,
+		}
+		feelStates[ball] = state
+	end
+	return state
+end
+
+local function deformationScale(stretch: number): Vector3
+	local along = math.max(1 + stretch, 0.58)
+	local cross = math.pow(along, -0.5)
+	return Vector3.new(cross, cross, along)
+end
+
+local function eventVector(value: any): Vector3?
+	if typeof(value) == "Vector3" then
+		return value
+	elseif typeof(value) == "vector" then
+		return Vector3.new(value.x, value.y, value.z)
+	end
+	return nil
 end
 
 local function destroyTrail(ball: BasePart)
@@ -186,6 +232,7 @@ local function buildVisual(ball: BasePart, assetId: string): BasePart
 	end
 	visual.Name = `{ball.Name}_Visual`
 	visual.Anchored = true
+	visual.LocalTransparencyModifier = 0
 	visual.CanCollide = false
 	visual.CanQuery = false
 	visual.CanTouch = false
@@ -202,6 +249,7 @@ local function addBall(ball: BasePart)
 	ball.LocalTransparencyModifier = 1
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
+	feelFor(ball, visual)
 	refreshTrail(ball, true)
 end
 
@@ -214,6 +262,7 @@ local function removeBall(ball: BasePart)
 	end
 	visuals[ball] = nil
 	appliedAssets[ball] = nil
+	feelStates[ball] = nil
 end
 
 local function refreshAsset(ball: BasePart)
@@ -231,6 +280,8 @@ local function refreshAsset(ball: BasePart)
 	end
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
+	feelStates[ball] = nil
+	feelFor(ball, visual)
 	refreshTrail(ball, true)
 end
 
@@ -245,6 +296,18 @@ function BallVisuals.onEvent(event: any)
 	end
 	if event.kind == "BallSettled" then
 		refreshAsset(ball)
+	elseif event.kind == "BallBounced" then
+		local visual = visuals[ball]
+		if visual then
+			local state = feelFor(ball, visual)
+			state.impactNormal = eventVector(event.normal)
+			local magnitude = math.max((event.magnitude :: number?) or 0, 0)
+			local impulse = math.min(
+				magnitude * Combat.Dodgeball.BallFeel.ImpactImpulseScale,
+				Combat.Dodgeball.BallFeel.MaxImpactSquash * 18
+			)
+			Spring.impulse(state.spring, -impulse)
+		end
 	end
 	local visual = visuals[ball]
 	if visual == nil then
@@ -257,11 +320,15 @@ function BallVisuals.onEvent(event: any)
 		BallSettled = "Landing",
 		BallPickedUp = "Pickup",
 		BallCaught = "Pickup",
-		BallRecallStarted = "Recall",
 	}
 	local effect = effectNames[event.kind]
 	if effect then
-		playOptional(visual, effect)
+		local intensity = 1
+		if event.kind == "BallBounced" then
+			local magnitude = (event.magnitude :: number?) or 0
+			intensity = math.clamp(magnitude * (1 / Combat.Dodgeball.BallFeel.HeavyImpactSpeed), 0.35, 1.35)
+		end
+		playOptional(visual, effect, intensity)
 	end
 end
 
@@ -296,7 +363,8 @@ function BallVisuals.start()
 
 	RunService.RenderStepped:Connect(function(dt)
 		local alpha = 1 - math.exp(-Combat.Dodgeball.RemoteSmoothing * dt)
-		local localId = tostring(Players.LocalPlayer.UserId)
+		local localId = PlayerIds.toId(Players.LocalPlayer)
+		local feelConfig = Combat.Dodgeball.BallFeel
 		for ball, visual in visuals do
 			if ball.Parent == nil then
 				removeBall(ball)
@@ -308,8 +376,41 @@ function BallVisuals.start()
 			local phase = ball:GetAttribute("ph")
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
+			local state = feelFor(ball, visual)
+			local velocity = ball:GetAttribute("vel")
+			local velocityVector = if typeof(velocity) == "Vector3" then velocity else Vector3.zero
+			local speed = velocityVector.Magnitude
+
+			state.elapsed += dt
+			if phase == 2 then
+				state.spring.target = math.min(speed * feelConfig.FlightStretchPerSpeed, feelConfig.MaxFlightStretch)
+			elseif phase == 4 then
+				state.spring.target = math.sin(state.elapsed * feelConfig.RollWobbleHz * math.pi * 2)
+					* feelConfig.RollWobbleScale
+			else
+				state.spring.target = 0
+			end
+			Spring.step(state.spring, feelConfig.SpringFrequencyHz, feelConfig.SpringDampingRatio, dt)
+			local stretch = math.clamp(state.spring.position, -feelConfig.MaxImpactSquash, feelConfig.MaxFlightStretch)
+			local scale = deformationScale(stretch)
+			visual.Size =
+				Vector3.new(state.baseSize.X * scale.X, state.baseSize.Y * scale.Y, state.baseSize.Z * scale.Z)
+
 			local targetCFrame = heldCFrame or ball.CFrame
+			if heldCFrame == nil and speed > 0.05 then
+				local direction = velocityVector.Unit
+				if stretch < -0.015 and state.impactNormal then
+					direction = state.impactNormal.Unit
+				elseif stretch >= -0.015 then
+					state.impactNormal = nil
+				end
+				state.spinAngle = (state.spinAngle + speed / math.max(Combat.Dodgeball.Radius, 0.01) * dt)
+					% (math.pi * 2)
+				targetCFrame = CFrame.lookAt(ball.Position, ball.Position + direction)
+					* CFrame.Angles(0, 0, state.spinAngle)
+			end
 			visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
+
 			updateRestPulse(ball, visual, phase == FREE_PHASE, dt)
 			local trailActive = TRAIL_ACTIVE_PHASES[phase] == true
 			setEnabled(visual, "Trail", trailActive)

@@ -1,5 +1,5 @@
 --!nonstrict
--- Cloud port of the MatchSim spec: pure match phase machine (Idle → Active →
+-- Cloud port of the MatchSim spec: pure match phase machine (Idle → Starting → Active →
 -- Results → Intermission), scoring rules, and the ModeRegistry surface.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +21,7 @@ local function activeMatch(playerIds)
 	MatchSim.setPlayers(state, present)
 	local events = {}
 	MatchSim.start(state, RULES, events)
+	MatchSim.tick(state, RULES, RULES.StartingSeconds, events)
 	return state, events
 end
 
@@ -60,6 +61,7 @@ return function()
 			MatchSim.setPlayers(state, { Red = true, Blue = true })
 			local events = {}
 			MatchSim.start(state, RULES, events)
+			MatchSim.tick(state, RULES, RULES.StartingSeconds, events)
 			MatchSim.applyElim(state, RULES, "Red", "p2", events)
 			expect(state.scores.Red).to.equal(1)
 			local changed = lastEvent(events, "ScoreChanged")

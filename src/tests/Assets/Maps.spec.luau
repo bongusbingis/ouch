@@ -1,5 +1,5 @@
 --!nonstrict
--- Validates every map in Config.Maps.Pool against the authored assets under
+-- Validates every enabled map in Config.Maps.Pool against the authored assets under
 -- ReplicatedStorage.Assets.Maps: the Scriptables hierarchy MapService clones
 -- and flattens must exist with populated spawn pools.
 
@@ -28,12 +28,15 @@ return function()
 		it("has unique map ids", function()
 			local seen = {}
 			for _, entry in Maps.Pool do
+				if not entry.Enabled then
+					continue
+				end
 				expect(seen[entry.Id]).never.to.be.ok()
 				seen[entry.Id] = true
 			end
 		end)
 
-		it("authors every pooled map with populated spawn pools", function()
+		it("authors every enabled map with populated spawn pools", function()
 			for _, entry in Maps.Pool do
 				local map = TestAssets.get(ReplicatedStorage, "Assets", "Maps", entry.AssetName)
 				local scriptables = TestAssets.get(map, "Scriptables")

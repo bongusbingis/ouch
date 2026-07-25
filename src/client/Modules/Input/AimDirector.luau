@@ -24,6 +24,9 @@ function AimDirector.deviceClass(): string
 	if lastInput == Enum.UserInputType.Touch then
 		return "Touch"
 	end
+	if string.find(lastInput.Name, "Gamepad", 1, true) == 1 then
+		return "Gamepad"
+	end
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
 		return "Touch"
 	end

@@ -33,8 +33,7 @@ local PHASE_NAMES: { [number]: string } = {
 	[2] = "InFlight",
 	[3] = "Bouncing",
 	[4] = "Rolling",
-	[5] = "Recalling",
-	[6] = "Free",
+	[5] = "Free",
 }
 
 local LINE_THICKNESS = 0.035
@@ -64,7 +63,6 @@ local function anyVisualEnabled(): boolean
 		or Debug.AimAssistTargetRange == true
 		or Debug.ThrowOriginMaxOffset == true
 		or Debug.PickupRadius == true
-		or Debug.RecallRange == true
 		or Debug.PhaseLabels == true
 		or Debug.Trajectory == true
 		or Debug.CollisionRadius == true
@@ -329,7 +327,7 @@ local function updateLabels(balls: Instance?)
 			end
 			live[child] = true
 			if Debug.PhaseLabels then
-				local phase = (child:GetAttribute("ph") :: number?) or 6
+				local phase = (child:GetAttribute("ph") :: number?) or 5
 				local heldBy = child:GetAttribute("hb")
 				local label = labelFor(child)
 				local text = label:FindFirstChild("Text")
@@ -392,10 +390,10 @@ local function drawBallDebug(balls: Instance?)
 		if Debug.CollisionRadius then
 			drawSphereRings(position, Combat.Dodgeball.Radius, Color3.fromRGB(80, 180, 255), 0.35)
 		end
-		if Debug.PickupRadius and phase == 6 then
+		if Debug.PickupRadius and phase == 5 then
 			drawGroundCircle(position, Combat.Dodgeball.PickupRadius, Color3.fromRGB(80, 255, 150), 0.4)
 		end
-		if Debug.Trajectory and (phase == 2 or phase == 3 or phase == 4 or phase == 5) then
+		if Debug.Trajectory and (phase == 2 or phase == 3 or phase == 4) then
 			updateTrajectory(child)
 		end
 	end
@@ -414,9 +412,6 @@ local function drawLocalPlayerDebug(character: Model?)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root == nil or not root:IsA("BasePart") then
 		return
-	end
-	if Debug.RecallRange then
-		drawGroundCircle(root.Position, Combat.Dodgeball.RecallMaxDistance, Color3.fromRGB(180, 120, 255), 0.72)
 	end
 	if Debug.ThrowOriginMaxOffset then
 		drawSphereRings(root.Position, Combat.Dodgeball.ThrowOriginMaxOffset, Color3.fromRGB(255, 140, 80), 0.55)
