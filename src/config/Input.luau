@@ -32,7 +32,7 @@ return {
 			Name = "Catch",
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseButton2 },
+				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseRightButton },
 				{ Name = "Keyboard", KeyCode = Enum.KeyCode.F },
 				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonL2 },
 				{ Name = "TouchFeed", Scriptable = true },

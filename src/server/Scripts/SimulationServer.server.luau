@@ -115,9 +115,7 @@ CmdrService.start()
 ServerAuthAdapter.onEvent(function(event)
 	playEventAnimation(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
-	if acceptedElim then
-		QuestService.handleCombatEvent(event)
-	elseif event.kind ~= "Elim" then
+	if acceptedElim or event.kind ~= "Elim" then
 		QuestService.handleCombatEvent(event)
 	end
 	if acceptedElim or event.kind == "BallCaught" then
