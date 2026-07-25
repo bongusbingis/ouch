@@ -7,7 +7,11 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local TestEZ = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("testEZ")) :: any
+local packages = ReplicatedStorage:FindFirstChild("Packages")
+assert(packages and packages:IsA("Folder"), "[Tests.Runner] ReplicatedStorage.Packages must be a Folder")
+local testEZ = packages:FindFirstChild("testEZ")
+assert(testEZ and testEZ:IsA("ModuleScript"), "[Tests.Runner] ReplicatedStorage.Packages.testEZ must be a ModuleScript")
+local TestEZ = require(testEZ) :: any
 
 export type Summary = {
 	passed: number,

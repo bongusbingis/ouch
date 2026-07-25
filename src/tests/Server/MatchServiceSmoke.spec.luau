@@ -6,15 +6,20 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ServerStorage = game:GetService("ServerStorage")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local MatchService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MatchService"))
+local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 
 return function()
 	describe("MatchService smoke", function()
 		it("start exposes the replicated MatchState surface and stays Idle", function()
+			local lobby = TestAssets.get(Workspace, "Lobby")
+			TestAssets.get(lobby, "PlayerSpawns")
 			MatchService.start()
 
 			local stateFolder = ReplicatedStorage:FindFirstChild("MatchState")

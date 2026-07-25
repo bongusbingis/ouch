@@ -38,6 +38,9 @@ return function()
 
 		it("authors every enabled map with populated spawn pools", function()
 			for _, entry in Maps.Pool do
+				if not entry.Enabled then
+					continue
+				end
 				local map = TestAssets.get(ReplicatedStorage, "Assets", "Maps", entry.AssetName)
 				local scriptables = TestAssets.get(map, "Scriptables")
 

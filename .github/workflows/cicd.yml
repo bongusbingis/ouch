@@ -123,6 +123,7 @@ jobs:
       # uploaded artifact, so agents inspecting the artifact see precisely
       # what this run built against.
       - name: Fetch live place
+        timeout-minutes: 4
         run: bash src/scripts/shell/fetch-live-place.sh live-place.rbxl
         env:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
@@ -136,6 +137,7 @@ jobs:
           retention-days: 14
 
       - name: Build, merge, test, and publish
+        timeout-minutes: 15
         run: |
           set +e
           bash src/scripts/shell/deploy.sh default.project.json live-place.rbxl

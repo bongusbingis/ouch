@@ -7,7 +7,11 @@
 local ServerStorage = game:GetService("ServerStorage")
 
 print("[cloud-tests] loading TestEZ runner")
-local runSuite = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Runner"))
+local tests = ServerStorage:FindFirstChild("Tests")
+assert(tests and tests:IsA("Folder"), "[cloud-tests] ServerStorage.Tests must be a Folder")
+local runner = tests:FindFirstChild("Runner")
+assert(runner and runner:IsA("ModuleScript"), "[cloud-tests] ServerStorage.Tests.Runner must be a ModuleScript")
+local runSuite = require(runner)
 print("[cloud-tests] running suite")
 local summary = runSuite()
 print("[cloud-tests] suite returned")

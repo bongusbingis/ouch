@@ -16,6 +16,8 @@ local serde = require("@lune/serde")
 local task = require("@lune/task")
 
 local REQUEST_RETRIES = 5
+local REQUEST_TIMEOUT_SECONDS = 30
+local REQUEST_WATCH_SECONDS = 0.05
 local RETRY_MAX_SECONDS = 15
 local RETRYABLE_STATUS_CODES = {
 	[429] = true,
@@ -38,6 +40,31 @@ local function requireEnv(name: string): string
 	return value :: string
 end
 
+local function requestWithTimeout(config: any): (boolean, any)
+	local completed = false
+	local requestOk = false
+	local response: any = nil
+	local worker = task.spawn(function()
+		requestOk, response = pcall(function()
+			return net.request(config)
+		end)
+		completed = true
+	end)
+	local deadline = os.clock() + REQUEST_TIMEOUT_SECONDS
+
+	while not completed and os.clock() < deadline do
+		task.wait(math.min(REQUEST_WATCH_SECONDS, math.max(deadline - os.clock(), 0)))
+	end
+
+	if not completed then
+		pcall(function()
+			task.cancel(worker)
+		end)
+		return false, `request timed out after {REQUEST_TIMEOUT_SECONDS}s`
+	end
+	return requestOk, response
+end
+
 local args = table.clone(process.args)
 if args[1] == "--" then
 	table.remove(args, 1)
@@ -53,13 +80,11 @@ local placeId = requireEnv("ROBLOX_PLACE_ID")
 local function getWithRetry(url: string, headers: { [string]: string }, context: string): string
 	local lastError = "request failed"
 	for attempt = 1, REQUEST_RETRIES do
-		local ok, response = pcall(function()
-			return net.request({
-				url = url,
-				method = "GET",
-				headers = headers,
-			})
-		end)
+		local ok, response = requestWithTimeout({
+			url = url,
+			method = "GET",
+			headers = headers,
+		})
 		if ok and (response :: any).ok then
 			return (response :: any).body
 		end

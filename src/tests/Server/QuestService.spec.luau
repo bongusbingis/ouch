@@ -6,6 +6,7 @@
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local QuestService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("QuestService"))
@@ -40,8 +41,25 @@ return function()
 		end)
 
 		it("match events for absent players are absorbed without error", function()
-			QuestService.handleMatchEvent({ kind = "MatchEnded", winnerId = "1" })
-			QuestService.handleMatchEvent({ kind = "MatchStarted" })
+			local matchState = ReplicatedStorage:FindFirstChild("MatchState")
+			local createdMatchState = matchState == nil
+			if matchState == nil then
+				matchState = Instance.new("Folder")
+				matchState.Name = "MatchState"
+				matchState.Parent = ReplicatedStorage
+			end
+
+			local ok, message = pcall(function()
+				QuestService.handleMatchEvent({ kind = "MatchEnded", winnerId = "1" })
+				QuestService.handleMatchEvent({ kind = "MatchStarted" })
+			end)
+			if createdMatchState then
+				matchState:Destroy()
+			end
+
+			if not ok then
+				error(message, 0)
+			end
 		end)
 
 		it("combat events dedupe and ignore unknown sources without error", function()
