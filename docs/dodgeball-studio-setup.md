@@ -47,7 +47,7 @@ This section is optional: when `ReplicatedStorage > Assets > Effects > Splat` is
 
 ## Match maps and recovery
 
-Each enabled `Config.Maps.Pool` entry requires `ReplicatedStorage > Assets > Maps > <AssetName>` as a `Folder` or `Model` authored at its final world position. It must contain `Scriptables > BallSpawns` and `Scriptables > PlayerSpawns`, each with at least one anchored `BasePart`; optional `Scriptables > BouncePads` and `Scriptables > FoamPits` folders contain their feature parts. `ThePit`, `FoamCourt`, and `SkyBounce` are configured but disabled until these trees exist. Set `Enabled = true` only after the matching tree is complete. `RecoveryY` in `Config.Maps` is the out-of-bounds threshold; recovered balls reuse the same instance and cycle across `BallSpawns`.
+Each enabled `Config.Maps.Pool` entry requires `ReplicatedStorage > Assets > Maps > <AssetName>` as a `Folder` or `Model` authored at its final world position. It must contain `Scriptables > BallSpawns` and `Scriptables > PlayerSpawns`, each with at least one anchored `BasePart`; optional `Scriptables > BouncePads` and `Scriptables > FoamPits` folders contain their feature parts. It must also contain `Static`; MapService anchors every cloned `BasePart` below it as a runtime fallback for missed authoring. `ThePit`, `FoamCourt`, and `SkyBounce` are configured but disabled until these trees exist. Set `Enabled = true` only after the matching tree is complete. `RecoveryY` in `Config.Maps` is the out-of-bounds threshold; recovered balls reuse the same instance and cycle across `BallSpawns`.
 
 ## Code-built HUD replacement trees
 

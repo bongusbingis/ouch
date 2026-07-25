@@ -49,6 +49,13 @@ local function allPartsOf(folder: Instance): { BasePart }
 	return parts
 end
 
+local function anchorStaticParts(mapRoot: Instance)
+	local static = mapRoot:WaitForChild("Static")
+	for _, part in allPartsOf(static) do
+		part.Anchored = true
+	end
+end
+
 -- BouncePads/FoamPits folders are optional per map (e.g. The Pit has none).
 local function optionalPartsOf(parent: Instance, folderName: string): { BasePart }
 	local folder = parent:FindFirstChild(folderName)
@@ -90,6 +97,7 @@ local function spawnEntry(entry: Maps.MapEntry): ActiveMap
 
 	local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Maps"):WaitForChild(entry.AssetName)
 	local clone = template:Clone()
+	anchorStaticParts(clone)
 	clone.Parent = Workspace
 
 	local scriptables = clone:WaitForChild("Scriptables")

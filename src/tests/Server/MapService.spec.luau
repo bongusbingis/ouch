@@ -13,6 +13,7 @@ local MapService =
 local Maps = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Maps"))
 local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
+local TestAssets = require(Helpers:WaitForChild("TestAssets"))
 
 local function poolIds(): { [string]: boolean }
 	local ids = {}
@@ -35,6 +36,15 @@ local function enabledCount(): number
 	return count
 end
 
+local function firstEnabledEntry()
+	for _, entry in Maps.Pool do
+		if entry.Enabled then
+			return entry
+		end
+	end
+	error("[MapService.spec] no enabled map")
+end
+
 return function()
 	describe("MapService", function()
 		afterEach(function()
@@ -53,6 +63,36 @@ return function()
 				expect(part:IsDescendantOf(map.instance)).to.equal(true)
 			end
 			expect(MapService.active()).to.equal(map)
+		end)
+
+		it("anchors cloned Static parts without changing Scriptables", function()
+			local entry = firstEnabledEntry()
+			local template = TestAssets.get(ReplicatedStorage, "Assets", "Maps", entry.AssetName)
+			local static = TestAssets.get(template, "Static")
+			local scriptables = TestAssets.get(template, "Scriptables")
+			local staticMarker = Instance.new("Part")
+			staticMarker.Name = "UnanchoredStaticFixture"
+			staticMarker.Anchored = false
+			staticMarker.CanCollide = false
+			staticMarker.Parent = static
+			local scriptableMarker = Instance.new("Part")
+			scriptableMarker.Name = "UnanchoredScriptableFixture"
+			scriptableMarker.Anchored = false
+			scriptableMarker.CanCollide = false
+			scriptableMarker.Parent = scriptables
+
+			local ok, message = pcall(function()
+				local map = assert(MapService.spawnById(entry.Id))
+				local clonedStatic = TestAssets.get(map.instance, "Static", staticMarker.Name)
+				local clonedScriptable = TestAssets.get(map.instance, "Scriptables", scriptableMarker.Name)
+				expect(clonedStatic.Anchored).to.equal(true)
+				expect(clonedScriptable.Anchored).to.equal(false)
+			end)
+			staticMarker:Destroy()
+			scriptableMarker:Destroy()
+			if not ok then
+				error(message, 0)
+			end
 		end)
 
 		it("despawn destroys the active map and clears active()", function()

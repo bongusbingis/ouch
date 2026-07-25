@@ -42,6 +42,7 @@ return function()
 					continue
 				end
 				local map = TestAssets.get(ReplicatedStorage, "Assets", "Maps", entry.AssetName)
+				TestAssets.get(map, "Static")
 				local scriptables = TestAssets.get(map, "Scriptables")
 
 				local ballSpawns = TestAssets.get(scriptables, "BallSpawns")
