@@ -32,11 +32,13 @@ This section is optional: when `ReplicatedStorage > Assets > Effects > Splat` is
 
 ## Hammer grip
 
-`HammerVisuals` aligns each hammer skin against the hand using a `GripAttachment` child on the skin's `BasePart`, matched against the character's own grip reference frame (R15's built-in `RightGripAttachment` on `RightHand`, or a small config-driven fallback for R6/custom avatars). No `GripAttachment` exists in Studio today: `HammerVisuals` seeds one at runtime from `Config.Combat.Hammer.GripOffset`/`GripRotationDeg` on any cloned hammer part that lacks its own.
+`HammerVisuals` uses a skin's authored `GripAttachment` when present. Without one, it measures that skin's own `BasePart.Size`, requires one clearly dominant axis, aligns that axis to the hand's local Y axis, and places the grip at `Config.Combat.Hammer.AutoGrip.GripAlongLongAxis` of the dominant length. The default hammer is Y-dominant, so the fallback holds its two heads vertically instead of applying the old sideways 90-degree rotation. Squash and stretch also follow each skin's resolved axis and original size.
 
-1. To author placement directly instead of iterating the config numbers: for each hammer skin under `ReplicatedStorage > Assets > Cosmetics > HammerAssets`, add an `Attachment` named `GripAttachment` on the part. A Studio-authored one always takes precedence over the config-seeded default.
-2. Because the mesh is a symmetric, double-headed inflatable hammer, one `GripAttachment` roughly 3/4 down the shaft (from either head) should read correctly held from both orientations — no separate top/bottom variant needed.
-3. Verify by equipping the hammer and checking it sits naturally in the hand at rest, mid-swing, and mid-squash (the stretch animation keeps the `GripAttachment` point anchored to the hand; only the visible mesh stretches around it).
+Dimensions cannot identify an arbitrary mesh pivot or choose between nearly equal axes. For those assets, author `ReplicatedStorage > Assets > Cosmetics > HammerAssets > <Asset> > GripAttachment`; ambiguous assets without one fail immediately instead of displaying with a guessed offset.
+
+1. Symmetric, centered, double-headed hammer skins may omit `GripAttachment` when their head-to-head dimension is clearly the largest local dimension.
+2. Add `GripAttachment` to off-center, asymmetrical, or near-square skins and place it exactly where the hand should hold the mesh.
+3. Verify every skin at rest, mid-swing, and mid-squash on both R15 and R6 rigs.
 
 ## Intermission lobby
 

@@ -3,12 +3,16 @@
 -- against their config sources of truth.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
 local TrailCosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("TrailCosmetics"))
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
+local Client = StarterPlayer:WaitForChild("StarterPlayerScripts"):WaitForChild("Client")
+local HammerGrip = require(Client:WaitForChild("Modules"):WaitForChild("Presentation"):WaitForChild("HammerGrip"))
 
 return function()
 	describe("Cosmetics assets", function()
@@ -50,6 +54,29 @@ return function()
 					if item.Category == "BallAssets" then
 						expect(asset:IsA("BasePart")).to.equal(true)
 					end
+				end
+			end
+		end)
+
+		it("resolves every hammer grip without guessing an ambiguous axis", function()
+			local assetNames = { Cosmetics.Defaults.HammerAssets.AssetName }
+			for _, item in Cosmetics.Items do
+				if item.Category == "HammerAssets" and item.AssetName ~= nil then
+					table.insert(assetNames, item.AssetName)
+				end
+			end
+			for _, assetName in assetNames do
+				local asset = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "HammerAssets", assetName)
+				expect(asset:IsA("BasePart")).to.equal(true)
+				local attachment = asset:FindFirstChild("GripAttachment")
+				if attachment then
+					expect(attachment:IsA("Attachment")).to.equal(true)
+				else
+					local size = asset.Size
+					local config = Combat.Hammer.AutoGrip
+					local solution =
+						HammerGrip.solve(size.X, size.Y, size.Z, config.MinAxisDominanceRatio, config.GripAlongLongAxis)
+					expect(solution).to.be.ok()
 				end
 			end
 		end)

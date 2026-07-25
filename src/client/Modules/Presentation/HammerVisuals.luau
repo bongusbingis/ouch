@@ -14,6 +14,7 @@ local Util = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitF
 local Spring = require(Util:WaitForChild("Spring"))
 local CharacterRig = require(script.Parent.CharacterRig)
 local WorldAudio = require(script.Parent.WorldAudio)
+local HammerGrip = require(script.Parent.HammerGrip)
 
 local HammerVisuals = {}
 
@@ -27,35 +28,35 @@ assert(defaultTemplate:IsA("BasePart"), "[HammerVisuals] default HammerAssets as
 local visuals: { [Player]: BasePart } = {}
 local appliedAssets: { [Player]: string } = {}
 local assetTemplates: { [string]: BasePart } = {}
+local visualBaseSizes: { [Player]: Vector3 } = {}
+local visualGripCFrames: { [Player]: CFrame } = {}
+local visualLongAxes: { [Player]: HammerGrip.Axis } = {}
 -- Springs outlive the visual (hidden while holding a ball, rebuilt on respawn)
 -- so a mid-wobble hammer resumes naturally; cleared only on PlayerRemoving.
 local springs: { [Player]: Spring.Spring } = {}
-local baseSize = defaultTemplate.Size
 local ballsFolder = Workspace:WaitForChild("Balls")
 local seenEvents = EventDedup.new(4096)
 
-local defaultGripCFrame = (function(): CFrame
-	local offset = Combat.Hammer.GripOffset
-	local rotation = Combat.Hammer.GripRotationDeg
-	return CFrame.new(offset.x, offset.y, offset.z)
-		* CFrame.Angles(math.rad(rotation.x), math.rad(rotation.y), math.rad(rotation.z))
-end)()
-
--- The GripAttachment is where/how the hand holds the mesh: its CFrame is
--- aligned against the hand's own grip reference frame (CharacterRig
--- .rightHandGripCFrame), so any hammer skin gets correct placement just by
--- carrying its own GripAttachment child. Seeded here for skins that don't
--- author one yet.
-local function gripAttachmentFor(visual: BasePart): Attachment
+local function gripFor(visual: BasePart, baseSize: Vector3): (CFrame, HammerGrip.Axis)
+	local axis = HammerGrip.longestAxis(baseSize.X, baseSize.Y, baseSize.Z)
 	local existing = visual:FindFirstChild("GripAttachment")
-	if existing and existing:IsA("Attachment") then
-		return existing
+	if existing then
+		assert(existing:IsA("Attachment"), `[HammerVisuals] {visual.Name}.GripAttachment must be an Attachment`)
+		return existing.CFrame, axis
 	end
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "GripAttachment"
-	attachment.CFrame = defaultGripCFrame
-	attachment.Parent = visual
-	return attachment
+
+	local config = Combat.Hammer.AutoGrip
+	local solution =
+		HammerGrip.solve(baseSize.X, baseSize.Y, baseSize.Z, config.MinAxisDominanceRatio, config.GripAlongLongAxis)
+	assert(solution ~= nil, `[HammerVisuals] {visual.Name} has ambiguous dimensions; author a GripAttachment`)
+	local position = solution.position
+	local rotation = solution.rotationDeg
+	return CFrame.new(position.x, position.y, position.z) * CFrame.Angles(
+		math.rad(rotation.x),
+		math.rad(rotation.y),
+		math.rad(rotation.z)
+	),
+		solution.axis
 end
 
 local function handGripCFrame(character: Model, hand: BasePart): CFrame
@@ -76,12 +77,11 @@ local function springFor(player: Player): Spring.Spring
 	return spring
 end
 
-local function scaleFor(stretch: number): Vector3
+local function scaleFor(stretch: number, axis: HammerGrip.Axis): Vector3
 	local along = 1 + stretch
 	-- Volume-preserving: cross-axes thin as the hammer stretches and fatten
 	-- as it squashes.
 	local cross = 1 / math.sqrt(along)
-	local axis = Combat.HammerFeel.StretchAxis
 	if axis == "X" then
 		return Vector3.new(along, cross, cross)
 	elseif axis == "Z" then
@@ -110,6 +110,9 @@ local function remove(player: Player)
 	end
 	visuals[player] = nil
 	appliedAssets[player] = nil
+	visualBaseSizes[player] = nil
+	visualGripCFrames[player] = nil
+	visualLongAxes[player] = nil
 end
 
 local function effectiveAsset(player: Player): (string, BasePart)
@@ -133,6 +136,8 @@ local function visualFor(player: Player): BasePart
 
 	visual = template:Clone()
 	visual.Name = `{player.Name}_HammerVisual`
+	local baseSize = template.Size
+	local gripCFrame, longAxis = gripFor(visual, baseSize)
 	visual.Anchored = true
 	visual.CanCollide = false
 	visual.CanQuery = false
@@ -140,6 +145,9 @@ local function visualFor(player: Player): BasePart
 	visual.Parent = Workspace.CurrentCamera
 	visuals[player] = visual
 	appliedAssets[player] = assetId
+	visualBaseSizes[player] = baseSize
+	visualGripCFrames[player] = gripCFrame
+	visualLongAxes[player] = longAxis
 	return visual
 end
 
@@ -194,18 +202,16 @@ function HammerVisuals.start()
 			local phase = (player.UserId % 100) * 0.618
 			local wobble = feel.IdleWobbleAmplitude * math.sin((now + phase) * feel.IdleWobbleHz * 2 * math.pi)
 			local stretch = math.clamp(spring.position + wobble, feel.MinStretch, feel.MaxStretch)
-			local scale = scaleFor(stretch)
-
 			local visual = visualFor(player)
-			local attachment = gripAttachmentFor(visual)
-			local itemGrip = attachment.CFrame
-			local gripLocal = attachment.Position
+			local baseSize = assert(visualBaseSizes[player])
+			local itemGrip = assert(visualGripCFrames[player])
+			local scale = scaleFor(stretch, assert(visualLongAxes[player]))
+			local gripLocal = itemGrip.Position
 			local handWorld = handGripCFrame(character, hand)
 
 			visual.Size = Vector3.new(baseSize.X * scale.X, baseSize.Y * scale.Y, baseSize.Z * scale.Z)
-			-- Size scales the mesh about the part center, but GripAttachment's
-			-- Position doesn't rescale with it; the translation maps the
-			-- scaled grip point back onto the hand so the handle stays put.
+			-- Size scales about the part center while the grip point remains local;
+			-- this correction keeps that point fixed on the hand.
 			visual.CFrame = handWorld
 				* itemGrip:Inverse()
 				* CFrame.new(gripLocal.X * (1 - scale.X), gripLocal.Y * (1 - scale.Y), gripLocal.Z * (1 - scale.Z))

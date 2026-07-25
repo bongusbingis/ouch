@@ -86,21 +86,17 @@ return {
 		DashSpeed = 58,
 		LineOfSightRadius = 0.35,
 		AnimationName = "Swing",
-		-- Local-to-part CFrame (position + rotation, degrees) for the
-		-- "GripAttachment" HammerVisuals seeds onto any cloned hammer part
-		-- that doesn't already carry one of its own. A Studio-authored
-		-- per-skin GripAttachment always wins once one exists — iterate
-		-- these two numbers in-game rather than adding another offset layer.
-		GripOffset = vector.create(0, -0.6, 0),
-		GripRotationDeg = vector.create(0, 0, 90),
+		AutoGrip = {
+			MinAxisDominanceRatio = 1.1,
+			GripAlongLongAxis = -0.094,
+		},
 		-- Used only when the character's hand has no built-in
 		-- RightGripAttachment (R6, or a custom avatar missing one).
 		HandGripFallbackOffset = vector.create(0, 0, -0.05),
 	},
 
-	-- Client-only inflatable feel for the hammer visual. Stretch values are
-	-- fractions of the template size along StretchAxis (the part-local axis
-	-- running handle-to-head); MinStretch must stay above -1.
+	-- Client-only inflatable feel for the hammer visual. Stretch follows each
+	-- cosmetic's dimension-resolved long axis; MinStretch must stay above -1.
 	HammerFeel = {
 		IdleWobbleAmplitude = 0.035,
 		IdleWobbleHz = 1.1,
@@ -111,7 +107,6 @@ return {
 		MissDeflateAmount = 0.4,
 		MaxStretch = 0.6,
 		MinStretch = -0.55,
-		StretchAxis = "Y",
 	},
 
 	-- World-space paint splat played on dodgeball eliminations.
