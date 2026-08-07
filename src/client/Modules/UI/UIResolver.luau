@@ -1676,8 +1676,7 @@ end
 
 -- FindFirstChild is deliberate: this temporary Instance.new exception was
 -- directed by the user while Studio is unavailable. The replacement is a
--- Hud.MatchFlow Frame containing Vote, Respawn, Tutorial, ActionFeedback, CombatFeed, and Summary. Vote
--- contains Option1 through Option3 TextButtons with Mode, Map, and Count labels.
+-- Hud.MatchFlow Frame with the hierarchy documented in dodgeball-studio-setup.md.
 local function resolveMatchFlow(hud: ScreenGui): Frame
 	local authored = hud:FindFirstChild("MatchFlow")
 	local root: Frame
@@ -1724,28 +1723,93 @@ local function resolveMatchFlow(hud: ScreenGui): Frame
 		label.Visible = false
 	end
 
+	local voteTheme = uiConfig().Hud.MatchVote
 	local vote = resolveNativePanel(
 		root,
 		"Vote",
-		0.2,
-		0.66,
-		0.6,
-		0.25,
+		0,
+		0,
+		0.92,
+		0.62,
 		94,
-		Color3.fromRGB(25, 32, 67),
-		Color3.fromRGB(48, 69, 127),
-		Color3.fromRGB(19, 24, 57),
-		Color3.fromRGB(255, 235, 167),
-		0.08
+		Color3.fromRGB(20, 25, 55),
+		Color3.fromRGB(49, 65, 124),
+		Color3.fromRGB(18, 21, 48),
+		Color3.fromRGB(255, 237, 176),
+		0.055
 	)
-	vote.BackgroundTransparency = 0.12
+	centered(vote, 0.5, 0.52, 0.92, 0.62, 94)
+	vote.BackgroundTransparency = 0.06
 	vote.Visible = false
-	local voteTitle = resolveText(vote, "Title", "VOTE FOR THE NEXT MATCH", 0.04, 0.05, 0.72, 0.16, 13, 25, 95, nil)
-	voteTitle.TextColor3 = Color3.fromRGB(255, 247, 205)
-	local voteTimer = resolveText(vote, "Timer", "10", 0.82, 0.05, 0.14, 0.16, 15, 28, 95, Enum.TextXAlignment.Right)
-	voteTimer.TextColor3 = Color3.fromRGB(255, 167, 68)
-	local options = resolveContainer(vote, "Options", 0.035, 0.25, 0.93, 0.67, 95)
+	local voteAspect = ensureAspect(vote, voteTheme.LandscapeAspect)
+	local sizeConstraintInstance = vote:FindFirstChild("SizeConstraint")
+		or vote:FindFirstChildWhichIsA("UISizeConstraint")
+	local sizeConstraint: UISizeConstraint
+	if sizeConstraintInstance then
+		assert(
+			sizeConstraintInstance:IsA("UISizeConstraint"),
+			"[UIResolver] MatchFlow.Vote.SizeConstraint must be a UISizeConstraint"
+		)
+		sizeConstraint = sizeConstraintInstance
+		sizeConstraint.Name = "SizeConstraint"
+	else
+		sizeConstraint = Instance.new("UISizeConstraint")
+		sizeConstraint.Name = "SizeConstraint"
+		sizeConstraint.Parent = vote
+	end
+	sizeConstraint.MinSize = Vector2.new(280, 220)
+	sizeConstraint.MaxSize = Vector2.new(1600, 900)
+
+	local voteTitle = resolveText(vote, "Title", "PICK THE NEXT MATCH", 0.05, 0.05, 0.66, 0.11, 16, 30, 95, nil)
+	voteTitle.TextColor3 = Color3.fromRGB(255, 249, 220)
+	voteTitle.TextStrokeColor3 = Color3.fromRGB(8, 12, 30)
+	voteTitle.TextStrokeTransparency = 0.25
+	local voteSubtitle = resolveText(
+		vote,
+		"Subtitle",
+		"CHOOSE AN ARENA — ITS GAME MODE IS LOCKED IN",
+		0.05,
+		0.15,
+		0.7,
+		0.065,
+		10,
+		17,
+		95,
+		nil
+	)
+	voteSubtitle.TextColor3 = Color3.fromRGB(177, 233, 229)
+	local voteTimer =
+		resolveText(vote, "Timer", "10 SEC", 0.82, 0.055, 0.13, 0.13, 14, 25, 95, Enum.TextXAlignment.Center)
+	styleNativePanel(
+		voteTimer,
+		Color3.fromRGB(255, 153, 52),
+		Color3.fromRGB(255, 204, 79),
+		Color3.fromRGB(244, 98, 49),
+		Color3.fromRGB(16, 20, 39),
+		0.32
+	)
+	voteTimer.TextColor3 = Color3.fromRGB(255, 250, 224)
+	voteTimer.TextStrokeColor3 = Color3.fromRGB(75, 29, 25)
+	voteTimer.TextStrokeTransparency = 0.35
+
+	local options = resolveContainer(vote, "Options", 0.04, 0.27, 0.92, 0.56, 95)
+	local optionLayouts: {
+		{
+			button: TextButton,
+			previewFallback: Frame,
+			thumbnail: ImageLabel,
+			previewShade: Frame,
+			previewHint: TextLabel,
+			map: TextLabel,
+			modeBacking: Frame,
+			mode: TextLabel,
+			count: TextLabel,
+			selected: TextLabel,
+		}
+	} =
+		{}
 	for index = 1, 3 do
+		local palette = voteTheme.Options[index]
 		local existing = options:FindFirstChild(`Option{index}`)
 		local button: TextButton
 		if existing then
@@ -1756,27 +1820,244 @@ local function resolveMatchFlow(hud: ScreenGui): Frame
 			button.Name = `Option{index}`
 			button.Parent = options
 		end
-		topLeft(button, (index - 1) * 0.34, 0, 0.32, 1, 96)
+		centered(button, (index - 1) * 0.34 + 0.16, 0.5, 0.32, 1, 96)
 		button.AutoButtonColor = false
+		button.ClipsDescendants = true
 		button.Text = ""
 		styleNativePanel(
 			button,
-			Color3.fromRGB(251, 222, 160),
-			Color3.fromRGB(255, 244, 202),
-			Color3.fromRGB(235, 169, 100),
-			Color3.fromRGB(55, 37, 35),
-			0.1
+			Color3.fromRGB(253, 226, 174),
+			Color3.fromRGB(255, 245, 209),
+			Color3.fromRGB(237, 177, 105),
+			Color3.fromRGB(29, 25, 38),
+			0.065
+		)
+		local buttonOutline = button:WaitForChild("Outline") :: UIStroke
+		buttonOutline.Thickness = 3.5
+
+		local scaleInstance = button:FindFirstChild("Scale")
+		local scale: UIScale
+		if scaleInstance then
+			assert(scaleInstance:IsA("UIScale"), `[UIResolver] Option{index}.Scale must be a UIScale`)
+			scale = scaleInstance
+		else
+			scale = Instance.new("UIScale")
+			scale.Name = "Scale"
+			scale.Parent = button
+		end
+		scale.Scale = 1
+
+		local previewFallback = resolveNativePanel(
+			button,
+			"PreviewFallback",
+			0,
+			0,
+			1,
+			0.7,
+			97,
+			palette.Bottom,
+			palette.Top,
+			palette.Bottom,
+			Color3.fromRGB(29, 25, 38),
+			0
+		)
+		local fallbackOutline = previewFallback:WaitForChild("Outline") :: UIStroke
+		fallbackOutline.Transparency = 1
+
+		local thumbnailInstance = button:FindFirstChild("Thumbnail")
+		local thumbnail: ImageLabel
+		if thumbnailInstance then
+			assert(thumbnailInstance:IsA("ImageLabel"), `[UIResolver] Option{index}.Thumbnail must be an ImageLabel`)
+			thumbnail = thumbnailInstance
+		else
+			thumbnail = Instance.new("ImageLabel")
+			thumbnail.Name = "Thumbnail"
+			thumbnail.Parent = button
+		end
+		topLeft(thumbnail, 0, 0, 1, 0.7, 98)
+		thumbnail.BackgroundTransparency = 1
+		thumbnail.Image = ""
+		thumbnail.ScaleType = Enum.ScaleType.Crop
+
+		local previewShade = resolveContainer(button, "PreviewShade", 0, 0, 1, 0.7, 99)
+		previewShade.BackgroundColor3 = Color3.fromRGB(7, 10, 25)
+		previewShade.BackgroundTransparency = 0.05
+		local shadeInstance = previewShade:FindFirstChild("Fade")
+		local shade: UIGradient
+		if shadeInstance then
+			assert(shadeInstance:IsA("UIGradient"), `[UIResolver] Option{index}.PreviewShade.Fade must be a UIGradient`)
+			shade = shadeInstance
+		else
+			shade = Instance.new("UIGradient")
+			shade.Name = "Fade"
+			shade.Parent = previewShade
+		end
+		shade.Rotation = 90
+		shade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.88),
+			NumberSequenceKeypoint.new(0.55, 0.66),
+			NumberSequenceKeypoint.new(1, 0.05),
+		})
+
+		local previewHint = resolveText(
+			button,
+			"PreviewHint",
+			"MAP PREVIEW",
+			0.08,
+			0.25,
+			0.84,
+			0.16,
+			9,
+			15,
+			100,
+			Enum.TextXAlignment.Center
+		)
+		previewHint.TextColor3 = Color3.fromRGB(255, 245, 211)
+		previewHint.TextStrokeColor3 = Color3.fromRGB(17, 21, 39)
+		previewHint.TextStrokeTransparency = 0.3
+
+		local mapLabel =
+			resolveText(button, "Map", "MAP", 0.06, 0.47, 0.88, 0.18, 13, 24, 100, Enum.TextXAlignment.Left)
+		mapLabel.TextColor3 = Color3.fromRGB(255, 249, 220)
+		mapLabel.TextStrokeColor3 = Color3.fromRGB(12, 15, 29)
+		mapLabel.TextStrokeTransparency = 0.12
+
+		local modeBacking = resolveNativePanel(
+			button,
+			"ModeBacking",
+			0.05,
+			0.75,
+			0.4,
+			0.17,
+			99,
+			Color3.fromRGB(25, 165, 157),
+			Color3.fromRGB(73, 218, 207),
+			Color3.fromRGB(17, 139, 156),
+			Color3.fromRGB(45, 32, 38),
+			0.28
 		)
 		local modeLabel =
-			resolveText(button, "Mode", "MODE", 0.08, 0.08, 0.84, 0.28, 11, 20, 97, Enum.TextXAlignment.Center)
-		modeLabel.TextColor3 = PAPER_TEXT
-		local mapLabel =
-			resolveText(button, "Map", "MAP", 0.08, 0.39, 0.84, 0.22, 9, 16, 97, Enum.TextXAlignment.Center)
-		mapLabel.TextColor3 = MUTED_TEXT
+			resolveText(button, "Mode", "MODE", 0.06, 0.76, 0.38, 0.15, 10, 18, 100, Enum.TextXAlignment.Center)
+		modeLabel.TextColor3 = Color3.fromRGB(255, 252, 226)
+		modeLabel.TextStrokeColor3 = Color3.fromRGB(20, 38, 44)
+		modeLabel.TextStrokeTransparency = 0.45
+
 		local countLabel =
-			resolveText(button, "Count", "0 VOTES", 0.08, 0.69, 0.84, 0.18, 9, 15, 97, Enum.TextXAlignment.Center)
-		countLabel.TextColor3 = Color3.fromRGB(14, 126, 119)
+			resolveText(button, "Count", "BE FIRST", 0.5, 0.74, 0.45, 0.19, 9, 16, 100, Enum.TextXAlignment.Right)
+		countLabel.TextColor3 = MUTED_TEXT
+
+		local selectedLabel =
+			resolveText(button, "Selected", "YOUR PICK", 0.57, 0.04, 0.38, 0.15, 8, 14, 101, Enum.TextXAlignment.Center)
+		styleNativePanel(
+			selectedLabel,
+			voteTheme.Selected,
+			Color3.fromRGB(255, 239, 123),
+			Color3.fromRGB(255, 183, 55),
+			Color3.fromRGB(31, 26, 39),
+			0.3
+		)
+		selectedLabel.TextColor3 = Color3.fromRGB(52, 35, 29)
+		selectedLabel.Visible = false
+
+		table.insert(optionLayouts, {
+			button = button,
+			previewFallback = previewFallback,
+			thumbnail = thumbnail,
+			previewShade = previewShade,
+			previewHint = previewHint,
+			map = mapLabel,
+			modeBacking = modeBacking,
+			mode = modeLabel,
+			count = countLabel,
+			selected = selectedLabel,
+		})
 	end
+
+	local progressTrack = resolveNativePanel(
+		vote,
+		"ProgressTrack",
+		0.05,
+		0.89,
+		0.9,
+		0.035,
+		95,
+		Color3.fromRGB(8, 12, 30),
+		Color3.fromRGB(14, 19, 43),
+		Color3.fromRGB(5, 8, 22),
+		Color3.fromRGB(255, 235, 174),
+		0.45
+	)
+	local progressFill = resolveNativePanel(
+		progressTrack,
+		"ProgressFill",
+		0,
+		0,
+		1,
+		1,
+		96,
+		Color3.fromRGB(55, 223, 166),
+		Color3.fromRGB(136, 255, 168),
+		Color3.fromRGB(32, 199, 190),
+		Color3.fromRGB(14, 25, 37),
+		0.45
+	)
+	local progressOutline = progressFill:WaitForChild("Outline") :: UIStroke
+	progressOutline.Transparency = 1
+
+	local function applyVoteLayout()
+		local screenSize = hud.AbsoluteSize
+		local portrait = screenSize.Y > 0 and screenSize.X / screenSize.Y < voteTheme.PortraitThreshold
+		if portrait then
+			centered(vote, 0.5, 0.51, 0.92, 0.82, 94)
+			voteAspect.AspectRatio = voteTheme.PortraitAspect
+			topLeft(voteTitle, 0.08, 0.04, 0.62, 0.08, 95)
+			topLeft(voteSubtitle, 0.08, 0.115, 0.74, 0.055, 95)
+			topLeft(voteTimer, 0.75, 0.045, 0.17, 0.09, 95)
+			topLeft(options, 0.07, 0.21, 0.86, 0.68, 95)
+			topLeft(progressTrack, 0.08, 0.925, 0.84, 0.025, 95)
+			for index, option in optionLayouts do
+				centered(option.button, 0.5, (index - 1) * 0.34 + 0.15, 1, 0.3, 96)
+				topLeft(option.previewFallback, 0, 0, 0.42, 1, 97)
+				topLeft(option.thumbnail, 0, 0, 0.42, 1, 98)
+				topLeft(option.previewShade, 0, 0, 0.42, 1, 99)
+				topLeft(option.previewHint, 0.04, 0.35, 0.34, 0.22, 100)
+				topLeft(option.map, 0.47, 0.08, 0.47, 0.24, 100)
+				option.map.TextColor3 = PAPER_TEXT
+				option.map.TextStrokeTransparency = 1
+				topLeft(option.modeBacking, 0.47, 0.43, 0.27, 0.25, 99)
+				topLeft(option.mode, 0.48, 0.45, 0.25, 0.21, 100)
+				topLeft(option.count, 0.76, 0.44, 0.19, 0.22, 100)
+				topLeft(option.selected, 0.04, 0.72, 0.34, 0.19, 101)
+			end
+		else
+			centered(vote, 0.5, 0.52, 0.92, 0.62, 94)
+			voteAspect.AspectRatio = voteTheme.LandscapeAspect
+			topLeft(voteTitle, 0.05, 0.05, 0.66, 0.11, 95)
+			topLeft(voteSubtitle, 0.05, 0.15, 0.7, 0.065, 95)
+			topLeft(voteTimer, 0.82, 0.055, 0.13, 0.13, 95)
+			topLeft(options, 0.04, 0.27, 0.92, 0.56, 95)
+			topLeft(progressTrack, 0.05, 0.89, 0.9, 0.035, 95)
+			for index, option in optionLayouts do
+				centered(option.button, (index - 1) * 0.34 + 0.16, 0.5, 0.32, 1, 96)
+				topLeft(option.previewFallback, 0, 0, 1, 0.7, 97)
+				topLeft(option.thumbnail, 0, 0, 1, 0.7, 98)
+				topLeft(option.previewShade, 0, 0, 1, 0.7, 99)
+				topLeft(option.previewHint, 0.08, 0.25, 0.84, 0.16, 100)
+				topLeft(option.map, 0.06, 0.47, 0.88, 0.18, 100)
+				option.map.TextColor3 = Color3.fromRGB(255, 249, 220)
+				option.map.TextStrokeTransparency = 0.12
+				topLeft(option.modeBacking, 0.05, 0.75, 0.4, 0.17, 99)
+				topLeft(option.mode, 0.06, 0.76, 0.38, 0.15, 100)
+				topLeft(option.count, 0.5, 0.74, 0.45, 0.19, 100)
+				topLeft(option.selected, 0.57, 0.04, 0.38, 0.15, 101)
+			end
+		end
+	end
+	applyVoteLayout()
+	local layoutConnection = hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(applyVoteLayout)
+	table.insert(cleanups, function()
+		layoutConnection:Disconnect()
+	end)
 
 	local summary = resolveNativePanel(
 		root,

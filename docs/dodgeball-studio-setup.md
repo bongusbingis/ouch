@@ -56,7 +56,9 @@ Each enabled `Config.Maps.Pool` entry requires `ReplicatedStorage > Assets > Map
 While Studio UI authoring is unavailable, `UIResolver` builds these exact temporary trees. A Studio-authored root with the same name wins later and must provide every listed child. All positions and sizes use `UDim2` scale with anchor points matching their placement.
 
 - `StarterGui > Hud > CatchButton` (`ImageButton`): `AspectRatio` (`UIAspectRatioConstraint`), `Corner` (`UICorner`), `Outline` (`UIStroke`), `Gradient` (`UIGradient`), and `Label` (`TextLabel`).
-- `StarterGui > Hud > MatchFlow` (`Frame`): `Respawn`, `Tutorial`, and `ActionFeedback` (`TextLabel`); `CombatFeed` (`Frame`) with `Line1`–`Line3` (`TextLabel`); `Vote` (`Frame`) with `Corner`, `Outline`, `ColorWash`, `Title`, `Timer`, and `Options`; `Options` contains `Option1`–`Option3` (`TextButton`), each with `Corner`, `Outline`, `ColorWash`, `Mode`, `Map`, and `Count`; `Summary` (`Frame`) with `Corner`, `Outline`, `ColorWash`, `Title`, `Stats`, and `Rewards`.
+- `StarterGui > Hud > MatchFlow` (`Frame`): `Respawn`, `Tutorial`, and `ActionFeedback` (`TextLabel`); `CombatFeed` (`Frame`) with `Line1`–`Line3` (`TextLabel`); `Vote` (`Frame`) with `Corner`, `Outline`, `ColorWash`, `AspectRatio`, `SizeConstraint`, `Title`, `Subtitle`, `Timer`, `ProgressTrack > ProgressFill`, and `Options`. `Options` contains `Option1`–`Option3` (`TextButton`), each with `Corner`, `Outline`, `ColorWash`, `Scale`, `PreviewFallback`, `Thumbnail`, `PreviewShade > Fade`, `PreviewHint`, `ModeBacking`, `Mode`, `Map`, `Count`, and `Selected`. `Summary` (`Frame`) contains `Corner`, `Outline`, `ColorWash`, `Title`, `Stats`, and `Rewards`.
+
+Map vote previews read `Config.Maps.Pool[*].Thumbnail`. Use a landscape image asset ID; the card uses `ScaleType.Crop` to preserve its aspect ratio without stretching. An empty thumbnail intentionally shows the configured candy-gradient fallback.
 
 ## Verification
 
@@ -67,7 +69,7 @@ While Studio UI authoring is unavailable, `UIResolver` builds these exact tempor
 5. Complete a match and verify that participants remain in the arena for Results, then move to `Workspace > Lobby` for Intermission before the arena clone is destroyed.
 6. Join with a new client during Intermission and verify that the new arrival is not teleported to the lobby.
 7. Verify Starting counts down for 3 seconds without accepting held combat inputs; then test Throw and Catch on mouse/keyboard, touch, and gamepad.
-8. During Intermission, vote from multiple clients and confirm counts, selection color, server tie handling, and the winning compatible mode/map pair.
+8. During Intermission, vote from multiple clients and confirm counts, selection color, server tie handling, and the winning compatible mode/map pair. Resize the vote live at 16:9, 21:9, 4:3 tablet, and 9:19.5 portrait; cards must remain centered in landscape, switch to rows in portrait, and keep every label inside its card.
 9. Verify FFA respawns in 1 second and TDM uses the displayed 4.5-second wave deadline. Confirm neither respawn creates a new ball, while a late join receives exactly one.
 10. Drop every match ball below the map RecoveryY and confirm the same instances return across BallSpawns without changing the total count.
 11. Score a dodgeball elimination and verify one splat burst plus the `Splat` sound at the impact point, colored to the thrower's equipped ball skin (default skin → rubber red), identical on every client. Repeat under the latency settings from step 4: exactly one splat, and exactly one hammer squash on hammer hits.

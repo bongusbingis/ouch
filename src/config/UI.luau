@@ -91,5 +91,35 @@ return {
 				Blue = Color3.fromRGB(72, 166, 255),
 			},
 		},
+		MatchVote = {
+			PortraitThreshold = 0.94,
+			LandscapeAspect = 2.18,
+			PortraitAspect = 0.78,
+			Options = {
+				{
+					Top = Color3.fromRGB(255, 103, 155),
+					Bottom = Color3.fromRGB(204, 36, 113),
+				},
+				{
+					Top = Color3.fromRGB(97, 222, 255),
+					Bottom = Color3.fromRGB(31, 121, 218),
+				},
+				{
+					Top = Color3.fromRGB(186, 255, 93),
+					Bottom = Color3.fromRGB(62, 184, 100),
+				},
+			},
+			Modes = {
+				FFA = {
+					Top = Color3.fromRGB(255, 103, 135),
+					Bottom = Color3.fromRGB(219, 39, 89),
+				},
+				TDM = {
+					Top = Color3.fromRGB(73, 218, 207),
+					Bottom = Color3.fromRGB(17, 139, 156),
+				},
+			},
+			Selected = Color3.fromRGB(255, 218, 82),
+		},
 	},
 }

@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Maps = require(Config:WaitForChild("Maps"))
 local DataConfig = require(Config:WaitForChild("Data"))
+local UIConfig = require(Config:WaitForChild("UI"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local PlayerIds = require(Shared:WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds"))
@@ -24,6 +25,14 @@ type VoteOption = {
 	map: TextLabel,
 	count: TextLabel,
 	gradient: UIGradient,
+	outline: UIStroke,
+	scale: UIScale,
+	thumbnail: ImageLabel,
+	previewFallback: Frame,
+	previewHint: TextLabel,
+	modeBacking: Frame,
+	modeGradient: UIGradient,
+	selected: TextLabel,
 }
 
 type FlowRefs = {
@@ -32,6 +41,7 @@ type FlowRefs = {
 	feed: { TextLabel },
 	vote: Frame,
 	voteTimer: TextLabel,
+	voteProgress: Frame,
 	options: { VoteOption },
 	summary: Frame,
 	summaryTitle: TextLabel,
@@ -85,6 +95,14 @@ local function resolveFlow(hud: Instance): FlowRefs
 			map = childOfClass(button, "Map", "TextLabel") :: TextLabel,
 			count = childOfClass(button, "Count", "TextLabel") :: TextLabel,
 			gradient = gradient,
+			outline = childOfClass(button, "Outline", "UIStroke") :: UIStroke,
+			scale = childOfClass(button, "Scale", "UIScale") :: UIScale,
+			thumbnail = childOfClass(button, "Thumbnail", "ImageLabel") :: ImageLabel,
+			previewFallback = childOfClass(button, "PreviewFallback", "Frame") :: Frame,
+			previewHint = childOfClass(button, "PreviewHint", "TextLabel") :: TextLabel,
+			modeBacking = childOfClass(button, "ModeBacking", "Frame") :: Frame,
+			modeGradient = childOfClass(childOfClass(button, "ModeBacking", "Frame"), "ColorWash", "UIGradient") :: UIGradient,
+			selected = childOfClass(button, "Selected", "TextLabel") :: TextLabel,
 		})
 	end
 	local feedRoot = childOfClass(root, "CombatFeed", "Frame") :: Frame
@@ -99,6 +117,7 @@ local function resolveFlow(hud: Instance): FlowRefs
 		feed = feed,
 		vote = vote,
 		voteTimer = childOfClass(vote, "Timer", "TextLabel") :: TextLabel,
+		voteProgress = childOfClass(childOfClass(vote, "ProgressTrack", "Frame"), "ProgressFill", "Frame") :: Frame,
 		options = options,
 		summary = summary,
 		summaryTitle = childOfClass(summary, "Title", "TextLabel") :: TextLabel,
@@ -120,13 +139,13 @@ local function displayName(playerId: string?): string
 	return if player then player.DisplayName else playerId
 end
 
-local function mapName(mapId: string): string
+local function mapEntry(mapId: string): Maps.MapEntry?
 	for _, entry in Maps.Pool do
 		if entry.Id == mapId then
-			return entry.DisplayName
+			return entry
 		end
 	end
-	return mapId
+	return nil
 end
 
 local function winnerText(winnerId: string): string
@@ -176,13 +195,32 @@ function MatchHud.start()
 			local mapId = (matchState:GetAttribute(`Vote{index}MapId`) :: string?) or ""
 			local count = (matchState:GetAttribute(`Vote{index}Count`) :: number?) or 0
 			local candidateMode = ModeRegistry.get(modeId)
-			option.button.Visible = modeId ~= "" and mapId ~= ""
-			option.mode.Text = if candidateMode then string.upper(candidateMode.displayName) else modeId
-			option.map.Text = mapName(mapId)
-			option.count.Text = if count == 1 then "1 VOTE" else `{count} VOTES`
-			option.gradient.Color = if selected == index
+			local candidateMap = mapEntry(mapId)
+			local available = candidateMode ~= nil and candidateMap ~= nil
+			local thumbnail = if candidateMap then candidateMap.Thumbnail else ""
+			local isSelected = selected == index
+			option.button.Visible = available
+			option.button.Active = available
+			option.button.Selectable = available
+			option.mode.Text = string.upper(modeId)
+			option.map.Text = if candidateMap then candidateMap.DisplayName else mapId
+			option.count.Text = if count == 0 then "BE FIRST" else if count == 1 then "1 VOTE" else `{count} VOTES`
+			option.thumbnail.Image = thumbnail
+			option.thumbnail.Visible = thumbnail ~= ""
+			option.previewFallback.Visible = thumbnail == ""
+			option.previewHint.Visible = thumbnail == ""
+			option.selected.Visible = isSelected
+			option.scale.Scale = if isSelected then 1.025 else 1
+			option.outline.Color = if isSelected then UIConfig.Hud.MatchVote.Selected else Color3.fromRGB(29, 25, 38)
+			option.outline.Thickness = if isSelected then 5 else 3.5
+			option.gradient.Color = if isSelected
 				then ColorSequence.new(Color3.fromRGB(205, 255, 172), Color3.fromRGB(75, 211, 147))
-				else ColorSequence.new(Color3.fromRGB(255, 244, 202), Color3.fromRGB(235, 169, 100))
+				else ColorSequence.new(Color3.fromRGB(255, 245, 209), Color3.fromRGB(237, 177, 105))
+			local modeTheme = UIConfig.Hud.MatchVote.Modes[modeId]
+			if modeTheme then
+				option.modeBacking.BackgroundColor3 = modeTheme.Bottom
+				option.modeGradient.Color = ColorSequence.new(modeTheme.Top, modeTheme.Bottom)
+			end
 		end
 	end
 
@@ -274,7 +312,9 @@ function MatchHud.start()
 
 		if flow.vote.Visible then
 			local voteEndsAt = (matchState:GetAttribute("voteEndsAt") :: number?) or 0
-			flow.voteTimer.Text = tostring(math.max(math.ceil(voteEndsAt - Workspace:GetServerTimeNow()), 0))
+			local voteRemaining = math.max(voteEndsAt - Workspace:GetServerTimeNow(), 0)
+			flow.voteTimer.Text = `{math.ceil(voteRemaining)} SEC`
+			flow.voteProgress.Size = UDim2.fromScale(math.clamp(voteRemaining / Maps.Voting.DurationSeconds, 0, 1), 1)
 		end
 
 		local now = os.clock()
