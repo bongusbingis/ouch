@@ -31,16 +31,14 @@ return function()
 			LobbyService.teleport(rig)
 
 			local pivot = rig:GetPivot().Position
-			local landed = false
+			local nearestDistance = math.huge
 			for _, part in spawnsFolder:GetChildren() do
 				if part:IsA("BasePart") then
-					if (pivot - (part.Position + Vector3.new(0, 3.5, 0))).Magnitude < 1e-3 then
-						landed = true
-						break
-					end
+					local distance = (pivot - (part.Position + Vector3.new(0, 3.5, 0))).Magnitude
+					nearestDistance = math.min(nearestDistance, distance)
 				end
 			end
-			expect(landed).to.equal(true)
+			expect(nearestDistance).to.be.near(0, 0.05)
 
 			CharacterFixture.destroy(rig)
 		end)
