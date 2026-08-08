@@ -66,6 +66,42 @@ return {
 				Padding = { x = 10, y = 4 },
 			},
 		},
+		StoreOffer = {
+			Palettes = {
+				GamePass = {
+					Background = Color3.fromRGB(107, 60, 176),
+					Top = Color3.fromRGB(206, 111, 242),
+					Bottom = Color3.fromRGB(82, 45, 158),
+					Accent = Color3.fromRGB(255, 112, 188),
+					Icon = Color3.fromRGB(69, 40, 126),
+					Button = { r = 0.98, g = 0.35, b = 0.62 },
+				},
+				Cash = {
+					Background = Color3.fromRGB(234, 169, 49),
+					Top = Color3.fromRGB(255, 228, 106),
+					Bottom = Color3.fromRGB(239, 126, 53),
+					Accent = Color3.fromRGB(48, 209, 187),
+					Icon = Color3.fromRGB(191, 108, 32),
+					Button = { r = 0.16, g = 0.72, b = 0.55 },
+				},
+				Crate = {
+					Background = Color3.fromRGB(220, 86, 129),
+					Top = Color3.fromRGB(255, 145, 176),
+					Bottom = Color3.fromRGB(173, 50, 115),
+					Accent = Color3.fromRGB(255, 211, 85),
+					Icon = Color3.fromRGB(132, 47, 104),
+					Button = { r = 0.93, g = 0.55, b = 0.15 },
+				},
+				SeasonPass = {
+					Background = Color3.fromRGB(45, 137, 192),
+					Top = Color3.fromRGB(88, 218, 229),
+					Bottom = Color3.fromRGB(39, 91, 174),
+					Accent = Color3.fromRGB(184, 255, 93),
+					Icon = Color3.fromRGB(27, 82, 142),
+					Button = { r = 0.22, g = 0.66, b = 0.92 },
+				},
+			},
+		},
 	},
 
 	Menus = {

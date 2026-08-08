@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
+local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
 local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
 local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
@@ -20,6 +21,8 @@ local AnalyticsService = require(script.Parent.AnalyticsService)
 -- future, and evicting a receipt would make that retry re-grant for free.
 
 local MonetizationService = {}
+
+local started = false
 
 local handlers: { [string]: (player: Player, def: any) -> boolean } = {
 	Crate = function(player, def)
@@ -84,6 +87,19 @@ function MonetizationService.registerHandler(productType: string, handler: (play
 end
 
 function MonetizationService.start()
+	if started then
+		return
+	end
+	started = true
+	for productId, definition in Products.ById do
+		assert(
+			handlers[definition.Type] ~= nil,
+			`[Monetization] product {productId} has unsupported type "{definition.Type}"`
+		)
+		if definition.Type == "Crate" then
+			assert(Crates[definition.CrateId] ~= nil, `[Monetization] product {productId} references an unknown crate`)
+		end
+	end
 	MarketplaceService.ProcessReceipt = processReceipt
 end
 

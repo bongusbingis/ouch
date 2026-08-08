@@ -15,6 +15,8 @@ type StartOptions = {
 	crateElement: any?,
 	crates: any?,
 	cosmetics: any?,
+	products: any?,
+	paidRandomPolicy: any?,
 	holder: ScrollingFrame?,
 	featuredMount: Frame?,
 	cashLabel: TextLabel?,
@@ -35,6 +37,7 @@ local activeMenuManager: any = nil
 local activeCrateElement: any = CrateCardElement
 local activeCrates: any = nil
 local activeCosmetics: any = nil
+local activePaidRandomPolicy: any = nil
 local function runAsyncDefault(callback: () -> ())
 	if task then
 		task.spawn(callback)
@@ -49,7 +52,9 @@ local busy: { [string]: boolean } = {}
 local viewOpen = false
 local storeDisconnect: (() -> ())? = nil
 local menuDisconnect: (() -> ())? = nil
+local policyDisconnect: (() -> ())? = nil
 local statusMessage = "Economy data is loading."
+local paidRandomAllowed = true
 
 local function replicatedStorage(): ReplicatedStorage
 	return game:GetService("ReplicatedStorage")
@@ -65,6 +70,14 @@ end
 
 local function resolveCosmetics(): any
 	return require(replicatedStorage():WaitForChild("Config"):WaitForChild("Cosmetics"))
+end
+
+local function resolveProducts(): any
+	return require(replicatedStorage():WaitForChild("Config"):WaitForChild("Products"))
+end
+
+local function resolvePaidRandomPolicy(): any
+	return require(script.Parent.PaidRandomPolicyStore)
 end
 
 local function resolveMenuManager(): any
@@ -159,6 +172,10 @@ local function errorMessage(reason: any): string
 		return "Economy data is still loading."
 	elseif reason == "invalid_crate" then
 		return "This crate is unavailable."
+	elseif reason == "paid_random_restricted" then
+		return "Random crates are unavailable in your region."
+	elseif reason == "policy_unavailable" then
+		return "Crate eligibility could not be verified. Please try again."
 	end
 	return `Open failed: {tostring(reason or "unknown error")}`
 end
@@ -166,7 +183,10 @@ end
 local render: () -> ()
 
 local function openCrate(crateId: string)
-	if busy[crateId] then
+	if busy[crateId] or not paidRandomAllowed then
+		if not paidRandomAllowed then
+			setStatus("Random crates are unavailable in your region.")
+		end
 		return
 	end
 	busy[crateId] = true
@@ -201,7 +221,9 @@ render = function()
 		return
 	end
 	if statusMessage == "Economy data is loading." then
-		setStatus("Select a crate to open.")
+		setStatus(
+			if paidRandomAllowed then "Select a crate to open." else "Random crates are unavailable in your region."
+		)
 	end
 
 	local ids = sortedCrateIds()
@@ -224,7 +246,7 @@ render = function()
 				highlight = presentation.highlight,
 				odds = presentation.odds,
 				actionText = if busy[crateId] then "Opening..." else actionText,
-				actionEnabled = price ~= nil and not busy[crateId],
+				actionEnabled = price ~= nil and not busy[crateId] and paidRandomAllowed,
 				layoutOrder = order,
 				featured = isFeatured,
 			},
@@ -259,6 +281,28 @@ function ShopController.start(options: StartOptions?)
 	activeCrates = if options and options.crates then options.crates else resolveCrates()
 	activeCosmetics = if options and options.cosmetics then options.cosmetics else resolveCosmetics()
 	activeRunAsync = if options and options.runAsync then options.runAsync else runAsyncDefault
+	local products = if options then options.products or { Catalog = {} } else resolveProducts()
+	local hasPaidCash = false
+	for _, definition in products.Catalog do
+		if definition.Enabled and definition.Type == "Cash" then
+			hasPaidCash = true
+			break
+		end
+	end
+	if hasPaidCash then
+		activePaidRandomPolicy = if options and options.paidRandomPolicy
+			then options.paidRandomPolicy
+			else resolvePaidRandomPolicy()
+		activePaidRandomPolicy.start()
+		paidRandomAllowed = activePaidRandomPolicy.snapshot() == true
+		policyDisconnect = activePaidRandomPolicy.onChanged(function(allowed)
+			paidRandomAllowed = allowed
+			if not allowed then
+				setStatus("Random crates are unavailable in your region.")
+			end
+			render()
+		end)
+	end
 
 	if options and options.holder and options.cashLabel and options.statusLabel then
 		holder = options.holder
@@ -292,6 +336,9 @@ function ShopController._resetForTest()
 	if menuDisconnect then
 		menuDisconnect()
 	end
+	if policyDisconnect then
+		policyDisconnect()
+	end
 	destroyItems()
 	started = false
 	holder = nil
@@ -304,13 +351,16 @@ function ShopController._resetForTest()
 	activeCrateElement = CrateCardElement
 	activeCrates = nil
 	activeCosmetics = nil
+	activePaidRandomPolicy = nil
 	activeRunAsync = runAsyncDefault
 	currentData = nil
 	table.clear(busy)
 	viewOpen = false
 	storeDisconnect = nil
 	menuDisconnect = nil
+	policyDisconnect = nil
 	statusMessage = "Economy data is loading."
+	paidRandomAllowed = true
 end
 
 return ShopController

@@ -19,6 +19,7 @@ local SETTINGS_IMAGE = "rbxassetid://84958958438571"
 local NOTIFICATION_IMAGE = "rbxassetid://128975504294668"
 local LEADERBOARD_ROW_IMAGE = "rbxassetid://139613458882714"
 local ECONOMY_CARD_ASPECT = 2.08
+local STORE_OFFER_CARD_ASPECT = 2.05
 local SHOP_ASPECT = 1.4415
 local INVENTORY_NATIVE_ASPECT = 4 / 3
 local INVENTORY_ART_ASPECT = 1612 / 1142
@@ -480,6 +481,44 @@ local function resolveCrateShelf(parent: Instance, x: number, y: number, width: 
 	return holder
 end
 
+local function resolveOfferShelf(parent: Instance, x: number, y: number, width: number, height: number): ScrollingFrame
+	local existing = parent:FindFirstChild("OffersHolder")
+	local holder: ScrollingFrame
+	if existing then
+		assert(existing:IsA("ScrollingFrame"), `[UIResolver] {parent.Name}.OffersHolder must be a ScrollingFrame`)
+		holder = existing
+	else
+		holder = Instance.new("ScrollingFrame")
+		holder.Name = "OffersHolder"
+		holder.Parent = parent
+	end
+	styleScroll(holder, x, y, width, height)
+	holder.AutomaticCanvasSize = Enum.AutomaticSize.X
+	holder.ScrollingDirection = Enum.ScrollingDirection.X
+	holder.ScrollBarThickness = 3
+
+	local existingLayout = holder:FindFirstChild("OfferShelf") or holder:FindFirstChildWhichIsA("UIListLayout")
+	local layout: UIListLayout
+	if existingLayout then
+		assert(
+			existingLayout:IsA("UIListLayout"),
+			`[UIResolver] {parent.Name}.OffersHolder.OfferShelf must be a UIListLayout`
+		)
+		layout = existingLayout
+		layout.Name = "OfferShelf"
+	else
+		layout = Instance.new("UIListLayout")
+		layout.Name = "OfferShelf"
+		layout.Parent = holder
+	end
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	layout.Padding = UDim.new(0.025, 0)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	return holder
+end
+
 local function styleMenuRoot(view: CanvasGroup, ratio: number)
 	view.AnchorPoint = Vector2.new(0.5, 0.5)
 	view.BackgroundTransparency = 1
@@ -762,6 +801,93 @@ local function resolveCrateCardTemplate(templates: Instance): CanvasGroup
 	return card
 end
 
+local function populateStoreOfferCard(card: CanvasGroup)
+	card.AnchorPoint = Vector2.zero
+	card.BackgroundTransparency = 0.02
+	card.BorderSizePixel = 0
+	card.ClipsDescendants = false
+	card.GroupTransparency = 0
+	card.Position = UDim2.fromScale(0, 0)
+	card.Size = UDim2.fromScale(0.62, 0.92)
+	card.ZIndex = 13
+	card.Visible = false
+	ensureAspect(card, STORE_OFFER_CARD_ASPECT)
+	styleNativePanel(
+		card,
+		Color3.fromRGB(107, 60, 176),
+		Color3.fromRGB(206, 111, 242),
+		Color3.fromRGB(82, 45, 158),
+		Color3.fromRGB(60, 35, 68),
+		0.13
+	)
+
+	resolveAccent(card, "Accent", Color3.fromRGB(255, 112, 188), 0.025, 0.1, 0.018, 0.8)
+	local iconWell = resolveNativePanel(
+		card,
+		"IconWell",
+		0.07,
+		0.15,
+		0.24,
+		0.7,
+		14,
+		Color3.fromRGB(69, 40, 126),
+		Color3.fromRGB(110, 63, 172),
+		Color3.fromRGB(50, 31, 104),
+		Color3.fromRGB(48, 29, 55),
+		0.2
+	)
+	ensureAspect(iconWell, 1)
+	local icon = resolveImage(iconWell, "Icon", "", 1, 0.08, 0.08, 0.84, 0.84, 16, nil)
+	icon.ScaleType = Enum.ScaleType.Fit
+	local glyph = resolveText(card, "Glyph", "★", 0.08, 0.24, 0.22, 0.45, 18, 34, 16, Enum.TextXAlignment.Center)
+	glyph.TextColor3 = Color3.fromRGB(255, 242, 182)
+
+	local badgeChip = resolveNativePanel(
+		card,
+		"BadgeChip",
+		0.35,
+		0.1,
+		0.34,
+		0.17,
+		14,
+		Color3.fromRGB(255, 112, 188),
+		Color3.fromRGB(255, 154, 207),
+		Color3.fromRGB(225, 65, 153),
+		Color3.fromRGB(67, 39, 65),
+		0.45
+	)
+	badgeChip.BackgroundTransparency = 0.02
+	local badge =
+		resolveText(card, "Badge", "PERMANENT PASS", 0.36, 0.11, 0.32, 0.15, 8, 12, 15, Enum.TextXAlignment.Center)
+	badge.TextColor3 = Color3.fromRGB(255, 249, 221)
+	local title = resolveText(card, "ItemName", "Offer", 0.35, 0.27, 0.6, 0.22, 11, 21, 14, nil)
+	title.TextColor3 = Color3.fromRGB(255, 249, 226)
+	local details = resolveText(card, "Details", "Offer details", 0.35, 0.47, 0.59, 0.2, 8, 14, 14, nil)
+	details.TextColor3 = Color3.fromRGB(255, 228, 238)
+
+	local actionMount = resolveContainer(card, "ActionMount", 0.62, 0.7, 0.34, 0.24, 14)
+	actionMount.BackgroundTransparency = 1
+end
+
+-- FindFirstChild is deliberate: this temporary Instance.new exception was
+-- directed by the user while Studio is unavailable. The replacement is an
+-- Assets.UI.Templates.StoreOfferCard CanvasGroup with Accent, IconWell/Icon,
+-- Glyph, BadgeChip, Badge, ItemName, Details, ActionMount, and style children.
+local function resolveStoreOfferCardTemplate(templates: Instance): CanvasGroup
+	local authored = templates:FindFirstChild("StoreOfferCard")
+	local card: CanvasGroup
+	if authored then
+		assert(authored:IsA("CanvasGroup"), "[UIResolver] Assets.UI.Templates.StoreOfferCard must be a CanvasGroup")
+		card = authored
+	else
+		card = Instance.new("CanvasGroup")
+		card.Name = "StoreOfferCard"
+		card.Parent = templates
+	end
+	populateStoreOfferCard(card)
+	return card
+end
+
 local function resolveInventoryTab(parent: Instance, name: string, labelText: string, order: number): TextButton
 	local existing = parent:FindFirstChild(name)
 	local button: TextButton
@@ -862,6 +988,9 @@ local function populateShop(view: CanvasGroup)
 	resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil)
 	hideLegacyGui(view, "StatusPlate")
 	hideLegacyGui(view, "CashPlate")
+	hideLegacyGui(view, "PassTeaser")
+	hideLegacyGui(view, "PassTitle")
+	hideLegacyGui(view, "PassStatus")
 	resolveNativePanel(
 		view,
 		"StatusCard",
@@ -880,9 +1009,9 @@ local function populateShop(view: CanvasGroup)
 	resolveNativePanel(
 		view,
 		"CashCard",
-		0.67,
+		0.62,
 		0.19,
-		0.22,
+		0.29,
 		0.13,
 		11,
 		Color3.fromRGB(255, 204, 65),
@@ -943,42 +1072,14 @@ local function populateShop(view: CanvasGroup)
 	local shelfTitle = resolveText(view, "ShelfTitle", "MORE CRATES", 0.1, 0.71, 0.46, 0.05, 9, 14, 13, nil)
 	shelfTitle.TextColor3 = Color3.fromRGB(255, 235, 218)
 	resolveCrateShelf(view, 0.09, 0.765, 0.5, 0.14)
-
-	local passTeaser = resolveNativePanel(
-		view,
-		"PassTeaser",
-		0.62,
-		0.71,
-		0.29,
-		0.195,
-		12,
-		Color3.fromRGB(46, 177, 202),
-		Color3.fromRGB(96, 227, 231),
-		Color3.fromRGB(44, 126, 192),
-		Color3.fromRGB(47, 45, 72),
-		0.16
-	)
-	passTeaser.BackgroundTransparency = 0.03
-	local passTitle =
-		resolveText(view, "PassTitle", "GAME PASSES", 0.65, 0.735, 0.23, 0.065, 10, 17, 13, Enum.TextXAlignment.Center)
-	passTitle.TextColor3 = Color3.fromRGB(31, 45, 63)
-	local passStatus = resolveText(
-		view,
-		"PassStatus",
-		"NEW COLLECTIONS\nCOMING SOON",
-		0.65,
-		0.8,
-		0.23,
-		0.08,
-		8,
-		13,
-		13,
-		Enum.TextXAlignment.Center
-	)
-	passStatus.TextColor3 = Color3.fromRGB(39, 55, 71)
+	local offerTitle = resolveText(view, "OfferTitle", "ROBUX SHOP", 0.61, 0.71, 0.29, 0.05, 9, 14, 13, nil)
+	offerTitle.TextColor3 = Color3.fromRGB(255, 235, 218)
+	resolveOfferShelf(view, 0.59, 0.765, 0.32, 0.14)
 	local cash =
-		resolveText(view, "Cash", "Cash: loading", 0.69, 0.212, 0.18, 0.078, 12, 20, 12, Enum.TextXAlignment.Center)
+		resolveText(view, "Cash", "Cash: loading", 0.64, 0.212, 0.15, 0.078, 12, 20, 12, Enum.TextXAlignment.Center)
 	cash.TextColor3 = Color3.fromRGB(48, 32, 20)
+	local cashActionMount = resolveContainer(view, "CashActionMount", 0.8, 0.207, 0.09, 0.09, 12)
+	cashActionMount.BackgroundTransparency = 1
 	resolveText(
 		view,
 		"Status",
@@ -998,8 +1099,8 @@ end
 -- directed by the user while Studio is unavailable. The replacement is a
 -- MainGui.BaseClip.Views.Shop CanvasGroup with Background, StatusCard,
 -- StatusAccent, CashCard, ContentWell, PromoStrip, PromoTitle, PromoDetail,
--- FeaturedMount, ShelfTitle, Holder/Shelf, PassTeaser, PassTitle, PassStatus,
--- Cash, and Status.
+-- FeaturedMount, ShelfTitle, Holder/Shelf, OfferTitle,
+-- OffersHolder/OfferShelf, CashActionMount, Cash, and Status.
 local function resolveShopView(views: Instance): CanvasGroup
 	local authored = views:FindFirstChild("Shop")
 	local view: CanvasGroup
@@ -2099,6 +2200,7 @@ function UIResolver.mount()
 	resolveButtonTemplate(templates)
 	resolveEconomyItemTemplate(templates)
 	resolveCrateCardTemplate(templates)
+	resolveStoreOfferCardTemplate(templates)
 	resolveNotificationTemplate(templates)
 	resolveLeaderboardRowTemplate(templates)
 	resolveShopView(views)

@@ -113,4 +113,26 @@ export type CrateCardHandle = ElementHandle & {
 	setData: (self: CrateCardHandle, data: CrateCardData) -> (),
 }
 
+export type StoreOfferCardData = {
+	id: string,
+	title: string,
+	details: string,
+	badge: string,
+	image: string,
+	style: string,
+	actionText: string,
+	actionEnabled: boolean,
+	layoutOrder: number,
+}
+
+export type StoreOfferCardProps = {
+	data: StoreOfferCardData,
+	activated: ((offerId: string) -> ())?,
+}
+
+export type StoreOfferCardHandle = ElementHandle & {
+	instance: GuiObject,
+	setData: (self: StoreOfferCardHandle, data: StoreOfferCardData) -> (),
+}
+
 return {}

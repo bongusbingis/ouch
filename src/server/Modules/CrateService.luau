@@ -12,6 +12,7 @@ local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitFor
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
+local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
 
 -- Crate opening: Cash path via the OpenCrate remote, Robux path via
 -- MonetizationService receipts. Both share one roll-and-grant routine; every
@@ -82,6 +83,11 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 	if crate == nil or crate.CashPrice == nil then
 		logCrateFailure(player, "invalid_crate")
 		return nil, "invalid_crate"
+	end
+	local policyAllowed, policyReason = PaidRandomPolicyService.canOpenCashCrate(player)
+	if not policyAllowed then
+		logCrateFailure(player, policyReason or "paid_random_restricted")
+		return nil, policyReason
 	end
 	local data = PlayerData.get(player)
 	if data == nil then

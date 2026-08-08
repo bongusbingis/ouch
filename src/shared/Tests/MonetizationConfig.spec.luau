@@ -10,6 +10,7 @@ T.describe("MonetizationConfig", function()
 		for _, definition in Products.Catalog do
 			T.expect(definition.Enabled):toEqual(false)
 			T.expect(definition.Id):toBeNil()
+			T.expect(type(definition.DisplayOrder)):toEqual("number")
 		end
 	end)
 
@@ -24,6 +25,7 @@ T.describe("MonetizationConfig", function()
 			T.expect(definition.Enabled):toEqual(false)
 			T.expect(definition.Id):toBeNil()
 			T.expect(#definition.EntitlementItemIds):toEqual(0)
+			T.expect(type(definition.DisplayOrder)):toEqual("number")
 			T.expect(definition.SuggestedRobuxMin <= definition.SuggestedRobuxMax):toBeTruthy()
 		end
 	end)
