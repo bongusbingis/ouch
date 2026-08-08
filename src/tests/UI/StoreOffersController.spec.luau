@@ -179,10 +179,11 @@ return function()
 			expect(cards[2].props.data.actionText).to.equal("R$ 79")
 			cards[1].props.activated(cards[1].props.data.id)
 			cards[2].props.activated(cards[2].props.data.id)
-			expect(prompts).to.equal({
-				{ kind = "GamePass", id = 101 },
-				{ kind = "Product", id = 202 },
-			})
+			expect(#prompts).to.equal(2)
+			expect(prompts[1].kind).to.equal("GamePass")
+			expect(prompts[1].id).to.equal(101)
+			expect(prompts[2].kind).to.equal("Product")
+			expect(prompts[2].id).to.equal(202)
 		end)
 	end)
 end
