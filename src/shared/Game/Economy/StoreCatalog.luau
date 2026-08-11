@@ -1,14 +1,16 @@
 --!strict
 
--- Produces the deterministic client storefront projection from enabled
--- game-pass and developer-product definitions.
+-- Produces the deterministic storefront projection. Preview offers remain
+-- visible with no platform id; Hidden offers are omitted.
 
 export type OfferKind = "GamePass" | "Product"
+export type CatalogStatus = "Preview" | "Active"
 
 export type StoreOffer = {
 	key: string,
-	id: number,
+	id: number?,
 	kind: OfferKind,
+	status: CatalogStatus,
 	displayName: string,
 	description: string,
 	displayOrder: number,
@@ -17,13 +19,22 @@ export type StoreOffer = {
 
 local StoreCatalog = {}
 
-local function appendEnabled(target: { StoreOffer }, catalog: { [string]: any }, kind: OfferKind)
+local function statusFor(definition: any): string
+	if definition.CatalogStatus ~= nil then
+		return definition.CatalogStatus
+	end
+	return if definition.Enabled == true then "Active" else "Hidden"
+end
+
+local function appendVisible(target: { StoreOffer }, catalog: { [string]: any }, kind: OfferKind)
 	for key, definition in catalog do
-		if definition.Enabled and type(definition.Id) == "number" then
+		local status = statusFor(definition)
+		if status ~= "Hidden" then
 			table.insert(target, {
 				key = key,
-				id = definition.Id,
+				id = if type(definition.Id) == "number" then definition.Id else nil,
 				kind = kind,
+				status = status,
 				displayName = definition.DisplayName,
 				description = definition.Description,
 				displayOrder = definition.DisplayOrder,
@@ -35,8 +46,8 @@ end
 
 function StoreCatalog.build(gamePassCatalog: { [string]: any }, productCatalog: { [string]: any }): { StoreOffer }
 	local offers: { StoreOffer } = {}
-	appendEnabled(offers, gamePassCatalog, "GamePass")
-	appendEnabled(offers, productCatalog, "Product")
+	appendVisible(offers, gamePassCatalog, "GamePass")
+	appendVisible(offers, productCatalog, "Product")
 	table.sort(offers, function(left, right)
 		if left.displayOrder ~= right.displayOrder then
 			return left.displayOrder < right.displayOrder

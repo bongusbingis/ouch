@@ -272,7 +272,11 @@ local function handleReport(player: Player, payload: { [string]: any })
 	if route.funnel and route.step and route.stepName then
 		AnalyticsService.logFunnelStep(player, route.funnel, route.step, route.stepName)
 	elseif route.customEventName then
-		AnalyticsService.logCustomEvent(player, route.customEventName, 1, { menuId = payload.menuId })
+		AnalyticsService.logCustomEvent(player, route.customEventName, 1, {
+			menuId = payload.menuId,
+			offerKey = payload.offerKey,
+			offerKind = payload.offerKind,
+		})
 	end
 end
 

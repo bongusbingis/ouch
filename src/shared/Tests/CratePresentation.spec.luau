@@ -26,12 +26,13 @@ T.describe("CratePresentation", function()
 			},
 		})
 
-		T.expect(result.odds):toEqual("ODDS  COMMON 70%  •  RARE 24%  •  LEGENDARY 6%")
-		T.expect(result.highlight):toEqual("CHASE: Solar Flare  •  LEGENDARY")
+		T.expect(result.odds):toEqual("ODDS  COMMON 70%  |  RARE 24%  |  LEGENDARY 6%")
+		T.expect(result.highlight):toEqual("CHASE: Solar Flare  |  LEGENDARY")
 		T.expect(result.rarityCount):toEqual(3)
+		T.expect(#result.outcomes):toEqual(3)
 	end)
 
-	T.it("normalizes a single available rarity to one hundred percent", function()
+	T.it("normalizes per-item probabilities to one hundred percent", function()
 		local result = CratePresentation.forCrate({ ItemPool = { "Red", "Blue" } }, {
 			Rarities = RARITIES,
 			Items = {
@@ -41,7 +42,9 @@ T.describe("CratePresentation", function()
 		})
 
 		T.expect(result.odds):toEqual("ODDS  COMMON 100%")
-		T.expect(result.highlight):toEqual("2 COLOR DROPS  •  Blue Ball")
+		T.expect(result.highlight):toEqual("2 COLOR DROPS  |  Blue Ball")
+		T.expect(result.outcomes[1].probability):toBeNear(0.5, 0.0001)
+		T.expect(result.outcomes[2].probability):toBeNear(0.5, 0.0001)
 	end)
 end)
 

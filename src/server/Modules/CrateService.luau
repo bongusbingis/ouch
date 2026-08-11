@@ -1,5 +1,6 @@
 --!strict
 
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
@@ -14,15 +15,16 @@ local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
 
--- Crate opening: Cash path via the OpenCrate remote, Robux path via
--- MonetizationService receipts. Both share one roll-and-grant routine; every
--- open fires CrateOpened to the buyer.
+-- Owns both crate payment paths and emits one identified result payload for
+-- client reveal deduplication.
 
 local CrateService = {}
 
 local rng = Random.new()
 
 type OpenResult = {
+	openId: string,
+	source: string,
 	crateId: string,
 	itemId: string,
 	rarity: string,
@@ -30,7 +32,7 @@ type OpenResult = {
 	cashRefund: number,
 }
 
-local function rollAndGrant(player: Player, crateId: string): OpenResult?
+local function rollAndGrant(player: Player, crateId: string, source: string, openId: string): OpenResult?
 	local crate = Crates[crateId]
 	local data = PlayerData.get(player)
 	if crate == nil or data == nil then
@@ -53,11 +55,13 @@ local function rollAndGrant(player: Player, crateId: string): OpenResult?
 		CosmeticsService.grant(player, result.itemId)
 		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
 			itemId = result.itemId,
-			source = "Crate",
+			source = source,
 		})
 	end
 
 	local payload: OpenResult = {
+		openId = openId,
+		source = source,
 		crateId = crateId,
 		itemId = result.itemId,
 		rarity = result.rarity,
@@ -68,6 +72,7 @@ local function rollAndGrant(player: Player, crateId: string): OpenResult?
 	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
 		crateId = crateId,
 		rarity = result.rarity,
+		source = source,
 		isDupe = result.isDupe,
 	})
 	Network.fire("CrateOpened", player, payload)
@@ -102,11 +107,11 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 	local steps = AnalyticsConfig.ShopFunnelSteps.Attempted
 	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
 		crateId = crateId,
+		source = "Cash",
 	})
 
-	-- Roll before charging: a misconfigured crate pool (e.g. all-zero-weight)
-	-- asserts inside CrateRolls, and that must not cost the player cash.
-	local ok, result = pcall(rollAndGrant, player, crateId)
+	local openId = HttpService:GenerateGUID(false)
+	local ok, result = pcall(rollAndGrant, player, crateId, "Cash", openId)
 	if not ok then
 		warn(`[CrateService] rollAndGrant failed for crate "{crateId}": {result}`)
 		logCrateFailure(player, "crate_roll_failed")
@@ -130,15 +135,15 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 	return result, nil
 end
 
-function CrateService.openFromReceipt(player: Player, crateId: string): boolean
-	return rollAndGrant(player, crateId) ~= nil
+function CrateService.openFromReceipt(player: Player, crateId: string, purchaseId: string): boolean
+	return rollAndGrant(player, crateId, "Robux", purchaseId) ~= nil
 end
 
 function CrateService.openForTesting(player: Player, crateId: string): (OpenResult?, string?)
 	if Crates[crateId] == nil then
 		return nil, "invalid_crate"
 	end
-	local result = rollAndGrant(player, crateId)
+	local result = rollAndGrant(player, crateId, "Testing", "test-open")
 	return result, if result then nil else "no_profile"
 end
 

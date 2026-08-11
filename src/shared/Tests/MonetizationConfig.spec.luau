@@ -5,35 +5,42 @@ local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
 local Products = require(script.Parent.Parent.Parent.Config.Products)
 
 T.describe("MonetizationConfig", function()
-	T.it("keeps developer-product stubs out of receipt processing", function()
+	T.it("keeps preview products visible but out of receipt processing", function()
 		T.expect(next(Products.ById)):toBeNil()
-		for _, definition in Products.Catalog do
-			T.expect(definition.Enabled):toEqual(false)
-			T.expect(definition.Id):toBeNil()
-			T.expect(type(definition.DisplayOrder)):toEqual("number")
+		T.expect(Products.Catalog.Cash500.CashAmount):toEqual(500)
+		T.expect(Products.Catalog.Cash1100.CashAmount):toEqual(1100)
+		T.expect(Products.Catalog.Cash2500.CashAmount):toEqual(2500)
+		T.expect(Products.Catalog.Cash5500.CashAmount):toEqual(5500)
+		T.expect(Products.Catalog.BallCrateOpen.SuggestedRobux):toEqual(39)
+		T.expect(Products.Catalog.TrailCrateOpen.SuggestedRobux):toEqual(79)
+		for key, definition in Products.Catalog do
+			if key ~= "SeasonalBattlePass" then
+				T.expect(definition.CatalogStatus):toEqual("Preview")
+				T.expect(definition.Id):toBeNil()
+			end
 		end
 	end)
 
-	T.it("keeps GDD game-pass stubs disabled until entitlements exist", function()
+	T.it("configures permanent pass previews without inventing missing assets", function()
 		T.expect(next(GamePasses.ById)):toBeNil()
-		T.expect(GamePasses.Catalog.HammerCosmetics.SuggestedRobuxMin):toEqual(150)
-		T.expect(GamePasses.Catalog.DodgeballEffects.SuggestedRobuxMax):toEqual(250)
-		T.expect(GamePasses.Catalog.CharacterCostumes.SuggestedRobuxMax):toEqual(600)
-		T.expect(GamePasses.Catalog.EliminationEmotes.SuggestedRobuxMin):toEqual(75)
-
+		T.expect(GamePasses.Catalog.HammerCosmetics.SuggestedRobux):toEqual(249)
+		T.expect(GamePasses.Catalog.DodgeballEffects.SuggestedRobux):toEqual(149)
+		T.expect(GamePasses.Catalog.CharacterCostumes.SuggestedRobux):toEqual(399)
+		T.expect(GamePasses.Catalog.EliminationEmotes.SuggestedRobux):toEqual(99)
+		T.expect(#GamePasses.Catalog.DodgeballEffects.EntitlementItemIds):toEqual(5)
+		T.expect(#GamePasses.Catalog.HammerCosmetics.EntitlementItemIds):toEqual(0)
+		T.expect(#GamePasses.Catalog.CharacterCostumes.EntitlementItemIds):toEqual(0)
+		T.expect(#GamePasses.Catalog.EliminationEmotes.EntitlementItemIds):toEqual(0)
 		for _, definition in GamePasses.Catalog do
-			T.expect(definition.Enabled):toEqual(false)
+			T.expect(definition.CatalogStatus):toEqual("Preview")
 			T.expect(definition.Id):toBeNil()
-			T.expect(#definition.EntitlementItemIds):toEqual(0)
-			T.expect(type(definition.DisplayOrder)):toEqual("number")
-			T.expect(definition.SuggestedRobuxMin <= definition.SuggestedRobuxMax):toBeTruthy()
 		end
 	end)
 
-	T.it("models the resetting battle pass as a developer product", function()
+	T.it("keeps the seasonal battle pass hidden", function()
 		local battlePass = Products.Catalog.SeasonalBattlePass
 		T.expect(battlePass.Type):toEqual("SeasonPass")
-		T.expect(battlePass.SuggestedRobux):toEqual(799)
+		T.expect(battlePass.CatalogStatus):toEqual("Hidden")
 		T.expect(GamePasses.Catalog.SeasonalBattlePass):toBeNil()
 	end)
 end)

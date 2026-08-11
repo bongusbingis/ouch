@@ -26,6 +26,11 @@ local Analytics = {
 		CratePurchaseFailed = "CratePurchaseFailed",
 		SessionEnded = "SessionEnded",
 		MenuOpened = "MenuOpened",
+		ShopSectionViewed = "ShopSectionViewed",
+		ShopOfferSelected = "ShopOfferSelected",
+		ShopPromptOpened = "ShopPromptOpened",
+		ShopPromptClosed = "ShopPromptClosed",
+		ShopPurchaseFailed = "ShopPurchaseFailed",
 	},
 
 	-- Match Enum.AnalyticsEconomyTransactionType names exactly.

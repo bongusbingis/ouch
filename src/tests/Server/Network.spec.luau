@@ -15,6 +15,7 @@ local EXPECTED_REMOTES = {
 	EquipCosmetic = "RemoteFunction",
 	OpenCrate = "RemoteFunction",
 	CrateOpened = "RemoteEvent",
+	StorePurchaseGranted = "RemoteEvent",
 	ReportDeviceClass = "RemoteEvent",
 	SubmitMatchVote = "RemoteEvent",
 	CombatFeed = "RemoteEvent",

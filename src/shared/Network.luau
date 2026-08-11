@@ -18,6 +18,7 @@ local definitions = {
 	EquipCosmetic = "function",
 	OpenCrate = "function",
 	CrateOpened = "event",
+	StorePurchaseGranted = "event",
 	ReportDeviceClass = "event",
 	SubmitMatchVote = "event",
 	CombatFeed = "event",

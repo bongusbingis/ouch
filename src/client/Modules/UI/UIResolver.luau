@@ -765,27 +765,25 @@ local function populateCrateCard(card: CanvasGroup)
 	resolveText(card, "ItemName", "Crate", 0.245, 0.25, 0.43, 0.22, 13, 24, 14, nil)
 	local highlight = resolveText(card, "Highlight", "Featured cosmetic", 0.245, 0.47, 0.44, 0.17, 9, 15, 14, nil)
 	highlight.TextColor3 = Color3.fromRGB(106, 53, 57)
-	local odds = resolveText(card, "Odds", "Odds", 0.245, 0.67, 0.49, 0.17, 8, 13, 14, nil)
+	local odds = resolveText(card, "Odds", "Odds", 0.245, 0.67, 0.45, 0.17, 8, 13, 14, nil)
 	odds.TextColor3 = Color3.fromRGB(92, 57, 57)
 
-	local existingMount = card:FindFirstChild("ActionMount")
-	local actionMount: Frame
-	if existingMount then
-		assert(existingMount:IsA("Frame"), "[UIResolver] CrateCard.ActionMount must be a Frame")
-		actionMount = existingMount
-	else
-		actionMount = Instance.new("Frame")
-		actionMount.Name = "ActionMount"
-		actionMount.Parent = card
+	for _, definition in
+		{
+			{ name = "CashActionMount", y = 0.12, height = 0.25 },
+			{ name = "RobuxActionMount", y = 0.39, height = 0.25 },
+			{ name = "DetailsActionMount", y = 0.69, height = 0.2 },
+		}
+	do
+		local mount = resolveContainer(card, definition.name, 0.72, definition.y, 0.255, definition.height, 14)
+		mount.BackgroundTransparency = 1
 	end
-	actionMount.BackgroundTransparency = 1
-	topLeft(actionMount, 0.72, 0.27, 0.25, 0.48, 14)
+	hideLegacyGui(card, "ActionMount")
 end
 
 -- FindFirstChild is deliberate: this temporary Instance.new exception was
 -- directed by the user while Studio is unavailable. The replacement is an
--- Assets.UI.Templates.CrateCard CanvasGroup with Preview/CrateBody/CrateLid,
--- Glyph, PreviewLabel, BadgeChip, Badge, ItemName, Highlight, Odds, and ActionMount.
+-- Assets.UI.Templates.CrateCard CanvasGroup with its preview, copy, and three action mounts.
 local function resolveCrateCardTemplate(templates: Instance): CanvasGroup
 	local authored = templates:FindFirstChild("CrateCard")
 	local card: CanvasGroup
@@ -865,7 +863,7 @@ local function populateStoreOfferCard(card: CanvasGroup)
 	local details = resolveText(card, "Details", "Offer details", 0.35, 0.47, 0.59, 0.2, 8, 14, 14, nil)
 	details.TextColor3 = Color3.fromRGB(255, 228, 238)
 
-	local actionMount = resolveContainer(card, "ActionMount", 0.62, 0.7, 0.34, 0.24, 14)
+	local actionMount = resolveContainer(card, "ActionMount", 0.59, 0.64, 0.37, 0.3, 14)
 	actionMount.BackgroundTransparency = 1
 end
 
@@ -981,126 +979,421 @@ end
 
 local function populateShop(view: CanvasGroup)
 	styleMenuRoot(view, SHOP_ASPECT)
-	local legacyTitle = view:FindFirstChild("Title")
-	if legacyTitle and legacyTitle:IsA("GuiObject") then
-		legacyTitle.Visible = false
+	local aspect = view:FindFirstChild("AspectRatio")
+	if aspect then
+		aspect:Destroy()
 	end
-	resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil)
-	hideLegacyGui(view, "StatusPlate")
-	hideLegacyGui(view, "CashPlate")
-	hideLegacyGui(view, "PassTeaser")
-	hideLegacyGui(view, "PassTitle")
-	hideLegacyGui(view, "PassStatus")
-	resolveNativePanel(
+	view.ClipsDescendants = true
+
+	for _, name in
+		{
+			"Title",
+			"StatusPlate",
+			"CashPlate",
+			"PassTeaser",
+			"PassTitle",
+			"PassStatus",
+			"StatusCard",
+			"StatusAccent",
+			"CashCard",
+			"ContentWell",
+			"PromoStrip",
+			"PromoTitle",
+			"PromoDetail",
+			"FeaturedMount",
+			"ShelfTitle",
+			"Holder",
+			"OfferTitle",
+			"OffersHolder",
+			"CashActionMount",
+			"Cash",
+			"Status",
+		}
+	do
+		hideLegacyGui(view, name)
+	end
+
+	local background = resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil)
+	local backgroundAspect = background:FindFirstChild("AspectRatio")
+	if backgroundAspect then
+		backgroundAspect:Destroy()
+	end
+	background.ScaleType = Enum.ScaleType.Stretch
+
+	local header = resolveNativePanel(
 		view,
-		"StatusCard",
-		0.09,
-		0.2,
-		0.44,
-		0.12,
+		"ShopHeader",
+		0.035,
+		0.035,
+		0.93,
+		0.235,
 		11,
 		Color3.fromRGB(255, 238, 220),
-		Color3.fromRGB(255, 249, 235),
-		Color3.fromRGB(255, 204, 198),
+		Color3.fromRGB(255, 250, 235),
+		Color3.fromRGB(255, 191, 204),
 		Color3.fromRGB(92, 43, 52),
-		0.28
+		0.08
 	)
-	resolveAccent(view, "StatusAccent", Color3.fromRGB(255, 75, 153), 0.112, 0.228, 0.012, 0.06)
-	resolveNativePanel(
-		view,
+	local title = resolveText(header, "ShopTitle", "SPLAT SHOP", 0.025, 0.08, 0.25, 0.34, 16, 30, 13, nil)
+	title.TextColor3 = Color3.fromRGB(91, 31, 65)
+	local status = resolveText(header, "Status", "Economy data is loading.", 0.025, 0.4, 0.53, 0.18, 9, 15, 13, nil)
+	status.TextColor3 = MUTED_TEXT
+	local cashCard = resolveNativePanel(
+		header,
 		"CashCard",
-		0.62,
-		0.19,
-		0.29,
-		0.13,
-		11,
+		0.6,
+		0.07,
+		0.28,
+		0.42,
+		12,
 		Color3.fromRGB(255, 204, 65),
-		Color3.fromRGB(255, 231, 120),
+		Color3.fromRGB(255, 235, 128),
 		Color3.fromRGB(244, 168, 49),
 		Color3.fromRGB(80, 46, 35),
 		0.28
 	)
-	local contentWell = resolveNativePanel(
-		view,
-		"ContentWell",
-		0.065,
-		0.34,
-		0.87,
-		0.59,
-		11,
-		Color3.fromRGB(171, 19, 89),
-		Color3.fromRGB(255, 100, 178),
-		Color3.fromRGB(140, 10, 75),
-		Color3.fromRGB(255, 188, 224),
+	local cash =
+		resolveText(cashCard, "Cash", "Cash: loading", 0.06, 0.08, 0.88, 0.84, 12, 21, 14, Enum.TextXAlignment.Center)
+	cash.TextColor3 = Color3.fromRGB(48, 32, 20)
+
+	local close = header:FindFirstChild("Close")
+	if close == nil then
+		close = Instance.new("TextButton")
+		close.Name = "Close"
+		close.Parent = header
+	end
+	assert(close:IsA("TextButton"), "[UIResolver] ShopHeader.Close must be a TextButton")
+	close.AutoButtonColor = true
+	close.BackgroundColor3 = Color3.fromRGB(220, 67, 112)
+	close.BorderSizePixel = 0
+	close.FontFace = uiConfig().Text.DefaultFont
+	close.Text = "X"
+	close.TextColor3 = Color3.fromRGB(255, 249, 226)
+	close.TextScaled = true
+	topLeft(close, 0.905, 0.07, 0.07, 0.42, 14)
+	styleNativePanel(
+		close,
+		Color3.fromRGB(220, 67, 112),
+		Color3.fromRGB(255, 114, 158),
+		Color3.fromRGB(190, 44, 94),
+		Color3.fromRGB(88, 38, 53),
+		0.3
+	)
+	local closeSize = close:FindFirstChild("TouchSize")
+	if closeSize == nil then
+		closeSize = Instance.new("UISizeConstraint")
+		closeSize.Name = "TouchSize"
+		closeSize.Parent = close
+	end
+	assert(closeSize:IsA("UISizeConstraint"), "[UIResolver] ShopHeader.Close.TouchSize must be a UISizeConstraint")
+	closeSize.MinSize = Vector2.new(44, 44)
+
+	local tabs = resolveContainer(header, "JumpTabs", 0.025, 0.62, 0.95, 0.34, 13)
+	local tabLayout = tabs:FindFirstChild("Layout")
+	if tabLayout == nil then
+		tabLayout = Instance.new("UIListLayout")
+		tabLayout.Name = "Layout"
+		tabLayout.Parent = tabs
+	end
+	assert(tabLayout:IsA("UIListLayout"), "[UIResolver] ShopHeader.JumpTabs.Layout must be a UIListLayout")
+	tabLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	tabLayout.Padding = UDim.new(0.012, 0)
+	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+	for order, definition in
+		{
+			{ name = "FeaturedTab", text = "FEATURED" },
+			{ name = "CratesTab", text = "CRATES" },
+			{ name = "CashTab", text = "CASH" },
+			{ name = "PassesTab", text = "PASSES" },
+		}
+	do
+		local button = tabs:FindFirstChild(definition.name)
+		if button == nil then
+			button = Instance.new("TextButton")
+			button.Name = definition.name
+			button.Parent = tabs
+		end
+		assert(button:IsA("TextButton"), `[UIResolver] ShopHeader.JumpTabs.{definition.name} must be a TextButton`)
+		button.AutoButtonColor = true
+		button.BackgroundColor3 = Color3.fromRGB(120, 65, 174)
+		button.BorderSizePixel = 0
+		button.FontFace = uiConfig().Text.DefaultFont
+		button.LayoutOrder = order
+		button.Size = UDim2.fromScale(0.235, 1)
+		button.Text = definition.text
+		button.TextColor3 = Color3.fromRGB(255, 246, 224)
+		button.TextScaled = true
+		button.Visible = true
+		button.ZIndex = 14
+		styleNativePanel(
+			button,
+			Color3.fromRGB(120, 65, 174),
+			Color3.fromRGB(190, 104, 222),
+			Color3.fromRGB(86, 48, 148),
+			Color3.fromRGB(74, 38, 77),
+			0.28
+		)
+		local touchSize = button:FindFirstChild("TouchSize")
+		if touchSize == nil then
+			touchSize = Instance.new("UISizeConstraint")
+			touchSize.Name = "TouchSize"
+			touchSize.Parent = button
+		end
+		assert(
+			touchSize:IsA("UISizeConstraint"),
+			`[UIResolver] ShopHeader.JumpTabs.{definition.name}.TouchSize must be a UISizeConstraint`
+		)
+		touchSize.MinSize = Vector2.new(88, 44)
+	end
+
+	local storefrontInstance = view:FindFirstChild("Storefront")
+	local storefront: ScrollingFrame
+	if storefrontInstance then
+		assert(storefrontInstance:IsA("ScrollingFrame"), "[UIResolver] Shop.Storefront must be a ScrollingFrame")
+		storefront = storefrontInstance
+	else
+		storefront = Instance.new("ScrollingFrame")
+		storefront.Name = "Storefront"
+		storefront.Parent = view
+	end
+	styleScroll(storefront, 0.035, 0.285, 0.93, 0.68)
+	storefront.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	storefront.CanvasSize = UDim2.fromOffset(0, 0)
+	storefront.ScrollBarThickness = 7
+	local storefrontLayout = storefront:FindFirstChild("Layout")
+	if storefrontLayout == nil then
+		storefrontLayout = Instance.new("UIListLayout")
+		storefrontLayout.Name = "Layout"
+		storefrontLayout.Parent = storefront
+	end
+	assert(storefrontLayout:IsA("UIListLayout"), "[UIResolver] Shop.Storefront.Layout must be a UIListLayout")
+	storefrontLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	storefrontLayout.Padding = UDim.new(0, 12)
+	storefrontLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	local function section(name: string, labelText: string, order: number, topColor: Color3, bottomColor: Color3): Frame
+		local frame = resolveNativePanel(
+			storefront,
+			name,
+			0,
+			0,
+			0.98,
+			0,
+			12,
+			bottomColor,
+			topColor,
+			bottomColor,
+			Color3.fromRGB(255, 205, 226),
+			0.04
+		)
+		frame.LayoutOrder = order
+		frame.Size = UDim2.new(0.98, 0, 0, 240)
+		local label = resolveText(frame, "SectionTitle", labelText, 0.025, 0.025, 0.7, 0, 13, 23, 14, nil)
+		label.Size = UDim2.new(0.7, 0, 0, 38)
+		label.TextColor3 = Color3.fromRGB(255, 247, 224)
+		return frame
+	end
+
+	local function gridHolder(parent: Frame, name: string): (Frame, UIGridLayout)
+		local holder = resolveContainer(parent, name, 0.025, 0, 0.95, 0, 13)
+		holder.Position = UDim2.new(0.025, 0, 0, 54)
+		holder.Size = UDim2.new(0.95, 0, 1, -68)
+		local grid = holder:FindFirstChild("Grid")
+		if grid == nil then
+			grid = Instance.new("UIGridLayout")
+			grid.Name = "Grid"
+			grid.Parent = holder
+		end
+		assert(grid:IsA("UIGridLayout"), `[UIResolver] {parent.Name}.{name}.Grid must be a UIGridLayout`)
+		grid.FillDirection = Enum.FillDirection.Horizontal
+		grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		grid.SortOrder = Enum.SortOrder.LayoutOrder
+		grid.StartCorner = Enum.StartCorner.TopLeft
+		grid.VerticalAlignment = Enum.VerticalAlignment.Top
+		return holder, grid
+	end
+
+	local featuredSection =
+		section("FeaturedSection", "FEATURED DROP", 10, Color3.fromRGB(249, 103, 173), Color3.fromRGB(145, 28, 103))
+	local featuredMount = resolveContainer(featuredSection, "FeaturedMount", 0.025, 0, 0.95, 0, 13)
+	featuredMount.Position = UDim2.new(0.025, 0, 0, 54)
+	featuredMount.Size = UDim2.new(0.95, 0, 1, -68)
+
+	local cratesSection = section(
+		"CratesSection",
+		"CRATES - EARN OR BUY",
+		20,
+		Color3.fromRGB(245, 116, 173),
+		Color3.fromRGB(153, 40, 103)
+	)
+	local cratesHolder, cratesGrid = gridHolder(cratesSection, "CratesHolder")
+
+	local cashSection =
+		section("CashSection", "CASH TOP-UPS", 30, Color3.fromRGB(245, 181, 62), Color3.fromRGB(183, 88, 47))
+	local cashOffersHolder, cashGrid = gridHolder(cashSection, "CashOffersHolder")
+
+	local passesSection =
+		section("PassesSection", "PERMANENT PASSES", 40, Color3.fromRGB(166, 85, 217), Color3.fromRGB(75, 43, 145))
+	local passesHolder, passesGrid = gridHolder(passesSection, "PassesHolder")
+
+	local function refreshSections()
+		local width = storefront.AbsoluteSize.X * 0.93
+		if width <= 0 then
+			width = 800
+		end
+		local columns = if width >= 900 then 3 else 2
+		local gap = 12
+		local offerWidth = math.max(180, math.floor((width - gap * (columns - 1)) / columns))
+		local offerHeight = math.max(150, math.floor(offerWidth / STORE_OFFER_CARD_ASPECT))
+		local offerRows = math.ceil(4 / columns)
+		local offerSectionHeight = 68 + offerRows * offerHeight + (offerRows - 1) * gap
+		cashSection.Size = UDim2.new(0.98, 0, 0, offerSectionHeight)
+		passesSection.Size = UDim2.new(0.98, 0, 0, offerSectionHeight)
+		cashGrid.CellPadding = UDim2.fromOffset(gap, gap)
+		cashGrid.CellSize = UDim2.fromOffset(offerWidth, offerHeight)
+		passesGrid.CellPadding = UDim2.fromOffset(gap, gap)
+		passesGrid.CellSize = UDim2.fromOffset(offerWidth, offerHeight)
+
+		local crateColumns = 2
+		local crateWidth = math.max(250, math.floor((width - gap) / crateColumns))
+		local crateHeight = math.clamp(math.floor(crateWidth / 2.45), 190, 230)
+		cratesSection.Size = UDim2.new(0.98, 0, 0, 68 + crateHeight)
+		cratesGrid.CellPadding = UDim2.fromOffset(gap, gap)
+		cratesGrid.CellSize = UDim2.fromOffset(crateWidth, crateHeight)
+		featuredSection.Size = UDim2.new(0.98, 0, 0, math.clamp(crateHeight + 68, 250, 310))
+	end
+	refreshSections()
+	local sectionConnection = storefront:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshSections)
+	table.insert(cleanups, function()
+		sectionConnection:Disconnect()
+	end)
+
+	local function overlay(name: string): CanvasGroup
+		local existing = view:FindFirstChild(name)
+		local group: CanvasGroup
+		if existing then
+			assert(existing:IsA("CanvasGroup"), `[UIResolver] Shop.{name} must be a CanvasGroup`)
+			group = existing
+		else
+			group = Instance.new("CanvasGroup")
+			group.Name = name
+			group.Parent = view
+		end
+		group.AnchorPoint = Vector2.zero
+		group.Active = true
+		group.BackgroundColor3 = Color3.fromRGB(42, 20, 45)
+		group.BackgroundTransparency = 0.18
+		group.BorderSizePixel = 0
+		group.ClipsDescendants = true
+		group.GroupTransparency = 0
+		group.Position = UDim2.fromScale(0, 0)
+		group.Size = UDim2.fromScale(1, 1)
+		group.Visible = false
+		group.ZIndex = 50
+		return group
+	end
+
+	local details = overlay("DetailsOverlay")
+	local detailsPanel = resolveNativePanel(
+		details,
+		"Panel",
+		0.5,
+		0.5,
+		0.72,
+		0.82,
+		52,
+		Color3.fromRGB(255, 238, 211),
+		Color3.fromRGB(255, 250, 230),
+		Color3.fromRGB(255, 195, 172),
+		Color3.fromRGB(82, 42, 54),
+		0.06
+	)
+	centered(detailsPanel, 0.5, 0.5, 0.72, 0.82, 52)
+	local detailsTitle = resolveText(detailsPanel, "Title", "CRATE DETAILS", 0.045, 0.04, 0.72, 0.1, 15, 27, 53, nil)
+	detailsTitle.TextColor3 = Color3.fromRGB(87, 34, 59)
+	local detailsSummary = resolveText(detailsPanel, "Summary", "", 0.045, 0.14, 0.91, 0.1, 10, 16, 53, nil)
+	detailsSummary.TextColor3 = MUTED_TEXT
+
+	local oddsListInstance = detailsPanel:FindFirstChild("OddsList")
+	local oddsList: ScrollingFrame
+	if oddsListInstance then
+		assert(
+			oddsListInstance:IsA("ScrollingFrame"),
+			"[UIResolver] DetailsOverlay.Panel.OddsList must be a ScrollingFrame"
+		)
+		oddsList = oddsListInstance
+	else
+		oddsList = Instance.new("ScrollingFrame")
+		oddsList.Name = "OddsList"
+		oddsList.Parent = detailsPanel
+	end
+	styleScroll(oddsList, 0.045, 0.27, 0.91, 0.48)
+	oddsList.ZIndex = 53
+	oddsList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	oddsList.ScrollBarThickness = 6
+	local outcomeText = resolveText(oddsList, "OutcomeText", "", 0, 0, 0.96, 0, 10, 16, 54, nil)
+	outcomeText.AutomaticSize = Enum.AutomaticSize.Y
+	outcomeText.Position = UDim2.fromOffset(0, 0)
+	outcomeText.Size = UDim2.fromScale(0.96, 0)
+	outcomeText.TextYAlignment = Enum.TextYAlignment.Top
+
+	resolveContainer(detailsPanel, "ConfirmMount", 0.51, 0.8, 0.43, 0.13, 53)
+	resolveContainer(detailsPanel, "CancelMount", 0.06, 0.8, 0.32, 0.13, 53)
+
+	local reveal = overlay("RevealOverlay")
+	local revealPanel = resolveNativePanel(
+		reveal,
+		"Panel",
+		0.5,
+		0.5,
+		0.58,
+		0.68,
+		52,
+		Color3.fromRGB(111, 55, 178),
+		Color3.fromRGB(225, 119, 246),
+		Color3.fromRGB(77, 43, 151),
+		Color3.fromRGB(255, 205, 228),
 		0.07
 	)
-	contentWell.BackgroundTransparency = 0.42
-	local promo = resolveNativePanel(
-		view,
-		"PromoStrip",
-		0.09,
-		0.355,
-		0.82,
-		0.1,
-		12,
-		Color3.fromRGB(105, 51, 151),
-		Color3.fromRGB(183, 93, 220),
-		Color3.fromRGB(75, 38, 132),
-		Color3.fromRGB(255, 188, 224),
-		0.18
-	)
-	promo.BackgroundTransparency = 0.05
-	local promoTitle = resolveText(view, "PromoTitle", "FRESH DROPS", 0.115, 0.372, 0.25, 0.065, 11, 20, 13, nil)
-	promoTitle.TextColor3 = Color3.fromRGB(255, 248, 219)
-	local promoDetail = resolveText(
-		view,
-		"PromoDetail",
-		"COSMETICS ONLY  •  NO GAMEPLAY ADVANTAGE",
-		0.36,
-		0.372,
-		0.52,
-		0.065,
-		8,
-		14,
-		13,
-		Enum.TextXAlignment.Right
-	)
-	promoDetail.TextColor3 = Color3.fromRGB(255, 226, 242)
+	centered(revealPanel, 0.5, 0.5, 0.58, 0.68, 52)
+	local revealGlyph =
+		resolveText(revealPanel, "Glyph", "?", 0.35, 0.08, 0.3, 0.32, 28, 64, 54, Enum.TextXAlignment.Center)
+	revealGlyph.TextColor3 = Color3.fromRGB(255, 225, 96)
+	local revealTitle =
+		resolveText(revealPanel, "Title", "OPENING...", 0.08, 0.42, 0.84, 0.14, 16, 30, 54, Enum.TextXAlignment.Center)
+	revealTitle.TextColor3 = Color3.fromRGB(255, 249, 221)
+	local revealDetails =
+		resolveText(revealPanel, "Details", "", 0.1, 0.56, 0.8, 0.12, 10, 18, 54, Enum.TextXAlignment.Center)
+	revealDetails.TextColor3 = Color3.fromRGB(255, 222, 240)
+	resolveContainer(revealPanel, "ActionMount", 0.29, 0.76, 0.42, 0.14, 54)
 
-	local featuredMount = resolveContainer(view, "FeaturedMount", 0.09, 0.475, 0.82, 0.22, 12)
-	featuredMount.ClipsDescendants = false
-	local shelfTitle = resolveText(view, "ShelfTitle", "MORE CRATES", 0.1, 0.71, 0.46, 0.05, 9, 14, 13, nil)
-	shelfTitle.TextColor3 = Color3.fromRGB(255, 235, 218)
-	resolveCrateShelf(view, 0.09, 0.765, 0.5, 0.14)
-	local offerTitle = resolveText(view, "OfferTitle", "ROBUX SHOP", 0.61, 0.71, 0.29, 0.05, 9, 14, 13, nil)
-	offerTitle.TextColor3 = Color3.fromRGB(255, 235, 218)
-	resolveOfferShelf(view, 0.59, 0.765, 0.32, 0.14)
-	local cash =
-		resolveText(view, "Cash", "Cash: loading", 0.64, 0.212, 0.15, 0.078, 12, 20, 12, Enum.TextXAlignment.Center)
-	cash.TextColor3 = Color3.fromRGB(48, 32, 20)
-	local cashActionMount = resolveContainer(view, "CashActionMount", 0.8, 0.207, 0.09, 0.09, 12)
-	cashActionMount.BackgroundTransparency = 1
-	resolveText(
-		view,
-		"Status",
-		"Economy data is loading.",
-		0.145,
-		0.215,
-		0.34,
-		0.078,
-		10,
-		17,
-		12,
-		Enum.TextXAlignment.Center
-	)
+	local boundsParent = view.Parent
+	while boundsParent and not boundsParent:IsA("GuiObject") do
+		boundsParent = boundsParent.Parent
+	end
+	local function refreshRoot()
+		if boundsParent then
+			local size = (boundsParent :: GuiObject).AbsoluteSize
+			local compact = size.X < 900 or size.Y < 520
+			view.Size = if compact then UDim2.fromScale(0.97, 0.92) else UDim2.fromScale(0.9, 0.88)
+		end
+	end
+	refreshRoot()
+	if boundsParent then
+		local rootConnection = (boundsParent :: GuiObject):GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshRoot)
+		table.insert(cleanups, function()
+			rootConnection:Disconnect()
+		end)
+	end
 end
 
 -- FindFirstChild is deliberate: this temporary Instance.new exception was
 -- directed by the user while Studio is unavailable. The replacement is a
--- MainGui.BaseClip.Views.Shop CanvasGroup with Background, StatusCard,
--- StatusAccent, CashCard, ContentWell, PromoStrip, PromoTitle, PromoDetail,
--- FeaturedMount, ShelfTitle, Holder/Shelf, OfferTitle,
--- OffersHolder/OfferShelf, CashActionMount, Cash, and Status.
+-- MainGui.BaseClip.Views.Shop CanvasGroup with its sticky header, vertical storefront sections,
+-- responsive card grids, details disclosure, and reveal overlays.
 local function resolveShopView(views: Instance): CanvasGroup
 	local authored = views:FindFirstChild("Shop")
 	local view: CanvasGroup

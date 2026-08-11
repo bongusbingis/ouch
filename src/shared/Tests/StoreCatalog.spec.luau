@@ -67,6 +67,28 @@ T.describe("StoreCatalog", function()
 		T.expect(offers[2].key):toEqual("Beta")
 		T.expect(offers[3].key):toEqual("Product")
 	end)
+	T.it("keeps previews visible without ids and omits hidden offers", function()
+		local offers = StoreCatalog.build({
+			PreviewPass = {
+				Id = nil,
+				CatalogStatus = "Preview",
+				DisplayName = "Preview",
+				Description = "Preview",
+				DisplayOrder = 1,
+			},
+			HiddenPass = {
+				Id = nil,
+				CatalogStatus = "Hidden",
+				DisplayName = "Hidden",
+				Description = "Hidden",
+				DisplayOrder = 2,
+			},
+		}, {})
+		T.expect(#offers):toEqual(1)
+		T.expect(offers[1].key):toEqual("PreviewPass")
+		T.expect(offers[1].status):toEqual("Preview")
+		T.expect(offers[1].id):toBeNil()
+	end)
 end)
 
 return true

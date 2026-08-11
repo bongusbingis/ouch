@@ -6,11 +6,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GamePasses"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 
--- Reconciles permanent platform pass ownership into idempotent cosmetic
--- grants. Roblox owns pass state; profile Cosmetics.Owned owns granted items.
+-- Reconciles permanent platform pass ownership into idempotent cosmetic grants.
 
 type StartOptions = {
 	marketplace: any?,
@@ -19,6 +19,7 @@ type StartOptions = {
 	cosmeticsService: any?,
 	gamePasses: any?,
 	cosmetics: any?,
+	network: any?,
 	runAsync: ((callback: () -> ()) -> ())?,
 	wait: ((seconds: number) -> ())?,
 }
@@ -36,9 +37,18 @@ local activePlayerData: any = PlayerData
 local activeCosmeticsService: any = CosmeticsService
 local activeGamePasses: any = GamePasses
 local activeCosmetics: any = Cosmetics
+local activeNetwork: any = Network
 local activeRunAsync: (callback: () -> ()) -> () = task.spawn
 local activeWait: (seconds: number) -> () = task.wait
 local connections: { any } = {}
+local purchaseNotifications = setmetatable({}, { __mode = "k" }) :: { [Player]: { [number]: boolean } }
+
+local function isActive(definition: any): boolean
+	if definition.CatalogStatus ~= nil then
+		return definition.CatalogStatus == "Active"
+	end
+	return definition.Enabled == true
+end
 
 local function sortedPassIds(): { number }
 	local ids = {}
@@ -51,7 +61,7 @@ end
 
 local function validateCatalog()
 	for key, definition in activeGamePasses.Catalog do
-		if definition.Enabled then
+		if isActive(definition) then
 			local allowedCategories = {}
 			for _, category in definition.Categories do
 				allowedCategories[category] = true
@@ -93,23 +103,27 @@ local function ownsPass(player: Player, passId: number): boolean?
 	return owned == true
 end
 
-local function grantConfiguredPass(player: Player, passId: number): boolean
+local function grantConfiguredPass(player: Player, passId: number): (boolean, number)
 	local definition = activeGamePasses.ById[passId]
 	if definition == nil or activePlayerData.get(player) == nil then
-		return false
+		return false, 0
 	end
+	local granted = 0
 	for _, itemId in definition.EntitlementItemIds do
-		activeCosmeticsService.grant(player, itemId)
+		if activeCosmeticsService.grant(player, itemId) then
+			granted += 1
+		end
 	end
-	return true
+	return true, granted
 end
 
-local function reconcilePass(player: Player, passId: number): boolean?
+local function reconcilePass(player: Player, passId: number): (boolean?, number)
 	local owned = ownsPass(player, passId)
 	if owned ~= true then
-		return owned
+		return owned, 0
 	end
-	return if grantConfiguredPass(player, passId) then true else nil
+	local granted, count = grantConfiguredPass(player, passId)
+	return if granted then true else nil, count
 end
 
 local function reconcilePlayer(player: Player)
@@ -121,6 +135,24 @@ local function reconcilePlayer(player: Player)
 	end
 end
 
+local function notifyPurchase(player: Player, passId: number, itemCount: number)
+	local notified = purchaseNotifications[player]
+	if notified == nil then
+		notified = {}
+		purchaseNotifications[player] = notified
+	end
+	if notified[passId] then
+		return
+	end
+	notified[passId] = true
+	activeNetwork.fire("StorePurchaseGranted", player, {
+		grantId = `pass:{passId}`,
+		kind = "GamePass",
+		passId = passId,
+		itemCount = itemCount,
+	})
+end
+
 local function onPurchaseFinished(player: Player, passId: number, wasPurchased: boolean)
 	if not wasPurchased or activeGamePasses.ById[passId] == nil then
 		return
@@ -130,7 +162,9 @@ local function onPurchaseFinished(player: Player, passId: number, wasPurchased: 
 			return
 		end
 		for attempt = 1, PURCHASE_ATTEMPTS do
-			if reconcilePass(player, passId) == true then
+			local reconciled, itemCount = reconcilePass(player, passId)
+			if reconciled == true then
+				notifyPurchase(player, passId, itemCount)
 				return
 			end
 			if attempt < PURCHASE_ATTEMPTS then
@@ -158,6 +192,7 @@ function GamePassService.start(options: StartOptions?)
 	activeCosmeticsService = if options and options.cosmeticsService then options.cosmeticsService else CosmeticsService
 	activeGamePasses = if options and options.gamePasses then options.gamePasses else GamePasses
 	activeCosmetics = if options and options.cosmetics then options.cosmetics else Cosmetics
+	activeNetwork = if options and options.network then options.network else Network
 	activeRunAsync = if options and options.runAsync then options.runAsync else task.spawn
 	activeWait = if options and options.wait then options.wait else task.wait
 
@@ -181,8 +216,10 @@ function GamePassService._resetForTest()
 	activeCosmeticsService = CosmeticsService
 	activeGamePasses = GamePasses
 	activeCosmetics = Cosmetics
+	activeNetwork = Network
 	activeRunAsync = task.spawn
 	activeWait = task.wait
+	table.clear(purchaseNotifications)
 end
 
 return GamePassService

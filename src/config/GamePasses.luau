@@ -1,16 +1,18 @@
 --!strict
 
--- Permanent cosmetic-only pass stubs derived from the GDD monetization tiers.
--- Disabled definitions cannot be sold or interpreted as owned entitlements.
+-- Permanent cosmetic-only passes. Preview entries merchandise planned offers
+-- without exposing a purchase action; Active entries require platform ids and
+-- complete entitlements; Hidden entries never enter the storefront.
+
+export type CatalogStatus = "Preview" | "Active" | "Hidden"
 
 export type GamePassDef = {
 	Id: number?,
-	Enabled: boolean,
+	CatalogStatus: CatalogStatus,
 	DisplayName: string,
 	Description: string,
 	DisplayOrder: number,
-	SuggestedRobuxMin: number,
-	SuggestedRobuxMax: number,
+	SuggestedRobux: number,
 	Categories: { string },
 	EntitlementItemIds: { string },
 }
@@ -18,45 +20,47 @@ export type GamePassDef = {
 local Catalog: { [string]: GamePassDef } = {
 	HammerCosmetics = {
 		Id = nil,
-		Enabled = false,
+		CatalogStatus = "Preview",
 		DisplayName = "Hammer Cosmetics",
 		Description = "A permanent collection of exclusive hammer looks.",
-		DisplayOrder = 10,
-		SuggestedRobuxMin = 150,
-		SuggestedRobuxMax = 350,
+		DisplayOrder = 410,
+		SuggestedRobux = 249,
 		Categories = { "HammerAssets" },
 		EntitlementItemIds = {},
 	},
 	DodgeballEffects = {
 		Id = nil,
-		Enabled = false,
+		CatalogStatus = "Preview",
 		DisplayName = "Dodgeball Effects",
-		Description = "A permanent collection of ball and trail effects.",
-		DisplayOrder = 20,
-		SuggestedRobuxMin = 99,
-		SuggestedRobuxMax = 250,
-		Categories = { "BallAssets", "TrailAssets" },
-		EntitlementItemIds = {},
+		Description = "Five exclusive trails, permanently unlocked.",
+		DisplayOrder = 420,
+		SuggestedRobux = 149,
+		Categories = { "TrailAssets" },
+		EntitlementItemIds = {
+			"TrailCelestialPrism",
+			"TrailEventHorizon",
+			"TrailRoyalNebula",
+			"TrailGlitchSpectrum",
+			"TrailSeraphicWake",
+		},
 	},
 	CharacterCostumes = {
 		Id = nil,
-		Enabled = false,
+		CatalogStatus = "Preview",
 		DisplayName = "Character Costumes",
 		Description = "A permanent collection of character costumes.",
-		DisplayOrder = 30,
-		SuggestedRobuxMin = 250,
-		SuggestedRobuxMax = 600,
+		DisplayOrder = 430,
+		SuggestedRobux = 399,
 		Categories = { "CostumeAssets" },
 		EntitlementItemIds = {},
 	},
 	EliminationEmotes = {
 		Id = nil,
-		Enabled = false,
+		CatalogStatus = "Preview",
 		DisplayName = "Elimination Emotes",
 		Description = "A permanent collection of elimination emotes.",
-		DisplayOrder = 40,
-		SuggestedRobuxMin = 75,
-		SuggestedRobuxMax = 150,
+		DisplayOrder = 440,
+		SuggestedRobux = 99,
 		Categories = { "EmoteAssets" },
 		EntitlementItemIds = {},
 	},
@@ -65,11 +69,12 @@ local Catalog: { [string]: GamePassDef } = {
 local ById: { [number]: GamePassDef } = {}
 
 for key, definition in Catalog do
-	if definition.Enabled then
-		assert(definition.Id ~= nil, `enabled game pass "{key}" must define Id`)
+	assert(definition.DisplayOrder % 1 == 0, `game pass "{key}" must define an integer DisplayOrder`)
+	assert(definition.SuggestedRobux > 0, `game pass "{key}" must define a positive SuggestedRobux`)
+	if definition.CatalogStatus == "Active" then
+		assert(definition.Id ~= nil, `active game pass "{key}" must define Id`)
 		assert(definition.Id > 0 and definition.Id % 1 == 0, `game pass "{key}" must define a positive integer Id`)
-		assert(definition.DisplayOrder % 1 == 0, `game pass "{key}" must define an integer DisplayOrder`)
-		assert(#definition.EntitlementItemIds > 0, `enabled game pass "{key}" must define entitlements`)
+		assert(#definition.EntitlementItemIds > 0, `active game pass "{key}" must define entitlements`)
 		assert(ById[definition.Id] == nil, `duplicate game pass id {definition.Id}`)
 		ById[definition.Id] = definition
 	end

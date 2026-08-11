@@ -62,7 +62,7 @@ return function()
 			expect(calls).to.equal(1)
 		end)
 
-		it("leaves earned-Cash crates available when no Cash product is enabled", function()
+		it("leaves earned-Cash crates available when paid offers are preview-only", function()
 			local removing = signal()
 			PaidRandomPolicyService.start({
 				players = { PlayerRemoving = removing },
@@ -71,7 +71,7 @@ return function()
 						error("must not query")
 					end,
 				},
-				products = { Catalog = {} },
+				products = { Catalog = { Cash500 = { CatalogStatus = "Preview", Type = "Cash" } } },
 			})
 			local allowed = PaidRandomPolicyService.canOpenCashCrate({ Name = "EarnedOnly" })
 			expect(allowed).to.equal(true)

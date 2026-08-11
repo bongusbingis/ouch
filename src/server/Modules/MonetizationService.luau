@@ -7,38 +7,63 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
 local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 
--- Owns ProcessReceipt. Receipts are recorded in the profile for idempotency
--- (retries after grant return PurchaseGranted without re-granting); unknown
--- products and failures return NotProcessedYet so Roblox retries/refunds.
--- New product types (battle pass) register a handler here.
---
--- Receipts are kept for the life of the profile, never pruned: Roblox may
--- retry ProcessReceipt for an already-granted purchase at any point in the
--- future, and evicting a receipt would make that retry re-grant for free.
+-- Owns ProcessReceipt and its permanent idempotency record. Client prompt
+-- completion never grants products.
+
+type StartOptions = {
+	marketplace: any?,
+	players: any?,
+	products: any?,
+	crates: any?,
+	crateService: any?,
+	playerData: any?,
+	analyticsService: any?,
+	network: any?,
+	time: (() -> number)?,
+}
+
+type GrantPayload = { [string]: any }
+type Handler = (player: Player, def: any, receiptInfo: { [string]: any }) -> (boolean, GrantPayload?)
 
 local MonetizationService = {}
 
 local started = false
+local activeMarketplace: any = MarketplaceService
+local activePlayers: any = Players
+local activeProducts: any = Products
+local activeCrates: any = Crates
+local activeCrateService: any = CrateService
+local activePlayerData: any = PlayerData
+local activeAnalyticsService: any = AnalyticsService
+local activeNetwork: any = Network
+local activeTime: () -> number = os.time
 
-local handlers: { [string]: (player: Player, def: any) -> boolean } = {
-	Crate = function(player, def)
-		return CrateService.openFromReceipt(player, def.CrateId)
+local handlers: { [string]: Handler } = {
+	Crate = function(player, def, receiptInfo)
+		return activeCrateService.openFromReceipt(player, def.CrateId, tostring(receiptInfo.PurchaseId)), nil
 	end,
-	Cash = function(player, def)
+	Cash = function(player, def, receiptInfo)
 		if type(def.CashAmount) ~= "number" or def.CashAmount <= 0 or def.CashAmount % 1 ~= 0 then
-			return false
+			return false, nil
 		end
-		PlayerData.addCash(player, def.CashAmount)
-		return true
+		activePlayerData.addCash(player, def.CashAmount)
+		return true,
+			{
+				grantId = tostring(receiptInfo.PurchaseId),
+				kind = "Cash",
+				productId = receiptInfo.ProductId,
+				amount = def.CashAmount,
+			}
 	end,
 }
 
 local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
-	local def = Products.ById[receiptInfo.ProductId]
+	local def = activeProducts.ById[receiptInfo.ProductId]
 	if def == nil then
 		warn(`[Monetization] receipt for unmapped product {receiptInfo.ProductId}`)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -49,11 +74,11 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
-	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+	local player = activePlayers:GetPlayerByUserId(receiptInfo.PlayerId)
 	if player == nil then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	local data = PlayerData.get(player)
+	local data = activePlayerData.get(player)
 	if data == nil then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -63,13 +88,13 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
 
-	local ok, granted = pcall(handler, player, def)
+	local ok, granted, payload = pcall(handler, player, def, receiptInfo)
 	if not ok or not granted then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
-	data.Receipts[receiptKey] = os.time()
-	AnalyticsService.logEconomyEvent(
+	data.Receipts[receiptKey] = activeTime()
+	activeAnalyticsService.logEconomyEvent(
 		player,
 		"Source",
 		"Robux",
@@ -79,28 +104,57 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 		tostring(receiptInfo.ProductId),
 		{ productType = def.Type }
 	)
+	if payload then
+		activeNetwork.fire("StorePurchaseGranted", player, payload)
+	end
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
-function MonetizationService.registerHandler(productType: string, handler: (player: Player, def: any) -> boolean)
+function MonetizationService.registerHandler(productType: string, handler: Handler)
 	handlers[productType] = handler
 end
 
-function MonetizationService.start()
+function MonetizationService.start(options: StartOptions?)
 	if started then
 		return
 	end
 	started = true
-	for productId, definition in Products.ById do
+	activeMarketplace = if options and options.marketplace then options.marketplace else MarketplaceService
+	activePlayers = if options and options.players then options.players else Players
+	activeProducts = if options and options.products then options.products else Products
+	activeCrates = if options and options.crates then options.crates else Crates
+	activeCrateService = if options and options.crateService then options.crateService else CrateService
+	activePlayerData = if options and options.playerData then options.playerData else PlayerData
+	activeAnalyticsService = if options and options.analyticsService then options.analyticsService else AnalyticsService
+	activeNetwork = if options and options.network then options.network else Network
+	activeTime = if options and options.time then options.time else os.time
+
+	for productId, definition in activeProducts.ById do
 		assert(
 			handlers[definition.Type] ~= nil,
 			`[Monetization] product {productId} has unsupported type "{definition.Type}"`
 		)
 		if definition.Type == "Crate" then
-			assert(Crates[definition.CrateId] ~= nil, `[Monetization] product {productId} references an unknown crate`)
+			assert(
+				activeCrates[definition.CrateId] ~= nil,
+				`[Monetization] product {productId} references an unknown crate`
+			)
 		end
 	end
-	MarketplaceService.ProcessReceipt = processReceipt
+	activeMarketplace.ProcessReceipt = processReceipt
+end
+
+function MonetizationService._resetForTest()
+	started = false
+	activeMarketplace = MarketplaceService
+	activePlayers = Players
+	activeProducts = Products
+	activeCrates = Crates
+	activeCrateService = CrateService
+	activePlayerData = PlayerData
+	activeAnalyticsService = AnalyticsService
+	activeNetwork = Network
+	activeTime = os.time
 end
 
 return MonetizationService

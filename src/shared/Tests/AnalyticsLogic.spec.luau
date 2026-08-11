@@ -66,6 +66,18 @@ T.describe("AnalyticsLogic", function()
 		local route = AnalyticsLogic.routeUIEvent({ kind = "Other" })
 		T.expect(route):toBeNil()
 	end)
+	T.it("routes Shop interactions to named custom events", function()
+		local selected = AnalyticsLogic.routeUIEvent({ kind = "OfferSelected", offerKey = "Cash500" })
+		T.expect(selected ~= nil):toBeTruthy()
+		if selected then
+			T.expect(selected.customEventName):toEqual("ShopOfferSelected")
+		end
+		local failed = AnalyticsLogic.routeUIEvent({ kind = "PurchaseFailed", offerKey = "Cash500" })
+		T.expect(failed ~= nil):toBeTruthy()
+		if failed then
+			T.expect(failed.customEventName):toEqual("ShopPurchaseFailed")
+		end
+	end)
 end)
 
 return true

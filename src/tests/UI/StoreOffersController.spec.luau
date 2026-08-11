@@ -4,7 +4,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local UI =
 	StarterPlayer:WaitForChild("StarterPlayerScripts"):WaitForChild("Client"):WaitForChild("Modules"):WaitForChild("UI")
-local StoreOffersController = require(UI:WaitForChild("StoreOffersController"))
+local ShopController = require(UI:WaitForChild("ShopController"))
 
 local function signal()
 	local callbacks = {}
@@ -46,6 +46,19 @@ local function fakeMenu()
 	return menu
 end
 
+local function fakeStore()
+	local data = { Cash = 1000, Cosmetics = { Owned = {}, Equipped = {} } }
+	return {
+		start = function() end,
+		snapshot = function()
+			return data
+		end,
+		onChanged = function()
+			return function() end
+		end,
+	}
+end
+
 local function fakeElement()
 	local mounted = {}
 	local element = {}
@@ -53,9 +66,6 @@ local function fakeElement()
 		local handle = { parent = parent, props = props, instance = {}, destroyed = false }
 		function handle:destroy()
 			self.destroyed = true
-		end
-		function handle:setEnabled(enabled)
-			self.enabled = enabled
 		end
 		table.insert(mounted, handle)
 		return handle
@@ -74,23 +84,24 @@ local function activeCards(mounted)
 end
 
 return function()
-	describe("StoreOffersController", function()
+	describe("ShopController offers", function()
 		beforeEach(function()
-			StoreOffersController._resetForTest()
+			ShopController._resetForTest()
 		end)
 
 		afterEach(function()
-			StoreOffersController._resetForTest()
+			ShopController._resetForTest()
 		end)
 
-		it("renders live regional prices and routes each offer to its platform prompt", function()
+		it("renders live regional prices and routes each active offer to its platform prompt", function()
 			local menu = fakeMenu()
-			local cardElement, mountedCards = fakeElement()
-			local buttonElement = fakeElement()
+			local offerElement, mountedCards = fakeElement()
+			local crateElement = fakeElement()
 			local player = { UserId = 810001 }
 			local passFinished = signal()
 			local productFinished = signal()
 			local prompts = {}
+			local listeners = {}
 			local marketplace = {
 				PromptGamePassPurchaseFinished = passFinished,
 				PromptProductPurchaseFinished = productFinished,
@@ -98,7 +109,7 @@ return function()
 					return {
 						Name = if productId == 101 then "Spark Pass" else "500 Cash",
 						IconImageAssetId = productId + 1000,
-						PriceInRobux = if productId == 101 then 149 else 79,
+						PriceInRobux = if productId == 101 then 149 else 49,
 						IsForSale = true,
 					}
 				end,
@@ -112,6 +123,12 @@ return function()
 					table.insert(prompts, { kind = "Product", id = productId })
 				end,
 			}
+			local network = {
+				on = function(name, callback)
+					listeners[name] = callback
+				end,
+				fireServer = function() end,
+			}
 			local catalog = require(
 				game:GetService("ReplicatedStorage")
 					:WaitForChild("Shared")
@@ -119,17 +136,19 @@ return function()
 					:WaitForChild("Economy")
 					:WaitForChild("StoreCatalog")
 			)
-			StoreOffersController.start({
+			ShopController.start({
+				store = fakeStore(),
+				network = network,
 				marketplace = marketplace,
 				player = player,
 				menuManager = menu,
-				cardElement = cardElement,
-				buttonElement = buttonElement,
+				offerElement = offerElement,
+				crateElement = crateElement,
 				gamePasses = {
 					Catalog = {
 						SparkPass = {
 							Id = 101,
-							Enabled = true,
+							CatalogStatus = "Active",
 							DisplayName = "Spark Pass",
 							Description = "Permanent spark cosmetics.",
 							DisplayOrder = 10,
@@ -138,9 +157,9 @@ return function()
 				},
 				products = {
 					Catalog = {
-						CashPack = {
+						Cash500 = {
 							Id = 202,
-							Enabled = true,
+							CatalogStatus = "Active",
 							DisplayName = "500 Cash",
 							Description = "Cash top-up.",
 							DisplayOrder = 20,
@@ -151,7 +170,7 @@ return function()
 				},
 				storeCatalog = catalog,
 				crates = {},
-				cosmetics = {},
+				cosmetics = { Items = {}, Rarities = {} },
 				paidRandomPolicy = {
 					start = function() end,
 					snapshot = function()
@@ -162,21 +181,22 @@ return function()
 						return function() end
 					end,
 				},
-				offersHolder = { Visible = false },
-				offerTitle = { Visible = false },
-				cashActionMount = { Visible = false },
-				crateHolder = {},
-				shelfTitle = {},
+				cratesHolder = {},
+				cashOffersHolder = {},
+				passesHolder = {},
+				cashLabel = { Text = "" },
+				statusLabel = { Text = "" },
 				runAsync = function(callback)
 					callback()
 				end,
+				wait = function() end,
 			})
 
 			menu:setOpen("Shop")
 			local cards = activeCards(mountedCards)
 			expect(#cards).to.equal(2)
 			expect(cards[1].props.data.actionText).to.equal("R$ 149")
-			expect(cards[2].props.data.actionText).to.equal("R$ 79")
+			expect(cards[2].props.data.actionText).to.equal("R$ 49")
 			cards[1].props.activated(cards[1].props.data.id)
 			cards[2].props.activated(cards[2].props.data.id)
 			expect(#prompts).to.equal(2)
@@ -184,6 +204,7 @@ return function()
 			expect(prompts[1].id).to.equal(101)
 			expect(prompts[2].kind).to.equal("Product")
 			expect(prompts[2].id).to.equal(202)
+			expect(listeners.StorePurchaseGranted).to.be.ok()
 		end)
 	end)
 end

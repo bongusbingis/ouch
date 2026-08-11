@@ -1,10 +1,6 @@
 --!strict
 
--- Pure decision logic for analytics routing: which onboarding step (if any)
--- a lifecycle signal advances to, how a client UI report maps to a funnel
--- step vs. a custom event, and weapon-type inference from an Elim event. No
--- Instance access, no AnalyticsService calls — AnalyticsService.luau wires
--- this module's output to the real API.
+-- Pure analytics routing and onboarding progression decisions.
 
 local AnalyticsLogic = {}
 
@@ -53,7 +49,14 @@ function AnalyticsLogic.weaponTypeForElim(event: { [string]: any }): string
 	return if event.projectileId ~= nil then "Dodgeball" else "Hammer"
 end
 
-export type UIEventPayload = { kind: string, menuId: string?, reason: string? }
+export type UIEventPayload = {
+	kind: string,
+	menuId: string?,
+	reason: string?,
+	offerKey: string?,
+	offerKind: string?,
+}
+
 export type UIRoute = {
 	funnel: string?,
 	step: number?,
@@ -61,16 +64,30 @@ export type UIRoute = {
 	customEventName: string?,
 }
 
+local SHOP_EVENTS = {
+	ShopSectionViewed = "ShopSectionViewed",
+	OfferSelected = "ShopOfferSelected",
+	PromptOpened = "ShopPromptOpened",
+	PromptClosed = "ShopPromptClosed",
+	PurchaseFailed = "ShopPurchaseFailed",
+}
+
 function AnalyticsLogic.routeUIEvent(payload: UIEventPayload): UIRoute?
-	if payload.kind ~= "MenuOpened" or payload.menuId == nil then
-		return nil
+	if payload.kind == "MenuOpened" then
+		if payload.menuId == nil then
+			return nil
+		end
+		if payload.menuId == "Shop" then
+			return { funnel = "ShopPurchase", step = 1, stepName = "Opened", customEventName = nil }
+		end
+		return { funnel = nil, step = nil, stepName = nil, customEventName = "MenuOpened" }
 	end
 
-	if payload.menuId == "Shop" then
-		return { funnel = "ShopPurchase", step = 1, stepName = "Opened", customEventName = nil }
+	local customEventName = SHOP_EVENTS[payload.kind]
+	if customEventName then
+		return { funnel = nil, step = nil, stepName = nil, customEventName = customEventName }
 	end
-
-	return { funnel = nil, step = nil, stepName = nil, customEventName = "MenuOpened" }
+	return nil
 end
 
 return AnalyticsLogic

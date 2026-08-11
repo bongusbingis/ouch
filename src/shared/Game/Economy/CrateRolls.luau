@@ -1,8 +1,9 @@
 --!strict
 
--- Pure crate roll: rarity by weight, then uniform among the pool's items of
--- that rarity. Deterministic given the injected Random, so lune tests can pin
--- distributions and the dupe-refund rule.
+-- Pure crate roll driven by the shared probability model. Deterministic given
+-- the injected Random.
+
+local CrateOdds = require(script.Parent.CrateOdds)
 
 local CrateRolls = {}
 
@@ -23,31 +24,10 @@ function CrateRolls.roll(
 	owned: { [string]: any },
 	random: Random
 ): RollResult
-	local buckets: { [string]: { string } } = {}
-	local rarityOrder: { string } = {}
-	local totalWeight = 0
-
-	for _, itemId in crate.ItemPool do
-		local item = items[itemId]
-		assert(item, `[CrateRolls] unknown item "{itemId}" in crate pool`)
-		local rarity = rarities[item.Rarity]
-		assert(rarity, `[CrateRolls] unknown rarity "{item.Rarity}" for item "{itemId}"`)
-		if rarity.Weight <= 0 then
-			continue
-		end
-		if buckets[item.Rarity] == nil then
-			buckets[item.Rarity] = {}
-			table.insert(rarityOrder, item.Rarity)
-			totalWeight += rarity.Weight
-		end
-		table.insert(buckets[item.Rarity], itemId)
-	end
-	assert(totalWeight > 0, "[CrateRolls] crate pool has no rollable items")
-	table.sort(rarityOrder)
-
-	local pick = random:NextNumber() * totalWeight
-	local chosenRarity = rarityOrder[#rarityOrder]
-	for _, rarityName in rarityOrder do
+	local model = CrateOdds.build(crate, items, rarities)
+	local pick = random:NextNumber() * model.totalWeight
+	local chosenRarity = model.rarityOrder[#model.rarityOrder]
+	for _, rarityName in model.rarityOrder do
 		pick -= rarities[rarityName].Weight
 		if pick <= 0 then
 			chosenRarity = rarityName
@@ -55,8 +35,7 @@ function CrateRolls.roll(
 		end
 	end
 
-	local bucket = buckets[chosenRarity]
-	table.sort(bucket)
+	local bucket = model.buckets[chosenRarity]
 	local itemId = bucket[random:NextInteger(1, #bucket)]
 	local isDupe = owned[itemId] == true
 

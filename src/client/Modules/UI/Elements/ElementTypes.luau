@@ -92,20 +92,25 @@ export type EconomyItemHandle = ElementHandle & {
 	setData: (self: EconomyItemHandle, data: EconomyItemData) -> (),
 }
 
+export type CrateAction = "Cash" | "Robux" | "Details"
+
 export type CrateCardData = {
 	id: string,
 	title: string,
 	highlight: string,
 	odds: string,
-	actionText: string,
-	actionEnabled: boolean,
+	cashActionText: string,
+	cashActionEnabled: boolean,
+	robuxActionText: string,
+	robuxActionEnabled: boolean,
+	detailsActionText: string,
 	layoutOrder: number,
 	featured: boolean,
 }
 
 export type CrateCardProps = {
 	data: CrateCardData,
-	activated: ((crateId: string) -> ())?,
+	activated: ((crateId: string, action: CrateAction) -> ())?,
 }
 
 export type CrateCardHandle = ElementHandle & {

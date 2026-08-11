@@ -31,6 +31,7 @@ local function dependencies(owned)
 	local playerAdded = signal()
 	local purchaseFinished = signal()
 	local granted = {}
+	local notifications = {}
 	local grantedSet = {}
 	local marketplace = {
 		PromptGamePassPurchaseFinished = purchaseFinished,
@@ -78,11 +79,17 @@ local function dependencies(owned)
 		player = player,
 		purchaseFinished = purchaseFinished,
 		granted = granted,
+		notifications = notifications,
 		options = {
 			marketplace = marketplace,
 			players = players,
 			playerData = playerData,
 			cosmeticsService = cosmeticsService,
+			network = {
+				fire = function(name, target, payload)
+					table.insert(notifications, { name = name, target = target, payload = payload })
+				end,
+			},
 			gamePasses = gamePasses,
 			cosmetics = { Items = { BallRed = { Category = "BallAssets" }, BallBlue = { Category = "BallAssets" } } },
 			runAsync = function(callback)
@@ -123,6 +130,8 @@ return function()
 			expect(#fixture.granted).to.equal(2)
 			expect(fixture.granted[1]).to.equal("BallRed")
 			expect(fixture.granted[2]).to.equal("BallBlue")
+			expect(#fixture.notifications).to.equal(1)
+			expect(fixture.notifications[1].name).to.equal("StorePurchaseGranted")
 		end)
 
 		it("rejects enabled passes that reference unknown cosmetics", function()
