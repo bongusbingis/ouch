@@ -1169,7 +1169,11 @@ local function populateShop(view: CanvasGroup)
 			touchSize:IsA("UISizeConstraint"),
 			`[UIResolver] ShopHeader.JumpTabs.{definition.name}.TouchSize must be a UISizeConstraint`
 		)
-		touchSize.MinSize = Vector2.new(88, 44)
+		-- Width is driven by the scale layout so five tabs always fit the row;
+		-- an 88px floor overflows the container on a phone. Height keeps the
+		-- 44px accessibility minimum, which is the axis that matters for a
+		-- horizontal strip.
+		touchSize.MinSize = Vector2.new(44, 44)
 	end
 
 	local storefrontInstance = view:FindFirstChild("Storefront")
@@ -1465,6 +1469,11 @@ local function populateShop(view: CanvasGroup)
 			local compact = size.X < 900 or size.Y < 520
 			view.Size = if compact then UDim2.fromScale(0.96, 0.9) else UDim2.fromScale(0.78, 0.82)
 			header.Size = if compact then UDim2.fromScale(0.93, 0.29) else UDim2.fromScale(0.93, 0.215)
+			-- The close button is a fixed pixel size, so it eats a larger share
+			-- of a narrow header. Yield the corner rather than let it clip the
+			-- Cash readout.
+			cashCard.Position = if compact then UDim2.fromScale(0.56, 0.07) else UDim2.fromScale(0.6, 0.07)
+			cashCard.Size = if compact then UDim2.fromScale(0.22, 0.42) else UDim2.fromScale(0.28, 0.42)
 			storefront.Position = if compact then UDim2.fromScale(0.035, 0.34) else UDim2.fromScale(0.035, 0.265)
 			storefront.Size = if compact then UDim2.fromScale(0.93, 0.625) else UDim2.fromScale(0.93, 0.69)
 		end
@@ -1789,66 +1798,46 @@ local function populateBattlePass(view: CanvasGroup)
 	if aspect then
 		aspect:Destroy()
 	end
+	-- styleMenuRoot strips any existing size constraint, so this must come after
+	-- it. Without a cap the view scales to 0.7 of a 4K display and the fixed
+	-- pixel tier rows inside it look lost.
+	local passSize = view:FindFirstChild("PassSize")
+	if passSize == nil then
+		passSize = Instance.new("UISizeConstraint")
+		passSize.Name = "PassSize"
+		passSize.Parent = view
+	end
+	assert(passSize:IsA("UISizeConstraint"), "[UIResolver] BattlePass.PassSize must be a UISizeConstraint")
+	passSize.MaxSize = Vector2.new(1360, 820)
 	view.ClipsDescendants = true
-	resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil).ScaleType = Enum.ScaleType.Stretch
 
+	local background = resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil)
+	local backgroundAspect = background:FindFirstChild("AspectRatio")
+	if backgroundAspect then
+		backgroundAspect:Destroy()
+	end
+	background.ScaleType = Enum.ScaleType.Stretch
+
+	-- Light card with dark text, matching the Shop and Inventory menus. The dark
+	-- palette belongs to the HUD, not to menus.
 	local header = resolveNativePanel(
 		view,
 		"PassHeader",
 		0.035,
 		0.035,
 		0.93,
-		0.22,
+		0.235,
 		11,
-		Color3.fromRGB(72, 38, 128),
-		Color3.fromRGB(148, 86, 214),
-		Color3.fromRGB(54, 28, 100),
-		Color3.fromRGB(255, 226, 250),
+		Color3.fromRGB(238, 228, 255),
+		Color3.fromRGB(250, 246, 255),
+		Color3.fromRGB(206, 182, 250),
+		Color3.fromRGB(74, 38, 110),
 		0.08
 	)
-	local title = resolveText(header, "SeasonTitle", "SEASON", 0.03, 0.08, 0.6, 0.34, 15, 28, 13, nil)
-	title.TextColor3 = Color3.fromRGB(255, 246, 224)
-	local status = resolveText(header, "Status", "Loading season...", 0.03, 0.44, 0.6, 0.2, 9, 15, 13, nil)
-	status.TextColor3 = Color3.fromRGB(238, 214, 255)
-	local tierLabel = resolveText(header, "TierLabel", "TIER 0", 0.03, 0.66, 0.3, 0.24, 12, 22, 13, nil)
-	tierLabel.TextColor3 = Color3.fromRGB(255, 224, 130)
 
-	-- Progress bar lifted from the QuestCard pattern: a track with a fill whose
-	-- width is set from derived tier progress.
-	local track = resolveNativePanel(
-		header,
-		"ProgressTrack",
-		0.34,
-		0.72,
-		0.62,
-		0.12,
-		13,
-		Color3.fromRGB(40, 20, 72),
-		Color3.fromRGB(60, 32, 104),
-		Color3.fromRGB(30, 14, 56),
-		Color3.fromRGB(255, 226, 250),
-		0.5
-	)
-	local fill = resolveNativePanel(
-		track,
-		"ProgressFill",
-		0,
-		0,
-		0,
-		1,
-		14,
-		Color3.fromRGB(255, 196, 84),
-		Color3.fromRGB(255, 230, 150),
-		Color3.fromRGB(226, 148, 40),
-		Color3.fromRGB(120, 70, 20),
-		0.5
-	)
-	fill.Size = UDim2.fromScale(0, 1)
-
-	local claimAll = resolveContainer(header, "ClaimAllMount", 0.66, 0.06, 0.15, 0.36, 14)
-	claimAll.BackgroundTransparency = 1
-	local premiumMount = resolveContainer(header, "PremiumMount", 0.82, 0.06, 0.15, 0.36, 14)
-	premiumMount.BackgroundTransparency = 1
+	-- Row 1: identity, with the close button owning the top-right corner.
+	local title = resolveText(header, "SeasonTitle", "SEASON", 0.025, 0.08, 0.6, 0.26, 15, 28, 13, nil)
+	title.TextColor3 = Color3.fromRGB(74, 38, 110)
 
 	local close = header:FindFirstChild("Close")
 	if close == nil then
@@ -1864,8 +1853,8 @@ local function populateBattlePass(view: CanvasGroup)
 	close.TextColor3 = Color3.fromRGB(255, 249, 226)
 	close.TextScaled = true
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -14, 0, 12)
-	close.Size = UDim2.fromOffset(44, 44)
+	close.Position = UDim2.new(1, -12, 0, 10)
+	close.Size = UDim2.fromOffset(48, 48)
 	close.ZIndex = 15
 	styleNativePanel(
 		close,
@@ -1875,6 +1864,58 @@ local function populateBattlePass(view: CanvasGroup)
 		Color3.fromRGB(88, 38, 53),
 		0.3
 	)
+	local closeSize = close:FindFirstChild("TouchSize")
+	if closeSize == nil then
+		closeSize = Instance.new("UISizeConstraint")
+		closeSize.Name = "TouchSize"
+		closeSize.Parent = close
+	end
+	assert(closeSize:IsA("UISizeConstraint"), "[UIResolver] PassHeader.Close.TouchSize must be a UISizeConstraint")
+	closeSize.MinSize = Vector2.new(44, 44)
+
+	-- Row 2: status line, kept clear of the close button's corner.
+	local status = resolveText(header, "Status", "Loading season...", 0.025, 0.37, 0.66, 0.2, 9, 16, 13, nil)
+	status.TextColor3 = MUTED_TEXT
+
+	-- Row 3: everything interactive sits on its own band, below the close
+	-- button's footprint, so the two can never overlap at any viewport width.
+	local tierLabel = resolveText(header, "TierLabel", "TIER 0", 0.025, 0.62, 0.2, 0.28, 12, 22, 13, nil)
+	tierLabel.TextColor3 = Color3.fromRGB(120, 60, 20)
+
+	local track = resolveNativePanel(
+		header,
+		"ProgressTrack",
+		0.24,
+		0.7,
+		0.34,
+		0.13,
+		13,
+		Color3.fromRGB(222, 210, 242),
+		Color3.fromRGB(236, 228, 250),
+		Color3.fromRGB(198, 180, 230),
+		Color3.fromRGB(120, 92, 168),
+		0.5
+	)
+	local fill = resolveNativePanel(
+		track,
+		"ProgressFill",
+		0,
+		0,
+		0,
+		1,
+		14,
+		Color3.fromRGB(150, 86, 220),
+		Color3.fromRGB(196, 140, 255),
+		Color3.fromRGB(118, 60, 190),
+		Color3.fromRGB(74, 38, 110),
+		0.5
+	)
+	fill.Size = UDim2.fromScale(0, 1)
+
+	local claimAll = resolveContainer(header, "ClaimAllMount", 0.61, 0.6, 0.17, 0.32, 14)
+	claimAll.BackgroundTransparency = 1
+	local premiumMount = resolveContainer(header, "PremiumMount", 0.79, 0.6, 0.185, 0.32, 14)
+	premiumMount.BackgroundTransparency = 1
 
 	local holder = view:FindFirstChild("TierHolder")
 	local scroll: ScrollingFrame
@@ -1886,7 +1927,7 @@ local function populateBattlePass(view: CanvasGroup)
 		scroll.Name = "TierHolder"
 		scroll.Parent = view
 	end
-	styleScroll(scroll, 0.035, 0.28, 0.93, 0.67)
+	styleScroll(scroll, 0.035, 0.295, 0.93, 0.665)
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.CanvasSize = UDim2.fromOffset(0, 0)
 	scroll.ScrollBarThickness = 7
@@ -1901,6 +1942,31 @@ local function populateBattlePass(view: CanvasGroup)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.Padding = UDim.new(0, 8)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	-- Matches the Shop's breakpoint so both menus reflow at the same width and
+	-- the header grows a band on narrow screens instead of crushing its rows.
+	local boundsParent = view.Parent
+	while boundsParent and not boundsParent:IsA("GuiObject") do
+		boundsParent = boundsParent.Parent
+	end
+	local function refreshRoot()
+		if boundsParent == nil then
+			return
+		end
+		local size = (boundsParent :: GuiObject).AbsoluteSize
+		local compact = size.X < 900 or size.Y < 520
+		view.Size = if compact then UDim2.fromScale(0.96, 0.9) else UDim2.fromScale(0.78, 0.82)
+		header.Size = if compact then UDim2.fromScale(0.93, 0.3) else UDim2.fromScale(0.93, 0.235)
+		scroll.Position = if compact then UDim2.fromScale(0.035, 0.36) else UDim2.fromScale(0.035, 0.295)
+		scroll.Size = if compact then UDim2.fromScale(0.93, 0.6) else UDim2.fromScale(0.93, 0.665)
+	end
+	refreshRoot()
+	if boundsParent then
+		local rootConnection = (boundsParent :: GuiObject):GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshRoot)
+		table.insert(cleanups, function()
+			rootConnection:Disconnect()
+		end)
+	end
 end
 
 -- FindFirstChild is deliberate: this temporary Instance.new exception was

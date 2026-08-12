@@ -433,6 +433,12 @@ return function()
 				holder = { Name = "Holder" },
 				cashLabel = cashLabel,
 				statusLabel = statusLabel,
+				-- Pinned: the featured slot and its discount rotate on wall-clock
+				-- time, so an unpinned clock makes this pass or fail by calendar
+				-- week. Period 0 features TrailCrate, leaving BallCrate at list price.
+				now = function()
+					return 0
+				end,
 				runAsync = immediate,
 			})
 			expect(cashLabel.Text).to.equal("Cash: 1000")
