@@ -31,16 +31,22 @@ local function applyEquipAttributes(player: Player)
 	end
 end
 
-function CosmeticsService.grant(player: Player, itemId: string): boolean
+-- Returns false with a reason so callers can tell "already owned" (nothing to
+-- do, and safe to treat as success) from "no profile" (retry later). Existing
+-- callers read only the first value and are unaffected.
+function CosmeticsService.grant(player: Player, itemId: string): (boolean, string?)
 	local data = PlayerData.get(player)
-	if data == nil or Cosmetics.Items[itemId] == nil then
-		return false
+	if data == nil then
+		return false, "no_profile"
+	end
+	if Cosmetics.Items[itemId] == nil then
+		return false, "unknown_item"
 	end
 	if data.Cosmetics.Owned[itemId] == true then
-		return false
+		return false, "already_owned"
 	end
 	data.Cosmetics.Owned[itemId] = true
-	return true
+	return true, nil
 end
 
 function CosmeticsService.equip(player: Player, slot: string, itemId: string?): (boolean, string?)

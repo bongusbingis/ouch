@@ -10,6 +10,13 @@ local CrateRolls = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CrateRolls")
 )
 local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop"))
+local FeaturedRotation = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Economy")
+		:WaitForChild("FeaturedRotation")
+)
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
@@ -30,6 +37,7 @@ type OpenResult = {
 	rarity: string,
 	isDupe: boolean,
 	cashRefund: number,
+	pityTriggered: string?,
 }
 
 local function rollAndGrant(player: Player, crateId: string, source: string, openId: string): OpenResult?
@@ -38,8 +46,19 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 	if crate == nil or data == nil then
 		return nil
 	end
+	if data.Crates == nil then
+		data.Crates = { Pity = {} }
+	end
 
-	local result = CrateRolls.roll(crate, Cosmetics.Items, Cosmetics.Rarities, data.Cosmetics.Owned, rng)
+	local result = CrateRolls.roll(
+		crate,
+		Cosmetics.Items,
+		Cosmetics.Rarities,
+		data.Cosmetics.Owned,
+		rng,
+		data.Crates.Pity[crateId]
+	)
+	data.Crates.Pity[crateId] = result.pity
 	if result.isDupe then
 		data.Cash += result.cashRefund
 		AnalyticsService.logEconomyEvent(
@@ -67,6 +86,7 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 		rarity = result.rarity,
 		isDupe = result.isDupe,
 		cashRefund = result.cashRefund,
+		pityTriggered = result.pityTriggered,
 	}
 	local steps = AnalyticsConfig.ShopFunnelSteps.Completed
 	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
@@ -74,6 +94,7 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 		rarity = result.rarity,
 		source = source,
 		isDupe = result.isDupe,
+		pityTriggered = result.pityTriggered,
 	})
 	Network.fire("CrateOpened", player, payload)
 	return payload
@@ -83,13 +104,24 @@ local function logCrateFailure(player: Player, reason: string)
 	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CratePurchaseFailed, 1, { reason = reason })
 end
 
+-- Authoritative price. The storefront calls the same function, so the featured
+-- discount it advertises is the one actually charged.
+function CrateService.priceFor(crateId: string, now: number?): number?
+	local crate = Crates[crateId]
+	if crate == nil or crate.CashPrice == nil then
+		return nil
+	end
+	return FeaturedRotation.priceFor(Shop.Featured, crateId, crate.CashPrice, now or os.time())
+end
+
 function CrateService.openWithCash(player: Player, crateId: string): (OpenResult?, string?)
 	local crate = Crates[crateId]
 	if crate == nil or crate.CashPrice == nil then
 		logCrateFailure(player, "invalid_crate")
 		return nil, "invalid_crate"
 	end
-	local policyAllowed, policyReason = PaidRandomPolicyService.canOpenCashCrate(player)
+	local price = CrateService.priceFor(crateId) :: number
+	local policyAllowed, policyReason = PaidRandomPolicyService.canReceivePaidRandom(player)
 	if not policyAllowed then
 		logCrateFailure(player, policyReason or "paid_random_restricted")
 		return nil, policyReason
@@ -99,7 +131,7 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 		logCrateFailure(player, "no_profile")
 		return nil, "no_profile"
 	end
-	if data.Cash < crate.CashPrice then
+	if data.Cash < price then
 		logCrateFailure(player, "insufficient_cash")
 		return nil, "insufficient_cash"
 	end
@@ -122,12 +154,12 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 		return nil, "invalid_crate"
 	end
 
-	data.Cash -= crate.CashPrice
+	data.Cash -= price
 	AnalyticsService.logEconomyEvent(
 		player,
 		"Sink",
 		"Cash",
-		crate.CashPrice,
+		price,
 		data.Cash,
 		AnalyticsConfig.EconomyTransactionTypes.Shop,
 		crateId
@@ -135,7 +167,45 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 	return result, nil
 end
 
+-- Roblox has already charged this receipt, so a restricted player must still be
+-- made whole: pay the crate's Cash value instead of rolling a random item.
+-- Returning false here would strand the purchase in ProcessReceipt retries.
+local function grantRestrictedValue(player: Player, crateId: string, purchaseId: string, reason: string): boolean
+	local crate = Crates[crateId]
+	local data = PlayerData.get(player)
+	if crate == nil or data == nil then
+		return false
+	end
+	local amount = crate.CashPrice
+	if amount == nil or amount <= 0 then
+		warn(`[CrateService] crate "{crateId}" is sold for Robux but has no CashPrice to substitute`)
+		return false
+	end
+
+	PlayerData.addCash(player, amount)
+	AnalyticsService.logEconomyEvent(
+		player,
+		"Source",
+		"Cash",
+		amount,
+		data.Cash,
+		AnalyticsConfig.EconomyTransactionTypes.IAP,
+		crateId,
+		{ substitutedFor = reason }
+	)
+	Network.fire("StorePurchaseGranted", player, {
+		grantId = purchaseId,
+		kind = "Cash",
+		amount = amount,
+	})
+	return true
+end
+
 function CrateService.openFromReceipt(player: Player, crateId: string, purchaseId: string): boolean
+	local allowed, reason = PaidRandomPolicyService.canReceivePaidRandom(player)
+	if not allowed then
+		return grantRestrictedValue(player, crateId, purchaseId, reason or "paid_random_restricted")
+	end
 	return rollAndGrant(player, crateId, "Robux", purchaseId) ~= nil
 end
 

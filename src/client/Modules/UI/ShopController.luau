@@ -7,6 +7,7 @@
 local ButtonElement = require(script.Parent.Elements.ButtonElement)
 local CrateCardElement = require(script.Parent.Elements.CrateCardElement)
 local StoreOfferCardElement = require(script.Parent.Elements.StoreOfferCardElement)
+local EconomyItemElement = require(script.Parent.Elements.EconomyItemElement)
 local CratePresentation = require(script.Parent.CratePresentation)
 local EconomyStore = require(script.Parent.EconomyStore)
 
@@ -17,11 +18,13 @@ type StartOptions = {
 	crateElement: any?,
 	itemElement: any?,
 	offerElement: any?,
+	directElement: any?,
 	buttonElement: any?,
 	crates: any?,
 	cosmetics: any?,
 	products: any?,
 	gamePasses: any?,
+	shop: any?,
 	storeCatalog: any?,
 	paidRandomPolicy: any?,
 	marketplace: any?,
@@ -31,11 +34,13 @@ type StartOptions = {
 	featuredMount: Frame?,
 	cashOffersHolder: Frame?,
 	passesHolder: Frame?,
+	directHolder: Frame?,
 	cashLabel: TextLabel?,
 	statusLabel: TextLabel?,
 	viewNodes: any?,
 	runAsync: ((callback: () -> ()) -> ())?,
 	wait: ((seconds: number) -> ())?,
+	now: (() -> number)?,
 }
 
 local ShopController = {}
@@ -46,6 +51,13 @@ local activeNetwork: any = nil
 local activeMenuManager: any = nil
 local activeCrateElement: any = CrateCardElement
 local activeOfferElement: any = StoreOfferCardElement
+local activeDirectElement: any = EconomyItemElement
+local activeDirectPurchase: any = nil
+local activeStarterOffer: any = nil
+local activeFeaturedRotation: any = nil
+local activeShop: any = nil
+local starterListeners: { (active: boolean) -> () } = {}
+local starterActive = false
 local activeButtonElement: any = ButtonElement
 local activeCrates: any = nil
 local activeCosmetics: any = nil
@@ -72,6 +84,21 @@ end
 
 local activeRunAsync: (callback: () -> ()) -> () = runAsyncDefault
 local activeWait: (seconds: number) -> () = waitDefault
+local activeNow: () -> number = function()
+	return os.time()
+end
+
+-- Buttons are mounted into fixed Frames, so every one fills its mount. Guarded
+-- because the headless test loader has no UDim2, matching EconomyPrototypeLayout.
+local function fillMount(handle: any)
+	if handle.instance == nil or UDim2 == nil then
+		return
+	end
+	handle.instance.AnchorPoint = Vector2.new(0.5, 0.5)
+	handle.instance.Position = UDim2.fromScale(0.5, 0.5)
+	handle.instance.Size = UDim2.fromScale(1, 1)
+end
+
 local nodes: any = nil
 local currentData: any = nil
 local offers: { any } = {}
@@ -123,16 +150,20 @@ local function resolveView(): any
 	assert(view:IsA("CanvasGroup"), "[ShopController] Views.Shop must be a CanvasGroup")
 	local header = view:WaitForChild("ShopHeader")
 	local storefront = view:WaitForChild("Storefront")
+	local starterSection = storefront:WaitForChild("StarterSection")
 	local featuredSection = storefront:WaitForChild("FeaturedSection")
 	local cratesSection = storefront:WaitForChild("CratesSection")
+	local directSection = storefront:WaitForChild("DirectSection")
 	local cashSection = storefront:WaitForChild("CashSection")
 	local passesSection = storefront:WaitForChild("PassesSection")
 	local details = view:WaitForChild("DetailsOverlay")
 	local reveal = view:WaitForChild("RevealOverlay")
 	assert(header:IsA("Frame"), "[ShopController] ShopHeader must be a Frame")
 	assert(storefront:IsA("ScrollingFrame"), "[ShopController] Storefront must be a ScrollingFrame")
+	assert(starterSection:IsA("Frame"), "[ShopController] StarterSection must be a Frame")
 	assert(featuredSection:IsA("Frame"), "[ShopController] FeaturedSection must be a Frame")
 	assert(cratesSection:IsA("Frame"), "[ShopController] CratesSection must be a Frame")
+	assert(directSection:IsA("Frame"), "[ShopController] DirectSection must be a Frame")
 	assert(cashSection:IsA("Frame"), "[ShopController] CashSection must be a Frame")
 	assert(passesSection:IsA("Frame"), "[ShopController] PassesSection must be a Frame")
 	assert(details:IsA("CanvasGroup"), "[ShopController] DetailsOverlay must be a CanvasGroup")
@@ -156,12 +187,20 @@ local function resolveView(): any
 		view = view,
 		header = header,
 		storefront = storefront,
+		starterSection = starterSection,
+		starterHeadline = starterSection:WaitForChild("Headline"),
+		starterDetail = starterSection:WaitForChild("Detail"),
+		starterTimer = starterSection:WaitForChild("Timer"),
+		starterActionMount = starterSection:WaitForChild("ActionMount"),
 		featuredSection = featuredSection,
+		featuredTitle = featuredSection:WaitForChild("SectionTitle"),
 		cratesSection = cratesSection,
+		directSection = directSection,
 		cashSection = cashSection,
 		passesSection = passesSection,
 		featuredMount = featuredSection:WaitForChild("FeaturedMount"),
 		cratesHolder = cratesSection:WaitForChild("CratesHolder"),
+		directHolder = directSection:WaitForChild("DirectHolder"),
 		cashOffersHolder = cashSection:WaitForChild("CashOffersHolder"),
 		passesHolder = passesSection:WaitForChild("PassesHolder"),
 		cashLabel = cash,
@@ -247,9 +286,14 @@ local function sortedCrateIds(): { string }
 	return ids
 end
 
+-- The configured rotation decides the slot; the rarity fallback only covers a
+-- rotation that names a crate this build no longer ships.
 local function featuredCrateId(ids: { string }): string?
-	if activeCrates.TrailCrate ~= nil then
-		return "TrailCrate"
+	if activeFeaturedRotation ~= nil and activeShop ~= nil then
+		local entry = activeFeaturedRotation.select(activeShop.Featured, activeNow())
+		if entry ~= nil and entry.kind == "Crate" and activeCrates[entry.id] ~= nil then
+			return entry.id
+		end
 	end
 	local selected: string? = nil
 	local selectedRarityCount = -1
@@ -261,6 +305,18 @@ local function featuredCrateId(ids: { string }): string?
 		end
 	end
 	return selected
+end
+
+-- Mirrors CrateService.priceFor so the advertised price is the charged price.
+local function cashPriceFor(crateId: string): number?
+	local crate = activeCrates[crateId]
+	if crate == nil or crate.CashPrice == nil then
+		return nil
+	end
+	if activeFeaturedRotation == nil or activeShop == nil then
+		return crate.CashPrice
+	end
+	return activeFeaturedRotation.priceFor(activeShop.Featured, crateId, crate.CashPrice, activeNow())
 end
 
 local function resultMessage(result: any): string
@@ -334,9 +390,7 @@ local function finishReveal(result: any)
 			destroyHandles(modalHandles)
 		end,
 	})
-	handle.instance.AnchorPoint = Vector2.new(0.5, 0.5)
-	handle.instance.Position = UDim2.fromScale(0.5, 0.5)
-	handle.instance.Size = UDim2.fromScale(1, 1)
+	fillMount(handle)
 	table.insert(modalHandles, handle)
 	setStatus(resultMessage(result))
 end
@@ -376,9 +430,7 @@ local function showReveal(result: any)
 			end
 		end,
 	})
-	skip.instance.AnchorPoint = Vector2.new(0.5, 0.5)
-	skip.instance.Position = UDim2.fromScale(0.5, 0.5)
-	skip.instance.Size = UDim2.fromScale(1, 1)
+	fillMount(skip)
 	table.insert(modalHandles, skip)
 	activeRunAsync(function()
 		activeWait(0.7)
@@ -418,6 +470,34 @@ local function openCashCrate(crateId: string)
 			report("PurchaseFailed", { key = crateId, kind = "CashCrate" })
 		else
 			showReveal(result)
+		end
+		render()
+	end)
+end
+
+-- Direct buys are deterministic, so they deliberately skip the paid-random
+-- policy gate and the reveal ritual: the player already knows what they get.
+local function purchaseCosmetic(itemId: string)
+	local key = `Direct:{itemId}`
+	if busy[key] then
+		return
+	end
+	busy[key] = true
+	setStatus("Purchasing...")
+	report("OfferSelected", { key = itemId, kind = "DirectBuy" })
+	render()
+	activeRunAsync(function()
+		local callOk, result, reason = pcall(activeNetwork.call, "PurchaseCosmetic", itemId)
+		busy[key] = nil
+		if not callOk then
+			setStatus("Purchase failed: network error.")
+			report("PurchaseFailed", { key = itemId, kind = "DirectBuy" })
+		elseif result == nil then
+			setStatus(errorMessage(reason))
+			report("PurchaseFailed", { key = itemId, kind = "DirectBuy" })
+		else
+			local item = activeCosmetics.Items[result.itemId]
+			setStatus(`Unlocked {if item then item.DisplayName else result.itemId}.`)
 		end
 		render()
 	end)
@@ -473,6 +553,19 @@ local function oddsDisclosure(presentation: any): string
 	end
 	if #presentation.outcomes == 0 then
 		table.insert(lines, "Outcome probabilities are unavailable.")
+	else
+		table.insert(lines, "")
+		table.insert(lines, "TOTAL - 100%")
+	end
+	if #presentation.pity > 0 then
+		table.insert(lines, "")
+		table.insert(lines, "Guaranteed drops:")
+		for _, guarantee in presentation.pity do
+			table.insert(
+				lines,
+				`{string.upper(guarantee.rarity)} at least once every {guarantee.threshold} opens of this crate`
+			)
+		end
 	end
 	return table.concat(lines, "\n")
 end
@@ -496,9 +589,7 @@ local function showDetails(crateId: string, path: string)
 		name = "CancelDetails",
 		activated = closeDetails,
 	})
-	cancel.instance.AnchorPoint = Vector2.new(0.5, 0.5)
-	cancel.instance.Position = UDim2.fromScale(0.5, 0.5)
-	cancel.instance.Size = UDim2.fromScale(1, 1)
+	fillMount(cancel)
 	table.insert(modalHandles, cancel)
 
 	local confirmText = "UNAVAILABLE"
@@ -519,7 +610,7 @@ local function showDetails(crateId: string, path: string)
 			end
 		end
 	else
-		local price = crate.CashPrice
+		local price = cashPriceFor(crateId)
 		local cash = currentData and currentData.Cash or 0
 		if price and cash >= price and paidRandomAllowed == true and oddsReady and not busy[`Cash:{crateId}`] then
 			confirmText = `OPEN - {price} CASH`
@@ -538,9 +629,7 @@ local function showDetails(crateId: string, path: string)
 		name = "ConfirmDetails",
 		activated = confirm,
 	})
-	confirmHandle.instance.AnchorPoint = Vector2.new(0.5, 0.5)
-	confirmHandle.instance.Position = UDim2.fromScale(0.5, 0.5)
-	confirmHandle.instance.Size = UDim2.fromScale(1, 1)
+	fillMount(confirmHandle)
 	confirmHandle:setEnabled(confirmEnabled)
 	table.insert(modalHandles, confirmHandle)
 	report("OfferSelected", { key = crateId, kind = `{path}Crate` })
@@ -609,14 +698,16 @@ local function offerData(offer: any, order: number): any
 	end
 	local style = if offer.kind == "GamePass" then "GamePass" else offer.definition.Type
 	local badge = if offer.kind == "GamePass"
-		then "PERMANENT PASS"
+		then "GAMEPASS"
 		else if offer.definition.Type == "Cash" then cashValueBadge(offer) else "DEVELOPER PRODUCT"
 	local details = if offer.kind == "Product" and offer.definition.Type == "Cash"
 		then `+{offer.definition.CashAmount} CASH  |  {offer.description}`
 		else offer.description
 	return {
 		id = key,
-		title = if state and state.title then state.title else offer.displayName,
+		title = if offer.kind == "Product" and offer.definition.Type == "Cash"
+			then offer.displayName
+			else if state and state.title then state.title else offer.displayName,
 		details = details,
 		badge = badge,
 		image = if state and state.image then state.image else "",
@@ -627,11 +718,99 @@ local function offerData(offer: any, order: number): any
 	}
 end
 
+-- Evaluated client-side because the offer grants nothing on its own: it only
+-- decides how prominently an ordinary pass is merchandised. The purchase still
+-- runs through the same server-verified game-pass prompt as every other offer.
+local function starterOfferState(): any
+	if activeStarterOffer == nil or activeGamePasses.StarterOffer == nil or currentData == nil then
+		return nil
+	end
+	local config = activeGamePasses.StarterOffer
+	local offer = offersByKey[`GamePass:{config.PassKey}`]
+	if offer == nil then
+		return nil
+	end
+
+	local ownsAny = false
+	for key, state in states do
+		if state.owned and offersByKey[key] ~= nil and offersByKey[key].kind == "GamePass" then
+			ownsAny = true
+			break
+		end
+	end
+	local purchased = activeStarterOffer.hasPurchased(currentData.Receipts, ownsAny)
+	local onboarding = currentData.Onboarding
+	local state =
+		activeStarterOffer.evaluate(config, if onboarding then onboarding.FirstJoinAt else nil, activeNow(), purchased)
+	if not state.active then
+		return nil
+	end
+	return { offer = offer, config = config, remaining = state.secondsRemaining }
+end
+
+-- Fired independently of the storefront being open: the sidebar badge is the
+-- surface that has to tell a player the offer exists before they think to look.
+local function updateStarterSignal()
+	local active = starterOfferState() ~= nil
+	if active == starterActive then
+		return
+	end
+	starterActive = active
+	for _, listener in starterListeners do
+		pcall(listener, active)
+	end
+end
+
+local function renderStarterOffer()
+	if nodes == nil or nodes.starterSection == nil then
+		return
+	end
+	local starter = starterOfferState()
+	nodes.starterSection.Visible = starter ~= nil
+	if starter == nil then
+		return
+	end
+
+	local key = offerKey(starter.offer)
+	local state = states[key]
+	nodes.starterHeadline.Text = string.upper(starter.offer.displayName)
+	nodes.starterDetail.Text = starter.offer.description
+	nodes.starterTimer.Text = `ENDS IN {activeStarterOffer.formatRemaining(starter.remaining)}`
+
+	local actionText = "COMING SOON"
+	local enabled = false
+	if starter.offer.status == "Active" then
+		if state == nil or not state.loaded then
+			actionText = "LOADING..."
+		elseif state.owned then
+			actionText = "OWNED"
+		elseif not state.forSale then
+			actionText = "OFF SALE"
+		elseif busy[key] then
+			actionText = "WAITING..."
+		else
+			actionText = `R$ {state.price}`
+			enabled = true
+		end
+	end
+	local handle = activeButtonElement.mount(nodes.starterActionMount, {
+		text = actionText,
+		name = "StarterAction",
+		activated = function()
+			purchaseOffer(key)
+		end,
+	})
+	fillMount(handle)
+	handle:setEnabled(enabled)
+	table.insert(cardHandles, handle)
+end
+
 render = function()
 	destroyHandles(cardHandles)
 	if nodes and nodes.cashLabel then
 		nodes.cashLabel.Text = if currentData then `Cash: {currentData.Cash or 0}` else "Cash: loading"
 	end
+	updateStarterSignal()
 	if not viewOpen or nodes == nil then
 		return
 	end
@@ -647,58 +826,71 @@ render = function()
 		)
 	end
 
+	renderStarterOffer()
+
 	local ids = sortedCrateIds()
 	local featuredId = if nodes.featuredMount then featuredCrateId(ids) else nil
-	for order, crateId in ids do
+	if nodes.featuredTitle and activeFeaturedRotation ~= nil and activeShop ~= nil then
+		local remaining = activeFeaturedRotation.secondsUntilRotation(activeShop.Featured, activeNow())
+		nodes.featuredTitle.Text = `FEATURED  |  NEW DROP IN {activeStarterOffer.formatRemaining(remaining)}`
+	end
+	local function mountCrate(crateId: string, parent: Instance, isFeatured: boolean, order: number)
 		local crate = activeCrates[crateId]
-		local isFeatured = crateId == featuredId
-		local parent = if isFeatured then nodes.featuredMount else nodes.cratesHolder
-		if parent then
-			local presentation = presentationFor(crate)
-			local price = crate.CashPrice
-			local cash = currentData.Cash or 0
-			local cashBusy = busy[`Cash:{crateId}`] == true
-			local product = crateProducts[crateId]
-			local productKey = product and offerKey(product)
-			local productState = productKey and states[productKey]
-			local robuxText = "N/A"
-			local robuxEnabled = false
-			if product and product.status == "Active" then
-				if paidRandomAllowed ~= true then
-					robuxText = if paidRandomAllowed == nil then "CHECKING..." else "REGION LOCKED"
-				elseif productState and productState.loaded and productState.forSale then
-					robuxText = if busy[productKey] then "WAITING..." else `R$ {productState.price}`
-					robuxEnabled = not busy[productKey] and #presentation.outcomes > 0
-				elseif productState and productState.error then
-					robuxText = "UNAVAILABLE"
-				else
-					robuxText = "LOADING..."
-				end
+		local presentation = presentationFor(crate)
+		local price = cashPriceFor(crateId)
+		local discounted = price ~= nil and crate.CashPrice ~= nil and price < crate.CashPrice
+		local cash = currentData.Cash or 0
+		local cashBusy = busy[`Cash:{crateId}`] == true
+		local product = crateProducts[crateId]
+		local productKey = product and offerKey(product)
+		local productState = productKey and states[productKey]
+		local robuxText = "N/A"
+		local robuxEnabled = false
+		if product and product.status == "Active" then
+			if paidRandomAllowed ~= true then
+				robuxText = if paidRandomAllowed == nil then "CHECKING..." else "REGION LOCKED"
+			elseif productState and productState.loaded and productState.forSale then
+				robuxText = if busy[productKey] then "WAITING..." else `R$ {productState.price}`
+				robuxEnabled = not busy[productKey] and #presentation.outcomes > 0
+			elseif productState and productState.error then
+				robuxText = "UNAVAILABLE"
+			else
+				robuxText = "LOADING..."
 			end
-			local handle = activeCrateElement.mount(parent, {
-				data = {
-					id = crateId,
-					title = crate.DisplayName or crateId,
-					highlight = presentation.highlight,
-					odds = presentation.odds,
-					cashActionText = if cashBusy then "OPENING..." else if price then `{price} CASH` else "N/A",
-					cashActionEnabled = price ~= nil
-						and cash >= price
-						and not cashBusy
-						and paidRandomAllowed == true
-						and #presentation.outcomes > 0,
-					robuxActionText = robuxText,
-					robuxActionEnabled = robuxEnabled,
-					detailsActionText = "DETAILS + ODDS",
-					layoutOrder = order,
-					featured = isFeatured,
-				},
-				activated = actionForCrate,
-			})
-			if handle.instance and isFeatured then
-				handle.instance.Size = UDim2.fromScale(1, 1)
-			end
-			table.insert(cardHandles, handle)
+		end
+		local handle = activeCrateElement.mount(parent, {
+			data = {
+				id = crateId,
+				title = crate.DisplayName or crateId,
+				highlight = if discounted
+					then `{presentation.highlight}  |  {activeShop.Featured.DiscountPercent}% OFF`
+					else presentation.highlight,
+				odds = presentation.odds,
+				cashActionText = if cashBusy then "OPENING..." else if price then `{price} CASH` else "N/A",
+				cashActionEnabled = price ~= nil
+					and cash >= price
+					and not cashBusy
+					and paidRandomAllowed == true
+					and #presentation.outcomes > 0,
+				robuxActionText = robuxText,
+				robuxActionEnabled = robuxEnabled,
+				detailsActionText = "VIEW ODDS",
+				layoutOrder = order,
+				featured = isFeatured,
+			},
+			activated = actionForCrate,
+		})
+		if handle.instance and isFeatured then
+			handle.instance.Size = UDim2.fromScale(1, 1)
+		end
+		table.insert(cardHandles, handle)
+	end
+	if featuredId and nodes.featuredMount then
+		mountCrate(featuredId, nodes.featuredMount, true, 0)
+	end
+	if nodes.cratesHolder then
+		for order, crateId in ids do
+			mountCrate(crateId, nodes.cratesHolder, false, order)
 		end
 	end
 
@@ -719,6 +911,36 @@ render = function()
 				activated = purchaseOffer,
 			})
 			table.insert(cardHandles, handle)
+		end
+	end
+
+	if nodes.directHolder and activeDirectPurchase then
+		local owned = currentData.Cosmetics and currentData.Cosmetics.Owned or {}
+		local cash = currentData.Cash or 0
+		local order = 0
+		for _, entry in activeDirectPurchase.catalog(activeCosmetics.Items, activeCosmetics.Rarities) do
+			if owned[entry.itemId] ~= true then
+				order += 1
+				local item = activeCosmetics.Items[entry.itemId]
+				local key = `Direct:{entry.itemId}`
+				local affordable = cash >= entry.price
+				local handle = activeDirectElement.mount(nodes.directHolder, {
+					data = {
+						id = entry.itemId,
+						title = item.DisplayName,
+						details = `{string.upper(entry.rarity)}  |  GUARANTEED, NO RANDOM ROLL`,
+						rarity = entry.rarity,
+						state = if affordable then "Available" else "Default",
+						actionText = if busy[key]
+							then "BUYING..."
+							else if affordable then `{entry.price} CASH` else `NEED {entry.price - cash} MORE`,
+						actionEnabled = affordable and not busy[key],
+						layoutOrder = order,
+					},
+					activated = purchaseCosmetic,
+				})
+				table.insert(cardHandles, handle)
+			end
 		end
 	end
 end
@@ -833,7 +1055,7 @@ local function handleGrant(payload: any)
 			end
 			busy[offerKey(offer)] = nil
 		end
-		setStatus("Permanent pass unlocked.")
+		setStatus("Gamepass unlocked.")
 	end
 	render()
 end
@@ -860,6 +1082,7 @@ local function connectViewActions()
 	local mappings = {
 		FeaturedTab = nodes.featuredSection,
 		CratesTab = nodes.cratesSection,
+		DirectTab = nodes.directSection,
 		CashTab = nodes.cashSection,
 		PassesTab = nodes.passesSection,
 	}
@@ -905,6 +1128,14 @@ function ShopController.start(options: StartOptions?)
 		then options.crateElement
 		else if options and options.itemElement then options.itemElement else CrateCardElement
 	activeOfferElement = if options and options.offerElement then options.offerElement else StoreOfferCardElement
+	activeDirectElement = if options and options.directElement then options.directElement else EconomyItemElement
+	activeDirectPurchase = require(
+		replicatedStorage()
+			:WaitForChild("Shared")
+			:WaitForChild("Game")
+			:WaitForChild("Economy")
+			:WaitForChild("DirectPurchase")
+	)
 	activeButtonElement = if options and options.buttonElement then options.buttonElement else ButtonElement
 	activeCrates = if options and options.crates then options.crates else resolveDependency("Crates")
 	activeCosmetics = if options and options.cosmetics then options.cosmetics else resolveDependency("Cosmetics")
@@ -913,6 +1144,26 @@ function ShopController.start(options: StartOptions?)
 	activeStoreCatalog = if options and options.storeCatalog then options.storeCatalog else resolveStoreCatalog()
 	activeRunAsync = if options and options.runAsync then options.runAsync else runAsyncDefault
 	activeWait = if options and options.wait then options.wait else waitDefault
+	activeNow = if options and options.now
+		then options.now
+		else function()
+			return os.time()
+		end
+	activeShop = if options and options.shop then options.shop else resolveDependency("Shop")
+	activeFeaturedRotation = require(
+		replicatedStorage()
+			:WaitForChild("Shared")
+			:WaitForChild("Game")
+			:WaitForChild("Economy")
+			:WaitForChild("FeaturedRotation")
+	)
+	activeStarterOffer = require(
+		replicatedStorage()
+			:WaitForChild("Shared")
+			:WaitForChild("Game")
+			:WaitForChild("Economy")
+			:WaitForChild("StarterOffer")
+	)
 	offers = activeStoreCatalog.build(activeGamePasses.Catalog, activeProducts.Catalog)
 	for _, offer in offers do
 		local key = offerKey(offer)
@@ -930,6 +1181,7 @@ function ShopController.start(options: StartOptions?)
 			featuredMount = options.featuredMount,
 			cashOffersHolder = options.cashOffersHolder,
 			passesHolder = options.passesHolder,
+			directHolder = options.directHolder,
 			cashLabel = options.cashLabel,
 			statusLabel = options.statusLabel,
 		}
@@ -1000,6 +1252,17 @@ function ShopController.start(options: StartOptions?)
 	render()
 end
 
+function ShopController.onStarterOfferChanged(callback: (active: boolean) -> ()): () -> ()
+	table.insert(starterListeners, callback)
+	pcall(callback, starterActive)
+	return function()
+		local index = table.find(starterListeners, callback)
+		if index then
+			table.remove(starterListeners, index)
+		end
+	end
+end
+
 function ShopController._resetForTest()
 	if storeDisconnect then
 		storeDisconnect()
@@ -1021,6 +1284,13 @@ function ShopController._resetForTest()
 	activeMenuManager = nil
 	activeCrateElement = CrateCardElement
 	activeOfferElement = StoreOfferCardElement
+	activeDirectElement = EconomyItemElement
+	activeDirectPurchase = nil
+	activeStarterOffer = nil
+	activeFeaturedRotation = nil
+	activeShop = nil
+	table.clear(starterListeners)
+	starterActive = false
 	activeButtonElement = ButtonElement
 	activeCrates = nil
 	activeCosmetics = nil

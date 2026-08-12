@@ -17,6 +17,10 @@ end
 local definitions = {
 	EquipCosmetic = "function",
 	OpenCrate = "function",
+	PurchaseCosmetic = "function",
+	GetSeasonPassState = "function",
+	ClaimSeasonTier = "function",
+	ClaimAllSeasonTiers = "function",
 	CrateOpened = "event",
 	StorePurchaseGranted = "event",
 	ReportDeviceClass = "event",
@@ -26,6 +30,7 @@ local definitions = {
 	GetQuestState = "function",
 	ClaimQuest = "function",
 	QuestStateChanged = "event",
+	SeasonPassStateChanged = "event",
 	DamageFeedback = "event",
 	ReportAnalyticsEvent = "event",
 }
@@ -75,10 +80,20 @@ local Network = {}
 -- Composable middleware: wrap handlers rather than threading a middleware
 -- config object.
 
-function Network.withRateLimit(limit, handler)
+-- Each wrapper owns an independent per-player budget. Callers pass the remote
+-- name so warnings name it; without one the budget is still private to this
+-- wrapper, because a shared key would let a chatty remote throttle every other.
+local anonymousBuckets = 0
+
+function Network.withRateLimit(limit, handler, bucket)
+	local key = bucket
+	if key == nil then
+		anonymousBuckets += 1
+		key = `anonymous:{anonymousBuckets}`
+	end
 	return function(player, ...)
-		if not checkRateLimit(player, "rl", limit) then
-			warn(("[Network] Rate limited: %s"):format(player.Name))
+		if not checkRateLimit(player, key, limit) then
+			warn(("[Network] Rate limited: %s on %s"):format(player.Name, key))
 			return nil, "rate_limited"
 		end
 		return handler(player, ...)
@@ -108,7 +123,7 @@ function Network.handleProtected(name, middleware, callback)
 	assert(IS_SERVER, "[Network] handleProtected can only be called on the server")
 	local handler = callback
 	if middleware.rateLimit then
-		handler = Network.withRateLimit(middleware.rateLimit, handler)
+		handler = Network.withRateLimit(middleware.rateLimit, handler, name)
 	end
 	if middleware.validate then
 		handler = Network.withValidation(middleware.validate, handler)

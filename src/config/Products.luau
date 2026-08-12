@@ -23,8 +23,8 @@ local Catalog: { [string]: ProductDef } = {
 	Cash500 = {
 		Id = nil,
 		CatalogStatus = "Preview",
-		DisplayName = "500 Cash",
-		Description = "A quick top-up for your next crate.",
+		DisplayName = "Pocket Stash",
+		Description = "A handy boost for your next crate.",
 		DisplayOrder = 310,
 		Type = "Cash",
 		SuggestedRobux = 49,
@@ -33,8 +33,8 @@ local Catalog: { [string]: ProductDef } = {
 	Cash1100 = {
 		Id = nil,
 		CatalogStatus = "Preview",
-		DisplayName = "1,100 Cash",
-		Description = "A little extra value for two crate opens.",
+		DisplayName = "Cash Stack",
+		Description = "A solid stack with a little extra value.",
 		DisplayOrder = 320,
 		Type = "Cash",
 		SuggestedRobux = 99,
@@ -43,8 +43,8 @@ local Catalog: { [string]: ProductDef } = {
 	Cash2500 = {
 		Id = nil,
 		CatalogStatus = "Preview",
-		DisplayName = "2,500 Cash",
-		Description = "A larger top-up with stronger value.",
+		DisplayName = "Big Haul",
+		Description = "A bigger haul for several crate opens.",
 		DisplayOrder = 330,
 		Type = "Cash",
 		SuggestedRobux = 199,
@@ -53,8 +53,8 @@ local Catalog: { [string]: ProductDef } = {
 	Cash5500 = {
 		Id = nil,
 		CatalogStatus = "Preview",
-		DisplayName = "5,500 Cash",
-		Description = "The largest evergreen Cash bundle.",
+		DisplayName = "Mega Vault",
+		Description = "The biggest Cash bundle and strongest value.",
 		DisplayOrder = 340,
 		Type = "Cash",
 		SuggestedRobux = 399,
@@ -80,15 +80,19 @@ local Catalog: { [string]: ProductDef } = {
 		SuggestedRobux = 79,
 		CrateId = "TrailCrate",
 	},
-	SeasonalBattlePass = {
+	-- One product per season rather than editing SeasonId in place, so receipt
+	-- history stays unambiguous about which season was actually bought.
+	SeasonPassS1 = {
 		Id = nil,
-		CatalogStatus = "Hidden",
-		DisplayName = "Seasonal Battle Pass",
-		Description = "Unlock the current cosmetic reward track.",
+		CatalogStatus = "Preview",
+		DisplayName = "Season 1 Premium Pass",
+		Description = "Unlock the premium reward track for Season 1.",
 		DisplayOrder = 500,
 		Type = "SeasonPass",
-		SuggestedRobux = 799,
-		SeasonId = nil,
+		-- Introductory: the GDD targets 799, held back until the track has a
+		-- season of proven content behind it.
+		SuggestedRobux = 499,
+		SeasonId = "S1",
 	},
 }
 

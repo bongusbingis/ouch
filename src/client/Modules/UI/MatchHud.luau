@@ -56,6 +56,10 @@ type Summary = {
 	catches: number,
 	xp: number,
 	cash: number,
+	baseXp: number?,
+	baseCash: number?,
+	xpMultiplier: number?,
+	cashMultiplier: number?,
 }
 
 type FeedEntry = {
@@ -232,7 +236,17 @@ function MatchHud.start()
 		end
 		flow.summaryTitle.Text = if summary.won then "VICTORY!" else "MATCH COMPLETE"
 		flow.summaryStats.Text = `{summary.elims} ELIMS  •  {summary.catches} CATCHES  •  {summary.deaths} FALLS`
-		flow.summaryRewards.Text = `+{summary.xp} XP  •  +{summary.cash} CASH`
+		-- Name the multiplier only when it actually changed the payout, so a
+		-- boost the player paid for is visible at the moment it pays out.
+		local xpText = `+{summary.xp} XP`
+		if summary.xpMultiplier ~= nil and summary.xpMultiplier > 1 and summary.xp ~= summary.baseXp then
+			xpText ..= ` ({summary.xpMultiplier}x)`
+		end
+		local cashText = `+{summary.cash} CASH`
+		if summary.cashMultiplier ~= nil and summary.cashMultiplier > 1 and summary.cash ~= summary.baseCash then
+			cashText ..= ` ({summary.cashMultiplier}x)`
+		end
+		flow.summaryRewards.Text = `{xpText}  •  {cashText}`
 	end
 
 	local function refresh()

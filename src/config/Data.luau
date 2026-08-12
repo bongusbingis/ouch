@@ -1,5 +1,6 @@
 return {
 	Template = {
+		SchemaVersion = 0, -- sentinel; never bump here. Target is DataConfig.SchemaVersion.
 		Cash = 2500,
 		Level = {
 			Points = 0,
@@ -22,11 +23,31 @@ return {
 			ResetAt = 0,
 			Active = {},
 		},
+		Crates = {
+			Pity = {}, -- { [crateId]: { [rarity]: opens since that rarity last dropped } }
+		},
 		Tutorial = {
 			Version = 0,
 		},
+		Onboarding = {
+			FirstJoinAt = 0, -- unix time, stamped once; 0 = not yet stamped
+		},
+		Season = {
+			-- Reset wholesale at rollover. Tier is derived from XP, never stored.
+			Id = "",
+			XP = 0,
+			ClaimedFree = {}, -- { [tostring(tier)]: true }
+			ClaimedPremium = {},
+		},
+		Entitlements = {
+			-- Never reset by rollover. Developer products are the only ownership
+			-- the platform does not remember for us, so premium lives here.
+			PremiumSeasons = {}, -- { [seasonId]: true }
+		},
 		Receipts = {}, -- { [purchaseId]: unix time } for ProcessReceipt idempotency
 	},
+
+	SchemaVersion = 1,
 
 	TutorialVersion = 1,
 

@@ -1,6 +1,6 @@
 --!strict
 
-export type MenuId = "Quests" | "Shop" | "Inventory" | "Leaderboard" | "Settings"
+export type MenuId = "Quests" | "Shop" | "BattlePass" | "Inventory" | "Leaderboard" | "Settings"
 
 export type ColorValue = {
 	r: number,

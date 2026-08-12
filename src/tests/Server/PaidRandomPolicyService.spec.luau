@@ -55,10 +55,10 @@ return function()
 				},
 			})
 
-			local allowed, reason = PaidRandomPolicyService.canOpenCashCrate(player)
+			local allowed, reason = PaidRandomPolicyService.canReceivePaidRandom(player)
 			expect(allowed).to.equal(false)
 			expect(reason).to.equal("paid_random_restricted")
-			PaidRandomPolicyService.canOpenCashCrate(player)
+			PaidRandomPolicyService.canReceivePaidRandom(player)
 			expect(calls).to.equal(1)
 		end)
 
@@ -73,7 +73,7 @@ return function()
 				},
 				products = { Catalog = { Cash500 = { CatalogStatus = "Preview", Type = "Cash" } } },
 			})
-			local allowed = PaidRandomPolicyService.canOpenCashCrate({ Name = "EarnedOnly" })
+			local allowed = PaidRandomPolicyService.canReceivePaidRandom({ Name = "EarnedOnly" })
 			expect(allowed).to.equal(true)
 		end)
 	end)

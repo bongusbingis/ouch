@@ -8,15 +8,20 @@ local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GamePasses"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
+local EntitlementService = require(script.Parent.EntitlementService)
 local PlayerData = require(script.Parent.PlayerData)
 
--- Reconciles permanent platform pass ownership into idempotent cosmetic grants.
+-- Reconciles permanent platform pass ownership into idempotent cosmetic grants,
+-- and is the only writer of EntitlementService's session ownership cache. Every
+-- definitive ownership answer is recorded, including false, so booster-only
+-- passes (which grant no items) still resolve.
 
 type StartOptions = {
 	marketplace: any?,
 	players: any?,
 	playerData: any?,
 	cosmeticsService: any?,
+	entitlementService: any?,
 	gamePasses: any?,
 	cosmetics: any?,
 	network: any?,
@@ -35,6 +40,7 @@ local activeMarketplace: any = MarketplaceService
 local activePlayers: any = Players
 local activePlayerData: any = PlayerData
 local activeCosmeticsService: any = CosmeticsService
+local activeEntitlementService: any = EntitlementService
 local activeGamePasses: any = GamePasses
 local activeCosmetics: any = Cosmetics
 local activeNetwork: any = Network
@@ -117,8 +123,19 @@ local function grantConfiguredPass(player: Player, passId: number): (boolean, nu
 	return true, granted
 end
 
+local function recordOwnership(passId: number, player: Player, owned: boolean)
+	local key = activeGamePasses.KeyById and activeGamePasses.KeyById[passId]
+	if key ~= nil then
+		activeEntitlementService.setOwnership(player, key, owned)
+	end
+end
+
 local function reconcilePass(player: Player, passId: number): (boolean?, number)
 	local owned = ownsPass(player, passId)
+	-- nil means the lookup failed, which must not be cached as "does not own".
+	if owned ~= nil then
+		recordOwnership(passId, player, owned)
+	end
 	if owned ~= true then
 		return owned, 0
 	end
@@ -190,6 +207,9 @@ function GamePassService.start(options: StartOptions?)
 	activePlayers = if options and options.players then options.players else Players
 	activePlayerData = if options and options.playerData then options.playerData else PlayerData
 	activeCosmeticsService = if options and options.cosmeticsService then options.cosmeticsService else CosmeticsService
+	activeEntitlementService = if options and options.entitlementService
+		then options.entitlementService
+		else EntitlementService
 	activeGamePasses = if options and options.gamePasses then options.gamePasses else GamePasses
 	activeCosmetics = if options and options.cosmetics then options.cosmetics else Cosmetics
 	activeNetwork = if options and options.network then options.network else Network
@@ -214,6 +234,7 @@ function GamePassService._resetForTest()
 	activePlayers = Players
 	activePlayerData = PlayerData
 	activeCosmeticsService = CosmeticsService
+	activeEntitlementService = EntitlementService
 	activeGamePasses = GamePasses
 	activeCosmetics = Cosmetics
 	activeNetwork = Network

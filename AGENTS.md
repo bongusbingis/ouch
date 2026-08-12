@@ -85,7 +85,7 @@ Entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only
 - **CrateService**: two purchase paths — Cash via the `OpenCrate` remote, Robux via MonetizationService receipts — sharing one roll-and-grant routine; every open fires `CrateOpened`. The roll itself is pure (`src/shared/Game/Economy/CrateRolls.luau`, injected `Random`) so tests pin distributions and the dupe-refund rule.
 - **MonetizationService**: owns `ProcessReceipt`. Receipts are recorded in the profile for idempotency (retry after grant returns `PurchaseGranted` without re-granting); unknown products/failures return `NotProcessedYet` so Roblox retries. New product types register a handler in its `handlers` table.
 
-**No power creep:** cosmetics only — nothing purchasable may affect gameplay stats (GDD §2, §7).
+**No competitive advantage:** nothing purchasable may affect combat outcomes — no weapon, movement, damage, cooldown, or health value is ever for sale (GDD §2, §7). Progression boosters (XP/Cash multipliers) are permitted and live in `GamePasses.Boosts`; they change earn *rate* only. If a proposed offer would change who wins a fight, it is out of scope regardless of how it is framed.
 
 ### Client — `src/client/Modules/`
 

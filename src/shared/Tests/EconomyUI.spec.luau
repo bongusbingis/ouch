@@ -172,6 +172,29 @@ local function fakeItemElement()
 	return element, mounted
 end
 
+local function fakeButtonElement()
+	local mounted = {}
+	local element = {}
+	function element.mount(parent, props)
+		local handle = {
+			parent = parent,
+			props = props,
+			enabled = true,
+			destroyed = false,
+			instance = { AnchorPoint = nil, Position = nil, Size = nil },
+		}
+		function handle:setEnabled(value)
+			self.enabled = value
+		end
+		function handle:destroy()
+			self.destroyed = true
+		end
+		table.insert(mounted, handle)
+		return handle
+	end
+	return element, mounted
+end
+
 local function immediate(callback)
 	callback()
 end
@@ -355,6 +378,9 @@ T.describe("ShopController", function()
 			holder = { Name = "Holder" } :: any,
 			cashLabel = cashLabel :: any,
 			statusLabel = statusLabel :: any,
+			now = function()
+				return 0
+			end,
 			runAsync = immediate,
 		})
 		T.expect(cashLabel.Text):toEqual("Cash: 1000")
@@ -372,7 +398,7 @@ T.describe("ShopController", function()
 		ShopController._resetForTest()
 	end)
 
-	T.it("features the crate with the broadest rarity selection", function()
+	T.it("features the crate the global rotation names for the current period", function()
 		ShopController._resetForTest()
 		local store = fakeStore({ Cash = 2000, Cosmetics = { Owned = {}, Equipped = {} } })
 		local menu = fakeMenu()
@@ -409,15 +435,317 @@ T.describe("ShopController", function()
 			featuredMount = featuredMount :: any,
 			cashLabel = { Text = "" } :: any,
 			statusLabel = { Text = "" } :: any,
+			-- Pinned: the featured slot and its discount rotate on wall-clock
+			-- time, so an unpinned clock makes this pass or fail by calendar week.
+			now = function()
+				return 0
+			end,
 			runAsync = immediate,
 		})
 
 		menu:setOpen("Shop")
-		T.expect(#mounted):toEqual(2)
-		local featured = if mounted[1].props.data.featured then mounted[1] else mounted[2]
+		T.expect(#mounted):toEqual(3)
+		local featured = mounted[1]
 		T.expect(featured.parent):toEqual(featuredMount)
 		T.expect(featured.props.data.title):toEqual("Trail Crate")
 		T.expect(featured.props.data.odds):toEqual("ODDS  COMMON 92.1%  |  LEGENDARY 7.9%")
+		ShopController._resetForTest()
+	end)
+
+	T.it("lists unowned direct buys cheapest first and routes the purchase", function()
+		ShopController._resetForTest()
+		local store = fakeStore({ Cash = 4000, Cosmetics = { Owned = { BallRed = true }, Equipped = {} } })
+		local menu = fakeMenu()
+		local crateElement = (fakeItemElement())
+		local directElement, direct = fakeItemElement()
+		local calls = {}
+		ShopController.start({
+			store = store,
+			network = {
+				on = function() end,
+				call = function(name, ...)
+					table.insert(calls, { name = name, args = { ... } })
+					return { itemId = "TrailMint", rarity = "Common", price = 1200 }, nil
+				end,
+			},
+			menuManager = menu,
+			crateElement = crateElement,
+			directElement = directElement,
+			crates = { BallCrate = { DisplayName = "Ball Crate", CashPrice = 500, ItemPool = { "BallRed" } } },
+			cosmetics = {
+				Rarities = {
+					Common = { Weight = 70, DupeCash = 50, DirectCash = 1200 },
+					Rare = { Weight = 24, DupeCash = 150, DirectCash = 3500 },
+					Exclusive = { Weight = 0, DupeCash = 0, DirectCash = 0 },
+				},
+				Items = {
+					BallRed = { DisplayName = "Red Ball", Rarity = "Common" },
+					TrailMint = { DisplayName = "Mint Mist", Rarity = "Common" },
+					TrailEmber = { DisplayName = "Ember Sprint", Rarity = "Rare" },
+					TrailPrism = { DisplayName = "Celestial Prism", Rarity = "Exclusive" },
+				},
+			},
+			holder = { Name = "Holder" } :: any,
+			directHolder = { Name = "DirectHolder" } :: any,
+			cashLabel = { Text = "" } :: any,
+			statusLabel = { Text = "" } :: any,
+			runAsync = immediate,
+		})
+
+		menu:setOpen("Shop")
+		-- BallRed is owned and TrailPrism is grant-only, so neither is offered.
+		T.expect(#direct):toEqual(2)
+		T.expect(direct[1].props.data.id):toEqual("TrailMint")
+		T.expect(direct[1].props.data.actionText):toEqual("1200 CASH")
+		T.expect(direct[1].props.data.actionEnabled):toEqual(true)
+		T.expect(direct[2].props.data.id):toEqual("TrailEmber")
+		T.expect(direct[2].props.data.actionText):toEqual("3500 CASH")
+
+		direct[1].props.activated("TrailMint")
+		T.expect(calls[#calls].name):toEqual("PurchaseCosmetic")
+		T.expect(calls[#calls].args[1]):toEqual("TrailMint")
+		ShopController._resetForTest()
+	end)
+
+	T.it("shows the starter banner only while the window is open and unconverted", function()
+		local function runShop(profile: any, now: number)
+			ShopController._resetForTest()
+			local starterSection = { Visible = false, Name = "StarterSection" }
+			local nodes = {
+				starterSection = starterSection,
+				starterHeadline = { Text = "" },
+				starterDetail = { Text = "" },
+				starterTimer = { Text = "" },
+				starterActionMount = { Name = "ActionMount" },
+				cashLabel = { Text = "" },
+				statusLabel = { Text = "" },
+			}
+			local menu = fakeMenu()
+			ShopController.start({
+				store = fakeStore(profile),
+				network = {
+					on = function() end,
+					call = function()
+						return nil
+					end,
+				},
+				menuManager = menu,
+				crateElement = (fakeItemElement()),
+				buttonElement = (fakeButtonElement()),
+				crates = {},
+				cosmetics = { Rarities = {}, Items = {} },
+				gamePasses = {
+					Catalog = {
+						SplatStarter = {
+							CatalogStatus = "Preview",
+							DisplayName = "Splat Starter Kit",
+							Description = "An exclusive trail.",
+							DisplayOrder = 400,
+							SuggestedRobux = 49,
+							Categories = {},
+							EntitlementItemIds = {},
+						},
+					},
+					ById = {},
+					StarterOffer = { PassKey = "SplatStarter", WindowSeconds = 72 * 3600 },
+				},
+				products = { Catalog = {} },
+				viewNodes = nodes,
+				now = function()
+					return now
+				end,
+				runAsync = immediate,
+			})
+			menu:setOpen("Shop")
+			return starterSection, nodes
+		end
+
+		local joined = 5000000
+		local base = { Cash = 0, Cosmetics = { Owned = {}, Equipped = {} }, Receipts = {} }
+
+		local live, nodes = runShop({
+			Cash = 0,
+			Cosmetics = { Owned = {}, Equipped = {} },
+			Receipts = {},
+			Onboarding = { FirstJoinAt = joined },
+		}, joined + 3600)
+		T.expect(live.Visible):toEqual(true)
+		T.expect(nodes.starterTimer.Text):toEqual("ENDS IN 2d 23h")
+
+		local expired = runShop({
+			Cash = 0,
+			Cosmetics = { Owned = {}, Equipped = {} },
+			Receipts = {},
+			Onboarding = { FirstJoinAt = joined },
+		}, joined + 72 * 3600 + 1)
+		T.expect(expired.Visible):toEqual(false)
+
+		local converted = runShop({
+			Cash = 0,
+			Cosmetics = { Owned = {}, Equipped = {} },
+			Receipts = { ["abc"] = 1 },
+			Onboarding = { FirstJoinAt = joined },
+		}, joined + 3600)
+		T.expect(converted.Visible):toEqual(false)
+
+		local unstamped = runShop(base, joined + 3600)
+		T.expect(unstamped.Visible):toEqual(false)
+		ShopController._resetForTest()
+	end)
+
+	T.it("advertises the discounted featured price the server will actually charge", function()
+		ShopController._resetForTest()
+		local crateElement, mounted = fakeItemElement()
+		local menu = fakeMenu()
+		local featuredMount = { Name = "FeaturedMount" }
+		local shop = {
+			Featured = {
+				RotationSeconds = 7 * 24 * 3600,
+				DiscountPercent = 15,
+				Rotation = { { kind = "Crate", id = "TrailCrate" }, { kind = "Crate", id = "BallCrate" } },
+			},
+		}
+		ShopController.start({
+			store = fakeStore({ Cash = 99999, Cosmetics = { Owned = {}, Equipped = {} } }),
+			network = {
+				on = function() end,
+				call = function()
+					return nil
+				end,
+			},
+			menuManager = menu,
+			crateElement = crateElement,
+			crates = {
+				BallCrate = { DisplayName = "Ball Crate", CashPrice = 500, ItemPool = { "BallRed" } },
+				TrailCrate = { DisplayName = "Trail Crate", CashPrice = 1000, ItemPool = { "TrailMint" } },
+			},
+			cosmetics = {
+				Rarities = { Common = { Weight = 70 } },
+				Items = {
+					BallRed = { DisplayName = "Red Ball", Rarity = "Common" },
+					TrailMint = { DisplayName = "Mint Mist", Rarity = "Common" },
+				},
+			},
+			shop = shop,
+			holder = { Name = "Holder" } :: any,
+			featuredMount = featuredMount :: any,
+			cashLabel = { Text = "" } :: any,
+			statusLabel = { Text = "" } :: any,
+			now = function()
+				return 0
+			end,
+			runAsync = immediate,
+		})
+
+		menu:setOpen("Shop")
+		local byTitle = {}
+		for _, entry in mounted do
+			byTitle[entry.props.data.title] = entry.props.data
+		end
+		-- Period 0 features TrailCrate: 1000 -> 850, and BallCrate stays 500.
+		T.expect(byTitle["Trail Crate"].cashActionText):toEqual("850 CASH")
+		T.expect(byTitle["Ball Crate"].cashActionText):toEqual("500 CASH")
+		-- Plain find: "%" is a Lua pattern escape, so "15% OFF" as a pattern
+		-- would silently mean "15 OFF" and match nothing.
+		T.expect(string.find(byTitle["Trail Crate"].highlight, "15% OFF", 1, true) ~= nil):toBeTruthy()
+		T.expect(string.find(byTitle["Ball Crate"].highlight, "OFF", 1, true) == nil):toBeTruthy()
+		ShopController._resetForTest()
+	end)
+
+	T.it("notifies starter-offer subscribers even while the shop stays closed", function()
+		ShopController._resetForTest()
+		local seen = {}
+		-- Subscribing before start mirrors SidebarController, which starts first.
+		local disconnect = ShopController.onStarterOfferChanged(function(active)
+			table.insert(seen, active)
+		end)
+		T.expect(seen[1]):toEqual(false)
+
+		local joined = 6000000
+		local menu = fakeMenu()
+		ShopController.start({
+			store = fakeStore({
+				Cash = 0,
+				Cosmetics = { Owned = {}, Equipped = {} },
+				Receipts = {},
+				Onboarding = { FirstJoinAt = joined },
+			}),
+			network = {
+				on = function() end,
+				call = function()
+					return nil
+				end,
+			},
+			menuManager = menu,
+			crateElement = (fakeItemElement()),
+			buttonElement = (fakeButtonElement()),
+			crates = {},
+			cosmetics = { Rarities = {}, Items = {} },
+			gamePasses = {
+				Catalog = {
+					SplatStarter = {
+						CatalogStatus = "Preview",
+						DisplayName = "Splat Starter Kit",
+						Description = "An exclusive trail.",
+						DisplayOrder = 400,
+						SuggestedRobux = 49,
+						Categories = {},
+						EntitlementItemIds = {},
+					},
+				},
+				ById = {},
+				StarterOffer = { PassKey = "SplatStarter", WindowSeconds = 72 * 3600 },
+			},
+			products = { Catalog = {} },
+			cashLabel = { Text = "" } :: any,
+			statusLabel = { Text = "" } :: any,
+			holder = { Name = "Holder" } :: any,
+			now = function()
+				return joined + 3600
+			end,
+			runAsync = immediate,
+		})
+
+		-- The shop was never opened, but the badge still has to learn about it.
+		T.expect(menu.open):toBeNil()
+		T.expect(seen[#seen]):toEqual(true)
+
+		disconnect()
+		ShopController._resetForTest()
+	end)
+
+	T.it("shows the shortfall instead of a price when a direct buy is unaffordable", function()
+		ShopController._resetForTest()
+		local store = fakeStore({ Cash = 900, Cosmetics = { Owned = {}, Equipped = {} } })
+		local menu = fakeMenu()
+		local directElement, direct = fakeItemElement()
+		ShopController.start({
+			store = store,
+			network = {
+				on = function() end,
+				call = function()
+					return nil
+				end,
+			},
+			menuManager = menu,
+			crateElement = (fakeItemElement()),
+			directElement = directElement,
+			crates = { BallCrate = { DisplayName = "Ball Crate", CashPrice = 500, ItemPool = { "BallRed" } } },
+			cosmetics = {
+				Rarities = { Common = { Weight = 70, DupeCash = 50, DirectCash = 1200 } },
+				Items = { BallRed = { DisplayName = "Red Ball", Rarity = "Common" } },
+			},
+			holder = { Name = "Holder" } :: any,
+			directHolder = { Name = "DirectHolder" } :: any,
+			cashLabel = { Text = "" } :: any,
+			statusLabel = { Text = "" } :: any,
+			runAsync = immediate,
+		})
+
+		menu:setOpen("Shop")
+		T.expect(#direct):toEqual(1)
+		T.expect(direct[1].props.data.actionText):toEqual("NEED 300 MORE")
+		T.expect(direct[1].props.data.actionEnabled):toEqual(false)
 		ShopController._resetForTest()
 	end)
 end)

@@ -1,0 +1,225 @@
+--!strict
+
+-- Pure season-pass rules: which season is live, what tier an XP total buys,
+-- what is still owed, and whether a claim is legal.
+--
+-- `now` is always a parameter and no Instance, Player, or clock is touched, so
+-- the whole ruleset is exercisable headlessly. Tier is derived from stored XP
+-- and never persisted -- storing both would let them drift.
+
+local BattlePassLogic = {}
+
+export type TierReward = {
+	kind: string,
+	amount: number?,
+	itemId: string?,
+}
+
+export type SeasonDef = {
+	Id: string,
+	DisplayName: string,
+	StartsAt: number,
+	EndsAt: number,
+	Archived: boolean?,
+	TierCount: number,
+	XpThresholds: { number },
+	FreeRewards: { [number]: TierReward },
+	PremiumRewards: { [number]: TierReward },
+}
+
+export type SeasonState = {
+	Id: string,
+	XP: number,
+	ClaimedFree: { [string]: boolean },
+	ClaimedPremium: { [string]: boolean },
+}
+
+export type Track = "Free" | "Premium"
+
+export type OwedTier = {
+	tier: number,
+	track: Track,
+	reward: TierReward,
+}
+
+export type ClaimReason =
+	"no_active_season"
+	| "unknown_tier"
+	| "tier_locked"
+	| "already_claimed"
+	| "premium_required"
+	| "no_reward"
+
+function BattlePassLogic.blankState(seasonId: string): SeasonState
+	return {
+		Id = seasonId,
+		XP = 0,
+		ClaimedFree = {},
+		ClaimedPremium = {},
+	}
+end
+
+-- Defensive copy, mirroring QuestLogic.copyEntries: callers mutate the copy and
+-- reassign wholesale, because Replica only replicates on assignment.
+function BattlePassLogic.readState(raw: any): SeasonState
+	if type(raw) ~= "table" then
+		return BattlePassLogic.blankState("")
+	end
+	local state = BattlePassLogic.blankState(if type(raw.Id) == "string" then raw.Id else "")
+	state.XP = if type(raw.XP) == "number" then raw.XP else 0
+	for _, field in { "ClaimedFree", "ClaimedPremium" } do
+		local source = raw[field]
+		if type(source) == "table" then
+			for tier, claimed in source do
+				if claimed == true then
+					(state :: any)[field][tostring(tier)] = true
+				end
+			end
+		end
+	end
+	return state
+end
+
+function BattlePassLogic.activeSeason(definitions: { [string]: SeasonDef }, now: number): SeasonDef?
+	local best: SeasonDef? = nil
+	for _, definition in definitions do
+		if not definition.Archived and now >= definition.StartsAt and now < definition.EndsAt then
+			if best == nil or definition.StartsAt < best.StartsAt then
+				best = definition
+			end
+		end
+	end
+	return best
+end
+
+-- Clamped to the season's tier count. XP above the final threshold keeps
+-- accumulating in storage so the number stays honest, but buys no more tiers.
+function BattlePassLogic.tierForXp(season: SeasonDef, xp: number): number
+	local tier = 0
+	for index, threshold in season.XpThresholds do
+		if xp >= threshold then
+			tier = index
+		else
+			break
+		end
+	end
+	return math.min(tier, season.TierCount)
+end
+
+function BattlePassLogic.tierProgress(season: SeasonDef, xp: number): (number, number, number)
+	local tier = BattlePassLogic.tierForXp(season, xp)
+	if tier >= season.TierCount then
+		return tier, 0, 0
+	end
+	local floorXp = if tier == 0 then 0 else season.XpThresholds[tier]
+	local nextXp = season.XpThresholds[tier + 1]
+	return tier, xp - floorXp, nextXp - floorXp
+end
+
+function BattlePassLogic.rewardAt(season: SeasonDef, tier: number, track: Track): TierReward?
+	local rewards = if track == "Premium" then season.PremiumRewards else season.FreeRewards
+	return rewards[tier]
+end
+
+local function claimedSet(state: SeasonState, track: Track): { [string]: boolean }
+	return if track == "Premium" then state.ClaimedPremium else state.ClaimedFree
+end
+
+function BattlePassLogic.isClaimed(state: SeasonState, tier: number, track: Track): boolean
+	return claimedSet(state, track)[tostring(tier)] == true
+end
+
+function BattlePassLogic.canClaim(
+	season: SeasonDef,
+	state: SeasonState,
+	tier: number,
+	track: Track,
+	hasPremium: boolean
+): (boolean, ClaimReason?)
+	if tier % 1 ~= 0 or tier < 1 or tier > season.TierCount then
+		return false, "unknown_tier"
+	end
+	if track == "Premium" and not hasPremium then
+		return false, "premium_required"
+	end
+	if BattlePassLogic.rewardAt(season, tier, track) == nil then
+		return false, "no_reward"
+	end
+	if BattlePassLogic.isClaimed(state, tier, track) then
+		return false, "already_claimed"
+	end
+	if BattlePassLogic.tierForXp(season, state.XP) < tier then
+		return false, "tier_locked"
+	end
+	return true, nil
+end
+
+-- The shared kernel behind claim, claimAll, and the rollover sweep, so "what is
+-- this player owed" has exactly one implementation. Deterministic order.
+function BattlePassLogic.unclaimedTiers(season: SeasonDef, state: SeasonState, hasPremium: boolean): { OwedTier }
+	local owed: { OwedTier } = {}
+	for tier = 1, season.TierCount do
+		for _, track in { "Free", "Premium" } :: { Track } do
+			local ok = BattlePassLogic.canClaim(season, state, tier, track, hasPremium)
+			if ok then
+				table.insert(owed, {
+					tier = tier,
+					track = track,
+					reward = BattlePassLogic.rewardAt(season, tier, track) :: TierReward,
+				})
+			end
+		end
+	end
+	return owed
+end
+
+local function cloneReward(reward: TierReward?): TierReward?
+	if reward == nil then
+		return nil
+	end
+	return { kind = reward.kind, amount = reward.amount, itemId = reward.itemId }
+end
+
+function BattlePassLogic.publicState(
+	season: SeasonDef?,
+	state: SeasonState,
+	hasPremium: boolean,
+	productId: number?
+): any
+	if season == nil then
+		return {
+			seasonId = "",
+			active = false,
+			tiers = {},
+		}
+	end
+	local tier, intoTier, forNextTier = BattlePassLogic.tierProgress(season, state.XP)
+	local tiers = {}
+	for index = 1, season.TierCount do
+		table.insert(tiers, {
+			tier = index,
+			unlocked = index <= tier,
+			freeReward = cloneReward(BattlePassLogic.rewardAt(season, index, "Free")),
+			premiumReward = cloneReward(BattlePassLogic.rewardAt(season, index, "Premium")),
+			freeClaimed = BattlePassLogic.isClaimed(state, index, "Free"),
+			premiumClaimed = BattlePassLogic.isClaimed(state, index, "Premium"),
+		})
+	end
+	return {
+		seasonId = season.Id,
+		active = true,
+		displayName = season.DisplayName,
+		startsAt = season.StartsAt,
+		endsAt = season.EndsAt,
+		xp = state.XP,
+		tier = tier,
+		tierCount = season.TierCount,
+		xpIntoTier = intoTier,
+		xpForNextTier = forNextTier,
+		hasPremium = hasPremium,
+		premiumProductId = productId,
+		tiers = tiers,
+	}
+end
+
+return BattlePassLogic

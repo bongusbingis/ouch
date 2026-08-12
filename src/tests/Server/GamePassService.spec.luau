@@ -74,13 +74,22 @@ local function dependencies(owned)
 				EntitlementItemIds = { "BallRed", "BallBlue" },
 			},
 		},
+		KeyById = { [91] = "StarterPass" },
+	}
+	local ownershipWrites = {}
+	local entitlementService = {
+		setOwnership = function(target, passKey, isOwned)
+			table.insert(ownershipWrites, { player = target, passKey = passKey, owned = isOwned })
+		end,
 	}
 	return {
 		player = player,
 		purchaseFinished = purchaseFinished,
 		granted = granted,
 		notifications = notifications,
+		ownershipWrites = ownershipWrites,
 		options = {
+			entitlementService = entitlementService,
 			marketplace = marketplace,
 			players = players,
 			playerData = playerData,
@@ -132,6 +141,37 @@ return function()
 			expect(fixture.granted[2]).to.equal("BallBlue")
 			expect(#fixture.notifications).to.equal(1)
 			expect(fixture.notifications[1].name).to.equal("StorePurchaseGranted")
+		end)
+
+		it("records ownership for the entitlement cache, including not-owned", function()
+			local fixture = dependencies({ [91] = false })
+			GamePassService.start(fixture.options)
+			expect(#fixture.ownershipWrites).to.equal(1)
+			expect(fixture.ownershipWrites[1].passKey).to.equal("StarterPass")
+			expect(fixture.ownershipWrites[1].owned).to.equal(false)
+		end)
+
+		it("records ownership again after a completed purchase", function()
+			local owned = { [91] = false }
+			local fixture = dependencies(owned)
+			GamePassService.start(fixture.options)
+
+			owned[91] = true
+			fixture.purchaseFinished:Fire(fixture.player, 91, true)
+			local last = fixture.ownershipWrites[#fixture.ownershipWrites]
+			expect(last.passKey).to.equal("StarterPass")
+			expect(last.owned).to.equal(true)
+		end)
+
+		it("never caches ownership when the platform lookup fails", function()
+			local fixture = dependencies({})
+			fixture.options.marketplace.UserOwnsGamePassAsync = function()
+				error("network down")
+			end
+			GamePassService.start(fixture.options)
+			-- A failed lookup must stay unknown so the boost is retried, not
+			-- cached as "does not own".
+			expect(#fixture.ownershipWrites).to.equal(0)
 		end)
 
 		it("rejects enabled passes that reference unknown cosmetics", function()

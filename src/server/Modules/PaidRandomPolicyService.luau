@@ -7,7 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
 
 -- Owns the server cache of Roblox's per-player paid-random-item policy and
--- gates paid Cash and crate paths only when purchasable Cash is active.
+-- gates every crate path -- earned Cash and Robux receipts alike -- but only
+-- once a Cash or Crate product is actually purchasable.
 
 type StartOptions = {
 	players: any?,
@@ -40,7 +41,7 @@ local function hasPaidRandomMonetization(): boolean
 	return false
 end
 
-function PaidRandomPolicyService.canOpenCashCrate(player: Player): (boolean, string?)
+function PaidRandomPolicyService.canReceivePaidRandom(player: Player): (boolean, string?)
 	if not hasPaidRandomMonetization() then
 		return true, nil
 	end

@@ -2,6 +2,10 @@
 
 -- Builds the single deterministic crate probability model consumed by both
 -- rolling and storefront disclosure.
+--
+-- Displayed percentages use largest-remainder allocation because Roblox's paid
+-- random items policy requires disclosed probabilities to sum to exactly 100%;
+-- rounding each outcome independently does not (9 items at 11.11% sum to 99.99).
 
 local CrateOdds = {}
 
@@ -69,6 +73,82 @@ function CrateOdds.build(
 		totalWeight = totalWeight,
 		outcomes = outcomes,
 	}
+end
+
+-- Hamilton/largest-remainder allocation: floor every share, then hand the
+-- leftover units to the largest fractional parts. Ties break on input index so
+-- the result is identical on every client and server.
+local function allocate(values: { number }, precision: number): { number }
+	local scale = 10 ^ precision
+	local totalUnits = math.round(100 * scale)
+	local count = #values
+	local units = table.create(count)
+	local order = table.create(count)
+	local assigned = 0
+
+	for index, value in values do
+		local exact = value * 100 * scale
+		local floored = math.floor(exact)
+		units[index] = floored
+		order[index] = { index = index, remainder = exact - floored }
+		assigned += floored
+	end
+
+	table.sort(order, function(left, right)
+		if left.remainder ~= right.remainder then
+			return left.remainder > right.remainder
+		end
+		return left.index < right.index
+	end)
+
+	for rank = 1, math.clamp(totalUnits - assigned, 0, count) do
+		units[order[rank].index] += 1
+	end
+
+	local percents = table.create(count)
+	for index, unit in units do
+		percents[index] = unit / scale
+	end
+	return percents
+end
+
+function CrateOdds.percentByItem(model: Model, precision: number): { [string]: number }
+	local values = table.create(#model.outcomes)
+	for index, outcome in model.outcomes do
+		values[index] = outcome.probability
+	end
+
+	local percents = allocate(values, precision)
+	local byItem: { [string]: number } = {}
+	for index, outcome in model.outcomes do
+		byItem[outcome.itemId] = percents[index]
+	end
+	return byItem
+end
+
+function CrateOdds.percentByRarity(
+	model: Model,
+	rarities: { [string]: RarityDef },
+	precision: number
+): { [string]: number }
+	local values = table.create(#model.rarityOrder)
+	for index, rarityName in model.rarityOrder do
+		values[index] = rarities[rarityName].Weight / model.totalWeight
+	end
+
+	local percents = allocate(values, precision)
+	local byRarity: { [string]: number } = {}
+	for index, rarityName in model.rarityOrder do
+		byRarity[rarityName] = percents[index]
+	end
+	return byRarity
+end
+
+function CrateOdds.formatPercent(percent: number, precision: number): string
+	if percent % 1 == 0 then
+		return tostring(math.floor(percent))
+	end
+	return string.format(`%.{precision}f`, percent)
 end
 
 return CrateOdds

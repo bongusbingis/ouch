@@ -855,8 +855,7 @@ local function populateStoreOfferCard(card: CanvasGroup)
 		0.45
 	)
 	badgeChip.BackgroundTransparency = 0.02
-	local badge =
-		resolveText(card, "Badge", "PERMANENT PASS", 0.36, 0.11, 0.32, 0.15, 8, 12, 15, Enum.TextXAlignment.Center)
+	local badge = resolveText(card, "Badge", "GAMEPASS", 0.36, 0.11, 0.32, 0.15, 8, 12, 15, Enum.TextXAlignment.Center)
 	badge.TextColor3 = Color3.fromRGB(255, 249, 221)
 	local title = resolveText(card, "ItemName", "Offer", 0.35, 0.27, 0.6, 0.22, 11, 21, 14, nil)
 	title.TextColor3 = Color3.fromRGB(255, 249, 226)
@@ -983,6 +982,14 @@ local function populateShop(view: CanvasGroup)
 	if aspect then
 		aspect:Destroy()
 	end
+	local shopSize = view:FindFirstChild("ShopSize")
+	if shopSize == nil then
+		shopSize = Instance.new("UISizeConstraint")
+		shopSize.Name = "ShopSize"
+		shopSize.Parent = view
+	end
+	assert(shopSize:IsA("UISizeConstraint"), "[UIResolver] Shop.ShopSize must be a UISizeConstraint")
+	shopSize.MaxSize = Vector2.new(1360, 820)
 	view.ClipsDescendants = true
 
 	for _, name in
@@ -1026,7 +1033,7 @@ local function populateShop(view: CanvasGroup)
 		0.035,
 		0.035,
 		0.93,
-		0.235,
+		0.215,
 		11,
 		Color3.fromRGB(255, 238, 220),
 		Color3.fromRGB(255, 250, 235),
@@ -1070,7 +1077,10 @@ local function populateShop(view: CanvasGroup)
 	close.Text = "X"
 	close.TextColor3 = Color3.fromRGB(255, 249, 226)
 	close.TextScaled = true
-	topLeft(close, 0.905, 0.07, 0.07, 0.42, 14)
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.new(1, -14, 0, 12)
+	close.Size = UDim2.fromOffset(48, 48)
+	close.ZIndex = 14
 	styleNativePanel(
 		close,
 		Color3.fromRGB(220, 67, 112),
@@ -1088,7 +1098,7 @@ local function populateShop(view: CanvasGroup)
 	assert(closeSize:IsA("UISizeConstraint"), "[UIResolver] ShopHeader.Close.TouchSize must be a UISizeConstraint")
 	closeSize.MinSize = Vector2.new(44, 44)
 
-	local tabs = resolveContainer(header, "JumpTabs", 0.025, 0.62, 0.95, 0.34, 13)
+	local tabs = resolveContainer(header, "JumpTabs", 0.025, 0.6, 0.95, 0.35, 13)
 	local tabLayout = tabs:FindFirstChild("Layout")
 	if tabLayout == nil then
 		tabLayout = Instance.new("UIListLayout")
@@ -1102,14 +1112,15 @@ local function populateShop(view: CanvasGroup)
 	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-	for order, definition in
-		{
-			{ name = "FeaturedTab", text = "FEATURED" },
-			{ name = "CratesTab", text = "CRATES" },
-			{ name = "CashTab", text = "CASH" },
-			{ name = "PassesTab", text = "PASSES" },
-		}
-	do
+	local tabDefinitions = {
+		{ name = "FeaturedTab", text = "FEATURED" },
+		{ name = "CratesTab", text = "CRATES" },
+		{ name = "DirectTab", text = "DIRECT" },
+		{ name = "CashTab", text = "CASH" },
+		{ name = "PassesTab", text = "GAMEPASSES" },
+	}
+	local tabWidth = (1 - 0.012 * (#tabDefinitions - 1)) / #tabDefinitions
+	for order, definition in tabDefinitions do
 		local button = tabs:FindFirstChild(definition.name)
 		if button == nil then
 			button = Instance.new("TextButton")
@@ -1122,7 +1133,7 @@ local function populateShop(view: CanvasGroup)
 		button.BorderSizePixel = 0
 		button.FontFace = uiConfig().Text.DefaultFont
 		button.LayoutOrder = order
-		button.Size = UDim2.fromScale(0.235, 1)
+		button.Size = UDim2.fromScale(tabWidth, 1)
 		button.Text = definition.text
 		button.TextColor3 = Color3.fromRGB(255, 246, 224)
 		button.TextScaled = true
@@ -1136,6 +1147,18 @@ local function populateShop(view: CanvasGroup)
 			Color3.fromRGB(74, 38, 77),
 			0.28
 		)
+		local textSize = button:FindFirstChild("TextSize")
+		if textSize == nil then
+			textSize = Instance.new("UITextSizeConstraint")
+			textSize.Name = "TextSize"
+			textSize.Parent = button
+		end
+		assert(
+			textSize:IsA("UITextSizeConstraint"),
+			`[UIResolver] ShopHeader.JumpTabs.{definition.name}.TextSize must be a UITextSizeConstraint`
+		)
+		textSize.MinTextSize = 12
+		textSize.MaxTextSize = 19
 		local touchSize = button:FindFirstChild("TouchSize")
 		if touchSize == nil then
 			touchSize = Instance.new("UISizeConstraint")
@@ -1159,7 +1182,7 @@ local function populateShop(view: CanvasGroup)
 		storefront.Name = "Storefront"
 		storefront.Parent = view
 	end
-	styleScroll(storefront, 0.035, 0.285, 0.93, 0.68)
+	styleScroll(storefront, 0.035, 0.265, 0.93, 0.69)
 	storefront.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	storefront.CanvasSize = UDim2.fromOffset(0, 0)
 	storefront.ScrollBarThickness = 7
@@ -1216,60 +1239,122 @@ local function populateShop(view: CanvasGroup)
 		return holder, grid
 	end
 
+	-- Order 5 pins the starter offer above everything else. ShopController hides
+	-- the whole section when the offer is not live, so an expired window leaves
+	-- no trace in the storefront.
+	local starterSection =
+		section("StarterSection", "STARTER OFFER", 5, Color3.fromRGB(255, 196, 84), Color3.fromRGB(196, 92, 24))
+	starterSection.Visible = false
+	local starterHeadline = resolveText(starterSection, "Headline", "", 0.025, 0, 0.7, 0, 12, 22, 14, nil)
+	starterHeadline.Position = UDim2.new(0.025, 0, 0, 54)
+	starterHeadline.Size = UDim2.new(0.7, 0, 0, 34)
+	starterHeadline.TextColor3 = Color3.fromRGB(255, 250, 232)
+	local starterDetail = resolveText(starterSection, "Detail", "", 0.025, 0, 0.7, 0, 9, 15, 14, nil)
+	starterDetail.Position = UDim2.new(0.025, 0, 0, 90)
+	starterDetail.Size = UDim2.new(0.7, 0, 0, 26)
+	starterDetail.TextColor3 = Color3.fromRGB(255, 236, 205)
+	local starterTimer = resolveText(starterSection, "Timer", "", 0.025, 0, 0.7, 0, 9, 15, 14, nil)
+	starterTimer.Position = UDim2.new(0.025, 0, 0, 116)
+	starterTimer.Size = UDim2.new(0.7, 0, 0, 24)
+	starterTimer.TextColor3 = Color3.fromRGB(255, 224, 168)
+	local starterActionMount = resolveContainer(starterSection, "ActionMount", 0.74, 0, 0.22, 0, 14)
+	starterActionMount.Position = UDim2.new(0.74, 0, 0, 62)
+	starterActionMount.Size = UDim2.new(0.22, 0, 0, 62)
+
 	local featuredSection =
-		section("FeaturedSection", "FEATURED DROP", 10, Color3.fromRGB(249, 103, 173), Color3.fromRGB(145, 28, 103))
+		section("FeaturedSection", "FEATURED", 10, Color3.fromRGB(249, 103, 173), Color3.fromRGB(145, 28, 103))
 	local featuredMount = resolveContainer(featuredSection, "FeaturedMount", 0.025, 0, 0.95, 0, 13)
 	featuredMount.Position = UDim2.new(0.025, 0, 0, 54)
 	featuredMount.Size = UDim2.new(0.95, 0, 1, -68)
 
-	local cratesSection = section(
-		"CratesSection",
-		"CRATES - EARN OR BUY",
-		20,
-		Color3.fromRGB(245, 116, 173),
-		Color3.fromRGB(153, 40, 103)
-	)
+	local cratesSection =
+		section("CratesSection", "CRATES", 20, Color3.fromRGB(245, 116, 173), Color3.fromRGB(153, 40, 103))
 	local cratesHolder, cratesGrid = gridHolder(cratesSection, "CratesHolder")
 
 	local cashSection =
-		section("CashSection", "CASH TOP-UPS", 30, Color3.fromRGB(245, 181, 62), Color3.fromRGB(183, 88, 47))
+		section("CashSection", "CASH BUNDLES", 30, Color3.fromRGB(245, 181, 62), Color3.fromRGB(183, 88, 47))
 	local cashOffersHolder, cashGrid = gridHolder(cashSection, "CashOffersHolder")
 
+	local directSection =
+		section("DirectSection", "BUY DIRECT", 25, Color3.fromRGB(96, 190, 160), Color3.fromRGB(24, 104, 88))
+	local directHolder, directGrid = gridHolder(directSection, "DirectHolder")
+
 	local passesSection =
-		section("PassesSection", "PERMANENT PASSES", 40, Color3.fromRGB(166, 85, 217), Color3.fromRGB(75, 43, 145))
+		section("PassesSection", "GAMEPASSES", 40, Color3.fromRGB(166, 85, 217), Color3.fromRGB(75, 43, 145))
 	local passesHolder, passesGrid = gridHolder(passesSection, "PassesHolder")
+
+	-- Row counts come from what is actually mounted; a fixed count silently
+	-- clips the grid the moment a section gains or loses a card.
+	local function cardCount(holder: Frame): number
+		local count = 0
+		for _, child in holder:GetChildren() do
+			if child:IsA("GuiObject") then
+				count += 1
+			end
+		end
+		return count
+	end
 
 	local function refreshSections()
 		local width = storefront.AbsoluteSize.X * 0.93
 		if width <= 0 then
 			width = 800
 		end
-		local columns = if width >= 900 then 3 else 2
+		local columns = if width >= 1050 then 4 else if width >= 620 then 2 else 1
 		local gap = 12
 		local offerWidth = math.max(180, math.floor((width - gap * (columns - 1)) / columns))
 		local offerHeight = math.max(150, math.floor(offerWidth / STORE_OFFER_CARD_ASPECT))
-		local offerRows = math.ceil(4 / columns)
-		local offerSectionHeight = 68 + offerRows * offerHeight + (offerRows - 1) * gap
-		cashSection.Size = UDim2.new(0.98, 0, 0, offerSectionHeight)
-		passesSection.Size = UDim2.new(0.98, 0, 0, offerSectionHeight)
-		cashGrid.CellPadding = UDim2.fromOffset(gap, gap)
-		cashGrid.CellSize = UDim2.fromOffset(offerWidth, offerHeight)
-		passesGrid.CellPadding = UDim2.fromOffset(gap, gap)
-		passesGrid.CellSize = UDim2.fromOffset(offerWidth, offerHeight)
+
+		local function sizeGrid(target: Frame, holder: Frame, grid: UIGridLayout, cellHeight: number)
+			grid.CellPadding = UDim2.fromOffset(gap, gap)
+			grid.CellSize = UDim2.fromOffset(offerWidth, cellHeight)
+			local rows = math.max(1, math.ceil(cardCount(holder) / columns))
+			target.Size = UDim2.new(0.98, 0, 0, 68 + rows * cellHeight + (rows - 1) * gap)
+		end
+
+		sizeGrid(cashSection, cashOffersHolder, cashGrid, offerHeight)
+		sizeGrid(passesSection, passesHolder, passesGrid, offerHeight)
+		sizeGrid(directSection, directHolder, directGrid, math.max(120, math.floor(offerWidth / ECONOMY_CARD_ASPECT)))
+
+		starterSection.Size = UDim2.new(0.98, 0, 0, 152)
 
 		local crateColumns = 2
 		local crateWidth = math.max(250, math.floor((width - gap) / crateColumns))
 		local crateHeight = math.clamp(math.floor(crateWidth / 2.45), 190, 230)
-		cratesSection.Size = UDim2.new(0.98, 0, 0, 68 + crateHeight)
+		local crateRows = math.max(1, math.ceil(cardCount(cratesHolder) / crateColumns))
+		cratesSection.Size = UDim2.new(0.98, 0, 0, 68 + crateRows * crateHeight + (crateRows - 1) * gap)
 		cratesGrid.CellPadding = UDim2.fromOffset(gap, gap)
 		cratesGrid.CellSize = UDim2.fromOffset(crateWidth, crateHeight)
 		featuredSection.Size = UDim2.new(0.98, 0, 0, math.clamp(crateHeight + 68, 250, 310))
 	end
+
+	-- Controllers mount many cards in one render pass; coalesce so the resize
+	-- runs once per batch rather than once per card.
+	local refreshQueued = false
+	local function queueRefresh()
+		if refreshQueued then
+			return
+		end
+		refreshQueued = true
+		task.defer(function()
+			refreshQueued = false
+			refreshSections()
+		end)
+	end
+
 	refreshSections()
 	local sectionConnection = storefront:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshSections)
 	table.insert(cleanups, function()
 		sectionConnection:Disconnect()
 	end)
+	for _, holder in { cratesHolder, cashOffersHolder, passesHolder, directHolder } do
+		local added = holder.ChildAdded:Connect(queueRefresh)
+		local removed = holder.ChildRemoved:Connect(queueRefresh)
+		table.insert(cleanups, function()
+			added:Disconnect()
+			removed:Disconnect()
+		end)
+	end
 
 	local function overlay(name: string): CanvasGroup
 		local existing = view:FindFirstChild(name)
@@ -1378,7 +1463,10 @@ local function populateShop(view: CanvasGroup)
 		if boundsParent then
 			local size = (boundsParent :: GuiObject).AbsoluteSize
 			local compact = size.X < 900 or size.Y < 520
-			view.Size = if compact then UDim2.fromScale(0.97, 0.92) else UDim2.fromScale(0.9, 0.88)
+			view.Size = if compact then UDim2.fromScale(0.96, 0.9) else UDim2.fromScale(0.78, 0.82)
+			header.Size = if compact then UDim2.fromScale(0.93, 0.29) else UDim2.fromScale(0.93, 0.215)
+			storefront.Position = if compact then UDim2.fromScale(0.035, 0.34) else UDim2.fromScale(0.035, 0.265)
+			storefront.Size = if compact then UDim2.fromScale(0.93, 0.625) else UDim2.fromScale(0.93, 0.69)
 		end
 	end
 	refreshRoot()
@@ -1692,6 +1780,144 @@ local function resolveSettingsView(views: Instance): CanvasGroup
 		view = buildMenuRoot(views, "Settings")
 	end
 	populateSettings(view)
+	return view
+end
+
+local function populateBattlePass(view: CanvasGroup)
+	styleMenuRoot(view, SHOP_ASPECT)
+	local aspect = view:FindFirstChild("AspectRatio")
+	if aspect then
+		aspect:Destroy()
+	end
+	view.ClipsDescendants = true
+	resolveImage(view, "Background", SHOP_IMAGE, SHOP_ASPECT, 0, 0, 1, 1, 10, nil).ScaleType = Enum.ScaleType.Stretch
+
+	local header = resolveNativePanel(
+		view,
+		"PassHeader",
+		0.035,
+		0.035,
+		0.93,
+		0.22,
+		11,
+		Color3.fromRGB(72, 38, 128),
+		Color3.fromRGB(148, 86, 214),
+		Color3.fromRGB(54, 28, 100),
+		Color3.fromRGB(255, 226, 250),
+		0.08
+	)
+	local title = resolveText(header, "SeasonTitle", "SEASON", 0.03, 0.08, 0.6, 0.34, 15, 28, 13, nil)
+	title.TextColor3 = Color3.fromRGB(255, 246, 224)
+	local status = resolveText(header, "Status", "Loading season...", 0.03, 0.44, 0.6, 0.2, 9, 15, 13, nil)
+	status.TextColor3 = Color3.fromRGB(238, 214, 255)
+	local tierLabel = resolveText(header, "TierLabel", "TIER 0", 0.03, 0.66, 0.3, 0.24, 12, 22, 13, nil)
+	tierLabel.TextColor3 = Color3.fromRGB(255, 224, 130)
+
+	-- Progress bar lifted from the QuestCard pattern: a track with a fill whose
+	-- width is set from derived tier progress.
+	local track = resolveNativePanel(
+		header,
+		"ProgressTrack",
+		0.34,
+		0.72,
+		0.62,
+		0.12,
+		13,
+		Color3.fromRGB(40, 20, 72),
+		Color3.fromRGB(60, 32, 104),
+		Color3.fromRGB(30, 14, 56),
+		Color3.fromRGB(255, 226, 250),
+		0.5
+	)
+	local fill = resolveNativePanel(
+		track,
+		"ProgressFill",
+		0,
+		0,
+		0,
+		1,
+		14,
+		Color3.fromRGB(255, 196, 84),
+		Color3.fromRGB(255, 230, 150),
+		Color3.fromRGB(226, 148, 40),
+		Color3.fromRGB(120, 70, 20),
+		0.5
+	)
+	fill.Size = UDim2.fromScale(0, 1)
+
+	local claimAll = resolveContainer(header, "ClaimAllMount", 0.66, 0.06, 0.15, 0.36, 14)
+	claimAll.BackgroundTransparency = 1
+	local premiumMount = resolveContainer(header, "PremiumMount", 0.82, 0.06, 0.15, 0.36, 14)
+	premiumMount.BackgroundTransparency = 1
+
+	local close = header:FindFirstChild("Close")
+	if close == nil then
+		close = Instance.new("TextButton")
+		close.Name = "Close"
+		close.Parent = header
+	end
+	assert(close:IsA("TextButton"), "[UIResolver] PassHeader.Close must be a TextButton")
+	close.AutoButtonColor = true
+	close.BorderSizePixel = 0
+	close.FontFace = uiConfig().Text.DefaultFont
+	close.Text = "X"
+	close.TextColor3 = Color3.fromRGB(255, 249, 226)
+	close.TextScaled = true
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.new(1, -14, 0, 12)
+	close.Size = UDim2.fromOffset(44, 44)
+	close.ZIndex = 15
+	styleNativePanel(
+		close,
+		Color3.fromRGB(220, 67, 112),
+		Color3.fromRGB(255, 114, 158),
+		Color3.fromRGB(190, 44, 94),
+		Color3.fromRGB(88, 38, 53),
+		0.3
+	)
+
+	local holder = view:FindFirstChild("TierHolder")
+	local scroll: ScrollingFrame
+	if holder then
+		assert(holder:IsA("ScrollingFrame"), "[UIResolver] BattlePass.TierHolder must be a ScrollingFrame")
+		scroll = holder
+	else
+		scroll = Instance.new("ScrollingFrame")
+		scroll.Name = "TierHolder"
+		scroll.Parent = view
+	end
+	styleScroll(scroll, 0.035, 0.28, 0.93, 0.67)
+	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scroll.CanvasSize = UDim2.fromOffset(0, 0)
+	scroll.ScrollBarThickness = 7
+	local layout = scroll:FindFirstChild("List")
+	if layout == nil then
+		layout = Instance.new("UIListLayout")
+		layout.Name = "List"
+		layout.Parent = scroll
+	end
+	assert(layout:IsA("UIListLayout"), "[UIResolver] BattlePass.TierHolder.List must be a UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Vertical
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+end
+
+-- FindFirstChild is deliberate: this temporary Instance.new exception was
+-- directed by the user while Studio is unavailable. The replacement is a
+-- MainGui.BaseClip.Views.BattlePass CanvasGroup with Background, PassHeader
+-- (SeasonTitle, Status, TierLabel, ProgressTrack/ProgressFill, ClaimAllMount,
+-- PremiumMount, Close) and a TierHolder ScrollingFrame with a List layout.
+local function resolveBattlePassView(views: Instance): CanvasGroup
+	local authored = views:FindFirstChild("BattlePass")
+	local view: CanvasGroup
+	if authored then
+		assert(authored:IsA("CanvasGroup"), "[UIResolver] Views.BattlePass must be a CanvasGroup")
+		view = authored
+	else
+		view = buildMenuRoot(views, "BattlePass")
+	end
+	populateBattlePass(view)
 	return view
 end
 
@@ -2499,6 +2725,7 @@ function UIResolver.mount()
 	resolveShopView(views)
 	resolveInventoryView(views)
 	resolveLeaderboardView(views)
+	resolveBattlePassView(views)
 	resolveSettingsView(views)
 	resolveLiveScoreboard(hud)
 	resolveCatchButton(hud)

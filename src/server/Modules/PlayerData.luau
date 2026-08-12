@@ -7,6 +7,7 @@ local Promise = require(ReplicatedStorage.Packages.promise)
 
 local Env = require(script.Parent.Parent.Env)
 local DataConfig = require(game.ReplicatedStorage.Config.Data)
+local ProfileMigrations = require(ReplicatedStorage.Shared.Game.Data.ProfileMigrations)
 
 local Data = {}
 Data._profiles = {}
@@ -117,6 +118,22 @@ local function _loadPlayerData(player)
 		end
 
 		profile:AddUserId(player.UserId)
+
+		-- Ordering is load-bearing on all three counts:
+		-- before Reconcile, so a migration can still tell "field absent" from
+		-- "field at the template default"; before Replica.New, because after
+		-- that every write emits a Set and partial migration state becomes
+		-- visible to the client; and never downward, since a rolling deploy
+		-- puts old servers in front of newer profiles.
+		local migrated, reached, migrationError = ProfileMigrations.apply(profile.Data, DataConfig.SchemaVersion)
+		if not migrated then
+			warn(
+				`[Data] Migration to v{DataConfig.SchemaVersion} failed for {player.Name} at v{reached}: {migrationError}`
+			)
+			profile:EndSession()
+			player:Kick("Data load failed.\nPlease rejoin!")
+			return
+		end
 		profile:Reconcile()
 
 		-- Self-cleaning: disconnects after one fire so it doesn't accumulate.
@@ -156,6 +173,7 @@ local function _loadPlayerData(player)
 			Replica = profileReplica,
 		}
 		Data._profiles[player.UserId] = entry
+		Data.markFirstJoin(player)
 		_subscribeWhenReady(player, entry)
 		resolve(true)
 	end)
@@ -271,6 +289,17 @@ function Data.completeTutorial(player): boolean
 	end
 	d.Tutorial.Version = DataConfig.TutorialVersion
 	player:SetAttribute("TutorialVersion", d.Tutorial.Version)
+	return true
+end
+
+-- Stamped once, on the first session that ever loads this profile. The starter
+-- offer window is measured from it, so it must never be rewritten on later joins.
+function Data.markFirstJoin(player, now)
+	local d = Data.get(player)
+	if not d or d.Onboarding.FirstJoinAt > 0 then
+		return false
+	end
+	d.Onboarding.FirstJoinAt = now or os.time()
 	return true
 end
 

@@ -1,0 +1,87 @@
+--!strict
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local DirectPurchase = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("DirectPurchase")
+)
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local CosmeticsService = require(script.Parent.CosmeticsService)
+local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
+
+-- Owns the guaranteed Cash-for-cosmetic path. Nothing here is random, so it is
+-- deliberately outside PaidRandomPolicyService's gate. Cash is deducted only
+-- after CosmeticsService reports the item as newly granted.
+
+local DirectPurchaseService = {}
+
+local started = false
+
+export type PurchaseResult = {
+	itemId: string,
+	rarity: string,
+	price: number,
+}
+
+function DirectPurchaseService.purchase(player: Player, itemId: string): (PurchaseResult?, string?)
+	local data = PlayerData.get(player)
+	if data == nil then
+		return nil, "no_profile"
+	end
+
+	local price, reason =
+		DirectPurchase.evaluate(itemId, Cosmetics.Items, Cosmetics.Rarities, data.Cosmetics.Owned, data.Cash)
+	if price == nil then
+		return nil, reason
+	end
+
+	if not CosmeticsService.grant(player, itemId) then
+		return nil, "grant_failed"
+	end
+	data.Cash -= price
+
+	local item = Cosmetics.Items[itemId]
+	AnalyticsService.logEconomyEvent(
+		player,
+		"Sink",
+		"Cash",
+		price,
+		data.Cash,
+		AnalyticsConfig.EconomyTransactionTypes.Shop,
+		itemId,
+		{ rarity = item.Rarity, source = "DirectBuy" }
+	)
+	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
+		itemId = itemId,
+		source = "DirectBuy",
+	})
+
+	return { itemId = itemId, rarity = item.Rarity, price = price }, nil
+end
+
+function DirectPurchaseService.start()
+	if started then
+		return
+	end
+	started = true
+	Network.handleProtected("PurchaseCosmetic", {
+		rateLimit = 2,
+		validate = function(_player, itemId)
+			if typeof(itemId) ~= "string" then
+				return false, "itemId must be a string"
+			end
+			return true
+		end,
+	}, function(player, itemId)
+		return DirectPurchaseService.purchase(player, itemId)
+	end)
+end
+
+function DirectPurchaseService._resetForTest()
+	started = false
+end
+
+return DirectPurchaseService

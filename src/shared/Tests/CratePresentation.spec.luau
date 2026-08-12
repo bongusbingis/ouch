@@ -46,6 +46,50 @@ T.describe("CratePresentation", function()
 		T.expect(result.outcomes[1].probability):toBeNear(0.5, 0.0001)
 		T.expect(result.outcomes[2].probability):toBeNear(0.5, 0.0001)
 	end)
+
+	T.it("lists pity guarantees rarest first and omits rarities the crate cannot drop", function()
+		local result = CratePresentation.forCrate({
+			ItemPool = { "Common", "Rare" },
+			Pity = { Rare = 5, Legendary = 25 },
+		}, {
+			Rarities = RARITIES,
+			Items = {
+				Common = { DisplayName = "Common", Rarity = "Common" },
+				Rare = { DisplayName = "Rare", Rarity = "Rare" },
+			},
+		})
+
+		T.expect(#result.pity):toEqual(1)
+		T.expect(result.pity[1].rarity):toEqual("Rare")
+		T.expect(result.pity[1].threshold):toEqual(5)
+	end)
+
+	T.it("orders multiple guarantees by rarity", function()
+		local result = CratePresentation.forCrate({
+			ItemPool = { "Common", "Rare", "Legend" },
+			Pity = { Rare = 5, Legendary = 25 },
+		}, {
+			Rarities = RARITIES,
+			Items = {
+				Common = { DisplayName = "Common", Rarity = "Common" },
+				Rare = { DisplayName = "Rare", Rarity = "Rare" },
+				Legend = { DisplayName = "Solar Flare", Rarity = "Legendary" },
+			},
+		})
+
+		T.expect(#result.pity):toEqual(2)
+		T.expect(result.pity[1].rarity):toEqual("Legendary")
+		T.expect(result.pity[2].rarity):toEqual("Rare")
+	end)
+
+	T.it("reports no guarantees for crates without a Pity block", function()
+		local result = CratePresentation.forCrate({ ItemPool = { "Common" } }, {
+			Rarities = RARITIES,
+			Items = { Common = { DisplayName = "Common", Rarity = "Common" } },
+		})
+
+		T.expect(#result.pity):toEqual(0)
+	end)
 end)
 
 return true

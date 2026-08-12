@@ -21,6 +21,7 @@ local Analytics = {
 		BallCaught = "BallCaught",
 		MatchCompleted = "MatchCompleted",
 		QuestClaimed = "QuestClaimed",
+		SeasonTierClaimed = "SeasonTierClaimed",
 		CosmeticGranted = "CosmeticGranted",
 		CosmeticEquipped = "CosmeticEquipped",
 		CratePurchaseFailed = "CratePurchaseFailed",

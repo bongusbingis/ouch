@@ -7,6 +7,7 @@ local ButtonElement = require(script.Parent.Elements.ButtonElement)
 local ElementFactory = require(script.Parent.Elements.ElementFactory)
 local ElementTypes = require(script.Parent.Elements.ElementTypes)
 local QuestsController = require(script.Parent.QuestsController)
+local ShopController = require(script.Parent.ShopController)
 
 type MenuId = MenuTypes.MenuId
 type MenuDefinition = MenuTypes.MenuDefinition
@@ -27,6 +28,8 @@ local started = false
 local handles: { [MenuId]: MenuButtonHandle } = {}
 local menuDisconnect: (() -> ())? = nil
 local questDisconnect: (() -> ())? = nil
+local shopDisconnect: (() -> ())? = nil
+local shopBadgeHandle: any = nil
 local questBadgeHandle: ElementTypes.ElementHandle? = nil
 
 local function resolveSidebar(): Frame
@@ -93,18 +96,34 @@ function SidebarController.start(sidebarOverride: Instance?, options: StartOptio
 		}, if options then options.buttonOptions else nil)
 	end
 
-	local questsButton = handles.Quests
-	if questsButton and not (options and options.buttonElement) then
+	local function attachBadge(button: any): (ImageLabel, any)
 		local template = ElementFactory.resolveTemplate("NotificationBadge", "ImageLabel") :: ImageLabel
-		local badge, badgeHandle = ElementFactory.cloneMount(template, questsButton.instance)
+		local badge, badgeHandle = ElementFactory.cloneMount(template, button.instance)
 		assert(badge:IsA("ImageLabel"), "[SidebarController] NotificationBadge must be an ImageLabel")
 		badge.AnchorPoint = Vector2.new(0.5, 0.5)
 		badge.Position = UDim2.fromScale(0.86, 0.16)
 		badge.Size = UDim2.fromScale(0.3, 0.3)
-		badge.ZIndex = questsButton.instance.ZIndex + 2
+		badge.ZIndex = button.instance.ZIndex + 2
+		return badge, badgeHandle
+	end
+
+	local questsButton = handles.Quests
+	if questsButton and not (options and options.buttonElement) then
+		local badge, badgeHandle = attachBadge(questsButton)
 		questBadgeHandle = badgeHandle
 		questDisconnect = QuestsController.onClaimableChanged(function(claimable)
 			badge.Visible = claimable
+		end)
+	end
+
+	-- The starter offer expires on a real clock, so the badge has to reach the
+	-- player before they think to open the shop on their own.
+	local shopButton = handles.Shop
+	if shopButton and not (options and options.buttonElement) then
+		local badge, badgeHandle = attachBadge(shopButton)
+		shopBadgeHandle = badgeHandle
+		shopDisconnect = ShopController.onStarterOfferChanged(function(active)
+			badge.Visible = active
 		end)
 	end
 
@@ -121,8 +140,14 @@ function SidebarController._resetForTest()
 	if questDisconnect then
 		questDisconnect()
 	end
+	if shopDisconnect then
+		shopDisconnect()
+	end
 	if questBadgeHandle then
 		questBadgeHandle:destroy()
+	end
+	if shopBadgeHandle then
+		shopBadgeHandle:destroy()
 	end
 	for _, handle in handles do
 		handle:destroy()
@@ -131,7 +156,9 @@ function SidebarController._resetForTest()
 	handles = {}
 	menuDisconnect = nil
 	questDisconnect = nil
+	shopDisconnect = nil
 	questBadgeHandle = nil
+	shopBadgeHandle = nil
 end
 
 return SidebarController

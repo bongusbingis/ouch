@@ -39,20 +39,40 @@ export type OutcomePresentation = {
 	percentText: string,
 }
 
+export type PityPresentation = {
+	rarity: string,
+	threshold: number,
+}
+
 export type Presentation = {
 	highlight: string,
 	odds: string,
 	rarityCount: number,
 	outcomes: { OutcomePresentation },
+	pity: { PityPresentation },
 }
 
-local function percentText(probability: number, precision: number): string
-	local percent = probability * 100
-	local rounded = math.floor(percent + 0.5)
-	if math.abs(percent - rounded) < 0.005 then
-		return tostring(rounded)
+-- Guarantees read rarest-first, and only for rarities this crate can actually
+-- drop -- a threshold for an absent rarity would never fire.
+local function pityFor(crate: any, cosmetics: any, buckets: { [string]: any }): { PityPresentation }
+	local entries: { PityPresentation } = {}
+	if crate.Pity == nil then
+		return entries
 	end
-	return string.format(if precision == 1 then "%.1f" else "%.2f", percent)
+	for rarityName, threshold in crate.Pity do
+		if buckets[rarityName] ~= nil and cosmetics.Rarities[rarityName] ~= nil then
+			table.insert(entries, { rarity = rarityName, threshold = threshold })
+		end
+	end
+	table.sort(entries, function(left, right)
+		local leftWeight = cosmetics.Rarities[left.rarity].Weight
+		local rightWeight = cosmetics.Rarities[right.rarity].Weight
+		if leftWeight ~= rightWeight then
+			return leftWeight < rightWeight
+		end
+		return left.rarity < right.rarity
+	end)
+	return entries
 end
 
 function CratePresentation.forCrate(crate: any, cosmetics: any): Presentation
@@ -63,6 +83,7 @@ function CratePresentation.forCrate(crate: any, cosmetics: any): Presentation
 			odds = "ODDS UNAVAILABLE",
 			rarityCount = 0,
 			outcomes = {},
+			pity = {},
 		}
 	end
 
@@ -83,12 +104,10 @@ function CratePresentation.forCrate(crate: any, cosmetics: any): Presentation
 		table.insert(rarityNames, rarityName)
 	end
 
+	local rarityPercents = CrateOdds.percentByRarity(model, cosmetics.Rarities, 1)
 	local oddsParts = {}
 	for _, rarityName in rarityNames do
-		table.insert(
-			oddsParts,
-			`{string.upper(rarityName)} {percentText(cosmetics.Rarities[rarityName].Weight / model.totalWeight, 1)}%`
-		)
+		table.insert(oddsParts, `{string.upper(rarityName)} {CrateOdds.formatPercent(rarityPercents[rarityName], 1)}%`)
 	end
 
 	local highestRarity = rarityNames[1]
@@ -105,6 +124,7 @@ function CratePresentation.forCrate(crate: any, cosmetics: any): Presentation
 		then `{#crate.ItemPool} COLOR DROPS  |  {cosmetics.Items[highestItems[1]].DisplayName}`
 		else `CHASE: {cosmetics.Items[highestItems[1]].DisplayName}  |  {string.upper(highestRarity)}`
 
+	local itemPercents = CrateOdds.percentByItem(model, 2)
 	local outcomes: { OutcomePresentation } = {}
 	for _, outcome in model.outcomes do
 		table.insert(outcomes, {
@@ -112,7 +132,7 @@ function CratePresentation.forCrate(crate: any, cosmetics: any): Presentation
 			displayName = cosmetics.Items[outcome.itemId].DisplayName,
 			rarity = outcome.rarity,
 			probability = outcome.probability,
-			percentText = percentText(outcome.probability, 2),
+			percentText = CrateOdds.formatPercent(itemPercents[outcome.itemId], 2),
 		})
 	end
 	table.sort(outcomes, function(left, right)
@@ -129,6 +149,7 @@ function CratePresentation.forCrate(crate: any, cosmetics: any): Presentation
 		odds = `ODDS  {table.concat(oddsParts, "  |  ")}`,
 		rarityCount = #rarityNames,
 		outcomes = outcomes,
+		pity = pityFor(crate, cosmetics, model.buckets),
 	}
 end
 

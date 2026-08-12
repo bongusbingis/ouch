@@ -20,6 +20,13 @@ local MenuRegistry: { [MenuId]: MenuDefinition } = {
 		color = { r = 0.96, g = 0.16, b = 0.52 },
 		sidebarOrder = 20,
 	},
+	BattlePass = {
+		id = "BattlePass",
+		viewName = "BattlePass",
+		label = "Season",
+		color = { r = 0.68, g = 0.34, b = 0.92 },
+		sidebarOrder = 25,
+	},
 	Inventory = {
 		id = "Inventory",
 		viewName = "Inventory",

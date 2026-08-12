@@ -8,7 +8,14 @@ local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):W
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local Boosts = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
+)
 local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
+local EntitlementService = require(script.Parent.EntitlementService)
+local BattlePassService = require(script.Parent.BattlePassService)
 
 type MatchEvent = { [string]: any }
 
@@ -28,6 +35,8 @@ local ProgressionService = {}
 local progressByPlayerId: { [string]: MatchProgress } = {}
 local seenEvents = EventDedup.new()
 local started = false
+local activeEntitlementService: any = EntitlementService
+local activeBattlePassService: any = BattlePassService
 
 local function blank(): MatchProgress
 	return {
@@ -117,15 +126,53 @@ local function commitMatch(event: MatchEvent)
 		end
 
 		if player then
-			PlayerData.applyProgression(player, progress)
+			-- A cold ownership cache would silently drop a paid boost, so wait
+			-- briefly for it; the yield is invisible at match end.
+			activeEntitlementService.awaitReady(player, 2)
+			local multipliers = activeEntitlementService.multipliers(player)
+			-- Boosted values go into a fresh delta, never back into `progress`:
+			-- resetMatch only clears on MatchStarted, so mutating it in place
+			-- would compound the multiplier if MatchEnded ever fired twice.
+			local awarded = {
+				Elims = progress.Elims,
+				Deaths = progress.Deaths,
+				Catches = progress.Catches,
+				Wins = progress.Wins,
+				Losses = progress.Losses,
+				MatchesPlayed = progress.MatchesPlayed,
+				XP = Boosts.apply(progress.XP, multipliers.Xp),
+				Cash = Boosts.apply(progress.Cash, multipliers.Cash),
+			}
+
+			PlayerData.applyProgression(player, awarded)
+			-- Career XP and season XP are different quantities, so neither can
+			-- be derived from the other. They are kept from drifting by this
+			-- being the only place either is incremented for a match.
+			activeBattlePassService.addSeasonXp(player, awarded.XP)
 			PlayerData.completeTutorial(player)
+			if awarded.Cash > 0 then
+				local data = PlayerData.get(player)
+				AnalyticsService.logEconomyEvent(
+					player,
+					"Source",
+					"Cash",
+					awarded.Cash,
+					if data then data.Cash else 0,
+					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+					"MatchRewards"
+				)
+			end
 			Network.fire("MatchSummary", player, {
 				won = playerWon,
 				elims = progress.Elims,
 				deaths = progress.Deaths,
 				catches = progress.Catches,
-				xp = progress.XP,
-				cash = progress.Cash,
+				baseXp = progress.XP,
+				baseCash = progress.Cash,
+				xpMultiplier = multipliers.Xp,
+				cashMultiplier = multipliers.Cash,
+				xp = awarded.XP,
+				cash = awarded.Cash,
 			})
 		end
 	end
@@ -143,11 +190,17 @@ local function handleEvent(event: MatchEvent)
 	end
 end
 
-function ProgressionService.start(matchService: any)
+function ProgressionService.start(matchService: any, options: { entitlementService: any?, battlePassService: any? }?)
 	if started then
 		return
 	end
 	started = true
+	activeEntitlementService = if options and options.entitlementService
+		then options.entitlementService
+		else EntitlementService
+	activeBattlePassService = if options and options.battlePassService
+		then options.battlePassService
+		else BattlePassService
 	resetMatch()
 	matchService.onEvent(handleEvent)
 	Players.PlayerAdded:Connect(function(player)

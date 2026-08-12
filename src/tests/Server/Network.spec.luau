@@ -75,6 +75,21 @@ return function()
 			expect(calls).to.equal(3)
 		end)
 
+		it("gives each rate-limited remote an independent budget", function()
+			local player = freshPlayer()
+			local chatty = Network.withRateLimit(1, function(_player)
+				return "chatty"
+			end, "ReportAnalyticsEvent")
+			local guarded = Network.withRateLimit(1, function(_player)
+				return "guarded"
+			end, "OpenCrate")
+
+			expect(chatty(player)).to.equal("chatty")
+			expect((chatty(player))).never.to.be.ok()
+			-- Exhausting one remote must leave every other remote's budget intact.
+			expect(guarded(player)).to.equal("guarded")
+		end)
+
 		it("tracks rate limits per player", function()
 			local first = freshPlayer()
 			local second = freshPlayer()
