@@ -7,6 +7,12 @@ local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local CosmeticVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CosmeticVisualFactory")
+)
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
@@ -44,7 +50,6 @@ local appliedTrails: { [BasePart]: string } = {}
 local trailHandles: { [BasePart]: TrailVisuals.Handle } = {}
 local restPulses: { [BasePart]: RestPulseState } = {}
 local feelStates: { [BasePart]: FeelState } = {}
-local assetTemplates: { [string]: BasePart } = {}
 local seen = EventDedup.new(4096)
 
 local function cframeOffset(offset: vector): CFrame
@@ -149,7 +154,8 @@ local function effectiveAssetId(ball: BasePart): string
 		return ""
 	end
 	local itemId = (owner:GetAttribute("Equip_BallAssets") :: string?) or ""
-	return if assetTemplates[itemId] ~= nil then itemId else ""
+	local item = Cosmetics.Items[itemId]
+	return if item and item.Category == "BallAssets" and item.Visual ~= nil then itemId else ""
 end
 
 local function effectiveTrailId(ball: BasePart): (string, string?)
@@ -218,18 +224,7 @@ local function refreshTrail(ball: BasePart, force: boolean?)
 end
 
 local function buildVisual(ball: BasePart, assetId: string): BasePart
-	local template = assetTemplates[assetId]
-	local visual: BasePart
-	if template then
-		visual = template:Clone()
-		-- Effect children (emitters/sounds/trails) live on the base ball
-		-- template; carry them onto the skinned shell.
-		for _, child in ball:GetChildren() do
-			child:Clone().Parent = visual
-		end
-	else
-		visual = ball:Clone()
-	end
+	local visual = CosmeticVisualFactory.create("BallAssets", if assetId == "" then nil else assetId)
 	visual.Name = `{ball.Name}_Visual`
 	visual.Anchored = true
 	visual.LocalTransparencyModifier = 0
@@ -333,17 +328,6 @@ function BallVisuals.onEvent(event: any)
 end
 
 function BallVisuals.start()
-	local assetsFolder = ReplicatedStorage:WaitForChild("Assets")
-		:WaitForChild("Cosmetics")
-		:WaitForChild(Cosmetics.CategoryFolders.BallAssets)
-	for itemId, item in Cosmetics.Items do
-		if item.Category == "BallAssets" then
-			local template = assetsFolder:WaitForChild(item.AssetName)
-			assert(template:IsA("BasePart"), `[BallVisuals] asset template {item.AssetName} must be a BasePart`)
-			assetTemplates[itemId] = template
-		end
-	end
-
 	local folder = Workspace:WaitForChild("Balls")
 	for _, child in folder:GetChildren() do
 		if child:IsA("BasePart") then

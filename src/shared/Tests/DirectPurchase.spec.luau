@@ -15,6 +15,7 @@ local ITEMS = {
 	RareA = { Category = "TrailAssets", Rarity = "Rare" },
 	LegendaryA = { Category = "TrailAssets", Rarity = "Legendary" },
 	ExclusiveA = { Category = "TrailAssets", Rarity = "Exclusive" },
+	FreeA = { Category = "CharacterColor", Rarity = "Common", AlwaysAvailable = true },
 }
 
 T.describe("DirectPurchase", function()
@@ -27,6 +28,12 @@ T.describe("DirectPurchase", function()
 	T.it("refuses to price grant-only rarities or unknown items", function()
 		T.expect(DirectPurchase.priceFor("ExclusiveA", ITEMS, RARITIES)):toBeNil()
 		T.expect(DirectPurchase.priceFor("Nope", ITEMS, RARITIES)):toBeNil()
+	end)
+
+	T.it("never prices always-available cosmetics", function()
+		T.expect(DirectPurchase.priceFor("FreeA", ITEMS, RARITIES)):toBeNil()
+		local _, reason = DirectPurchase.evaluate("FreeA", ITEMS, RARITIES, {}, 99999)
+		T.expect(reason):toEqual("not_purchasable")
 	end)
 
 	T.it("approves an affordable unowned item", function()

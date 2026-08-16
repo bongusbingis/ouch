@@ -6,7 +6,12 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local CosmeticVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CosmeticVisualFactory")
+)
 local PlayerIds = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
 )
@@ -47,12 +52,7 @@ end
 
 local function ballTemplate(): BasePart
 	if template == nil then
-		local default = Cosmetics.Defaults.BallAssets
-		local asset = ReplicatedStorage:WaitForChild("Assets")
-			:WaitForChild("Cosmetics")
-			:WaitForChild(Cosmetics.CategoryFolders.BallAssets)
-			:WaitForChild(default.AssetName)
-		assert(asset:IsA("BasePart"), "[BallService] default BallAssets asset must be a BasePart")
+		local asset = CosmeticVisualFactory.create("BallAssets", nil)
 		assert(not asset.CanCollide, "[BallService] default BallAssets asset must have CanCollide disabled")
 		assert(not asset.CanTouch, "[BallService] default BallAssets asset must have CanTouch disabled")
 		assert(not asset.CanQuery, "[BallService] default BallAssets asset must have CanQuery disabled")

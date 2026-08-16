@@ -5,7 +5,7 @@
 
 local CosmeticsLogic = {}
 
-type ItemDef = { Category: string, [string]: any }
+type ItemDef = { Category: string, AlwaysAvailable: boolean?, [string]: any }
 
 function CosmeticsLogic.canEquip(
 	items: { [string]: ItemDef },
@@ -27,7 +27,7 @@ function CosmeticsLogic.canEquip(
 	if item.Category ~= slot then
 		return false, "wrong_slot"
 	end
-	if owned[itemId] ~= true then
+	if item.AlwaysAvailable ~= true and owned[itemId] ~= true then
 		return false, "not_owned"
 	end
 	return true, nil

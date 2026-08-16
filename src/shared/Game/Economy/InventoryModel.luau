@@ -1,0 +1,131 @@
+--!strict
+
+-- Pure inventory projection. Profile ownership/equips remain authoritative.
+
+local InventoryModel = {}
+
+export type Entry = {
+	id: string,
+	itemId: string?,
+	category: string,
+	displayName: string,
+	rarity: string,
+	isDefault: boolean,
+	sortOrder: number,
+	definition: any,
+}
+
+type Catalog = {
+	Slots: { [string]: boolean }?,
+	Defaults: { [string]: any },
+	Items: { [string]: any },
+}
+
+local function available(itemId: string, item: any, owned: { [string]: any }): boolean
+	return item.AlwaysAvailable == true or owned[itemId] == true
+end
+
+local function sortEntries(entries: { Entry })
+	table.sort(entries, function(left, right)
+		if left.category ~= right.category then
+			return left.category < right.category
+		end
+		if left.sortOrder ~= right.sortOrder then
+			return left.sortOrder < right.sortOrder
+		end
+		if left.displayName ~= right.displayName then
+			return left.displayName < right.displayName
+		end
+		return left.id < right.id
+	end)
+end
+
+function InventoryModel.entries(catalog: Catalog, owned: { [string]: any }, category: string?): { Entry }
+	local entries: { Entry } = {}
+	for slot, definition in catalog.Defaults or {} do
+		if category == nil or slot == category then
+			table.insert(entries, {
+				id = `Default_{slot}`,
+				itemId = nil,
+				category = slot,
+				displayName = definition.DisplayName,
+				rarity = definition.Rarity or "Common",
+				isDefault = true,
+				sortOrder = definition.SortOrder or 0,
+				definition = definition,
+			})
+		end
+	end
+	for itemId, definition in catalog.Items or {} do
+		if (category == nil or definition.Category == category) and available(itemId, definition, owned) then
+			table.insert(entries, {
+				id = itemId,
+				itemId = itemId,
+				category = definition.Category,
+				displayName = definition.DisplayName,
+				rarity = definition.Rarity,
+				isDefault = false,
+				sortOrder = definition.SortOrder or 1000,
+				definition = definition,
+			})
+		end
+	end
+	sortEntries(entries)
+	return entries
+end
+
+function InventoryModel.categories(catalog: Catalog, preferredOrder: { string }): { string }
+	local present: { [string]: boolean } = {}
+	for category in catalog.Slots or {} do
+		present[category] = true
+	end
+	for category in catalog.Defaults or {} do
+		present[category] = true
+	end
+	for _, item in catalog.Items or {} do
+		present[item.Category] = true
+	end
+
+	local categories = {}
+	for _, category in preferredOrder do
+		if present[category] then
+			table.insert(categories, category)
+			present[category] = nil
+		end
+	end
+	local remaining = {}
+	for category in present do
+		table.insert(remaining, category)
+	end
+	table.sort(remaining)
+	for _, category in remaining do
+		table.insert(categories, category)
+	end
+	return categories
+end
+
+function InventoryModel.find(entries: { Entry }, entryId: string): Entry?
+	for _, entry in entries do
+		if entry.id == entryId then
+			return entry
+		end
+	end
+	return nil
+end
+
+function InventoryModel.isEquipped(entry: Entry, equipped: { [string]: any }): boolean
+	local itemId = equipped[entry.category]
+	if entry.isDefault then
+		return itemId == nil or itemId == ""
+	end
+	return itemId == entry.itemId
+end
+
+function InventoryModel.nextEquip(entry: Entry, equipped: { [string]: any }): string?
+	if entry.isDefault or InventoryModel.isEquipped(entry, equipped) then
+		return nil
+	end
+	return entry.itemId
+end
+
+return InventoryModel

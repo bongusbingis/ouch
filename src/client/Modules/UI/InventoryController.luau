@@ -5,6 +5,18 @@
 
 local EconomyItemElement = require(script.Parent.Elements.EconomyItemElement)
 local EconomyStore = require(script.Parent.EconomyStore)
+local dataModel: any = script
+while dataModel.Parent do
+	dataModel = dataModel.Parent
+end
+local replicatedStorageInstance = dataModel:WaitForChild("ReplicatedStorage")
+local InventoryModel = require(
+	replicatedStorageInstance
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Economy")
+		:WaitForChild("InventoryModel")
+)
 
 type StartOptions = {
 	store: any?,
@@ -22,14 +34,7 @@ type StartOptions = {
 	runAsync: ((callback: () -> ()) -> ())?,
 }
 
-type InventoryEntry = {
-	id: string,
-	itemId: string?,
-	category: string,
-	displayName: string,
-	rarity: string,
-	isDefault: boolean,
-}
+type InventoryEntry = InventoryModel.Entry
 
 local CATEGORY_ORDER = { "BallAssets", "HammerAssets", "TrailAssets", "CostumeAssets", "EmoteAssets" }
 local CATEGORY_LABELS = {
@@ -81,7 +86,7 @@ local statusMessage = "Inventory data is loading."
 local selectedCategory: string? = nil
 
 local function replicatedStorage(): ReplicatedStorage
-	return game:GetService("ReplicatedStorage")
+	return replicatedStorageInstance :: ReplicatedStorage
 end
 
 local function resolveNetwork(): any
@@ -161,76 +166,11 @@ local function setStatus(message: string)
 end
 
 local function sortedEntries(categoryFilter: string?): { InventoryEntry }
-	local entries = {}
-	for category, defaultItem in activeCosmetics.Defaults or {} do
-		if categoryFilter == nil or category == categoryFilter then
-			table.insert(entries, {
-				id = `Default_{category}`,
-				itemId = nil,
-				category = category,
-				displayName = defaultItem.DisplayName,
-				rarity = "Default",
-				isDefault = true,
-			})
-		end
-	end
-	local owned = currentData.Cosmetics.Owned
-	for itemId, isOwned in owned do
-		local item = activeCosmetics.Items[itemId]
-		if isOwned and item and (categoryFilter == nil or item.Category == categoryFilter) then
-			table.insert(entries, {
-				id = itemId,
-				itemId = itemId,
-				category = item.Category,
-				displayName = item.DisplayName,
-				rarity = item.Rarity,
-				isDefault = false,
-			})
-		end
-	end
-	table.sort(entries, function(left, right)
-		if left.category ~= right.category then
-			return left.category < right.category
-		end
-		if left.isDefault ~= right.isDefault then
-			return left.isDefault
-		end
-		if left.displayName ~= right.displayName then
-			return left.displayName < right.displayName
-		end
-		return left.id < right.id
-	end)
-	return entries
+	return InventoryModel.entries(activeCosmetics, currentData.Cosmetics.Owned, categoryFilter)
 end
 
 local function availableCategories(): { string }
-	local present: { [string]: boolean } = {}
-	for category in activeCosmetics.Slots or {} do
-		present[category] = true
-	end
-	for category in activeCosmetics.Defaults or {} do
-		present[category] = true
-	end
-	for _, item in activeCosmetics.Items or {} do
-		present[item.Category] = true
-	end
-
-	local categories = {}
-	for _, category in CATEGORY_ORDER do
-		if present[category] then
-			table.insert(categories, category)
-			present[category] = nil
-		end
-	end
-	local remaining = {}
-	for category in present do
-		table.insert(remaining, category)
-	end
-	table.sort(remaining)
-	for _, category in remaining do
-		table.insert(categories, category)
-	end
-	return categories
+	return InventoryModel.categories(activeCosmetics, CATEGORY_ORDER)
 end
 
 local function categoryName(category: string): string
@@ -238,12 +178,7 @@ local function categoryName(category: string): string
 end
 
 local function entryForId(entryId: string): InventoryEntry?
-	for _, entry in sortedEntries(nil) do
-		if entry.id == entryId then
-			return entry
-		end
-	end
-	return nil
+	return InventoryModel.find(sortedEntries(nil), entryId)
 end
 
 local function errorMessage(reason: any): string
@@ -334,12 +269,11 @@ local function toggleEquip(entryId: string)
 	if entry == nil then
 		return
 	end
-	local equippedId = currentData.Cosmetics.Equipped[entry.category]
-	local equipped = if entry.isDefault then equippedId == nil or equippedId == "" else equippedId == entry.itemId
+	local equipped = InventoryModel.isEquipped(entry, currentData.Cosmetics.Equipped)
 	if entry.isDefault and equipped then
 		return
 	end
-	local nextItemId = if entry.isDefault or equipped then nil else entry.itemId
+	local nextItemId = InventoryModel.nextEquip(entry, currentData.Cosmetics.Equipped)
 	busy[entryId] = true
 	setStatus(if nextItemId == nil then "Equipping default item..." else "Equipping item...")
 	render()
@@ -410,8 +344,7 @@ render = function()
 		return
 	end
 	for order, entry in entries do
-		local equippedId = currentData.Cosmetics.Equipped[entry.category]
-		local equipped = if entry.isDefault then equippedId == nil or equippedId == "" else equippedId == entry.itemId
+		local equipped = InventoryModel.isEquipped(entry, currentData.Cosmetics.Equipped)
 		table.insert(
 			handles,
 			activeItemElement.mount(holder, {

@@ -18,9 +18,11 @@ local SLOTS = { BallAssets = true, HammerAssets = true }
 
 return function()
 	describe("CosmeticsLogic", function()
-		it("configures category-folder defaults", function()
-			expect(Cosmetics.Defaults.BallAssets.AssetName).to.equal("DefaultDodgeball")
-			expect(Cosmetics.Defaults.HammerAssets.AssetName).to.equal("DefaultHammer")
+		it("configures shared visual defaults", function()
+			expect(Cosmetics.Defaults.BallAssets.Visual.Template).to.equal("Dodgeball")
+			expect(Cosmetics.Defaults.HammerAssets.Visual.Template).to.equal("Hammer")
+			expect(Cosmetics.VisualTemplates.Dodgeball.MeshId).to.equal(126364964183882)
+			expect(Cosmetics.VisualTemplates.Hammer.MeshId).to.equal(95803748037612)
 		end)
 
 		it("allows equipping an owned item into its matching slot", function()
@@ -38,6 +40,13 @@ return function()
 		it("allows unequipping any valid slot", function()
 			local ok = CosmeticsLogic.canEquip(ITEMS, SLOTS, {}, "BallAssets", nil)
 			expect(ok).to.equal(true)
+		end)
+
+		it("allows always-available cosmetics without ownership", function()
+			local items = { Red = { Category = "CharacterColor", AlwaysAvailable = true } }
+			local ok, reason = CosmeticsLogic.canEquip(items, { CharacterColor = true }, {}, "CharacterColor", "Red")
+			expect(ok).to.equal(true)
+			expect(reason).never.to.be.ok()
 		end)
 
 		it("rejects invalid slots, unknown items, wrong slots, and unowned items", function()

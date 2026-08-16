@@ -7,6 +7,12 @@ local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local CosmeticVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CosmeticVisualFactory")
+)
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
@@ -18,16 +24,8 @@ local HammerGrip = require(script.Parent.HammerGrip)
 
 local HammerVisuals = {}
 
-local assetsFolder = ReplicatedStorage:WaitForChild("Assets")
-	:WaitForChild("Cosmetics")
-	:WaitForChild(Cosmetics.CategoryFolders.HammerAssets)
-local default = Cosmetics.Defaults.HammerAssets
-local defaultTemplate = assetsFolder:WaitForChild(default.AssetName)
-assert(defaultTemplate:IsA("BasePart"), "[HammerVisuals] default HammerAssets asset must be a BasePart")
-
 local visuals: { [Player]: BasePart } = {}
 local appliedAssets: { [Player]: string } = {}
-local assetTemplates: { [string]: BasePart } = {}
 local visualBaseSizes: { [Player]: Vector3 } = {}
 local visualGripCFrames: { [Player]: CFrame } = {}
 local visualLongAxes: { [Player]: HammerGrip.Axis } = {}
@@ -115,17 +113,17 @@ local function remove(player: Player)
 	visualLongAxes[player] = nil
 end
 
-local function effectiveAsset(player: Player): (string, BasePart)
+local function effectiveAsset(player: Player): string
 	local itemId = (player:GetAttribute("Equip_HammerAssets") :: string?) or ""
-	local template = assetTemplates[itemId]
-	if template then
-		return itemId, template
+	local item = Cosmetics.Items[itemId]
+	if item and item.Category == "HammerAssets" and item.Visual ~= nil then
+		return itemId
 	end
-	return "", defaultTemplate
+	return ""
 end
 
 local function visualFor(player: Player): BasePart
-	local assetId, template = effectiveAsset(player)
+	local assetId = effectiveAsset(player)
 	local visual = visuals[player]
 	if visual and appliedAssets[player] == assetId then
 		return visual
@@ -134,9 +132,9 @@ local function visualFor(player: Player): BasePart
 		visual:Destroy()
 	end
 
-	visual = template:Clone()
+	visual = CosmeticVisualFactory.create("HammerAssets", if assetId == "" then nil else assetId)
 	visual.Name = `{player.Name}_HammerVisual`
-	local baseSize = template.Size
+	local baseSize = visual.Size
 	local gripCFrame, longAxis = gripFor(visual, baseSize)
 	visual.Anchored = true
 	visual.CanCollide = false
@@ -167,14 +165,6 @@ local function audioParentFor(playerId: string): Instance?
 end
 
 function HammerVisuals.start()
-	for itemId, item in Cosmetics.Items do
-		if item.Category == "HammerAssets" then
-			local asset = assetsFolder:WaitForChild(item.AssetName)
-			assert(asset:IsA("BasePart"), `[HammerVisuals] asset template {item.AssetName} must be a BasePart`)
-			assetTemplates[itemId] = asset
-		end
-	end
-
 	Players.PlayerRemoving:Connect(function(player)
 		remove(player)
 		springs[player] = nil

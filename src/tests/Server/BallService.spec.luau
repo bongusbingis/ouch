@@ -12,7 +12,6 @@ local Workspace = game:GetService("Workspace")
 local BallService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("BallService"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
 local FakePlayer = require(Helpers:WaitForChild("FakePlayer"))
@@ -71,13 +70,7 @@ return function()
 			expect(ball:GetAttribute("vel")).to.equal(Vector3.zero)
 			expect(ball.Anchored).to.equal(true)
 
-			local template = TestAssets.get(
-				ReplicatedStorage,
-				"Assets",
-				"Cosmetics",
-				Cosmetics.CategoryFolders.BallAssets,
-				Cosmetics.Defaults.BallAssets.AssetName
-			)
+			local template = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "Templates", "DodgeballBase")
 			expect(ball.Size).to.equal(template.Size)
 		end)
 

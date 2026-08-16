@@ -15,8 +15,32 @@ local SLOTS = { BallAssets = true, HammerAssets = true }
 
 T.describe("CosmeticsLogic", function()
 	T.it("configures category-folder defaults", function()
-		T.expect(Cosmetics.Defaults.BallAssets.AssetName):toEqual("DefaultDodgeball")
-		T.expect(Cosmetics.Defaults.HammerAssets.AssetName):toEqual("DefaultHammer")
+		T.expect(Cosmetics.Defaults.BallAssets.Visual.Template):toEqual("Dodgeball")
+		T.expect(Cosmetics.Defaults.HammerAssets.Visual.Template):toEqual("Hammer")
+		T.expect(Cosmetics.VisualTemplates.Dodgeball.MeshId):toEqual(126364964183882)
+		T.expect(Cosmetics.VisualTemplates.Hammer.MeshId):toEqual(95803748037612)
+	end)
+
+	T.it("provides six ordered character colors without ownership", function()
+		local entries = {
+			{
+				name = Cosmetics.Defaults.CharacterColor.DisplayName,
+				order = Cosmetics.Defaults.CharacterColor.SortOrder,
+			},
+		}
+		for _, item in Cosmetics.Items do
+			if item.Category == "CharacterColor" then
+				T.expect(item.AlwaysAvailable):toEqual(true)
+				table.insert(entries, { name = item.DisplayName, order = item.SortOrder })
+			end
+		end
+		table.sort(entries, function(left, right)
+			return left.order < right.order
+		end)
+		T.expect(#entries):toEqual(6)
+		T.expect(entries[1].name):toEqual("Red")
+		T.expect(entries[3].name):toEqual("Cyan")
+		T.expect(entries[6].name):toEqual("Purple")
 	end)
 
 	T.it("registers renderable trail cosmetics in every rarity", function()
@@ -83,6 +107,21 @@ T.describe("CosmeticsLogic", function()
 	T.it("allows unequipping any valid slot", function()
 		local ok = CosmeticsLogic.canEquip(ITEMS, SLOTS, {}, "BallAssets", nil)
 		T.expect(ok):toEqual(true)
+	end)
+
+	T.it("allows always-available items without ownership", function()
+		local items = {
+			CharacterColorRed = { Category = "CharacterColor", AlwaysAvailable = true },
+		}
+		local ok, reason = CosmeticsLogic.canEquip(
+			items,
+			{ CharacterColor = true },
+			{},
+			"CharacterColor",
+			"CharacterColorRed"
+		)
+		T.expect(ok):toEqual(true)
+		T.expect(reason):toBeNil()
 	end)
 
 	T.it("rejects invalid slots, unknown items, wrong slots, and unowned items", function()

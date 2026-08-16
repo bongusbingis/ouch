@@ -1,6 +1,5 @@
 --!nonstrict
--- Validates authored cosmetic templates, procedural effects, and crate pools
--- against their config sources of truth.
+-- Validates cosmetic carriers, procedural effects, and crate pools.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -14,70 +13,55 @@ local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Hel
 local Client = StarterPlayer:WaitForChild("StarterPlayerScripts"):WaitForChild("Client")
 local HammerGrip = require(Client:WaitForChild("Modules"):WaitForChild("Presentation"):WaitForChild("HammerGrip"))
 
+local function numericAssetId(contentId)
+	return tonumber(string.match(contentId, "%d+"))
+end
+
 return function()
 	describe("Cosmetics assets", function()
-		it("has a folder for every Studio-authored category", function()
-			local authoredCategories = {}
-			for category in Cosmetics.Defaults do
-				authoredCategories[category] = true
-			end
-			for _, item in Cosmetics.Items do
-				if item.AssetName ~= nil then
-					authoredCategories[item.Category] = true
-				end
-			end
-
-			for category in authoredCategories do
-				local folderName = Cosmetics.CategoryFolders[category]
-				expect(folderName).to.be.ok()
-				TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folderName)
+		it("has every configured MeshPart carrier with its catalog mesh", function()
+			for _, definition in Cosmetics.VisualTemplates do
+				local carrier =
+					TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "Templates", definition.CarrierName)
+				expect(carrier:IsA("MeshPart")).to.equal(true)
+				expect(numericAssetId(carrier.MeshId)).to.equal(definition.MeshId)
 			end
 		end)
 
-		it("has every configured default template", function()
-			for category, default in Cosmetics.Defaults do
-				local folderName = Cosmetics.CategoryFolders[category]
-				expect(folderName).to.be.ok()
-				local asset = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folderName, default.AssetName)
-				if category == "BallAssets" then
-					expect(asset:IsA("BasePart")).to.equal(true)
-				end
-			end
+		it("keeps the authored hammer PBR maps on its carrier", function()
+			local carrier = TestAssets.get(
+				ReplicatedStorage,
+				"Assets",
+				"Cosmetics",
+				"Templates",
+				Cosmetics.VisualTemplates.Hammer.CarrierName
+			)
+			local appearance = TestAssets.get(carrier, "SurfaceAppearance")
+			local maps = Cosmetics.VisualTemplates.Hammer.SurfaceMaps
+			expect(appearance:IsA("SurfaceAppearance")).to.equal(true)
+			expect(numericAssetId(appearance.ColorMap)).to.equal(maps.ColorMapId)
+			expect(numericAssetId(appearance.MetalnessMap)).to.equal(maps.MetalnessMapId)
+			expect(numericAssetId(appearance.NormalMap)).to.equal(maps.NormalMapId)
+			expect(numericAssetId(appearance.RoughnessMap)).to.equal(maps.RoughnessMapId)
 		end)
 
-		it("has a template for every catalog item", function()
-			for _, item in Cosmetics.Items do
-				if item.AssetName ~= nil then
-					local folderName = Cosmetics.CategoryFolders[item.Category]
-					expect(folderName).to.be.ok()
-					local asset = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folderName, item.AssetName)
-					if item.Category == "BallAssets" then
-						expect(asset:IsA("BasePart")).to.equal(true)
-					end
-				end
-			end
-		end)
-
-		it("resolves every hammer grip without guessing an ambiguous axis", function()
-			local assetNames = { Cosmetics.Defaults.HammerAssets.AssetName }
-			for _, item in Cosmetics.Items do
-				if item.Category == "HammerAssets" and item.AssetName ~= nil then
-					table.insert(assetNames, item.AssetName)
-				end
-			end
-			for _, assetName in assetNames do
-				local asset = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "HammerAssets", assetName)
-				expect(asset:IsA("BasePart")).to.equal(true)
-				local attachment = asset:FindFirstChild("GripAttachment")
-				if attachment then
-					expect(attachment:IsA("Attachment")).to.equal(true)
-				else
-					local size = asset.Size
-					local config = Combat.Hammer.AutoGrip
-					local solution =
-						HammerGrip.solve(size.X, size.Y, size.Z, config.MinAxisDominanceRatio, config.GripAlongLongAxis)
-					expect(solution).to.be.ok()
-				end
+		it("resolves the hammer carrier grip without an ambiguous axis", function()
+			local carrier = TestAssets.get(
+				ReplicatedStorage,
+				"Assets",
+				"Cosmetics",
+				"Templates",
+				Cosmetics.VisualTemplates.Hammer.CarrierName
+			)
+			local attachment = carrier:FindFirstChild("GripAttachment")
+			if attachment then
+				expect(attachment:IsA("Attachment")).to.equal(true)
+			else
+				local size = carrier.Size
+				local config = Combat.Hammer.AutoGrip
+				local solution =
+					HammerGrip.solve(size.X, size.Y, size.Z, config.MinAxisDominanceRatio, config.GripAlongLongAxis)
+				expect(solution).to.be.ok()
 			end
 		end)
 
@@ -89,12 +73,13 @@ return function()
 			end
 		end)
 
-		it("references only known items and rarities from crate pools", function()
+		it("references only purchasable, known cosmetics from crate pools", function()
 			for _, crate in Crates do
 				for _, itemId in crate.ItemPool do
 					local item = Cosmetics.Items[itemId]
 					expect(item).to.be.ok()
 					expect(Cosmetics.Rarities[item.Rarity]).to.be.ok()
+					expect(item.AlwaysAvailable).never.to.equal(true)
 				end
 			end
 		end)

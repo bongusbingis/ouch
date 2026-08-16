@@ -8,7 +8,7 @@ local DirectPurchase = {}
 
 export type Reason = "unknown_item" | "not_purchasable" | "already_owned" | "insufficient_cash"
 
-type ItemDef = { Category: string, Rarity: string, [string]: any }
+type ItemDef = { Category: string, Rarity: string, AlwaysAvailable: boolean?, [string]: any }
 type RarityDef = { DirectCash: number, [string]: any }
 
 function DirectPurchase.priceFor(
@@ -18,6 +18,9 @@ function DirectPurchase.priceFor(
 ): number?
 	local item = items[itemId]
 	if item == nil then
+		return nil
+	end
+	if item.AlwaysAvailable == true then
 		return nil
 	end
 	local rarity = rarities[item.Rarity]
