@@ -21,25 +21,35 @@ Also: **never rewrite `game.rbxl` with repository tooling.** It is a Git LFS bin
 Tools are pinned in `aftman.toml` (rojo, wally, lune, stylua, selene, rbxcloud). Run everything from the repo root.
 
 ```sh
-wally install                                # populate Packages/ (gitignored)
-lune run src/scripts/lune/run-tests.luau     # run all specs headlessly (regenerates sourcemap.json via rojo)
-bash src/scripts/shell/lint.sh src           # selene lint
-bash src/scripts/shell/check-format.sh src   # stylua --check; run `stylua src` to fix
+wally install                                      # populate Packages/ (gitignored)
+lune run src/scripts/lune/run-tests.luau           # run all specs headlessly (regenerates sourcemap.json via rojo)
+bash src/scripts/shell/lint.sh src                 # selene lint canonical arena/shared code
+bash src/scripts/shell/lint.sh places/lobby/src    # selene lint lobby code
+bash src/scripts/shell/check-format.sh src
+bash src/scripts/shell/check-format.sh places/lobby/src
 ```
 
 CI (`.github/workflows/cicd.yml`) runs lint, format check, and the Lune tests on every PR to `main`/`prod`; a PR to `prod` also builds and publishes to Roblox.
 
-## Layout (Rojo mapping in `default.project.json`)
+## Layout
+
+This repository owns both Roblox places. Always pass the project file explicitly:
+`arena.project.json` serves only place `121997450145716` on port `34872`, and
+`lobby.project.json` serves only place `130584867985467` on port `34873`.
+Each project also blocks the other place ID. Do not add a `default.project.json`.
 
 | Filesystem | DataModel |
 |---|---|
 | `src/shared/` | `ReplicatedStorage.Shared` |
 | `src/config/` | `ReplicatedStorage.Config` |
 | `Packages/` | `ReplicatedStorage.Packages` |
-| `src/server/` | `ServerScriptService.Server` |
-| `src/client/` | `StarterPlayer.StarterPlayerScripts.Client` |
+| `src/server/` | Arena server plus canonical data/economy services used by both places |
+| `src/client/` | Arena client |
+| `places/lobby/src/server/` | Lobby server and matchmaking |
+| `places/lobby/src/client/` | Lobby client |
+| `places/lobby/src/shared/Matchmaking/` | Lobby matchmaking protocol/config |
 
-Entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only), `src/server/Scripts/SimulationServer.server.luau` (starts all services, wires sim events to animations/feedback), `src/client/Scripts/SimulationClient.client.luau` (starts all client modules).
+Arena entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only), `src/server/Scripts/SimulationServer.server.luau` (starts all services, wires sim events to animations/feedback), `src/client/Scripts/SimulationClient.client.luau` (starts all client modules). Lobby entry points: `places/lobby/src/server/Server.server.luau`, `places/lobby/src/server/Scripts/MatchmakingScript.server.luau`, and `places/lobby/src/client/Scripts/LobbyClient.client.luau`.
 
 ## Systems
 
@@ -107,7 +117,7 @@ Specs live in `src/shared/Tests/*.spec.luau` and use `TestKit` — a minimal pur
 
 ## Conventions
 
-- Luau with `--!strict` at the top of modules; tab indentation; StyLua-formatted (`stylua src`).
+- Luau with `--!strict` at the top of modules; tab indentation; StyLua-formatted (`stylua src places/lobby/src`).
 - Services/modules are plain tables with functions; a `start()` guards against double-start with a `started` flag.
 - Comments follow rule 1: module-top responsibility/invariant blocks, minimal inline.
 - Selene (`std = "roblox"`) with `unused_variable` allowed.

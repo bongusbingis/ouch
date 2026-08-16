@@ -1,4 +1,4 @@
-name: CI checks + deployment #todo: remove refs to roblox_place_id legacy secret
+name: CI checks + arena deployment
 
 on:
   pull_request:
@@ -41,7 +41,9 @@ jobs:
           key: tools-${{ hashFiles('aftman.toml') }}
 
       - name: Lint
-        run: bash src/scripts/shell/lint.sh src
+        run: |
+          bash src/scripts/shell/lint.sh src
+          bash src/scripts/shell/lint.sh places/lobby/src
 
   formatting:
     name: Format with StyLua
@@ -61,7 +63,9 @@ jobs:
           key: tools-${{ hashFiles('aftman.toml') }}
 
       - name: Check format
-        run: bash src/scripts/shell/check-format.sh src
+        run: |
+          bash src/scripts/shell/check-format.sh src
+          bash src/scripts/shell/check-format.sh places/lobby/src
 
   lune-tests:
     name: Run Lune tests
@@ -82,6 +86,11 @@ jobs:
 
       - name: Install Wally packages
         run: wally install
+
+      - name: Build place projects
+        run: |
+          rojo build arena.project.json --output /tmp/arena.rbxl
+          rojo build lobby.project.json --output /tmp/lobby.rbxl
 
       # The runner regenerates sourcemap.json via rojo and exits nonzero on
       # any failing spec.
@@ -127,7 +136,7 @@ jobs:
         run: bash src/scripts/shell/fetch-live-place.sh live-place.rbxl
         env:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
-          ROBLOX_PLACE_ID: ${{ vars.ROBLOX_PLACE_ID }}
+          ROBLOX_PLACE_ID: "121997450145716"
 
       - name: Upload live place artifact
         uses: actions/upload-artifact@v4
@@ -140,7 +149,7 @@ jobs:
         timeout-minutes: 15
         run: |
           set +e
-          bash src/scripts/shell/deploy.sh default.project.json live-place.rbxl
+          bash src/scripts/shell/deploy.sh arena.project.json live-place.rbxl
           code=$?
           set -e
           if [ "$code" -eq 2 ]; then
@@ -150,4 +159,4 @@ jobs:
         env:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
           ROBLOX_UNIVERSE_ID: ${{ vars.ROBLOX_UNIVERSE_ID }}
-          ROBLOX_PLACE_ID: ${{ vars.ROBLOX_PLACE_ID }}
+          ROBLOX_PLACE_ID: "121997450145716"

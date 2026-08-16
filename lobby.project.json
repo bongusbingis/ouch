@@ -1,0 +1,78 @@
+{
+  "name": "ouch-lobby",
+  "serveAddress": "0.0.0.0",
+  "servePort": 34873,
+  "servePlaceIds": [130584867985467],
+  "blockedPlaceIds": [121997450145716],
+  "globIgnorePaths": [
+    "**/_Index/**/*.server.lua",
+    "**/_Index/**/*.server.luau",
+    "**/_Index/**/*.client.lua",
+    "**/_Index/**/*.client.luau",
+    "**/_Index/**/*.spec.lua",
+    "**/_Index/**/*.spec.luau"
+  ],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared",
+
+        "Matchmaking": {
+          "$path": "places/lobby/src/shared/Matchmaking"
+        }
+      },
+
+      "Config": {
+        "$path": "src/config"
+      },
+
+      "Packages": {
+        "$path": "Packages"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "places/lobby/src/server/Server.server.luau",
+
+        "Env": {
+          "$path": "src/server/Env.luau"
+        },
+
+        "Scripts": {
+          "$path": "places/lobby/src/server/Scripts"
+        },
+
+        "Modules": {
+          "$path": "places/lobby/src/server/Modules",
+
+          "PlayerData": {
+            "$path": "src/server/Modules/PlayerData.luau"
+          },
+
+          "CosmeticsService": {
+            "$path": "src/server/Modules/CosmeticsService.luau"
+          },
+
+          "AnalyticsService": {
+            "$path": "src/server/Modules/AnalyticsService.luau"
+          }
+        }
+      }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+
+        "Client": {
+          "$path": "places/lobby/src/client"
+        }
+      }
+    }
+  }
+}

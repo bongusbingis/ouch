@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Rojo: Serve Arena (34872)",
+      "type": "shell",
+      "command": "rojo serve arena.project.json",
+      "problemMatcher": [],
+      "presentation": {
+        "group": "rojo-arena",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rojo: Serve Lobby (34873)",
+      "type": "shell",
+      "command": "rojo serve lobby.project.json",
+      "problemMatcher": [],
+      "presentation": {
+        "group": "rojo-lobby",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

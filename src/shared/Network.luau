@@ -15,6 +15,8 @@ else
 end
 
 local definitions = {
+	PartyRequest = "function",
+	PartyPacket = "event",
 	EquipCosmetic = "function",
 	OpenCrate = "function",
 	PurchaseCosmetic = "function",

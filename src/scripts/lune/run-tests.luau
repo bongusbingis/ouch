@@ -8,7 +8,7 @@
 local process = require("@lune/process")
 local Loader = require("./loader")
 
-local sourcemap = process.exec("rojo", { "sourcemap", "default.project.json", "-o", "sourcemap.json" })
+local sourcemap = process.exec("rojo", { "sourcemap", "arena.project.json", "-o", "sourcemap.json" })
 if not sourcemap.ok then
 	print("warning: rojo sourcemap failed, using existing sourcemap.json")
 	print(sourcemap.stderr)
