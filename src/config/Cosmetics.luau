@@ -8,6 +8,7 @@ export type RarityDef = {
 	Weight: number,
 	DupeCash: number,
 	DirectCash: number,
+	DisplayOrder: number,
 }
 
 export type SurfaceMaps = {
@@ -52,10 +53,10 @@ export type DefaultDef = {
 }
 
 local Rarities: { [string]: RarityDef } = {
-	Common = { Weight = 70, DupeCash = 50, DirectCash = 1200 },
-	Rare = { Weight = 24, DupeCash = 150, DirectCash = 3500 },
-	Legendary = { Weight = 6, DupeCash = 400, DirectCash = 12000 },
-	Exclusive = { Weight = 0, DupeCash = 0, DirectCash = 0 },
+	Common = { Weight = 70, DupeCash = 50, DirectCash = 1200, DisplayOrder = 4 },
+	Rare = { Weight = 24, DupeCash = 150, DirectCash = 3500, DisplayOrder = 3 },
+	Legendary = { Weight = 6, DupeCash = 400, DirectCash = 12000, DisplayOrder = 2 },
+	Exclusive = { Weight = 0, DupeCash = 0, DirectCash = 0, DisplayOrder = 1 },
 }
 
 local Slots = {

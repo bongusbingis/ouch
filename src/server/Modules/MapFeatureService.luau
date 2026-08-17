@@ -12,7 +12,7 @@ local MovementSpeedService = require(
 		:WaitForChild("MovementSpeedService")
 )
 
--- Applies the active map's terrain features server-side: bounce pads launch
+-- Applies authored arena terrain features server-side: bounce pads launch
 -- along their UpVector (same server-set velocity pattern as hammer knockback,
 -- which predicts cleanly), foam pits slow movement while a character's root
 -- is inside the pit volume (via MovementSpeedService, which owns WalkSpeed).

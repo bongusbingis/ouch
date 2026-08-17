@@ -17,13 +17,13 @@ local EXPECTED_REMOTES = {
 	CrateOpened = "RemoteEvent",
 	StorePurchaseGranted = "RemoteEvent",
 	ReportDeviceClass = "RemoteEvent",
-	SubmitMatchVote = "RemoteEvent",
 	CombatFeed = "RemoteEvent",
 	MatchSummary = "RemoteEvent",
 	GetQuestState = "RemoteFunction",
 	ClaimQuest = "RemoteFunction",
 	QuestStateChanged = "RemoteEvent",
 	DamageFeedback = "RemoteEvent",
+	SubmitModeVote = "RemoteEvent",
 }
 
 -- Each case uses fresh UserIds: rate-limit counters are per-user with a

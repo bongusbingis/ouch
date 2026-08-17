@@ -26,7 +26,6 @@ local definitions = {
 	CrateOpened = "event",
 	StorePurchaseGranted = "event",
 	ReportDeviceClass = "event",
-	SubmitMatchVote = "event",
 	CombatFeed = "event",
 	MatchSummary = "event",
 	GetQuestState = "function",
@@ -34,6 +33,7 @@ local definitions = {
 	QuestStateChanged = "event",
 	SeasonPassStateChanged = "event",
 	DamageFeedback = "event",
+	SubmitModeVote = "event",
 	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}
@@ -182,7 +182,7 @@ function Network.on(name, callback)
 		remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent"),
 		`[Network] Remotes.{name} must be an event remote`
 	)
-	remote.OnClientEvent:Connect(callback)
+	return remote.OnClientEvent:Connect(callback)
 end
 
 return Network

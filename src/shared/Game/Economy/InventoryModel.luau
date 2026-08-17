@@ -19,16 +19,24 @@ type Catalog = {
 	Slots: { [string]: boolean }?,
 	Defaults: { [string]: any },
 	Items: { [string]: any },
+	Rarities: { [string]: { DisplayOrder: number } }?,
 }
 
 local function available(itemId: string, item: any, owned: { [string]: any }): boolean
 	return item.AlwaysAvailable == true or owned[itemId] == true
 end
 
-local function sortEntries(entries: { Entry })
+local function sortEntries(entries: { Entry }, catalog: Catalog)
 	table.sort(entries, function(left, right)
 		if left.category ~= right.category then
 			return left.category < right.category
+		end
+		local leftRarity = catalog.Rarities and catalog.Rarities[left.rarity]
+		local rightRarity = catalog.Rarities and catalog.Rarities[right.rarity]
+		local leftRarityOrder = if leftRarity then leftRarity.DisplayOrder else math.huge
+		local rightRarityOrder = if rightRarity then rightRarity.DisplayOrder else math.huge
+		if leftRarityOrder ~= rightRarityOrder then
+			return leftRarityOrder < rightRarityOrder
 		end
 		if left.sortOrder ~= right.sortOrder then
 			return left.sortOrder < right.sortOrder
@@ -70,7 +78,7 @@ function InventoryModel.entries(catalog: Catalog, owned: { [string]: any }, cate
 			})
 		end
 	end
-	sortEntries(entries)
+	sortEntries(entries, catalog)
 	return entries
 end
 

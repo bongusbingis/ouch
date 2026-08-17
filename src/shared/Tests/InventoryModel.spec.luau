@@ -4,6 +4,12 @@ local T = require(script.Parent.TestKit)
 local InventoryModel = require(script.Parent.Parent.Game.Economy.InventoryModel)
 
 local CATALOG = {
+	Rarities = {
+		Common = { DisplayOrder = 4 },
+		Rare = { DisplayOrder = 3 },
+		Legendary = { DisplayOrder = 2 },
+		Exclusive = { DisplayOrder = 1 },
+	},
 	Slots = {
 		BallAssets = true,
 		CharacterColor = true,
@@ -30,6 +36,8 @@ local CATALOG = {
 		},
 		OwnedBall = { Category = "BallAssets", DisplayName = "Owned Ball", Rarity = "Rare" },
 		LockedBall = { Category = "BallAssets", DisplayName = "Locked Ball", Rarity = "Legendary" },
+		LegendaryBall = { Category = "BallAssets", DisplayName = "Legendary Ball", Rarity = "Legendary" },
+		ExclusiveBall = { Category = "BallAssets", DisplayName = "Exclusive Ball", Rarity = "Exclusive" },
 	},
 }
 
@@ -46,6 +54,18 @@ T.describe("InventoryModel", function()
 		T.expect(entries[1].displayName):toEqual("Red")
 		T.expect(entries[2].displayName):toEqual("Cyan")
 		T.expect(entries[3].displayName):toEqual("Purple")
+	end)
+
+	T.it("orders available items from highest to lowest rarity", function()
+		local entries = InventoryModel.entries(CATALOG, {
+			OwnedBall = true,
+			LegendaryBall = true,
+			ExclusiveBall = true,
+		}, "BallAssets")
+		T.expect(entries[1].displayName):toEqual("Exclusive Ball")
+		T.expect(entries[2].displayName):toEqual("Legendary Ball")
+		T.expect(entries[3].displayName):toEqual("Owned Ball")
+		T.expect(entries[4].displayName):toEqual("Default Ball")
 	end)
 
 	T.it("keeps configured empty categories in stable order", function()

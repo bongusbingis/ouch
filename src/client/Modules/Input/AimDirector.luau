@@ -9,10 +9,10 @@ local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 
 -- The client's single source of aim truth. Desktop: aim = camera look, target
--- is the predicted soft-lock highlight. Touch: aim = direction from the
+-- is the predicted soft-lock candidate. Touch: aim = direction from the
 -- character to an auto-acquired target (camera look fallback), with sticky
 -- hysteresis so the lock doesn't flicker. InputRouter feeds the aim into the
--- Aim action; TargetingUI renders the target.
+-- Aim action.
 
 local AimDirector = {}
 

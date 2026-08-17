@@ -131,11 +131,6 @@ return {
 		ShakeFadeOut = 0.2,
 		ShakePositionInfluence = vector.create(0.12, 0.1, 0.1),
 		ShakeRotationInfluence = vector.create(1.7, 1.1, 0.65),
-		FlashInTime = 0.035,
-		FlashOutTime = 0.28,
-		FlashPeakTransparency = 0.42,
-		ConfirmHoldTime = 0.2,
-		ConfirmFadeTime = 0.18,
 	},
 
 	-- Simplified hit capsule applied to every character (never per-limb).

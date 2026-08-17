@@ -1,9 +1,7 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-
-local Client = script.Parent.Parent.Parent.Parent.StarterPlayer.StarterPlayerScripts.Client
-local HammerGrip = require(Client.Modules.Presentation.HammerGrip)
+local HammerGrip = require(script.Parent.Parent.Game.Cosmetics.HammerGrip)
 
 T.describe("HammerGrip", function()
 	T.it("keeps a Y-dominant hammer upright with a proportional grip", function()

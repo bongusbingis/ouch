@@ -9,14 +9,13 @@ return {
 	CombatTrace = false,
 	CollisionTrace = false,
 
-	CosmeticsGrantAll = false,
+	AutoGrantAllItemsInStudio = true,
 	AnalyticsVerbose = false,
 
 	AimAssistCones = true,
 	AimAssistTargetRange = true,
 	ThrowOriginMaxOffset = true,
 	PickupRadius = true,
-	PhaseLabels = true,
 	Trajectory = true,
 	CollisionRadius = true,
 	SelectedTarget = true,

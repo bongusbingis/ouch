@@ -74,6 +74,10 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		if model == nil then
 			continue
 		end
+		if player:GetAttribute("ArenaAdmission") == "Rejected" then
+			table.insert(excluded, model)
+			continue
+		end
 		local root = model:FindFirstChild("HumanoidRootPart")
 		if root == nil or not root:IsA("BasePart") then
 			continue
