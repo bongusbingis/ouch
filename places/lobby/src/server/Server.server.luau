@@ -3,11 +3,13 @@
 
 local Players = game:GetService("Players")
 
-local Modules = script.Modules
-local PlayerData = require(Modules.PlayerData)
-local CosmeticsService = require(Modules.CosmeticsService)
+local Modules = script:WaitForChild("Modules")
+local PlayerData = require(Modules:WaitForChild("PlayerData"))
+local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
+local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
 
 CosmeticsService.start()
+CharacterColorService.start()
 
 Players.PlayerAdded:Connect(function(player)
 	PlayerData.load(player)

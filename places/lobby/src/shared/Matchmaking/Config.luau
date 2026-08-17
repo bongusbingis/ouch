@@ -1,15 +1,22 @@
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
 
 local Config = {
 	ArenaPlaceId = 121997450145716,
-	DefaultMapKey = "Default",
-	DefaultMode = "FFA",
-	GameModes = { "FFA", "TDM", "BR" },
+	ModeVoteOptions = table.clone(GameModes.VoteOptions),
 
 	PartyMinPlayers = 1,
 	PartyMaxPlayers = 4,
 	MatchTargetPlayers = 20,
-	MatchMaximumWait = 30,
+	MatchPopulationExpansion = {
+		{ AfterSeconds = 0, MinimumPlayers = 20 },
+		{ AfterSeconds = 8, MinimumPlayers = 16 },
+		{ AfterSeconds = 16, MinimumPlayers = 12 },
+		{ AfterSeconds = 24, MinimumPlayers = 8 },
+		{ AfterSeconds = 30, MinimumPlayers = 1 },
+	},
 
 	PartyRecordLifetime = 600,
 	PresenceLifetime = 90,
@@ -27,16 +34,20 @@ local Config = {
 	CloudRetryAttempts = 4,
 	CloudRetryBaseDelay = 0.25,
 	CloudRetryMaximumDelay = 2,
+	BanDataStoreName = "OuchMatchmakingBans_v1",
+	BanDataStoreScope = "global",
 
 	TeleportRetryAttempts = 5,
 	TeleportRetryDelay = 1,
 	TeleportFloodedDelay = 15,
 	MatchRecordLifetime = 900,
 
-	PartyTopicPrefix = "ouch:party:v1:",
-	ProtocolVersion = 1,
+	PartyTopicPrefix = "ouch:party:v2:",
+	QueueKey = "AllPlayers",
+	WorkerLeaseKey = "AllPlayers",
+	ProtocolVersion = 2,
 }
 
-Config.MemoryStoreNamespace = RunService:IsStudio() and "OuchDev_v1" or "OuchLive_v1"
+Config.MemoryStoreNamespace = RunService:IsStudio() and "OuchDev_v2" or "OuchLive_v2"
 
 return table.freeze(Config)

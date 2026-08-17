@@ -67,7 +67,7 @@ function PartyRepository:_claimCode(partyId)
 	return nil, "code_space_unavailable"
 end
 
-function PartyRepository:CreateParty(userId)
+function PartyRepository:CreateParty(userId, characterColorId)
 	local partyId = HttpService:GenerateGUID(false)
 	local joinCode, codeError = self:_claimCode(partyId)
 	if not joinCode then
@@ -85,12 +85,8 @@ function PartyRepository:CreateParty(userId)
 			{
 				userId = userId,
 				joinedAt = now,
+				characterColorId = characterColorId or "",
 			},
-		},
-		selection = {
-			mode = Config.DefaultMode,
-			brTeamSize = nil,
-			fill = false,
 		},
 		allowFriendJoins = true,
 		phase = "Lobby",

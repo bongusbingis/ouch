@@ -6,7 +6,6 @@ local PartyModel = {}
 
 function PartyModel.clone(party)
 	local copy = table.clone(party)
-	copy.selection = table.clone(party.selection)
 	copy.members = {}
 
 	for index, member in party.members do
@@ -82,7 +81,6 @@ function PartyModel.toSnapshot(party)
 		revision = party.revision,
 		leaderUserId = party.leaderUserId,
 		members = members,
-		selection = table.clone(party.selection),
 		allowFriendJoins = party.allowFriendJoins,
 		phase = party.phase,
 		matchId = party.matchId,

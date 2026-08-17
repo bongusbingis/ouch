@@ -5,6 +5,7 @@ local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 
 local matchmaking = script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Matchmaking")
+local BanRepository = require(matchmaking.BanRepository)
 local MatchmakerService = require(matchmaking.MatchmakerService)
 local MatchRepository = require(matchmaking.MatchRepository)
 local PartyBus = require(matchmaking.PartyBus)
@@ -18,7 +19,9 @@ local queueRepository = QueueRepository.new()
 local matchRepository = MatchRepository.new()
 local partyBus = PartyBus.new()
 local teleportCoordinator = TeleportCoordinator.new(matchRepository)
-local partyService = PartyService.new(partyRepository, queueRepository, matchRepository, partyBus, teleportCoordinator)
+local banRepository = BanRepository.new()
+local partyService =
+	PartyService.new(partyRepository, queueRepository, matchRepository, partyBus, teleportCoordinator, banRepository)
 local matchmakerService = MatchmakerService.new(
 	partyRepository,
 	queueRepository,
@@ -31,6 +34,9 @@ local matchmakerService = MatchmakerService.new(
 
 teleportCoordinator:SetFailureHandler(function(player)
 	partyService:HandleTeleportFailure(player)
+end)
+partyService:SetQueueChangedHandler(function()
+	matchmakerService:Tick()
 end)
 
 Network.handleProtected("PartyRequest", {
@@ -64,9 +70,9 @@ local running = true
 task.spawn(function()
 	while running do
 		task.wait(Config.WorkerPollInterval)
-		for mode in partyService:GetLocalQueuedModes() do
+		if partyService:HasLocalQueuedParty() then
 			task.spawn(function()
-				matchmakerService:Tick(mode)
+				matchmakerService:Tick()
 			end)
 		end
 	end

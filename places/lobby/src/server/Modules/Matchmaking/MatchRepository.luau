@@ -55,10 +55,10 @@ function MatchRepository:ContainsParty(matchRecord, partyId)
 	return false
 end
 
-function MatchRepository:AcquireLease(mode)
+function MatchRepository:AcquireLease()
 	local now = os.time()
 	local success, lease = CloudRetry.call("MatchRepository.AcquireLease", function()
-		return self._leaseMap:UpdateAsync(mode, function(current)
+		return self._leaseMap:UpdateAsync(Config.WorkerLeaseKey, function(current)
 			if current and current.ownerJobId ~= game.JobId and current.expiresAt > now then
 				return nil
 			end
@@ -74,6 +74,23 @@ function MatchRepository:AcquireLease(mode)
 	end
 
 	return lease ~= nil and lease.ownerJobId == game.JobId
+end
+
+function MatchRepository:ReleaseLease()
+	local success = CloudRetry.call("MatchRepository.ReleaseLease", function()
+		return self._leaseMap:UpdateAsync(Config.WorkerLeaseKey, function(current)
+			if not current or current.ownerJobId ~= game.JobId then
+				return nil
+			end
+
+			return {
+				ownerJobId = game.JobId,
+				expiresAt = 0,
+			}
+		end, 1)
+	end)
+
+	return success
 end
 
 return MatchRepository

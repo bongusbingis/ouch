@@ -7,24 +7,19 @@ local CloudRetry = require(script.Parent.CloudRetry)
 local QueueRepository = {}
 QueueRepository.__index = QueueRepository
 
-local function queueName(mode)
-	return Config.MemoryStoreNamespace .. ":Queue:" .. mode
+local function queueName()
+	return Config.MemoryStoreNamespace .. ":Queue:" .. Config.QueueKey
 end
 
 function QueueRepository.new()
-	local maps = {}
-	for _, mode in Config.GameModes do
-		maps[mode] = MemoryStoreService:GetSortedMap(queueName(mode))
-	end
-
 	return setmetatable({
-		_maps = maps,
+		_map = MemoryStoreService:GetSortedMap(queueName()),
 	}, QueueRepository)
 end
 
 function QueueRepository:Enqueue(ticket)
 	local success, value = CloudRetry.call("QueueRepository.Enqueue", function()
-		return self._maps[ticket.mode]:SetAsync(ticket.partyId, ticket, Config.QueueRecordLifetime, ticket.enqueuedAt)
+		return self._map:SetAsync(ticket.partyId, ticket, Config.QueueRecordLifetime, ticket.enqueuedAt)
 	end)
 
 	return success, value
@@ -34,17 +29,17 @@ function QueueRepository:Refresh(ticket)
 	return self:Enqueue(ticket)
 end
 
-function QueueRepository:Remove(mode, partyId)
+function QueueRepository:Remove(partyId)
 	local success, value = CloudRetry.call("QueueRepository.Remove", function()
-		return self._maps[mode]:RemoveAsync(partyId)
+		return self._map:RemoveAsync(partyId)
 	end)
 
 	return success, value
 end
 
-function QueueRepository:GetCandidates(mode)
+function QueueRepository:GetCandidates()
 	local success, items = CloudRetry.call("QueueRepository.GetCandidates", function()
-		return self._maps[mode]:GetRangeAsync(Enum.SortDirection.Ascending, Config.QueueCandidateLimit)
+		return self._map:GetRangeAsync(Enum.SortDirection.Ascending, Config.QueueCandidateLimit)
 	end)
 	if not success then
 		return nil, items
