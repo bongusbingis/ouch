@@ -21,13 +21,7 @@ export type MatchRules = {
 export type ScoreScope = "Player" | "Team"
 
 export type ModeContext = {
-	map: {
-		ballSpawns: { BasePart },
-		playerSpawns: { BasePart },
-	},
 	balls: {
-		startGroundSpawns: (points: { BasePart }) -> (),
-		stopGroundSpawns: () -> (),
 		grantHeldBall: (player: Player) -> boolean,
 		clearAll: () -> (),
 	},

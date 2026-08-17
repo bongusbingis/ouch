@@ -6,31 +6,20 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
-local ServerStorage = game:GetService("ServerStorage")
-local Workspace = game:GetService("Workspace")
-
-local Shared = ReplicatedStorage:WaitForChild("Shared")
-local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local MatchService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MatchService"))
-local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 
 return function()
 	describe("MatchService smoke", function()
 		it("start exposes the replicated MatchState surface and stays Idle", function()
-			local lobby = TestAssets.get(Workspace, "Lobby")
-			TestAssets.get(lobby, "PlayerSpawns")
 			MatchService.start()
 
 			local stateFolder = ReplicatedStorage:FindFirstChild("MatchState")
 			expect(stateFolder).to.be.ok()
 			expect(stateFolder:GetAttribute("phase")).to.equal("Idle")
 			expect(stateFolder:GetAttribute("winnerId")).to.equal("")
-			expect(stateFolder:GetAttribute("mapId")).to.equal("")
-			expect(stateFolder:GetAttribute("modeId")).to.equal(ModeRegistry.default().id)
+			expect(stateFolder:GetAttribute("modeId")).to.equal("")
 			expect(typeof(stateFolder:GetAttribute("timeRemaining"))).to.equal("number")
-			expect(stateFolder:GetAttribute("voteOpen")).to.equal(false)
-			expect(typeof(stateFolder:GetAttribute("voteEndsAt"))).to.equal("number")
 
 			expect(MatchService.phase()).to.equal("Idle")
 

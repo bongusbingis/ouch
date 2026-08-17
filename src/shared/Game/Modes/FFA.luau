@@ -1,5 +1,7 @@
 --!strict
 
+local ReplicatedStorage = script.Parent.Parent.Parent.Parent
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
 local GameMode = require(script.Parent.GameMode)
 
 -- Classic FFA: each entrant receives one persistent contested ball.
@@ -12,7 +14,7 @@ FFA.rules = {
 	ScoreTarget = 15,
 	TimeCapSeconds = 300,
 	ResultsSeconds = 8,
-	IntermissionSeconds = 15,
+	IntermissionSeconds = GameModes.VoteDurationSeconds,
 	StartingSeconds = 3,
 	RespawnSeconds = 1,
 	SpawnInvulnSeconds = 1.5,
