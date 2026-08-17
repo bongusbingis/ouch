@@ -1,24 +1,38 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local ReactRoblox = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react-roblox"))
 local Replica = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replica"))
 local EconomyStore = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("EconomyStore")
 )
+local UIFeedback = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
+)
 
 local lobby = script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby")
-local NavigationController = require(lobby:WaitForChild("NavigationController"))
-local NotificationController = require(lobby:WaitForChild("NotificationController"))
-local InventoryController = require(lobby:WaitForChild("InventoryController"))
 local PartyBackgroundController = require(lobby:WaitForChild("PartyBackgroundController"))
-local PartyController = require(lobby:WaitForChild("PartyController"))
+local PartyClient = require(lobby:WaitForChild("PartyClient"))
+local LobbyApp = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("LobbyApp"))
 
-local screenGui = Players.LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("ScreenGui")
-local notifications = NotificationController.new(screenGui)
+local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+local partyClient = PartyClient.new()
+local background = PartyBackgroundController.start()
+local root = ReactRoblox.createRoot(playerGui)
 
-NavigationController.start(screenGui)
 EconomyStore.start()
-task.spawn(InventoryController.start, screenGui, notifications)
-task.spawn(PartyBackgroundController.start)
-task.spawn(PartyController.start, screenGui, notifications)
+UIFeedback.start()
+partyClient:start()
+root:render(React.createElement(LobbyApp, { PartyClient = partyClient }))
 Replica.RequestData()
+
+script.Destroying:Connect(function()
+	root:unmount()
+	partyClient:destroy()
+	if background then
+		background:destroy()
+	end
+	EconomyStore.stop()
+	UIFeedback.destroy()
+end)

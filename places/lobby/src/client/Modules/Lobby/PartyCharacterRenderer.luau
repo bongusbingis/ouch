@@ -4,9 +4,27 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local CharacterColorLogic = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Economy")
+		:WaitForChild("CharacterColorLogic")
+)
+local CosmeticVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CosmeticVisualFactory")
+)
+local HammerGrip = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("HammerGrip")
+)
 
 local USERNAME_LOOKUP_ATTEMPTS = 3
 local USERNAME_RETRY_DELAY = 1
+local IDLE_PLAYBACK_SPEED = 0.85
 
 local PartyCharacterRenderer = {}
 PartyCharacterRenderer.__index = PartyCharacterRenderer
@@ -36,14 +54,124 @@ function PartyCharacterRenderer.new(localUserId, onKick)
 			[localUserId] = Players.LocalPlayer.Name,
 		},
 		_usernameRequests = {},
+		_skinsPreview = nil,
+		_destroyed = false,
+		_generation = 0,
 	}, PartyCharacterRenderer)
 
 	self:Render({ members = {} })
 	self:_faceLocalCharacterToCamera()
 	self._renderConnection = RunService.RenderStepped:Connect(function()
 		self:_faceLocalCharacterToCamera()
+		self:_updateSkinsPreview()
 	end)
 	return self
+end
+
+local function configureHeldVisual(visual)
+	visual.Anchored = true
+	visual.CanCollide = false
+	visual.CanQuery = false
+	visual.CanTouch = false
+	visual.Massless = true
+end
+
+local function attachmentCFrame(part, name)
+	local attachment = part:FindFirstChild(name)
+	return if attachment and attachment:IsA("Attachment") then part.CFrame * attachment.CFrame else nil
+end
+
+local function hammerGripCFrame(hammer)
+	local attachment = hammer:FindFirstChild("GripAttachment")
+	if attachment then
+		assert(attachment:IsA("Attachment"), "[PartyCharacterRenderer] Hammer GripAttachment must be an Attachment")
+		return attachment.CFrame
+	end
+	local config = Combat.Hammer.AutoGrip
+	local solution = HammerGrip.solve(
+		hammer.Size.X,
+		hammer.Size.Y,
+		hammer.Size.Z,
+		config.MinAxisDominanceRatio,
+		config.GripAlongLongAxis
+	)
+	assert(solution ~= nil, "[PartyCharacterRenderer] ambiguous hammer requires GripAttachment")
+	return CFrame.new(solution.position.x, solution.position.y, solution.position.z)
+		* CFrame.Angles(
+			math.rad(solution.rotationDeg.x),
+			math.rad(solution.rotationDeg.y),
+			math.rad(solution.rotationDeg.z)
+		)
+end
+
+local function effectiveItemId(category, itemId)
+	if typeof(itemId) == "string" and CosmeticVisualFactory.definition(category, itemId) ~= nil then
+		return itemId
+	end
+	return ""
+end
+
+function PartyCharacterRenderer:_destroySkinsPreview()
+	local preview = self._skinsPreview
+	if not preview then
+		return
+	end
+	preview.hammer:Destroy()
+	preview.ball:Destroy()
+	self._skinsPreview = nil
+end
+
+function PartyCharacterRenderer:SetSkinsPreview(active, ballItemId, hammerItemId)
+	if self._destroyed or not active then
+		self:_destroySkinsPreview()
+		return
+	end
+	local normalizedBallId = effectiveItemId("BallAssets", ballItemId)
+	local normalizedHammerId = effectiveItemId("HammerAssets", hammerItemId)
+	local preview = self._skinsPreview
+	if preview and preview.ballItemId == normalizedBallId and preview.hammerItemId == normalizedHammerId then
+		return
+	end
+
+	self:_destroySkinsPreview()
+	local ball = CosmeticVisualFactory.create("BallAssets", normalizedBallId)
+	local hammer = CosmeticVisualFactory.create("HammerAssets", normalizedHammerId)
+	configureHeldVisual(ball)
+	configureHeldVisual(hammer)
+	ball.Name = "LobbySkinsDodgeball"
+	hammer.Name = "LobbySkinsHammer"
+	ball.Parent = self._characterContainer
+	hammer.Parent = self._characterContainer
+	self._skinsPreview = {
+		ball = ball,
+		hammer = hammer,
+		ballItemId = normalizedBallId,
+		hammerItemId = normalizedHammerId,
+		hammerGrip = hammerGripCFrame(hammer),
+	}
+	self:_updateSkinsPreview()
+end
+
+function PartyCharacterRenderer:_updateSkinsPreview()
+	local preview = self._skinsPreview
+	local character = self._characters[self._localUserId]
+	if not preview or not character then
+		return
+	end
+	local leftHand = character.leftHand
+	local rightHand = character.rightHand
+
+	local hammerHand = attachmentCFrame(leftHand, "LeftGripAttachment")
+		or leftHand.CFrame
+			* CFrame.new(
+				Combat.Hammer.HandGripFallbackOffset.x,
+				Combat.Hammer.HandGripFallbackOffset.y,
+				Combat.Hammer.HandGripFallbackOffset.z
+			)
+	preview.hammer.CFrame = hammerHand * preview.hammerGrip:Inverse()
+	local ballOffset = Combat.Dodgeball.HeldVisualHandOffset
+	preview.ball.CFrame = attachmentCFrame(rightHand, "DodgeballGrip")
+		or rightHand.CFrame * CFrame.new(ballOffset.x, ballOffset.y, ballOffset.z)
 end
 
 function PartyCharacterRenderer:_faceLocalCharacterToCamera()
@@ -64,11 +192,12 @@ function PartyCharacterRenderer:_faceLocalCharacterToCamera()
 end
 
 function PartyCharacterRenderer:_requestUsername(userId)
-	if self._usernames[userId] or self._usernameRequests[userId] then
+	if self._destroyed or self._usernames[userId] or self._usernameRequests[userId] then
 		return
 	end
 
 	self._usernameRequests[userId] = true
+	local generation = self._generation
 	task.spawn(function()
 		local username
 		for attempt = 1, USERNAME_LOOKUP_ATTEMPTS do
@@ -82,6 +211,9 @@ function PartyCharacterRenderer:_requestUsername(userId)
 			end
 		end
 
+		if self._destroyed or generation ~= self._generation then
+			return
+		end
 		self._usernameRequests[userId] = nil
 		if not username then
 			warn(("[PartyCharacterRenderer] Could not load username for %d"):format(userId))
@@ -109,12 +241,13 @@ function PartyCharacterRenderer:_remove(userId)
 	character.rig:Destroy()
 end
 
-function PartyCharacterRenderer:_spawn(userId, slot)
+function PartyCharacterRenderer:_spawn(userId, slot, characterColorId)
 	local rig = self._characterTemplate:Clone()
 	rig.Name = ("PartyCharacter_%d"):format(userId)
 	rig:SetAttribute("UserId", userId)
 	rig:SetAttribute("PartySlot", slot)
 
+	local color = CharacterColorLogic.resolve(Cosmetics, characterColorId)
 	for _, descendant in rig:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.CanCollide = false
@@ -122,11 +255,18 @@ function PartyCharacterRenderer:_spawn(userId, slot)
 			descendant.CanTouch = false
 			descendant.Massless = true
 		end
+		if descendant:IsA("MeshPart") then
+			descendant.Color = color
+		end
 	end
 
 	local humanoid = rig:WaitForChild("Humanoid")
 	local rootPart = rig:WaitForChild("HumanoidRootPart")
+	local leftHand = rig:WaitForChild("LeftHand")
+	local rightHand = rig:WaitForChild("RightHand")
 	local animator = humanoid:WaitForChild("Animator")
+	assert(leftHand:IsA("BasePart"), "[PartyCharacterRenderer] CharacterRig.LeftHand must be a BasePart")
+	assert(rightHand:IsA("BasePart"), "[PartyCharacterRenderer] CharacterRig.RightHand must be a BasePart")
 	local spawn = self._spawns[slot]
 	local nametag = self._nametagTemplate:Clone()
 	local usernameLabel = nametag:WaitForChild("Username")
@@ -159,7 +299,7 @@ function PartyCharacterRenderer:_spawn(userId, slot)
 	local idleTrack = animator:LoadAnimation(self._idleAnimation)
 	idleTrack.Looped = true
 	idleTrack.Priority = Enum.AnimationPriority.Idle
-	idleTrack:Play(0)
+	idleTrack:Play(0, 1, IDLE_PLAYBACK_SPEED)
 
 	self._characters[userId] = {
 		rig = rig,
@@ -168,9 +308,26 @@ function PartyCharacterRenderer:_spawn(userId, slot)
 		usernameLabel = usernameLabel,
 		crownLabel = crownLabel,
 		kickButton = kickButton,
+		leftHand = leftHand,
+		rightHand = rightHand,
 		slot = slot,
+		characterColorId = characterColorId or "",
 	}
 	self:_requestUsername(userId)
+end
+
+function PartyCharacterRenderer:_setCharacterColor(character, characterColorId)
+	local normalizedId = characterColorId or ""
+	if character.characterColorId == normalizedId then
+		return
+	end
+	character.characterColorId = normalizedId
+	local color = CharacterColorLogic.resolve(Cosmetics, normalizedId)
+	for _, descendant in character.rig:GetDescendants() do
+		if descendant:IsA("MeshPart") then
+			descendant.Color = color
+		end
+	end
 end
 
 function PartyCharacterRenderer:_move(character, slot)
@@ -182,18 +339,23 @@ function PartyCharacterRenderer:_move(character, slot)
 	character.nametag.Parent = self._playerGui
 
 	if not character.idleTrack.IsPlaying then
-		character.idleTrack:Play(0)
+		character.idleTrack:Play(0, 1, IDLE_PLAYBACK_SPEED)
 	end
 end
 
 function PartyCharacterRenderer:Render(snapshot)
+	if self._destroyed then
+		return
+	end
 	local isLocalLeader = snapshot.leaderUserId == self._localUserId
 	local orderedUserIds = { self._localUserId }
 	local includedUserIds = {
 		[self._localUserId] = true,
 	}
+	local characterColors = {}
 
 	for _, member in snapshot.members do
+		characterColors[member.userId] = member.characterColorId
 		if #orderedUserIds >= Config.PartyMaxPlayers then
 			break
 		end
@@ -214,11 +376,13 @@ function PartyCharacterRenderer:Render(snapshot)
 	end
 
 	for slot, userId in orderedUserIds do
+		local characterColorId = characterColors[userId]
 		local character = self._characters[userId]
 		if character then
 			self:_move(character, slot)
+			self:_setCharacterColor(character, characterColorId)
 		else
-			self:_spawn(userId, slot)
+			self:_spawn(userId, slot, characterColorId)
 			character = self._characters[userId]
 		end
 		local canKick = isLocalLeader and userId ~= snapshot.leaderUserId
@@ -228,6 +392,27 @@ function PartyCharacterRenderer:Render(snapshot)
 		character.kickButton.Selectable = canKick
 		character.nametag.Active = canKick
 	end
+end
+
+function PartyCharacterRenderer:destroy()
+	if self._destroyed then
+		return
+	end
+	self._destroyed = true
+	self:_destroySkinsPreview()
+	self._generation += 1
+	if self._renderConnection then
+		self._renderConnection:Disconnect()
+		self._renderConnection = nil
+	end
+	local removals = {}
+	for userId in self._characters do
+		table.insert(removals, userId)
+	end
+	for _, userId in removals do
+		self:_remove(userId)
+	end
+	table.clear(self._usernameRequests)
 end
 
 return PartyCharacterRenderer
