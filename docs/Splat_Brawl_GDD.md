@@ -1,13 +1,13 @@
 # SPLAT BRAWL
 
-**Game Design Document — v0.3**
+**Game Design Document — v0.4**
 Roblox PvP Arena Brawler — Dodgeball & Inflatable Hammer Combat
 
-> v0.3 (2026-07-24): recall removed; added a dedicated timed catch, persistent contested match balls, a pre-match countdown, combined mode/map voting, late-join rules, and exact respawn timing.
+> v0.4 (2026-08-17): matchmaking now sends players to one permanent arena, where the arriving group will vote only on the game mode. Removed map selection, cloned map templates, and the intermission lobby lifecycle.
 
 ## 1. High Concept
 
-Splat Brawl is a fast, skill-based PvP arena game built around two asymmetric weapons — throwable dodgeballs and melee inflatable hammers — set in a bright, bouncy-castle aesthetic. Players fight in Free-for-All and Team Deathmatch modes across small, symmetric arenas designed for constant engagement and readable counterplay.
+Splat Brawl is a fast, skill-based PvP arena game built around two asymmetric weapons — throwable dodgeballs and melee inflatable hammers — set in a bright, bouncy-castle aesthetic. Players fight in Free-for-All and Team Deathmatch modes inside one large arena designed for constant engagement and readable counterplay.
 
 - **Genre:** Arena Brawler / PvP Shooter-Melee Hybrid
 - **Platform:** Roblox
@@ -66,29 +66,22 @@ This triangle is the entire balance foundation and should not be diluted with ad
 - Respawn: synchronized 4.5-second waves with an exact server-time countdown, preserving team push/retreat rhythm.
 - Ball supply: one persistent ball per entrant. Late joiners receive one ball on their first arena spawn; respawns do not create more.
 
-### 4.3 Match Loop and Intermission Lobby
+### 4.3 Match Arrival and Mode Selection
 
-- A 3-second `Starting` phase follows arena teleport. Combat inputs are suppressed until it reaches `Active`.
-- During the first 10 seconds of Intermission, players vote among up to three compatible mode/map pairs. The highest count wins; ties resolve randomly on the server.
+- Lobby matchmaking teleports the completed group into a reserved arena server with a versioned payload containing the match identity, party identity, expected player count, and allowed mode-vote options.
+- The first admitted player opens a 10-second server-authoritative game-mode vote. Delayed teleport arrivals join the vote at its authoritative remaining time rather than restarting it.
+- Each player has one changeable ballot. If nobody votes, the server chooses randomly from all offered modes; a tie is resolved randomly among only the tied leaders.
+- FFA and TDM are the enabled launch options. Infection has a disabled configuration stub for a later rules pass; Battle Royale is not offered.
+- After voting selects a registered mode, a 3-second `Starting` phase begins. Combat inputs are suppressed until it reaches `Active`.
+- TDM keeps each matchmaking party together and chooses the closest balanced partition possible. Late party members inherit their party's existing team.
 - Players joining during `Starting` or `Active` enter immediately. TDM assigns them to the smaller team, with deterministic team-order tie breaking.
-- Match arenas are templates under `ReplicatedStorage.Assets.Maps` and are cloned into `Workspace` only for an active match and its results presentation.
-- `Workspace.Lobby` is a permanent, Studio-authored intermission area. It is never cloned, reparented, or destroyed by the match/map lifecycle.
-- When Results ends, players who participated in that match return to `Workspace.Lobby.PlayerSpawns`; match balls and terrain bindings are cleared, then the arena clone is destroyed.
-- New arrivals are not sent to the lobby. They remain at their normal arrival location until admitted into a match.
-- Returning participants remain in the lobby through intermission and any subsequent wait for enough players. The next match teleports all admitted players to the newly cloned arena.
-- Shops, crate opening, and other lobby interactions will live in this permanent area but are outside the current gameplay pass.
+- Results and subsequent round flow remain inside the same permanent arena server; the next 10-second vote occupies Intermission, and arena geometry is never cloned or destroyed between rounds.
 
-## 5. Map Design
+## 5. Arena Design
 
-Launch with 3 maps, each testing a different balance of the combat triangle:
+The arena is permanently authored at `Workspace.Assets.Arena`. Static geometry lives in `Map`; future world behavior such as jump pads lives in `Scriptables`. Non-team modes use direct spawn parts under `PlayerSpawns`, while TDM uses direct spawn parts under `TeamSpawns.Red` and `TeamSpawns.Blue`.
 
-| Map | Mode Focus | Key Feature |
-|---|---|---|
-| The Pit | FFA | Small, chaotic arena with short recovery routes that force constant hammer contact |
-| Foam Court | TDM | Symmetric 3-lane layout with fair team spawns, foam pits, and a mid control platform |
-| Sky Bounce | TDM / FFA | Two-level map — hammer-favored upper walkways, dodgeball-favored ground floor, bounce pads for repositioning |
-
-Shared design rules: no sightline longer than ~25 studs (keeps dodgeball from becoming a pure sniping tool), bounce pads and foam pits used as terrain-based mobility/dodge tools, symmetric layouts for TDM to keep team spawns fair.
+Shared design rules: keep sightlines readable enough that dodgeball does not become pure sniping, use arena features as mobility and dodge tools, and preserve fair Red/Blue spawn geometry for TDM.
 
 ## 6. Progression & Retention
 
@@ -199,7 +192,7 @@ One product per season rather than one reusable product, so receipt history is u
 - Server-authoritative hit detection for both dodgeball and hammer to prevent client-side exploiting — do not trust client RaycastResult for eliminations.
 - Catch windows are deterministic sim state driven by the dedicated Catch input; validation of direction, distance, ownership, team, and approach happens in the server-authoritative simulation.
 - Respawn waves (TDM) handled via a server-side timer service, not per-client.
-- StreamingEnabled recommended if Sky Bounce map grows beyond a single streamable region.
+- StreamingEnabled is recommended if the permanent arena grows beyond a single streamable region.
 - Reuse your existing DataStore persistence pattern (as in Pizza Shift) for stats, XP, and cosmetic ownership.
 
 ## 9. KPIs & Analytics

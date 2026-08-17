@@ -40,25 +40,29 @@ Dimensions cannot identify an arbitrary mesh pivot or choose between nearly equa
 2. Add `GripAttachment` to off-center, asymmetrical, or near-square skins and place it exactly where the hand should hold the mesh.
 3. Verify every skin at rest, mid-swing, and mid-squash on both R15 and R6 rigs.
 
-## Intermission lobby
+## Permanent arena
 
-1. Keep the Studio-authored lobby permanently at `Workspace > Lobby`. Do not place it under `ReplicatedStorage > Assets > Maps`; runtime map cleanup must never move or destroy it.
-2. Add a direct child folder at `Workspace > Lobby > PlayerSpawns` with at least one anchored `BasePart` spawn marker.
-3. Make each marker invisible with `CanCollide`, `CanTouch`, and `CanQuery` disabled. The server teleports returning match participants 3.5 studs above a random marker.
-4. Place the lobby at its final world position, separated from match arenas. New arrivals are not automatically teleported there; it is reserved for players returning from a completed match.
+Create this exact Studio-authored hierarchy. Every named container is a `Folder`, and each spawn pool must contain at least one direct child `BasePart`:
 
-## Match maps and recovery
+```text
+Workspace
+└─ Assets
+   └─ Arena
+      ├─ Map
+      ├─ Scriptables
+      ├─ PlayerSpawns
+      └─ TeamSpawns
+         ├─ Red
+         └─ Blue
+```
 
-Each enabled `Config.Maps.Pool` entry requires `ReplicatedStorage > Assets > Maps > <AssetName>` as a `Folder` or `Model` authored at its final world position. It must contain `Scriptables > BallSpawns` and `Scriptables > PlayerSpawns`, each with at least one anchored `BasePart`; optional `Scriptables > BouncePads` and `Scriptables > FoamPits` folders contain their feature parts. It must also contain `Static`; MapService anchors every cloned `BasePart` below it as a runtime fallback for missed authoring. `ThePit`, `FoamCourt`, and `SkyBounce` are configured but disabled until these trees exist. Set `Enabled = true` only after the matching tree is complete. `RecoveryY` in `Config.Maps` is the out-of-bounds threshold; recovered balls reuse the same instance and cycle across `BallSpawns`.
+`Map` contains all permanent static arena assets. `Scriptables` is reserved for a later world-feature pass. Put non-team spawn markers directly under `PlayerSpawns`, Red TDM markers directly under `TeamSpawns.Red`, and Blue TDM markers directly under `TeamSpawns.Blue`. Spawn markers should be anchored and normally invisible with `CanCollide`, `CanTouch`, and `CanQuery` disabled. Runtime code never clones, reparents, or destroys the arena.
 
-## Code-built HUD replacement trees
+## Matchmaking arrival
 
-While Studio UI authoring is unavailable, `UIResolver` builds these exact temporary trees. A Studio-authored root with the same name wins later and must provide every listed child. All positions and sizes use `UDim2` scale with anchor points matching their placement.
+Lobby matchmaking sends a versioned TeleportData payload containing match identity, party identity, expected player count, and the allowed mode-vote options. The arena validates that payload and opens the authoritative 10-second vote when the first admitted player arrives; malformed or mismatched arrivals cannot vote or enter gameplay. Direct Studio joins use the enabled options in `Config.GameModes` but do not create a fake matchmaking session. Add FFA and TDM thumbnail asset IDs to `Config.GameModes`; the empty strings are intentional placeholders. Until they are set, each card renders a blank white thumbnail. Infection remains disabled until its gameplay rules exist.
 
-- `StarterGui > Hud > CatchButton` (`ImageButton`): `AspectRatio` (`UIAspectRatioConstraint`), `Corner` (`UICorner`), `Outline` (`UIStroke`), `Gradient` (`UIGradient`), and `Label` (`TextLabel`).
-- `StarterGui > Hud > MatchFlow` (`Frame`): `Respawn`, `Tutorial`, and `ActionFeedback` (`TextLabel`); `CombatFeed` (`Frame`) with `Line1`–`Line3` (`TextLabel`); `Vote` (`Frame`) with `Corner`, `Outline`, `ColorWash`, `AspectRatio`, `SizeConstraint`, `Title`, `Subtitle`, `Timer`, `ProgressTrack > ProgressFill`, and `Options`. `Options` contains `Option1`–`Option3` (`TextButton`), each with `Corner`, `Outline`, `ColorWash`, `Scale`, `PreviewFallback`, `Thumbnail`, `PreviewShade > Fade`, `PreviewHint`, `ModeBacking`, `Mode`, `Map`, `Count`, and `Selected`. `Summary` (`Frame`) contains `Corner`, `Outline`, `ColorWash`, `Title`, `Stats`, and `Rewards`.
-
-Map vote previews read `Config.Maps.Pool[*].Thumbnail`. Use a landscape image asset ID; the card uses `ScaleType.Crop` to preserve its aspect ratio without stretching. An empty thumbnail intentionally shows the configured candy-gradient fallback.
+The per-player selection checkmark on each mode card uses a placeholder image asset (`rbxassetid://72382658` in `GameModeCard`); replace it with the intended published asset. It is authored square at 100x100 pixels against a 1890x1200 reference viewport and scales with the card from there.
 
 ## Verification
 
@@ -66,10 +70,10 @@ Map vote previews read `Config.Maps.Pool[*].Thumbnail`. Use a landscape image as
 2. Test with **Server & Clients**, not a single local player process.
 3. Verify held balls align to `DodgeballGrip`; adjust only that attachment to refine placement.
 4. Exercise 0, 100, 150, and 200 ms simulated latency and check that throw/rebound effects do not replay during corrections.
-5. Complete a match and verify that participants remain in the arena for Results, then move to `Workspace > Lobby` for Intermission before the arena clone is destroyed.
-6. Join with a new client during Intermission and verify that the new arrival is not teleported to the lobby.
-7. Verify Starting counts down for 3 seconds without accepting held combat inputs; then test Throw and Catch on mouse/keyboard, touch, and gamepad.
-8. During Intermission, vote from multiple clients and confirm counts, selection color, server tie handling, and the winning compatible mode/map pair. Resize the vote live at 16:9, 21:9, 4:3 tablet, and 9:19.5 portrait; cards must remain centered in landscape, switch to rows in portrait, and keep every label inside its card.
-9. Verify FFA respawns in 1 second and TDM uses the displayed 4.5-second wave deadline. Confirm neither respawn creates a new ball, while a late join receives exactly one.
-10. Drop every match ball below the map RecoveryY and confirm the same instances return across BallSpawns without changing the total count.
+5. Join the arena directly in Studio and confirm the FFA/TDM vote opens for 10 seconds without TeleportData.
+6. Join through lobby matchmaking and confirm every party member is accepted into one arena session with the expected match and party identities.
+7. Vote from multiple clients and confirm `XXX` counts, per-player checkmarks, vote changes, random no-vote selection, and random tie resolution. A delayed arrival must see the existing remaining bar time.
+8. Let both FFA and TDM win. Confirm FFA uses `PlayerSpawns`; TDM uses the authored Red and Blue pools and keeps lobby parties together.
+9. Verify Starting counts down for 3 seconds without accepting held combat inputs; then test Throw and Catch on mouse/keyboard, touch, and gamepad.
+10. Verify FFA respawns in 1 second and TDM uses the displayed 4.5-second wave deadline. Confirm neither respawn creates a new ball, while a late join receives exactly one.
 11. Score a dodgeball elimination and verify one splat burst plus the `Splat` sound at the impact point, colored to the thrower's equipped ball skin (default skin → rubber red), identical on every client. Repeat under the latency settings from step 4: exactly one splat, and exactly one hammer squash on hammer hits.
