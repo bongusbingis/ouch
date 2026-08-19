@@ -11,6 +11,8 @@ local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegist
 local ModeVote = require(Game:WaitForChild("Modes"):WaitForChild("ModeVote"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
+local AnalyticsConfig = require(Config:WaitForChild("Analytics"))
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local MatchService = require(script.Parent.MatchService)
 
@@ -178,6 +180,18 @@ local function finishVote(expectedRevision: number, force: boolean?)
 	folder:SetAttribute("open", false)
 	folder:SetAttribute("winnerModeId", winner)
 	publish()
+
+	-- Logged per voter with their own pick alongside the outcome, so mode
+	-- popularity can be read separately from what actually got played.
+	local counts = ModeVote.counts(vote)
+	for _, player in admittedPlayers() do
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ModeVoteResolved, 1, {
+			modeId = winner,
+			votedFor = player:GetAttribute(SELECTION_ATTRIBUTE),
+			winnerVotes = counts[winner],
+			voterCount = #admittedPlayers(),
+		})
+	end
 	vote = nil
 	voteEndsAt = 0
 	pendingWinner = winner
@@ -261,6 +275,7 @@ local function submitVote(player: Player, modeId: string)
 	end
 	player:SetAttribute(SELECTION_ATTRIBUTE, modeId)
 	publish()
+	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ModeVoteCast, 1, { modeId = modeId })
 	closeIfEveryoneVoted()
 end
 

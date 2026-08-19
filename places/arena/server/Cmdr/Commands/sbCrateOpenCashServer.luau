@@ -11,7 +11,7 @@ local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cr
 
 local function describe(result): string
 	if result.isDupe then
-		return `{result.itemId} ({result.rarity}, duplicate, +{result.cashRefund} Cash)`
+		return `{result.itemId} ({result.rarity}, duplicate, +{result.bonksRefund} Bonks)`
 	end
 	return `{result.itemId} ({result.rarity}, new)`
 end
@@ -25,11 +25,11 @@ return function(_context, players: { Player }, crateId: string): string
 
 	local output = {}
 	for _, player in targets do
-		local result, reason = CrateService.openWithCash(player, crateId)
+		local result, reason = CrateService.openWithBonks(player, crateId)
 		if result then
 			local data = PlayerData.get(player)
-			local balance = if data then data.Cash else "unavailable"
-			table.insert(output, `{player.Name}: {describe(result)} | cost={crate.CashPrice or 0} balance={balance}`)
+			local balance = if data then data.Bonks else "unavailable"
+			table.insert(output, `{player.Name}: {describe(result)} | cost={crate.BonksPrice or 0} balance={balance}`)
 		else
 			table.insert(output, `{player.Name}: failed ({reason or "unknown"})`)
 		end

@@ -36,7 +36,7 @@ return function()
 			PaidRandomPolicyService._resetForTest()
 		end)
 
-		it("blocks paid Cash crates for restricted players and caches the policy", function()
+		it("blocks paid Bonks crates for restricted players and caches the policy", function()
 			local removing = signal()
 			local calls = 0
 			local player = { Name = "Restricted" }
@@ -50,7 +50,7 @@ return function()
 				},
 				products = {
 					Catalog = {
-						CashPack = { Enabled = true, Type = "Cash" },
+						BonksPack = { Enabled = true, Type = "Bonks" },
 					},
 				},
 			})
@@ -62,7 +62,7 @@ return function()
 			expect(calls).to.equal(1)
 		end)
 
-		it("leaves earned-Cash crates available when paid offers are preview-only", function()
+		it("leaves earned-Bonks crates available when paid offers are preview-only", function()
 			local removing = signal()
 			PaidRandomPolicyService.start({
 				players = { PlayerRemoving = removing },
@@ -71,7 +71,7 @@ return function()
 						error("must not query")
 					end,
 				},
-				products = { Catalog = { Cash500 = { CatalogStatus = "Preview", Type = "Cash" } } },
+				products = { Catalog = { Bonks500 = { CatalogStatus = "Preview", Type = "Bonks" } } },
 			})
 			local allowed = PaidRandomPolicyService.canReceivePaidRandom({ Name = "EarnedOnly" })
 			expect(allowed).to.equal(true)

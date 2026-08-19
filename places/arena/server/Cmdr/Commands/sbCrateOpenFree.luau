@@ -2,7 +2,7 @@
 
 return {
 	Name = "sb-crate-open-free",
-	Description = "Rolls a crate without charging Cash and fires the normal reveal event.",
+	Description = "Rolls a crate without charging Bonks and fires the normal reveal event.",
 	Group = "Splat Brawl | Economy",
 	Args = {
 		{

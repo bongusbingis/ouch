@@ -13,7 +13,7 @@ return {
 		{
 			Type = "profileField",
 			Name = "field",
-			Description = "Cash, XP, or progression field.",
+			Description = "Bonks, XP, or progression field.",
 		},
 		{
 			Type = "integer",

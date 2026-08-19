@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = script:WaitForChild("Modules")
+local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
@@ -18,6 +19,9 @@ ConfigLiveService.start({
 		),
 	},
 })
+-- No match loop in the lobby; session, onboarding, economy and funnel
+-- reporting still run.
+AnalyticsService.start()
 CosmeticsService.start()
 CharacterColorService.start()
 

@@ -9,7 +9,7 @@ local PlayerData = require(script.Parent.PlayerData)
 -- Dispatches reward grants by kind, mirroring MonetizationService.registerHandler.
 --
 -- Duplicate cosmetics resolve as GrantOrRefund: an already-owned item pays the
--- rarity's DupeCash instead. Returning false there would leave the reward
+-- rarity's DupeBonks instead. Returning false there would leave the reward
 -- permanently unclaimable, since callers only mark a reward claimed once the
 -- grant succeeds -- and it reuses the exact dupe economics crates already use.
 
@@ -25,12 +25,12 @@ type Handler = (player: Player, reward: Reward) -> (boolean, string?)
 
 local handlers: { [string]: Handler } = {}
 
-handlers.Cash = function(player, reward)
+handlers.Bonks = function(player, reward)
 	local amount = reward.amount
 	if amount == nil or amount <= 0 then
 		return false, "invalid_reward"
 	end
-	PlayerData.addCash(player, amount)
+	PlayerData.addBonks(player, amount)
 	return true, nil
 end
 
@@ -58,9 +58,9 @@ handlers.Cosmetic = function(player, reward)
 	end
 	if reason == "already_owned" then
 		local rarity = Cosmetics.Rarities[item.Rarity]
-		local refund = if rarity then rarity.DupeCash else 0
+		local refund = if rarity then rarity.DupeBonks else 0
 		if refund > 0 then
-			PlayerData.addCash(player, refund)
+			PlayerData.addBonks(player, refund)
 		end
 		return true, nil
 	end

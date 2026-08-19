@@ -1,7 +1,7 @@
 return {
 	Template = {
 		SchemaVersion = 0, -- sentinel; never bump here. Target is DataConfig.SchemaVersion.
-		Cash = 2500,
+		Bonks = 2500,
 		Level = {
 			Points = 0,
 		},
@@ -58,7 +58,7 @@ return {
 		Catch = 15,
 	},
 
-	ProgressionCash = {
+	ProgressionBonks = {
 		MatchComplete = 50,
 		Win = 150,
 		Elim = 10,

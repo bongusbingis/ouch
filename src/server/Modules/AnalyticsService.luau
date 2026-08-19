@@ -37,6 +37,7 @@ local onboardingProgress: { [number]: OnboardingProgress } = {}
 local sessionStart: { [number]: number } = {}
 local funnelSessionIds: { [number]: { [string]: string } } = {}
 local combatDedup = EventDedup.new()
+local matchStartedAt = 0
 local started = false
 
 local function isStudio(): boolean
@@ -56,14 +57,18 @@ local function progressFor(userId: number): OnboardingProgress
 	return progress
 end
 
-local function funnelSessionId(userId: number, funnelName: string): string
+-- A funnel session identifies one journey through a funnel, not the player's
+-- whole visit: step 1 starts a new one so a second shop trip or a re-queue is a
+-- separate row rather than merging into the first and making the drop-off
+-- between steps unreadable.
+local function funnelSessionId(userId: number, funnelName: string, step: number): string
 	local byFunnel = funnelSessionIds[userId]
 	if byFunnel == nil then
 		byFunnel = {}
 		funnelSessionIds[userId] = byFunnel
 	end
 	local id = byFunnel[funnelName]
-	if id == nil then
+	if id == nil or step <= 1 then
 		id = HttpService:GenerateGUID(false)
 		byFunnel[funnelName] = id
 	end
@@ -94,7 +99,7 @@ function AnalyticsService.logFunnelStep(
 	stepName: string,
 	customFields: { [string]: any }?
 )
-	local sessionId = funnelSessionId(player.UserId, funnelName)
+	local sessionId = funnelSessionId(player.UserId, funnelName, step)
 	if isStudio() then
 		if verbose() then
 			print(`[Analytics/studio] FunnelStep {player.Name} funnel={funnelName} step={step} name={stepName}`)
@@ -246,16 +251,27 @@ end
 local function handleMatchEvent(event: { [string]: any })
 	if event.kind == "MatchStarted" then
 		combatDedup.clear()
+		matchStartedAt = os.clock()
 		for _, player in Players:GetPlayers() do
 			advanceOnboarding(player, "MatchStarted")
 		end
 	elseif event.kind == "Elim" or event.kind == "BallCaught" then
 		handleElimOrCatch(event)
 	elseif event.kind == "MatchEnded" then
+		local durationSeconds = if matchStartedAt > 0 then os.clock() - matchStartedAt else 0
+		matchStartedAt = 0
+		local modeId = matchStateAttribute("modeId")
+		local playerCount = #Players:GetPlayers()
 		for _, player in Players:GetPlayers() do
 			advanceOnboarding(player, "MatchEnded")
-			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchCompleted, 1, {
+			-- Value is the duration so match length is aggregatable without
+			-- unpacking custom fields; the rest describes what was played.
+			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchCompleted, durationSeconds, {
 				winnerId = event.winnerId,
+				modeId = modeId,
+				playerCount = playerCount,
+				score = player:GetAttribute("MatchScore"),
+				won = event.winnerId ~= nil and tostring(event.winnerId) == PlayerIds.toId(player),
 			})
 		end
 	end
@@ -277,7 +293,9 @@ local function handleReport(player: Player, payload: { [string]: any })
 	end
 end
 
-function AnalyticsService.start(matchService: any)
+-- matchService is optional: the lobby runs the same service for session,
+-- onboarding, economy, and funnel reporting but has no match loop to observe.
+function AnalyticsService.start(matchService: any?)
 	if started then
 		return
 	end
@@ -290,7 +308,9 @@ function AnalyticsService.start(matchService: any)
 		end,
 	}, handleReport)
 
-	matchService.onEvent(handleMatchEvent)
+	if matchService then
+		matchService.onEvent(handleMatchEvent)
+	end
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)

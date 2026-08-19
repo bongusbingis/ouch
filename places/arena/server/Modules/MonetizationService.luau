@@ -47,17 +47,17 @@ local handlers: { [string]: Handler } = {
 	Crate = function(player, def, receiptInfo)
 		return activeCrateService.openFromReceipt(player, def.CrateId, tostring(receiptInfo.PurchaseId)), nil
 	end,
-	Cash = function(player, def, receiptInfo)
-		if type(def.CashAmount) ~= "number" or def.CashAmount <= 0 or def.CashAmount % 1 ~= 0 then
+	Bonks = function(player, def, receiptInfo)
+		if type(def.BonksAmount) ~= "number" or def.BonksAmount <= 0 or def.BonksAmount % 1 ~= 0 then
 			return false, nil
 		end
-		activePlayerData.addCash(player, def.CashAmount)
+		activePlayerData.addBonks(player, def.BonksAmount)
 		return true,
 			{
 				grantId = tostring(receiptInfo.PurchaseId),
-				kind = "Cash",
+				kind = "Bonks",
 				productId = receiptInfo.ProductId,
-				amount = def.CashAmount,
+				amount = def.BonksAmount,
 			}
 	end,
 }

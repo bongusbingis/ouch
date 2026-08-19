@@ -13,10 +13,10 @@ local ScriptedRandom =
 	require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("ScriptedRandom"))
 
 local RARITIES = {
-	Common = { Weight = 70, DupeCash = 50 },
-	Rare = { Weight = 24, DupeCash = 150 },
-	Legendary = { Weight = 6, DupeCash = 400 },
-	Exclusive = { Weight = 0, DupeCash = 0 },
+	Common = { Weight = 70, DupeBonks = 50 },
+	Rare = { Weight = 24, DupeBonks = 150 },
+	Legendary = { Weight = 6, DupeBonks = 400 },
+	Exclusive = { Weight = 0, DupeBonks = 0 },
 }
 
 local ITEMS = {
@@ -68,7 +68,7 @@ return function()
 			local result = CrateRolls.roll(CRATE, ITEMS, RARITIES, owned, ScriptedRandom.new({ 0 }, { 1 }))
 			expect(result.itemId).to.equal("CommonA")
 			expect(result.isDupe).to.equal(true)
-			expect(result.cashRefund).to.equal(50)
+			expect(result.bonksRefund).to.equal(50)
 		end)
 
 		it("uses the rolled item's own rarity for the refund amount", function()
@@ -76,14 +76,14 @@ return function()
 			local result = CrateRolls.roll(CRATE, ITEMS, RARITIES, owned, ScriptedRandom.new({ 0.75 }, { 1 }))
 			expect(result.itemId).to.equal("LegendaryA")
 			expect(result.isDupe).to.equal(true)
-			expect(result.cashRefund).to.equal(400)
+			expect(result.bonksRefund).to.equal(400)
 		end)
 
 		it("returns zero refund for fresh items", function()
 			local result = CrateRolls.roll(CRATE, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0 }, { 2 }))
 			expect(result.itemId).to.equal("CommonB")
 			expect(result.isDupe).to.equal(false)
-			expect(result.cashRefund).to.equal(0)
+			expect(result.bonksRefund).to.equal(0)
 		end)
 
 		it("rejects crates with no rollable items", function()

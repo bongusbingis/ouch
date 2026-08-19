@@ -36,7 +36,7 @@ type OpenResult = {
 	itemId: string,
 	rarity: string,
 	isDupe: boolean,
-	cashRefund: number,
+	bonksRefund: number,
 	pityTriggered: string?,
 }
 
@@ -60,13 +60,13 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 	)
 	data.Crates.Pity[crateId] = result.pity
 	if result.isDupe then
-		data.Cash += result.cashRefund
+		data.Bonks += result.bonksRefund
 		AnalyticsService.logEconomyEvent(
 			player,
 			"Source",
-			"Cash",
-			result.cashRefund,
-			data.Cash,
+			"Bonks",
+			result.bonksRefund,
+			data.Bonks,
 			AnalyticsConfig.EconomyTransactionTypes.Gameplay,
 			crateId
 		)
@@ -85,7 +85,7 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 		itemId = result.itemId,
 		rarity = result.rarity,
 		isDupe = result.isDupe,
-		cashRefund = result.cashRefund,
+		bonksRefund = result.bonksRefund,
 		pityTriggered = result.pityTriggered,
 	}
 	local steps = AnalyticsConfig.ShopFunnelSteps.Completed
@@ -108,15 +108,15 @@ end
 -- discount it advertises is the one actually charged.
 function CrateService.priceFor(crateId: string, now: number?): number?
 	local crate = Crates[crateId]
-	if crate == nil or crate.CashPrice == nil then
+	if crate == nil or crate.BonksPrice == nil then
 		return nil
 	end
-	return FeaturedRotation.priceFor(Shop.Featured, crateId, crate.CashPrice, now or os.time())
+	return FeaturedRotation.priceFor(Shop.Featured, crateId, crate.BonksPrice, now or os.time())
 end
 
-function CrateService.openWithCash(player: Player, crateId: string): (OpenResult?, string?)
+function CrateService.openWithBonks(player: Player, crateId: string): (OpenResult?, string?)
 	local crate = Crates[crateId]
-	if crate == nil or crate.CashPrice == nil then
+	if crate == nil or crate.BonksPrice == nil then
 		logCrateFailure(player, "invalid_crate")
 		return nil, "invalid_crate"
 	end
@@ -131,19 +131,19 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 		logCrateFailure(player, "no_profile")
 		return nil, "no_profile"
 	end
-	if data.Cash < price then
-		logCrateFailure(player, "insufficient_cash")
-		return nil, "insufficient_cash"
+	if data.Bonks < price then
+		logCrateFailure(player, "insufficient_bonks")
+		return nil, "insufficient_bonks"
 	end
 
 	local steps = AnalyticsConfig.ShopFunnelSteps.Attempted
 	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
 		crateId = crateId,
-		source = "Cash",
+		source = "Bonks",
 	})
 
 	local openId = HttpService:GenerateGUID(false)
-	local ok, result = pcall(rollAndGrant, player, crateId, "Cash", openId)
+	local ok, result = pcall(rollAndGrant, player, crateId, "Bonks", openId)
 	if not ok then
 		warn(`[CrateService] rollAndGrant failed for crate "{crateId}": {result}`)
 		logCrateFailure(player, "crate_roll_failed")
@@ -154,13 +154,13 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 		return nil, "invalid_crate"
 	end
 
-	data.Cash -= price
+	data.Bonks -= price
 	AnalyticsService.logEconomyEvent(
 		player,
 		"Sink",
-		"Cash",
+		"Bonks",
 		price,
-		data.Cash,
+		data.Bonks,
 		AnalyticsConfig.EconomyTransactionTypes.Shop,
 		crateId
 	)
@@ -168,7 +168,7 @@ function CrateService.openWithCash(player: Player, crateId: string): (OpenResult
 end
 
 -- Roblox has already charged this receipt, so a restricted player must still be
--- made whole: pay the crate's Cash value instead of rolling a random item.
+-- made whole: pay the crate's Bonks value instead of rolling a random item.
 -- Returning false here would strand the purchase in ProcessReceipt retries.
 local function grantRestrictedValue(player: Player, crateId: string, purchaseId: string, reason: string): boolean
 	local crate = Crates[crateId]
@@ -176,26 +176,26 @@ local function grantRestrictedValue(player: Player, crateId: string, purchaseId:
 	if crate == nil or data == nil then
 		return false
 	end
-	local amount = crate.CashPrice
+	local amount = crate.BonksPrice
 	if amount == nil or amount <= 0 then
-		warn(`[CrateService] crate "{crateId}" is sold for Robux but has no CashPrice to substitute`)
+		warn(`[CrateService] crate "{crateId}" is sold for Robux but has no BonksPrice to substitute`)
 		return false
 	end
 
-	PlayerData.addCash(player, amount)
+	PlayerData.addBonks(player, amount)
 	AnalyticsService.logEconomyEvent(
 		player,
 		"Source",
-		"Cash",
+		"Bonks",
 		amount,
-		data.Cash,
+		data.Bonks,
 		AnalyticsConfig.EconomyTransactionTypes.IAP,
 		crateId,
 		{ substitutedFor = reason }
 	)
 	Network.fire("StorePurchaseGranted", player, {
 		grantId = purchaseId,
-		kind = "Cash",
+		kind = "Bonks",
 		amount = amount,
 	})
 	return true
@@ -227,7 +227,7 @@ function CrateService.start()
 			return true
 		end,
 	}, function(player, crateId)
-		return CrateService.openWithCash(player, crateId)
+		return CrateService.openWithBonks(player, crateId)
 	end)
 end
 

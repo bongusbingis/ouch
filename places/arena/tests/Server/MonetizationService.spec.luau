@@ -15,9 +15,9 @@ return function()
 			MonetizationService._resetForTest()
 		end)
 
-		it("grants Cash receipts once and emits one authoritative grant event", function()
+		it("grants Bonks receipts once and emits one authoritative grant event", function()
 			local player = { UserId = 720001 }
-			local data = { Cash = 0, Receipts = {} }
+			local data = { Bonks = 0, Receipts = {} }
 			local marketplace = {}
 			local grants = {}
 			local economyEvents = {}
@@ -31,8 +31,8 @@ return function()
 				products = {
 					ById = {
 						[202] = {
-							Type = "Cash",
-							CashAmount = 500,
+							Type = "Bonks",
+							BonksAmount = 500,
 						},
 					},
 				},
@@ -41,9 +41,9 @@ return function()
 					get = function(target)
 						return if target == player then data else nil
 					end,
-					addCash = function(target, amount)
+					addBonks = function(target, amount)
 						if target == player then
-							data.Cash += amount
+							data.Bonks += amount
 						end
 					end,
 				},
@@ -69,7 +69,7 @@ return function()
 				CurrencySpent = 49,
 			}
 			expect(marketplace.ProcessReceipt(receipt)).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
-			expect(data.Cash).to.equal(500)
+			expect(data.Bonks).to.equal(500)
 			expect(data.Receipts["purchase-1"]).to.equal(12345)
 			expect(#grants).to.equal(1)
 			expect(grants[1].name).to.equal("StorePurchaseGranted")
@@ -77,7 +77,7 @@ return function()
 			expect(#economyEvents).to.equal(1)
 
 			expect(marketplace.ProcessReceipt(receipt)).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
-			expect(data.Cash).to.equal(500)
+			expect(data.Bonks).to.equal(500)
 			expect(#grants).to.equal(1)
 			expect(#economyEvents).to.equal(1)
 		end)

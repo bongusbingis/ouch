@@ -4,10 +4,10 @@ local T = require(script.Parent.TestKit)
 local DirectPurchase = require(script.Parent.Parent.Game.Economy.DirectPurchase)
 
 local RARITIES = {
-	Common = { Weight = 70, DupeCash = 50, DirectCash = 1200 },
-	Rare = { Weight = 24, DupeCash = 150, DirectCash = 3500 },
-	Legendary = { Weight = 6, DupeCash = 400, DirectCash = 12000 },
-	Exclusive = { Weight = 0, DupeCash = 0, DirectCash = 0 },
+	Common = { Weight = 70, DupeBonks = 50, DirectBonks = 1200 },
+	Rare = { Weight = 24, DupeBonks = 150, DirectBonks = 3500 },
+	Legendary = { Weight = 6, DupeBonks = 400, DirectBonks = 12000 },
+	Exclusive = { Weight = 0, DupeBonks = 0, DirectBonks = 0 },
 }
 
 local ITEMS = {
@@ -53,7 +53,7 @@ T.describe("DirectPurchase", function()
 		T.expect(owned):toEqual("already_owned")
 
 		local _, broke = DirectPurchase.evaluate("RareA", ITEMS, RARITIES, {}, 3499)
-		T.expect(broke):toEqual("insufficient_cash")
+		T.expect(broke):toEqual("insufficient_bonks")
 	end)
 
 	T.it("checks ownership before affordability so an owned item never reads as too expensive", function()
@@ -76,15 +76,15 @@ T.describe("DirectPurchase", function()
 	end)
 
 	T.it("prices every direct buy above the expected crate cost for that rarity", function()
-		-- Expected Cash per specific item = crate price / (rarity odds / bucket size).
+		-- Expected Bonks per specific item = crate price / (rarity odds / bucket size).
 		-- Guarantees the gamble stays the value play at every rarity.
 		local cratePrice = 1000
 		for rarityName, rarity in RARITIES do
-			if rarity.DirectCash > 0 then
+			if rarity.DirectBonks > 0 then
 				local bucketSize = 5
 				local expectedCrateCost = cratePrice / (rarity.Weight / 100 / bucketSize)
-				T.expect(rarity.DirectCash < expectedCrateCost):toBeTruthy()
-				T.expect(rarity.DirectCash > rarity.DupeCash):toBeTruthy()
+				T.expect(rarity.DirectBonks < expectedCrateCost):toBeTruthy()
+				T.expect(rarity.DirectBonks > rarity.DupeBonks):toBeTruthy()
 			end
 		end
 	end)

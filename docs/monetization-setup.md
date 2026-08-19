@@ -55,7 +55,7 @@ fails startup if an item is unknown or outside its declared categories.
 **Boosters** declare multipliers instead of items:
 
 ```luau
-Boosts = { XpMultiplier = 2.5, CashMultiplier = 1.5 },
+Boosts = { XpMultiplier = 2.5, BonksMultiplier = 1.5 },
 ```
 
 Stacking is **max-wins per multiplier type**, never multiplicative. A bundle
@@ -72,17 +72,17 @@ strand a permanent booster flag on a player. The corollary matters:
 
 ## Developer products
 
-Three receipt-backed types: `Cash`, `Crate`, and `SeasonPass`.
+Three receipt-backed types: `Bonks`, `Crate`, and `SeasonPass`.
 
 ```luau
-Cash1100 = {
+Bonks1100 = {
     Id = 234567891,
     CatalogStatus = "Active",
-    DisplayName = "Cash Stack",
+    DisplayName = "Bonks Stack",
     DisplayOrder = 320,
-    Type = "Cash",
+    Type = "Bonks",
     SuggestedRobux = 99,
-    CashAmount = 1100,
+    BonksAmount = 1100,
 },
 ```
 
@@ -133,7 +133,7 @@ charged price.
 - Crate cards disclose every outcome and its numerical probability before
   purchase, summing to exactly 100%, plus the pity guarantees.
 - `PolicyService` gates **both** crate payment paths. A restricted player whose
-  receipt Roblox already charged is made whole with the crate's Cash value
+  receipt Roblox already charged is made whole with the crate's Bonks value
   rather than a random roll — returning a failure would strand the purchase in
   retries forever.
 - Pity thresholds are a published guarantee. Changing them changes a promise

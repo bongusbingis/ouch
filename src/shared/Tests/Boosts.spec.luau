@@ -7,40 +7,40 @@ local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
 local CATALOG = {
 	Cosmetic = { EntitlementItemIds = { "TrailX" } },
 	DoubleXP = { Boosts = { XpMultiplier = 2 } },
-	CashBoost = { Boosts = { CashMultiplier = 1.5 } },
-	Club = { Boosts = { XpMultiplier = 2.5, CashMultiplier = 1.5 } },
+	BonksBoost = { Boosts = { BonksMultiplier = 1.5 } },
+	Club = { Boosts = { XpMultiplier = 2.5, BonksMultiplier = 1.5 } },
 }
 
 T.describe("Boosts", function()
 	T.it("defaults to no multiplier when nothing is owned", function()
 		local result = Boosts.multipliers(CATALOG, {})
 		T.expect(result.Xp):toEqual(1)
-		T.expect(result.Cash):toEqual(1)
+		T.expect(result.Bonks):toEqual(1)
 	end)
 
 	T.it("ignores cosmetic-only passes", function()
 		local result = Boosts.multipliers(CATALOG, { Cosmetic = true })
 		T.expect(result.Xp):toEqual(1)
-		T.expect(result.Cash):toEqual(1)
+		T.expect(result.Bonks):toEqual(1)
 	end)
 
 	T.it("applies a single owned booster", function()
 		local result = Boosts.multipliers(CATALOG, { DoubleXP = true })
 		T.expect(result.Xp):toEqual(2)
-		T.expect(result.Cash):toEqual(1)
+		T.expect(result.Bonks):toEqual(1)
 	end)
 
 	T.it("takes the best of overlapping boosters rather than compounding them", function()
-		local result = Boosts.multipliers(CATALOG, { DoubleXP = true, CashBoost = true, Club = true })
+		local result = Boosts.multipliers(CATALOG, { DoubleXP = true, BonksBoost = true, Club = true })
 		-- Multiplicative would be 2 * 2.5 = 5x XP; max-wins keeps it at 2.5.
 		T.expect(result.Xp):toEqual(2.5)
-		T.expect(result.Cash):toEqual(1.5)
+		T.expect(result.Bonks):toEqual(1.5)
 	end)
 
 	T.it("combines different multiplier types from separate passes", function()
-		local result = Boosts.multipliers(CATALOG, { DoubleXP = true, CashBoost = true })
+		local result = Boosts.multipliers(CATALOG, { DoubleXP = true, BonksBoost = true })
 		T.expect(result.Xp):toEqual(2)
-		T.expect(result.Cash):toEqual(1.5)
+		T.expect(result.Bonks):toEqual(1.5)
 	end)
 
 	T.it("treats a false ownership entry as unowned", function()
@@ -60,16 +60,16 @@ T.describe("Boosts", function()
 		-- otherwise the upgrade is a dead purchase under max-wins.
 		local club = GamePasses.Catalog.BrawlersClub.Boosts
 		local doubleXp = GamePasses.Catalog.DoubleXP.Boosts
-		local cashBoost = GamePasses.Catalog.CashBoost.Boosts
+		local bonksBoost = GamePasses.Catalog.BonksBoost.Boosts
 		T.expect(club.XpMultiplier > doubleXp.XpMultiplier):toBeTruthy()
-		T.expect(club.CashMultiplier >= cashBoost.CashMultiplier):toBeTruthy()
+		T.expect(club.BonksMultiplier >= bonksBoost.BonksMultiplier):toBeTruthy()
 	end)
 
-	T.it("never lets a shipped booster touch anything but XP and Cash", function()
+	T.it("never lets a shipped booster touch anything but XP and Bonks", function()
 		for key, definition in GamePasses.Catalog do
 			if definition.Boosts ~= nil then
 				for field in definition.Boosts do
-					local allowed = field == "XpMultiplier" or field == "CashMultiplier"
+					local allowed = field == "XpMultiplier" or field == "BonksMultiplier"
 					T.expect(allowed):toBeTruthy()
 					if not allowed then
 						error(`game pass "{key}" declares a non-earn-rate boost "{field}"`)

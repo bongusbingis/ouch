@@ -36,9 +36,9 @@ return function(context: any, player: Player?): string
 	local equips = sortedEquips(cosmetics.Equipped)
 	local equipSummary = if #equips > 0 then table.concat(equips, ", ") else "none"
 	return string.format(
-		"%s | Cash %d | XP %d | E/D/C %d/%d/%d | W/L %d/%d | Matches %d | KDR %.2f | Cosmetics %d | Equipped %s",
+		"%s | Bonks %d | XP %d | E/D/C %d/%d/%d | W/L %d/%d | Matches %d | KDR %.2f | Cosmetics %d | Equipped %s",
 		target.Name,
-		data.Cash,
+		data.Bonks,
 		data.Level.Points,
 		progression.Elims,
 		progression.Deaths,

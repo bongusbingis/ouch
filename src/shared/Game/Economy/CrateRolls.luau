@@ -19,13 +19,13 @@ export type RollResult = {
 	itemId: string,
 	rarity: string,
 	isDupe: boolean,
-	cashRefund: number,
+	bonksRefund: number,
 	pity: PityState,
 	pityTriggered: string?,
 }
 
 type ItemDef = { Category: string, Rarity: string, [string]: any }
-type RarityDef = { Weight: number, DupeCash: number }
+type RarityDef = { Weight: number, DupeBonks: number }
 type CrateDef = { ItemPool: { string }, Pity: { [string]: number }?, [string]: any }
 
 function CrateRolls.roll(
@@ -90,7 +90,7 @@ function CrateRolls.roll(
 		itemId = itemId,
 		rarity = chosenRarity,
 		isDupe = isDupe,
-		cashRefund = if isDupe then rarities[chosenRarity].DupeCash else 0,
+		bonksRefund = if isDupe then rarities[chosenRarity].DupeBonks else 0,
 		pity = counters,
 		pityTriggered = forced,
 	}

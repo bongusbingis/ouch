@@ -4,10 +4,10 @@ local T = require(script.Parent.TestKit)
 local CrateRolls = require(script.Parent.Parent.Game.Economy.CrateRolls)
 
 local RARITIES = {
-	Common = { Weight = 70, DupeCash = 50 },
-	Rare = { Weight = 24, DupeCash = 150 },
-	Legendary = { Weight = 6, DupeCash = 400 },
-	Exclusive = { Weight = 0, DupeCash = 0 },
+	Common = { Weight = 70, DupeBonks = 50 },
+	Rare = { Weight = 24, DupeBonks = 150 },
+	Legendary = { Weight = 6, DupeBonks = 400 },
+	Exclusive = { Weight = 0, DupeBonks = 0 },
 }
 
 local ITEMS = {
@@ -62,14 +62,14 @@ T.describe("CrateRolls", function()
 		local result = CrateRolls.roll(CRATE, ITEMS, RARITIES, owned, scriptedRandom({ 0 }, { 1 }))
 		T.expect(result.itemId):toEqual("CommonA")
 		T.expect(result.isDupe):toEqual(true)
-		T.expect(result.cashRefund):toEqual(50)
+		T.expect(result.bonksRefund):toEqual(50)
 	end)
 
 	T.it("returns zero refund for fresh items", function()
 		local result = CrateRolls.roll(CRATE, ITEMS, RARITIES, {}, scriptedRandom({ 0 }, { 2 }))
 		T.expect(result.itemId):toEqual("CommonB")
 		T.expect(result.isDupe):toEqual(false)
-		T.expect(result.cashRefund):toEqual(0)
+		T.expect(result.bonksRefund):toEqual(0)
 	end)
 
 	T.it("leaves crates without a Pity block rolling exactly as before", function()

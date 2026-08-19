@@ -2,7 +2,7 @@
 
 -- Crate definitions. A crate rolls a rarity by weight (Config.Cosmetics
 -- Rarities), then uniformly among the pool's items of that rarity.
--- CashPrice = openable with earned Cash; Robux crates map through
+-- BonksPrice = openable with earned Bonks; Robux crates map through
 -- Config.Products.ById developer products.
 
 -- Pity: opens without the named rarity that force it on the next open. Values
@@ -11,7 +11,7 @@
 export type CrateDef = {
 	DisplayName: string,
 	Thumbnail: string,
-	CashPrice: number?,
+	BonksPrice: number?,
 	Pity: { [string]: number }?,
 	ItemPool: { string },
 }
@@ -36,14 +36,14 @@ return {
 	BallCrate = {
 		DisplayName = "Ball Crate",
 		Thumbnail = "",
-		CashPrice = 500,
+		BonksPrice = 500,
 		Pity = { Rare = 5, Legendary = 25 },
 		ItemPool = poolByCategory("BallAssets"),
 	},
 	TrailCrate = {
 		DisplayName = "Trail Crate",
 		Thumbnail = "",
-		CashPrice = 1000,
+		BonksPrice = 1000,
 		Pity = { Rare = 5, Legendary = 25 },
 		ItemPool = poolByCategory("TrailAssets"),
 	},

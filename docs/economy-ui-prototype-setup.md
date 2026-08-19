@@ -11,7 +11,7 @@ PlayerGui
 │       └── Views
 │           ├── Shop
 │           │   ├── Title
-│           │   ├── Cash
+│           │   ├── Bonks
 │           │   ├── Status
 │           │   └── Holder
 │           │       └── List
@@ -35,7 +35,7 @@ All sidebar menus, including Shop and Inventory, continue to clone the existing 
 ## Assumptions and current scope
 
 - `MainGui > BaseClip > Views` and the existing sidebar `ButtonTemplate` remain part of the established Studio UI infrastructure.
-- Shop lists cash-purchasable entries in `Config.Crates`; the current server has no direct cosmetic-purchase API.
+- Shop lists bonks-purchasable entries in `Config.Crates`; the current server has no direct cosmetic-purchase API.
 - Inventory lists owned entries from the `GameProfile` Replica and equips or unequips through `EquipCosmetic`.
 - Shop and Inventory remain globally reachable for testing because there is no authoritative replicated lobby-membership restriction.
 - No `UIAspectRatioConstraint` is applied to flexible text/list panels. Add one only to a future fixed-shape thumbnail or preview component.
@@ -44,7 +44,7 @@ All sidebar menus, including Shop and Inventory, continue to clone the existing 
 
 1. Enter Play mode and inspect `Players > LocalPlayer > PlayerGui`; both generated views and the row template should be present.
 2. Test with mouse and phone emulation. Confirm Shop and Inventory sidebar buttons open, toggle closed, and switch views.
-3. Confirm Shop displays replicated Cash, lists cash crates, reports errors, and reports successful rolls or duplicate refunds.
+3. Confirm Shop displays replicated Bonks, lists bonks crates, reports errors, and reports successful rolls or duplicate refunds.
 4. Confirm successful crate rolls appear in Inventory without rejoining.
 5. Confirm owned cosmetics equip and unequip and visibly update their row state.
 6. Confirm long text wraps without overlapping the action button at the smallest supported phone viewport.

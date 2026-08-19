@@ -71,7 +71,7 @@ T.describe("FeaturedRotation", function()
 		for _, entry in Shop.Featured.Rotation do
 			if entry.kind == "Crate" then
 				T.expect(Crates[entry.id] ~= nil):toBeTruthy()
-				T.expect(Crates[entry.id].CashPrice ~= nil):toBeTruthy()
+				T.expect(Crates[entry.id].BonksPrice ~= nil):toBeTruthy()
 			end
 		end
 	end)

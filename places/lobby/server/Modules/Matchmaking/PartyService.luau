@@ -5,13 +5,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
-local ReturnPayload = require(
-	game:GetService("ReplicatedStorage")
-		:WaitForChild("Shared")
-		:WaitForChild("Game")
-		:WaitForChild("Matchmaking")
-		:WaitForChild("ReturnPayload")
-)
+local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
+local AnalyticsConfig = require(ReplicatedStorage.Config.Analytics)
+local AnalyticsService = require(script.Parent.Parent.AnalyticsService)
 local PartyModel = require(script.Parent.PartyModel)
 
 local PartyService = {}
@@ -90,12 +86,28 @@ function PartyService:_getLocalPlayers(partyId)
 	return players
 end
 
+-- Matchmaking telemetry is reported per local member: the funnel is a per-player
+-- journey, and a party's members may be spread across lobby servers.
+function PartyService:_reportFunnel(partyId, stepKey, fields)
+	local step = AnalyticsConfig.MatchmakingFunnelSteps[stepKey]
+	for _, player in self:_getLocalPlayers(partyId) do
+		AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.Matchmaking, step.step, step.name, fields)
+	end
+end
+
+function PartyService:_reportEvent(partyId, eventName, fields)
+	for _, player in self:_getLocalPlayers(partyId) do
+		AnalyticsService.logCustomEvent(player, eventName, 1, fields)
+	end
+end
+
 function PartyService:_maybeTeleport(party)
 	if not party.matchId then
 		return
 	end
 
 	if party.phase == "Assigned" then
+		self:_reportFunnel(party.partyId, "Matched", { matchId = party.matchId })
 		task.spawn(function()
 			local updated = self._partyRepository:UpdateParty(party.partyId, function(current)
 				if not current or current.phase ~= "Assigned" or current.matchId ~= party.matchId then
@@ -125,6 +137,7 @@ function PartyService:_maybeTeleport(party)
 
 	self._teleportDispatching[party.partyId] = true
 	task.spawn(function()
+		self:_reportFunnel(party.partyId, "Teleporting", { matchId = party.matchId })
 		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, partyPlayers)
 		self._teleportDispatching[party.partyId] = nil
 	end)
@@ -751,6 +764,7 @@ function PartyService:_startMatchmaking(player)
 	end
 
 	self:NotifyCommitted(updated, "MatchmakingStarted", player.UserId)
+	self:_reportFunnel(updated.partyId, "Queued", { partySize = #updated.members })
 	if self._queueChangedHandler then
 		task.spawn(self._queueChangedHandler)
 	end
@@ -792,6 +806,9 @@ function PartyService:_cancelMatchmaking(player)
 
 	self._queueRepository:Remove(updated.partyId)
 	self:NotifyCommitted(updated, "MatchmakingCancelled", player.UserId)
+	self:_reportEvent(updated.partyId, AnalyticsConfig.CustomEvents.MatchmakingCancelled, {
+		partySize = #updated.members,
+	})
 	return Protocol.success(PartyModel.toSnapshot(updated))
 end
 
@@ -835,6 +852,7 @@ end
 
 function PartyService:HandleTeleportFailure(player)
 	self:_sendError(player, Protocol.Errors.TeleportFailed)
+	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchmakingTeleportFailed, 1)
 	local partyId = self._localPartyByUser[player.UserId]
 	if partyId then
 		task.spawn(self._moveMemberToSoloParty, self, player, partyId, "TeleportFailed")
