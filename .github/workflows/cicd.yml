@@ -161,14 +161,6 @@ jobs:
           echo "Places to deploy: $places"
           echo "places=$places" >> "$GITHUB_OUTPUT"
 
-  # PRs into prod run the full sequence per changed place: fetch the currently-live
-  # place via Open Cloud -> rojo build -> merge rojo's build into that exact fetched
-  # place (so the merge base is never a possibly-stale committed copy) -> upload as
-  # a Saved version -> run that place's cloud TestEZ suite against that exact
-  # version via the Open Cloud Luau Execution API -> publish only on green.
-  #
-  # Every check above runs on every trigger regardless of which places changed;
-  # only the publish is narrowed.
   deploy:
     name: Deploy ${{ matrix.place }}
     runs-on: ubuntu-latest
