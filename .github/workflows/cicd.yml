@@ -1,4 +1,4 @@
-name: CI checks + arena deployment
+name: CI checks + place deployment
 
 on:
   pull_request:
@@ -43,7 +43,8 @@ jobs:
       - name: Lint
         run: |
           bash src/scripts/shell/lint.sh src
-          bash src/scripts/shell/lint.sh places/lobby/src
+          bash src/scripts/shell/lint.sh places/arena
+          bash src/scripts/shell/lint.sh places/lobby
 
   formatting:
     name: Format with StyLua
@@ -65,7 +66,8 @@ jobs:
       - name: Check format
         run: |
           bash src/scripts/shell/check-format.sh src
-          bash src/scripts/shell/check-format.sh places/lobby/src
+          bash src/scripts/shell/check-format.sh places/arena
+          bash src/scripts/shell/check-format.sh places/lobby
 
   lune-tests:
     name: Run Lune tests
@@ -97,20 +99,95 @@ jobs:
       - name: Run tests
         run: lune run src/scripts/lune/run-tests.luau
 
-  # PRs into prod run the full sequence: fetch the currently-live place via
-  # Open Cloud -> rojo build -> merge rojo's build into that exact fetched
-  # place (so the merge base is never a possibly-stale committed copy) ->
-  # upload as a Saved version -> run the cloud TestEZ suite against that exact
+  # Which places this change actually affects. Anything under src/ is shared by
+  # both places, so it forces both; places/<name>/ and <name>.project.json force
+  # only that one. Emits a JSON array consumed as the deploy matrix, so a change
+  # touching neither place skips deployment entirely.
+  changed-places:
+    name: Detect changed places
+    runs-on: ubuntu-latest
+    outputs:
+      places: ${{ steps.detect.outputs.places }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.3.0
+        with:
+          fetch-depth: 0
+
+      - name: Detect
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          arena=no
+          lobby=no
+
+          if [ -z "${BASE_SHA}" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "No usable base commit; treating both places as changed."
+            arena=yes
+            lobby=yes
+          else
+            echo "Comparing ${BASE_SHA}...HEAD"
+            files=$(git diff --name-only "${BASE_SHA}" HEAD)
+            echo "$files"
+            while IFS= read -r file; do
+              [ -n "$file" ] || continue
+              case "$file" in
+                src/*|Packages/*|wally.toml|wally.lock|aftman.toml)
+                  arena=yes
+                  lobby=yes
+                  ;;
+                places/arena/*|arena.project.json)
+                  arena=yes
+                  ;;
+                places/lobby/*|lobby.project.json)
+                  lobby=yes
+                  ;;
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$arena" = yes ] && [ "$lobby" = yes ]; then
+            places='["arena","lobby"]'
+          elif [ "$arena" = yes ]; then
+            places='["arena"]'
+          elif [ "$lobby" = yes ]; then
+            places='["lobby"]'
+          else
+            places='[]'
+          fi
+
+          echo "Places to deploy: $places"
+          echo "places=$places" >> "$GITHUB_OUTPUT"
+
+  # PRs into prod run the full sequence per changed place: fetch the currently-live
+  # place via Open Cloud -> rojo build -> merge rojo's build into that exact fetched
+  # place (so the merge base is never a possibly-stale committed copy) -> upload as
+  # a Saved version -> run that place's cloud TestEZ suite against that exact
   # version via the Open Cloud Luau Execution API -> publish only on green.
-  test-and-deploy:
-    name: Test and deploy via Open Cloud
+  #
+  # Every check above runs on every trigger regardless of which places changed;
+  # only the publish is narrowed.
+  deploy:
+    name: Deploy ${{ matrix.place }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [install-tools, linting, formatting, lune-tests]
-  # if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' }}
+    needs: [install-tools, linting, formatting, lune-tests, changed-places]
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' && needs.changed-places.outputs.places != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        place: ${{ fromJson(needs.changed-places.outputs.places) }}
+    # Shared across matrix legs and across runs: the Luau Execution API is
+    # serialised, so the two places deploy one after the other.
     concurrency:
       group: luau-execution
       cancel-in-progress: false
+    env:
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+      ROBLOX_UNIVERSE_ID: ${{ vars.OUCH_UNIVERSE_ID }}
+      ROBLOX_PLACE_ID: ${{ matrix.place == 'arena' && vars.ARENA_PLACE_ID || vars.LOBBY_PLACE_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.3.0
@@ -134,14 +211,11 @@ jobs:
       - name: Fetch live place
         timeout-minutes: 4
         run: bash src/scripts/shell/fetch-live-place.sh live-place.rbxl
-        env:
-          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
-          ROBLOX_PLACE_ID: "121997450145716"
 
       - name: Upload live place artifact
         uses: actions/upload-artifact@v4
         with:
-          name: live-place
+          name: live-place-${{ matrix.place }}
           path: live-place.rbxl
           retention-days: 14
 
@@ -149,14 +223,10 @@ jobs:
         timeout-minutes: 15
         run: |
           set +e
-          bash src/scripts/shell/deploy.sh arena.project.json live-place.rbxl
+          bash src/scripts/shell/deploy.sh ${{ matrix.place }}.project.json live-place.rbxl
           code=$?
           set -e
           if [ "$code" -eq 2 ]; then
-            echo "::warning::Roblox Open Cloud was busy after retries; nothing was published. Re-run this job."
+            echo "::warning::Roblox Open Cloud was busy after retries; nothing was published for ${{ matrix.place }}. Re-run this job."
           fi
           exit "$code"
-        env:
-          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
-          ROBLOX_UNIVERSE_ID: ${{ vars.ROBLOX_UNIVERSE_ID }}
-          ROBLOX_PLACE_ID: "121997450145716"

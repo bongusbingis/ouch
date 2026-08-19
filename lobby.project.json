@@ -20,7 +20,7 @@
         "$path": "src/shared",
 
         "Matchmaking": {
-          "$path": "places/lobby/src/shared/Matchmaking"
+          "$path": "places/lobby/shared/Matchmaking"
         }
       },
 
@@ -33,20 +33,34 @@
       }
     },
 
+    "ServerStorage": {
+      "Tests": {
+        "$path": "places/lobby/tests",
+
+        "Runner": {
+          "$path": "src/tests/Runner.luau"
+        },
+
+        "Helpers": {
+          "$path": "src/tests/Helpers"
+        }
+      }
+    },
+
     "ServerScriptService": {
       "Server": {
-        "$path": "places/lobby/src/server/Server.server.luau",
+        "$path": "places/lobby/server/Server.server.luau",
 
         "Env": {
           "$path": "src/server/Env.luau"
         },
 
         "Scripts": {
-          "$path": "places/lobby/src/server/Scripts"
+          "$path": "places/lobby/server/Scripts"
         },
 
         "Modules": {
-          "$path": "places/lobby/src/server/Modules",
+          "$path": "places/lobby/server/Modules",
 
           "PlayerData": {
             "$path": "src/server/Modules/PlayerData.luau"
@@ -78,7 +92,7 @@
         "$className": "StarterPlayerScripts",
 
         "Client": {
-          "$path": "places/lobby/src/client"
+          "$path": "places/lobby/client"
         }
       }
     }
