@@ -185,7 +185,7 @@ jobs:
       group: luau-execution
       cancel-in-progress: false
     env:
-      ROBLOX_API_KEY: ${{ secrets.API_KEY }}
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
       ROBLOX_UNIVERSE_ID: ${{ vars.OUCH_UNIVERSE_ID }}
       ROBLOX_PLACE_ID: ${{ matrix.place == 'arena' && vars.ARENA_PLACE_ID || vars.LOBBY_PLACE_ID }}
     steps:
