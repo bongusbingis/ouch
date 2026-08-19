@@ -40,25 +40,122 @@ Dimensions cannot identify an arbitrary mesh pivot or choose between nearly equa
 2. Add `GripAttachment` to off-center, asymmetrical, or near-square skins and place it exactly where the hand should hold the mesh.
 3. Verify every skin at rest, mid-swing, and mid-squash on both R15 and R6 rigs.
 
-## Intermission lobby
+## Permanent arena
 
-1. Keep the Studio-authored lobby permanently at `Workspace > Lobby`. Do not place it under `ReplicatedStorage > Assets > Maps`; runtime map cleanup must never move or destroy it.
-2. Add a direct child folder at `Workspace > Lobby > PlayerSpawns` with at least one anchored `BasePart` spawn marker.
-3. Make each marker invisible with `CanCollide`, `CanTouch`, and `CanQuery` disabled. The server teleports returning match participants 3.5 studs above a random marker.
-4. Place the lobby at its final world position, separated from match arenas. New arrivals are not automatically teleported there; it is reserved for players returning from a completed match.
+Create this exact Studio-authored hierarchy. Every named container is a `Folder`, and each spawn pool must contain at least one direct child `BasePart`:
 
-## Match maps and recovery
+```text
+Workspace
+└─ Assets
+   └─ Arena
+      ├─ Map
+      │  └─ ArenaSpawn        (SpawnLocation)
+      ├─ MapOrigin            (invisible BasePart)
+      ├─ Scriptables
+      │  ├─ ElimZones
+      │  ├─ BouncePads
+      │  ├─ FoamPits
+      │  └─ Rotating
+      │     └─ <AssemblyName>   (one Folder per rotating assembly)
+      │        ├─ Origin        (BasePart, the axis)
+      │        └─ Assembly      (Model, the geometry that turns)
+      ├─ PlayerSpawns
+      └─ TeamSpawns
+         ├─ Red
+         └─ Blue
+```
 
-Each enabled `Config.Maps.Pool` entry requires `ReplicatedStorage > Assets > Maps > <AssetName>` as a `Folder` or `Model` authored at its final world position. It must contain `Scriptables > BallSpawns` and `Scriptables > PlayerSpawns`, each with at least one anchored `BasePart`; optional `Scriptables > BouncePads` and `Scriptables > FoamPits` folders contain their feature parts. It must also contain `Static`; MapService anchors every cloned `BasePart` below it as a runtime fallback for missed authoring. `ThePit`, `FoamCourt`, and `SkyBounce` are configured but disabled until these trees exist. Set `Enabled = true` only after the matching tree is complete. `RecoveryY` in `Config.Maps` is the out-of-bounds threshold; recovered balls reuse the same instance and cycle across `BallSpawns`.
+`Map` contains all permanent static arena assets, including exactly one `SpawnLocation`
+named `ArenaSpawn`. It is required: `MatchService` only teleports a character into the
+arena while a match is running, so between matches — including for the whole mode vote —
+the engine's default spawn is what places the player. With no `SpawnLocation` in the
+place, that is world origin, and a character spawned into empty space falls past
+`Workspace.FallenPartsDestroyHeight` and is destroyed.
 
-## Code-built HUD replacement trees
+Position `ArenaSpawn` just above solid arena floor and set:
 
-While Studio UI authoring is unavailable, `UIResolver` builds these exact temporary trees. A Studio-authored root with the same name wins later and must provide every listed child. All positions and sizes use `UDim2` scale with anchor points matching their placement.
+| Property | Value | Why |
+|---|---|---|
+| `Enabled` | true | Otherwise it is ignored and spawning falls back to origin |
+| `Neutral` | true | Arena teams are a `TeamId` attribute, not Roblox `Team` objects; nothing reads `player.Team` |
+| `AllowTeamChangeOnTouch` | false | Prevents touching it from writing an unused `player.Team` |
+| `Duration` | 0 | No engine ForceField; MatchService owns spawn protection through the `minv` attribute |
+| `Anchored` | true | Must not fall |
+| `CanCollide` | false | The floor beneath it catches the player; avoids adding collision geometry |
+| `CanQuery` | false | Keeps it out of the sim's line-of-sight raycasts |
+| `Transparency` | 1 | Not visible in play |
 
-- `StarterGui > Hud > CatchButton` (`ImageButton`): `AspectRatio` (`UIAspectRatioConstraint`), `Corner` (`UICorner`), `Outline` (`UIStroke`), `Gradient` (`UIGradient`), and `Label` (`TextLabel`).
-- `StarterGui > Hud > MatchFlow` (`Frame`): `Respawn`, `Tutorial`, and `ActionFeedback` (`TextLabel`); `CombatFeed` (`Frame`) with `Line1`–`Line3` (`TextLabel`); `Vote` (`Frame`) with `Corner`, `Outline`, `ColorWash`, `AspectRatio`, `SizeConstraint`, `Title`, `Subtitle`, `Timer`, `ProgressTrack > ProgressFill`, and `Options`. `Options` contains `Option1`–`Option3` (`TextButton`), each with `Corner`, `Outline`, `ColorWash`, `Scale`, `PreviewFallback`, `Thumbnail`, `PreviewShade > Fade`, `PreviewHint`, `ModeBacking`, `Mode`, `Map`, `Count`, and `Selected`. `Summary` (`Frame`) contains `Corner`, `Outline`, `ColorWash`, `Title`, `Stats`, and `Rewards`.
+Also check `Workspace.FallenPartsDestroyHeight` sits below the arena's lowest walkable
+point but above where a fall is unrecoverable. There is currently **no void recovery**: the
+per-map `RecoveryY` died with the removed `MapService`, so a player who falls off the
+arena during a match is destroyed rather than returned to a spawn.
 
-Map vote previews read `Config.Maps.Pool[*].Thumbnail`. Use a landscape image asset ID; the card uses `ScaleType.Crop` to preserve its aspect ratio without stretching. An empty thumbnail intentionally shows the configured candy-gradient fallback.
+`MapOrigin` is an invisible `BasePart` marking the point the vote camera orbits. Place it
+at the centre of the playable arena; the camera circles it at `Config.UI.VoteCamera`
+`Distance` studs out and `Height` studs above, looking back at it, for as long as the mode
+vote is open. Keep it `Anchored` with `Transparency` 1 and `CanCollide`, `CanTouch`, and
+`CanQuery` disabled so it never affects play or the sim's raycasts.
+
+`Scriptables` holds one folder per authored map feature, each named after the feature kit
+that drives it. Every direct `BasePart` child of a feature folder is driven by that kit,
+and parts may be added or removed at runtime — the service re-reads the folder on change,
+so moving or spawned hazards work without extra code.
+
+| Folder | Effect on a player inside one of its parts |
+|---|---|
+| `ElimZones` | Immediate elimination, scored exactly like a dodgeball elimination |
+| `BouncePads` | Launched along the pad's `UpVector`; a numeric `LaunchSpeed` attribute on a pad overrides the shared speed |
+| `FoamPits` | Movement slowed while inside |
+
+Feature parts are volumes, not touch triggers: a player counts as inside when their
+`HumanoidRootPart` is within the part's box, plus `VerticalPadding` studs vertically
+(`Config.MapFeatures`). Size them as volumes a falling player passes through rather than
+as thin planes. Keep them `Anchored`, and set `CanCollide` false on `ElimZones` so players
+fall into them rather than landing on them.
+
+Eliminations only apply during an Active match, so a player standing in an `ElimZone`
+between matches is left alone.
+
+A registered kit with no authored folder warns once at startup and stays inactive.
+
+### Rotating
+
+`Rotating` holds one **Folder per rotating assembly**. Each contains an `Origin` BasePart
+and an `Assembly` Model. The Assembly turns about `Origin`'s **up axis**, keeping the pose
+it was authored in relative to Origin, so tilt Origin to tilt the axis of rotation. Speed
+is `Config.MapFeatures.Rotating.DegreesPerSecond`, overridable per assembly with a numeric
+`RotationSpeed` attribute **on that assembly's Origin**.
+
+Both children are required and are resolved with `WaitForChild`: a folder missing either
+one is a setup error and should surface as such.
+
+Only the **server** drives the spin; clients receive the pose through ordinary
+replication. Both sides moving the same anchored assembly fight each other, each write
+undoing the other's, which shows up as the ring stuttering violently instead of turning.
+
+**Riders.** The local client carries its own character with the platform it is riding
+(`PlatformRider`). Under default network ownership that position replicates outward, so
+other clients and the server see it without a second mover. Only position is carried, never
+facing — rotating the camera under a player would fight aiming.
+
+The carry measures the assembly's movement frame over frame from the assembly itself,
+so it stays correct under replication lag rather than assuming the client's clock.
+
+Carry continues while the rider is **airborne above the assembly's footprint**, which is
+what makes a jump land in the same spot relative to the platform instead of the platform
+turning out from under them. The window is the assembly's bounding box extended
+`CarryHeight` studs above its top (`Config.MapFeatures.Rotating`); jump past the edge and
+carry stops, so you can still leave normally. Note this is a deliberate assist rather than
+physical behaviour: a real jump from a turntable leaves tangentially.
+
+Size each `Assembly` so its bounding box matches the ridable surface — the footprint test
+uses that box, so a stray decorative part sticking far out widens the carry area with it.
+
+## Matchmaking arrival
+
+Lobby matchmaking sends a versioned TeleportData payload containing match identity, party identity, expected player count, and the allowed mode-vote options. The arena validates that payload and opens the authoritative 10-second vote when the first admitted player arrives; malformed or mismatched arrivals cannot vote or enter gameplay. Direct Studio joins use the enabled options in `Config.GameModes` but do not create a fake matchmaking session. Add FFA and TDM thumbnail asset IDs to `Config.GameModes`; the empty strings are intentional placeholders. Until they are set, each card renders a blank white thumbnail. Infection remains disabled until its gameplay rules exist.
+
+The per-player selection checkmark on each mode card uses a placeholder image asset (`rbxassetid://72382658` in `GameModeCard`); replace it with the intended published asset. It is authored square at 100x100 pixels against a 1890x1200 reference viewport and scales with the card from there.
 
 ## Verification
 
@@ -66,10 +163,10 @@ Map vote previews read `Config.Maps.Pool[*].Thumbnail`. Use a landscape image as
 2. Test with **Server & Clients**, not a single local player process.
 3. Verify held balls align to `DodgeballGrip`; adjust only that attachment to refine placement.
 4. Exercise 0, 100, 150, and 200 ms simulated latency and check that throw/rebound effects do not replay during corrections.
-5. Complete a match and verify that participants remain in the arena for Results, then move to `Workspace > Lobby` for Intermission before the arena clone is destroyed.
-6. Join with a new client during Intermission and verify that the new arrival is not teleported to the lobby.
-7. Verify Starting counts down for 3 seconds without accepting held combat inputs; then test Throw and Catch on mouse/keyboard, touch, and gamepad.
-8. During Intermission, vote from multiple clients and confirm counts, selection color, server tie handling, and the winning compatible mode/map pair. Resize the vote live at 16:9, 21:9, 4:3 tablet, and 9:19.5 portrait; cards must remain centered in landscape, switch to rows in portrait, and keep every label inside its card.
-9. Verify FFA respawns in 1 second and TDM uses the displayed 4.5-second wave deadline. Confirm neither respawn creates a new ball, while a late join receives exactly one.
-10. Drop every match ball below the map RecoveryY and confirm the same instances return across BallSpawns without changing the total count.
+5. Join the arena directly in Studio and confirm the FFA/TDM vote opens for 10 seconds without TeleportData.
+6. Join through lobby matchmaking and confirm every party member is accepted into one arena session with the expected match and party identities.
+7. Vote from multiple clients and confirm `XXX` counts, per-player checkmarks, vote changes, random no-vote selection, and random tie resolution. A delayed arrival must see the existing remaining bar time.
+8. Let both FFA and TDM win. Confirm FFA uses `PlayerSpawns`; TDM uses the authored Red and Blue pools and keeps lobby parties together.
+9. Verify Starting counts down for 3 seconds without accepting held combat inputs; then test Throw and Catch on mouse/keyboard, touch, and gamepad.
+10. Verify FFA respawns in 1 second and TDM uses the displayed 4.5-second wave deadline. Confirm neither respawn creates a new ball, while a late join receives exactly one.
 11. Score a dodgeball elimination and verify one splat burst plus the `Splat` sound at the impact point, colored to the thrower's equipped ball skin (default skin → rubber red), identical on every client. Repeat under the latency settings from step 4: exactly one splat, and exactly one hammer squash on hammer hits.

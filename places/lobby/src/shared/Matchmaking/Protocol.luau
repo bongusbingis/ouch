@@ -9,7 +9,6 @@ Protocol.Actions = table.freeze({
 	JoinByCode = "JoinByCode",
 	KickMember = "KickMember",
 	LeaveParty = "LeaveParty",
-	SetMode = "SetMode",
 	StartMatchmaking = "StartMatchmaking",
 	CancelMatchmaking = "CancelMatchmaking",
 })
@@ -21,6 +20,7 @@ Protocol.Errors = table.freeze({
 	InvalidCode = "invalid_code",
 	InvalidRequest = "invalid_request",
 	MatchForming = "match_forming",
+	MatchmakingUnavailable = "matchmaking_unavailable",
 	NotFound = "party_not_found",
 	NotLeader = "not_party_leader",
 	NotReady = "party_not_ready",
@@ -28,15 +28,6 @@ Protocol.Errors = table.freeze({
 	RateLimited = "rate_limited",
 	TeleportFailed = "teleport_failed",
 })
-
-local validModes = {}
-for _, mode in Config.GameModes do
-	validModes[mode] = true
-end
-
-function Protocol.isMode(value)
-	return typeof(value) == "string" and validModes[value] == true
-end
 
 function Protocol.normalizeCode(value)
 	if typeof(value) ~= "string" or #value > 16 then
@@ -75,10 +66,6 @@ function Protocol.validateRequest(_player, action, payload)
 			and payload.targetUserId ~= 0
 			and payload.targetUserId % 1 == 0,
 			Protocol.Errors.InvalidRequest
-	end
-
-	if action == Protocol.Actions.SetMode then
-		return typeof(payload) == "table" and Protocol.isMode(payload.mode), Protocol.Errors.InvalidRequest
 	end
 
 	return false, Protocol.Errors.InvalidRequest

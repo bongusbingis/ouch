@@ -11,151 +11,35 @@ return {
 		DefaultMaxSize = 28,
 		DefaultPadding = { x = 8, y = 4 },
 	},
-
-	Tweens = {
-		Menu = {
-			Open = {
-				Time = 0.18,
-				EasingStyle = Enum.EasingStyle.Quad,
-				EasingDirection = Enum.EasingDirection.Out,
-			},
-			Close = {
-				Time = 0.14,
-				EasingStyle = Enum.EasingStyle.Quad,
-				EasingDirection = Enum.EasingDirection.In,
-			},
-		},
-
-		Button = {
-			Hover = {
-				Time = 0.1,
-				EasingStyle = Enum.EasingStyle.Quad,
-				EasingDirection = Enum.EasingDirection.Out,
-			},
-			Press = {
-				Time = 0.06,
-				EasingStyle = Enum.EasingStyle.Quad,
-				EasingDirection = Enum.EasingDirection.Out,
-			},
-			Release = {
-				Time = 0.12,
-				EasingStyle = Enum.EasingStyle.Back,
-				EasingDirection = Enum.EasingDirection.Out,
-			},
-			Select = {
-				Time = 0.14,
-				EasingStyle = Enum.EasingStyle.Quad,
-				EasingDirection = Enum.EasingDirection.Out,
-			},
+	Feedback = {
+		HoverSoundId = "rbxassetid://117503154823137",
+		ClickSoundId = {
+			"rbxassetid://122835655736085",
+			"rbxassetid://124993589864467",
 		},
 	},
-
-	Elements = {
-		Button = {
-			DefaultColor = { r = 0.18, g = 0.36, b = 0.82 },
-			SelectedColor = { r = 0.35, g = 0.62, b = 1 },
-			HoverBrightness = 1.12,
-			PressedBrightness = 0.9,
-			DefaultScale = 1,
-			HoverScale = 1.045,
-			PressedScale = 0.94,
-			SelectedScale = 1.025,
-			Text = {
-				MinSize = 12,
-				MaxSize = 26,
-				Padding = { x = 10, y = 4 },
-			},
-		},
-		StoreOffer = {
-			Palettes = {
-				GamePass = {
-					Background = Color3.fromRGB(107, 60, 176),
-					Top = Color3.fromRGB(206, 111, 242),
-					Bottom = Color3.fromRGB(82, 45, 158),
-					Accent = Color3.fromRGB(255, 112, 188),
-					Icon = Color3.fromRGB(69, 40, 126),
-					Button = { r = 0.98, g = 0.35, b = 0.62 },
-				},
-				Cash = {
-					Background = Color3.fromRGB(234, 169, 49),
-					Top = Color3.fromRGB(255, 228, 106),
-					Bottom = Color3.fromRGB(239, 126, 53),
-					Accent = Color3.fromRGB(48, 209, 187),
-					Icon = Color3.fromRGB(191, 108, 32),
-					Button = { r = 0.16, g = 0.72, b = 0.55 },
-				},
-				Crate = {
-					Background = Color3.fromRGB(220, 86, 129),
-					Top = Color3.fromRGB(255, 145, 176),
-					Bottom = Color3.fromRGB(173, 50, 115),
-					Accent = Color3.fromRGB(255, 211, 85),
-					Icon = Color3.fromRGB(132, 47, 104),
-					Button = { r = 0.93, g = 0.55, b = 0.15 },
-				},
-				SeasonPass = {
-					Background = Color3.fromRGB(45, 137, 192),
-					Top = Color3.fromRGB(88, 218, 229),
-					Bottom = Color3.fromRGB(39, 91, 174),
-					Accent = Color3.fromRGB(184, 255, 93),
-					Icon = Color3.fromRGB(27, 82, 142),
-					Button = { r = 0.22, g = 0.66, b = 0.92 },
-				},
-			},
-		},
+	PartyState = {
+		DotPulseSeconds = 0.5,
+		DotStaggerSeconds = 0.18,
+		SequencePauseSeconds = 0.35,
 	},
-
-	Menus = {
-		ClosedYOffset = 26,
-		ClosedScale = 0.96,
-		OpenScale = 1,
+	-- Orbiting establishing shot shown while the mode vote is open. Distance and
+	-- Height are studs from Workspace.Assets.Arena.MapOrigin.
+	VoteCamera = {
+		Distance = 450,
+		Height = 120,
+		RotationSpeedDeg = 6,
+		BlurSize = 10,
 	},
-
-	Hud = {
-		DelayIndicator = {
-			FullSize = {
-				xScale = 0.35,
-				xOffset = 0,
-				yScale = 0.002,
-				yOffset = 0,
-			},
-		},
-		LiveScoreboard = {
-			FfaRows = 3,
-			TeamRows = 2,
-			TeamColors = {
-				Red = Color3.fromRGB(255, 83, 110),
-				Blue = Color3.fromRGB(72, 166, 255),
-			},
-		},
-		MatchVote = {
-			PortraitThreshold = 0.94,
-			LandscapeAspect = 2.18,
-			PortraitAspect = 0.78,
-			Options = {
-				{
-					Top = Color3.fromRGB(255, 103, 155),
-					Bottom = Color3.fromRGB(204, 36, 113),
-				},
-				{
-					Top = Color3.fromRGB(97, 222, 255),
-					Bottom = Color3.fromRGB(31, 121, 218),
-				},
-				{
-					Top = Color3.fromRGB(186, 255, 93),
-					Bottom = Color3.fromRGB(62, 184, 100),
-				},
-			},
-			Modes = {
-				FFA = {
-					Top = Color3.fromRGB(255, 103, 135),
-					Bottom = Color3.fromRGB(219, 39, 89),
-				},
-				TDM = {
-					Top = Color3.fromRGB(73, 218, 207),
-					Bottom = Color3.fromRGB(17, 139, 156),
-				},
-			},
-			Selected = Color3.fromRGB(255, 218, 82),
-		},
+	-- Always-on highlight over other players so they read clearly against the
+	-- arena. DepthMode Occluded keeps them hidden behind geometry; AlwaysOnTop
+	-- would show every player through walls, which the sim's line-of-sight
+	-- mechanics are built around.
+	PlayerHighlight = {
+		FillColor = Color3.fromRGB(255, 0, 0),
+		OutlineColor = Color3.new(1, 1, 1),
+		FillTransparency = 0.5,
+		OutlineTransparency = 0,
+		DepthMode = Enum.HighlightDepthMode.Occluded,
 	},
 }

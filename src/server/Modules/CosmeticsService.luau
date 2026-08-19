@@ -110,7 +110,7 @@ local function onProfileReady(player: Player)
 		if player.Parent == nil then
 			return
 		end
-		if Debug.CosmeticsGrantAll and RunService:IsStudio() then
+		if Debug.AutoGrantAllItemsInStudio and RunService:IsStudio() then
 			CosmeticsService.grantAllForTesting(player)
 		end
 		applyEquipAttributes(player)

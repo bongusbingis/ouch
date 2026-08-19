@@ -1,7 +1,7 @@
 --!strict
 
 -- Dedup guard for sim/match event consumers: the same event can be observed
--- more than once (rollback re-dispatch, multiple feeds into one handler), so
+-- more than once (multiple feeds into one handler, replayed broadcasts), so
 -- consumers gate side effects behind markSeen. Sim ticks only grow, so a
 -- capped instance may clear its history without re-admitting a live event;
 -- an uncapped instance is for per-match lifetimes — call clear() at match

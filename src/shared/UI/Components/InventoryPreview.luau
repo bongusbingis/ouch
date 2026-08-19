@@ -1,0 +1,242 @@
+--!strict
+
+local GuiService = game:GetService("GuiService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local InventoryConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Inventory"))
+local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
+local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
+local InventoryTrailPreview = require(script.Parent.InventoryTrailPreview)
+
+local c = React.createElement
+local UPDATE_INTERVAL = 1 / 30
+local active = {}
+local connection: RBXScriptConnection? = nil
+local accumulator = 0
+
+local function overlaps(position: Vector2, size: Vector2, clipPosition: Vector2, clipSize: Vector2): boolean
+	return position.X < clipPosition.X + clipSize.X
+		and position.X + size.X > clipPosition.X
+		and position.Y < clipPosition.Y + clipSize.Y
+		and position.Y + size.Y > clipPosition.Y
+end
+
+local function isVisible(state): boolean
+	local viewport = state.viewport
+	if not viewport.Visible then
+		return false
+	end
+	local camera = Workspace.CurrentCamera
+	if
+		camera == nil
+		or not overlaps(viewport.AbsolutePosition, viewport.AbsoluteSize, Vector2.zero, camera.ViewportSize)
+	then
+		return false
+	end
+	local scroller = state.scroller
+	return scroller == nil
+		or overlaps(
+			viewport.AbsolutePosition,
+			viewport.AbsoluteSize,
+			scroller.AbsolutePosition,
+			scroller.AbsoluteWindowSize
+		)
+end
+
+local function setPivot(object: Model | BasePart, pivot: CFrame)
+	if object:IsA("Model") then
+		object:PivotTo(pivot)
+	else
+		object.CFrame = pivot
+	end
+end
+
+local function update(state, dt: number)
+	if GuiService.ReducedMotionEnabled then
+		if state.category == "TrailAssets" then
+			local phase = 0.35 * math.pi * 2 / state.config.TravelSeconds
+			local x = math.sin(phase) * state.config.TravelDistance * 0.5
+			setPivot(state.object, CFrame.new(x, 0, 0) * CFrame.Angles(0, state.baseRotation, 0))
+		else
+			setPivot(state.object, CFrame.Angles(0, state.baseRotation, 0) * state.basePivot)
+		end
+		state.setElapsed(0.35)
+		return
+	end
+	state.elapsed += dt
+	if state.category == "TrailAssets" then
+		local phase = state.elapsed * math.pi * 2 / state.config.TravelSeconds
+		local x = math.sin(phase) * state.config.TravelDistance * 0.5
+		setPivot(state.object, CFrame.new(x, 0, 0) * CFrame.Angles(0, state.baseRotation, 0))
+		state.setElapsed(state.elapsed)
+	else
+		local spin = math.rad(state.config.SpinDegreesPerSecond) * state.elapsed
+		setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
+	end
+end
+
+local function stopIfIdle()
+	if next(active) == nil and connection then
+		connection:Disconnect()
+		connection = nil
+		accumulator = 0
+	end
+end
+
+local function register(state)
+	active[state] = true
+	update(state, 0)
+	if not connection then
+		connection = RunService.RenderStepped:Connect(function(dt)
+			accumulator += dt
+			if accumulator < UPDATE_INTERVAL then
+				return
+			end
+			local step = math.min(accumulator, 0.1)
+			accumulator = 0
+			for preview in active do
+				if isVisible(preview) then
+					preview.updateAccumulator += step
+					local interval = 1 / (preview.config.UpdateHz or 30)
+					if preview.updateAccumulator >= interval then
+						local previewStep = preview.updateAccumulator
+						preview.updateAccumulator = 0
+						update(preview, previewStep)
+					end
+				else
+					preview.updateAccumulator = 0
+				end
+			end
+		end)
+	end
+	return function()
+		active[state] = nil
+		stopIfIdle()
+	end
+end
+
+local function preparePart(part: BasePart)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+end
+
+local function characterPreview(color: Color3): Model
+	local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Rigs"):WaitForChild("CharacterRig")
+	assert(template:IsA("Model"), "[InventoryPreview] Assets.Rigs.CharacterRig must be a Model")
+	local rig = template:Clone()
+	for _, descendant in rig:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			preparePart(descendant)
+			if descendant.Transparency < 1 then
+				descendant.Color = color
+			end
+		end
+	end
+	return rig
+end
+
+local function setScale(object: Model | BasePart, scale: number)
+	if object:IsA("Model") then
+		object:ScaleTo(scale)
+	else
+		object.Size *= scale
+	end
+end
+
+local function centerObject(object: Model | BasePart): CFrame
+	if object:IsA("Model") then
+		object:PivotTo(CFrame.identity)
+		local bounds = object:GetBoundingBox()
+		object:PivotTo(CFrame.new(-bounds.Position) * object:GetPivot())
+		return object:GetPivot()
+	end
+	object.CFrame = CFrame.identity
+	return object.CFrame
+end
+
+export type Props = {
+	ItemId: string?,
+	Category: string,
+	Definition: any,
+	ZIndex: number,
+}
+
+return React.memo(function(props: Props)
+	local viewportRef = React.useRef(nil)
+	local cameraRef = React.useRef(nil)
+	local worldRef = React.useRef(nil)
+	local elapsed, setElapsed = React.useBinding(0)
+	local config = InventoryConfig.Viewport[props.Category]
+	assert(config ~= nil, `[InventoryPreview] no preview config for {props.Category}`)
+
+	React.useEffect(function()
+		local viewport: ViewportFrame = viewportRef.current
+		local camera: Camera = cameraRef.current
+		local world: WorldModel = worldRef.current
+		if not viewport or not camera or not world then
+			return
+		end
+		viewport.CurrentCamera = camera
+		local object: Model | BasePart
+		if props.Category == "CharacterColor" then
+			local color = props.Definition.PreviewColor
+			assert(color ~= nil, "[InventoryPreview] character colors require PreviewColor")
+			object = characterPreview(color)
+		elseif props.Category == "TrailAssets" then
+			object = CosmeticVisualFactory.create("BallAssets", nil)
+		else
+			object = CosmeticVisualFactory.create(props.Category, props.ItemId)
+		end
+		setScale(object, config.Scale)
+		object.Parent = world
+		local target = config.TargetOffset
+		camera.CFrame = CFrame.lookAt(target + config.CameraOffset, target)
+		local state = {
+			object = object,
+			viewport = viewport,
+			scroller = viewport:FindFirstAncestorWhichIsA("ScrollingFrame"),
+			category = props.Category,
+			config = config,
+			basePivot = centerObject(object),
+			baseRotation = math.rad(config.RotationDegrees),
+			elapsed = 0,
+			setElapsed = setElapsed,
+			updateAccumulator = 0,
+		}
+		local unregister = register(state)
+		return function()
+			unregister()
+			object:Destroy()
+			if viewport.CurrentCamera == camera then
+				viewport.CurrentCamera = nil
+			end
+		end
+	end, { props.Category, props.ItemId, props.Definition })
+
+	local effectId = props.Definition.EffectId
+	return c("ViewportFrame", {
+		ref = viewportRef,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.5, 0.475),
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = props.ZIndex,
+	}, {
+		UIScale = c("UIScale", { Scale = 2 }),
+		PreviewCamera = c("Camera", { ref = cameraRef }),
+		PreviewWorld = c("WorldModel", { ref = worldRef }),
+		TrailPreview = if props.Category == "TrailAssets" and effectId
+			then c(InventoryTrailPreview, {
+				EffectId = effectId,
+				Config = config,
+				Elapsed = elapsed,
+				ZIndex = props.ZIndex,
+			})
+			else nil,
+	})
+end)

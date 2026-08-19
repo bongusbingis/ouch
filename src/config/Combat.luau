@@ -5,7 +5,7 @@
 
 return {
 	Dodgeball = {
-		ThrowSpeed = 200,
+		ThrowSpeed = 500,
 		Gravity = 50,
 		Radius = 1,
 		HitForgiveness = 0.35, -- added to Radius for hit tests (device magnetism adds more)
@@ -15,7 +15,7 @@ return {
 		-- This should line up with the authored throw/release moment in
 		-- Assets.Animations.Throw. The current clip is about 0.75s, so 0.38s
 		-- leaves enough follow-through after the projectile releases.
-		WindupDuration = 0.3,
+		WindupDuration = 0,
 		ThrowAnimationName = "Throw",
 		MomentumInheritance = 0.3,
 		KnockbackSpeed = 70,
@@ -131,11 +131,6 @@ return {
 		ShakeFadeOut = 0.2,
 		ShakePositionInfluence = vector.create(0.12, 0.1, 0.1),
 		ShakeRotationInfluence = vector.create(1.7, 1.1, 0.65),
-		FlashInTime = 0.035,
-		FlashOutTime = 0.28,
-		FlashPeakTransparency = 0.42,
-		ConfirmHoldTime = 0.2,
-		ConfirmFadeTime = 0.18,
 	},
 
 	-- Simplified hit capsule applied to every character (never per-limb).

@@ -222,7 +222,6 @@ local function handleElimOrCatch(event: { [string]: any })
 		return
 	end
 
-	local mapId = matchStateAttribute("mapId")
 	local modeId = matchStateAttribute("modeId")
 
 	if event.kind == "Elim" then
@@ -230,7 +229,6 @@ local function handleElimOrCatch(event: { [string]: any })
 		if target then
 			AnalyticsService.logCustomEvent(target, AnalyticsConfig.CustomEvents.Elimination, 1, {
 				weaponType = AnalyticsLogic.weaponTypeForElim(event),
-				mapId = mapId,
 				modeId = modeId,
 				killer = event.sourceId,
 			})
@@ -239,7 +237,6 @@ local function handleElimOrCatch(event: { [string]: any })
 		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
 		if catcher then
 			AnalyticsService.logCustomEvent(catcher, AnalyticsConfig.CustomEvents.BallCaught, 1, {
-				mapId = mapId,
 				modeId = modeId,
 			})
 		end

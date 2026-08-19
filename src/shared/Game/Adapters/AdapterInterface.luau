@@ -3,19 +3,17 @@
 local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
 
 -- The contract between the pure sim and any netcode backend. Gameplay and
--- presentation code depend only on this shape, which keeps the traditional
--- (remote-based) fallback a bounded rewrite of one adapter module.
+-- presentation code depend only on this shape.
 --
--- Under server authority, input submission is not part of this interface:
--- inputs flow through the Input Action System and are read inside the
--- simulation itself.
+-- Input submission is not part of this interface: clients send throw/catch
+-- intent over a remote, and the adapter turns it into sim commands.
 
 export type Adapter = {
 	-- Binds the sim loop. Idempotent per process.
 	start: () -> (),
-	-- Registers a listener for sim events produced this frame. On the client,
-	-- events may replay during resimulation; listeners needing exactly-once
-	-- semantics must deduplicate (the presentation layer's job).
+	-- Registers a listener for sim events produced this frame. Broadcast events
+	-- can arrive more than once, so listeners needing exactly-once semantics
+	-- must deduplicate (the presentation layer's job).
 	onEvent: (listener: (event: SimTypes.SimEvent) -> ()) -> (),
 }
 

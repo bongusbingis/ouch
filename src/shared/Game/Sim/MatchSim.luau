@@ -5,7 +5,7 @@ local GameMode = require(script.Parent.Parent.Modes.GameMode)
 
 -- Pure match rules: scoring, win conditions, and the phase machine. The
 -- active mode's MatchRules are passed in by the caller, so the same machine
--- serves every mode. Deaths/respawns/maps are consequences applied by
+-- serves every mode. Deaths, respawns, and arena teleports are applied by
 -- MatchService; this module only decides scores and match flow.
 
 local MatchSim = {}

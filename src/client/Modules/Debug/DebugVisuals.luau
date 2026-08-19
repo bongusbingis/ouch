@@ -27,15 +27,6 @@ type BounceNormal = {
 
 local DebugVisuals = {}
 
-local PHASE_NAMES: { [number]: string } = {
-	[0] = "Held",
-	[1] = "Windup",
-	[2] = "InFlight",
-	[3] = "Bouncing",
-	[4] = "Rolling",
-	[5] = "Free",
-}
-
 local LINE_THICKNESS = 0.035
 local CONE_SLICES = 8
 local RING_SEGMENTS = 16
@@ -48,7 +39,6 @@ local lines: { Part } = {}
 local lineCursor = 0
 local coneSlices: { Part } = {}
 local coneCursor = 0
-local labels: { [BasePart]: BillboardGui } = {}
 local trajectories: { [BasePart]: { Vector3 } } = {}
 local bounceNormals: { BounceNormal } = {}
 local started = false
@@ -63,7 +53,6 @@ local function anyVisualEnabled(): boolean
 		or Debug.AimAssistTargetRange == true
 		or Debug.ThrowOriginMaxOffset == true
 		or Debug.PickupRadius == true
-		or Debug.PhaseLabels == true
 		or Debug.Trajectory == true
 		or Debug.CollisionRadius == true
 		or Debug.SelectedTarget == true
@@ -79,10 +68,6 @@ local function clearTransientVisuals()
 	lineCursor = 0
 	coneSlices = {}
 	coneCursor = 0
-	for _, label in labels do
-		label:Destroy()
-	end
-	labels = {}
 	trajectories = {}
 	bounceNormals = {}
 end
@@ -281,72 +266,6 @@ local function findSelectedTarget(camera: Camera, character: Model?, balls: Inst
 	return best
 end
 
-local function labelFor(ball: BasePart): BillboardGui
-	local label = labels[ball]
-	if label then
-		return label
-	end
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "DebugPhaseLabel"
-	billboard.Adornee = ball
-	billboard.AlwaysOnTop = true
-	billboard.Size = UDim2.fromOffset(140, 34)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, Combat.Dodgeball.Radius + 1.5, 0)
-
-	local text = Instance.new("TextLabel")
-	text.Name = "Text"
-	text.BackgroundTransparency = 0.35
-	text.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	text.BorderSizePixel = 0
-	text.Font = Enum.Font.GothamMedium
-	text.TextColor3 = Color3.fromRGB(255, 255, 255)
-	text.TextScaled = true
-	text.Size = UDim2.fromScale(1, 1)
-	text.Parent = billboard
-
-	billboard.Parent = ensureRoot()
-	labels[ball] = billboard
-	return billboard
-end
-
-local function updateLabels(balls: Instance?)
-	if not Debug.PhaseLabels then
-		for _, label in labels do
-			label:Destroy()
-		end
-		labels = {}
-		return
-	end
-
-	local live: { [BasePart]: boolean } = {}
-	if balls then
-		for _, child in balls:GetChildren() do
-			if not child:IsA("BasePart") then
-				continue
-			end
-			live[child] = true
-			if Debug.PhaseLabels then
-				local phase = (child:GetAttribute("ph") :: number?) or 5
-				local heldBy = child:GetAttribute("hb")
-				local label = labelFor(child)
-				local text = label:FindFirstChild("Text")
-				if text and text:IsA("TextLabel") then
-					text.Text = `{child.Name}\n{PHASE_NAMES[phase] or "?"}{if heldBy then ` by {heldBy}` else ""}`
-				end
-				label.Enabled = true
-			end
-		end
-	end
-
-	for ball, label in labels do
-		if not live[ball] then
-			label:Destroy()
-			labels[ball] = nil
-		end
-	end
-end
-
 local function updateTrajectory(ball: BasePart)
 	local history = trajectories[ball]
 	if history == nil then
@@ -522,7 +441,6 @@ function DebugVisuals.start()
 		drawLocalPlayerDebug(character)
 		drawBallDebug(balls)
 		drawBounceNormals()
-		updateLabels(balls)
 		hideUnusedLines()
 	end)
 end

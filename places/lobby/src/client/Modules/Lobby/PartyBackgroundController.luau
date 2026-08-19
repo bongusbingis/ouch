@@ -2,6 +2,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local PartyBackgroundController = {}
+PartyBackgroundController.__index = PartyBackgroundController
 
 local CAMERA_DISTANCE = 50
 local LOOP_DURATION = 25
@@ -12,10 +13,10 @@ local TAU = math.pi * 2
 
 function PartyBackgroundController.start()
 	local background = Workspace:WaitForChild("Views"):WaitForChild("Party"):WaitForChild("Background")
-	if not background:IsA("BasePart") then
-		warn("[PartyBackgroundController] Workspace.Views.Party.Background must be a BasePart")
-		return
-	end
+	assert(
+		background:IsA("BasePart"),
+		"[PartyBackgroundController] Workspace.Views.Party.Background must be a BasePart"
+	)
 
 	local textures = {}
 	for _, descendant in background:GetDescendants() do
@@ -32,7 +33,8 @@ function PartyBackgroundController.start()
 
 	local elapsed = 0
 
-	RunService.RenderStepped:Connect(function(deltaTime)
+	local self = setmetatable({ _connection = nil }, PartyBackgroundController)
+	self._connection = RunService.RenderStepped:Connect(function(deltaTime)
 		elapsed = (elapsed + deltaTime) % LOOP_DURATION
 		local phase = elapsed / LOOP_DURATION * TAU
 		local camera = Workspace.CurrentCamera
@@ -52,6 +54,14 @@ function PartyBackgroundController.start()
 			end
 		end
 	end)
+	return self
+end
+
+function PartyBackgroundController:destroy()
+	if self._connection then
+		self._connection:Disconnect()
+		self._connection = nil
+	end
 end
 
 return PartyBackgroundController

@@ -65,9 +65,7 @@ return function(context, target: Player?): string
 	local profile, equipped = profileFor(player)
 	return table.concat({
 		`{player.Name} ({player.UserId}) team={player:GetAttribute("TeamId") or "-"}`,
-		`match: phase={match.phase} mode={match.modeId} map={match.mapId or "-"} time={math.floor(
-			match.timeRemaining + 0.5
-		)} target={match.scoreTarget}`,
+		`match: phase={match.phase} mode={match.modeId or "-"} time={math.floor(match.timeRemaining + 0.5)} target={match.scoreTarget}`,
 		`combat: {combatFor(player)} position={positionFor(player)}`,
 		`profile: {profile}`,
 		equipped,

@@ -14,14 +14,19 @@ local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Debug)
+local Network = require(script.Parent.Parent.Parent.Network)
 
 type SimEvent = SimTypes.SimEvent
 type InputCommand = SimTypes.InputCommand
 
--- Server-authority backend: one BindToSimulation callback, initialized on both
--- client and server, that decodes SimState from predicted instances, reads
--- InputActions, runs the pure SimCore step, and encodes the result back.
--- The engine owns prediction, rollback, and resimulation.
+-- The single bridge between the pure sim and the engine. The server is the only
+-- simulator: it consumes throw/catch intents, runs SimCore on a fixed tick, and
+-- encodes the result onto the ball instances that replicate to clients.
+--
+-- Clients send intent only. Every raycast, hit test, catch, and elimination is
+-- resolved here from server-known character positions, and the aim origin is
+-- taken from the player's own root rather than anything the client supplied, so
+-- a client can never report having hit or been hit by anything.
 
 local ServerAuthAdapter = {}
 
@@ -32,13 +37,9 @@ local pendingWeaponResets: { [string]: boolean } = {}
 local matchState: Folder? = nil
 local started = false
 
-local function sideTag(): string
-	return if RunService:IsServer() then "S" else "C"
-end
-
 local function trace(message: string)
 	if Debug.CombatTrace then
-		print(`[Combat/{sideTag()}] {message}`)
+		print(`[Combat] {message}`)
 	end
 end
 
@@ -74,6 +75,10 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		if model == nil then
 			continue
 		end
+		if player:GetAttribute("ArenaAdmission") == "Rejected" then
+			table.insert(excluded, model)
+			continue
+		end
 		local root = model:FindFirstChild("HumanoidRootPart")
 		if root == nil or not root:IsA("BasePart") then
 			continue
@@ -104,9 +109,47 @@ local function throwPosition(entry: CharacterEntry): Vector3
 	return socketPosition(entry, Combat.Dodgeball.OverhandReleaseRootOffset)
 end
 
+-- Allocated once and reused every tick. At 60Hz a fresh RaycastParams, closure,
+-- and snapshot table per step is pure GC churn; only their contents change.
+local raycastParams = RaycastParams.new()
+raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+-- Gameplay traces ignore non-collidable geometry (invisible markers, decorative
+-- no-clip parts); raycasts hit them by default otherwise.
+raycastParams.RespectCanCollide = true
+
+local collisionWorld: SimTypes.CollisionWorld = {
+	sweepSphere = function(origin, displacement, radius)
+		local distance = vector.magnitude(displacement)
+		if distance <= 1e-6 then
+			return nil
+		end
+		local result = Workspace:Spherecast(origin, radius, displacement, raycastParams)
+		if result == nil then
+			return nil
+		end
+		if Debug.CollisionTrace then
+			trace(`sweep hit {result.Instance:GetFullName()} at d={result.Distance}`)
+		end
+		-- SweepHit.position is the sphere center at contact, matching the
+		-- mock-world semantics the sim is tested against.
+		return {
+			distance = result.Distance,
+			position = origin + (displacement / distance) * result.Distance,
+			normal = result.Normal,
+		}
+	end,
+}
+
+local worldSnapshot: SimTypes.WorldSnapshot = {
+	characters = {},
+	collision = collisionWorld,
+	ballSpawns = {},
+}
+
 local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { Instance }): SimTypes.WorldSnapshot
 	local capsule = Combat.CharacterCapsule
 	local characters: { [string]: SimTypes.CharacterSnapshot } = {}
+	raycastParams.FilterDescendantsInstances = excluded
 	for id, entry in entries do
 		characters[id] = {
 			position = entry.root.CFrame.Position,
@@ -124,102 +167,51 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 		}
 	end
 
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = excluded
-	-- Gameplay traces ignore non-collidable geometry (invisible markers,
-	-- decorative no-clip parts); raycasts hit them by default otherwise.
-	params.RespectCanCollide = true
-
-	local collision: SimTypes.CollisionWorld = {
-		sweepSphere = function(origin, displacement, radius)
-			local distance = vector.magnitude(displacement)
-			if distance <= 1e-6 then
-				return nil
-			end
-			local result = Workspace:Spherecast(origin, radius, displacement, params)
-			if result == nil then
-				return nil
-			end
-			if Debug.CollisionTrace then
-				trace(`sweep hit {result.Instance:GetFullName()} at d={result.Distance}`)
-			end
-			-- SweepHit.position is the sphere center at contact, matching the
-			-- mock-world semantics the sim is tested against.
-			return {
-				distance = result.Distance,
-				position = origin + (displacement / distance) * result.Distance,
-				normal = result.Normal,
-			}
-		end,
-	}
-
 	-- World ball spawning happens outside the sim (BallSpawner); the sim never
 	-- sees spawn points under this backend.
-	return { characters = characters, collision = collision, ballSpawns = {} }
+	worldSnapshot.characters = characters
+	return worldSnapshot
 end
 
--- Bool action edges are detected against the previous tick's state, stored as
--- attributes on the character so rollback restores them correctly.
-local function readEdge(action: InputAction, model: Model, attrName: string): boolean
-	local now = action:GetState() == true
-	local previous = model:GetAttribute(attrName) == true
-	if model:GetAttribute(attrName) ~= now then
-		model:SetAttribute(attrName, now)
+local STEP_SECONDS = 1 / 60
+local MAX_QUEUED_INTENTS = 16
+
+type Intent = { playerId: string, kind: SimTypes.CommandKind, aimDir: Vector3 }
+
+local pendingIntents: { Intent } = {}
+
+local function queueIntent(player: Player, kind: SimTypes.CommandKind, aimDir: Vector3)
+	if #pendingIntents >= MAX_QUEUED_INTENTS then
+		return
 	end
-	return now and not previous
+	table.insert(pendingIntents, { playerId = PlayerIds.toId(player), kind = kind, aimDir = aimDir })
 end
 
-local function collectCommands(entries: { [string]: CharacterEntry }): { InputCommand }
+-- Intents become commands only against a live character the server can see, and
+-- the origin is derived from that character rather than sent by the client.
+local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
-	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
-	for id, entry in entries do
-		if entry.model:GetAttribute("CombatAlive") == false then
-			continue
-		end
-		local context = entry.player:FindFirstChild(InputConfig.ContextName)
-		if context == nil then
-			continue
-		end
-		local throwAction = context:FindFirstChild("Throw")
-		local catchAction = context:FindFirstChild("Catch")
-		local aimAction = context:FindFirstChild("Aim")
-		if throwAction == nil or catchAction == nil or aimAction == nil then
-			continue
-		end
-
-		local throwEdge = readEdge(throwAction :: InputAction, entry.model, "prevThrow")
-		local catchEdge = readEdge(catchAction :: InputAction, entry.model, "prevCatch")
-		if not active then
-			continue
-		end
-		if not throwEdge and not catchEdge then
-			continue
-		end
-
-		local aimDir = (aimAction :: InputAction):GetState()
-		if typeof(aimDir) ~= "Vector3" or vector.magnitude(aimDir) <= 1e-6 then
-			continue
-		end
-		aimDir = vector.normalize(aimDir)
-		local aimOrigin = entry.root.CFrame.Position + aimDir * 2
-		local function append(kind: SimTypes.CommandKind)
-			table.insert(commands, {
-				playerId = id,
-				kind = kind,
-				aimOrigin = aimOrigin,
-				aimDir = aimDir,
-				targetId = nil,
-				deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse",
-			})
-		end
-		if throwEdge then
-			append("Throw")
-		end
-		if catchEdge then
-			append("Catch")
-		end
+	if matchState == nil or matchState:GetAttribute("phase") ~= "Active" then
+		table.clear(pendingIntents)
+		return commands
 	end
+
+	for _, intent in pendingIntents do
+		local entry = entries[intent.playerId]
+		if entry == nil or entry.model:GetAttribute("CombatAlive") == false then
+			continue
+		end
+		local aimDir = vector.normalize(intent.aimDir)
+		table.insert(commands, {
+			playerId = intent.playerId,
+			kind = intent.kind,
+			aimOrigin = entry.root.CFrame.Position + aimDir * 2,
+			aimDir = aimDir,
+			targetId = nil,
+			deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse",
+		})
+	end
+	table.clear(pendingIntents)
 	return commands
 end
 
@@ -240,28 +232,29 @@ local function step(dt: number)
 
 	local snapshot = buildSnapshot(entries, excluded)
 	local state = SimStateCodec.decode(ballsFolder, characterModels)
-	if RunService:IsServer() then
-		for playerId in pendingWeaponResets do
-			local playerState = state.players[playerId]
-			if playerState then
-				for _, kit in WeaponRegistry.all() do
-					playerState.weapons[kit.kind] = kit.init()
-				end
-				pendingWeaponResets[playerId] = nil
+	for playerId in pendingWeaponResets do
+		local playerState = state.players[playerId]
+		if playerState then
+			for _, kit in WeaponRegistry.all() do
+				playerState.weapons[kit.kind] = kit.init()
 			end
+			pendingWeaponResets[playerId] = nil
 		end
 	end
-	local commands = collectCommands(entries)
+	local commands = buildCommands(entries)
 
 	local events = SimCore.step(state, commands, snapshot, dt)
 
 	MovementSpeedService.step(state, characterModels, events)
 	SimStateCodec.encode(state, ballsFolder, characterModels)
 	dispatch(events)
+	if #events > 0 then
+		Network.fire("CombatSimEvent", nil, events)
+	end
 end
 
 function ServerAuthAdapter.resetWeaponsForTesting(player: Player): boolean
-	if not RunService:IsServer() or player.Parent ~= Players then
+	if player.Parent ~= Players then
 		return false
 	end
 	pendingWeaponResets[PlayerIds.toId(player)] = true
@@ -273,22 +266,49 @@ function ServerAuthAdapter.start()
 		return
 	end
 	started = true
+	if not RunService:IsServer() then
+		return
+	end
+
 	local resolvedMatchState = ReplicatedStorage:WaitForChild("MatchState")
 	assert(resolvedMatchState:IsA("Folder"), "[ServerAuthAdapter] ReplicatedStorage.MatchState must be a Folder")
 	matchState = resolvedMatchState
-	if RunService:IsServer() then
-		Players.PlayerRemoving:Connect(function(player)
-			pendingWeaponResets[PlayerIds.toId(player)] = nil
-		end)
-	end
 
-	local runService: any = RunService
-	if typeof(runService.BindToSimulation) ~= "function" then
-		warn("[ServerAuthAdapter] BindToSimulation unavailable — enable the Server Authority settings in Studio")
-		return
-	end
-	runService:BindToSimulation(step)
-	print(`[ServerAuthAdapter] simulation bound ({if RunService:IsServer() then "server" else "client"})`)
+	Players.PlayerRemoving:Connect(function(player)
+		local id = PlayerIds.toId(player)
+		pendingWeaponResets[id] = nil
+		for index = #pendingIntents, 1, -1 do
+			if pendingIntents[index].playerId == id then
+				table.remove(pendingIntents, index)
+			end
+		end
+	end)
+
+	Network.handleProtected("SubmitCombatInput", {
+		rateLimit = 20,
+		validate = function(_player, kind, aimDir)
+			if kind ~= "Throw" and kind ~= "Catch" then
+				return false, "invalid_kind"
+			end
+			if typeof(aimDir) ~= "Vector3" then
+				return false, "invalid_aim"
+			end
+			local magnitude = vector.magnitude(aimDir)
+			if magnitude ~= magnitude or magnitude <= 1e-6 or magnitude == math.huge then
+				return false, "invalid_aim"
+			end
+			return true
+		end,
+	}, queueIntent)
+
+	local accumulator = 0
+	RunService.Heartbeat:Connect(function(deltaTime: number)
+		accumulator = math.min(accumulator + deltaTime, STEP_SECONDS * 8)
+		while accumulator >= STEP_SECONDS do
+			accumulator -= STEP_SECONDS
+			step(STEP_SECONDS)
+		end
+	end)
 end
 
 return ServerAuthAdapter

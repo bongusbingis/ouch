@@ -97,7 +97,7 @@ function EconomyStore.onChanged(callback: ChangedCallback): () -> ()
 	end
 end
 
-function EconomyStore._resetForTest()
+function EconomyStore.stop()
 	disconnect(profileChangeConnection)
 	disconnect(newReplicaConnection)
 	started = false
@@ -106,6 +106,10 @@ function EconomyStore._resetForTest()
 	newReplicaConnection = nil
 	profileChangeConnection = nil
 	table.clear(callbacks)
+end
+
+function EconomyStore._resetForTest()
+	EconomyStore.stop()
 end
 
 return EconomyStore

@@ -2,6 +2,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local PopulationPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.PopulationPolicy)
 local PartyModel = require(script.Parent.PartyModel)
 
 local MatchmakerService = {}
@@ -17,11 +18,6 @@ local function memberIds(party)
 	return ids
 end
 
-local function brDistanceLimit(waitTime)
-	local progress = math.clamp(waitTime / Config.MatchMaximumWait, 0, 1)
-	return math.min(Config.PartyMaxPlayers - 1, math.floor(progress * Config.PartyMaxPlayers))
-end
-
 function MatchmakerService.new(partyRepository, queueRepository, matchRepository, teleportCoordinator, onChanged)
 	return setmetatable({
 		_partyRepository = partyRepository,
@@ -29,8 +25,8 @@ function MatchmakerService.new(partyRepository, queueRepository, matchRepository
 		_matchRepository = matchRepository,
 		_teleportCoordinator = teleportCoordinator,
 		_onChanged = onChanged,
-		_running = {},
-		_nextLeaseAttempt = {},
+		_running = false,
+		_nextLeaseAttempt = 0,
 	}, MatchmakerService)
 end
 
@@ -80,7 +76,7 @@ function MatchmakerService:_recoverClaim(party)
 	if matchRecord and self._matchRepository:ContainsParty(matchRecord, party.partyId) then
 		local assigned = self:_assignClaim(party, matchRecord.matchId)
 		if assigned then
-			self._queueRepository:Remove(assigned.queueTicket.mode, assigned.partyId)
+			self._queueRepository:Remove(assigned.partyId)
 			self._onChanged(assigned, "MatchAssigned", 0)
 		end
 		return
@@ -91,8 +87,8 @@ function MatchmakerService:_recoverClaim(party)
 	end
 end
 
-function MatchmakerService:_readValidCandidates(mode)
-	local items = self._queueRepository:GetCandidates(mode)
+function MatchmakerService:_readCandidates()
+	local items = self._queueRepository:GetCandidates()
 	if not items then
 		return {}
 	end
@@ -100,25 +96,20 @@ function MatchmakerService:_readValidCandidates(mode)
 	local candidates = {}
 	for _, item in items do
 		local ticket = item.value
-		local party, partyError = self._partyRepository:GetParty(item.key)
-
-		if partyError then
-			continue
-		elseif
-			not party
-			or not party.queueTicket
-			or party.queueTicket.ticketId ~= ticket.ticketId
-			or not party.leaseUntil
-			or party.leaseUntil <= os.time()
-			or (party.phase ~= "Claimed" and party.phase ~= "Queued")
-			or party.selection.mode ~= mode
+		if
+			typeof(ticket) ~= "table"
+			or ticket.partyId ~= item.key
+			or typeof(ticket.ticketId) ~= "string"
+			or typeof(ticket.partySize) ~= "number"
+			or ticket.partySize % 1 ~= 0
+			or ticket.partySize < Config.PartyMinPlayers
+			or ticket.partySize > Config.PartyMaxPlayers
+			or typeof(ticket.enqueuedAt) ~= "number"
 		then
-			self._queueRepository:Remove(mode, item.key)
-		elseif party.phase == "Claimed" and party.claim then
-			self:_recoverClaim(party)
+			self._queueRepository:Remove(item.key)
 		else
 			table.insert(candidates, {
-				party = party,
+				partyId = item.key,
 				ticket = ticket,
 			})
 		end
@@ -127,30 +118,45 @@ function MatchmakerService:_readValidCandidates(mode)
 	return candidates
 end
 
-function MatchmakerService:_selectCandidates(mode, candidates)
+function MatchmakerService:_selectCandidates(candidates)
 	local seed = candidates[1]
 	if not seed then
 		return {}, 0, 0
 	end
 
-	local now = os.time()
+	local now = DateTime.now().UnixTimestampMillis / 1000
 	local oldestWait = math.max(0, now - seed.ticket.enqueuedAt)
-	local allowedDistance = mode == "BR" and brDistanceLimit(oldestWait) or Config.PartyMaxPlayers
 	local selected = {}
 	local totalPlayers = 0
 
 	for _, candidate in candidates do
-		local compatible = mode ~= "BR"
-			or math.abs(candidate.ticket.partySize - seed.ticket.partySize) <= allowedDistance
-		local memberCount = #candidate.party.members
-
-		if compatible and totalPlayers + memberCount <= Config.MatchTargetPlayers then
+		local memberCount = candidate.ticket.partySize
+		if totalPlayers + memberCount <= Config.MatchTargetPlayers then
 			table.insert(selected, candidate)
 			totalPlayers += memberCount
 		end
 	end
 
 	return selected, totalPlayers, oldestWait
+end
+
+function MatchmakerService:_reconcileUnclaimedCandidate(candidate)
+	local party, partyError = self._partyRepository:GetParty(candidate.partyId)
+	if partyError then
+		return
+	end
+	if
+		not party
+		or not party.queueTicket
+		or party.queueTicket.ticketId ~= candidate.ticket.ticketId
+		or not party.leaseUntil
+		or party.leaseUntil <= os.time()
+		or (party.phase ~= "Queued" and party.phase ~= "Claimed")
+	then
+		self._queueRepository:Remove(candidate.partyId)
+	elseif party.phase == "Claimed" and party.claim then
+		self:_recoverClaim(party)
+	end
 end
 
 function MatchmakerService:_claimCandidates(selected, matchId)
@@ -160,12 +166,15 @@ function MatchmakerService:_claimCandidates(selected, matchId)
 
 	for _, candidate in selected do
 		local ticketId = candidate.ticket.ticketId
-		local party = self._partyRepository:UpdateParty(candidate.party.partyId, function(current)
+		local party = self._partyRepository:UpdateParty(candidate.partyId, function(current)
 			if
 				not current
 				or current.phase ~= "Queued"
 				or not current.queueTicket
 				or current.queueTicket.ticketId ~= ticketId
+				or current.queueTicket.partySize ~= #current.members
+				or not current.leaseUntil
+				or current.leaseUntil <= now
 			then
 				return nil
 			end
@@ -182,13 +191,15 @@ function MatchmakerService:_claimCandidates(selected, matchId)
 		if party then
 			table.insert(claimed, party)
 			totalPlayers += #party.members
+		else
+			self:_reconcileUnclaimedCandidate(candidate)
 		end
 	end
 
 	return claimed, totalPlayers
 end
 
-function MatchmakerService:_createMatch(mode, parties, accessCode, matchId)
+function MatchmakerService:_createMatch(parties, accessCode, matchId)
 	local matchParties = {}
 	local expectedUserIds = {}
 
@@ -206,8 +217,10 @@ function MatchmakerService:_createMatch(mode, parties, accessCode, matchId)
 	return {
 		schemaVersion = Config.ProtocolVersion,
 		matchId = matchId,
-		mode = mode,
-		mapKey = Config.DefaultMapKey,
+		modeSelection = {
+			strategy = "Vote",
+			options = table.clone(Config.ModeVoteOptions),
+		},
 		arenaPlaceId = Config.ArenaPlaceId,
 		targetPlayers = Config.MatchTargetPlayers,
 		parties = matchParties,
@@ -218,19 +231,12 @@ function MatchmakerService:_createMatch(mode, parties, accessCode, matchId)
 	}
 end
 
-function MatchmakerService:_process(mode)
-	if os.clock() < (self._nextLeaseAttempt[mode] or 0) then
-		return
-	end
-	if not self._matchRepository:AcquireLease(mode) then
-		self._nextLeaseAttempt[mode] = os.clock() + random:NextNumber(3, 6)
-		return
-	end
-	self._nextLeaseAttempt[mode] = 0
-
-	local candidates = self:_readValidCandidates(mode)
-	local selected, selectedPlayers, oldestWait = self:_selectCandidates(mode, candidates)
-	if selectedPlayers < Config.MatchTargetPlayers and oldestWait < Config.MatchMaximumWait then
+function MatchmakerService:_process()
+	local candidates = self:_readCandidates()
+	local selected, selectedPlayers, oldestWait = self:_selectCandidates(candidates)
+	local requiredPlayers =
+		PopulationPolicy.requiredPlayers(Config.MatchPopulationExpansion, oldestWait, Config.MatchTargetPlayers)
+	if selectedPlayers < requiredPlayers then
 		return
 	end
 
@@ -239,7 +245,7 @@ function MatchmakerService:_process(mode)
 	if #claimed == 0 then
 		return
 	end
-	if claimedPlayers < Config.MatchTargetPlayers and oldestWait < Config.MatchMaximumWait then
+	if claimedPlayers < requiredPlayers then
 		for _, party in claimed do
 			self:_releaseClaim(party, "ClaimReleased")
 		end
@@ -254,7 +260,7 @@ function MatchmakerService:_process(mode)
 		return
 	end
 
-	local matchRecord = self:_createMatch(mode, claimed, accessCode, matchId)
+	local matchRecord = self:_createMatch(claimed, accessCode, matchId)
 	local stored = self._matchRepository:SetMatch(matchRecord)
 	if not stored then
 		for _, party in claimed do
@@ -266,22 +272,32 @@ function MatchmakerService:_process(mode)
 	for _, party in claimed do
 		local assigned = self:_assignClaim(party, matchId)
 		if assigned then
-			self._queueRepository:Remove(mode, assigned.partyId)
+			self._queueRepository:Remove(assigned.partyId)
 			self._onChanged(assigned, "MatchAssigned", 0)
 		end
 	end
 end
 
-function MatchmakerService:Tick(mode)
-	if self._running[mode] then
+function MatchmakerService:Tick()
+	if self._running or os.clock() < self._nextLeaseAttempt then
 		return
 	end
 
-	self._running[mode] = true
+	self._running = true
+	local leaseAcquired = false
 	local success, message = xpcall(function()
-		self:_process(mode)
+		if not self._matchRepository:AcquireLease() then
+			self._nextLeaseAttempt = os.clock() + random:NextNumber(3, 6)
+			return
+		end
+		leaseAcquired = true
+		self._nextLeaseAttempt = 0
+		self:_process()
 	end, debug.traceback)
-	self._running[mode] = nil
+	if leaseAcquired then
+		self._matchRepository:ReleaseLease()
+	end
+	self._running = false
 
 	if not success then
 		warn(("[MatchmakerService] %s"):format(message))

@@ -20,8 +20,5 @@ return function(_context: any): string
 		remaining = state.intermissionRemaining
 	end
 	local scores = if #scoreEntries > 0 then table.concat(scoreEntries, ", ") else "none"
-	return `Phase={state.phase} | Mode={state.modeId} | Map={state.mapId or "none"} | Remaining={string.format(
-		"%.1f",
-		remaining
-	)} | Target={state.scoreTarget} | Winner={state.winnerId or "none"} | Scores: {scores}`
+	return `Phase={state.phase} | Mode={state.modeId or "none"} | Remaining={string.format("%.1f", remaining)} | Target={state.scoreTarget} | Winner={state.winnerId or "none"} | Scores: {scores}`
 end

@@ -1,0 +1,156 @@
+--!strict
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local AnimatedButton = require(script.Parent.AnimatedButton)
+local ResponsiveText = require(script.Parent.ResponsiveText)
+
+local c = React.createElement
+local SELECTED = "rbxassetid://94748581468730"
+local UNSELECTED = "rbxassetid://136021539696619"
+
+type TabDefinition = {
+	Id: string,
+	Label: string,
+	Icon: string,
+	LayoutOrder: number?,
+	IconPosition: UDim2,
+	IconSize: UDim2,
+	LabelPosition: UDim2,
+	ButtonPosition: UDim2,
+	ButtonSize: UDim2,
+	ZIndex: number?,
+	Enabled: boolean,
+}
+
+local DEFINITIONS: { TabDefinition } = {
+	{
+		Id = "Settings",
+		Label = "SETTINGS",
+		Icon = "rbxassetid://2161586632",
+		LayoutOrder = 3,
+		IconPosition = UDim2.fromScale(0.495312, 0.481),
+		IconSize = UDim2.fromScale(0.542942, 0.75),
+		LabelPosition = UDim2.fromScale(0.499999, 0),
+		ButtonPosition = UDim2.fromScale(0.418851, 0.25),
+		ButtonSize = UDim2.fromScale(0.242, 0.75),
+		Enabled = false,
+	},
+	{
+		Id = "Inventory",
+		Label = "BACKPACK",
+		Icon = "rbxassetid://18245740340",
+		LayoutOrder = 2,
+		IconPosition = UDim2.fromScale(0.493847, 0.484),
+		IconSize = UDim2.fromScale(0.496643, 0.66),
+		LabelPosition = UDim2.fromScale(0.5, 0),
+		ButtonPosition = UDim2.fromScale(0.418851, 0.25),
+		ButtonSize = UDim2.fromScale(0.242, 0.75),
+		ZIndex = -5,
+		Enabled = true,
+	},
+	{
+		Id = "Shop",
+		Label = "SHOP",
+		Icon = "rbxassetid://18136118615",
+		LayoutOrder = 1,
+		IconPosition = UDim2.fromScale(0.47, 0.5),
+		IconSize = UDim2.fromScale(0.486154, 0.628),
+		LabelPosition = UDim2.fromScale(0.465819, 0),
+		ButtonPosition = UDim2.fromScale(0.418851, 0.25),
+		ButtonSize = UDim2.fromScale(0.242, 0.75),
+		Enabled = true,
+	},
+	{
+		Id = "SplashScreen",
+		Label = "LOBBY",
+		Icon = "rbxassetid://8517323790",
+		IconPosition = UDim2.fromScale(0.5, 0.5),
+		IconSize = UDim2.fromScale(0.410489, 0.5),
+		LabelPosition = UDim2.fromScale(0.5, 0),
+		ButtonPosition = UDim2.fromScale(0.120503, 0.125),
+		ButtonSize = UDim2.fromScale(0.242138, 0.75),
+		Enabled = true,
+	},
+}
+
+export type Props = {
+	CurrentPage: string,
+	OnNavigate: (string) -> (),
+}
+
+return function(props: Props)
+	local buttons = {
+		UIListLayout = c("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0.08, 0),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}),
+	}
+
+	for _, definition in DEFINITIONS do
+		local selected = definition.Id == props.CurrentPage
+		buttons[definition.Id] = c(AnimatedButton, {
+			Enabled = definition.Enabled,
+			Native = {
+				BackgroundTransparency = 1,
+				Image = if selected then SELECTED else UNSELECTED,
+				LayoutOrder = definition.LayoutOrder,
+				Position = definition.ButtonPosition,
+				ScaleType = Enum.ScaleType.Slice,
+				Size = definition.ButtonSize,
+				SliceCenter = Rect.new(224, 202, 770, 474),
+				SliceScale = 0.2,
+				ZIndex = definition.ZIndex,
+			},
+			OnActivated = function()
+				props.OnNavigate(definition.Id)
+			end,
+		}, {
+			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1.3 }),
+			ImageLabel = c("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Image = definition.Icon,
+				LayoutOrder = 2,
+				Position = definition.IconPosition,
+				Size = definition.IconSize,
+			}),
+			Label = c(ResponsiveText, {
+				HostName = "Label",
+				MeasurementFont = Enum.Font.SourceSansBold,
+				Native = {
+					Active = true,
+					AnchorPoint = Vector2.new(0.5, 1),
+					BackgroundTransparency = 1,
+					FontFace = Font.new(
+						"rbxasset://fonts/families/SourceSansPro.json",
+						Enum.FontWeight.Bold,
+						Enum.FontStyle.Normal
+					),
+					Position = definition.LabelPosition,
+					Size = UDim2.fromScale(1.4, if definition.Id == "Inventory" then 0.420305 else 0.42),
+					Text = definition.Label,
+					TextColor3 = Color3.new(1, 1, 1),
+				},
+			}),
+		})
+	end
+
+	return c("Frame", {
+		BackgroundColor3 = Color3.fromRGB(63, 63, 63),
+		BorderColor3 = Color3.new(),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 0.113754),
+	}, {
+		PageTabs = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Position = UDim2.fromScale(0.5, 0.62),
+			SelectionGroup = true,
+			Size = UDim2.fromScale(0.4, 0.877073),
+		}, buttons),
+	})
+end

@@ -40,7 +40,7 @@ return {
 		},
 		{
 			-- Camera look direction, fed every frame by InputRouter through a
-			-- scriptable binding so it replays correctly during resimulation.
+			-- scriptable binding driven by the client aim director.
 			Name = "Aim",
 			Type = Enum.InputActionType.Direction3D,
 			Bindings = {

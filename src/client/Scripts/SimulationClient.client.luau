@@ -1,11 +1,20 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
-local Replica = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replica"))
-local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
+local Debug = require(ConfigRoot:WaitForChild("Debug"))
+local ConfigReplication = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Adapters")
+		:WaitForChild("ConfigReplication")
+)
 
 local Client = Players.LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
-local InputRouter = require(Client:WaitForChild("Modules"):WaitForChild("Input"):WaitForChild("InputRouter"))
+local InputModules = Client:WaitForChild("Modules"):WaitForChild("Input")
+local InputRouter = require(InputModules:WaitForChild("InputRouter"))
+local CombatInputSender = require(InputModules:WaitForChild("CombatInputSender"))
+local PlatformRider = require(Client:WaitForChild("Modules"):WaitForChild("Movement"):WaitForChild("PlatformRider"))
 local Presentation = Client:WaitForChild("Modules"):WaitForChild("Presentation")
 local BallVisuals = require(Presentation:WaitForChild("BallVisuals"))
 local DamageFeedback = require(Presentation:WaitForChild("DamageFeedback"))
@@ -13,51 +22,26 @@ local DeathEffects = require(Presentation:WaitForChild("DeathEffects"))
 local HammerVisuals = require(Presentation:WaitForChild("HammerVisuals"))
 local SplatEffects = require(Presentation:WaitForChild("SplatEffects"))
 local MatchAudio = require(Presentation:WaitForChild("MatchAudio"))
-local TargetingUI = require(Presentation:WaitForChild("TargetingUI"))
-local UI = Client:WaitForChild("Modules"):WaitForChild("UI")
-local MenuManager = require(UI:WaitForChild("MenuManager"))
-local SidebarController = require(UI:WaitForChild("SidebarController"))
-local QuestsController = require(UI:WaitForChild("QuestsController"))
-local UIResolver = require(UI:WaitForChild("UIResolver"))
-local EconomyStore = require(UI:WaitForChild("EconomyStore"))
-local ShopController = require(UI:WaitForChild("ShopController"))
-local BattlePassController = require(UI:WaitForChild("BattlePassController"))
-local InventoryController = require(UI:WaitForChild("InventoryController"))
-local LeaderboardController = require(UI:WaitForChild("LeaderboardController"))
-local MatchHud = require(UI:WaitForChild("MatchHud"))
-local LiveScoreboardController = require(UI:WaitForChild("LiveScoreboardController"))
-local CooldownIndicator = require(UI:WaitForChild("CooldownIndicator"))
+local PlayerHighlights = require(Presentation:WaitForChild("PlayerHighlights"))
+local WeaponAnimations = require(Presentation:WaitForChild("WeaponAnimations"))
+local VoteCamera = require(Presentation:WaitForChild("VoteCamera"))
 local DebugModules = Client:WaitForChild("Modules"):WaitForChild("Debug")
 local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
-local AnalyticsModules = Client:WaitForChild("Modules"):WaitForChild("Analytics")
-local AnalyticsReporter = require(AnalyticsModules:WaitForChild("AnalyticsReporter"))
 
-local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
-local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
+local RotatingPlatforms = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("RotatingPlatforms")
+)
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
-local function startCmdr()
-	local player = Players.LocalPlayer
-	while player:GetAttribute("CmdrAccess") == nil do
-		task.wait()
-	end
-	if player:GetAttribute("CmdrAccess") ~= true then
-		return
-	end
-
-	local root = ReplicatedStorage:WaitForChild("CmdrClient")
-	while root:GetAttribute("SplatBrawlReady") ~= true do
-		task.wait()
-	end
-	local cmdr = require(root)
-	cmdr.Registry:RegisterHook("BeforeRun", function()
-		return nil
-	end)
-	cmdr:SetActivationKeys({ Enum.KeyCode.F2 })
-	cmdr:SetPlaceName("Splat Brawl")
-end
-
-UIResolver.mount()
+ConfigReplication.startClient({
+	Combat = require(ConfigRoot:WaitForChild("Combat")),
+	AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
+	GameModes = require(ConfigRoot:WaitForChild("GameModes")),
+	MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
+})
 InputRouter.start()
 BallVisuals.start()
 DamageFeedback.start()
@@ -65,36 +49,25 @@ DeathEffects.start()
 HammerVisuals.start()
 SplatEffects.start()
 MatchAudio.start()
-TargetingUI.start()
-MenuManager.start()
-AnalyticsReporter.start()
-SidebarController.start()
-EconomyStore.start()
-QuestsController.start()
-ShopController.start()
-BattlePassController.start()
-InventoryController.start()
-LeaderboardController.start()
-MatchHud.start()
-LiveScoreboardController.start()
-CooldownIndicator.start()
+PlayerHighlights.start()
+RotatingPlatforms.load()
+PlatformRider.start()
+-- Started last: it waits on the authored Arena.MapOrigin, so a missing part
+-- surfaces as an infinite-yield warning without stalling the modules above.
+VoteCamera.start()
 DebugVisuals.start()
-task.spawn(startCmdr)
 
-Replica.RequestData()
-
--- Tentative feedback only: client events can replay during resimulation, so
--- anything user-facing built on them must deduplicate (M3).
-ServerAuthAdapter.onEvent(function(event)
-	BallVisuals.onEvent(event)
-	if event.kind == "CatchStarted" or event.kind == "CatchMissed" then
-		DamageFeedback.onEvent(event)
-	end
-	HammerVisuals.onEvent(event)
-	SplatEffects.onEvent(event)
-	DebugVisuals.onEvent(event)
-	if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
-		print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+-- Presentation only. These are the server's authoritative events, replayed here
+-- purely to drive effects; nothing in this path decides an outcome.
+Network.on("CombatSimEvent", function(events)
+	for _, event in events do
+		BallVisuals.onEvent(event)
+		HammerVisuals.onEvent(event)
+		SplatEffects.onEvent(event)
+		DebugVisuals.onEvent(event)
+		if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
+			print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+		end
 	end
 end)
 
@@ -103,4 +76,6 @@ Network.on("DamageFeedback", function(event)
 	DeathEffects.notifyElim(event)
 end)
 
-ServerAuthAdapter.start()
+WeaponAnimations.start()
+CombatInputSender.onIntent(WeaponAnimations.onIntent)
+CombatInputSender.start()

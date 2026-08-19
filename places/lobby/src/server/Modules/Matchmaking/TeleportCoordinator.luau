@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local TeleportPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.TeleportPayload)
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local TeleportCoordinator = {}
@@ -115,12 +116,7 @@ function TeleportCoordinator:TeleportParty(matchId, partyId, partyPlayers)
 
 	local options = Instance.new("TeleportOptions")
 	options.ReservedServerAccessCode = matchRecord.reservedServerAccessCode
-	options:SetTeleportData({
-		schemaVersion = Config.ProtocolVersion,
-		matchId = matchRecord.matchId,
-		mode = matchRecord.mode,
-		mapKey = matchRecord.mapKey,
-	})
+	options:SetTeleportData(TeleportPayload.build(matchRecord, partyId))
 
 	local success, teleportError =
 		pcall(TeleportService.TeleportAsync, TeleportService, matchRecord.arenaPlaceId, players, options)

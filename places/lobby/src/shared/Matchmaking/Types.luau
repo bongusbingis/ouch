@@ -1,22 +1,15 @@
-export type GameMode = "FFA" | "TDM" | "BR"
+export type GameMode = "FFA" | "TDM" | "Infection"
 export type PartyPhase = "Lobby" | "Queued" | "Claimed" | "Assigned" | "Teleporting"
 
 export type PartyMember = {
 	userId: number,
 	joinedAt: number,
-}
-
-export type PartySelection = {
-	mode: GameMode,
-	brTeamSize: number?,
-	fill: boolean,
+	characterColorId: string?,
 }
 
 export type QueueTicket = {
 	ticketId: string,
 	partyId: string,
-	partyRevision: number,
-	mode: GameMode,
 	partySize: number,
 	enqueuedAt: number,
 }
@@ -33,7 +26,6 @@ export type PartyRecord = {
 	revision: number,
 	leaderUserId: number,
 	members: { PartyMember },
-	selection: PartySelection,
 	allowFriendJoins: boolean,
 	phase: PartyPhase,
 	queueTicket: QueueTicket?,
@@ -54,8 +46,10 @@ export type MatchParty = {
 export type MatchRecord = {
 	schemaVersion: number,
 	matchId: string,
-	mode: GameMode,
-	mapKey: string,
+	modeSelection: {
+		strategy: "Vote",
+		options: { GameMode },
+	},
 	arenaPlaceId: number,
 	targetPlayers: number,
 	parties: { MatchParty },
@@ -63,6 +57,17 @@ export type MatchRecord = {
 	reservedServerAccessCode: string,
 	status: "Ready",
 	createdAt: number,
+}
+
+export type TeleportData = {
+	schemaVersion: number,
+	matchId: string,
+	partyId: string,
+	expectedPlayerCount: number,
+	modeSelection: {
+		strategy: "Vote",
+		options: { GameMode },
+	},
 }
 
 return {}

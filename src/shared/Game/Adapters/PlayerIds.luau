@@ -9,8 +9,18 @@ local Players = game:GetService("Players")
 
 local PlayerIds = {}
 
+-- Memoised because the sim, the codec, and the presentation loops all convert the
+-- same players every tick, and tostring allocates each time. Weak keys, so a
+-- departed player's entry is collected without a lifecycle hook.
+local idCache: { [Player]: string } = setmetatable({}, { __mode = "k" }) :: any
+
 function PlayerIds.toId(player: Player): string
-	return tostring(player.UserId)
+	local cached = idCache[player]
+	if cached == nil then
+		cached = tostring(player.UserId)
+		idCache[player] = cached
+	end
+	return cached
 end
 
 function PlayerIds.fromId(id: string?): Player?
