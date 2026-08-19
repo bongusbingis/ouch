@@ -27,7 +27,6 @@ end
 
 local function requireFolder(parent: Instance, name: string, path: string): Folder
 	local folder = parent:WaitForChild(name)
-	assert(folder:IsA("Folder"), `[ArenaService] {path} must be a Folder`)
 	return folder
 end
 

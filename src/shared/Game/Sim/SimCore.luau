@@ -10,8 +10,8 @@ type WorldSnapshot = SimTypes.WorldSnapshot
 type InputCommand = SimTypes.InputCommand
 type SimEvent = SimTypes.SimEvent
 
--- The single deterministic combat step, run identically by client prediction
--- and server authority. Owns no engine state: characters and geometry arrive
+-- The single deterministic combat step, run by the authoritative server.
+-- Owns no engine state: characters and geometry arrive
 -- via the snapshot, time is the tick counter.
 
 local SimCore = {}
@@ -36,7 +36,7 @@ local function syncPlayers(state: SimState, world: WorldSnapshot)
 end
 
 -- Canonical command order: the server may receive different arrival orders
--- than the predicting client saw; sorting makes resimulation agree.
+-- than they were sent in; sorting keeps a tick reproducible.
 local function sortCommands(commands: { InputCommand })
 	table.sort(commands, function(a, b)
 		if a.playerId ~= b.playerId then

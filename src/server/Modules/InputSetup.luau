@@ -7,9 +7,9 @@ local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChil
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
 -- Materializes the declarative input map as an InputContext under each Player.
--- InputContexts must be descendants of a Player so the engine knows ownership
--- and replicates action state into the shared simulation timeline. Also owns
--- the client-reported DeviceClass attribute the adapter stamps onto commands.
+-- InputContexts must be descendants of a Player so the engine knows ownership.
+-- Action state is read on the client, which sends throw/catch intent to the
+-- server. Also owns the client-reported DeviceClass attribute.
 
 local InputSetup = {}
 

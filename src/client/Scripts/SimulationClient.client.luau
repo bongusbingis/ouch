@@ -1,10 +1,20 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
-local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
+local Debug = require(ConfigRoot:WaitForChild("Debug"))
+local ConfigReplication = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Adapters")
+		:WaitForChild("ConfigReplication")
+)
 
 local Client = Players.LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
-local InputRouter = require(Client:WaitForChild("Modules"):WaitForChild("Input"):WaitForChild("InputRouter"))
+local InputModules = Client:WaitForChild("Modules"):WaitForChild("Input")
+local InputRouter = require(InputModules:WaitForChild("InputRouter"))
+local CombatInputSender = require(InputModules:WaitForChild("CombatInputSender"))
+local PlatformRider = require(Client:WaitForChild("Modules"):WaitForChild("Movement"):WaitForChild("PlatformRider"))
 local Presentation = Client:WaitForChild("Modules"):WaitForChild("Presentation")
 local BallVisuals = require(Presentation:WaitForChild("BallVisuals"))
 local DamageFeedback = require(Presentation:WaitForChild("DamageFeedback"))
@@ -12,16 +22,26 @@ local DeathEffects = require(Presentation:WaitForChild("DeathEffects"))
 local HammerVisuals = require(Presentation:WaitForChild("HammerVisuals"))
 local SplatEffects = require(Presentation:WaitForChild("SplatEffects"))
 local MatchAudio = require(Presentation:WaitForChild("MatchAudio"))
-local UI = Client:WaitForChild("Modules"):WaitForChild("UI")
-local LiveScoreboardResolver = require(UI:WaitForChild("LiveScoreboardResolver"))
-local LiveScoreboardController = require(UI:WaitForChild("LiveScoreboardController"))
+local PlayerHighlights = require(Presentation:WaitForChild("PlayerHighlights"))
+local WeaponAnimations = require(Presentation:WaitForChild("WeaponAnimations"))
+local VoteCamera = require(Presentation:WaitForChild("VoteCamera"))
 local DebugModules = Client:WaitForChild("Modules"):WaitForChild("Debug")
 local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
 
-local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
-local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
+local RotatingPlatforms = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("RotatingPlatforms")
+)
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
+ConfigReplication.startClient({
+	Combat = require(ConfigRoot:WaitForChild("Combat")),
+	AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
+	GameModes = require(ConfigRoot:WaitForChild("GameModes")),
+	MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
+})
 InputRouter.start()
 BallVisuals.start()
 DamageFeedback.start()
@@ -29,19 +49,25 @@ DeathEffects.start()
 HammerVisuals.start()
 SplatEffects.start()
 MatchAudio.start()
-LiveScoreboardResolver.mount()
-LiveScoreboardController.start()
+PlayerHighlights.start()
+RotatingPlatforms.load()
+PlatformRider.start()
+-- Started last: it waits on the authored Arena.MapOrigin, so a missing part
+-- surfaces as an infinite-yield warning without stalling the modules above.
+VoteCamera.start()
 DebugVisuals.start()
 
--- Tentative feedback only: client events can replay during resimulation, so
--- anything user-facing built on them must deduplicate (M3).
-ServerAuthAdapter.onEvent(function(event)
-	BallVisuals.onEvent(event)
-	HammerVisuals.onEvent(event)
-	SplatEffects.onEvent(event)
-	DebugVisuals.onEvent(event)
-	if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
-		print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+-- Presentation only. These are the server's authoritative events, replayed here
+-- purely to drive effects; nothing in this path decides an outcome.
+Network.on("CombatSimEvent", function(events)
+	for _, event in events do
+		BallVisuals.onEvent(event)
+		HammerVisuals.onEvent(event)
+		SplatEffects.onEvent(event)
+		DebugVisuals.onEvent(event)
+		if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
+			print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+		end
 	end
 end)
 
@@ -50,4 +76,6 @@ Network.on("DamageFeedback", function(event)
 	DeathEffects.notifyElim(event)
 end)
 
-ServerAuthAdapter.start()
+WeaponAnimations.start()
+CombatInputSender.onIntent(WeaponAnimations.onIntent)
+CombatInputSender.start()

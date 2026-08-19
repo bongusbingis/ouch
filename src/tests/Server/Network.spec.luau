@@ -24,6 +24,9 @@ local EXPECTED_REMOTES = {
 	QuestStateChanged = "RemoteEvent",
 	DamageFeedback = "RemoteEvent",
 	SubmitModeVote = "RemoteEvent",
+	ArenaClientReady = "RemoteEvent",
+	SubmitCombatInput = "RemoteEvent",
+	CombatSimEvent = "UnreliableRemoteEvent",
 }
 
 -- Each case uses fresh UserIds: rate-limit counters are per-user with a

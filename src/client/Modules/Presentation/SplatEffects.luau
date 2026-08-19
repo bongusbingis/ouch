@@ -4,7 +4,7 @@
 -- projectileId; hammer elims have none). The effect clone is anchored at the
 -- event's impact position instead of the ball, which the sim frees at impact.
 -- Splat color derives from the thrower's Equip_BallAssets projection; sim
--- events replay during rollback corrections, so effects gate on EventDedup.
+-- broadcast events can arrive more than once, so effects gate on EventDedup.
 -- A Studio-authored Assets.Effects.Splat overrides the code-built prototype
 -- template when present (user-directed Instance.new exception while Studio
 -- asset access is unavailable); the Splat AudioPlayer is optional and

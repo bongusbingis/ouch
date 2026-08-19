@@ -49,14 +49,107 @@ Workspace
 └─ Assets
    └─ Arena
       ├─ Map
+      │  └─ ArenaSpawn        (SpawnLocation)
+      ├─ MapOrigin            (invisible BasePart)
       ├─ Scriptables
+      │  ├─ ElimZones
+      │  ├─ BouncePads
+      │  ├─ FoamPits
+      │  └─ Rotating
+      │     └─ <AssemblyName>   (one Folder per rotating assembly)
+      │        ├─ Origin        (BasePart, the axis)
+      │        └─ Assembly      (Model, the geometry that turns)
       ├─ PlayerSpawns
       └─ TeamSpawns
          ├─ Red
          └─ Blue
 ```
 
-`Map` contains all permanent static arena assets. `Scriptables` is reserved for a later world-feature pass. Put non-team spawn markers directly under `PlayerSpawns`, Red TDM markers directly under `TeamSpawns.Red`, and Blue TDM markers directly under `TeamSpawns.Blue`. Spawn markers should be anchored and normally invisible with `CanCollide`, `CanTouch`, and `CanQuery` disabled. Runtime code never clones, reparents, or destroys the arena.
+`Map` contains all permanent static arena assets, including exactly one `SpawnLocation`
+named `ArenaSpawn`. It is required: `MatchService` only teleports a character into the
+arena while a match is running, so between matches — including for the whole mode vote —
+the engine's default spawn is what places the player. With no `SpawnLocation` in the
+place, that is world origin, and a character spawned into empty space falls past
+`Workspace.FallenPartsDestroyHeight` and is destroyed.
+
+Position `ArenaSpawn` just above solid arena floor and set:
+
+| Property | Value | Why |
+|---|---|---|
+| `Enabled` | true | Otherwise it is ignored and spawning falls back to origin |
+| `Neutral` | true | Arena teams are a `TeamId` attribute, not Roblox `Team` objects; nothing reads `player.Team` |
+| `AllowTeamChangeOnTouch` | false | Prevents touching it from writing an unused `player.Team` |
+| `Duration` | 0 | No engine ForceField; MatchService owns spawn protection through the `minv` attribute |
+| `Anchored` | true | Must not fall |
+| `CanCollide` | false | The floor beneath it catches the player; avoids adding collision geometry |
+| `CanQuery` | false | Keeps it out of the sim's line-of-sight raycasts |
+| `Transparency` | 1 | Not visible in play |
+
+Also check `Workspace.FallenPartsDestroyHeight` sits below the arena's lowest walkable
+point but above where a fall is unrecoverable. There is currently **no void recovery**: the
+per-map `RecoveryY` died with the removed `MapService`, so a player who falls off the
+arena during a match is destroyed rather than returned to a spawn.
+
+`MapOrigin` is an invisible `BasePart` marking the point the vote camera orbits. Place it
+at the centre of the playable arena; the camera circles it at `Config.UI.VoteCamera`
+`Distance` studs out and `Height` studs above, looking back at it, for as long as the mode
+vote is open. Keep it `Anchored` with `Transparency` 1 and `CanCollide`, `CanTouch`, and
+`CanQuery` disabled so it never affects play or the sim's raycasts.
+
+`Scriptables` holds one folder per authored map feature, each named after the feature kit
+that drives it. Every direct `BasePart` child of a feature folder is driven by that kit,
+and parts may be added or removed at runtime — the service re-reads the folder on change,
+so moving or spawned hazards work without extra code.
+
+| Folder | Effect on a player inside one of its parts |
+|---|---|
+| `ElimZones` | Immediate elimination, scored exactly like a dodgeball elimination |
+| `BouncePads` | Launched along the pad's `UpVector`; a numeric `LaunchSpeed` attribute on a pad overrides the shared speed |
+| `FoamPits` | Movement slowed while inside |
+
+Feature parts are volumes, not touch triggers: a player counts as inside when their
+`HumanoidRootPart` is within the part's box, plus `VerticalPadding` studs vertically
+(`Config.MapFeatures`). Size them as volumes a falling player passes through rather than
+as thin planes. Keep them `Anchored`, and set `CanCollide` false on `ElimZones` so players
+fall into them rather than landing on them.
+
+Eliminations only apply during an Active match, so a player standing in an `ElimZone`
+between matches is left alone.
+
+A registered kit with no authored folder warns once at startup and stays inactive.
+
+### Rotating
+
+`Rotating` holds one **Folder per rotating assembly**. Each contains an `Origin` BasePart
+and an `Assembly` Model. The Assembly turns about `Origin`'s **up axis**, keeping the pose
+it was authored in relative to Origin, so tilt Origin to tilt the axis of rotation. Speed
+is `Config.MapFeatures.Rotating.DegreesPerSecond`, overridable per assembly with a numeric
+`RotationSpeed` attribute **on that assembly's Origin**.
+
+Both children are required and are resolved with `WaitForChild`: a folder missing either
+one is a setup error and should surface as such.
+
+Only the **server** drives the spin; clients receive the pose through ordinary
+replication. Both sides moving the same anchored assembly fight each other, each write
+undoing the other's, which shows up as the ring stuttering violently instead of turning.
+
+**Riders.** The local client carries its own character with the platform it is riding
+(`PlatformRider`). Under default network ownership that position replicates outward, so
+other clients and the server see it without a second mover. Only position is carried, never
+facing — rotating the camera under a player would fight aiming.
+
+The carry measures the assembly's movement frame over frame from the assembly itself,
+so it stays correct under replication lag rather than assuming the client's clock.
+
+Carry continues while the rider is **airborne above the assembly's footprint**, which is
+what makes a jump land in the same spot relative to the platform instead of the platform
+turning out from under them. The window is the assembly's bounding box extended
+`CarryHeight` studs above its top (`Config.MapFeatures.Rotating`); jump past the edge and
+carry stops, so you can still leave normally. Note this is a deliberate assist rather than
+physical behaviour: a real jump from a turntable leaves tangentially.
+
+Size each `Assembly` so its bounding box matches the ridable surface — the footprint test
+uses that box, so a stray decorative part sticking far out widens the carry area with it.
 
 ## Matchmaking arrival
 

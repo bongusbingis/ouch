@@ -398,9 +398,7 @@ local function LobbyContent(props)
 					OnChoose = notifications.close,
 				}),
 			}),
-			GameVersion = c(GameVersion, {
-				Position = UDim2.fromScale(0.5, 0.95),
-			}),
+			GameVersion = c(GameVersion),
 		}),
 	})
 end

@@ -50,4 +50,6 @@ local Config = {
 
 Config.MemoryStoreNamespace = RunService:IsStudio() and "OuchDev_v2" or "OuchLive_v2"
 
-return table.freeze(Config)
+-- Left unfrozen so Config.LiveConfig may override the matchmaking scalars it
+-- declares; every other field is written only here.
+return Config

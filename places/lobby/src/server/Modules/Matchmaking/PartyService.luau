@@ -5,6 +5,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
+local ReturnPayload = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("ReturnPayload")
+)
 local PartyModel = require(script.Parent.PartyModel)
 
 local PartyService = {}
@@ -421,6 +428,9 @@ function PartyService:_joinTarget(player, target, requireFriendAccess)
 	return updated
 end
 
+-- Returns the party to place the arriving player in, and whether joining it
+-- requires friendship. A player coming back from a match rejoins their own party
+-- and is not friend-gated; an invite still is.
 function PartyService:_resolveArrivalTarget(player)
 	local function isFriend(userId)
 		local success, result = pcall(player.IsFriendsWith, player, userId)
@@ -428,11 +438,31 @@ function PartyService:_resolveArrivalTarget(player)
 	end
 
 	local joinData = player:GetJoinData()
+
+	local returning = ReturnPayload.parse(joinData.TeleportData)
+	if returning then
+		local party = self._partyRepository:GetParty(returning.partyId)
+		if party then
+			return party, false
+		end
+		-- The record expired while the match ran. Regroup on whichever member
+		-- got here first and made one, rather than everyone landing solo.
+		for _, userId in returning.memberUserIds do
+			if userId ~= player.UserId then
+				local partyId = self._partyRepository:GetUserPartyId(userId)
+				local rebuilt = partyId and self._partyRepository:GetParty(partyId)
+				if rebuilt then
+					return rebuilt, false
+				end
+			end
+		end
+	end
+
 	local invite = Protocol.decodeInviteData(joinData.LaunchData)
 	if invite and isFriend(invite.inviterUserId) then
 		local party = self._partyRepository:GetParty(invite.partyId)
 		if party and party.allowFriendJoins and PartyModel.hasMember(party, invite.inviterUserId) then
-			return party
+			return party, true
 		end
 	end
 
@@ -441,7 +471,7 @@ function PartyService:_resolveArrivalTarget(player)
 		if partyId then
 			local party = self._partyRepository:GetParty(partyId)
 			if party and party.allowFriendJoins and PartyModel.hasMember(party, player.FollowUserId) then
-				return party
+				return party, true
 			end
 		end
 	end
@@ -454,9 +484,9 @@ function PartyService:_initializePlayerUnlocked(player)
 		return
 	end
 
-	local target = self:_resolveArrivalTarget(player)
+	local target, requireFriendAccess = self:_resolveArrivalTarget(player)
 	if target then
-		local joined = self:_joinTarget(player, target, true)
+		local joined = self:_joinTarget(player, target, requireFriendAccess)
 		if joined then
 			return
 		end

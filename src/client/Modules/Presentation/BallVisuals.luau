@@ -50,6 +50,7 @@ local appliedTrails: { [BasePart]: string } = {}
 local trailHandles: { [BasePart]: TrailVisuals.Handle } = {}
 local restPulses: { [BasePart]: RestPulseState } = {}
 local feelStates: { [BasePart]: FeelState } = {}
+local trailEnabled: { [BasePart]: boolean } = {}
 local seen = EventDedup.new(4096)
 
 local function cframeOffset(offset: vector): CFrame
@@ -258,6 +259,7 @@ local function removeBall(ball: BasePart)
 	visuals[ball] = nil
 	appliedAssets[ball] = nil
 	feelStates[ball] = nil
+	trailEnabled[ball] = nil
 end
 
 local function refreshAsset(ball: BasePart)
@@ -276,6 +278,9 @@ local function refreshAsset(ball: BasePart)
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
 	feelStates[ball] = nil
+	-- The rebuilt visual carries its template's trail state, so the cached flag
+	-- no longer describes it and the next frame must re-apply.
+	trailEnabled[ball] = nil
 	feelFor(ball, visual)
 	refreshTrail(ball, true)
 end
@@ -397,7 +402,12 @@ function BallVisuals.start()
 
 			updateRestPulse(ball, visual, phase == FREE_PHASE, dt)
 			local trailActive = TRAIL_ACTIVE_PHASES[phase] == true
-			setEnabled(visual, "Trail", trailActive)
+			-- Only on change: setEnabled walks every descendant, which is far too
+			-- much to repeat per ball per frame just to re-assert the same value.
+			if trailEnabled[ball] ~= trailActive then
+				trailEnabled[ball] = trailActive
+				setEnabled(visual, "Trail", trailActive)
+			end
 			local trailHandle = trailHandles[ball]
 			if trailHandle then
 				trailHandle:setEnabled(trailActive)

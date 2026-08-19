@@ -1,6 +1,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local PartyStatus = require(script.Parent.PartyStatus)
@@ -20,6 +21,10 @@ export type Props = {
 }
 
 return function(props: Props)
+	local success, rbxVersion = pcall(MarketplaceService.GetProductInfoAsync, MarketplaceService, game.PlaceId)
+	local version = game:GetAttribute("BuildVersion")
+	local versionText = React.useState(`v{version}\n{rbxVersion and rbxVersion.AssetVersion or "?"}`)
+
 	return c("TextLabel", {
 		AnchorPoint = Vector2.new(0, 1),
 		BackgroundTransparency = 1,
@@ -30,7 +35,7 @@ return function(props: Props)
 		),
 		Position = UDim2.fromScale(0.01, 0.99),
 		Size = UDim2.fromScale(0.2, 0.03),
-		Text = "Version xxx\n123456789",
+		Text = versionText,
 		TextColor3 = Color3.new(1, 1, 1),
 		TextScaled = true,
 		TextTransparency = 0.6,

@@ -19,6 +19,19 @@ T.describe("ModeVote", function()
 		T.expect(ModeVote.counts(state).TDM):toEqual(0)
 	end)
 
+	T.it("reports all voted only once every listed voter has a ballot", function()
+		local state = ModeVote.new({ "FFA", "TDM" })
+		T.expect(not ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
+		ModeVote.cast(state, 1, "FFA")
+		T.expect(not ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
+		ModeVote.cast(state, 2, "TDM")
+		T.expect(ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
+		-- A voter who is not listed cannot satisfy the roster on someone's behalf.
+		T.expect(not ModeVote.allVoted(state, { 1, 2, 3 })):toBeTruthy()
+		-- An empty roster never counts as everyone having voted.
+		T.expect(not ModeVote.allVoted(state, {})):toBeTruthy()
+	end)
+
 	T.it("selects from all options when nobody votes", function()
 		local state = ModeVote.new({ "FFA", "TDM" })
 		T.expect(table.concat(ModeVote.finalists(state), ",")):toEqual("FFA,TDM")

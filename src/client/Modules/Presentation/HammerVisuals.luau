@@ -88,17 +88,30 @@ local function scaleFor(stretch: number, axis: HammerGrip.Axis): Vector3
 	return Vector3.new(cross, along, cross)
 end
 
-local function hasBall(player: Player): boolean
-	local playerId = PlayerIds.toId(player)
+-- Rebuilt once per frame rather than scanned per player: the per-player form
+-- walked every ball for every player, which is the product of two counts each
+-- frame instead of their sum.
+local ballHolders: { [string]: boolean } = {}
+
+local function refreshBallHolders()
+	table.clear(ballHolders)
 	for _, ball in ballsFolder:GetChildren() do
-		if ball:IsA("BasePart") and ball:GetAttribute("hb") == playerId then
-			local phase = ball:GetAttribute("ph")
-			if phase == 0 or phase == 1 then
-				return true
-			end
+		if not ball:IsA("BasePart") then
+			continue
+		end
+		local phase = ball:GetAttribute("ph")
+		if phase ~= 0 and phase ~= 1 then
+			continue
+		end
+		local holder = ball:GetAttribute("hb")
+		if typeof(holder) == "string" then
+			ballHolders[holder] = true
 		end
 	end
-	return false
+end
+
+local function hasBall(player: Player): boolean
+	return ballHolders[PlayerIds.toId(player)] == true
 end
 
 local function remove(player: Player)
@@ -173,6 +186,7 @@ function HammerVisuals.start()
 	RunService.RenderStepped:Connect(function(dt)
 		local feel = Combat.HammerFeel
 		local now = os.clock()
+		refreshBallHolders()
 		for _, player in Players:GetPlayers() do
 			local character = player.Character
 			if character == nil then

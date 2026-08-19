@@ -34,6 +34,9 @@ local definitions = {
 	SeasonPassStateChanged = "event",
 	DamageFeedback = "event",
 	SubmitModeVote = "event",
+	ArenaClientReady = "event",
+	SubmitCombatInput = "event",
+	CombatSimEvent = "unreliable",
 	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}

@@ -57,11 +57,15 @@ function ModeVoteClient.subscribe(callback: (Snapshot) -> ()): () -> ()
 	local function changed()
 		callback(ModeVoteClient.getSnapshot())
 	end
-	local revisionConnection = state:GetAttributeChangedSignal("revision"):Connect(changed)
+	-- Every attribute on the folder, not just revision: attributes do not
+	-- replicate in the order they were written, so a subscriber woken only by
+	-- revision can read a snapshot whose open flag has not arrived yet and never
+	-- be told again.
+	local stateConnection = state.AttributeChanged:Connect(changed)
 	local selectionConnection = player:GetAttributeChangedSignal("ModeVoteSelection"):Connect(changed)
 	local admissionConnection = player:GetAttributeChangedSignal("ArenaAdmission"):Connect(changed)
 	return function()
-		revisionConnection:Disconnect()
+		stateConnection:Disconnect()
 		selectionConnection:Disconnect()
 		admissionConnection:Disconnect()
 	end

@@ -10,6 +10,12 @@ local EconomyStore = require(
 local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )
+local ConfigReplication = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Adapters")
+		:WaitForChild("ConfigReplication")
+)
 
 local lobby = script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby")
 local PartyBackgroundController = require(lobby:WaitForChild("PartyBackgroundController"))
@@ -21,6 +27,10 @@ local partyClient = PartyClient.new()
 local background = PartyBackgroundController.start()
 local root = ReactRoblox.createRoot(playerGui)
 
+ConfigReplication.startClient({
+	GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes")),
+	Matchmaking = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")),
+})
 EconomyStore.start()
 UIFeedback.start()
 partyClient:start()

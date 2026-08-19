@@ -27,6 +27,8 @@ local revision = 0
 local deadlineRevision = 0
 local started = false
 local random = Random.new()
+local readyWaitScheduled = false
+local readyWaitExpired = false
 local beginVote: () -> ()
 
 local function admittedPlayers(): { Player }
@@ -37,6 +39,33 @@ local function admittedPlayers(): { Player }
 		end
 	end
 	return result
+end
+
+local function allAdmittedReady(): boolean
+	for _, player in admittedPlayers() do
+		if not ArenaSessionService.isReady(player) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Holds the ballot until arriving clients report their UI ready, so it is not
+-- spent before anyone can see it. The wait is capped and armed at most once per
+-- ballot, so a client that never reports delays the match by that cap and no
+-- more.
+local function readyToOpen(): boolean
+	if readyWaitExpired or allAdmittedReady() then
+		return true
+	end
+	if not readyWaitScheduled then
+		readyWaitScheduled = true
+		task.delay(GameModes.ClientReadyWaitSeconds, function()
+			readyWaitExpired = true
+			beginVote()
+		end)
+	end
+	return false
 end
 
 local function ensureStateFolder(): Folder
@@ -122,16 +151,20 @@ local function startWinner()
 	end
 end
 
-local function finishVote(expectedRevision: number)
+-- force skips the remaining-time reschedule, for the case where every loaded
+-- player has already voted and there is nothing left to wait for.
+local function finishVote(expectedRevision: number, force: boolean?)
 	if expectedRevision ~= deadlineRevision or vote == nil then
 		return
 	end
-	local remaining = voteEndsAt - Workspace:GetServerTimeNow()
-	if remaining > 0 then
-		task.delay(remaining, function()
-			finishVote(expectedRevision)
-		end)
-		return
+	if not force then
+		local remaining = voteEndsAt - Workspace:GetServerTimeNow()
+		if remaining > 0 then
+			task.delay(remaining, function()
+				finishVote(expectedRevision)
+			end)
+			return
+		end
 	end
 	if #admittedPlayers() == 0 then
 		cancelVote()
@@ -167,7 +200,12 @@ beginVote = function()
 	if options == nil or #options == 0 then
 		return
 	end
+	if not readyToOpen() then
+		return
+	end
 
+	readyWaitScheduled = false
+	readyWaitExpired = false
 	vote = ModeVote.new(options)
 	deadlineRevision += 1
 	local currentDeadlineRevision = deadlineRevision
@@ -189,6 +227,26 @@ beginVote = function()
 	end)
 end
 
+-- Only players whose client is loaded are expected to vote: an admitted player
+-- who never reported ready cannot see the ballot, so waiting on them would hold
+-- it open for its full duration for no reason.
+local function loadedUserIds(): { number }
+	local userIds = {}
+	for _, player in admittedPlayers() do
+		if ArenaSessionService.isReady(player) then
+			table.insert(userIds, player.UserId)
+		end
+	end
+	return userIds
+end
+
+local function closeIfEveryoneVoted()
+	local activeVote = vote
+	if activeVote ~= nil and ModeVote.allVoted(activeVote, loadedUserIds()) then
+		finishVote(deadlineRevision, true)
+	end
+end
+
 local function submitVote(player: Player, modeId: string)
 	local activeVote = vote
 	if activeVote == nil or not ArenaSessionService.isAdmitted(player) then
@@ -203,6 +261,7 @@ local function submitVote(player: Player, modeId: string)
 	end
 	player:SetAttribute(SELECTION_ATTRIBUTE, modeId)
 	publish()
+	closeIfEveryoneVoted()
 end
 
 function ModeVoteService.start()
@@ -219,6 +278,9 @@ function ModeVoteService.start()
 		end,
 	}, submitVote)
 
+	ArenaSessionService.onReady(function()
+		task.defer(beginVote)
+	end)
 	Players.PlayerAdded:Connect(function()
 		task.defer(function()
 			if pendingWinner then
@@ -233,6 +295,7 @@ function ModeVoteService.start()
 		if activeVote and ModeVote.remove(activeVote, player.UserId) then
 			publish()
 		end
+		closeIfEveryoneVoted()
 		task.defer(function()
 			if #admittedPlayers() == 0 and (vote == activeVote or pendingWinner ~= nil) then
 				cancelVote()

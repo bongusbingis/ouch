@@ -38,6 +38,20 @@ function ModeVote.remove(state: State, userId: number): boolean
 	return true
 end
 
+-- True when every given voter has a ballot. An empty roster is never "all
+-- voted": it would otherwise close a ballot nobody could have cast.
+function ModeVote.allVoted(state: State, userIds: { number }): boolean
+	if #userIds == 0 then
+		return false
+	end
+	for _, userId in userIds do
+		if state.votesByUserId[userId] == nil then
+			return false
+		end
+	end
+	return true
+end
+
 function ModeVote.counts(state: State): { [string]: number }
 	local result = {}
 	for _, modeId in state.options do

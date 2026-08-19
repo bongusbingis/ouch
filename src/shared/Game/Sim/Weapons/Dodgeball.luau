@@ -51,7 +51,7 @@ local AIM_LINE_OF_SIGHT_RADIUS = 0.2
 
 -- Deterministic in-sim soft-lock: best candidate in the device's selection
 -- cone with line of sight, scored by angular offset with a small distance
--- tiebreak. Runs identically on client prediction and server, so there is no
+-- tiebreak. Resolved only on the server, so there is no
 -- client proposal to trust.
 local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrigin: Vec, aimDir: Vec): string?
 	local cfg = config()

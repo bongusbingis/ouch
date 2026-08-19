@@ -7,7 +7,7 @@ local PlayerIds = require(script.Parent.PlayerIds)
 
 -- Owns character WalkSpeed and hammer physics inside the synchronized
 -- simulation callback. Server-owned terrain modifiers are queued and written
--- to predicted attributes only when the simulation steps.
+-- to the character attributes only when the simulation steps.
 
 local MovementSpeedService = {}
 

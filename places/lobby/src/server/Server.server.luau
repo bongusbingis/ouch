@@ -2,12 +2,22 @@
 -- are mapped from the canonical source tree by lobby.project.json.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = script:WaitForChild("Modules")
+local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
 
+ConfigLiveService.start({
+	modules = {
+		GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes")),
+		Matchmaking = require(
+			ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")
+		),
+	},
+})
 CosmeticsService.start()
 CharacterColorService.start()
 

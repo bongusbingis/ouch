@@ -6,13 +6,13 @@ local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 type SimState = SimTypes.SimState
 type ProjectileState = SimTypes.ProjectileState
 
--- Attributes on predicted instances are the between-tick source of truth: the
--- engine rolls them back on misprediction, so the adapter decodes a fresh
+-- Attributes on the ball instances are the between-tick source of truth and
+-- replicate to clients for presentation. The adapter decodes a fresh
 -- SimState every simulation step and encodes the result back. Names are kept
 -- short for the replication limits (first 64 attributes, <=50-char names).
 --
 -- Ball position is NOT an attribute — it lives in the part's CFrame, which
--- has Simulation Access and is predicted natively.
+-- is set by the server each tick and replicates natively.
 
 local SimStateCodec = {}
 

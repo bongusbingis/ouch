@@ -52,6 +52,10 @@
             "$path": "src/server/Modules/PlayerData.luau"
           },
 
+          "ConfigLiveService": {
+            "$path": "src/server/Modules/ConfigLiveService.luau"
+          },
+
           "CosmeticsService": {
             "$path": "src/server/Modules/CosmeticsService.luau"
           },

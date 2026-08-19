@@ -8,6 +8,7 @@ local GameModes = require(Config:WaitForChild("GameModes"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local GameModeSelect = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameModeSelect"))
+local GameVersion = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameVersion"))
 local useExternalStore = require(Shared:WaitForChild("UI"):WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
@@ -53,5 +54,6 @@ return function()
 			DurationSeconds = snapshot.durationSeconds,
 			OnVote = ModeVoteClient.vote,
 		}),
+		GameVersion = c(GameVersion),
 	})
 end

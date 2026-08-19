@@ -41,7 +41,11 @@ local playerMatchElims: { [string]: number } = {}
 local pendingWaveRespawns: { [string]: Player } = {}
 local partyTeamAssignments: { [string]: string } = {}
 local waveTimer = 0
-local testingEventSequence = 0
+-- Eliminations raised outside the deterministic sim (world features, dev
+-- tooling) take ticks from this counter. They are negative so they can never
+-- collide with a real sim tick, and shared so two sources cannot collide with
+-- each other.
+local externalEventSequence = 0
 local started = false
 local startingMatch = false
 
@@ -666,15 +670,28 @@ function MatchService.setTimeForTesting(seconds: number): (boolean, string?)
 	return true
 end
 
-function MatchService.eliminateForTesting(source: Player?, target: Player): (boolean, { [string]: any })
-	testingEventSequence += 1
-	local event = {
+local function buildElimEvent(source: Player?, target: Player): { [string]: any }
+	externalEventSequence += 1
+	return {
 		kind = "Elim",
-		tick = -testingEventSequence,
+		tick = -externalEventSequence,
 		sourceId = if source then PlayerIds.toId(source) else nil,
 		targetId = PlayerIds.toId(target),
 		direction = Vector3.zero,
 	}
+end
+
+-- Server-only seam for authored world features such as elimination zones.
+-- Routing through handleCombatEvent keeps scoring, the combat feed, mode hooks,
+-- and respawn in one place rather than giving hazards their own path. Returns
+-- false outside an Active match, which is what leaves players alone between
+-- matches.
+function MatchService.eliminate(target: Player, source: Player?): boolean
+	return MatchService.handleCombatEvent(buildElimEvent(source, target))
+end
+
+function MatchService.eliminateForTesting(source: Player?, target: Player): (boolean, { [string]: any })
+	local event = buildElimEvent(source, target)
 	return MatchService.handleCombatEvent(event), event
 end
 
