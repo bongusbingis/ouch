@@ -1,7 +1,6 @@
 --!nonstrict
 -- Cloud port of the Dodgeball kit spec: throw gating, soft-lock selection and
 -- validation cones per device class, occlusion fail-open, catch window and
--- team rules.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
