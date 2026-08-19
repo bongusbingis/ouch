@@ -23,13 +23,15 @@ Tools are pinned in `aftman.toml` (rojo, wally, lune, stylua, selene, rbxcloud).
 ```sh
 wally install                                      # populate Packages/ (gitignored)
 lune run src/scripts/lune/run-tests.luau           # run all specs headlessly (regenerates sourcemap.json via rojo)
-bash src/scripts/shell/lint.sh src                 # selene lint canonical arena/shared code
-bash src/scripts/shell/lint.sh places/lobby/src    # selene lint lobby code
+bash src/scripts/shell/lint.sh src                 # selene lint shared code
+bash src/scripts/shell/lint.sh places/arena        # selene lint arena code
+bash src/scripts/shell/lint.sh places/lobby        # selene lint lobby code
 bash src/scripts/shell/check-format.sh src
-bash src/scripts/shell/check-format.sh places/lobby/src
+bash src/scripts/shell/check-format.sh places/arena
+bash src/scripts/shell/check-format.sh places/lobby
 ```
 
-CI (`.github/workflows/cicd.yml`) runs lint, format check, and the Lune tests on every PR to `main`/`prod`; a PR to `prod` also builds and publishes to Roblox.
+CI (`.github/workflows/cicd.yml`) runs lint, format check, and the Lune tests on every PR to `main`/`prod` regardless of what changed. A PR to `prod` additionally deploys, but only the places the change affects: `places/arena/**` deploys the arena, `places/lobby/**` deploys the lobby, and anything under `src/**` (or the toolchain) deploys both, since both places load it. Each deployed place builds, merges into the currently-live place, uploads a Saved version, runs **that place's own** `ServerStorage.Tests` suite through the Open Cloud Luau Execution API, and publishes only on green. Both places therefore need an in-place suite: shared harness in `src/tests/` (`Runner`, `Helpers`), place-specific specs in `places/<place>/tests/`.
 
 ## Layout
 
@@ -40,16 +42,23 @@ Each project also blocks the other place ID. Do not add a `default.project.json`
 
 | Filesystem | DataModel |
 |---|---|
-| `src/shared/` | `ReplicatedStorage.Shared` |
-| `src/config/` | `ReplicatedStorage.Config` |
+| `src/shared/` | `ReplicatedStorage.Shared` (both places) |
+| `src/config/` | `ReplicatedStorage.Config` (both places) |
+| `src/server/` | Server modules **both places load**: PlayerData, ConfigLiveService, CosmeticsService, CharacterColorService, AnalyticsService, and `Env` |
+| `src/scripts/` | Tooling; not mapped into either place |
+| `src/tests/` | Shared in-place test harness (`Runner`, `Helpers`), mapped into both places' `ServerStorage.Tests` |
 | `Packages/` | `ReplicatedStorage.Packages` |
-| `src/server/` | Arena server plus canonical data/economy services used by both places |
-| `src/client/` | Arena client |
-| `places/lobby/src/server/` | Lobby server and matchmaking |
-| `places/lobby/src/client/` | Lobby client |
-| `places/lobby/src/shared/Matchmaking/` | Lobby matchmaking protocol/config |
+| `places/arena/server/` | Arena `ServerScriptService.Server` |
+| `places/arena/client/` | Arena `StarterPlayerScripts.Client` |
+| `places/arena/tests/` | Arena-specific specs, merged into `ServerStorage.Tests` |
+| `places/lobby/server/` | Lobby `ServerScriptService.Server` |
+| `places/lobby/client/` | Lobby `StarterPlayerScripts.Client` |
+| `places/lobby/shared/Matchmaking/` | Lobby-only `ReplicatedStorage.Shared.Matchmaking` |
+| `places/lobby/tests/` | Lobby-specific specs, merged into `ServerStorage.Tests` |
 
-Arena entry points: `src/server/init.server.luau` (PlayerData load/save lifecycle only), `src/server/Scripts/SimulationServer.server.luau` (starts all services, wires sim events to animations/feedback), `src/client/Scripts/SimulationClient.client.luau` (starts all client modules). Lobby entry points: `places/lobby/src/server/Server.server.luau`, `places/lobby/src/server/Scripts/MatchmakingScript.server.luau`, and `places/lobby/src/client/Scripts/LobbyClient.client.luau`.
+`src/` is shared by both places and nothing else; anything place-specific lives under `places/`. The shared server modules stay in `src/server/` and are mapped into each place's `Server.Modules` by both project files, so a module's location tells you whether the lobby depends on it.
+
+Arena entry points: `places/arena/server/Server.server.luau` (PlayerData load/save lifecycle only), `places/arena/server/Scripts/SimulationServer.server.luau` (starts all services, wires sim events to animations/feedback), `places/arena/client/Scripts/SimulationClient.client.luau` (starts all client modules). Lobby entry points: `places/lobby/server/Server.server.luau`, `places/lobby/server/Scripts/MatchmakingScript.server.luau`, and `places/lobby/client/Scripts/LobbyClient.client.luau`.
 
 ## Systems
 
@@ -102,7 +111,7 @@ Weapon animations are started by the acting player's own client (`WeaponAnimatio
 
 **No competitive advantage:** nothing purchasable may affect combat outcomes — no weapon, movement, damage, cooldown, or health value is ever for sale (GDD §2, §7). Progression boosters (XP/Cash multipliers) are permitted and live in `GamePasses.Boosts`; they change earn *rate* only. If a proposed offer would change who wins a fight, it is out of scope regardless of how it is framed.
 
-### Client — `src/client/Modules/`
+### Client — `places/arena/client/Modules/`
 
 - **Input/**: `InputRouter` feeds `AimDirector`'s aim into the `Aim` InputAction every frame, pulses `Throw` on touch taps, and reports mouse, touch, or gamepad device class. It releases the centered mouse only while the authoritative mode vote is open. `AimDirector` owns aim/soft-lock target selection.
 - **Presentation/** (BallVisuals, HammerVisuals, DamageFeedback, DeathEffects, WorldAudio; CharacterRig owns rig-name lookups like the R15/R6 right-hand fallback): rendering and audio feedback *only* — they react to sim events, attributes, and remotes and hold no gameplay authority. Effects on the ball template (trails, emitters, sounds) are Studio-authored and enabled/disabled by phase; broadcast events can arrive more than once, so effects must deduplicate (test at 0/100/150/200 ms latency per `docs/dodgeball-studio-setup.md`).
@@ -126,7 +135,7 @@ Specs live in `src/shared/Tests/*.spec.luau` and use `TestKit` — a minimal pur
 
 ## Conventions
 
-- Luau with `--!strict` at the top of modules; tab indentation; StyLua-formatted (`stylua src places/lobby/src`).
+- Luau with `--!strict` at the top of modules; tab indentation; StyLua-formatted (`stylua src places`).
 - Services/modules are plain tables with functions; a `start()` guards against double-start with a `started` flag.
 - Comments follow rule 1: module-top responsibility/invariant blocks, minimal inline.
 - Selene (`std = "roblox"`) with `unused_variable` allowed.

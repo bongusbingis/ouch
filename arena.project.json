@@ -6,31 +6,81 @@
   "blockedPlaceIds": [130584867985467],
   "tree": {
     "$className": "DataModel",
+
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared"
       },
-      "Packages": {
-        "$path": "Packages"
-      },
+
       "Config": {
         "$path": "src/config"
+      },
+
+      "Packages": {
+        "$path": "Packages"
       }
     },
+
     "ServerScriptService": {
       "Server": {
-        "$path": "src/server"
+        "$path": "places/arena/server/Server.server.luau",
+
+        "Cmdr": {
+          "$path": "places/arena/server/Cmdr"
+        },
+
+        "Scripts": {
+          "$path": "places/arena/server/Scripts"
+        },
+
+        "Env": {
+          "$path": "src/server/Env.luau"
+        },
+
+        "Modules": {
+          "$path": "places/arena/server/Modules",
+
+          "PlayerData": {
+            "$path": "src/server/Modules/PlayerData.luau"
+          },
+
+          "ConfigLiveService": {
+            "$path": "src/server/Modules/ConfigLiveService.luau"
+          },
+
+          "CosmeticsService": {
+            "$path": "src/server/Modules/CosmeticsService.luau"
+          },
+
+          "CharacterColorService": {
+            "$path": "src/server/Modules/CharacterColorService.luau"
+          },
+
+          "AnalyticsService": {
+            "$path": "src/server/Modules/AnalyticsService.luau"
+          }
+        }
       }
     },
+
     "ServerStorage": {
       "Tests": {
-        "$path": "src/tests"
+        "$path": "places/arena/tests",
+
+        "Runner": {
+          "$path": "src/tests/Runner.luau"
+        },
+
+        "Helpers": {
+          "$path": "src/tests/Helpers"
+        }
       }
     },
+
     "StarterPlayer": {
       "StarterPlayerScripts": {
         "Client": {
-          "$path": "src/client"
+          "$path": "places/arena/client"
         }
       }
     }
