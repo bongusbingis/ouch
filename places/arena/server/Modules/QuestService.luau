@@ -234,13 +234,13 @@ function QuestService.claim(player: Player, questId: string): (boolean, any)
 			data.Quests.Active = entries
 
 			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.QuestClaimed, 1, { questId = questId })
-			if definition.reward.kind == "Cash" then
+			if definition.reward.kind == "Bonks" then
 				AnalyticsService.logEconomyEvent(
 					player,
 					"Source",
-					"Cash",
+					"Bonks",
 					definition.reward.amount or 0,
-					data.Cash,
+					data.Bonks,
 					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
 					questId
 				)

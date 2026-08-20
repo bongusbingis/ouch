@@ -16,6 +16,9 @@ export type MatchRules = {
 	-- of individually after RespawnSeconds (GDD §4.2 TDM push/retreat rhythm).
 	WaveRespawnSeconds: number?,
 	SpawnInvulnSeconds: number,
+	-- Who wins when the clock runs out, for modes where surviving to the cap is
+	-- itself the win. Unset means the leading score takes it.
+	TimeCapWinnerId: string?,
 }
 
 export type ScoreScope = "Player" | "Team"
@@ -27,6 +30,13 @@ export type ModeContext = {
 	},
 	getPlayers: () -> { Player },
 	getPlayerTeam: (player: Player) -> string?,
+	getPlayerById: (id: string) -> Player?,
+	-- Modes that move players between sides mid-match (infection) rather than
+	-- being assigned once at the start.
+	setPlayerTeam: (player: Player, teamId: string?) -> (),
+	-- Ends the match now, naming the winner outright for outcomes that are not
+	-- a score race.
+	finishMatch: (winnerId: string?, reason: string) -> (),
 }
 
 export type GameMode = {

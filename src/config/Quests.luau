@@ -1,7 +1,7 @@
 --!strict
 
 export type Reward = {
-	kind: "Cash" | string,
+	kind: "Bonks" | string,
 	amount: number?,
 	itemId: string?,
 }
@@ -40,7 +40,7 @@ local Quests = {
 			title = "Get 5 eliminations",
 			goal = 5,
 			steps = 5,
-			reward = { kind = "Cash", amount = 150 },
+			reward = { kind = "Bonks", amount = 150 },
 			track = { kind = "Elim" },
 		},
 		{
@@ -48,7 +48,7 @@ local Quests = {
 			title = "Catch 3 dodgeballs",
 			goal = 3,
 			steps = 3,
-			reward = { kind = "Cash", amount = 125 },
+			reward = { kind = "Bonks", amount = 125 },
 			track = { kind = "Catch" },
 		},
 		{
@@ -56,7 +56,7 @@ local Quests = {
 			title = "Play 2 matches",
 			goal = 2,
 			steps = 2,
-			reward = { kind = "Cash", amount = 100 },
+			reward = { kind = "Bonks", amount = 100 },
 			track = { kind = "MatchPlayed" },
 		},
 		{
@@ -64,7 +64,7 @@ local Quests = {
 			title = "Win a match",
 			goal = 1,
 			steps = 1,
-			reward = { kind = "Cash", amount = 200 },
+			reward = { kind = "Bonks", amount = 200 },
 			track = { kind = "Win" },
 		},
 		{
@@ -72,7 +72,7 @@ local Quests = {
 			title = "Win a FFA match",
 			goal = 1,
 			steps = 1,
-			reward = { kind = "Cash", amount = 225 },
+			reward = { kind = "Bonks", amount = 225 },
 			track = { kind = "ModeWin", modeId = "FFA" },
 		},
 		{
@@ -80,7 +80,7 @@ local Quests = {
 			title = "Win a TDM match",
 			goal = 1,
 			steps = 1,
-			reward = { kind = "Cash", amount = 225 },
+			reward = { kind = "Bonks", amount = 225 },
 			track = { kind = "ModeWin", modeId = "TDM" },
 		},
 		{
@@ -88,7 +88,7 @@ local Quests = {
 			title = "Get 3 dodgeball eliminations",
 			goal = 3,
 			steps = 3,
-			reward = { kind = "Cash", amount = 175 },
+			reward = { kind = "Bonks", amount = 175 },
 			track = { kind = "DodgeballElim" },
 		},
 		{
@@ -96,7 +96,7 @@ local Quests = {
 			title = "Get 3 hammer eliminations",
 			goal = 3,
 			steps = 3,
-			reward = { kind = "Cash", amount = 175 },
+			reward = { kind = "Bonks", amount = 175 },
 			track = { kind = "HammerElim" },
 		},
 		{
@@ -104,7 +104,7 @@ local Quests = {
 			title = "Hit 5 players with the hammer",
 			goal = 5,
 			steps = 5,
-			reward = { kind = "Cash", amount = 150 },
+			reward = { kind = "Bonks", amount = 150 },
 			track = { kind = "HammerHit" },
 		},
 		{
@@ -112,7 +112,7 @@ local Quests = {
 			title = "Throw 10 dodgeballs",
 			goal = 10,
 			steps = 10,
-			reward = { kind = "Cash", amount = 125 },
+			reward = { kind = "Bonks", amount = 125 },
 			track = { kind = "BallThrow" },
 		},
 	} :: { QuestDefinition },

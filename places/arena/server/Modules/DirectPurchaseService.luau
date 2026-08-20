@@ -12,8 +12,8 @@ local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 
--- Owns the guaranteed Cash-for-cosmetic path. Nothing here is random, so it is
--- deliberately outside PaidRandomPolicyService's gate. Cash is deducted only
+-- Owns the guaranteed Bonks-for-cosmetic path. Nothing here is random, so it is
+-- deliberately outside PaidRandomPolicyService's gate. Bonks is deducted only
 -- after CosmeticsService reports the item as newly granted.
 
 local DirectPurchaseService = {}
@@ -33,7 +33,7 @@ function DirectPurchaseService.purchase(player: Player, itemId: string): (Purcha
 	end
 
 	local price, reason =
-		DirectPurchase.evaluate(itemId, Cosmetics.Items, Cosmetics.Rarities, data.Cosmetics.Owned, data.Cash)
+		DirectPurchase.evaluate(itemId, Cosmetics.Items, Cosmetics.Rarities, data.Cosmetics.Owned, data.Bonks)
 	if price == nil then
 		return nil, reason
 	end
@@ -41,15 +41,15 @@ function DirectPurchaseService.purchase(player: Player, itemId: string): (Purcha
 	if not CosmeticsService.grant(player, itemId) then
 		return nil, "grant_failed"
 	end
-	data.Cash -= price
+	data.Bonks -= price
 
 	local item = Cosmetics.Items[itemId]
 	AnalyticsService.logEconomyEvent(
 		player,
 		"Sink",
-		"Cash",
+		"Bonks",
 		price,
-		data.Cash,
+		data.Bonks,
 		AnalyticsConfig.EconomyTransactionTypes.Shop,
 		itemId,
 		{ rarity = item.Rarity, source = "DirectBuy" }

@@ -26,6 +26,8 @@ local NotificationModal = require(Components:WaitForChild("NotificationModal"))
 local PageTransition = require(Components:WaitForChild("PageTransition"))
 local PartyCode = require(Components:WaitForChild("PartyCode"))
 local ShopPage = require(Components:WaitForChild("ShopPage"))
+local AnalyticsReporter =
+	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby"):WaitForChild("AnalyticsReporter"))
 local SplashPage = require(Components:WaitForChild("SplashPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
 local GameVersion = require(Components:WaitForChild("GameVersion"))
@@ -172,6 +174,13 @@ local function LobbyContent(props)
 	local partyClient = props.PartyClient
 	local notifications = NotificationContext.useNotification()
 	local currentPage, setCurrentPage = React.useState("SplashScreen")
+
+	-- One report per page the player actually lands on. The server maps a Shop
+	-- open onto the purchase funnel's first step and everything else onto a
+	-- MenuOpened custom event.
+	React.useEffect(function()
+		AnalyticsReporter.menuOpened(currentPage)
+	end, { currentPage })
 	local inventoryTab, setInventoryTab = React.useState("OUTFITS")
 	local joinOpen, setJoinOpen = React.useState(false)
 	local codeVisible, setCodeVisible = React.useState(false)

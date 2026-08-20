@@ -7,6 +7,30 @@ return {
 	Dodgeball = {
 		ThrowSpeed = 500,
 		Gravity = 50,
+
+		-- Held throw. A charged ball is simply faster, which is what makes it
+		-- flatter, longer and harder to dodge -- the arc is not special-cased.
+		-- It cannot hit harder than a normal throw, because a dodgeball hit
+		-- already eliminates outright.
+		Charge = {
+			-- Speed multiplier at full charge; the uncharged throw is 1.
+			-- Sane: 1.15-1.6. The catch test samples closest approach over a
+			-- tick, so speed does not break it geometrically -- what shrinks is
+			-- the defender's reaction time, and past 1.6 that is short enough
+			-- that a full charge is effectively uncatchable.
+			MaxSpeedScale = 1.3,
+		},
+
+		-- Swipe-up throw: slower and pitched up, so it clears cover and drops
+		-- onto someone rather than travelling flat at them.
+		Lob = {
+			-- Speed multiplier. Sane: 0.65-0.9; below 0.65 it barely travels.
+			SpeedScale = 0.82,
+			-- Upward pitch added to the player's aim, in degrees. This is what
+			-- makes the swipe read as a lob rather than a weak throw.
+			-- Sane: 10-30; above 30 it goes nearly straight up.
+			PitchDeg = 20,
+		},
 		Radius = 1,
 		HitForgiveness = 0.35, -- added to Radius for hit tests (device magnetism adds more)
 		ThrowCooldown = 0.6,

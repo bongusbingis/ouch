@@ -53,13 +53,13 @@ T.describe("Crate configuration", function()
 		-- If targeting an item cost more than gambling for it, the guaranteed
 		-- path would be pointless and nobody would ever take it.
 		for _, crate in Crates do
-			local price = crate.CashPrice
+			local price = crate.BonksPrice
 			if price ~= nil then
 				local model = CrateOdds.build(crate, Cosmetics.Items, Cosmetics.Rarities)
 				for _, outcome in model.outcomes do
-					local directCash = Cosmetics.Rarities[outcome.rarity].DirectCash
-					if directCash > 0 then
-						T.expect(directCash < price / outcome.probability):toBeTruthy()
+					local directBonks = Cosmetics.Rarities[outcome.rarity].DirectBonks
+					if directBonks > 0 then
+						T.expect(directBonks < price / outcome.probability):toBeTruthy()
 					end
 				end
 			end
@@ -71,13 +71,13 @@ T.describe("Crate configuration", function()
 		-- there is no reason to open one.
 		local cheapestDirect = math.huge
 		for _, rarity in Cosmetics.Rarities do
-			if rarity.DirectCash > 0 then
-				cheapestDirect = math.min(cheapestDirect, rarity.DirectCash)
+			if rarity.DirectBonks > 0 then
+				cheapestDirect = math.min(cheapestDirect, rarity.DirectBonks)
 			end
 		end
 		for _, crate in Crates do
-			if crate.CashPrice ~= nil then
-				T.expect(crate.CashPrice < cheapestDirect):toBeTruthy()
+			if crate.BonksPrice ~= nil then
+				T.expect(crate.BonksPrice < cheapestDirect):toBeTruthy()
 			end
 		end
 	end)

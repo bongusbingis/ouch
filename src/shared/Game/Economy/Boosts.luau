@@ -8,25 +8,25 @@ local Boosts = {}
 
 export type Multipliers = {
 	Xp: number,
-	Cash: number,
+	Bonks: number,
 }
 
-type BoostDef = { XpMultiplier: number?, CashMultiplier: number? }
+type BoostDef = { XpMultiplier: number?, BonksMultiplier: number? }
 type PassDef = { Boosts: BoostDef?, [string]: any }
 
 function Boosts.multipliers(catalog: { [string]: PassDef }, owned: { [string]: boolean }): Multipliers
 	local xp = 1
-	local cash = 1
+	local bonks = 1
 	for key, definition in catalog do
 		if owned[key] == true and definition.Boosts ~= nil then
 			xp = math.max(xp, definition.Boosts.XpMultiplier or 1)
-			cash = math.max(cash, definition.Boosts.CashMultiplier or 1)
+			bonks = math.max(bonks, definition.Boosts.BonksMultiplier or 1)
 		end
 	end
-	return { Xp = xp, Cash = cash }
+	return { Xp = xp, Bonks = bonks }
 end
 
--- Awarded amounts floor so a multiplier can never mint a fractional Cash unit,
+-- Awarded amounts floor so a multiplier can never mint a fractional Bonks unit,
 -- and never fall below the unboosted amount.
 function Boosts.apply(amount: number, multiplier: number): number
 	return math.max(amount, math.floor(amount * multiplier))

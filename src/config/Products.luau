@@ -4,7 +4,7 @@
 -- prompt a purchase; only Active definitions enter the receipt map.
 
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
-export type ProductType = "Crate" | "Cash" | "SeasonPass"
+export type ProductType = "Crate" | "Bonks" | "SeasonPass"
 
 export type ProductDef = {
 	Id: number?,
@@ -15,50 +15,50 @@ export type ProductDef = {
 	Type: ProductType,
 	SuggestedRobux: number,
 	CrateId: string?,
-	CashAmount: number?,
+	BonksAmount: number?,
 	SeasonId: string?,
 }
 
 local Catalog: { [string]: ProductDef } = {
-	Cash500 = {
+	Bonks500 = {
 		Id = nil,
 		CatalogStatus = "Preview",
 		DisplayName = "Pocket Stash",
 		Description = "A handy boost for your next crate.",
 		DisplayOrder = 310,
-		Type = "Cash",
+		Type = "Bonks",
 		SuggestedRobux = 49,
-		CashAmount = 500,
+		BonksAmount = 500,
 	},
-	Cash1100 = {
+	Bonks1100 = {
 		Id = nil,
 		CatalogStatus = "Preview",
-		DisplayName = "Cash Stack",
+		DisplayName = "Bonks Stack",
 		Description = "A solid stack with a little extra value.",
 		DisplayOrder = 320,
-		Type = "Cash",
+		Type = "Bonks",
 		SuggestedRobux = 99,
-		CashAmount = 1100,
+		BonksAmount = 1100,
 	},
-	Cash2500 = {
+	Bonks2500 = {
 		Id = nil,
 		CatalogStatus = "Preview",
 		DisplayName = "Big Haul",
 		Description = "A bigger haul for several crate opens.",
 		DisplayOrder = 330,
-		Type = "Cash",
+		Type = "Bonks",
 		SuggestedRobux = 199,
-		CashAmount = 2500,
+		BonksAmount = 2500,
 	},
-	Cash5500 = {
+	Bonks5500 = {
 		Id = nil,
 		CatalogStatus = "Preview",
 		DisplayName = "Mega Vault",
-		Description = "The biggest Cash bundle and strongest value.",
+		Description = "The biggest Bonks bundle and strongest value.",
 		DisplayOrder = 340,
-		Type = "Cash",
+		Type = "Bonks",
 		SuggestedRobux = 399,
-		CashAmount = 5500,
+		BonksAmount = 5500,
 	},
 	BallCrateOpen = {
 		Id = nil,
@@ -107,10 +107,10 @@ for key, definition in Catalog do
 			definition.Id > 0 and definition.Id % 1 == 0,
 			`developer product "{key}" must define a positive integer Id`
 		)
-		if definition.Type == "Cash" then
+		if definition.Type == "Bonks" then
 			assert(
-				definition.CashAmount ~= nil and definition.CashAmount > 0 and definition.CashAmount % 1 == 0,
-				`cash product "{key}" must define a positive integer CashAmount`
+				definition.BonksAmount ~= nil and definition.BonksAmount > 0 and definition.BonksAmount % 1 == 0,
+				`bonks product "{key}" must define a positive integer BonksAmount`
 			)
 		elseif definition.Type == "Crate" then
 			assert(

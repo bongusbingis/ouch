@@ -55,7 +55,7 @@ local function profileFor(player: Player): (string, string)
 		table.insert(equips, `{slot}={data.Cosmetics.Equipped[slot] or "-"}`)
 	end
 
-	return `cash={data.Cash} xp={data.Level.Points} elims={progression.Elims} deaths={progression.Deaths} catches={progression.Catches} wins={progression.Wins} losses={progression.Losses} matches={progression.MatchesPlayed} owned={owned}`,
+	return `bonks={data.Bonks} xp={data.Level.Points} elims={progression.Elims} deaths={progression.Deaths} catches={progression.Catches} wins={progression.Wins} losses={progression.Losses} matches={progression.MatchesPlayed} owned={owned}`,
 		`equipped: {table.concat(equips, ", ")}`
 end
 

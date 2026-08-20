@@ -53,7 +53,10 @@ local function applyHammerMotion(events: { any })
 			if root then
 				local velocity = root.AssemblyLinearVelocity
 				local forwardSpeed = Vector3.new(velocity.X, 0, velocity.Z):Dot(direction)
-				local deltaSpeed = math.max(Combat.Hammer.DashSpeed - forwardSpeed, 0)
+				-- The swing carries its own dash speed so a lunge can close more
+				-- ground; older events without one fall back to the baseline.
+				local dashSpeed = (event.magnitude :: number?) or Combat.Hammer.DashSpeed
+				local deltaSpeed = math.max(dashSpeed - forwardSpeed, 0)
 				root:ApplyImpulse(direction * root.AssemblyMass * deltaSpeed)
 			end
 		elseif event.kind == "HammerHit" and event.targetId ~= nil then

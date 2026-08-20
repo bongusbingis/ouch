@@ -8,7 +8,7 @@ local CrateService = require(Modules:WaitForChild("CrateService"))
 
 local function describe(result): string
 	if result.isDupe then
-		return `{result.itemId} ({result.rarity}, duplicate, +{result.cashRefund} Cash)`
+		return `{result.itemId} ({result.rarity}, duplicate, +{result.bonksRefund} Bonks)`
 	end
 	return `{result.itemId} ({result.rarity}, new)`
 end

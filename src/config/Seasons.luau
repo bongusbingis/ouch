@@ -57,31 +57,31 @@ local Definitions: { [string]: SeasonDef } = {
 		-- The free track has to be worth engaging with: it is the on-ramp that
 		-- makes the premium track legible before anyone is asked to pay.
 		FreeRewards = {
-			[2] = { kind = "Cash", amount = 250 },
+			[2] = { kind = "Bonks", amount = 250 },
 			[4] = { kind = "Cosmetic", itemId = "TrailCoralGlow" },
-			[6] = { kind = "Cash", amount = 350 },
+			[6] = { kind = "Bonks", amount = 350 },
 			[9] = { kind = "Cosmetic", itemId = "TrailSlateStreak" },
-			[12] = { kind = "Cash", amount = 500 },
+			[12] = { kind = "Bonks", amount = 500 },
 			[15] = { kind = "Cosmetic", itemId = "TrailLavenderDrift" },
-			[18] = { kind = "Cash", amount = 700 },
+			[18] = { kind = "Bonks", amount = 700 },
 			[21] = { kind = "Cosmetic", itemId = "TrailPeachFizz" },
 			[25] = { kind = "Cosmetic", itemId = "TrailAquaLine" },
 		},
 		PremiumRewards = {
 			[1] = { kind = "Cosmetic", itemId = "TrailHoneyGlide" },
-			[3] = { kind = "Cash", amount = 500 },
+			[3] = { kind = "Bonks", amount = 500 },
 			[5] = { kind = "Cosmetic", itemId = "TrailStaticSnap" },
 			[7] = { kind = "Cosmetic", itemId = "TrailBerryDash" },
-			[8] = { kind = "Cash", amount = 500 },
+			[8] = { kind = "Bonks", amount = 500 },
 			[10] = { kind = "Cosmetic", itemId = "TrailPollenBurst" },
 			[11] = { kind = "Cosmetic", itemId = "TrailSageWisp" },
-			[13] = { kind = "Cash", amount = 750 },
+			[13] = { kind = "Bonks", amount = 750 },
 			[14] = { kind = "Cosmetic", itemId = "TrailInkSpill" },
 			[16] = { kind = "Cosmetic", itemId = "TrailCopperArc" },
-			[17] = { kind = "Cash", amount = 750 },
+			[17] = { kind = "Bonks", amount = 750 },
 			[19] = { kind = "Cosmetic", itemId = "TrailCitrusFlare" },
 			[20] = { kind = "Cosmetic", itemId = "TrailIndigoTrace" },
-			[22] = { kind = "Cash", amount = 1000 },
+			[22] = { kind = "Bonks", amount = 1000 },
 			[23] = { kind = "Cosmetic", itemId = "TrailGlacierEdge" },
 			[24] = { kind = "Cosmetic", itemId = "TrailRubyStreak" },
 			-- Retired permanently when the season ends.
@@ -120,8 +120,8 @@ for key, definition in Definitions do
 					reward.itemId ~= nil and Cosmetics.Items[reward.itemId] ~= nil,
 					`season "{key}" rewards unknown cosmetic "{tostring(reward.itemId)}"`
 				)
-			elseif reward.kind == "Cash" then
-				assert((reward.amount or 0) > 0, `season "{key}" Cash reward must be positive`)
+			elseif reward.kind == "Bonks" then
+				assert((reward.amount or 0) > 0, `season "{key}" Bonks reward must be positive`)
 			end
 		end
 	end

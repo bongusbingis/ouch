@@ -37,6 +37,8 @@ local function throwCommand(overrides)
 		aimDir = vector.create(1, 0, 0),
 		targetId = nil,
 		deviceClass = "Mouse",
+		-- What a mouse player resolves to: cone snap on, lead inert.
+		assist = { ConeSnap = 1, Lead = 0 },
 	}
 	for key, value in overrides or {} do
 		command[key] = value

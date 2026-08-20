@@ -18,7 +18,7 @@ export type CatalogStatus = "Preview" | "Active" | "Hidden"
 
 export type Boosts = {
 	XpMultiplier: number?,
-	CashMultiplier: number?,
+	BonksMultiplier: number?,
 }
 
 export type GamePassDef = {
@@ -71,27 +71,27 @@ local Catalog: { [string]: GamePassDef } = {
 		EntitlementItemIds = {},
 		Boosts = { XpMultiplier = 2 },
 	},
-	CashBoost = {
+	BonksBoost = {
 		Id = nil,
 		CatalogStatus = "Preview",
-		DisplayName = "Cash Boost",
-		Description = "Earn 1.5x Cash from every match, forever.",
+		DisplayName = "Bonks Boost",
+		Description = "Earn 1.5x Bonks from every match, forever.",
 		DisplayOrder = 430,
 		SuggestedRobux = 249,
 		Categories = {},
 		EntitlementItemIds = {},
-		Boosts = { CashMultiplier = 1.5 },
+		Boosts = { BonksMultiplier = 1.5 },
 	},
 	BrawlersClub = {
 		Id = nil,
 		CatalogStatus = "Preview",
 		DisplayName = "Brawler's Club",
-		Description = "2.5x XP, 1.5x Cash, and two club-only trails. The best value in the shop.",
+		Description = "2.5x XP, 1.5x Bonks, and two club-only trails. The best value in the shop.",
 		DisplayOrder = 440,
 		SuggestedRobux = 499,
 		Categories = { "TrailAssets" },
 		EntitlementItemIds = { "TrailClubAurora", "TrailClubRadiance" },
-		Boosts = { XpMultiplier = 2.5, CashMultiplier = 1.5 },
+		Boosts = { XpMultiplier = 2.5, BonksMultiplier = 1.5 },
 	},
 	FoundersPack = {
 		Id = nil,
@@ -107,7 +107,7 @@ local Catalog: { [string]: GamePassDef } = {
 			"TrailClubRadiance",
 			"TrailFounderCrown",
 		},
-		Boosts = { XpMultiplier = 2.5, CashMultiplier = 1.5 },
+		Boosts = { XpMultiplier = 2.5, BonksMultiplier = 1.5 },
 	},
 	HammerCosmetics = {
 		Id = nil,
@@ -149,10 +149,10 @@ for key, definition in Catalog do
 	assert(definition.SuggestedRobux > 0, `game pass "{key}" must define a positive SuggestedRobux`)
 	if definition.Boosts ~= nil then
 		local xp = definition.Boosts.XpMultiplier
-		local cash = definition.Boosts.CashMultiplier
-		assert(xp ~= nil or cash ~= nil, `game pass "{key}" declares an empty Boosts block`)
+		local bonks = definition.Boosts.BonksMultiplier
+		assert(xp ~= nil or bonks ~= nil, `game pass "{key}" declares an empty Boosts block`)
 		assert(xp == nil or xp > 1, `game pass "{key}" XpMultiplier must be greater than 1`)
-		assert(cash == nil or cash > 1, `game pass "{key}" CashMultiplier must be greater than 1`)
+		assert(bonks == nil or bonks > 1, `game pass "{key}" BonksMultiplier must be greater than 1`)
 	end
 	if definition.CatalogStatus == "Active" then
 		assert(definition.Id ~= nil, `active game pass "{key}" must define Id`)

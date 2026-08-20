@@ -14,7 +14,7 @@ local definitions = {
 		title = "Elims",
 		goal = 5,
 		steps = 5,
-		reward = { kind = "Cash", amount = 100 },
+		reward = { kind = "Bonks", amount = 100 },
 		track = { kind = "Elim" },
 	},
 	{
@@ -22,7 +22,7 @@ local definitions = {
 		title = "Catches",
 		goal = 3,
 		steps = 3,
-		reward = { kind = "Cash", amount = 100 },
+		reward = { kind = "Bonks", amount = 100 },
 		track = { kind = "Catch" },
 	},
 	{
@@ -30,7 +30,7 @@ local definitions = {
 		title = "Matches",
 		goal = 2,
 		steps = 2,
-		reward = { kind = "Cash", amount = 100 },
+		reward = { kind = "Bonks", amount = 100 },
 		track = { kind = "MatchPlayed" },
 	},
 	{
@@ -38,7 +38,7 @@ local definitions = {
 		title = "TDM",
 		goal = 1,
 		steps = 1,
-		reward = { kind = "Cash", amount = 100 },
+		reward = { kind = "Bonks", amount = 100 },
 		track = { kind = "ModeWin", modeId = "TDM" },
 	},
 }

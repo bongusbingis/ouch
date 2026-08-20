@@ -7,17 +7,26 @@ local Workspace = game:GetService("Workspace")
 
 local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("AimAssist"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
 
--- The client's single source of aim truth. Desktop: aim = camera look, target
--- is the predicted soft-lock candidate. Touch: aim = direction from the
--- character to an auto-acquired target (camera look fallback), with sticky
--- hysteresis so the lock doesn't flicker. InputRouter feeds the aim into the
--- Aim action.
+-- The client's single source of aim truth. Aim is the camera look direction on
+-- every device: the player always points the camera themselves, and assists
+-- only bias what happens afterwards. Touch used to override aim with the
+-- direction to an auto-acquired target, which meant the camera was decorative
+-- and the throw was not really the player's -- that is what the assists below
+-- replace.
+--
+-- Selection is sticky: acquiring needs the target inside the narrow cone,
+-- holding it only needs the wider sticky cone, so a lock does not flicker
+-- between two enemies standing near each other. Confidence falls off toward the
+-- edge of that cone so every assist that scales by it fades out smoothly rather
+-- than snapping off. InputRouter feeds the aim into the Aim action.
 
 local AimDirector = {}
 
 local currentTarget: Model? = nil
 local currentAimDir: Vector3 = Vector3.zAxis
+local currentConfidence = 0
 
 function AimDirector.deviceClass(): string
 	local lastInput = UserInputService:GetLastInputType()
@@ -69,17 +78,36 @@ local function candidateRoot(character: Model, localTeamId: any): BasePart?
 	return root
 end
 
-local function selectTarget(camera: Camera, character: Model): Model?
+-- 1 dead centre, tapering to 0 at the edge of the cone that holds the lock. The
+-- fade start keeps the middle of the cone at full strength so assists do not
+-- feel weaker just for being slightly off centre.
+local function confidenceFor(angleDeg: number, coneDeg: number): number
+	if coneDeg <= 1e-4 then
+		return 0
+	end
+	local fraction = math.clamp(angleDeg / coneDeg, 0, 1)
+	local fadeStart = MobileInput.Assist.ConeFadeStartFraction
+	if fraction <= fadeStart then
+		return 1
+	end
+	if fadeStart >= 1 then
+		return 1
+	end
+	return 1 - (fraction - fadeStart) / (1 - fadeStart)
+end
+
+local function selectTarget(camera: Camera, character: Model): (Model?, number)
 	local row = deviceRow()
 	local balls = Workspace:FindFirstChild("Balls")
 	local localTeamId = character:GetAttribute("TeamId")
 	local localRoot = character:FindFirstChild("HumanoidRootPart")
 	if localRoot == nil or not localRoot:IsA("BasePart") then
-		return nil
+		return nil, 0
 	end
 
 	local best: Model? = nil
 	local bestScore = math.huge
+	local bestConfidence = 0
 	for _, player in Players:GetPlayers() do
 		local targetCharacter = player.Character
 		if player == Players.LocalPlayer or targetCharacter == nil then
@@ -110,9 +138,10 @@ local function selectTarget(camera: Camera, character: Model): Model?
 		if score < bestScore then
 			best = targetCharacter
 			bestScore = score
+			bestConfidence = confidenceFor(angle, coneDeg)
 		end
 	end
-	return best
+	return best, bestConfidence
 end
 
 function AimDirector.update()
@@ -120,23 +149,11 @@ function AimDirector.update()
 	local character = Players.LocalPlayer.Character
 	if camera == nil or character == nil then
 		currentTarget = nil
+		currentConfidence = 0
 		return
 	end
 
-	currentTarget = selectTarget(camera, character)
-
-	if AimDirector.deviceClass() == "Touch" then
-		local target = currentTarget
-		local localRoot = character:FindFirstChild("HumanoidRootPart")
-		local targetRoot = target and target:FindFirstChild("HumanoidRootPart")
-		if localRoot and localRoot:IsA("BasePart") and targetRoot and targetRoot:IsA("BasePart") then
-			local offset = targetRoot.Position - localRoot.Position
-			if offset.Magnitude > 1e-4 then
-				currentAimDir = offset.Unit
-				return
-			end
-		end
-	end
+	currentTarget, currentConfidence = selectTarget(camera, character)
 	currentAimDir = camera.CFrame.LookVector
 end
 
@@ -146,6 +163,11 @@ end
 
 function AimDirector.currentTarget(): Model?
 	return currentTarget
+end
+
+-- 0-1 confidence in the current target. Zero whenever there is none.
+function AimDirector.currentConfidence(): number
+	return if currentTarget == nil then 0 else currentConfidence
 end
 
 return AimDirector

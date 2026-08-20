@@ -44,6 +44,21 @@ local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, pos
 	projectile.windupRemaining = 0
 	projectile.releaseAim = nil
 	projectile.releaseTargetId = nil
+	projectile.releaseCharge = nil
+	projectile.releaseLob = nil
+end
+
+-- Rotates a direction toward world up by the given angle. The axis is
+-- perpendicular to both, so the yaw the player aimed is preserved exactly and
+-- only the pitch changes. An already-vertical aim has no such axis and is left
+-- alone rather than snapping to an arbitrary heading.
+local function pitchUp(aim: Vec, radians: number): Vec
+	local axis = vector.cross(aim, vector.create(0, 1, 0))
+	if vector.magnitude(axis) <= 1e-4 then
+		return aim
+	end
+	axis = vector.normalize(axis)
+	return vector.normalize(aim * math.cos(radians) + vector.cross(axis, aim) * math.sin(radians))
 end
 
 local function horizontalOf(v: Vec): Vec
@@ -161,10 +176,20 @@ local function stepWindup(
 
 	local row = AimAssist[projectile.releaseDeviceClass or "Mouse"] or AimAssist.Mouse
 	local aim = vector.normalize(projectile.releaseAim)
+	local speed = config.ThrowSpeed
+	if projectile.releaseLob then
+		aim = pitchUp(aim, math.rad(config.Lob.PitchDeg))
+		speed *= config.Lob.SpeedScale
+	else
+		-- Charge only changes speed. A faster ball is already flatter, longer
+		-- and harder to react to, so there is no separate arc to tune.
+		local charge = math.clamp(projectile.releaseCharge or 0, 0, 1)
+		speed *= 1 + (config.Charge.MaxSpeedScale - 1) * charge
+	end
 	projectile.phase = "InFlight"
 	projectile.heldBy = nil
 	projectile.position = releasePosition(world, holder.throwPosition, aim, config)
-	projectile.velocity = aim * config.ThrowSpeed + holder.velocity * config.MomentumInheritance
+	projectile.velocity = aim * speed + holder.velocity * config.MomentumInheritance
 	projectile.targetId = projectile.releaseTargetId
 	projectile.effectiveRadius = config.Radius + config.HitForgiveness + row.MagnetismRadius
 	projectile.flightTime = 0

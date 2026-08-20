@@ -1,8 +1,8 @@
 --!strict
 
 return {
-	Name = "sb-crate-open-cash",
-	Description = "Opens a crate through the normal Cash purchase path.",
+	Name = "sb-crate-open-bonks",
+	Description = "Opens a crate through the normal Bonks purchase path.",
 	Group = "Splat Brawl | Economy",
 	Args = {
 		{
@@ -13,7 +13,7 @@ return {
 		{
 			Type = "crateId",
 			Name = "crate",
-			Description = "Cash crate to purchase.",
+			Description = "Bonks crate to purchase.",
 		},
 	},
 }

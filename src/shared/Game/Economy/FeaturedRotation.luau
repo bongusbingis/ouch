@@ -40,7 +40,7 @@ function FeaturedRotation.secondsUntilRotation(config: Config, now: number): num
 	return math.max(0, FeaturedRotation.nextRotationAt(config, now) - now)
 end
 
--- Rounds in the player's favour, and never below one Cash so a steep discount
+-- Rounds in the player's favour, and never below one Bonks so a steep discount
 -- cannot make a crate free.
 function FeaturedRotation.discountedPrice(basePrice: number, discountPercent: number): number
 	return math.max(1, math.floor(basePrice * (100 - discountPercent) / 100))

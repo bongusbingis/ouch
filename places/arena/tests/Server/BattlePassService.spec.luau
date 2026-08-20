@@ -35,8 +35,8 @@ local SEASONS = {
 			EndsAt = 2000,
 			TierCount = 3,
 			XpThresholds = { 100, 250, 500 },
-			FreeRewards = { [1] = { kind = "Cash", amount = 50 }, [2] = { kind = "Cash", amount = 75 } },
-			PremiumRewards = { [1] = { kind = "Cash", amount = 200 } },
+			FreeRewards = { [1] = { kind = "Bonks", amount = 50 }, [2] = { kind = "Bonks", amount = 75 } },
+			PremiumRewards = { [1] = { kind = "Bonks", amount = 200 } },
 		},
 		S2 = {
 			Id = "S2",
@@ -45,7 +45,7 @@ local SEASONS = {
 			EndsAt = 4000,
 			TierCount = 2,
 			XpThresholds = { 100, 200 },
-			FreeRewards = { [1] = { kind = "Cash", amount = 60 } },
+			FreeRewards = { [1] = { kind = "Bonks", amount = 60 } },
 			PremiumRewards = {},
 		},
 	},
@@ -55,7 +55,7 @@ local function fixture(now)
 	local clock = { value = now }
 	local player = { UserId = 900001, Name = "PassPlayer", Parent = true }
 	local profile = {
-		Cash = 0,
+		Bonks = 0,
 		Season = nil,
 		Entitlements = nil,
 	}

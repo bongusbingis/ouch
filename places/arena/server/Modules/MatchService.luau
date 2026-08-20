@@ -251,6 +251,10 @@ local function syncPlayers()
 	MatchSim.setPlayers(state, present)
 end
 
+-- Forward declared: modeContext's finishMatch lever needs it, and it is defined
+-- below alongside the rest of the match event handling.
+local handleMatchEvents: ({ MatchSim.MatchEvent }) -> ()
+
 local function modeContext(): GameMode.ModeContext
 	return {
 		balls = {
@@ -261,6 +265,18 @@ local function modeContext(): GameMode.ModeContext
 			return matchPlayers()
 		end,
 		getPlayerTeam = playerTeam,
+		getPlayerById = PlayerIds.fromId,
+		setPlayerTeam = setPlayerTeam,
+		finishMatch = function(winnerId: string?, reason: string)
+			local activeMode = mode
+			if activeMode == nil then
+				return
+			end
+			local events: { MatchSim.MatchEvent } = {}
+			if MatchSim.finish(state, activeMode.rules, reason, events, winnerId) then
+				handleMatchEvents(events)
+			end
+		end,
 	}
 end
 
@@ -327,7 +343,7 @@ local function cleanupMatch()
 	end
 end
 
-local function handleMatchEvents(events: { MatchSim.MatchEvent })
+function handleMatchEvents(events: { MatchSim.MatchEvent })
 	for _, event in events do
 		if event.kind == "ScoreChanged" then
 			if scoreScope() == "Team" and event.playerId ~= nil then

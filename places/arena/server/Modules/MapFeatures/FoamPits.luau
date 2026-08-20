@@ -22,7 +22,8 @@ FoamPits.folderName = "FoamPits"
 
 function FoamPits.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)
 	local inPit = false
-	for _, pit in context.parts do
+	for _, instance in context.instances do
+		local pit = instance :: BasePart
 		if Volume.contains(pit.CFrame, pit.Size, root.Position, MapFeatures.FoamPit.VerticalPadding) then
 			inPit = true
 			break

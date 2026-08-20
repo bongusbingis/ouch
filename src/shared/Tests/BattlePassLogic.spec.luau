@@ -13,12 +13,12 @@ local SEASON = {
 	TierCount = 3,
 	XpThresholds = { 100, 250, 500 },
 	FreeRewards = {
-		[1] = { kind = "Cash", amount = 50 },
+		[1] = { kind = "Bonks", amount = 50 },
 		[3] = { kind = "Cosmetic", itemId = "TrailX" },
 	},
 	PremiumRewards = {
-		[2] = { kind = "Cash", amount = 200 },
-		[3] = { kind = "Cash", amount = 400 },
+		[2] = { kind = "Bonks", amount = 200 },
+		[3] = { kind = "Bonks", amount = 400 },
 	},
 }
 

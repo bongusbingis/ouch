@@ -192,7 +192,8 @@ function SplatEffects.onEvent(event: any)
 		end
 	end
 
-	WorldAudio.play("Dodgeball", Combat.Splat.SoundName, clone)
+	-- The elimination sound comes from GameAudio's config ids; this clone is the
+	-- splat visual only.
 	Debris:AddItem(clone, Combat.Splat.Lifetime)
 end
 

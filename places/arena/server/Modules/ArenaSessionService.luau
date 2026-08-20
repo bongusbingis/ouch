@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local TeleportPayload = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -85,9 +87,17 @@ function ArenaSessionService.onReady(listener: (Player) -> ())
 	table.insert(readyListeners, listener)
 end
 
+-- How players actually reach the arena. This is the measurement behind whether
+-- the lobby is still earning its place.
 local function setAdmission(player: Player, admission: Admission)
+	local previous = admissionByUserId[player.UserId]
 	admissionByUserId[player.UserId] = admission
 	player:SetAttribute("ArenaAdmission", admission)
+	if previous ~= admission then
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaArrival, 1, {
+			admission = admission,
+		})
+	end
 end
 
 local function receive(player: Player)

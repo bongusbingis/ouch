@@ -16,7 +16,7 @@ Splat Brawl is a fast, skill-based PvP arena game built around two asymmetric we
 
 ## 2. Core Pillars
 
-- **No competitive advantage** — nothing purchasable affects combat outcomes. Skill determines who wins, not spending. Progression boosters (XP/Cash multipliers) are permitted because they change how fast you earn cosmetics, never how a fight resolves; weapon, movement, damage, cooldown, and health values are never for sale.
+- **No competitive advantage** — nothing purchasable affects combat outcomes. Skill determines who wins, not spending. Progression boosters (XP/Bonks multipliers) are permitted because they change how fast you earn cosmetics, never how a fight resolves; weapon, movement, damage, cooldown, and health values are never for sale.
 - **Fast respawn, fast re-engagement** — FFA returns players in 1 second; TDM uses readable 4.5-second team waves.
 - **Bright, tactile, bouncy** — every surface, effect, and hit reaction reinforces the inflatable/foam fantasy. (Not needed)
 
@@ -87,30 +87,30 @@ Shared design rules: keep sightlines readable enough that dodgeball does not bec
 
 Persistent stats — eliminations, catches, win rate, K/D — are visible on the profile for competitive players to chase. They carry no reward and no stat impact.
 
-### 6.1 XP & Cash earn rates
+### 6.1 XP & Bonks earn rates
 
 Both currencies are awarded from the same match events. Values live in `Config.Data`; this table is the design intent, the config is the source of truth.
 
-| Event | XP | Cash |
+| Event | XP | Bonks |
 |---|---|---|
 | Match complete | 25 | 50 |
 | Win | 100 | 150 |
 | Elimination | 20 | 10 |
 | Catch | 15 | 15 |
 
-An average player earns roughly **165 XP and ~150 Cash per match**, about **1,650 XP / 1,500 Cash per hour** at ~10 matches an hour. Daily quests add ~495 Cash/day on top.
+An average player earns roughly **165 XP and ~150 Bonks per match**, about **1,650 XP / 1,500 Bonks per hour** at ~10 matches an hour. Daily quests add ~495 Bonks/day on top.
 
 Career XP (`Level.Points`) is lifetime and never resets — it exists for the leaderstat. Season XP is a separate, season-scoped counter. Neither is derived from the other; they are kept in step by a single award path at match commit.
 
 ### 6.2 Daily quests
 
-Three quests per day, drawn deterministically per player from a ten-quest pool, resetting at UTC midnight. Rewards are Cash. Completed-but-unclaimed quests are paid out automatically at rollover so nothing is lost to timing.
+Three quests per day, drawn deterministically per player from a ten-quest pool, resetting at UTC midnight. Rewards are Bonks. Completed-but-unclaimed quests are paid out automatically at rollover so nothing is lost to timing.
 
 ### 6.3 Season structure
 
 - **6 weeks** per season, with a **1-week rest gap** before the next — long enough to avoid burning content, short enough to stay a reason to return.
 - **25 tiers**, threshold `600n + 8n²`, ≈20,000 XP to complete — about **12 hours of play**, comfortably inside a 6-week window for a casual player.
-- **Free track**: Cash and five trails. It has to be worth engaging with on its own; it is the on-ramp that makes the premium track legible before anyone is asked to pay.
+- **Free track**: Bonks and five trails. It has to be worth engaging with on its own; it is the on-ramp that makes the premium track legible before anyone is asked to pay.
 - **Premium track**: sixteen further rewards, ending in a season-exclusive trail that is **retired permanently** when the season closes.
 - Rewards are **claimed manually**, not auto-granted, so the player sees what they earned. Anything still unclaimed at rollover is granted automatically rather than lost.
 
@@ -120,21 +120,21 @@ Cosmetics and progression boosters only. Nothing purchasable affects combat — 
 
 ### 7.1 Currency model
 
-- **Cash** — soft currency, earned from matches and quests. Never a competitive resource; it buys only cosmetics.
-- **Robux** — hard currency. Buys Cash bundles, direct crate opens, gamepasses, and the season pass.
+- **Bonks** — soft currency, earned from matches and quests. Never a competitive resource; it buys only cosmetics.
+- **Robux** — hard currency. Buys Bonks bundles, direct crate opens, gamepasses, and the season pass.
 
-Cash is deliberately the *only* thing Robux converts into on the random-reward path, so every purchase route has an earnable equivalent.
+Bonks is deliberately the *only* thing Robux converts into on the random-reward path, so every purchase route has an earnable equivalent.
 
 ### 7.2 Crates
 
-| Crate | Cash price | Pool |
+| Crate | Bonks price | Pool |
 |---|---|---|
 | Ball Crate | 500 | 9 ball skins |
 | Trail Crate | 1,000 | 40 droppable trails |
 
 Rarity weights: Common 70 / Rare 24 / Legendary 6. Exclusive is weight 0 — it never drops and exists only as pass entitlements.
 
-**Duplicate protection.** A duplicate refunds Cash by rarity (50 / 150 / 400).
+**Duplicate protection.** A duplicate refunds Bonks by rarity (50 / 150 / 400).
 
 **Pity.** Per crate, a Rare or better is guaranteed within **5** opens and a Legendary within **25**. Counters reset when the rarity drops naturally. **The pity rule is disclosed in the odds panel** — a guarantee the player cannot see does none of the trust work that justifies it.
 
@@ -142,9 +142,9 @@ Rarity weights: Common 70 / Rare 24 / Legendary 6. Exclusive is weight 0 — it 
 
 ### 7.3 Direct purchase
 
-Any droppable cosmetic can be bought outright for Cash: Common 1,200 / Rare 3,500 / Legendary 12,000.
+Any droppable cosmetic can be bought outright for Bonks: Common 1,200 / Rare 3,500 / Legendary 12,000.
 
-This exists because RNG-averse players otherwise have nothing to spend Cash on, and because one sink is not an economy. The pricing holds two invariants, both pinned by tests:
+This exists because RNG-averse players otherwise have nothing to spend Bonks on, and because one sink is not an economy. The pricing holds two invariants, both pinned by tests:
 
 - Direct buy is **cheaper than chasing one specific item** through crates (12,000 vs ~200,000 expected for a named Legendary), so targeting is always the rational choice for a specific want.
 - One crate open is **cheaper than the cheapest direct buy** (1,000 vs 1,200), so crates stay the value play for breadth.
@@ -158,8 +158,8 @@ Crates win on breadth, direct buy wins on targeting. Neither dominates.
 | Splat Starter Kit | 49 | 1 exclusive trail |
 | Trail Collection | 149 | 5 exclusive trails, no boosts |
 | Double XP | 199 | 2.0x XP |
-| Cash Boost | 249 | 1.5x Cash |
-| Brawler's Club | 499 | 2.5x XP, 1.5x Cash, 2 club trails |
+| Bonks Boost | 249 | 1.5x Bonks |
+| Brawler's Club | 499 | 2.5x XP, 1.5x Bonks, 2 club trails |
 | Founder's Pack | 999 | The above plus the Founder's Crown trail; retired after launch |
 
 **Stacking is max-wins per multiplier type**, never multiplicative — owning Double XP and Brawler's Club gives 2.5x, not 5x. Brawler's Club is deliberately 2.5x so that upgrading from Double XP is never a dead purchase.
@@ -177,7 +177,7 @@ One product per season rather than one reusable product, so receipt history is u
 ### 7.6 Compliance
 
 - Paid random items follow Roblox policy: all outcomes and numerical odds shown before purchase, summing to exactly 100%, reachable from a details control.
-- `PolicyService` gates **both** crate payment paths. A restricted player who has already been charged is still made whole — they receive the crate's Cash value instead of a random roll, because an already-charged receipt must never be stranded in retries.
+- `PolicyService` gates **both** crate payment paths. A restricted player who has already been charged is still made whole — they receive the crate's Bonks value instead of a random roll, because an already-charged receipt must never be stranded in retries.
 - `ProcessReceipt` is idempotent: purchase IDs are recorded permanently in the profile, so a retry after a grant acknowledges without re-granting.
 
 ### 7.7 Pricing philosophy
@@ -207,8 +207,8 @@ Targets to judge the economy against. Every one maps to an event that is already
 | D1 retention | 35%+ | Onboarding funnel `FirstMatchCompleted` → next-day `Joined` |
 | D7 retention | 12%+ | Same, seven-day window |
 | ARPDAU | Track, no launch target | Robux `Source` economy events / DAU |
-| Cash faucet vs. sink | Sink within 70–110% of faucet | `Source`/`Sink` economy events, `Gameplay` vs `Shop` |
-| Crate → direct-buy split | Neither below 20% of Cash spend | `Sink` events by `itemSku` |
+| Bonks faucet vs. sink | Sink within 70–110% of faucet | `Source`/`Sink` economy events, `Gameplay` vs `Shop` |
+| Crate → direct-buy split | Neither below 20% of Bonks spend | `Sink` events by `itemSku` |
 
 Two of these are guard rails rather than growth targets. **Faucet vs. sink** catches an economy drifting into either inflation or a grind wall. **Crate/direct split** catches one path dominating: if direct buy falls below 20%, the RNG-averse player has no real option; if crates fall below 20%, the gamble has stopped being the better deal for breadth and its pricing needs revisiting.
 

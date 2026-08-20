@@ -30,7 +30,7 @@ local CATALOG = {
 	Catalog = {
 		TrailCollection = { EntitlementItemIds = { "TrailX" } },
 		DoubleXP = { Boosts = { XpMultiplier = 2 } },
-		BrawlersClub = { Boosts = { XpMultiplier = 2.5, CashMultiplier = 1.5 } },
+		BrawlersClub = { Boosts = { XpMultiplier = 2.5, BonksMultiplier = 1.5 } },
 	},
 }
 
@@ -59,7 +59,7 @@ return function()
 			local player = fixture()
 			local multipliers = EntitlementService.multipliers(player)
 			expect(multipliers.Xp).to.equal(1)
-			expect(multipliers.Cash).to.equal(1)
+			expect(multipliers.Bonks).to.equal(1)
 		end)
 
 		it("applies the best owned booster", function()
@@ -68,7 +68,7 @@ return function()
 			EntitlementService.setOwnership(player, "BrawlersClub", true)
 			local multipliers = EntitlementService.multipliers(player)
 			expect(multipliers.Xp).to.equal(2.5)
-			expect(multipliers.Cash).to.equal(1.5)
+			expect(multipliers.Bonks).to.equal(1.5)
 		end)
 
 		it("is not ready until every boost pass has an answer", function()

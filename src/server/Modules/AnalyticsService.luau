@@ -16,6 +16,16 @@ local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local AnalyticsLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("AnalyticsLogic")
 )
+local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PlayerAssist"))
+local AssistProjection = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Config")
+		:WaitForChild("AssistProjection")
+)
+local AssistResolver = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Config"):WaitForChild("AssistResolver")
+)
 
 -- Sole caller of Roblox's AnalyticsService. Every other service reports
 -- through the public log* functions here rather than touching the engine
@@ -37,7 +47,41 @@ local onboardingProgress: { [number]: OnboardingProgress } = {}
 local sessionStart: { [number]: number } = {}
 local funnelSessionIds: { [number]: { [string]: string } } = {}
 local combatDedup = EventDedup.new()
+local matchStartedAt = 0
 local started = false
+
+-- Per-player, per-match combat tallies. Aggregated rather than logged per throw:
+-- a single event per player per match answers "hit rate by device" without
+-- putting one analytics call on every input.
+type CombatTally = { throws: number, hits: number, catches: number, deaths: number }
+
+local combatTallies: { [number]: CombatTally } = {}
+-- Server-wide values sampled at match end, registered by whoever owns them so
+-- this service does not have to reach into the simulation to read them.
+local gauges: { [string]: () -> number } = {}
+
+local function tallyFor(userId: number): CombatTally
+	local tally = combatTallies[userId]
+	if tally == nil then
+		tally = { throws = 0, hits = 0, catches = 0, deaths = 0 }
+		combatTallies[userId] = tally
+	end
+	return tally
+end
+
+-- Dimensions stamped onto every event. Device class is the axis every
+-- mobile-competitiveness question is sliced by, and the assist bucket separates
+-- A/B cohorts; stamping centrally means no call site can omit either.
+local function withDimensions(player: Player, customFields: { [string]: any }?): { [string]: any }
+	local fields: { [string]: any } = table.clone(customFields or {})
+	local dimensions = AnalyticsConfig.Dimensions
+	fields[dimensions.DeviceClass] = (player:GetAttribute("DeviceClass") :: string?) or "Mouse"
+
+	local projected = player:FindFirstChild(PlayerAssist.FolderName)
+	local folder = if projected and projected:IsA("Folder") then projected else nil
+	fields[dimensions.AssistBucket] = AssistResolver.bucket(PlayerAssist.Entries, AssistProjection.resolved(folder))
+	return fields
+end
 
 local function isStudio(): boolean
 	return RunService:IsStudio()
@@ -56,14 +100,18 @@ local function progressFor(userId: number): OnboardingProgress
 	return progress
 end
 
-local function funnelSessionId(userId: number, funnelName: string): string
+-- A funnel session identifies one journey through a funnel, not the player's
+-- whole visit: step 1 starts a new one so a second shop trip or a re-queue is a
+-- separate row rather than merging into the first and making the drop-off
+-- between steps unreadable.
+local function funnelSessionId(userId: number, funnelName: string, step: number): string
 	local byFunnel = funnelSessionIds[userId]
 	if byFunnel == nil then
 		byFunnel = {}
 		funnelSessionIds[userId] = byFunnel
 	end
 	local id = byFunnel[funnelName]
-	if id == nil then
+	if id == nil or step <= 1 then
 		id = HttpService:GenerateGUID(false)
 		byFunnel[funnelName] = id
 	end
@@ -94,7 +142,7 @@ function AnalyticsService.logFunnelStep(
 	stepName: string,
 	customFields: { [string]: any }?
 )
-	local sessionId = funnelSessionId(player.UserId, funnelName)
+	local sessionId = funnelSessionId(player.UserId, funnelName, step)
 	if isStudio() then
 		if verbose() then
 			print(`[Analytics/studio] FunnelStep {player.Name} funnel={funnelName} step={step} name={stepName}`)
@@ -102,7 +150,14 @@ function AnalyticsService.logFunnelStep(
 		return
 	end
 	local ok, err = pcall(function()
-		RobloxAnalytics:LogFunnelStepEvent(player, funnelName, sessionId, step, stepName, customFields)
+		RobloxAnalytics:LogFunnelStepEvent(
+			player,
+			funnelName,
+			sessionId,
+			step,
+			stepName,
+			withDimensions(player, customFields)
+		)
 	end)
 	if not ok then
 		warn(`[AnalyticsService] LogFunnelStepEvent failed: {err}`)
@@ -163,7 +218,7 @@ function AnalyticsService.logCustomEvent(
 		return
 	end
 	local ok, err = pcall(function()
-		RobloxAnalytics:LogCustomEvent(player, eventName, value, customFields)
+		RobloxAnalytics:LogCustomEvent(player, eventName, value, withDimensions(player, customFields))
 	end)
 	if not ok then
 		warn(`[AnalyticsService] LogCustomEvent failed: {err}`)
@@ -210,6 +265,7 @@ local function onPlayerRemoving(player: Player)
 	onboardingProgress[player.UserId] = nil
 	sessionStart[player.UserId] = nil
 	funnelSessionIds[player.UserId] = nil
+	combatTallies[player.UserId] = nil
 end
 
 local function matchStateAttribute(name: string): any
@@ -225,8 +281,13 @@ local function handleElimOrCatch(event: { [string]: any })
 	local modeId = matchStateAttribute("modeId")
 
 	if event.kind == "Elim" then
+		local source = PlayerIds.fromId(event.sourceId)
+		if source then
+			tallyFor(source.UserId).hits += 1
+		end
 		local target = PlayerIds.fromId(event.targetId)
 		if target then
+			tallyFor(target.UserId).deaths += 1
 			AnalyticsService.logCustomEvent(target, AnalyticsConfig.CustomEvents.Elimination, 1, {
 				weaponType = AnalyticsLogic.weaponTypeForElim(event),
 				modeId = modeId,
@@ -236,6 +297,7 @@ local function handleElimOrCatch(event: { [string]: any })
 	elseif event.kind == "BallCaught" then
 		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
 		if catcher then
+			tallyFor(catcher.UserId).catches += 1
 			AnalyticsService.logCustomEvent(catcher, AnalyticsConfig.CustomEvents.BallCaught, 1, {
 				modeId = modeId,
 			})
@@ -246,18 +308,60 @@ end
 local function handleMatchEvent(event: { [string]: any })
 	if event.kind == "MatchStarted" then
 		combatDedup.clear()
+		table.clear(combatTallies)
+		matchStartedAt = os.clock()
 		for _, player in Players:GetPlayers() do
 			advanceOnboarding(player, "MatchStarted")
+		end
+	elseif event.kind == "BallWindup" then
+		if combatDedup.markSeen(event) then
+			local thrower = PlayerIds.fromId(event.playerId)
+			if thrower then
+				tallyFor(thrower.UserId).throws += 1
+			end
 		end
 	elseif event.kind == "Elim" or event.kind == "BallCaught" then
 		handleElimOrCatch(event)
 	elseif event.kind == "MatchEnded" then
+		local durationSeconds = if matchStartedAt > 0 then os.clock() - matchStartedAt else 0
+		local gaugeValues: { [string]: any } = {}
+		for name, read in gauges do
+			local ok, value = pcall(read)
+			gaugeValues[name] = if ok then value else nil
+		end
+		matchStartedAt = 0
+		local modeId = matchStateAttribute("modeId")
+		local playerCount = #Players:GetPlayers()
 		for _, player in Players:GetPlayers() do
 			advanceOnboarding(player, "MatchEnded")
-			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchCompleted, 1, {
+			-- Value is the duration so match length is aggregatable without
+			-- unpacking custom fields; the rest describes what was played.
+			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchCompleted, durationSeconds, {
 				winnerId = event.winnerId,
+				modeId = modeId,
+				playerCount = playerCount,
+				score = player:GetAttribute("MatchScore"),
+				won = event.winnerId ~= nil and tostring(event.winnerId) == PlayerIds.toId(player),
 			})
+
+			-- One row per player per match carrying the whole combat tally, so
+			-- hit rate is a division on the dashboard rather than a join across
+			-- per-throw events. Gauge values describe the server everyone in
+			-- this match shared, so they ride along on every row.
+			local tally = tallyFor(player.UserId)
+			local fields: { [string]: any } = {
+				modeId = modeId,
+				throws = tally.throws,
+				hits = tally.hits,
+				catches = tally.catches,
+				deaths = tally.deaths,
+			}
+			for name, value in gaugeValues do
+				fields[name] = value
+			end
+			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CombatSummary, tally.throws, fields)
 		end
+		table.clear(combatTallies)
 	end
 end
 
@@ -277,7 +381,33 @@ local function handleReport(player: Player, payload: { [string]: any })
 	end
 end
 
-function AnalyticsService.start(matchService: any)
+-- Lets whoever owns a server-wide counter report it without this service having
+-- to reach into the simulation to read it. Values are sampled once at match end
+-- and attached to every player's CombatSummary row.
+function AnalyticsService.registerGauge(name: string, read: () -> number)
+	gauges[name] = read
+end
+
+-- Round-trip time is the input to the largest known fairness gap (see
+-- docs/hitreg-audit.md F1), and it cannot be inferred from anything else we log,
+-- so it is sampled directly. Per player, because the whole point is comparing
+-- one connection against another.
+local function sampleLatency()
+	for _, player in Players:GetPlayers() do
+		local ok, ping = pcall(function()
+			return player:GetNetworkPing()
+		end)
+		if ok and typeof(ping) == "number" then
+			-- GetNetworkPing reports one way, in seconds; milliseconds round trip
+			-- is what everyone actually reasons about.
+			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.InputLatency, ping * 2000)
+		end
+	end
+end
+
+-- matchService is optional: the lobby runs the same service for session,
+-- onboarding, economy, and funnel reporting but has no match loop to observe.
+function AnalyticsService.start(matchService: any?)
 	if started then
 		return
 	end
@@ -290,13 +420,22 @@ function AnalyticsService.start(matchService: any)
 		end,
 	}, handleReport)
 
-	matchService.onEvent(handleMatchEvent)
+	if matchService then
+		matchService.onEvent(handleMatchEvent)
+	end
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
 	for _, player in Players:GetPlayers() do
 		onPlayerAdded(player)
 	end
+
+	task.spawn(function()
+		while true do
+			task.wait(AnalyticsConfig.LatencySampleSeconds)
+			sampleLatency()
+		end
+	end)
 end
 
 return AnalyticsService

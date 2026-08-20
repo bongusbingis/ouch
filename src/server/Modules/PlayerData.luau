@@ -23,7 +23,7 @@ export type ProgressionDelta = {
 	Losses: number?,
 	MatchesPlayed: number?,
 	XP: number?,
-	Cash: number?,
+	Bonks: number?,
 }
 
 local EDITABLE_PROGRESSION_FIELDS = {
@@ -247,10 +247,10 @@ function Data.get(player)
 	return entry and entry.Data
 end
 
-function Data.addCash(player, amount)
+function Data.addBonks(player, amount)
 	local d = Data.get(player)
 	if d then
-		d.Cash = d.Cash + amount
+		d.Bonks = d.Bonks + amount
 	end
 end
 
@@ -276,7 +276,7 @@ function Data.applyProgression(player, delta: ProgressionDelta)
 	progression.Losses += delta.Losses or 0
 	progression.MatchesPlayed += delta.MatchesPlayed or 0
 	d.Level.Points += delta.XP or 0
-	d.Cash += delta.Cash or 0
+	d.Bonks += delta.Bonks or 0
 	_recalculateKDR(d)
 	_syncLeaderStats(player)
 	return true
@@ -310,8 +310,8 @@ function Data.setFieldForTesting(player, field, value)
 	end
 
 	local nextValue = math.max(math.floor(value), 0)
-	if field == "Cash" then
-		d.Cash = nextValue
+	if field == "Bonks" then
+		d.Bonks = nextValue
 	elseif field == "XP" then
 		d.Level.Points = nextValue
 	elseif EDITABLE_PROGRESSION_FIELDS[field] then
@@ -332,8 +332,8 @@ function Data.addFieldForTesting(player, field, amount)
 	end
 
 	local current
-	if field == "Cash" then
-		current = d.Cash
+	if field == "Bonks" then
+		current = d.Bonks
 	elseif field == "XP" then
 		current = d.Level.Points
 	elseif EDITABLE_PROGRESSION_FIELDS[field] then

@@ -6,6 +6,7 @@ realm = "shared"
 
 [dependencies]
 testEZ = "roblox/testez@0.4.1"
+zone-plus = "legendoj1/zoneplus@3.2.2"
 janitor = "howmanysmall/janitor@^1.17.0"
 replica = "ayrezrblx/replica@0.1.9"
 promise = "evaera/promise@4.0.0"

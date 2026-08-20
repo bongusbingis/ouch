@@ -44,6 +44,8 @@ local function throwCommand(overrides: { [string]: any }?): InputCommand
 		aimDir = vector.create(1, 0, 0),
 		targetId = nil,
 		deviceClass = "Mouse",
+		-- What a mouse player resolves to: cone snap on, lead inert.
+		assist = { ConeSnap = 1, Lead = 0 },
 	}
 	for key, value in overrides or {} do
 		(command :: any)[key] = value
@@ -137,6 +139,88 @@ T.describe("Dodgeball kit", function()
 				T.expect(event.targetId):toEqual("dummy")
 			end
 		end
+	end)
+
+	T.it("does not auto-select at all when cone snap strength is zero", function()
+		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
+		local state = stateWithHeldBall(world)
+		local events = SimCore.step(state, { throwCommand({ assist = { ConeSnap = 0 } }) }, world, DT)
+		T.expect(countEvents(events, "BallWindup")):toEqual(1)
+		for _, event in events do
+			if event.kind == "BallWindup" then
+				T.expect(event.targetId):toBeNil()
+			end
+		end
+	end)
+
+	T.it("still honours a tapped target when cone snap is off", function()
+		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
+		local state = stateWithHeldBall(world)
+		local events =
+			SimCore.step(state, { throwCommand({ targetId = "dummy", assist = { ConeSnap = 0 } }) }, world, DT)
+		for _, event in events do
+			if event.kind == "BallWindup" then
+				T.expect(event.targetId):toEqual("dummy")
+			end
+		end
+	end)
+
+	T.it("leaves the throw on the player's own aim when lead is off", function()
+		local world = arena({
+			dummy = MockWorld.character(vector.create(30, 2.5, 1), { velocity = vector.create(0, 0, 40) }),
+		})
+		world.characters.dummy.velocityConsistency = 1
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ assist = { ConeSnap = 1, Lead = 0 } }) }, world, DT)
+		local ball = state.projectiles.ball_0001
+		T.expect(ball.releaseAim.z):toBeNear(0, 1e-5)
+	end)
+
+	T.it("biases the throw ahead of a target moving across it", function()
+		local world = arena({
+			dummy = MockWorld.character(vector.create(30, 2.5, 1), { velocity = vector.create(0, 0, 40) }),
+		})
+		world.characters.dummy.velocityConsistency = 1
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ assist = { ConeSnap = 1, Lead = 1 } }) }, world, DT)
+		local ball = state.projectiles.ball_0001
+		T.expect(ball.releaseAim.z > 0):toBeTruthy()
+	end)
+
+	T.it("does not lead a target whose movement has been erratic", function()
+		local world = arena({
+			dummy = MockWorld.character(vector.create(30, 2.5, 1), { velocity = vector.create(0, 0, 40) }),
+		})
+		world.characters.dummy.velocityConsistency = 0
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ assist = { ConeSnap = 1, Lead = 1 } }) }, world, DT)
+		local ball = state.projectiles.ball_0001
+		T.expect(ball.releaseAim.z):toBeNear(0, 1e-5)
+	end)
+
+	T.it("carries the charge the player held through to the release", function()
+		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ charge = 0.75 }) }, world, DT)
+		local ball = state.projectiles.ball_0001
+		T.expect(ball.releaseCharge):toBeNear(0.75, 1e-6)
+		T.expect(ball.releaseLob):toEqual(false)
+	end)
+
+	T.it("resolves a client claiming both a lob and a charge in favour of the lob", function()
+		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ charge = 1, lob = true }) }, world, DT)
+		local ball = state.projectiles.ball_0001
+		T.expect(ball.releaseLob):toEqual(true)
+		T.expect(ball.releaseCharge):toEqual(0)
+	end)
+
+	T.it("clamps a charge the client sent out of range", function()
+		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ charge = 12 }) }, world, DT)
+		T.expect(state.projectiles.ball_0001.releaseCharge):toEqual(1)
 	end)
 
 	T.it("does not auto-select outside the selection cone", function()

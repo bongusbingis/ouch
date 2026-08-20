@@ -8,7 +8,7 @@ local mount = require(script.Parent.StoryRoot)
 local function Story()
 	local selectedTab, setSelectedTab = React.useState("OUTFITS")
 	return React.createElement(InventoryPage, {
-		Data = { Cash = 0, Cosmetics = { Owned = {}, Equipped = {} } },
+		Data = { Bonks = 0, Cosmetics = { Owned = {}, Equipped = {} } },
 		SelectedTab = selectedTab,
 		OnTabChanged = setSelectedTab,
 		OnEquip = function() end,

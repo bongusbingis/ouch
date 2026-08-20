@@ -65,4 +65,16 @@ function SimUtil.hasLineOfSight(
 	return hit == nil or hit.distance >= distance - target.radius
 end
 
+-- Resolved 0-1 strength of one assist feature for the player who issued this
+-- command, or 0 when the adapter attached nothing. Every weapon reads assists
+-- through here so a missing set can never mean "full strength" in one kit and
+-- "off" in another.
+function SimUtil.assistStrength(command: SimTypes.InputCommand, feature: string): number
+	local assist = command.assist
+	if assist == nil then
+		return 0
+	end
+	return math.clamp(assist[feature] or 0, 0, 1)
+end
+
 return SimUtil

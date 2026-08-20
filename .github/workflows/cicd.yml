@@ -183,6 +183,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.3.0
+        with:
+          # The place files are Git LFS binaries; without this the merge base
+          # would be a pointer text file.
+          lfs: true
 
       - name: Install Aftman
         uses: ok-nick/setup-aftman@v0.4.2
@@ -196,26 +200,42 @@ jobs:
       - name: Install Wally packages
         run: wally install
 
-      # Downloads whatever place is currently live via Open Cloud's Asset
-      # Delivery API. This exact file is both the merge base below and the
-      # uploaded artifact, so agents inspecting the artifact see precisely
-      # what this run built against.
-      - name: Fetch live place
-        timeout-minutes: 4
-        run: bash src/scripts/shell/fetch-live-place.sh live-place.rbxl
+      # The Studio-authored place committed under places/<place>/ is the merge
+      # base and the artifact that gets published. Its name is not fixed, so it
+      # is discovered; exactly one must exist or the deploy is ambiguous.
+      - name: Resolve place file
+        id: place-file
+        run: |
+          set -euo pipefail
+          dir="places/${{ matrix.place }}"
+          count=$(find "$dir" -maxdepth 1 -name '*.rbxl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Expected exactly one .rbxl in $dir, found $count."
+            find "$dir" -maxdepth 1 -name '*.rbxl'
+            exit 1
+          fi
+          file=$(find "$dir" -maxdepth 1 -name '*.rbxl')
+          echo "Using place file: $file"
+          # An LFS pointer is a few hundred bytes; a real place is far larger.
+          size=$(wc -c < "$file")
+          if [ "$size" -lt 10000 ]; then
+            echo "::error::$file is only ${size} bytes - Git LFS content was not fetched."
+            exit 1
+          fi
+          echo "file=$file" >> "$GITHUB_OUTPUT"
 
-      - name: Upload live place artifact
+      - name: Upload base place artifact
         uses: actions/upload-artifact@v4
         with:
-          name: live-place-${{ matrix.place }}
-          path: live-place.rbxl
+          name: base-place-${{ matrix.place }}
+          path: ${{ steps.place-file.outputs.file }}
           retention-days: 14
 
       - name: Build, merge, test, and publish
         timeout-minutes: 15
         run: |
           set +e
-          bash src/scripts/shell/deploy.sh ${{ matrix.place }}.project.json live-place.rbxl
+          bash src/scripts/shell/deploy.sh ${{ matrix.place }}.project.json "${{ steps.place-file.outputs.file }}"
           code=$?
           set -e
           if [ "$code" -eq 2 ]; then

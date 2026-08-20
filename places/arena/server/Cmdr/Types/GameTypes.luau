@@ -40,7 +40,7 @@ return function(registry)
 	registry:RegisterType(
 		"profileField",
 		registry.Cmdr.Util.MakeEnumType("profile field", {
-			"Cash",
+			"Bonks",
 			"XP",
 			"Elims",
 			"Deaths",

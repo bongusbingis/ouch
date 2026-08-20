@@ -27,7 +27,7 @@ type MatchProgress = {
 	Losses: number,
 	MatchesPlayed: number,
 	XP: number,
-	Cash: number,
+	Bonks: number,
 }
 
 local ProgressionService = {}
@@ -47,7 +47,7 @@ local function blank(): MatchProgress
 		Losses = 0,
 		MatchesPlayed = 0,
 		XP = 0,
-		Cash = 0,
+		Bonks = 0,
 	}
 end
 
@@ -70,7 +70,7 @@ end
 
 local function addRewards(progress: MatchProgress, rewardKey: string)
 	progress.XP += DataConfig.ProgressionXP[rewardKey] or 0
-	progress.Cash += DataConfig.ProgressionCash[rewardKey] or 0
+	progress.Bonks += DataConfig.ProgressionBonks[rewardKey] or 0
 end
 
 local function trackElim(event: MatchEvent)
@@ -141,7 +141,7 @@ local function commitMatch(event: MatchEvent)
 				Losses = progress.Losses,
 				MatchesPlayed = progress.MatchesPlayed,
 				XP = Boosts.apply(progress.XP, multipliers.Xp),
-				Cash = Boosts.apply(progress.Cash, multipliers.Cash),
+				Bonks = Boosts.apply(progress.Bonks, multipliers.Bonks),
 			}
 
 			PlayerData.applyProgression(player, awarded)
@@ -150,14 +150,14 @@ local function commitMatch(event: MatchEvent)
 			-- being the only place either is incremented for a match.
 			activeBattlePassService.addSeasonXp(player, awarded.XP)
 			PlayerData.completeTutorial(player)
-			if awarded.Cash > 0 then
+			if awarded.Bonks > 0 then
 				local data = PlayerData.get(player)
 				AnalyticsService.logEconomyEvent(
 					player,
 					"Source",
-					"Cash",
-					awarded.Cash,
-					if data then data.Cash else 0,
+					"Bonks",
+					awarded.Bonks,
+					if data then data.Bonks else 0,
 					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
 					"MatchRewards"
 				)
@@ -168,11 +168,11 @@ local function commitMatch(event: MatchEvent)
 				deaths = progress.Deaths,
 				catches = progress.Catches,
 				baseXp = progress.XP,
-				baseCash = progress.Cash,
+				baseBonks = progress.Bonks,
 				xpMultiplier = multipliers.Xp,
-				cashMultiplier = multipliers.Cash,
+				bonksMultiplier = multipliers.Bonks,
 				xp = awarded.XP,
-				cash = awarded.Cash,
+				bonks = awarded.Bonks,
 			})
 		end
 	end

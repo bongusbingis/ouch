@@ -21,7 +21,8 @@ local ElimZones = {}
 ElimZones.folderName = "ElimZones"
 
 function ElimZones.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)
-	for _, zone in context.parts do
+	for _, instance in context.instances do
+		local zone = instance :: BasePart
 		if Volume.contains(zone.CFrame, zone.Size, root.Position, MapFeatures.ElimZone.VerticalPadding) then
 			MatchService.eliminate(player)
 			return

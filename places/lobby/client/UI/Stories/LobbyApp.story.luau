@@ -49,7 +49,7 @@ return function(target: Instance)
 	local root = ReactRoblox.createRoot(target)
 	root:render(React.createElement(LobbyApp, {
 		PartyClient = mockPartyClient,
-		EconomyData = { Cash = 0, Cosmetics = { Owned = {}, Equipped = {} } },
+		EconomyData = { Bonks = 0, Cosmetics = { Owned = {}, Equipped = {} } },
 		CameraEnabled = false,
 		WorldPresentationEnabled = false,
 	}))
