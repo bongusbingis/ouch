@@ -6,6 +6,10 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("AimAssist"))
+local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
+local AimDirector = require(script.Parent.Parent.Input.AimDirector)
+local ArmIK = require(script.Parent.Parent.Presentation.ArmIK)
+local CombatState = require(script.Parent.Parent.Presentation.CombatState)
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
 local PlayerIds = require(
@@ -57,6 +61,11 @@ local function anyVisualEnabled(): boolean
 		or Debug.CollisionRadius == true
 		or Debug.SelectedTarget == true
 		or Debug.BounceNormals == true
+		or Debug.PoseAimVector == true
+		or Debug.PoseIKTarget == true
+		or Debug.PoseElbowPole == true
+		or Debug.PoseReleaseOrigin == true
+		or Debug.PoseWindupAnchor == true
 end
 
 local function clearTransientVisuals()
@@ -388,6 +397,75 @@ local function drawBounceNormals()
 	end
 end
 
+-- Pose layer. Draws what the procedural systems are using rather than
+-- recomputing an approximation, so what you see is what the solver sees.
+local lastReadout = ""
+
+local function drawPoseDebug(character: Model?)
+	if character == nil then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root == nil or not root:IsA("BasePart") then
+		return
+	end
+
+	if Debug.PoseReleaseOrigin then
+		local offset = Combat.Dodgeball.OverhandReleaseRootOffset
+		local origin = (root.CFrame * CFrame.new(offset.x, offset.y, offset.z)).Position
+		drawSphereRings(origin, 0.35, Color3.fromRGB(255, 200, 0), 0.2)
+	end
+
+	-- The configured shoulder, not the animated limb: this is the frame the
+	-- solver actually measures from, so drawing the real bone would show
+	-- something the maths never sees.
+	local shoulderOffset = ThrowPose.Arm.ShoulderOffset
+	local shoulder = (root.CFrame * CFrame.new(shoulderOffset.x, shoulderOffset.y, shoulderOffset.z)).Position
+
+	if Debug.PoseAimVector then
+		local aim = AimDirector.currentAim()
+		if typeof(aim) == "Vector3" and aim.Magnitude > 1e-6 then
+			drawLine(shoulder, shoulder + aim.Unit * 8, Color3.fromRGB(0, 255, 128), 0.05, 0.1)
+		end
+	end
+
+	if Debug.PoseWindupAnchor then
+		local windup = ThrowPose.Arm.WindupOffset
+		local anchor = (root.CFrame * CFrame.new(
+			shoulderOffset.x + windup.x,
+			shoulderOffset.y + windup.y,
+			shoulderOffset.z + windup.z
+		)).Position
+		drawSphereRings(anchor, 0.28, Color3.fromRGB(255, 120, 0), 0.2)
+		drawLine(shoulder, anchor, Color3.fromRGB(255, 120, 0), 0.03, 0.5)
+	end
+
+	local target, pole, weight = ArmIK.debugState()
+	if Debug.PoseIKTarget and target then
+		drawSphereRings(target, 0.3, Color3.fromRGB(0, 170, 255), 0.15)
+		drawLine(shoulder, target, Color3.fromRGB(0, 170, 255), 0.03, 0.5)
+	end
+	if Debug.PoseElbowPole and pole then
+		drawSphereRings(pole, 0.22, Color3.fromRGB(255, 0, 200), 0.2)
+	end
+
+	if Debug.PoseStateReadout then
+		local snapshot = CombatState.getSnapshot()
+		local readout = string.format(
+			"[Pose] %s / %s charge=%.2f ik=%.2f",
+			snapshot.weapon,
+			snapshot.state,
+			snapshot.chargeAlpha,
+			weight
+		)
+		-- Only on change: a per-frame print at this rate is unreadable and slow.
+		if readout ~= lastReadout then
+			lastReadout = readout
+			print(readout)
+		end
+	end
+end
+
 function DebugVisuals.onEvent(event: SimEvent)
 	if not enabled() or not Debug.BounceNormals then
 		return
@@ -439,6 +517,7 @@ function DebugVisuals.start()
 
 		drawAimDebug(camera, character, balls)
 		drawLocalPlayerDebug(character)
+		drawPoseDebug(character)
 		drawBallDebug(balls)
 		drawBounceNormals()
 		hideUnusedLines()

@@ -19,6 +19,7 @@ local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Util = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util")
 local Spring = require(Util:WaitForChild("Spring"))
 local CharacterRig = require(script.Parent.CharacterRig)
+local CombatState = require(script.Parent.CombatState)
 local TrailVisuals = require(script.Parent.TrailVisuals)
 local WorldAudio = require(script.Parent.WorldAudio)
 
@@ -53,7 +54,7 @@ local feelStates: { [BasePart]: FeelState } = {}
 local trailEnabled: { [BasePart]: boolean } = {}
 local seen = EventDedup.new(4096)
 
-local function cframeOffset(offset: vector): CFrame
+local function cframeOffset(offset: Vector3): CFrame
 	return CFrame.new(offset.x, offset.y, offset.z)
 end
 
@@ -134,7 +135,7 @@ local function updateRestPulse(ball: BasePart, visual: BasePart, active: boolean
 		local highlight = Instance.new("Highlight")
 		highlight.Name = "RestGoldPulse"
 		highlight.Adornee = visual
-		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 		highlight.FillColor = config.FillColor
 		highlight.OutlineColor = config.OutlineColor
 		highlight.Parent = visual
@@ -202,7 +203,7 @@ end
 local function eventVector(value: any): Vector3?
 	if typeof(value) == "Vector3" then
 		return value
-	elseif typeof(value) == "vector" then
+	elseif typeof(value) == "Vector3" then
 		return Vector3.new(value.x, value.y, value.z)
 	end
 	return nil
@@ -356,10 +357,17 @@ function BallVisuals.start()
 		end
 	end)
 
-	RunService.RenderStepped:Connect(function(dt)
+	-- After the animator (Character) and the arm IK (Character + 1). A held ball
+	-- is positioned from the hand's transform, so reading it at the default
+	-- RenderStepped priority reads last frame's pose: the ball renders where the
+	-- hand used to be while the hand renders where it now is. Standing still the
+	-- error is invisible, but a running arm swing or a wind-up moves the hand far
+	-- enough per frame that the ball visibly separates and judders against it.
+	RunService:BindToRenderStep("BallVisuals", Enum.RenderPriority.Character.Value + 2, function(dt)
 		local alpha = 1 - math.exp(-Combat.Dodgeball.RemoteSmoothing * dt)
 		local localId = PlayerIds.toId(Players.LocalPlayer)
 		local feelConfig = Combat.Dodgeball.BallFeel
+		local snapshot = CombatState.getSnapshot()
 		for ball, visual in visuals do
 			if ball.Parent == nil then
 				removeBall(ball)
@@ -369,9 +377,13 @@ function BallVisuals.start()
 			refreshTrail(ball)
 			visual = visuals[ball] :: BasePart
 			local phase = ball:GetAttribute("ph")
+			local isLocalHeld = ball:GetAttribute("hb") == localId
+			local isChargeAiming = snapshot.state == "Charging" and snapshot.weapon == "Dodgeball" and isLocalHeld
+			visual.Transparency = if isChargeAiming then 0.5 else 0
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
 			local state = feelFor(ball, visual)
+			local heldBlend = if isLocalHeld then 1 - math.exp(-dt * 22) else 1
 			local velocity = ball:GetAttribute("vel")
 			local velocityVector = if typeof(velocity) == "Vector3" then velocity else Vector3.zero
 			local speed = velocityVector.Magnitude
@@ -388,10 +400,17 @@ function BallVisuals.start()
 			Spring.step(state.spring, feelConfig.SpringFrequencyHz, feelConfig.SpringDampingRatio, dt)
 			local stretch = math.clamp(state.spring.position, -feelConfig.MaxImpactSquash, feelConfig.MaxFlightStretch)
 			local scale = deformationScale(stretch)
-			visual.Size =
-				Vector3.new(state.baseSize.X * scale.X, state.baseSize.Y * scale.Y, state.baseSize.Z * scale.Z)
+			local restingSize = Vector3.new(4, 4, 4)
+			local visualSize = if phase == FREE_PHASE
+				then restingSize
+				else Vector3.new(state.baseSize.X * scale.X, state.baseSize.Y * scale.Y, state.baseSize.Z * scale.Z)
+			visual.Size = visualSize
 
 			local targetCFrame = heldCFrame or ball.CFrame
+			if phase == FREE_PHASE then
+				local extraY = (restingSize.Y - state.baseSize.Y) / 2
+				targetCFrame = CFrame.new(ball.Position + Vector3.new(0, extraY, 0)) * ball.CFrame.Rotation
+			end
 			if heldCFrame == nil and speed > 0.05 then
 				local direction = velocityVector.Unit
 				if stretch < -0.015 and state.impactNormal then
@@ -404,7 +423,11 @@ function BallVisuals.start()
 				targetCFrame = CFrame.lookAt(ball.Position, ball.Position + direction)
 					* CFrame.Angles(0, 0, state.spinAngle)
 			end
-			visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
+			if isLocalHeld then
+				visual.CFrame = visual.CFrame:Lerp(targetCFrame, heldBlend)
+			else
+				visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)
+			end
 
 			updateRestPulse(ball, visual, phase == FREE_PHASE, dt)
 			local trailActive = TRAIL_ACTIVE_PHASES[phase] == true

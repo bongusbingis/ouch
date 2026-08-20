@@ -185,6 +185,7 @@ local function LobbyContent(props)
 	local joinOpen, setJoinOpen = React.useState(false)
 	local codeVisible, setCodeVisible = React.useState(false)
 	local busySlots = React.useRef({})
+	local devTapState = React.useRef({ lastTapAt = 0, tapCount = 0 })
 	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.onChanged)
 	local economyData = props.EconomyData or storeData
 	local snapshot, requestBusy = useParty(partyClient, notifications)
@@ -257,6 +258,23 @@ local function LobbyContent(props)
 	React.useEffect(function()
 		local connection = UserInputService.InputBegan:Connect(function(input, processed)
 			local isBack = input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB
+			if
+				input.UserInputType == Enum.UserInputType.Touch
+				or input.UserInputType == Enum.UserInputType.MouseButton2
+			then
+				local now = os.clock()
+				local tapState = devTapState.current
+				if now - tapState.lastTapAt > 1.25 then
+					tapState.tapCount = 0
+				end
+				tapState.lastTapAt = now
+				tapState.tapCount += 1
+				if tapState.tapCount >= 10 then
+					tapState.tapCount = 0
+					print("spawning dev server for solo play")
+					task.spawn(partyClient.devSoloPlay, partyClient)
+				end
+			end
 			if not isBack then
 				return
 			end

@@ -154,6 +154,10 @@ function PartyClient:toggleMatchmaking()
 	return nil, "match_forming"
 end
 
+function PartyClient:devSoloPlay()
+	return self:request(Protocol.Actions.DevSoloPlay, nil, false)
+end
+
 function PartyClient:promptInvite()
 	local snapshot = self:getSnapshot()
 	if snapshot == nil then

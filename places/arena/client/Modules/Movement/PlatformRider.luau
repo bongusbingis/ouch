@@ -82,9 +82,9 @@ local function step()
 	-- Only a continuous ride carries: stepping onto a different platform starts
 	-- tracking fresh rather than applying a delta accumulated elsewhere.
 	if ridingPlatform == platform and ridingPivot then
-		local delta = pivot * ridingPivot:Inverse()
 		local current = root.CFrame
-		local carried = delta * current.Position
+		local localOffset = ridingPivot:Inverse() * current.Position
+		local carried = pivot * localOffset
 		if (carried - current.Position).Magnitude >= MINIMUM_CARRY_STUDS then
 			root.CFrame = CFrame.new(carried) * current.Rotation
 		end

@@ -1,38 +1,31 @@
 --!strict
 
 local Players = game:GetService("Players")
+local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local InputBuffer = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("InputBuffer")
 )
-local Gestures = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("Gestures")
-)
 local AimDirector = require(script.Parent.AimDirector)
-local TouchInput = require(script.Parent.TouchInput)
+local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
+local CombatState = require(script.Parent.Parent.Presentation.CombatState)
 
 -- Sends throw and catch intent to the server. Intent only: the server decides
 -- whether the action is legal, where it starts from, and what it hits.
 --
--- Two producers feed this. Hardware buttons (mouse, keyboard, gamepad) come in
--- through their InputActions; touch comes in as classified gestures from
--- TouchInput. Both land in the same buffer so timing behaves identically.
+-- Input is classified upstream in PlayerModule.Combat, which owns every device
+-- and every touch. What arrives here is already device-independent intent, so
+-- there is one code path regardless of whether the player tapped, clicked,
+-- flicked or pulled a trigger.
 --
--- Throw style is resolved per producer but from one shared ramp. A button press
--- that will throw a ball resolves on release, so its hold duration is known: a
--- quick click lobs, anything held longer charges. Touch reaches the same two
--- throws through a swipe up and a held release.
---
--- The same button swings the hammer when no ball is held, and a swing has no
--- style to wait for -- deferring it would put the tap window's worth of latency
--- on every melee swing. So the deferral is decided per press by whether a ball
--- is in hand. Catch never defers either.
+-- There are only two throws: a normal one and a charged one. Every gesture that
+-- is not a hold produces the normal throw, so a tap, a click, a bottom swipe and
+-- a trigger pull all arrive here identically.
 
 local CombatInputSender = {}
 
@@ -41,7 +34,10 @@ local listeners: { (string) -> () } = {}
 local buffer = InputBuffer.new()
 -- How a throw was performed, carried alongside the action so a buffered input
 -- replays as the same throw the player made.
-type Style = { targetId: string?, charge: number?, lob: boolean? }
+-- How a throw was performed, carried alongside the action so a buffered input
+-- replays as the same throw. There is no lob: every non-charged throw is the
+-- same normal throw whatever gesture produced it.
+type Style = { targetId: string?, charge: number? }
 
 local pendingStyle: Style? = nil
 
@@ -58,23 +54,6 @@ local function notify(kind: string)
 			warn(`[CombatInputSender] intent listener error: {err}`)
 		end
 	end
-end
-
-local function holdsBall(): boolean
-	local balls = Workspace:FindFirstChild("Balls")
-	if balls == nil then
-		return false
-	end
-	local localId = tostring(Players.LocalPlayer.UserId)
-	for _, ball in balls:GetChildren() do
-		if ball:GetAttribute("hb") == localId then
-			local phase = ball:GetAttribute("ph")
-			if phase == 0 or phase == 1 then
-				return true
-			end
-		end
-	end
-	return false
 end
 
 -- A ball is inbound when projecting its current velocity forward passes close
@@ -117,7 +96,7 @@ end
 -- With no ball held a tap is ambiguous between swinging and catching. The
 -- hammer stays the default; catch only wins when something is genuinely inbound.
 local function intentForTap(): string
-	if holdsBall() then
+	if CombatState.holdsBall() then
 		return "Throw"
 	end
 	return if ballIncoming() then "Catch" else "Throw"
@@ -128,7 +107,7 @@ local function send(kind: string, style: Style)
 	if typeof(aimDir) ~= "Vector3" or aimDir.Magnitude <= 1e-6 then
 		return
 	end
-	Network.fireServer("SubmitCombatInput", kind, aimDir, style.targetId, style.charge, style.lob)
+	Network.fireServer("SubmitCombatInput", kind, aimDir, style.targetId, style.charge)
 	notify(kind)
 end
 
@@ -145,27 +124,16 @@ end
 
 -- Actionable input is sent immediately, so no device pays a frame of latency
 -- for the buffer existing. Only input that provably cannot fire yet waits, and
--- only for a short window; mobile taps that land a hair early otherwise feel
--- dropped.
--- A button press resolves to the same two throws touch gets, off the same ramp:
--- a click too short to be a hold lobs, anything longer charges by how long it
--- was held.
-local function buttonStyle(heldSeconds: number): Style
-	local gestures = MobileInput.Gestures
-	if heldSeconds <= gestures.TapMaxSeconds then
-		return { lob = true }
-	end
-	return { charge = Gestures.chargeFor(heldSeconds, gestures) }
-end
-
+-- only for a short window; inputs that land a hair early otherwise feel dropped.
+--
+-- This lives on the game side deliberately: it is a weapon-cooldown concern,
+-- and PlayerModule has no business knowing when a throw is legal.
 local function submit(kind: string, style: Style)
 	if actionable() or not MobileInput.Buffer.Enabled then
 		send(kind, style)
 		return
 	end
 	InputBuffer.push(buffer, kind, os.clock())
-	-- The style travels with the buffered action: a throw that waits out a
-	-- cooldown must still be the charged or lobbed throw the player performed.
 	pendingStyle = style
 end
 
@@ -182,64 +150,53 @@ local function flush()
 	send(action, style)
 end
 
+-- Combat intents arrive already classified by PlayerModule: it decided whether
+-- a press was a tap, a hold, a look or a flick, on whichever device the player
+-- is using. This module no longer watches input at all -- it turns an intent
+-- into a server request and keeps the local visual state in step.
+--
+-- There is no lob. A bottom swipe and a middle tap both mean "normal throw",
+-- which is the whole point of the second gesture: an easier way to do the same
+-- thing, not another thing to learn.
+local function onIntent(intent: string)
+	if intent == "NormalThrow" then
+		local kind = intentForTap()
+		notify(kind)
+		CombatState.onThrow()
+		submit(kind, {})
+	elseif intent == "BeginCharge" then
+		-- Only a held ball can be charged; with the hammer out, a hold is just a
+		-- press and the swing already went out on the way down.
+		if CombatState.holdsBall() then
+			CombatState.beginCharge(os.clock())
+		end
+	elseif intent == "ReleaseCharge" then
+		if not CombatState.holdsBall() then
+			CombatState.endCharge()
+			return
+		end
+		-- Read before advancing the state machine, which resets the charge that
+		-- the style is built from.
+		local style: Style = { charge = CombatState.currentCharge() }
+		notify("Throw")
+		CombatState.onThrow()
+		submit("Throw", style)
+	elseif intent == "CancelCharge" then
+		CombatState.endCharge()
+	elseif intent == "HammerAttack" then
+		notify("Throw")
+		submit("Throw", {})
+	end
+end
+
 function CombatInputSender.start()
 	if started then
 		return
 	end
 	started = true
 
-	local context = Players.LocalPlayer:WaitForChild(InputConfig.ContextName)
-	local actions: { { kind: string, action: InputAction, pressed: boolean } } = {
-		{ kind = "Throw", action = context:WaitForChild("Throw") :: InputAction, pressed = false },
-		{ kind = "Catch", action = context:WaitForChild("Catch") :: InputAction, pressed = false },
-	}
-	-- Set on a press that is holding a ball, cleared when that press resolves.
-	local throwPressedAt: number? = nil
-
-	-- Touch gestures. Tap picks its own intent and may carry a tapped target; a
-	-- held release charges the throw, and an upward swipe lobs it.
-	TouchInput.onGesture(function(gesture)
-		if TouchInput.getSnapshot().inputDevice ~= "Touch" then
-			return
-		end
-		if gesture.kind == "Tap" or gesture.kind == "DoubleTap" then
-			submit(intentForTap(), { targetId = gesture.targetId })
-			return
-		end
-		if gesture.kind == "ChargedRelease" then
-			submit("Throw", { charge = gesture.charge })
-			return
-		end
-		-- Only an upward swipe lobs. The other directions stay unclaimed rather
-		-- than throwing, so a mis-swiped camera flick does not spend the ball.
-		if gesture.kind == "Swipe" and gesture.direction == "Up" then
-			submit("Throw", { lob = true })
-		end
-	end)
-
-	-- One connection polling both hardware actions rather than one each: the aim
-	-- state is read at most once per frame instead of once per action.
-	RunService.Heartbeat:Connect(function()
-		local now = os.clock()
-		for _, entry in actions do
-			local pressed = entry.action:GetState() == true
-			if pressed and not entry.pressed then
-				if entry.kind == "Throw" and holdsBall() then
-					throwPressedAt = now
-				else
-					submit(entry.kind, {})
-				end
-			elseif not pressed and entry.pressed and entry.kind == "Throw" then
-				local pressedAt = throwPressedAt
-				throwPressedAt = nil
-				if pressedAt ~= nil then
-					submit("Throw", buttonStyle(now - pressedAt))
-				end
-			end
-			entry.pressed = pressed
-		end
-		flush()
-	end)
+	Combat.onIntent(onIntent)
+	RunService.Heartbeat:Connect(flush)
 end
 
 return CombatInputSender

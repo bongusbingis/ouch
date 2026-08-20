@@ -66,6 +66,10 @@
             "$path": "src/server/Modules/PlayerData.luau"
           },
 
+          "CombatPoseService": {
+            "$path": "src/server/Modules/CombatPoseService.luau"
+          },
+
           "ConfigLiveService": {
             "$path": "src/server/Modules/ConfigLiveService.luau"
           },
@@ -86,6 +90,10 @@
     },
 
     "StarterPlayer": {
+      "PlayerModule": {
+        "$path": "src/client/PlayerModule"
+      },
+
       "$className": "StarterPlayer",
 
       "StarterPlayerScripts": {

@@ -7,6 +7,7 @@ local Protocol = {}
 Protocol.Actions = table.freeze({
 	GetSnapshot = "GetSnapshot",
 	JoinByCode = "JoinByCode",
+	DevSoloPlay = "DevSoloPlay",
 	KickMember = "KickMember",
 	LeaveParty = "LeaveParty",
 	StartMatchmaking = "StartMatchmaking",
@@ -23,6 +24,7 @@ Protocol.Errors = table.freeze({
 	MatchmakingUnavailable = "matchmaking_unavailable",
 	NotFound = "party_not_found",
 	NotLeader = "not_party_leader",
+	NotDeveloper = "not_developer",
 	NotReady = "party_not_ready",
 	PartyFull = "party_full",
 	RateLimited = "rate_limited",
@@ -52,6 +54,7 @@ function Protocol.validateRequest(_player, action, payload)
 		or action == Protocol.Actions.LeaveParty
 		or action == Protocol.Actions.StartMatchmaking
 		or action == Protocol.Actions.CancelMatchmaking
+		or action == Protocol.Actions.DevSoloPlay
 	then
 		return payload == nil, Protocol.Errors.InvalidRequest
 	end

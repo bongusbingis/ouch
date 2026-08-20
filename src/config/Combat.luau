@@ -5,8 +5,8 @@
 
 return {
 	Dodgeball = {
-		ThrowSpeed = 500,
-		Gravity = 50,
+		ThrowSpeed = 200,
+		Gravity = 70,
 
 		-- Held throw. A charged ball is simply faster, which is what makes it
 		-- flatter, longer and harder to dodge -- the arc is not special-cased.
@@ -31,6 +31,32 @@ return {
 			-- Sane: 10-30; above 30 it goes nearly straight up.
 			PitchDeg = 20,
 		},
+		-- The arc drawn while a throw is charging. Presentation only: it predicts
+		-- the same parabola the sim will fly, but nothing reads it back.
+		Preview = {
+			-- How quickly the drawn arc follows the camera, in spring Hz. The arc
+			-- is smoothed rather than tracking raw aim, because a beam redrawn
+			-- from an unfiltered look vector shimmers with every frame of input
+			-- noise. Lower is calmer but lags the camera; higher is tighter and
+			-- shows more jitter. Sane: 12-30.
+			FollowFrequency = 20,
+			-- Damping for that follow. At or just above 1 it settles without
+			-- overshoot, which is what an aiming aid wants -- a bouncy arc reads
+			-- as inaccurate.
+			FollowDamping = 1,
+			-- How many straight pieces the flight path is sampled into when
+			-- looking for the impact point. Higher is a more exact landing spot
+			-- at the cost of that many short raycasts per frame. Sane: 8-16.
+			ImpactSamples = 12,
+			-- Beam subdivisions. Purely visual smoothness of the curve itself.
+			Segments = 32,
+			-- Field-of-view pulled in at full charge, in degrees. Negative zooms
+			-- in. Scales with charge rather than snapping on press.
+			FovAtFullCharge = -12,
+			-- How fast the field of view follows, in spring Hz. Sane: 6-14.
+			FovFrequency = 9,
+		},
+
 		Radius = 1,
 		HitForgiveness = 0.35, -- added to Radius for hit tests (device magnetism adds more)
 		ThrowCooldown = 0.6,
@@ -58,19 +84,19 @@ return {
 
 		PickupRadius = 4,
 		BounceRestitution = 0.52,
-		BounceFriction = 0.22,
+		BounceFriction = 0.8,
 		MaxBounces = 5,
 		SettleSpeed = 10,
 		SettleVerticalSpeed = 5,
 		ContactSeparation = 0.08,
 		MinBounceNormalSpeed = 1.5,
 		MaxBounceContactsPerStep = 4,
-		RollFriction = 18,
+		RollFriction = 28,
 		RollSettleSpeed = 1.5,
 		RollGroundSnap = 3,
 		RemoteSmoothing = 18,
 		BallFeel = {
-			FlightStretchPerSpeed = 0.001,
+			FlightStretchPerSpeed = 0.01,
 			MaxFlightStretch = 0.16,
 			ImpactImpulseScale = 0.018,
 			MaxImpactSquash = 0.42,

@@ -2,117 +2,177 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 
+local Animations = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Animations"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
-local PlayerIds = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
-)
+local CombatState = require(script.Parent.CombatState)
 
--- Starts the local player's weapon animation the instant they press, instead of
--- waiting for the server's event to arrive. Played on the local character, so it
--- replicates outward and stays the only copy.
+-- Plays the local player's combat animations, driven by the visual state
+-- machine rather than by raw input.
 --
--- Purely cosmetic: the server still decides whether the action happens at all.
+-- Everything is played on the local character the instant the state changes, so
+-- a press is never waiting on a round trip. Playing locally also means the
+-- animation replicates outward by itself and stays the only copy -- the server
+-- must never play these too, or the clip restarts on the actor mid-motion.
+--
+-- Purely cosmetic. The server decides whether an action happens at all; if it
+-- rejects a throw, the worst case is an animation that played for nothing.
+--
+-- Clip names and which of them are required live in Config.Animations. This
+-- module knows how to play a clip and when, never which asset it is.
 
 local WeaponAnimations = {}
 
-local HELD_PHASE = 0
-
--- heldBall is the condition under which this weapon takes a Throw press, which
--- is how the sim routes it: Dodgeball consumes the press while a ball is held,
--- Hammer otherwise. Keep this list in WeaponRegistry order. Config is read per
--- press rather than captured, so live overrides apply.
-local weapons = {
-	{
-		module = "Dodgeball",
-		animationKey = "ThrowAnimationName",
-		cooldownKey = "ThrowCooldown",
-		fadeTime = 0.04,
-		heldBall = true,
-	},
-	{
-		module = "Hammer",
-		animationKey = "AnimationName",
-		cooldownKey = "Cooldown",
-		fadeTime = 0.03,
-		heldBall = false,
-	},
-}
-
 local started = false
-local ballsFolder: Folder? = nil
-local tracks: { [string]: AnimationTrack } = {}
-local lastPlayedAt: { [string]: number } = {}
 local animator: Animator? = nil
+local tracks: { [string]: AnimationTrack } = {}
+-- Clips that are configured but absent from the Studio assets. Remembered so a
+-- missing optional animation is looked up once rather than every play.
+local missing: { [string]: boolean } = {}
+local lastPlayedAt: { [string]: number } = {}
+local currentLoop: AnimationTrack? = nil
+
+local function clipKey(weapon: string, name: string): string
+	return weapon .. "." .. name
+end
+
+local function folder(): Instance
+	return ReplicatedStorage:WaitForChild("Assets"):WaitForChild(Animations.FolderName)
+end
+
+local function resolve(weapon: string, name: string): AnimationTrack?
+	local key = clipKey(weapon, name)
+	if missing[key] then
+		return nil
+	end
+	local existing = tracks[key]
+	if existing then
+		return existing
+	end
+
+	local current = animator
+	local clip = Animations.Clips[weapon] and Animations.Clips[weapon][name]
+	if current == nil or clip == nil then
+		return nil
+	end
+
+	local instance: Instance?
+	if clip.Required then
+		-- Required assets are waited for: a missing one is a setup error and the
+		-- infinite-yield warning is the correct way to surface it.
+		instance = folder():WaitForChild(clip.Name)
+		assert(instance and instance:IsA("Animation"), "[WeaponAnimations] " .. clip.Name .. " must be an Animation")
+	else
+		-- Optional clips legitimately may not be authored yet.
+		instance = folder():FindFirstChild(clip.Name)
+		if instance == nil or not instance:IsA("Animation") then
+			missing[key] = true
+			return nil
+		end
+	end
+
+	local loaded = current:LoadAnimation(instance :: Animation)
+	loaded.Priority = Enum.AnimationPriority[clip.Priority]
+	loaded.Looped = clip.Looped
+	tracks[key] = loaded
+
+	-- The release marker is what hands the throw over to its follow-through. A
+	-- clip without one still works; the state machine's timer covers it.
+	if weapon == "Dodgeball" and name == "Throw" then
+		loaded:GetMarkerReachedSignal("Release"):Connect(function()
+			CombatState.onReleaseMarker()
+		end)
+	elseif weapon == "Dodgeball" and name == "Charge" then
+		-- Freezing on the marker holds the wound pose for as long as the player
+		-- keeps charging, so the clip only has to cover the wind-up itself
+		-- rather than the longest possible hold.
+		loaded:GetMarkerReachedSignal("Charged"):Connect(function()
+			loaded:AdjustSpeed(0)
+		end)
+	end
+	return loaded
+end
+
+local function stopLoop()
+	local track = currentLoop
+	if track then
+		if track.IsPlaying then
+			track:Stop(Animations.FadeTime.Hold)
+		end
+		-- A charge clip frozen on its marker has to be released, or the next
+		-- wind-up starts already stopped at the wound pose.
+		track:AdjustSpeed(1)
+	end
+	currentLoop = nil
+end
+
+local function playLoop(weapon: string, name: string)
+	local track = resolve(weapon, name)
+	if track == currentLoop then
+		return
+	end
+	stopLoop()
+	if track == nil then
+		return
+	end
+	track:Play(Animations.FadeTime.Hold)
+	currentLoop = track
+end
+
+local function playOnce(weapon: string, name: string, fadeTime: number, cooldown: number?)
+	local track = resolve(weapon, name)
+	if track == nil or track.IsPlaying then
+		return
+	end
+	-- The cooldown gate stops a press the server will reject from replaying the
+	-- clip; IsPlaying alone leaves a gap whenever the cooldown outlasts it.
+	local key = clipKey(weapon, name)
+	local now = os.clock()
+	if cooldown and now - (lastPlayedAt[key] or -math.huge) < cooldown then
+		return
+	end
+	lastPlayedAt[key] = now
+	track:Play(fadeTime)
+end
 
 local function onCharacter(character: Model)
 	table.clear(tracks)
+	table.clear(missing)
 	table.clear(lastPlayedAt)
+	currentLoop = nil
 	local humanoid = character:WaitForChild("Humanoid")
 	local resolved = humanoid:WaitForChild("Animator")
 	assert(resolved:IsA("Animator"), "[WeaponAnimations] Humanoid.Animator must be an Animator")
 	animator = resolved
 end
 
-local function trackFor(name: string): AnimationTrack?
-	local existing = tracks[name]
-	if existing then
-		return existing
-	end
-	local current = animator
-	if current == nil then
-		return nil
-	end
-	local animation = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations"):WaitForChild(name)
-	assert(animation:IsA("Animation"), `[WeaponAnimations] Assets.Animations.{name} must be an Animation`)
-	local loaded = current:LoadAnimation(animation)
-	loaded.Priority = Enum.AnimationPriority.Action4
-	loaded.Looped = false
-	tracks[name] = loaded
-	return loaded
-end
-
-local function holdsBall(): boolean
-	local folder = ballsFolder
-	if folder == nil then
-		return false
-	end
-	local localId = PlayerIds.toId(Players.LocalPlayer)
-	for _, ball in folder:GetChildren() do
-		if ball:GetAttribute("hb") == localId and ball:GetAttribute("ph") == HELD_PHASE then
-			return true
-		end
-	end
-	return false
-end
-
+-- The hammer swing is the one action still driven straight off input rather
+-- than off state: it has no charge to wait for, and deferring it would add the
+-- whole press-to-release window to every melee swing.
 function WeaponAnimations.onIntent(kind: string)
-	if kind ~= "Throw" then
+	if kind ~= "Throw" or CombatState.holdsBall() then
 		return
 	end
-	local held = holdsBall()
-	for _, weapon in weapons do
-		if weapon.heldBall ~= held then
-			continue
-		end
-		local settings = (Combat :: any)[weapon.module]
-		local name = settings[weapon.animationKey] :: string
-		local track = trackFor(name)
-		-- The cooldown gate stops a press the server will reject on cooldown from
-		-- replaying the clip; IsPlaying alone leaves a gap when the cooldown is
-		-- longer than the animation.
-		local now = os.clock()
-		if
-			track == nil
-			or track.IsPlaying
-			or now - (lastPlayedAt[name] or -math.huge) < settings[weapon.cooldownKey]
-		then
-			return
-		end
-		lastPlayedAt[name] = now
-		track:Play(weapon.fadeTime)
+	playOnce("Hammer", "Swing", Animations.FadeTime.Attack, Combat.Hammer.Cooldown)
+end
+
+local function onState(snapshot: CombatState.Snapshot)
+	if snapshot.weapon ~= "Dodgeball" then
+		stopLoop()
+		playLoop("Hammer", "Idle")
 		return
+	end
+
+	local state = snapshot.state
+	if state == "Throwing" then
+		playOnce("Dodgeball", "Throw", Animations.FadeTime.Attack, Combat.Dodgeball.ThrowCooldown)
+		stopLoop()
+	elseif state == "Charging" then
+		playLoop("Dodgeball", "Charge")
+	elseif state == "Recovering" then
+		playOnce("Dodgeball", "Recover", Animations.FadeTime.Recover)
+	elseif state == "Aiming" or state == "BallEquipped" then
+		playLoop("Dodgeball", "Hold")
 	end
 end
 
@@ -122,16 +182,14 @@ function WeaponAnimations.start()
 	end
 	started = true
 
-	local resolved = Workspace:WaitForChild("Balls")
-	assert(resolved:IsA("Folder"), "[WeaponAnimations] Workspace.Balls must be a Folder")
-	ballsFolder = resolved
-
 	local player = Players.LocalPlayer
 	player.CharacterAdded:Connect(onCharacter)
 	local character = player.Character
 	if character then
 		onCharacter(character)
 	end
+
+	CombatState.subscribe(onState)
 end
 
 return WeaponAnimations

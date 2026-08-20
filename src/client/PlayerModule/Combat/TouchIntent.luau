@@ -1,0 +1,338 @@
+--!strict
+
+local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
+local TouchRegions = require(script.Parent:WaitForChild("TouchRegions"))
+
+-- Per-touch classification: deciding whether a finger meant to attack or to look
+-- around, and never confusing the two.
+--
+-- Each touch owns a small record and a state. State only moves forward, and the
+-- important edge is one-way: once a touch has been claimed by the camera it can
+-- never produce an attack, no matter what the finger does afterwards. That single
+-- rule removes almost every accidental throw, because the overwhelmingly common
+-- accident is "I was moving the camera and it attacked".
+--
+-- This module is a pure observer of the camera. It never suppresses, redirects
+-- or applies camera input -- CameraInput keeps complete ownership of every
+-- touch, exactly as upstream wrote it. That is what makes aiming while charging
+-- work for free, and it means there is no arbitration to lose: two systems
+-- cannot fight over a touch when only one of them is steering.
+--
+-- When a touch is ambiguous, nothing happens. A missed gesture costs a player
+-- one repeat; a false attack costs them a cooldown, their position, and their
+-- trust in the controls.
+
+local TouchIntent = {}
+
+export type State =
+	-- Undecided. Still able to become any of the below.
+	"Pending"
+	-- Moved enough to be a look. Permanently disqualified from attacking.
+	| "Camera"
+	-- Held still long enough to be a charge. Still free to aim.
+	| "Charging"
+	-- Already produced its action. Cannot produce another.
+	| "Consumed"
+	-- Started somewhere that is not gameplay, or was cancelled.
+	| "Ignored"
+
+type Touch = {
+	startX: number,
+	startY: number,
+	x: number,
+	y: number,
+	startedAt: number,
+	-- Furthest the finger has been from where it landed. Peak rather than
+	-- current, so returning to the start does not re-qualify a drag as a tap.
+	maxDrift: number,
+	velocity: number,
+	lastMovedAt: number,
+	fromBottom: boolean,
+	swipeAlive: boolean,
+	state: State,
+}
+
+export type Handlers = {
+	onNormalThrow: () -> (),
+	onBeginCharge: () -> (),
+	onReleaseCharge: () -> (),
+	onCancelCharge: () -> (),
+}
+
+local touches: { [InputObject]: Touch } = {}
+local chargeOwner: InputObject? = nil
+local handlers: Handlers? = nil
+local counters = { taps = 0, cameras = 0, charges = 0, swipes = 0, ambiguous = 0, cancelled = 0 }
+
+local function log(message: string)
+	if CombatConfig.Debug.LogClassification then
+		print("[CombatInput] " .. message)
+	end
+end
+
+local function fire(name: string)
+	local resolved = handlers
+	if resolved == nil then
+		return
+	end
+	local callback = (resolved :: any)[name]
+	if callback then
+		local ok, err = pcall(callback)
+		if not ok then
+			warn("[CombatInput] handler " .. name .. " errored: " .. tostring(err))
+		end
+	end
+end
+
+local function distance(touch: Touch): number
+	local dx, dy = touch.x - touch.startX, touch.y - touch.startY
+	return math.sqrt(dx * dx + dy * dy)
+end
+
+-- Hands the touch to the camera for good. Idempotent, because several signals
+-- can independently conclude the same thing on the same frame.
+local function claimCamera(touch: Touch, reason: string)
+	if touch.state == "Camera" then
+		return
+	end
+	-- A charge that is already running is not undone by later movement: the
+	-- player is aiming, which is the whole point of being able to charge and
+	-- look at the same time.
+	if touch.state == "Charging" or touch.state == "Consumed" then
+		return
+	end
+	touch.state = "Camera"
+	touch.swipeAlive = false
+	counters.cameras += 1
+	log("-> Camera (" .. reason .. ")")
+end
+
+-- Everything an upward flick has to satisfy. Several independent signals rather
+-- than one threshold, because any single one of them fires constantly during
+-- ordinary camera panning.
+local function evaluateBottomSwipe(touch: Touch, now: number): boolean
+	if not touch.swipeAlive or touch.state ~= "Pending" then
+		return false
+	end
+
+	local dx = touch.x - touch.startX
+	-- Screen Y grows downward, so travelling up is negative.
+	local dy = touch.y - touch.startY
+	local travel = math.sqrt(dx * dx + dy * dy)
+	if travel <= 1e-3 then
+		return false
+	end
+
+	local duration = now - touch.startedAt
+	if duration > CombatConfig.BottomSwipe.MaxDuration then
+		touch.swipeAlive = false
+		log("swipe cancelled: too slow")
+		return false
+	end
+
+	-- Direction first: a downward or sideways drag is a camera move and should
+	-- stop pretending to be a swipe immediately rather than at the distance gate.
+	local upDot = -dy / travel
+	if upDot < CombatConfig.BottomSwipe.DirectionDot then
+		touch.swipeAlive = false
+		log("swipe cancelled: direction")
+		return false
+	end
+	if math.abs(dy) > 1e-3 and math.abs(dx) / math.abs(dy) > CombatConfig.BottomSwipe.MaxHorizontalRatio then
+		touch.swipeAlive = false
+		log("swipe cancelled: too diagonal")
+		return false
+	end
+
+	if travel < TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance) then
+		return false
+	end
+	if touch.velocity < TouchRegions.scale(CombatConfig.BottomSwipe.MinVelocity) then
+		return false
+	end
+	return true
+end
+
+local function beginCharge(touch: Touch, input: InputObject)
+	touch.state = "Charging"
+	touch.swipeAlive = false
+	chargeOwner = input
+	counters.charges += 1
+	log("-> Charge")
+	fire("onBeginCharge")
+end
+
+function TouchIntent.setHandlers(value: Handlers)
+	handlers = value
+end
+
+function TouchIntent.began(input: InputObject, sunk: boolean)
+	-- Roblox already knows when UI swallowed a touch. Trusting that is both
+	-- cheaper and more accurate than trying to work it out from geometry.
+	if sunk then
+		touches[input] = nil
+		return
+	end
+	local x, y = input.Position.X, input.Position.Y
+	if not TouchRegions.isGameplayArea(x, y) then
+		log("ignored: outside gameplay area")
+		return
+	end
+
+	local now = os.clock()
+	touches[input] = {
+		startX = x,
+		startY = y,
+		x = x,
+		y = y,
+		startedAt = now,
+		maxDrift = 0,
+		velocity = 0,
+		lastMovedAt = now,
+		fromBottom = TouchRegions.isInBottomSwipeRegion(x, y),
+		swipeAlive = TouchRegions.isInBottomSwipeRegion(x, y),
+		state = "Pending",
+	}
+end
+
+function TouchIntent.moved(input: InputObject, sunk: boolean)
+	local touch = touches[input]
+	if touch == nil then
+		return
+	end
+	if sunk then
+		-- UI took the touch mid-gesture. Drop it rather than guessing.
+		touches[input] = nil
+		return
+	end
+
+	local now = os.clock()
+	local x, y = input.Position.X, input.Position.Y
+	local dt = now - touch.lastMovedAt
+	if dt > 1e-4 then
+		local stepX, stepY = x - touch.x, y - touch.y
+		local stepped = math.sqrt(stepX * stepX + stepY * stepY)
+		-- Smoothed so one noisy sample cannot claim the camera on its own.
+		touch.velocity = touch.velocity * 0.5 + (stepped / dt) * 0.5
+		touch.lastMovedAt = now
+	end
+	touch.x, touch.y = x, y
+	touch.maxDrift = math.max(touch.maxDrift, distance(touch))
+
+	if touch.state ~= "Pending" then
+		return
+	end
+
+	if touch.fromBottom then
+		if evaluateBottomSwipe(touch, now) then
+			touch.state = "Consumed"
+			counters.swipes += 1
+			log(("-> NormalThrow (swipe %dpx)"):format(math.floor(touch.maxDrift)))
+			fire("onNormalThrow")
+			return
+		end
+		-- Still a live swipe candidate: hold off on claiming the camera so a
+		-- fast flick is not stolen by its own speed.
+		if touch.swipeAlive then
+			return
+		end
+	end
+
+	if touch.maxDrift > TouchRegions.scale(CombatConfig.Camera.ClaimDistance) then
+		claimCamera(touch, "displacement")
+	elseif touch.velocity > TouchRegions.scale(CombatConfig.Camera.ClaimVelocity) then
+		claimCamera(touch, "velocity")
+	end
+end
+
+-- Time-driven promotion. A finger that lands and never moves produces no move
+-- events at all, so the charge threshold has to be checked on a clock.
+function TouchIntent.step()
+	local now = os.clock()
+	for input, touch in touches do
+		if touch.state ~= "Pending" then
+			continue
+		end
+		if chargeOwner ~= nil then
+			continue
+		end
+		if now - touch.startedAt < CombatConfig.Charge.HoldDelay then
+			continue
+		end
+		if touch.maxDrift > TouchRegions.scale(CombatConfig.Charge.HoldSlop) then
+			continue
+		end
+		beginCharge(touch, input)
+	end
+end
+
+function TouchIntent.ended(input: InputObject)
+	local touch = touches[input]
+	touches[input] = nil
+	if touch == nil then
+		return
+	end
+
+	if input == chargeOwner then
+		chargeOwner = nil
+	end
+
+	if touch.state == "Charging" then
+		log("-> ReleaseCharge")
+		fire("onReleaseCharge")
+		return
+	end
+	if touch.state ~= "Pending" then
+		-- Camera, Consumed and Ignored all end silently. This is the guard that
+		-- stops one physical action producing two attacks.
+		return
+	end
+
+	local duration = os.clock() - touch.startedAt
+	local withinTap = touch.maxDrift <= TouchRegions.scale(CombatConfig.Tap.MaxDistance)
+	if duration <= CombatConfig.Tap.MaxDuration and withinTap then
+		counters.taps += 1
+		log(("-> NormalThrow (tap %.2fs %dpx)"):format(duration, math.floor(touch.maxDrift)))
+		fire("onNormalThrow")
+		return
+	end
+
+	-- Neither clearly a tap nor clearly a look. Doing nothing is the right
+	-- answer: a missed gesture is cheap, a throw the player did not ask for is
+	-- not.
+	counters.ambiguous += 1
+	log(("-> NoAction (ambiguous %.2fs %dpx)"):format(duration, math.floor(touch.maxDrift)))
+end
+
+-- Drops every touch and unwinds a charge if one was running. Used for death,
+-- respawn, menus, focus loss and teardown -- anything that can swallow the
+-- InputEnded that would otherwise have resolved the gesture.
+function TouchIntent.cancelAll()
+	local hadCharge = chargeOwner ~= nil
+	table.clear(touches)
+	chargeOwner = nil
+	if hadCharge then
+		counters.cancelled += 1
+		log("-> CancelCharge (interrupted)")
+		fire("onCancelCharge")
+	end
+end
+
+function TouchIntent.isCameraTouchActive(): boolean
+	for _, touch in touches do
+		if touch.state == "Camera" then
+			return true
+		end
+	end
+	return false
+end
+
+function TouchIntent.isCharging(): boolean
+	return chargeOwner ~= nil
+end
+
+function TouchIntent.debugSnapshot(): ({ [InputObject]: Touch }, { [string]: number })
+	return touches, counters
+end
+
+return TouchIntent

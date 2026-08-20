@@ -54,6 +54,10 @@ Network.handleProtected("PartyRequest", {
 			limit = 2,
 			window = 5,
 		},
+		[Protocol.Actions.DevSoloPlay] = {
+			limit = 1,
+			window = 10,
+		},
 		[Protocol.Actions.StartMatchmaking] = {
 			limit = 2,
 			window = 5,

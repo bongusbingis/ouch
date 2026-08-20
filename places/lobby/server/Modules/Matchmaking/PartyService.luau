@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local DevSoloPlay = require(ReplicatedStorage.Shared.Matchmaking.DevSoloPlay)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
@@ -771,6 +772,106 @@ function PartyService:_startMatchmaking(player)
 	return Protocol.success(PartyModel.toSnapshot(updated))
 end
 
+function PartyService:_startDevSoloPlay(player)
+	if Config.ArenaPlaceId <= 0 then
+		return Protocol.failure(Protocol.Errors.ArenaNotConfigured)
+	end
+	if not DevSoloPlay.canUse(player) then
+		return Protocol.failure(Protocol.Errors.NotDeveloper)
+	end
+
+	local party = self:_partyForPlayer(player)
+	if not party then
+		return Protocol.failure(Protocol.Errors.NotReady)
+	end
+	if not PartyModel.hasMember(party, player.UserId) then
+		return Protocol.failure(Protocol.Errors.NotFound)
+	end
+	if party.leaderUserId ~= player.UserId then
+		return Protocol.failure(Protocol.Errors.NotLeader)
+	end
+	if party.phase ~= "Lobby" or #party.members ~= 1 then
+		return Protocol.failure(Protocol.Errors.MatchForming)
+	end
+
+	local checkedParty = self._partyRepository:GetParty(party.partyId)
+	if not checkedParty then
+		return Protocol.failure(Protocol.Errors.MatchmakingUnavailable)
+	end
+	if not DevSoloPlay.canUse(player) then
+		return Protocol.failure(Protocol.Errors.NotDeveloper)
+	end
+	if not PartyModel.hasMember(checkedParty, player.UserId) then
+		return Protocol.failure(Protocol.Errors.NotFound)
+	end
+	if checkedParty.leaderUserId ~= player.UserId then
+		return Protocol.failure(Protocol.Errors.NotLeader)
+	end
+	if checkedParty.phase ~= "Lobby" or #checkedParty.members ~= 1 then
+		return Protocol.failure(Protocol.Errors.MatchForming)
+	end
+
+	local accessCode, reserveError = self._teleportCoordinator:ReserveServer()
+	if not accessCode then
+		return Protocol.failure(reserveError or Protocol.Errors.Internal)
+	end
+
+	local matchId = HttpService:GenerateGUID(false)
+	local matchRecord = {
+		schemaVersion = Config.ProtocolVersion,
+		matchId = matchId,
+		modeSelection = {
+			strategy = "Vote",
+			options = table.clone(Config.ModeVoteOptions),
+		},
+		arenaPlaceId = Config.ArenaPlaceId,
+		targetPlayers = 1,
+		parties = {
+			{
+				partyId = party.partyId,
+				memberUserIds = { player.UserId },
+			},
+		},
+		expectedUserIds = { player.UserId },
+		reservedServerAccessCode = accessCode,
+		status = "Ready",
+		createdAt = os.time(),
+	}
+
+	local stored = self._matchRepository:SetMatch(matchRecord)
+	if not stored then
+		return Protocol.failure(Protocol.Errors.Internal)
+	end
+
+	local denial
+	local updated = self._partyRepository:UpdateParty(party.partyId, function(current)
+		if not current or not PartyModel.hasMember(current, player.UserId) then
+			denial = Protocol.Errors.NotFound
+			return nil
+		end
+		if current.leaderUserId ~= player.UserId then
+			denial = Protocol.Errors.NotLeader
+			return nil
+		end
+		if current.phase ~= "Lobby" or #current.members ~= 1 then
+			denial = Protocol.Errors.MatchForming
+			return nil
+		end
+
+		local nextParty = PartyModel.clone(current)
+		nextParty.phase = "Assigned"
+		nextParty.matchId = matchId
+		return PartyModel.touch(nextParty, os.time())
+	end)
+	if not updated then
+		self._matchRepository:RemoveMatch(matchId)
+		return Protocol.failure(denial or Protocol.Errors.Internal)
+	end
+
+	self:NotifyCommitted(updated, "DevSoloPlayStarted", player.UserId)
+	return Protocol.success(PartyModel.toSnapshot(updated))
+end
+
 function PartyService:_cancelMatchmaking(player)
 	local party = self:_partyForPlayer(player)
 	if not party then
@@ -818,6 +919,8 @@ function PartyService:_dispatchRequest(player, action, payload)
 		return party and Protocol.success(PartyModel.toSnapshot(party)) or Protocol.failure(Protocol.Errors.NotReady)
 	elseif action == Protocol.Actions.JoinByCode then
 		return self:_joinByCode(player, payload)
+	elseif action == Protocol.Actions.DevSoloPlay then
+		return self:_startDevSoloPlay(player)
 	elseif action == Protocol.Actions.KickMember then
 		return self:_kickMember(player, payload)
 	elseif action == Protocol.Actions.LeaveParty then

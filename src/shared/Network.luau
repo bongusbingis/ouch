@@ -26,6 +26,7 @@ local definitions = {
 	CrateOpened = "event",
 	StorePurchaseGranted = "event",
 	ReportDeviceClass = "event",
+	ReportAimPose = "unreliable",
 	CombatFeed = "event",
 	MatchSummary = "event",
 	GetQuestState = "function",

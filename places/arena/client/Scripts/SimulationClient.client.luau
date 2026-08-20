@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local StarterPlayer = game:GetService("StarterPlayer")
 
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
 local Debug = require(ConfigRoot:WaitForChild("Debug"))
@@ -14,7 +15,6 @@ local Client = Players.LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("C
 local InputModules = Client:WaitForChild("Modules"):WaitForChild("Input")
 local InputRouter = require(InputModules:WaitForChild("InputRouter"))
 local CombatInputSender = require(InputModules:WaitForChild("CombatInputSender"))
-local TouchInput = require(InputModules:WaitForChild("TouchInput"))
 local AssistConfig = require(InputModules:WaitForChild("AssistConfig"))
 local CameraAssist = require(InputModules:WaitForChild("CameraAssist"))
 local PlatformRider = require(Client:WaitForChild("Modules"):WaitForChild("Movement"):WaitForChild("PlatformRider"))
@@ -29,9 +29,13 @@ local GameAudio = require(Presentation:WaitForChild("GameAudio"))
 local JumpPadVisuals = require(Presentation:WaitForChild("JumpPadVisuals"))
 local PlayerHighlights = require(Presentation:WaitForChild("PlayerHighlights"))
 local WeaponAnimations = require(Presentation:WaitForChild("WeaponAnimations"))
+local CombatState = require(Presentation:WaitForChild("CombatState"))
+local ArmIK = require(Presentation:WaitForChild("ArmIK"))
 local VoteCamera = require(Presentation:WaitForChild("VoteCamera"))
 local DebugModules = Client:WaitForChild("Modules"):WaitForChild("Debug")
+local ThrowPoseTuner = require(DebugModules:WaitForChild("ThrowPoseTuner"))
 local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
+local ChargeAim = require(Presentation:WaitForChild("ChargeAim"))
 
 local RotatingPlatforms = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -47,8 +51,17 @@ ConfigReplication.startClient({
 	GameModes = require(ConfigRoot:WaitForChild("GameModes")),
 	MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
 })
+-- The arena is the only place that turns combat on. The lobby leaves it off and
+-- therefore keeps a normal cursor for its menus, with no lobby-side code needed.
+local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
+Combat.setCameraEnabled(true)
+Combat.setInputEnabled(true)
+
 AssistConfig.start()
-TouchInput.start()
+-- Before the arm and animation layers: both read its snapshot, and the input
+-- sender pushes presses into it.
+CombatState.start()
+ArmIK.start()
 InputRouter.start()
 CameraAssist.start()
 BallVisuals.start()
@@ -65,6 +78,8 @@ PlatformRider.start()
 -- surfaces as an infinite-yield warning without stalling the modules above.
 VoteCamera.start()
 DebugVisuals.start()
+ThrowPoseTuner.start()
+ChargeAim.start()
 
 -- Presentation only. These are the server's authoritative events, replayed here
 -- purely to drive effects; nothing in this path decides an outcome.

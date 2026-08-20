@@ -1,13 +1,16 @@
 --!strict
 
 local Players = game:GetService("Players")
+local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
 local AimDirector = require(script.Parent.AimDirector)
 local AssistConfig = require(script.Parent.AssistConfig)
-local TouchInput = require(script.Parent.TouchInput)
+local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
+local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
+local UserInputService = game:GetService("UserInputService")
 
 -- Camera adhesion and aim friction, applied on top of whatever camera the
 -- player is already using.
@@ -123,7 +126,7 @@ local function update(dt: number)
 	local friction = AssistConfig.strength("Friction", device) * confidence
 	-- Friction only means anything while the player is turning the camera; off a
 	-- drag there is nothing to damp and applying it would fight adhesion.
-	if friction > 0 and previousRotation ~= nil and TouchInput.getSnapshot().aiming then
+	if friction > 0 and previousRotation ~= nil and Combat.isCameraTouchActive() then
 		applyFriction(camera, previousRotation, friction * MobileInput.Assist.FrictionMaxReduction)
 	end
 
@@ -135,6 +138,12 @@ local function update(dt: number)
 	-- Adhesion moved the camera, so the baseline friction measures against next
 	-- frame must be the pose the player is actually looking from now.
 	lastRotation = camera.CFrame.Rotation
+
+	-- The shoulder offset used to be applied here as a post-hoc lateral shove of
+	-- the camera CFrame. It is now owned by PlayerModule.Combat.CombatCamera,
+	-- which sets it through the camera controller's own mouse-lock offset. Two
+	-- systems each nudging the camera sideways produced a doubled, drifting
+	-- offset that neither one could account for.
 end
 
 function CameraAssist.start()

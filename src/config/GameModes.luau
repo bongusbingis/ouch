@@ -15,13 +15,13 @@ local modes = {
 		ThumbnailId = "",
 		SortOrder = 2,
 	},
-	Infection = {
-		Enabled = true,
-		Title = "INFECTION",
-		Description = "One player starts infected. Survive to the clock, or join them.",
-		ThumbnailId = "",
-		SortOrder = 3,
-	},
+	-- Infection = {
+	-- 	Enabled = true,
+	-- 	Title = "INFECTION",
+	-- 	Description = "One player starts infected. Survive to the clock, or join them.",
+	-- 	ThumbnailId = "",
+	-- 	SortOrder = 3,
+	-- },
 }
 
 local voteOptions = {}

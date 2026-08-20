@@ -105,10 +105,65 @@ local function heldBallPosition(entry: CharacterEntry): Vector3
 	return entry.root.CFrame.Position
 end
 
+-- Parts whose transform is driven by the animator. A release socket parented to
+-- one of these would make the gameplay launch point depend on which frame of the
+-- throw animation happens to be playing, which is exactly the coupling the
+-- projectile is kept clear of.
+local ANIMATED_PARENTS = {
+	RightHand = true,
+	RightLowerArm = true,
+	RightUpperArm = true,
+	LeftHand = true,
+	LeftLowerArm = true,
+	LeftUpperArm = true,
+	Head = true,
+	["Right Arm"] = true,
+	["Left Arm"] = true,
+}
+
+-- Resolved once per character rather than searched every tick: a recursive
+-- descendant search at 60Hz per player is pure waste, and caching also gives one
+-- place to validate the socket. Weak keys so a respawned character's entry is
+-- collected with the old model instead of accumulating one row per death.
+local releaseSockets: { [Model]: Attachment | false } = setmetatable({}, { __mode = "k" }) :: any
+
+local function releaseSocket(model: Model): Attachment?
+	local cached = releaseSockets[model]
+	if cached ~= nil then
+		return if cached then cached else nil
+	end
+
+	local found = model:FindFirstChild("DodgeballReleaseSocket", true)
+	if found == nil or not found:IsA("Attachment") then
+		releaseSockets[model] = false
+		return nil
+	end
+
+	local parent = found.Parent
+	if parent and ANIMATED_PARENTS[parent.Name] then
+		warn(
+			"[ServerAuthAdapter] DodgeballReleaseSocket is parented to "
+				.. parent.Name
+				.. ", which the animator drives. Move it to HumanoidRootPart or a torso part;"
+				.. " falling back to the configured root offset."
+		)
+		releaseSockets[model] = false
+		return nil
+	end
+
+	releaseSockets[model] = found
+	return found
+end
+
+-- The authoritative launch point. Deliberately derived from the character's root
+-- (or a socket rigidly attached to it), never from the animated hand: gameplay
+-- must not change because an animation is a few frames further along, or because
+-- one player's animation is a different length from another's. The held ball is
+-- drawn at the hand separately, which is what sells the throw visually.
 local function throwPosition(entry: CharacterEntry): Vector3
-	local release = entry.model:FindFirstChild("DodgeballReleaseSocket", true)
-	if release and release:IsA("Attachment") then
-		return release.WorldPosition
+	local socket = releaseSocket(entry.model)
+	if socket then
+		return socket.WorldPosition
 	end
 	return socketPosition(entry, Combat.Dodgeball.OverhandReleaseRootOffset)
 end
@@ -367,7 +422,9 @@ function ServerAuthAdapter.start()
 			if charge ~= nil and (typeof(charge) ~= "number" or charge ~= charge or charge < 0 or charge > 1) then
 				return false, "invalid_charge"
 			end
-			if lob ~= nil and typeof(lob) ~= "boolean" then
+			-- No input produces a lob any more. Rejecting it outright means a
+			-- client cannot reach a throw style the game no longer offers.
+			if lob ~= nil then
 				return false, "invalid_lob"
 			end
 			return true

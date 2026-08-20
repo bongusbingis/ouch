@@ -18,7 +18,7 @@ return {
 				"rbxassetid://1847683526",
 				"rbxassetid://131711369956795",
 			},
-			Volume = 0.18,
+			Volume = 0,--0.18,
 			FadeInSeconds = 0.8,
 		},
 		Lobby = {
@@ -38,7 +38,7 @@ return {
 	Gameplay = {
 		HammerElimination = {
 			Scope = "World",
-			Volume = 0.6,
+			Volume = 1.6,
 			AssetIds = {
 				"rbxassetid://122682383632262",
 				"rbxassetid://87679579947858",
@@ -48,7 +48,7 @@ return {
 		},
 		HammerSwing = {
 			Scope = "World",
-			Volume = 0.45,
+			Volume = 1.45,
 			AssetIds = {
 				"rbxassetid://137298186656357",
 				"rbxassetid://93854325647161",
@@ -57,7 +57,7 @@ return {
 		},
 		JumpPadBounce = {
 			Scope = "World",
-			Volume = 0.5,
+			Volume = 1.5,
 			AssetIds = {
 				"rbxassetid://123922570136163",
 				"rbxassetid://135468135163946",
@@ -66,7 +66,7 @@ return {
 		},
 		DodgeballElimination = {
 			Scope = "World",
-			Volume = 0.6,
+			Volume = 1.6,
 			AssetIds = {
 				"rbxassetid://173818824",
 				"rbxassetid://6509749580",
@@ -75,7 +75,7 @@ return {
 		},
 		DodgeballThrow = {
 			Scope = "World",
-			Volume = 0.45,
+			Volume = 1.45,
 			AssetIds = {
 				"rbxassetid://94573137804285",
 				"rbxassetid://129467477219437",
@@ -84,9 +84,8 @@ return {
 		},
 		DodgeballBounce = {
 			Scope = "World",
-			Volume = 0.4,
+			Volume = 1.4,
 			AssetIds = {
-				"rbxassetid://115370210004477",
 				"rbxassetid://8254244321",
 				"rbxassetid://8254243230",
 				"rbxassetid://8254243751",
@@ -94,7 +93,7 @@ return {
 		},
 		ElimZoneFall = {
 			Scope = "World",
-			Volume = 0.6,
+			Volume = 1.6,
 			AssetIds = {
 				"rbxassetid://93903966058481",
 			},
