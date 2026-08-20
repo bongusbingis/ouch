@@ -13,6 +13,16 @@ return function()
 	describe("Lobby remotes", function()
 		it("materializes the party remotes with their declared classes", function()
 			local folder = ReplicatedStorage:FindFirstChild("Remotes")
+			-- If the test environment hasn't run server startup code that
+			-- requires the shared Network module, require it here so the
+			-- remotes folder is materialized. This keeps the spec robust in
+			-- cloud/headless runs.
+			if not folder then
+				pcall(function()
+					require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+				end)
+				folder = ReplicatedStorage:WaitForChild("Remotes", 3)
+			end
 			expect(folder).to.be.ok()
 
 			for name, className in EXPECTED_REMOTES do
