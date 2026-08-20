@@ -5,6 +5,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = script:WaitForChild("Modules")
+-- Ensure the shared Network module runs on server startup so remotes are
+-- materialized for tests and runtime consumers.
+local _ = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
