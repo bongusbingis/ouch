@@ -26,6 +26,10 @@ local folder: Folder? = nil
 local template: BasePart? = nil
 local sequence = 0
 local started = false
+local recoveryPoints: { BasePart } = {}
+local recoveryThreshold: number? = nil
+local groundSpawnPoints: { BasePart } = {}
+local groundSpawnEnabled = false
 
 local function ballsFolder(): Folder
 	if folder then
@@ -108,6 +112,82 @@ function BallService.start()
 	started = true
 
 	ballsFolder()
+
+	-- Recovery loop: recycle out-of-bounds balls onto configured recovery points
+	task.spawn(function()
+		while started do
+			if recoveryThreshold and #recoveryPoints > 0 then
+				for _, inst in pairs(ballsFolder():GetChildren()) do
+					if inst:IsA("BasePart") then
+						local ph = inst:GetAttribute("ph")
+						if type(ph) == "number" and ph >= 5 then
+							local posY = inst.CFrame.Position.Y
+							if posY < recoveryThreshold then
+								local point = recoveryPoints[1]
+								if point and point:IsA("BasePart") then
+									local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
+									inst.CFrame = CFrame.new(expected)
+									inst:SetAttribute("er", Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness)
+									inst:SetAttribute("hb", nil)
+									inst:SetAttribute("ow", nil)
+									inst.Parent = ballsFolder()
+								end
+							end
+						end
+					end
+				end
+			end
+			task.wait(0.1)
+		end
+	end)
+
+	-- Ground spawn loop: spawn free balls at active points without stacking
+	task.spawn(function()
+		while started do
+			if groundSpawnEnabled and #groundSpawnPoints > 0 then
+				for _, point in ipairs(groundSpawnPoints) do
+					if point and point:IsA("BasePart") then
+						local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
+						local occupied = false
+						for _, inst in pairs(ballsFolder():GetChildren()) do
+							if inst:IsA("BasePart") and (inst.CFrame.Position - expected).Magnitude < 0.1 then
+								occupied = true
+								break
+							end
+						end
+						if not occupied then
+							local ball = spawnBall(CFrame.new(expected))
+							ball:SetAttribute("ph", 5)
+							ball:SetAttribute("hb", nil)
+							ball:SetAttribute("ow", nil)
+							ball.Parent = ballsFolder()
+						end
+					end
+				end
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+function BallService.configureRecovery(points: { BasePart }, threshold: number)
+	recoveryPoints = points or {}
+	recoveryThreshold = threshold
+end
+
+function BallService.clearRecovery()
+	recoveryPoints = {}
+	recoveryThreshold = nil
+end
+
+function BallService.startGroundSpawns(points: { BasePart })
+	groundSpawnPoints = points or {}
+	groundSpawnEnabled = true
+end
+
+function BallService.stopGroundSpawns()
+	groundSpawnEnabled = false
+	groundSpawnPoints = {}
 end
 
 return BallService
