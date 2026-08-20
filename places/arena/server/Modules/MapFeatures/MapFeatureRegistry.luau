@@ -1,7 +1,7 @@
 --!strict
 
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
-local BouncePads = require(script.Parent.BouncePads)
+local JumpPads = require(script.Parent.JumpPads)
 local ElimZones = require(script.Parent.ElimZones)
 local FoamPits = require(script.Parent.FoamPits)
 
@@ -10,7 +10,7 @@ local FoamPits = require(script.Parent.FoamPits)
 -- Workspace.Assets.Arena.Scriptables.
 local kits: { MapFeatureKit.MapFeatureKit } = {
 	ElimZones,
-	BouncePads,
+	JumpPads,
 	FoamPits,
 }
 

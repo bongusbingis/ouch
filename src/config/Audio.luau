@@ -27,6 +27,80 @@ return {
 			FadeInSeconds = 1,
 		},
 	},
+	-- Gameplay one-shots, spawned in code from these ids rather than authored as
+	-- templates. AssetIds is picked from at random each time, so a list of one is
+	-- simply a sound with no variance.
+	--
+	-- Scope decides how it reaches the player: "World" positions it at the event
+	-- so distance and direction apply, "Local" plays it flat for this client only,
+	-- for anything that should read as personal feedback rather than a world
+	-- sound. Adding a local cue later is a Scope change here, not new code.
+	Gameplay = {
+		HammerElimination = {
+			Scope = "World",
+			Volume = 0.6,
+			AssetIds = {
+				"rbxassetid://122682383632262",
+				"rbxassetid://87679579947858",
+				"rbxassetid://134712572791297",
+				"rbxassetid://92196646571002",
+			},
+		},
+		HammerSwing = {
+			Scope = "World",
+			Volume = 0.45,
+			AssetIds = {
+				"rbxassetid://137298186656357",
+				"rbxassetid://93854325647161",
+				"rbxassetid://137964779511233",
+			},
+		},
+		JumpPadBounce = {
+			Scope = "World",
+			Volume = 0.5,
+			AssetIds = {
+				"rbxassetid://123922570136163",
+				"rbxassetid://135468135163946",
+				"rbxassetid://6746569988",
+			},
+		},
+		DodgeballElimination = {
+			Scope = "World",
+			Volume = 0.6,
+			AssetIds = {
+				"rbxassetid://173818824",
+				"rbxassetid://6509749580",
+				"rbxassetid://139905654761878",
+			},
+		},
+		DodgeballThrow = {
+			Scope = "World",
+			Volume = 0.45,
+			AssetIds = {
+				"rbxassetid://94573137804285",
+				"rbxassetid://129467477219437",
+				"rbxassetid://101808428209321",
+			},
+		},
+		DodgeballBounce = {
+			Scope = "World",
+			Volume = 0.4,
+			AssetIds = {
+				"rbxassetid://115370210004477",
+				"rbxassetid://8254244321",
+				"rbxassetid://8254243230",
+				"rbxassetid://8254243751",
+			},
+		},
+		ElimZoneFall = {
+			Scope = "World",
+			Volume = 0.6,
+			AssetIds = {
+				"rbxassetid://93903966058481",
+			},
+		},
+	},
+
 	Effects = {
 		MatchEndWhistle = {
 			AssetId = "rbxassetid://9120681039",

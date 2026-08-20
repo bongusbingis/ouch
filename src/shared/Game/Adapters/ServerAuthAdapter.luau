@@ -9,6 +9,10 @@ local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Sim.SimCore)
 local SimStateCodec = require(script.Parent.SimStateCodec)
 local PlayerIds = require(script.Parent.PlayerIds)
+local AssistProjection = require(script.Parent.Parent.Config.AssistProjection)
+local PlayerAssist = require(script.Parent.Parent.Parent.Parent.Config.PlayerAssist)
+local MobileInput = require(script.Parent.Parent.Parent.Parent.Config.MobileInput)
+local Intercept = require(script.Parent.Parent.Sim.Intercept)
 local MovementSpeedService = require(script.Parent.MovementSpeedService)
 local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
@@ -146,6 +150,24 @@ local worldSnapshot: SimTypes.WorldSnapshot = {
 	ballSpawns = {},
 }
 
+-- Rolling window of each character's velocity, kept here rather than in SimState
+-- because it is a measurement of the engine world, not a sim decision, and the
+-- sim must stay a pure function of the snapshot it is handed.
+local velocityHistory: { [string]: { SimTypes.Vec } } = {}
+
+local function sampleConsistency(id: string, velocity: SimTypes.Vec): number
+	local samples = velocityHistory[id]
+	if samples == nil then
+		samples = {}
+		velocityHistory[id] = samples
+	end
+	table.insert(samples, velocity)
+	if #samples > MobileInput.Assist.VelocitySamples then
+		table.remove(samples, 1)
+	end
+	return Intercept.consistency(samples)
+end
+
 local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { Instance }): SimTypes.WorldSnapshot
 	local capsule = Combat.CharacterCapsule
 	local characters: { [string]: SimTypes.CharacterSnapshot } = {}
@@ -164,7 +186,13 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 			teamId = entry.model:GetAttribute("TeamId") :: string?,
 			-- Spawn protection flag, set by MatchService on the character model.
 			invulnerable = entry.model:GetAttribute("minv") == true,
+			velocityConsistency = sampleConsistency(id, entry.root.AssemblyLinearVelocity),
 		}
+	end
+	for id in velocityHistory do
+		if entries[id] == nil then
+			velocityHistory[id] = nil
+		end
 	end
 
 	-- World ball spawning happens outside the sim (BallSpawner); the sim never
@@ -175,16 +203,40 @@ end
 
 local STEP_SECONDS = 1 / 60
 local MAX_QUEUED_INTENTS = 16
+local MAX_CATCHUP_STEPS = 8
 
-type Intent = { playerId: string, kind: SimTypes.CommandKind, aimDir: Vector3 }
+local droppedSeconds = 0
+
+type Intent = {
+	playerId: string,
+	kind: SimTypes.CommandKind,
+	aimDir: Vector3,
+	targetId: string?,
+	charge: number?,
+	lob: boolean?,
+}
 
 local pendingIntents: { Intent } = {}
 
-local function queueIntent(player: Player, kind: SimTypes.CommandKind, aimDir: Vector3)
+local function queueIntent(
+	player: Player,
+	kind: SimTypes.CommandKind,
+	aimDir: Vector3,
+	targetId: string?,
+	charge: number?,
+	lob: boolean?
+)
 	if #pendingIntents >= MAX_QUEUED_INTENTS then
 		return
 	end
-	table.insert(pendingIntents, { playerId = PlayerIds.toId(player), kind = kind, aimDir = aimDir })
+	table.insert(pendingIntents, {
+		playerId = PlayerIds.toId(player),
+		kind = kind,
+		aimDir = aimDir,
+		targetId = targetId,
+		charge = charge,
+		lob = lob,
+	})
 end
 
 -- Intents become commands only against a live character the server can see, and
@@ -202,13 +254,23 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 			continue
 		end
 		local aimDir = vector.normalize(intent.aimDir)
+		local deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse"
+		local projected = entry.player:FindFirstChild(PlayerAssist.FolderName)
+		local assistFolder = if projected and projected:IsA("Folder") then projected else nil
 		table.insert(commands, {
 			playerId = intent.playerId,
 			kind = intent.kind,
 			aimOrigin = entry.root.CFrame.Position + aimDir * 2,
 			aimDir = aimDir,
-			targetId = nil,
-			deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse",
+			-- Only a proposal: validateTarget re-checks it server-side against the
+			-- wider validation cone and falls back to an unguided throw.
+			targetId = intent.targetId,
+			charge = intent.charge,
+			lob = intent.lob,
+			deviceClass = deviceClass,
+			-- Read from the same projection the client reads, so an assist can
+			-- never be stronger on one side than the other.
+			assist = AssistProjection.strengths(assistFolder, deviceClass),
 		})
 	end
 	table.clear(pendingIntents)
@@ -286,7 +348,7 @@ function ServerAuthAdapter.start()
 
 	Network.handleProtected("SubmitCombatInput", {
 		rateLimit = 20,
-		validate = function(_player, kind, aimDir)
+		validate = function(_player, kind, aimDir, targetId, charge, lob)
 			if kind ~= "Throw" and kind ~= "Catch" then
 				return false, "invalid_kind"
 			end
@@ -297,18 +359,44 @@ function ServerAuthAdapter.start()
 			if magnitude ~= magnitude or magnitude <= 1e-6 or magnitude == math.huge then
 				return false, "invalid_aim"
 			end
+			if targetId ~= nil and (typeof(targetId) ~= "string" or #targetId == 0 or #targetId > 32) then
+				return false, "invalid_target"
+			end
+			-- Charge is clamped again in the kit; rejecting garbage here keeps a
+			-- NaN from ever reaching the sim.
+			if charge ~= nil and (typeof(charge) ~= "number" or charge ~= charge or charge < 0 or charge > 1) then
+				return false, "invalid_charge"
+			end
+			if lob ~= nil and typeof(lob) ~= "boolean" then
+				return false, "invalid_lob"
+			end
 			return true
 		end,
 	}, queueIntent)
 
 	local accumulator = 0
 	RunService.Heartbeat:Connect(function(deltaTime: number)
-		accumulator = math.min(accumulator + deltaTime, STEP_SECONDS * 8)
+		local wanted = accumulator + deltaTime
+		accumulator = math.min(wanted, STEP_SECONDS * MAX_CATCHUP_STEPS)
+		-- Time past the clamp is discarded, not deferred, so the simulation ends
+		-- up permanently behind wall clock and every cooldown stretches. The
+		-- clamp is correct -- without it a long hitch spirals into catch-up --
+		-- but it used to fail silently. Counting it makes the regression visible.
+		droppedSeconds += math.max(wanted - accumulator, 0)
 		while accumulator >= STEP_SECONDS do
 			accumulator -= STEP_SECONDS
 			step(STEP_SECONDS)
 		end
 	end)
+end
+
+-- Simulation time discarded by the catch-up clamp since the last read, in
+-- milliseconds. Reading resets it, so each report covers one interval and two
+-- consumers cannot double-count the same hitch.
+function ServerAuthAdapter.takeDroppedMilliseconds(): number
+	local value = droppedSeconds * 1000
+	droppedSeconds = 0
+	return value
 end
 
 return ServerAuthAdapter

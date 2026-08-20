@@ -91,15 +91,21 @@ local function ownerFor(ball: BasePart): Player?
 	return PlayerIds.fromId(ball:GetAttribute("ow") :: string?)
 end
 
+-- Particles only for Throw and Bounce; those two sounds come from GameAudio's
+-- config ids instead, so playing them here as well would double them.
+local SOUNDLESS_EFFECTS = { Throw = true, Bounce = true }
+
 local function playOptional(ball: BasePart, name: string, intensity: number?)
 	local strength = intensity or 1
-	WorldAudio.play(
-		"Dodgeball",
-		name,
-		ball,
-		math.clamp(strength, 0.65, 1.35),
-		0.96 + math.clamp(strength, 0, 1.5) * 0.08
-	)
+	if not SOUNDLESS_EFFECTS[name] then
+		WorldAudio.play(
+			"Dodgeball",
+			name,
+			ball,
+			math.clamp(strength, 0.65, 1.35),
+			0.96 + math.clamp(strength, 0, 1.5) * 0.08
+		)
+	end
 	local emitter = ball:FindFirstChild(name, true)
 	if emitter and emitter:IsA("ParticleEmitter") then
 		local count = (emitter:GetAttribute("BurstCount") :: number?) or 8

@@ -89,18 +89,26 @@ local function leader(state: MatchState): string?
 	return if tied then nil else bestId
 end
 
-local function endMatch(state: MatchState, rules: MatchRules, reason: string, events: { MatchEvent })
+-- winnerId is for modes whose outcome is not a score race (infection ending when
+-- the last survivor falls); without one the leading score still decides.
+local function endMatch(state: MatchState, rules: MatchRules, reason: string, events: { MatchEvent }, winnerId: string?)
 	state.phase = "Results"
 	state.resultsRemaining = rules.ResultsSeconds
-	state.winnerId = leader(state)
+	state.winnerId = winnerId or leader(state)
 	table.insert(events, { kind = "MatchEnded", winnerId = state.winnerId, reason = reason })
 end
 
-function MatchSim.finish(state: MatchState, rules: MatchRules, reason: string, events: { MatchEvent }): boolean
+function MatchSim.finish(
+	state: MatchState,
+	rules: MatchRules,
+	reason: string,
+	events: { MatchEvent },
+	winnerId: string?
+): boolean
 	if state.phase ~= "Active" then
 		return false
 	end
-	endMatch(state, rules, reason, events)
+	endMatch(state, rules, reason, events, winnerId)
 	return true
 end
 
@@ -142,7 +150,7 @@ function MatchSim.tick(state: MatchState, rules: MatchRules, dt: number, events:
 	elseif state.phase == "Active" then
 		state.timeRemaining = math.max(state.timeRemaining - dt, 0)
 		if state.timeRemaining <= 0 then
-			endMatch(state, rules, "TimeCap", events)
+			endMatch(state, rules, "TimeCap", events, rules.TimeCapWinnerId)
 		end
 	elseif state.phase == "Results" then
 		state.resultsRemaining = math.max(state.resultsRemaining - dt, 0)

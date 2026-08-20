@@ -2,12 +2,14 @@
 
 local GameMode = require(script.Parent.GameMode)
 local FFA = require(script.Parent.FFA)
+local Infection = require(script.Parent.Infection)
 local TDM = require(script.Parent.TDM)
 --local Scramble = require(script.Parent.Scramble)
 
 local modes: { GameMode.GameMode } = {
 	FFA,
 	TDM,
+	Infection,
 	--Scramble,
 }
 

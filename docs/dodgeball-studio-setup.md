@@ -53,7 +53,7 @@ Workspace
       ├─ MapOrigin            (invisible BasePart)
       ├─ Scriptables
       │  ├─ ElimZones
-      │  ├─ BouncePads
+      │  ├─ JumpPads
       │  ├─ FoamPits
       │  └─ Rotating
       │     └─ <AssemblyName>   (one Folder per rotating assembly)
@@ -104,7 +104,7 @@ so moving or spawned hazards work without extra code.
 | Folder | Effect on a player inside one of its parts |
 |---|---|
 | `ElimZones` | Immediate elimination, scored exactly like a dodgeball elimination |
-| `BouncePads` | Launched along the pad's `UpVector`; a numeric `LaunchSpeed` attribute on a pad overrides the shared speed |
+| `JumpPads` | Bounced upward with a floaty arc. Children are **Models**, not BaseParts |
 | `FoamPits` | Movement slowed while inside |
 
 Feature parts are volumes, not touch triggers: a player counts as inside when their
@@ -117,6 +117,30 @@ Eliminations only apply during an Active match, so a player standing in an `Elim
 between matches is left alone.
 
 A registered kit with no authored folder warns once at startup and stays inactive.
+
+### JumpPads
+
+Each child of `JumpPads` is a **Model** — the trampoline, with a `MeshPart` named `Inner`
+and one or more other parts forming the outer shell. The trigger volume is not authored:
+it is derived from the model's bounding box, so size the model to the surface you want
+players to bounce off.
+
+Parts must be `Anchored`. The client resizes them for the squash, and an unanchored part
+would fall the moment it is written to.
+
+`Inner` is matched **by name** and gets the slower, looser spring; every other part follows
+the outer spring. That two-spring split is what gives the delayed second bounce, so a pad
+whose inner mesh is named something else will squash as one rigid shell.
+
+Author the burst effect at `ReplicatedStorage > Assets > VFX > CloudJumpParticleEmitter`
+as a `ParticleEmitter`. The server clones it onto the bouncing character's
+`RootRigAttachment`, emits `ParticleBurst` particles, and removes it after
+`ParticleLifetime` seconds (`Config.MapFeatures.JumpPad`). It is required — a missing
+emitter surfaces as an infinite-yield warning rather than a silent no-op.
+
+Bounce feel lives in `Config.MapFeatures.JumpPad`: `BouncePower` is the vertical speed on
+launch (horizontal is preserved), and `FloatFactor` is the fraction of gravity cancelled
+while airborne, which is what makes the arc floaty rather than a plain high jump.
 
 ### Rotating
 

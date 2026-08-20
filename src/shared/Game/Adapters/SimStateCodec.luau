@@ -68,6 +68,8 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			releaseAim = ball:GetAttribute("ra") :: Vector3?,
 			releaseTargetId = ball:GetAttribute("rt") :: string?,
 			releaseDeviceClass = ball:GetAttribute("rd") :: string?,
+			releaseCharge = ball:GetAttribute("rc") :: number?,
+			releaseLob = ball:GetAttribute("rl") :: boolean?,
 		}
 	end
 
@@ -124,6 +126,8 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(ball, "ra", projectile.releaseAim)
 		setAttributeIfChanged(ball, "rt", projectile.releaseTargetId)
 		setAttributeIfChanged(ball, "rd", projectile.releaseDeviceClass)
+		setAttributeIfChanged(ball, "rc", projectile.releaseCharge)
+		setAttributeIfChanged(ball, "rl", projectile.releaseLob)
 		local velocity = projectile.velocity
 		if projectile.phase ~= "InFlight" and projectile.phase ~= "Bouncing" and projectile.phase ~= "Rolling" then
 			velocity = vector.zero

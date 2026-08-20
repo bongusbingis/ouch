@@ -37,6 +37,7 @@ local definitions = {
 	ArenaClientReady = "event",
 	SubmitCombatInput = "event",
 	CombatSimEvent = "unreliable",
+	JumpPadImpulse = "unreliable",
 	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}

@@ -10,13 +10,16 @@
 -- them current as the folder changes, and drives the hooks below each Heartbeat.
 
 export type Context = {
-	parts: { BasePart },
+	instances: { Instance },
 	now: number,
 	deltaTime: number,
 }
 
 export type MapFeatureKit = {
 	folderName: string,
+	-- Class of direct child this kit drives, defaulting to BasePart. Kits that
+	-- drive authored Models (a trampoline, a rig) declare "Model" instead.
+	instanceClass: string?,
 	-- Per-Heartbeat per-alive-player update. The common shape: react to a player
 	-- being inside one of this kit's parts.
 	tickPlayer: ((context: Context, player: Player, root: BasePart) -> ())?,

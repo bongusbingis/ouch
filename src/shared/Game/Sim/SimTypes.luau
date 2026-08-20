@@ -16,6 +16,10 @@ export type CharacterSnapshot = {
 	teamId: string?,
 	-- Spawn protection: still moves/throws/holds, but cannot be hit or targeted.
 	invulnerable: boolean,
+	-- 0-1 measure of how steadily this character has been moving, measured by
+	-- the adapter over a rolling window. Assists that predict where it is going
+	-- fade out as this drops. Absent means unmeasured, treated as no confidence.
+	velocityConsistency: number?,
 }
 
 export type SweepHit = {
@@ -53,6 +57,10 @@ export type ProjectileState = {
 	releaseAim: Vec?,
 	releaseTargetId: string?,
 	releaseDeviceClass: string?,
+	-- Throw style locked in at windup and consumed at release, so a player who
+	-- changes their mind mid-windup cannot rewrite a throw already committed.
+	releaseCharge: number?,
+	releaseLob: boolean?,
 }
 
 export type PlayerCombatState = {
@@ -77,6 +85,14 @@ export type InputCommand = {
 	aimDir: Vec?,
 	targetId: string?,
 	deviceClass: string?,
+	-- 0-1 hold duration behind a charged throw. Absent or 0 is a normal throw.
+	charge: number?,
+	-- Throw as a lob: slower, pitched up. Mutually exclusive with charge, and
+	-- the sim resolves the conflict rather than trusting the sender.
+	lob: boolean?,
+	-- Resolved 0-1 assist strengths for this player, attached by the adapter.
+	-- Absent means no assist, which is what an unconfigured player gets.
+	assist: { [string]: number }?,
 }
 
 export type SimEvent = {

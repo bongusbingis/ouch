@@ -5,6 +5,7 @@ local MockWorld = require(script.Parent.MockWorld)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local Combat = require(script.Parent.Parent.Parent.Config.Combat)
+local MobileInput = require(script.Parent.Parent.Parent.Config.MobileInput)
 
 type InputCommand = SimTypes.InputCommand
 type SimEvent = SimTypes.SimEvent
@@ -161,6 +162,97 @@ T.describe("Hammer kit", function()
 			end
 		end
 		T.expect(swung):toBeTruthy()
+	end)
+
+	local function swingEvent(events: { SimEvent }): SimEvent?
+		for _, event in events do
+			if event.kind == "HammerSwing" then
+				return event
+			end
+		end
+		return nil
+	end
+
+	-- Enemy at 45 degrees off aim, inside the melee cone but well outside the
+	-- swing box, so only an assist could turn the swing toward them.
+	local function offAxisWorld(distance: number): SimTypes.WorldSnapshot
+		local offset = distance / math.sqrt(2)
+		return world({ e1 = MockWorld.character(vector.create(offset, 2.5, offset)) })
+	end
+
+	T.it("leaves the swing exactly where it was aimed with no assists", function()
+		local state = SimTypes.newState()
+		local events = SimCore.step(state, { command({ assist = { AutoFace = 0, Lunge = 0 } }) }, offAxisWorld(6), DT)
+		local swing = swingEvent(events)
+		T.expect(swing ~= nil):toBeTruthy()
+		T.expect((swing :: SimEvent).direction.x):toBeNear(1, 1e-6)
+		T.expect((swing :: SimEvent).direction.z):toBeNear(0, 1e-6)
+	end)
+
+	T.it("dashes at the baseline speed with no assists", function()
+		local state = SimTypes.newState()
+		local events = SimCore.step(state, { command({ assist = { AutoFace = 0, Lunge = 0 } }) }, offAxisWorld(6), DT)
+		T.expect((swingEvent(events) :: SimEvent).magnitude):toBeNear(Combat.Hammer.DashSpeed, 1e-6)
+	end)
+
+	T.it("turns the swing toward a target that is off axis", function()
+		local state = SimTypes.newState()
+		local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, offAxisWorld(6), DT)
+		local direction = (swingEvent(events) :: SimEvent).direction
+		T.expect(direction.z > 0):toBeTruthy()
+		T.expect(vector.magnitude(direction)):toBeNear(1, 1e-5)
+	end)
+
+	T.it("never turns the swing further than the clamp allows", function()
+		local state = SimTypes.newState()
+		local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, offAxisWorld(6), DT)
+		local direction = (swingEvent(events) :: SimEvent).direction
+		local turned = math.deg(math.acos(math.clamp(vector.dot(direction, vector.create(1, 0, 0)), -1, 1)))
+		T.expect(turned <= MobileInput.Assist.AutoFaceMaxAngleDeg + 0.5):toBeTruthy()
+	end)
+
+	T.it("keeps the swing flat when the target is above the player", function()
+		local state = SimTypes.newState()
+		local high = world({ e1 = MockWorld.character(vector.create(4, 12, 2)) })
+		local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, high, DT)
+		T.expect((swingEvent(events) :: SimEvent).direction.y):toBeNear(0, 1e-6)
+	end)
+
+	T.it("lunges harder at a target beyond the swing box", function()
+		local state = SimTypes.newState()
+		local far = world({ e1 = MockWorld.character(vector.create(Combat.Hammer.Range + 2, 2.5, 0)) })
+		local events = SimCore.step(state, { command({ assist = { Lunge = 1 } }) }, far, DT)
+		T.expect((swingEvent(events) :: SimEvent).magnitude > Combat.Hammer.DashSpeed):toBeTruthy()
+	end)
+
+	T.it("does not lunge at a target already inside the swing box", function()
+		local state = SimTypes.newState()
+		local near = world({ e1 = MockWorld.character(vector.create(Combat.Hammer.Range * 0.5, 2.5, 0)) })
+		local events = SimCore.step(state, { command({ assist = { Lunge = 1 } }) }, near, DT)
+		T.expect((swingEvent(events) :: SimEvent).magnitude):toBeNear(Combat.Hammer.DashSpeed, 1e-6)
+	end)
+
+	T.it("ignores teammates when assisting a swing", function()
+		local state = SimTypes.newState()
+		local allies = world({
+			e1 = MockWorld.character(vector.create(4, 2.5, 4), { teamId = "Red" }),
+		})
+		allies.characters.p1.teamId = "Red"
+		local events = SimCore.step(state, { command({ assist = { AutoFace = 1, Lunge = 1 } }) }, allies, DT)
+		local swing = swingEvent(events) :: SimEvent
+		T.expect(swing.direction.z):toBeNear(0, 1e-6)
+		T.expect(swing.magnitude):toBeNear(Combat.Hammer.DashSpeed, 1e-6)
+	end)
+
+	T.it("scales the turn by strength so a half-strength assist turns less", function()
+		local function turnFor(strength: number): number
+			local state = SimTypes.newState()
+			local events = SimCore.step(state, { command({ assist = { AutoFace = strength } }) }, offAxisWorld(6), DT)
+			local direction = (swingEvent(events) :: SimEvent).direction
+			return math.acos(math.clamp(vector.dot(direction, vector.create(1, 0, 0)), -1, 1))
+		end
+		T.expect(turnFor(0.5) < turnFor(1)):toBeTruthy()
+		T.expect(turnFor(0.5) > 0):toBeTruthy()
 	end)
 end)
 

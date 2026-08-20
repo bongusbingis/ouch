@@ -225,13 +225,13 @@ function HammerVisuals.start()
 end
 
 function HammerVisuals.onEvent(event: any)
+	-- HammerSwing is absent on purpose: GameAudio plays it from config ids.
 	local soundNames = {
-		HammerSwing = "Swing",
 		HammerHit = "Hit",
 		HammerMiss = "Miss",
 	}
 	local soundName = soundNames[event.kind]
-	if soundName == nil then
+	if soundName == nil and event.kind ~= "HammerSwing" then
 		return
 	end
 
@@ -258,7 +258,7 @@ function HammerVisuals.onEvent(event: any)
 	end
 
 	local parent = audioParentFor(playerId)
-	if parent then
+	if parent and soundName then
 		WorldAudio.play("Hammer", soundName, parent)
 	end
 end

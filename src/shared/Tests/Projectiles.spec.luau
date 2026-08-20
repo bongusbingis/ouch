@@ -41,6 +41,8 @@ local function makeBall(state: SimTypes.SimState, fields: { [string]: any }): Pr
 		windupRemaining = fields.windupRemaining or 0,
 		bounceCount = fields.bounceCount or 0,
 		releaseAim = fields.releaseAim,
+		releaseCharge = fields.releaseCharge,
+		releaseLob = fields.releaseLob,
 		releaseTargetId = fields.releaseTargetId,
 		releaseDeviceClass = fields.releaseDeviceClass,
 	}
@@ -355,6 +357,73 @@ T.describe("Projectiles", function()
 			T.expect(ball.bounceCount > 0):toBeTruthy()
 			T.expect(ball.phase == "Bouncing" or ball.phase == "Rolling"):toBeTruthy()
 		end)
+	end)
+
+	local function release(fields: { [string]: any }): ProjectileState
+		local state = SimTypes.newState()
+		local owner = MockWorld.character(vector.create(0, 2.5, 0), {
+			handPosition = vector.create(0, 1.2, 0),
+			throwPosition = vector.create(0, 1.2, 0),
+		})
+		local world = MockWorld.snapshot({ owner = owner }, {})
+		local ball = makeBall(state, {
+			phase = "Windup",
+			heldBy = "owner",
+			ownerId = "owner",
+			position = owner.handPosition,
+			releaseAim = vector.create(0, 0, 1),
+			windupRemaining = 0,
+			releaseCharge = fields.releaseCharge,
+			releaseLob = fields.releaseLob,
+		})
+		local events: { SimTypes.SimEvent } = {}
+		Projectiles.step(state, world, DT, events)
+		return ball
+	end
+
+	T.it("releases an uncharged throw at the configured speed", function()
+		local ball = release({})
+		T.expect(vector.magnitude(ball.velocity)):toBeNear(Combat.Dodgeball.ThrowSpeed, 1e-3)
+	end)
+
+	T.it("throws a fully charged ball faster", function()
+		local ball = release({ releaseCharge = 1 })
+		local expected = Combat.Dodgeball.ThrowSpeed * Combat.Dodgeball.Charge.MaxSpeedScale
+		T.expect(vector.magnitude(ball.velocity)):toBeNear(expected, 1e-3)
+	end)
+
+	T.it("scales charge speed continuously rather than in steps", function()
+		local half = vector.magnitude(release({ releaseCharge = 0.5 }).velocity)
+		local none = vector.magnitude(release({}).velocity)
+		local full = vector.magnitude(release({ releaseCharge = 1 }).velocity)
+		T.expect(half > none and half < full):toBeTruthy()
+	end)
+
+	T.it("does not let an out-of-range charge exceed the full-charge throw", function()
+		local full = vector.magnitude(release({ releaseCharge = 1 }).velocity)
+		T.expect(vector.magnitude(release({ releaseCharge = 5 }).velocity)):toBeNear(full, 1e-3)
+	end)
+
+	T.it("lobs slower than a normal throw", function()
+		local lob = vector.magnitude(release({ releaseLob = true }).velocity)
+		T.expect(lob):toBeNear(Combat.Dodgeball.ThrowSpeed * Combat.Dodgeball.Lob.SpeedScale, 1e-3)
+	end)
+
+	T.it("pitches a lob upward by the configured angle without changing its heading", function()
+		local flat = release({})
+		local lob = release({ releaseLob = true })
+		local direction = vector.normalize(lob.velocity)
+		local pitch = math.deg(math.asin(math.clamp(direction.y, -1, 1)))
+		T.expect(pitch):toBeNear(Combat.Dodgeball.Lob.PitchDeg, 0.5)
+		-- The player's yaw is untouched: still travelling down +Z, not sideways.
+		T.expect(direction.x):toBeNear(0, 1e-4)
+		T.expect(flat.velocity.y):toBeNear(0, 1e-4)
+	end)
+
+	T.it("ignores charge on a lob so the two cannot stack", function()
+		local plain = vector.magnitude(release({ releaseLob = true }).velocity)
+		local charged = vector.magnitude(release({ releaseLob = true, releaseCharge = 1 }).velocity)
+		T.expect(charged):toBeNear(plain, 1e-3)
 	end)
 
 	T.it("holds at the fake held socket during windup", function()

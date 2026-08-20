@@ -18,7 +18,7 @@ local MapFeatureRegistry = require(script.Parent.MapFeatures.MapFeatureRegistry)
 
 local MapFeatureService = {}
 
-local partsByKit: { [string]: { BasePart } } = {}
+local partsByKit: { [string]: { Instance } } = {}
 local connections: { RBXScriptConnection } = {}
 local heartbeat: RBXScriptConnection? = nil
 local started = false
@@ -33,13 +33,14 @@ local function aliveRoot(player: Player): BasePart?
 end
 
 local function refresh(kit: MapFeatureKit.MapFeatureKit, folder: Folder)
-	local parts = {}
+	local collected = {}
+	local className = kit.instanceClass or "BasePart"
 	for _, child in folder:GetChildren() do
-		if child:IsA("BasePart") then
-			table.insert(parts, child)
+		if child:IsA(className) then
+			table.insert(collected, child)
 		end
 	end
-	partsByKit[kit.folderName] = parts
+	partsByKit[kit.folderName] = collected
 end
 
 -- Alive roots are resolved once per frame and shared by every kit: resolving them
@@ -47,7 +48,7 @@ end
 -- allocates a fresh table on every call.
 local riders: { Player } = {}
 local riderRoots: { BasePart } = {}
-local context: MapFeatureKit.Context = { parts = {}, now = 0, deltaTime = 0 }
+local context: MapFeatureKit.Context = { instances = {}, now = 0, deltaTime = 0 }
 
 local function step(deltaTime: number)
 	table.clear(riders)
@@ -63,11 +64,11 @@ local function step(deltaTime: number)
 	context.now = os.clock()
 	context.deltaTime = deltaTime
 	for _, kit in MapFeatureRegistry.all() do
-		local parts = partsByKit[kit.folderName]
-		if parts == nil or #parts == 0 then
+		local instances = partsByKit[kit.folderName]
+		if instances == nil or #instances == 0 then
 			continue
 		end
-		context.parts = parts
+		context.instances = instances
 		if kit.tickWorld then
 			kit.tickWorld(context)
 		end

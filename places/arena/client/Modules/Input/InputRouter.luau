@@ -9,6 +9,10 @@ local UserInputService = game:GetService("UserInputService")
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AimDirector = require(script.Parent.AimDirector)
+local PlayerIds = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
+)
+local TouchInput = require(script.Parent.TouchInput)
 
 -- Client side of the input layer. Hardware actions are handled by their
 -- InputBindings; the router feeds aim each frame and exposes touch catch for
@@ -20,6 +24,17 @@ local TAP_PULSE_SECONDS = 0.1
 local touchCatchFeed: InputBinding? = nil
 local generations = { Throw = 0, Catch = 0 }
 local modeVoteState: Folder? = nil
+
+-- AimDirector works in characters; the rest of the stack works in sim player
+-- ids, so the translation happens once, here, through the owner of that
+-- convention.
+local function targetIdOf(target: Model?): string?
+	if target == nil then
+		return nil
+	end
+	local player = Players:GetPlayerFromCharacter(target)
+	return if player then PlayerIds.toId(player) else nil
+end
 
 local function lockMouse()
 	local voteState = modeVoteState
@@ -58,14 +73,10 @@ local function reportDeviceClass()
 end
 
 local function bindTouchControls(context: Instance)
-	local throwFeed = context:WaitForChild("Throw"):WaitForChild("TouchFeed") :: InputBinding
+	-- Only the catch feed remains here. Touch throws now arrive as classified
+	-- gestures from TouchInput, which can tell a tap from a camera drag and can
+	-- carry a tapped target; TouchTap could do neither.
 	touchCatchFeed = context:WaitForChild("Catch"):WaitForChild("TouchFeed") :: InputBinding
-	UserInputService.TouchTap:Connect(function(_positions, gameProcessedEvent)
-		if gameProcessedEvent or AimDirector.deviceClass() ~= "Touch" then
-			return
-		end
-		pulse("Throw", throwFeed)
-	end)
 end
 
 function InputRouter.triggerTouchCatch(): boolean
@@ -96,6 +107,7 @@ function InputRouter.start()
 		lockMouse()
 		AimDirector.update()
 		aimBinding:Fire(AimDirector.currentAim())
+		TouchInput.setLockedTarget(targetIdOf(AimDirector.currentTarget()), AimDirector.currentConfidence())
 	end)
 end
 

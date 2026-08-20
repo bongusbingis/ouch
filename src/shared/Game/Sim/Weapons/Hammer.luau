@@ -5,6 +5,8 @@ local SimTypes = require(Sim.SimTypes)
 local SimUtil = require(Sim.SimUtil)
 local WeaponKit = require(Sim.WeaponKit)
 local Combat = require(Sim.Parent.Parent.Parent.Config.Combat)
+local MobileInput = require(Sim.Parent.Parent.Parent.Config.MobileInput)
+local TargetSelect = require(Sim.TargetSelect)
 
 type Vec = SimTypes.Vec
 type SimState = SimTypes.SimState
@@ -36,6 +38,68 @@ local function horizontal(direction: Vec): Vec?
 		return nil
 	end
 	return flat / magnitude
+end
+
+-- Melee assists, applied once at swing time and never after: the swing commits
+-- to a direction and a dash speed, and the rest of the phase machine plays out
+-- against whatever the world does next. Steering an in-flight swing would let a
+-- player track a dodging target, which is the whiff-punish window the GDD is
+-- built around.
+--
+-- Both are inert at strength 0 and on any device whose DeviceScale zeroes them,
+-- which is how mouse and keyboard keep the swing they have always had.
+local function assistSwing(command: InputCommand, world: WorldSnapshot, origin: Vec, direction: Vec): (Vec, number)
+	local cfg = config()
+	local assist = MobileInput.Assist
+	local autoFace = SimUtil.assistStrength(command, "AutoFace")
+	local lunge = SimUtil.assistStrength(command, "Lunge")
+	local dashSpeed = cfg.DashSpeed
+	if autoFace <= 0 and lunge <= 0 then
+		return direction, dashSpeed
+	end
+
+	local targetId, confidence = TargetSelect.pick(world, command.playerId, origin, direction, {
+		rangeStuds = cfg.Range * assist.MeleeAcquireRangeScale,
+		coneDeg = assist.MeleeConeDeg,
+		fadeStartFraction = assist.ConeFadeStartFraction,
+		-- No line-of-sight test: at contact range the sweep starts inside the
+		-- target's own capsule and would report itself as an obstruction.
+		lineOfSightRadius = nil,
+	})
+	if targetId == nil or confidence <= 0 then
+		return direction, dashSpeed
+	end
+
+	local target = world.characters[targetId]
+	local assisted = direction
+	if autoFace > 0 then
+		-- Steer flat: the swing box is decided in the horizontal plane, so
+		-- pitching toward a target above or below would tilt it for nothing.
+		local flatTarget = vector.create(target.position.x, origin.y, target.position.z)
+		local steered = horizontal(
+			TargetSelect.steer(
+				direction,
+				origin,
+				flatTarget,
+				autoFace * confidence,
+				math.rad(assist.AutoFaceMaxAngleDeg)
+			)
+		)
+		if steered ~= nil then
+			assisted = steered
+		end
+	end
+
+	-- Lunge only closes a gap that exists. A target already inside the swing box
+	-- needs no help being reached, and dashing harder at them would push the
+	-- swing straight past.
+	if lunge > 0 then
+		local distance = vector.magnitude(target.position - origin)
+		if distance > cfg.Range then
+			dashSpeed += assist.LungeMaxExtraSpeed * lunge * confidence
+		end
+	end
+	return assisted, dashSpeed
 end
 
 local function findHitTarget(playerId: string, origin: Vec, direction: Vec, world: WorldSnapshot): string?
@@ -117,6 +181,9 @@ function Hammer.handleInput(
 		return false
 	end
 
+	local dashSpeed: number
+	direction, dashSpeed = assistSwing(command, world, character.position, direction)
+
 	local cfg = config()
 	kitState.cooldown = cfg.Cooldown
 	kitState.activeRemaining = cfg.ActiveDuration
@@ -135,6 +202,9 @@ function Hammer.handleInput(
 		position = character.position,
 		normal = nil,
 		direction = direction,
+		-- Dash speed for this swing. The adapter applies it, so a lunge is one
+		-- number on the event rather than a second movement path.
+		magnitude = dashSpeed,
 	})
 
 	return true

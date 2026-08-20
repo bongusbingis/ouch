@@ -16,9 +16,9 @@ local modes = {
 		SortOrder = 2,
 	},
 	Infection = {
-		Enabled = false,
+		Enabled = true,
 		Title = "INFECTION",
-		Description = "",
+		Description = "One player starts infected. Survive to the clock, or join them.",
 		ThumbnailId = "",
 		SortOrder = 3,
 	},

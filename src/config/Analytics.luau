@@ -46,7 +46,27 @@ local Analytics = {
 		ShopPromptOpened = "ShopPromptOpened",
 		ShopPromptClosed = "ShopPromptClosed",
 		ShopPurchaseFailed = "ShopPurchaseFailed",
+		-- Input-layer telemetry. These exist to answer the questions in
+		-- docs/hitreg-audit.md that reading the code cannot.
+		InputLatency = "InputLatency",
+		CombatSummary = "CombatSummary",
 	},
+
+	-- Every custom event and funnel step carries these, stamped centrally so no
+	-- call site can forget them and no cohort comparison is missing rows.
+	Dimensions = {
+		-- Mouse | Touch | Gamepad. The axis every mobile-competitiveness
+		-- question is sliced by.
+		DeviceClass = "deviceClass",
+		-- Default | Variant, from the player's resolved assist config, so an
+		-- A/B test is separable without joining against the config service.
+		AssistBucket = "assistBucket",
+	},
+
+	-- Seconds between round-trip-time samples per player. Latency is the input
+	-- to the largest known fairness gap, so it is sampled rather than inferred.
+	-- Frequent enough to see a connection degrade, rare enough not to be noise.
+	LatencySampleSeconds = 60,
 
 	-- Match Enum.AnalyticsEconomyTransactionType names exactly.
 	EconomyTransactionTypes = {

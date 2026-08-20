@@ -27,6 +27,7 @@ local EXPECTED_REMOTES = {
 	ArenaClientReady = "RemoteEvent",
 	SubmitCombatInput = "RemoteEvent",
 	CombatSimEvent = "UnreliableRemoteEvent",
+	JumpPadImpulse = "UnreliableRemoteEvent",
 }
 
 -- Each case uses fresh UserIds: rate-limit counters are per-user with a

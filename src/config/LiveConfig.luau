@@ -62,8 +62,8 @@ local entries: { Entry } = {
 
 	{ Key = "GameModes.VoteDurationSeconds", Type = "number", Minimum = 3, Maximum = 60 },
 
-	{ Key = "MapFeatures.BouncePad.LaunchSpeed", Type = "number", Minimum = 0, Maximum = 500 },
-	{ Key = "MapFeatures.BouncePad.CooldownSeconds", Type = "number", Minimum = 0, Maximum = 10 },
+	{ Key = "MapFeatures.JumpPad.BouncePower", Type = "number", Minimum = 0, Maximum = 500 },
+	{ Key = "MapFeatures.JumpPad.FloatFactor", Type = "number", Minimum = 0, Maximum = 1 },
 	{ Key = "MapFeatures.FoamPit.WalkSpeedScale", Type = "number", Minimum = 0.05, Maximum = 1 },
 
 	{ Key = "Matchmaking.PartyMaxPlayers", Type = "number", Minimum = 1, Maximum = 8 },

@@ -7,10 +7,33 @@
 -- VerticalPadding widens a volume upward so a root hovering just above the part
 -- still counts as inside it.
 return {
-	BouncePad = {
-		LaunchSpeed = 80, -- along the pad's UpVector
-		CooldownSeconds = 0.4, -- per player per pad, prevents retrigger while overlapping
+	-- Jump pads. Bounce feel is the prototype's, converted from its mass/damping/
+	-- spring constants to the equivalent frequency and damping ratio: outer
+	-- (m=1, c=3, k=125) and inner (m=50, c=5, k=200) describe the same motion.
+	JumpPad = {
+		BouncePower = 85, -- vertical speed set on launch, horizontal is preserved
+		-- Fraction of gravity cancelled while airborne, which is what makes the
+		-- arc floaty rather than a plain high jump.
+		FloatFactor = 0.65,
+		-- How far above the pad still counts as standing on it, so a jump taken
+		-- from the surface triggers rather than only a landing.
+		ZoneHeight = 8,
 		VerticalPadding = 2,
+		-- A player descending faster than this gets bounced on contact instead of
+		-- having to jump.
+		FallSpeed = 5,
+		FallCastBuffer = 15,
+		RetriggerCooldown = 0.15,
+		ParticleBurst = 50,
+		ParticleLifetime = 2,
+		-- Squash visuals, client side.
+		OuterFrequencyHz = 1.7796,
+		OuterDampingRatio = 0.1342,
+		OuterImpulse = -2,
+		InnerFrequencyHz = 0.3183,
+		InnerDampingRatio = 0.025,
+		InnerImpulse = -1,
+		MinimumSquash = 0.5, -- floor on vertical scale, keeps the pad from inverting
 	},
 	FoamPit = {
 		WalkSpeedScale = 0.45,

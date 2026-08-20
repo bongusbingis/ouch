@@ -27,6 +27,23 @@ T.describe("LiveConfig registry", function()
 		end
 	end)
 
+	-- A key whose leaf was renamed or deleted would otherwise sit in the registry
+	-- advertising a config that can never be applied.
+	T.it("points every key at a config leaf that actually exists", function()
+		local configRoot = script.Parent.Parent.Parent.Config
+		for _, entry in LiveConfig.Entries do
+			local moduleName, path = ConfigOverrides.parseKey(entry.Key)
+			local moduleScript = configRoot:FindFirstChild(moduleName :: string)
+			-- Modules that only exist in the other place cannot be resolved here.
+			if moduleScript == nil then
+				continue
+			end
+			local leaf = ConfigOverrides.readPath(require(moduleScript), path :: { string })
+			T.expect(leaf ~= nil):toBeTruthy()
+			T.expect(typeof(leaf)):toEqual(entry.Type)
+		end
+	end)
+
 	T.it("stays within the Open Cloud repository key limit", function()
 		T.expect(#LiveConfig.Entries <= 100):toBeTruthy()
 	end)

@@ -6,6 +6,9 @@ local SimUtil = require(Sim.SimUtil)
 local WeaponKit = require(Sim.WeaponKit)
 local Combat = require(Sim.Parent.Parent.Parent.Config.Combat)
 local AimAssist = require(Sim.Parent.Parent.Parent.Config.AimAssist)
+local MobileInput = require(Sim.Parent.Parent.Parent.Config.MobileInput)
+local Intercept = require(Sim.Intercept)
+local TargetSelect = require(Sim.TargetSelect)
 
 type Vec = SimTypes.Vec
 type SimState = SimTypes.SimState
@@ -54,38 +57,13 @@ local AIM_LINE_OF_SIGHT_RADIUS = 0.2
 -- tiebreak. Resolved only on the server, so there is no
 -- client proposal to trust.
 local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrigin: Vec, aimDir: Vec): string?
-	local cfg = config()
-	local cosCone = math.cos(math.rad(deviceRow(command.deviceClass).SelectionConeDeg))
-	local best: string? = nil
-	local bestScore = math.huge
-
-	for _, characterId in SimUtil.sortedKeys(world.characters) do
-		if characterId == command.playerId or SimUtil.sameTeam(world, command.playerId, characterId) then
-			continue
-		end
-		local character = world.characters[characterId]
-		if not character.alive or character.invulnerable then
-			continue
-		end
-		local toTarget = character.position - aimOrigin
-		local distance = vector.magnitude(toTarget)
-		if distance <= 1e-6 or distance > cfg.TargetSelectRange then
-			continue
-		end
-		local dot = vector.dot(aimDir, toTarget / distance)
-		if dot < cosCone then
-			continue
-		end
-		if not SimUtil.hasLineOfSight(world, aimOrigin, character, AIM_LINE_OF_SIGHT_RADIUS) then
-			continue
-		end
-		local score = math.acos(math.clamp(dot, -1, 1)) + distance * 1e-3
-		if score < bestScore then
-			best = characterId
-			bestScore = score
-		end
-	end
-	return best
+	local targetId = TargetSelect.pick(world, command.playerId, aimOrigin, aimDir, {
+		rangeStuds = config().TargetSelectRange,
+		coneDeg = deviceRow(command.deviceClass).SelectionConeDeg,
+		fadeStartFraction = MobileInput.Assist.ConeFadeStartFraction,
+		lineOfSightRadius = AIM_LINE_OF_SIGHT_RADIUS,
+	})
+	return targetId
 end
 
 -- Re-check of an explicitly proposed target (traditional-backend path): alive,
@@ -155,10 +133,41 @@ local function handleThrow(
 	ball.position = character.handPosition
 	ball.velocity = vector.zero
 	ball.releaseAim = aimDir
-	ball.releaseTargetId = if command.targetId ~= nil
-		then validateTarget(command, world, aimOrigin, aimDir)
-		else selectTarget(command, world, aimOrigin, aimDir)
+	-- Cone snap is an assist like any other: at zero strength a throw goes
+	-- exactly where it was aimed and homes at nothing. A target the player
+	-- tapped is still honoured, since that is an input they gave rather than a
+	-- decision made for them.
+	if command.targetId ~= nil then
+		ball.releaseTargetId = validateTarget(command, world, aimOrigin, aimDir)
+	elseif SimUtil.assistStrength(command, "ConeSnap") > 0 then
+		ball.releaseTargetId = selectTarget(command, world, aimOrigin, aimDir)
+	else
+		ball.releaseTargetId = nil
+	end
 	ball.releaseDeviceClass = command.deviceClass or "Mouse"
+	-- A lob and a charge are different gestures and cannot both be true; the
+	-- sim decides that here rather than trusting whatever the client sent.
+	ball.releaseLob = command.lob == true
+	ball.releaseCharge = if ball.releaseLob then 0 else math.clamp(command.charge or 0, 0, 1)
+
+	-- Lead prediction rides on top of the aim the player actually gave, never
+	-- replacing it: the throw is rotated toward where the target will be, capped
+	-- by MaxLeadAngleDeg and faded by how steadily that target has been moving.
+	local leadStrength = SimUtil.assistStrength(command, "Lead")
+	if leadStrength > 0 and ball.releaseTargetId ~= nil then
+		local target = world.characters[ball.releaseTargetId]
+		if target ~= nil then
+			local point = Intercept.solve(aimOrigin, target.position, target.velocity, cfg.ThrowSpeed)
+			local confidence = target.velocityConsistency or 0
+			ball.releaseAim = Intercept.biasAim(
+				aimDir,
+				aimOrigin,
+				point,
+				leadStrength * confidence,
+				math.rad(MobileInput.Assist.MaxLeadAngleDeg)
+			)
+		end
+	end
 	ball.windupRemaining = cfg.WindupDuration
 	ball.bounceCount = 0
 	ball.flightTime = 0
@@ -271,6 +280,8 @@ local function tryCatch(
 	ball.flightTime = 0
 	ball.releaseAim = nil
 	ball.releaseTargetId = nil
+	ball.releaseCharge = nil
+	ball.releaseLob = nil
 	kitState.catchRemaining = 0
 	kitState.catchDirection = nil
 
