@@ -21,7 +21,7 @@ return function()
 				pcall(function()
 					require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 				end)
-				folder = ReplicatedStorage:FindFirstChild("Remotes")
+				folder = ReplicatedStorage:WaitForChild("Remotes", 3)
 			end
 			expect(folder).to.be.ok()
 
