@@ -403,7 +403,11 @@ function BallVisuals.start()
 			local restingSize = Vector3.new(4, 4, 4)
 			local visualSize = if phase == FREE_PHASE
 				then restingSize
-				else Vector3.new(state.baseSize.X * scale.X, state.baseSize.Y * scale.Y, state.baseSize.Z * scale.Z)
+				else Vector3.new(
+					state.baseSize.X * scale.X,
+					state.baseSize.Y * scale.Y,
+					state.baseSize.Z * scale.Z
+				)
 			visual.Size = visualSize
 
 			local targetCFrame = heldCFrame or ball.CFrame

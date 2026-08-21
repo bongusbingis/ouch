@@ -42,10 +42,9 @@ return function()
 		})
 	end
 
-	return c("ScreenGui", {
-		ResetOnSpawn = false,
-		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	return c("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
 	}, {
 		GameModeSelect = c(GameModeSelect, {
 			Active = snapshot.admitted and snapshot.open,

@@ -13,7 +13,6 @@ local FlagUtil = CommonUtils.get("FlagUtil")
 
 local CameraUtils = require(script.Parent:WaitForChild("CameraUtils"))
 local ZoomController = require(script.Parent:WaitForChild("ZoomController"))
-local CameraToggleStateController = require(script.Parent:WaitForChild("CameraToggleStateController"))
 local CameraInput = require(script.Parent:WaitForChild("CameraInput"))
 local CameraUI = require(script.Parent:WaitForChild("CameraUI"))
 
@@ -99,6 +98,9 @@ function BaseCamera.new()
 
 	self.inFirstPerson = false
 	self.inMouseLockedMode = false
+	-- GAME MODIFICATION (Combat): rotation type to use while mouse-locked, or nil
+	-- for stock behaviour. Written by Combat/CombatCamera.
+	self.combatRotationType = nil
 
 	-- Used by modules which want to reset the camera angle on respawn.
 	self.resetCameraAngle = true
@@ -540,46 +542,28 @@ function BaseCamera:Cleanup()
 	CameraUtils.restoreMouseBehavior()
 end
 
+-- GAME MODIFICATION (Combat): the upstream CameraToggle branch has been removed.
+-- It bypassed the mouse-locked path entirely and handed MouseBehavior to
+-- CameraToggleStateController, which is what let right-click unlock the combat
+-- camera on live servers. Camera Toggle is no longer a selectable mode.
 function BaseCamera:UpdateMouseBehavior()
-	local blockToggleDueToClickToMove = UserGameSettings.ComputerMovementMode == Enum.ComputerMovementMode.ClickToMove
+	CameraUI.setCameraModeToastEnabled(false)
+	CameraInput.disableCameraToggleInput()
 
-	if self.isCameraToggle and blockToggleDueToClickToMove == false then
-		CameraUI.setCameraModeToastEnabled(true)
-		CameraInput.enableCameraToggleInput()
-		CameraToggleStateController(self.inFirstPerson)
+	-- first time transition to first person mode or mouse-locked third person
+	if self.inFirstPerson or self.inMouseLockedMode then
+		-- combatRotationType is published by Combat/CombatCamera. A plain field
+		-- read rather than a require, so combat logic does not leak into the
+		-- camera stack and this stays cheap in a per-frame path.
+		CameraUtils.setRotationTypeOverride(self.combatRotationType or Enum.RotationType.CameraRelative)
+		CameraUtils.setMouseBehaviorOverride(Enum.MouseBehavior.LockCenter)
 	else
-		CameraUI.setCameraModeToastEnabled(false)
-		CameraInput.disableCameraToggleInput()
+		CameraUtils.restoreRotationType()
 
-		-- first time transition to first person mode or mouse-locked third person
-		if self.inFirstPerson or self.inMouseLockedMode then
-			local preferCameraRelative = true
-			local ok, CombatCamera = pcall(function()
-				return require(script.Parent.Parent:WaitForChild("Combat"):WaitForChild("CombatCamera"))
-			end)
-			if ok and CombatCamera and CombatCamera.isActive() then
-				local okConfig, CombatConfig = pcall(function()
-					return require(script.Parent.Parent:WaitForChild("Combat"):WaitForChild("CombatConfig"))
-				end)
-				if okConfig and CombatConfig then
-					preferCameraRelative = CombatConfig.CombatCamera.CharacterFollowsCameraYaw
-				end
-			end
-			if preferCameraRelative then
-				CameraUtils.setRotationTypeOverride(Enum.RotationType.CameraRelative)
-			else
-				CameraUtils.setRotationTypeOverride(Enum.RotationType.MovementRelative)
-			end
-			CameraUtils.setMouseBehaviorOverride(Enum.MouseBehavior.LockCenter)
+		if CameraInput.getPanActivated() then
+			CameraUtils.setMouseBehaviorOverride(Enum.MouseBehavior.LockCurrentPosition)
 		else
-			CameraUtils.restoreRotationType()
-
-			local rotationActivated = CameraInput.getPanActivated()
-			if rotationActivated then
-				CameraUtils.setMouseBehaviorOverride(Enum.MouseBehavior.LockCurrentPosition)
-			else
-				CameraUtils.restoreMouseBehavior()
-			end
+			CameraUtils.restoreMouseBehavior()
 		end
 	end
 end

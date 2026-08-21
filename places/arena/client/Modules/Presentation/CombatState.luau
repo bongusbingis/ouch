@@ -7,9 +7,6 @@ local Workspace = game:GetService("Workspace")
 
 local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
-local Gestures = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("Gestures")
-)
 local PlayerIds = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
 )
@@ -127,12 +124,18 @@ local function evaluate()
 
 	-- One charge clock for every device. PlayerModule decides *that* a charge
 	-- began, on whichever device; the ramp from there is a gameplay curve and is
-	-- timed here. Touch used to measure its own charge in parallel, which meant
-	-- two answers to the same question.
+	-- timed here.
+	--
+	-- The clock starts when the charge begins, so it ramps straight from zero.
+	-- It used to run through Gestures.chargeFor, which subtracts the hold
+	-- threshold a second time -- charge then stayed at zero for a further 0.25s
+	-- and a throw released inside that window sent charge = 0 while the pose was
+	-- already showing a wind-up.
 	local held = pressedAt
 	if held ~= nil then
 		snapshot.state = "Charging"
-		snapshot.chargeAlpha = Gestures.chargeFor(now - held, MobileInput.Gestures)
+		local full = math.max(MobileInput.Gestures.ChargeFullSeconds, 1e-3)
+		snapshot.chargeAlpha = math.clamp((now - held) / full, 0, 1)
 	else
 		snapshot.state = if matchIsActive() then "Aiming" else "BallEquipped"
 		snapshot.chargeAlpha = 0

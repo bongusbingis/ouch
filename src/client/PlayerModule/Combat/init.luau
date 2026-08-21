@@ -4,6 +4,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local CommonUtils = require(script.Parent:WaitForChild("CommonUtils"))
+local PlayerModuleEventBus = CommonUtils.get("PlayerModuleEventBus")
+
 local CombatCamera = require(script:WaitForChild("CombatCamera"))
 local CombatConfig = require(script:WaitForChild("CombatConfig"))
 local CombatDebug = require(script:WaitForChild("CombatDebug"))
@@ -109,6 +112,12 @@ end
 -- input goes quiet for as long as any request is outstanding, and the cursor
 -- only returns to the game when the last requester releases.
 function Combat.requestCursor(reason: string)
+	-- Guarded because callers poll this every frame. Unguarded, cancelEverything
+	-- ran 60x a second for the whole mode vote, clearing the touch table before
+	-- any gesture could be tracked.
+	if CombatCamera.isCursorRequested(reason) then
+		return
+	end
 	CombatCamera.requestCursor(reason)
 	cancelEverything()
 end
@@ -167,6 +176,13 @@ function Combat.start()
 	started = true
 
 	TouchRegions.start()
+
+	-- The movement stick and jump button report their own rectangles. Position
+	-- guessing cannot work here: a dynamic thumbstick materialises wherever the
+	-- player's thumb lands, so only the control itself knows where it is.
+	PlayerModuleEventBus:subscribe("HUD_REGION"):Connect(function(name: string, rect: TouchRegions.Rect?)
+		TouchRegions.setExclusion(name, rect)
+	end)
 	CombatCamera.setChargingPredicate(TouchIntent.isCharging)
 	CombatCamera.start()
 	TouchIntent.setHandlers(handlers)

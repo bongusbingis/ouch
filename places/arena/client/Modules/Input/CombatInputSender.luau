@@ -161,30 +161,32 @@ end
 local function onIntent(intent: string)
 	if intent == "NormalThrow" then
 		local kind = intentForTap()
-		notify(kind)
 		CombatState.onThrow()
 		submit(kind, {})
 	elseif intent == "BeginCharge" then
-		-- Only a held ball can be charged; with the hammer out, a hold is just a
-		-- press and the swing already went out on the way down.
+		-- Only a held ball can be charged. With the hammer out there is nothing
+		-- to build, so the hold swings immediately rather than entering a charge
+		-- that ReleaseCharge would later discard -- which is why holding longer
+		-- than the charge threshold used to do nothing at all.
 		if CombatState.holdsBall() then
 			CombatState.beginCharge(os.clock())
+		else
+			submit("Throw", {})
 		end
 	elseif intent == "ReleaseCharge" then
 		if not CombatState.holdsBall() then
+			-- The swing already went out when the charge began.
 			CombatState.endCharge()
 			return
 		end
 		-- Read before advancing the state machine, which resets the charge that
 		-- the style is built from.
 		local style: Style = { charge = CombatState.currentCharge() }
-		notify("Throw")
 		CombatState.onThrow()
 		submit("Throw", style)
 	elseif intent == "CancelCharge" then
 		CombatState.endCharge()
 	elseif intent == "HammerAttack" then
-		notify("Throw")
 		submit("Throw", {})
 	end
 end

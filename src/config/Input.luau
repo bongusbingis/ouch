@@ -19,8 +19,6 @@ return {
 	ContextName = "CombatInput",
 	-- Lateral offset, in studs, applied to the camera while the mouse is
 	-- locked to center. Positive moves the camera to the right, making the
-	-- character appear left of the cursor (shift-lock-like feel).
-	MouseLockLateralOffset = 1.2,
 	Actions = {
 		{
 			Name = "Throw",

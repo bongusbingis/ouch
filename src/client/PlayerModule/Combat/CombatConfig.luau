@@ -29,12 +29,9 @@ return {
 	-- TAP -- the quick "throw now" gesture
 	--==================================================================
 	Tap = {
-		-- Longest a touch can last and still count as a tap.
-		-- Higher: slower taps still throw; more forgiving for players who
-		--   press deliberately rather than flick.
-		-- Too high: overlaps the charge threshold and taps start charging.
-		-- Symptom to lower it: taps occasionally produce a charged throw.
-		MaxDuration = 0.22,
+		-- Note: there is no tap duration here. Charge.HoldDelay already defines
+		-- the window -- a touch still undecided at that point becomes a charge --
+		-- so a second ceiling could only ever be unreachable or contradict it.
 
 		-- How far the finger may drift and still count as a tap. Fingers are
 		-- never still; this is tremor tolerance, not a target.
@@ -115,11 +112,21 @@ return {
 		-- Higher: easier to start a swipe; encroaches on the middle tap area.
 		RegionHeightFraction = 0.28,
 
-		-- Horizontal bounds of the strip, as fractions of viewport width. The
-		-- gaps at each end are left for the movement stick and combat buttons;
-		-- actual HUD geometry is subtracted on top of this at runtime.
-		RegionMinXFraction = 0.28,
-		RegionMaxXFraction = 0.78,
+		-- Horizontal bounds of the strip, as fractions of viewport width. Full
+		-- width: the movement stick and jump button register their real
+		-- rectangles as exclusions, which is far more accurate than guessing at
+		-- fractions. The old 0.28-0.78 strip sat in the middle of the screen,
+		-- where no thumb rests -- a right thumb sits around 0.85-0.95.
+		RegionMinXFraction = 0,
+		RegionMaxXFraction = 1,
+
+		-- Travel required before the direction of a swipe is judged at all.
+		-- The first move sample is 1-5px and is mostly digitizer noise; judging
+		-- direction on it rejected almost every real swipe.
+		-- Higher: more forgiving of a thumb that starts its arc sideways.
+		-- Too high: a sideways drag stays a swipe candidate for longer than it
+		--   should before falling through to the camera.
+		DirectionSampleMinPixels = { Fraction = 0.035, MinPixels = 16, MaxPixels = 48 } :: Scaled,
 
 		-- Minimum upward travel before the gesture counts.
 		-- Higher: fewer accidental swipes; more thumb travel required.
@@ -131,18 +138,19 @@ return {
 
 		-- Minimum speed, in pixels per second. Kept low enough that the gesture
 		-- is not an execution test -- it is a convenience, not a skill check.
-		MinVelocity = { Fraction = 0.9, MinPixels = 320, MaxPixels = 1700 } :: Scaled,
+		-- This is now an honest number: the velocity estimate used to ramp from
+		-- zero, so a swipe had to be ~14% faster than whatever was configured.
+		MinVelocity = { Fraction = 0.7, MinPixels = 260, MaxPixels = 1400 } :: Scaled,
 
 		-- How closely the movement must point up, as a dot product against
 		-- screen-up. 1 is exactly vertical, 0 is a right angle.
 		-- Higher: stricter, fewer false positives, more failed swipes.
-		-- 0.8 is roughly a 36-degree cone either side of straight up.
-		DirectionDot = 0.8,
-
-		-- Horizontal drift allowed relative to vertical travel. Belt and braces
-		-- alongside DirectionDot: this one catches long diagonal drags that
-		-- still satisfy the dot product.
-		MaxHorizontalRatio = 0.75,
+		-- 0.72 is roughly a 44-degree cone either side of straight up, which a
+		-- thumb arcing from the bottom of the screen can actually stay inside.
+		--
+		-- There is no separate horizontal-ratio limit: it encoded the identical
+		-- cone, so it only ever doubled the chance of a rounding-edge rejection.
+		DirectionDot = 0.72,
 	},
 
 	--==================================================================
@@ -189,7 +197,7 @@ return {
 		-- keeps the locked, hidden-cursor, shoulder-offset camera exactly as it
 		-- is and only stops the body yawing. Useful for strafe-style movement
 		-- or when a pose system wants to own facing.
-		CharacterFollowsCameraYaw = true,
+		CharacterFollowsCameraYaw = false,
 
 		-- Note: there is deliberately no responsiveness value here. Body yaw uses
 		-- Roblox's own RotationType.CameraRelative, the same path shift lock

@@ -11,9 +11,13 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )
+local ReactRoot = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("ReactRoot")
+)
 local ArenaApp = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ArenaApp"))
 
-local root = ReactRoblox.createRoot(Players.LocalPlayer:WaitForChild("PlayerGui"))
+local container = ReactRoot.create("ArenaRoot")
+local root = ReactRoblox.createRoot(container)
 
 UIFeedback.start()
 root:render(React.createElement(ArenaApp))
@@ -36,5 +40,6 @@ sendReady()
 
 script.Destroying:Connect(function()
 	root:unmount()
+	container:Destroy()
 	UIFeedback.destroy()
 end)

@@ -20,12 +20,15 @@ local ConfigReplication = require(
 local lobby = script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby")
 local PartyBackgroundController = require(lobby:WaitForChild("PartyBackgroundController"))
 local PartyClient = require(lobby:WaitForChild("PartyClient"))
+local ReactRoot = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("ReactRoot")
+)
 local LobbyApp = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("LobbyApp"))
 
-local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local partyClient = PartyClient.new()
 local background = PartyBackgroundController.start()
-local root = ReactRoblox.createRoot(playerGui)
+local container = ReactRoot.create("LobbyRoot")
+local root = ReactRoblox.createRoot(container)
 
 ConfigReplication.startClient({
 	GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes")),
@@ -39,6 +42,7 @@ Replica.RequestData()
 
 script.Destroying:Connect(function()
 	root:unmount()
+	container:Destroy()
 	partyClient:destroy()
 	if background then
 		background:destroy()

@@ -13,20 +13,12 @@ local AvatarAbilitiesInterface = require(script.Parent:WaitForChild("AvatarAbili
 local InputReplication = {}
 InputReplication.__index = InputReplication
 
+-- GAME MODIFICATION (Combat): reads the setting only. See the matching note in
+-- ControlModule/init.luau -- the combat camera's choice already reaches this
+-- value through BaseCamera, so deriving it a second time here would be a second
+-- source of truth.
 local function shouldUseCameraRelativeRotation(): boolean
-	local globalState = UserGameSettings.RotationType == Enum.RotationType.CameraRelative
-	local ok, CombatCamera = pcall(function()
-		return require(script.Parent.Parent:WaitForChild("Combat"):WaitForChild("CombatCamera"))
-	end)
-	if ok and CombatCamera then
-		local okConfig, CombatConfig = pcall(function()
-			return require(script.Parent.Parent:WaitForChild("Combat"):WaitForChild("CombatConfig"))
-		end)
-		if okConfig and CombatConfig and CombatCamera.isActive() and not CombatConfig.CombatCamera.CharacterFollowsCameraYaw then
-			return false
-		end
-	end
-	return globalState
+	return UserGameSettings.RotationType == Enum.RotationType.CameraRelative
 end
 
 function InputReplication._calculatePlayerInputValues(player: Player)
@@ -223,23 +215,11 @@ function InputReplication.SendInputToHumanoidForServerAuth(player: Player)
 	local jumpAction = characterContext.JumpAction
 
     local moveVector, cameraVector3D, cameraRelativeRotation = InputReplication._calculatePlayerInputValues(player)
-    local combatNoFollowYaw = false
-    local ok, CombatCamera = pcall(function()
-        return require(script.Parent.Parent:WaitForChild("Combat"):WaitForChild("CombatCamera"))
-    end)
-    if ok and CombatCamera and CombatCamera.isActive() then
-        local okConfig, CombatConfig = pcall(function()
-            return require(script.Parent.Parent:WaitForChild("Combat"):WaitForChild("CombatConfig"))
-        end)
-        if okConfig and CombatConfig then
-            combatNoFollowYaw = not CombatConfig.CombatCamera.CharacterFollowsCameraYaw
-        end
-    end
 
     humanoid:Move(moveVector)
-    humanoid.AutoRotate = not (cameraRelativeRotation and not combatNoFollowYaw)
+    humanoid.AutoRotate = not cameraRelativeRotation
 
-    if cameraRelativeRotation and not combatNoFollowYaw then
+    if cameraRelativeRotation then
         if humanoid.SeatPart == nil and humanoid.RootPart ~= nil and not humanoid.Sit and not humanoid.RootPart:IsGrounded() then
             humanoid.RootPart.CFrame = CFrame.new(
                 humanoid.RootPart.CFrame.Position,

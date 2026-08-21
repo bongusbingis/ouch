@@ -46,6 +46,7 @@ type Touch = {
 	-- current, so returning to the start does not re-qualify a drag as a tap.
 	maxDrift: number,
 	velocity: number,
+	hasVelocity: boolean,
 	lastMovedAt: number,
 	fromBottom: boolean,
 	swipeAlive: boolean,
@@ -130,17 +131,18 @@ local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 		return false
 	end
 
-	-- Direction first: a downward or sideways drag is a camera move and should
-	-- stop pretending to be a swipe immediately rather than at the distance gate.
+	-- Direction is only meaningful once the finger has actually gone somewhere.
+	-- Judging it on the first 1-5px sample rejected nearly every real swipe,
+	-- because that sample is dominated by digitizer noise and by the sideways
+	-- roll a thumb makes as it starts to flick.
+	if travel < TouchRegions.scale(CombatConfig.BottomSwipe.DirectionSampleMinPixels) then
+		return false
+	end
+
 	local upDot = -dy / travel
 	if upDot < CombatConfig.BottomSwipe.DirectionDot then
 		touch.swipeAlive = false
 		log("swipe cancelled: direction")
-		return false
-	end
-	if math.abs(dy) > 1e-3 and math.abs(dx) / math.abs(dy) > CombatConfig.BottomSwipe.MaxHorizontalRatio then
-		touch.swipeAlive = false
-		log("swipe cancelled: too diagonal")
 		return false
 	end
 
@@ -188,6 +190,7 @@ function TouchIntent.began(input: InputObject, sunk: boolean)
 		startedAt = now,
 		maxDrift = 0,
 		velocity = 0,
+		hasVelocity = false,
 		lastMovedAt = now,
 		fromBottom = TouchRegions.isInBottomSwipeRegion(x, y),
 		swipeAlive = TouchRegions.isInBottomSwipeRegion(x, y),
@@ -201,8 +204,17 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 		return
 	end
 	if sunk then
-		-- UI took the touch mid-gesture. Drop it rather than guessing.
+		-- UI took the touch mid-gesture. Drop it rather than guessing -- but hand
+		-- back the charge first. ended() returns early for a touch that is no
+		-- longer tracked, so without this chargeOwner stayed set forever and no
+		-- further charge could ever begin.
 		touches[input] = nil
+		if input == chargeOwner then
+			chargeOwner = nil
+			counters.cancelled += 1
+			log("-> CancelCharge (taken by UI)")
+			fire("onCancelCharge")
+		end
 		return
 	end
 
@@ -211,9 +223,18 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 	local dt = now - touch.lastMovedAt
 	if dt > 1e-4 then
 		local stepX, stepY = x - touch.x, y - touch.y
-		local stepped = math.sqrt(stepX * stepX + stepY * stepY)
-		-- Smoothed so one noisy sample cannot claim the camera on its own.
-		touch.velocity = touch.velocity * 0.5 + (stepped / dt) * 0.5
+		local sampled = math.sqrt(stepX * stepX + stepY * stepY) / dt
+		if touch.hasVelocity then
+			-- Smoothed so one noisy sample cannot claim the camera on its own.
+			touch.velocity = touch.velocity * 0.5 + sampled * 0.5
+		else
+			-- Seeded from the first real sample rather than blended up from zero.
+			-- Ramping from zero meant the estimate read low for several frames, so
+			-- every speed threshold was silently stricter than its configured
+			-- value, and more so the lower the frame rate.
+			touch.velocity = sampled
+			touch.hasVelocity = true
+		end
 		touch.lastMovedAt = now
 	end
 	touch.x, touch.y = x, y
@@ -288,9 +309,10 @@ function TouchIntent.ended(input: InputObject)
 		return
 	end
 
+	-- Still Pending means the hold threshold was never reached, so the only
+	-- question left is whether the finger stayed put.
 	local duration = os.clock() - touch.startedAt
-	local withinTap = touch.maxDrift <= TouchRegions.scale(CombatConfig.Tap.MaxDistance)
-	if duration <= CombatConfig.Tap.MaxDuration and withinTap then
+	if touch.maxDrift <= TouchRegions.scale(CombatConfig.Tap.MaxDistance) then
 		counters.taps += 1
 		log(("-> NormalThrow (tap %.2fs %dpx)"):format(duration, math.floor(touch.maxDrift)))
 		fire("onNormalThrow")

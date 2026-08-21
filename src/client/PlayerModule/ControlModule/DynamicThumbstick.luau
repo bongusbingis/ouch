@@ -37,6 +37,7 @@ local ThumbstickFadeTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.
 
 local CommonUtils = require(script.Parent.Parent:WaitForChild("CommonUtils"))
 local FlagUtil = CommonUtils.get("FlagUtil")
+local HudRegion = CommonUtils.get("HudRegion")
 local FFlagUserPlayerScriptsCCLIntegrationC = FlagUtil.getUserFlag("UserPlayerScriptsCCLIntegrationC")
 local FFlagUserAllowAbilityControlsBonus = FlagUtil.getUserFlag("UserAllowAbilityControlsBonus")
 local FFlagUserPlayerScriptsDynamicThumbstickUsesIAS = FlagUtil.getUserFlag("UserPlayerScriptsDynamicThumbstickUsesIAS")
@@ -179,6 +180,7 @@ function DynamicThumbstick:Enable(enable: boolean?, uiParentFrame): boolean?
 
 	self.enabled = enable
 	self.thumbstickFrame.Visible = enable
+	HudRegion.publish("MovementThumbstick", self.thumbstickFrame, enable == true)
 	return nil
 end
 

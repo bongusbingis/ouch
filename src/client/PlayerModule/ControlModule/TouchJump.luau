@@ -13,6 +13,7 @@ local CommonUtils = require(script.Parent.Parent:WaitForChild("CommonUtils"))
 local ConnectionUtil = CommonUtils.get("ConnectionUtil")
 local CharacterUtil = CommonUtils.get("CharacterUtil")
 local FlagUtil = CommonUtils.get("FlagUtil")
+local HudRegion = CommonUtils.get("HudRegion")
 local FFlagUserPlayerScriptsCCLIntegrationC = FlagUtil.getUserFlag("UserPlayerScriptsCCLIntegrationC")
 local FFlagUserPlayerScriptsRefactor1 = FlagUtil.getUserFlag("UserPlayerScriptsRefactor1")
 local FFlagUserPlayerScriptsFireThroughScriptableBindings = FlagUtil.getUserFlag("UserPlayerScriptsFireThroughScriptableBindings")
@@ -112,6 +113,7 @@ function TouchJump:EnableButton(enable)
 			self:Create()
 		end
 		self.jumpButton.Visible = true
+		HudRegion.publish("JumpButton", self.jumpButton, true)
 
 		if not FFlagUserPlayerScriptsFireThroughScriptableBindings then
 			-- stop jumping on menu open
@@ -126,6 +128,7 @@ function TouchJump:EnableButton(enable)
 		if self.jumpButton then
 			self.jumpButton.Visible = false
 		end
+		HudRegion.publish("JumpButton", nil, false)
 		if not FFlagUserPlayerScriptsFireThroughScriptableBindings then
 			self._connectionUtil:disconnect(CONNECTIONS.MENU_OPENED)
 		end

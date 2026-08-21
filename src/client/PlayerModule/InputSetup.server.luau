@@ -35,15 +35,22 @@ local CONNECTIONS = {
 if FFlagUserPlayerScriptsTapToMoveUsesIAS2 then
 	local characterContext = StarterPlayer.PlayerModule.InputContexts.CharacterContext
 
-	local touchBinding = Instance.new("InputBinding")
-	touchBinding.Name = "TouchBinding"
-	touchBinding.KeyCode = Enum.KeyCode.TouchPosition
-	touchBinding.Parent = characterContext.ClickToMoveAction
+	-- GAME MODIFICATION (Combat): guarded, matching the neighbouring blocks. The
+	-- shipped InputContexts model was captured after this script had already run,
+	-- so it already contains these; without a guard every boot adds a duplicate.
+	if not characterContext.ClickToMoveAction:FindFirstChild("TouchBinding") then
+		local touchBinding = Instance.new("InputBinding")
+		touchBinding.Name = "TouchBinding"
+		touchBinding.KeyCode = Enum.KeyCode.TouchPosition
+		touchBinding.Parent = characterContext.ClickToMoveAction
+	end
 
-	local touchPositionBinding = Instance.new("InputBinding")
-	touchPositionBinding.Name = "TouchBinding"
-	touchPositionBinding.KeyCode = Enum.KeyCode.TouchPosition
-	touchPositionBinding.Parent = characterContext.ClickToMovePositionAction
+	if not characterContext.ClickToMovePositionAction:FindFirstChild("TouchBinding") then
+		local touchPositionBinding = Instance.new("InputBinding")
+		touchPositionBinding.Name = "TouchBinding"
+		touchPositionBinding.KeyCode = Enum.KeyCode.TouchPosition
+		touchPositionBinding.Parent = characterContext.ClickToMovePositionAction
+	end
 end
 
 if FFlagUserPlayerScriptsCameraTouchUsesIAS then
@@ -77,24 +84,39 @@ if FFlagUserPlayerScriptsCameraTouchUsesIAS then
 end
 
 if FFlagUserPlayerScriptsDynamicThumbstickUsesIAS or FFlagUserPlayerScriptsClassicThumbstickUsesIAS then
-	local characterContext = StarterPlayer.PlayerModule.InputContexts.CharacterContext
+	local inputContexts = StarterPlayer.PlayerModule.InputContexts
+	local characterContext = inputContexts.CharacterContext
 
-	local thumbstickAction = Instance.new("InputAction")
-	thumbstickAction.Name = "ThumbstickAction"
-	thumbstickAction.Type = Enum.InputActionType.ViewportPosition
-	thumbstickAction.Enabled = false
+	-- GAME MODIFICATION (Combat): guarded for the same reason as above. A second
+	-- ThumbstickAction is worse than a wasted instance -- DynamicThumbstick binds
+	-- its UIModifier through WaitForChild and can attach to the dead one, leaving
+	-- a thumbstick that renders but does not respond.
+	local existingContext = if FFlagUserPlayerScriptsThumbstickContext
+		then inputContexts:FindFirstChild("TransformerContext")
+		else nil
+	local owner: Instance = existingContext or characterContext
 
-	if FFlagUserPlayerScriptsThumbstickContext then
-		characterContext.Priority = 150
+	if not owner:FindFirstChild("ThumbstickAction") then
+		local thumbstickAction = Instance.new("InputAction")
+		thumbstickAction.Name = "ThumbstickAction"
+		thumbstickAction.Type = Enum.InputActionType.ViewportPosition
+		thumbstickAction.Enabled = false
 
-		local thumbstickContext = Instance.new("InputContext")
-		thumbstickContext.Name = "TransformerContext"
-		thumbstickContext.Priority = 300
-		thumbstickContext.Sink = true
-		thumbstickContext.Parent = StarterPlayer.PlayerModule.InputContexts
-		thumbstickAction.Parent = thumbstickContext
-	else
-		thumbstickAction.Parent = characterContext
+		if FFlagUserPlayerScriptsThumbstickContext then
+			characterContext.Priority = 150
+
+			local thumbstickContext = existingContext
+			if thumbstickContext == nil then
+				thumbstickContext = Instance.new("InputContext")
+				thumbstickContext.Name = "TransformerContext"
+				thumbstickContext.Priority = 300
+				thumbstickContext.Sink = true
+				thumbstickContext.Parent = inputContexts
+			end
+			thumbstickAction.Parent = thumbstickContext
+		else
+			thumbstickAction.Parent = characterContext
+		end
 	end
 end
 

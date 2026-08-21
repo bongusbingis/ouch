@@ -4,7 +4,6 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local CameraModule = require(script.Parent.Parent:WaitForChild("CameraModule"))
-local CameraUtils = require(script.Parent.Parent:WaitForChild("CameraModule"):WaitForChild("CameraUtils"))
 local CameraInput = require(script.Parent.Parent:WaitForChild("CameraModule"):WaitForChild("CameraInput"))
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
 
@@ -22,16 +21,14 @@ local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
 --   character follows camera yaw   -- whether the body turns to match
 --
 -- Upstream ties both to inMouseLockedMode inside BaseCamera:UpdateMouseBehavior,
--- so you cannot have one without the other. Driving the two overrides directly
--- decouples them, which is what makes CharacterFollowsCameraYaw = false a valid
--- configuration: identical camera, identical controls, the body simply stops
--- turning on its own.
+-- so you cannot have one without the other. This module publishes the two as
+-- separate pieces of state that BaseCamera then applies, which is what makes
+-- CharacterFollowsCameraYaw = false valid: identical camera, identical controls,
+-- the body simply stops turning on its own and faces where it is walking.
 --
--- Body yaw uses Roblox's own RotationType.CameraRelative rather than a custom
--- yaw spring. That path already turns the character smoothly and is the same one
--- shift lock uses, so there is exactly one owner of root rotation and nothing to
--- fight over. A hand-rolled spring here would have to disable Humanoid.AutoRotate
--- and take that ownership away from the engine for no visible gain.
+-- Body yaw is expressed as a RotationType and nothing else. Root rotation stays
+-- owned by the engine and ControlModule; this module never touches AutoRotate or
+-- the root CFrame.
 --
 -- Cursor release is reference counted. Several things can independently need a
 -- pointer -- a shop, a settings panel, a results screen -- and the cursor should
@@ -45,8 +42,6 @@ local RENDER_NAME = "CombatCameraState"
 local enabled = false
 local started = false
 local cursorRequests: { [string]: boolean } = {}
-local appliedLock: boolean? = nil
-local appliedRotationType: boolean? = nil
 local appliedCursor: boolean? = nil
 local listeners: { (boolean) -> () } = {}
 -- Set by the facade. Kept as a predicate rather than a require so this module
@@ -92,47 +87,21 @@ local function apply()
 	local config = CombatConfig.CombatCamera
 	local active = isActive()
 
+	-- Everything below is state, not engine writes. BaseCamera:UpdateMouseBehavior
+	-- runs after this each frame and is the single writer of MouseBehavior and
+	-- RotationType; it reads what we set here. Writing those properties from here
+	-- as well is what let the two fight, with whichever ran last winning.
 	local controller = (CameraModule :: any).activeCameraController
 	if controller then
 		controller:SetIsMouseLocked(active)
 		if active then
 			controller:SetMouseLockOffset(config.ShoulderOffset)
 		end
-	end
-
-	if appliedLock ~= active then
-		appliedLock = active
-		if active and config.LockMouseToCenter then
-			CameraUtils.setMouseBehaviorOverride(Enum.MouseBehavior.LockCenter)
-		else
-			CameraUtils.restoreMouseBehavior()
-		end
-	end
-
-	-- The flag that decides whether the body turns, kept independent of the lock
-	-- above so either can change without disturbing the other.
-	-- Explicitly force MovementRelative when we do not want camera yaw to own the
-	-- model, because restoring the previous value is wrong if the default PlayerModule
-	-- has been forked to CameraRelative (which is the current behavior that still
-	-- makes the character yaw to the camera).
-	local followYaw = active and config.CharacterFollowsCameraYaw
-	if active and not followYaw then
-		local player = Players.LocalPlayer
-		local character = player and player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.AutoRotate = false
-		end
-	end
-	if appliedRotationType ~= followYaw then
-		appliedRotationType = followYaw
-		if followYaw then
-			CameraUtils.setRotationTypeOverride(Enum.RotationType.CameraRelative)
-		elseif active then
-			CameraUtils.setRotationTypeOverride(Enum.RotationType.MovementRelative)
-		else
-			CameraUtils.restoreRotationType()
-		end
+		-- nil hands rotation back to stock behaviour when combat is off.
+		controller.combatRotationType = if not active
+			then nil
+			elseif config.CharacterFollowsCameraYaw then Enum.RotationType.CameraRelative
+			else Enum.RotationType.MovementRelative
 	end
 
 	-- Fine aim while a charge is building, and the overall mouse feel knob. One
@@ -147,6 +116,7 @@ local function apply()
 	end
 	CameraInput.setSensitivityScale(scale)
 
+	-- Cursor visibility has no other owner, so it is written here.
 	local hideCursor = active and config.HideMouseCursor
 	if appliedCursor ~= hideCursor and UserInputService.MouseEnabled then
 		appliedCursor = hideCursor
@@ -186,6 +156,10 @@ function CombatCamera.requestCursor(reason: string)
 	cursorRequests[reason] = true
 	apply()
 	notify()
+end
+
+function CombatCamera.isCursorRequested(reason: string): boolean
+	return cursorRequests[reason] == true
 end
 
 function CombatCamera.releaseCursor(reason: string)

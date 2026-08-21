@@ -353,10 +353,9 @@ local function LobbyContent(props)
 		})
 	end
 
-	return c("ScreenGui", {
-		ResetOnSpawn = false,
-		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	return c("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
 	}, {
 		BaseClip = c("Frame", {
 			BackgroundTransparency = 1,

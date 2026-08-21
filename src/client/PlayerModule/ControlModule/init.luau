@@ -68,20 +68,13 @@ local inputContexts = script.Parent:WaitForChild("InputContexts")
 local cameraContext = inputContexts:WaitForChild("CameraContext") :: InputContext
 local cameraRotationAction = cameraContext:WaitForChild("CameraRotationAction") :: InputAction
 
+-- GAME MODIFICATION (Combat): reads the setting and nothing else. The combat
+-- camera publishes its rotation type through BaseCamera, which writes it here,
+-- so the combat decision is already baked into this value. Re-deriving it from
+-- the Combat modules gave two answers to one question and cost a require per
+-- frame.
 local function shouldUseCameraRelativeRotation(): boolean
-	local globalState = UserGameSettings.RotationType == Enum.RotationType.CameraRelative
-	local ok, CombatCamera = pcall(function()
-		return require(script.Parent:WaitForChild("Combat"):WaitForChild("CombatCamera"))
-	end)
-	if ok and CombatCamera and CombatCamera.isActive() then
-		local okConfig, CombatConfig = pcall(function()
-			return require(script.Parent:WaitForChild("Combat"):WaitForChild("CombatConfig"))
-		end)
-		if okConfig and CombatConfig and not CombatConfig.CombatCamera.CharacterFollowsCameraYaw then
-			return false
-		end
-	end
-	return globalState
+	return UserGameSettings.RotationType == Enum.RotationType.CameraRelative
 end
 
 local CONTROL_ACTION_PRIORITY = Enum.ContextActionPriority.Medium.Value
@@ -812,6 +805,14 @@ end
 
 function ControlModule:UpdateTouchGuiVisibility()
 	local doShow = self.humanoid and GuiService.TouchControlsEnabled and UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	-- GAME MODIFICATION (Combat): also rebuild when the gui has been destroyed
+	-- out from under us. A destroyed instance is still a truthy reference, so the
+	-- original `not self.touchGui` check could never recover and the thumbstick
+	-- and jump button stayed detached for the rest of the session.
+	if self.touchGui and self.touchGui.Parent == nil then
+		self.touchGui = nil
+		self.touchControlFrame = nil
+	end
 	if doShow and not self.touchGui then
 		-- lazy load the UI
 		self:CreateTouchGuiContainer()
@@ -1001,20 +1002,11 @@ function ControlModule:ProcessInputs(player:Player, dt:number)
 			local moveVector = cameraVector3D * moveVector2D.Y + rightVector * moveVector2D.X
 			humanoid:Move(moveVector)
 
-			local rotationIsCameraRelative = rotationAction:GetState()
-			local combatNoFollowYaw = false
-			local ok, CombatCamera = pcall(function()
-				return require(script.Parent:WaitForChild("Combat"):WaitForChild("CombatCamera"))
-			end)
-			if ok and CombatCamera and CombatCamera.isActive() then
-				local okConfig, CombatConfig = pcall(function()
-					return require(script.Parent:WaitForChild("Combat"):WaitForChild("CombatConfig"))
-				end)
-				if okConfig and CombatConfig then
-					combatNoFollowYaw = not CombatConfig.CombatCamera.CharacterFollowsCameraYaw
-				end
-			end
-			if rotationIsCameraRelative and not combatNoFollowYaw then
+			-- GAME MODIFICATION (Combat): the sole owner of AutoRotate on the client.
+			-- Camera-relative turns the body to face the camera; otherwise the
+			-- Humanoid turns it to face its own movement, which previously could
+			-- not happen because both branches set AutoRotate false.
+			if rotationAction:GetState() then
 				humanoid.AutoRotate = false
 				if humanoid.SeatPart == nil and humanoid.RootPart ~= nil and not humanoid.Sit and not humanoid.RootPart:IsGrounded() then
 					humanoid.RootPart.CFrame = CFrame.new(
@@ -1023,7 +1015,7 @@ function ControlModule:ProcessInputs(player:Player, dt:number)
 					)
 				end
 			else
-				humanoid.AutoRotate = false
+				humanoid.AutoRotate = true
 			end
 		end
 

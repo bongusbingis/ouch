@@ -65,7 +65,10 @@ function ClassicCamera:SetCameraMovementMode(cameraMovementMode: Enum.ComputerCa
 	BaseCamera.SetCameraMovementMode(self, cameraMovementMode)
 
 	self.isFollowCamera = cameraMovementMode == Enum.ComputerCameraMovementMode.Follow
-	self.isCameraToggle = cameraMovementMode == Enum.ComputerCameraMovementMode.CameraToggle
+	-- GAME MODIFICATION (Combat): pinned off. Camera Toggle is a per-account
+	-- setting, so leaving this live meant the combat camera worked in Studio and
+	-- broke for any live player who had that mode selected.
+	self.isCameraToggle = false
 end
 
 function ClassicCamera:Update(dt)

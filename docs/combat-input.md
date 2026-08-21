@@ -161,6 +161,32 @@ character.
 
 ---
 
+## 4b. Ownership map
+
+One writer per piece of state. This is the chain that was previously contested:
+
+```
+CombatCamera            publishes  controller.combatRotationType
+                                   controller:SetIsMouseLocked / SetMouseLockOffset
+        |
+BaseCamera              writes     UserInputService.MouseBehavior
+:UpdateMouseBehavior               UserGameSettings.RotationType
+        |
+ControlModule           writes     Humanoid.AutoRotate
+:ProcessInputs
+```
+
+`CombatCamera` owns *state*, `BaseCamera` owns the *mouse and rotation writes*, and
+`ControlModule` owns `AutoRotate`. Nothing writes a property another module also writes.
+Cursor visibility (`MouseIconEnabled`) has no other claimant and stays with `CombatCamera`.
+
+HUD geometry flows the other way: `DynamicThumbstick` and `TouchJump` publish their own
+rectangles through `CommonUtils.HudRegion` onto the PlayerModule event bus, and `Combat`
+subscribes. The control that owns the geometry is the one that reports it, and neither side
+requires the other.
+
+---
+
 ## 5. Upstream diff summary
 
 Three files, each marked `GAME MODIFICATION (Combat)` so they are greppable when
@@ -171,6 +197,14 @@ diffing a future fork.
 | `init.luau` | Requires/starts `Combat` and exposes it on the previously-empty public API table | No — a fork has to have one entry point |
 | `CameraModule/MouseLockController.luau` | The stock Shift toggle is not connected. Leaving it would give two sources of truth for the camera offset and Shift would silently fight the combat camera | Yes — could be replaced by rebinding `MouseLockSwitchAction` from outside if Roblox makes that possible |
 | `CameraModule/CameraInput.luau` | One sensitivity multiplier on `getRotation`, set through a setter. Placed here because it is where every device's rotation converges | Partly — a fork-free version would need an upstream sensitivity hook |
+| `CameraModule/BaseCamera.luau` | Removed the CameraToggle branch and read `combatRotationType`. The toggle branch bypassed the combat path and let right-click own MouseBehavior | No — the branch has to go for the camera to have one owner |
+| `CameraModule/ClassicCamera.luau` | `isCameraToggle` pinned false, so a per-account setting cannot resurrect the branch | Yes, if Roblox ever exposes the mode per-experience |
+| `CameraModule/init.luau` | Stopped registering `CameraToggle` as a selectable mode | Yes |
+| `ControlModule/init.luau` | Touch gui rebuilt if destroyed; sole `AutoRotate` owner; publishes thumbstick rect | No |
+| `ControlModule/InputReplication.luau` | Reads `RotationType` only, no combat requires | No |
+| `ControlModule/DynamicThumbstick.luau`, `TouchJump.luau` | Publish their HUD rectangles | Yes |
+| `CommonUtils/HudRegion.luau` | New: the publisher both controls share | Yes — purely additive |
+| `InputSetup.server.luau` | Idempotency guards on two blocks that lacked them | No — upstream bug |
 
 Everything else is additive under `Combat/`. Lint and format exclusions cover
 only the upstream directories, so `Combat/` is held to project standard while the

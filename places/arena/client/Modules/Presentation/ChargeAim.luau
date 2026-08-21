@@ -202,8 +202,7 @@ local function update(dt: number)
 	end
 	local aim = rawAim.Unit
 
-	local speed = Combat.Dodgeball.ThrowSpeed
-		* (1 + (Combat.Dodgeball.Charge.MaxSpeedScale - 1) * snapshot.chargeAlpha)
+	local speed = Combat.Dodgeball.ThrowSpeed * (1 + (Combat.Dodgeball.Charge.MaxSpeedScale - 1) * snapshot.chargeAlpha)
 	local velocity = aim * speed
 	local flight = timeToImpact(origin, velocity, character)
 
