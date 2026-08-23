@@ -13,6 +13,7 @@ local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
+local EconomyService = require(Modules:WaitForChild("EconomyService"))
 
 ConfigLiveService.start({
 	modules = {
@@ -29,6 +30,7 @@ ConfigLiveService.start({
 AnalyticsService.start()
 CosmeticsService.start()
 CharacterColorService.start()
+EconomyService.start()
 
 Players.PlayerAdded:Connect(function(player)
 	PlayerData.load(player)

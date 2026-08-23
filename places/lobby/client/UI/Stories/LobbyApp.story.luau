@@ -20,6 +20,63 @@ local mockPartyClient = {
 	JoinCodeErrorMessages = {},
 }
 
+local shopState = {
+	status = "Ready",
+	shopState = {
+		serverNow = os.time(),
+		offers = {},
+		offersExpireAt = os.time() + 86400,
+		featured = { kind = "Crate", id = "DodgeballCrate" },
+		featuredExpireAt = os.time() + 604800,
+		bundle = {
+			bundleId = "StarterOutfitBundle",
+			displayName = "Starter Outfit Bundle",
+			description = "A complete look, cheaper than buying the pieces.",
+			status = "Preview",
+			itemIds = {},
+		},
+		bundleExpireAt = os.time() + 604800,
+	},
+	metadata = {},
+	ownedPasses = {},
+	pending = {},
+	reveal = nil,
+	grant = nil,
+}
+
+local mockShopClient = {}
+
+function mockShopClient.snapshot()
+	return shopState
+end
+
+function mockShopClient.subscribe(_callback)
+	return function() end
+end
+
+function mockShopClient.refresh()
+	return true
+end
+
+function mockShopClient.purchaseCosmetic(_cardId, _itemId)
+	return true
+end
+
+function mockShopClient.openCrate(_cardId, _crateId)
+	return true
+end
+
+function mockShopClient.promptProduct(_cardId, _productId)
+	return true
+end
+
+function mockShopClient.promptGamePass(_cardId, _passId)
+	return true
+end
+
+function mockShopClient.clearReveal() end
+function mockShopClient.clearGrant() end
+
 function mockPartyClient:getSnapshot()
 	return snapshot
 end
@@ -49,6 +106,7 @@ return function(target: Instance)
 	local root = ReactRoblox.createRoot(target)
 	root:render(React.createElement(LobbyApp, {
 		PartyClient = mockPartyClient,
+		ShopClient = mockShopClient,
 		EconomyData = { Bonks = 0, Cosmetics = { Owned = {}, Equipped = {} } },
 		CameraEnabled = false,
 		WorldPresentationEnabled = false,

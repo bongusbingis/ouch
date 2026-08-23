@@ -71,7 +71,6 @@ export type ProjectileState = {
 	-- Throw style locked in at windup and consumed at release, so a player who
 	-- changes their mind mid-windup cannot rewrite a throw already committed.
 	releaseCharge: number?,
-	releaseLob: boolean?,
 }
 
 export type PlayerCombatState = {
@@ -108,9 +107,6 @@ export type InputCommand = {
 	deviceClass: string?,
 	-- 0-1 hold duration behind a charged throw. Absent or 0 is a normal throw.
 	charge: number?,
-	-- Throw as a lob: slower, pitched up. Mutually exclusive with charge, and
-	-- the sim resolves the conflict rather than trusting the sender.
-	lob: boolean?,
 	-- Resolved 0-1 assist strengths for this player, attached by the adapter.
 	-- Absent means no assist, which is what an unconfigured player gets.
 	assist: { [string]: number }?,

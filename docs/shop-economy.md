@@ -110,15 +110,8 @@ grant.
 `InventoryPreview` asserts. That assert is the intended signal that how the thing
 previews has not been decided yet.
 
-## Known gap
+## Runtime availability
 
-Every economy service — `ShopService`, `CrateService`, `DirectPurchaseService`,
-`MonetizationService`, `GamePassService`, `BattlePassService` — runs in the
-**arena only**, while `ShopPage` renders in the **lobby**. A lobby client calling
-`GetShopState`, `OpenCrate` or `PurchaseCosmetic` yields forever, because the
-remote exists there but nothing handles it.
-
-None of these services depend on anything arena-specific; every dependency is
-shared config, shared `Game` code, or a shared server module. Moving them to
-`src/server/Modules/` would make them load in both places. This is unresolved and
-must be settled before the shop UI is wired up.
+The economy service cohort lives under `src/server/Modules` and is started by
+`EconomyService` in both places. Lobby and arena therefore use the same rotation,
+purchase, receipt, entitlement, crate, and season-pass authority.

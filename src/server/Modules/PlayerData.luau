@@ -7,6 +7,9 @@ local Promise = require(ReplicatedStorage.Packages.promise)
 
 local Env = require(script.Parent.Parent.Env)
 local DataConfig = require(game.ReplicatedStorage.Config.Data)
+local WriteThroughProxy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
+)
 
 local Data = {}
 Data._profiles = {}
@@ -33,47 +36,6 @@ local EDITABLE_PROGRESSION_FIELDS = {
 	Losses = true,
 	MatchesPlayed = true,
 }
-
-local function _wrapProxy(data, profileReplica, path)
-	local proxy = {}
-	setmetatable(proxy, {
-		__index = function(_, key)
-			local value = data[key]
-			if type(value) == "table" then
-				local newPath = table.clone(path or {})
-				table.insert(newPath, key)
-				return _wrapProxy(value, profileReplica, newPath)
-			end
-			return value
-		end,
-		__newindex = function(_, key, value)
-			local fullPath = table.clone(path or {})
-			table.insert(fullPath, key)
-			local rawValue = value
-			if type(value) == "table" then
-				value = _wrapProxy(value, profileReplica, fullPath)
-			end
-			data[key] = value
-			profileReplica:Set(fullPath, rawValue)
-		end,
-		__len = function(_)
-			return #data
-		end,
-		-- __iter = function(_)
-		-- 	return next, data, nil
-		-- end,
-		__pairs = function(_)
-			return pairs(data)
-		end,
-		__ipairs = function(_)
-			return ipairs(data)
-		end,
-		__iter = function(_)
-			return pairs, data, nil
-		end,
-	})
-	return proxy
-end
 
 local function _subscribeWhenReady(player, entry)
 	local function subscribe()
@@ -156,7 +118,7 @@ local function _loadPlayerData(player)
 
 		local entry = {
 			Profile = profile,
-			Data = _wrapProxy(profile.Data, profileReplica),
+			Data = WriteThroughProxy.wrap(profile.Data, profileReplica),
 			Replica = profileReplica,
 		}
 		Data._profiles[player.UserId] = entry

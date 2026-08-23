@@ -204,16 +204,6 @@ T.describe("Dodgeball kit", function()
 		SimCore.step(state, { throwCommand({ charge = 0.75 }) }, world, DT)
 		local ball = state.projectiles.ball_0001
 		T.expect(ball.releaseCharge):toBeNear(0.75, 1e-6)
-		T.expect(ball.releaseLob):toEqual(false)
-	end)
-
-	T.it("resolves a client claiming both a lob and a charge in favour of the lob", function()
-		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
-		local state = stateWithHeldBall(world)
-		SimCore.step(state, { throwCommand({ charge = 1, lob = true }) }, world, DT)
-		local ball = state.projectiles.ball_0001
-		T.expect(ball.releaseLob):toEqual(true)
-		T.expect(ball.releaseCharge):toEqual(0)
 	end)
 
 	T.it("clamps a charge the client sent out of range", function()

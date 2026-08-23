@@ -1,5 +1,7 @@
 --!strict
 
+local FOCUS_COLOR = Color3.fromRGB(255, 224, 78)
+
 return table.freeze({
 	UpdateHz = 30,
 	Reticle = table.freeze({
@@ -7,20 +9,23 @@ return table.freeze({
 		MinPixels = 44,
 		MaxPixels = 72,
 		NeutralColor = Color3.fromRGB(255, 255, 255),
-		TargetColor = Color3.fromRGB(255, 224, 78),
-		FullChargeColor = Color3.fromRGB(255, 102, 180),
+		TargetColor = FOCUS_COLOR,
+		FullChargeColor = FOCUS_COLOR,
 		UnavailableTransparency = 0.62,
 		ReadyTransparency = 0.16,
-		RingMinimumAlpha = 0.12,
-		RingStartScale = 1.34,
-		RingFullScale = 0.9,
-		RingStartThickness = 0.035,
-		RingFullThickness = 0.09,
-		RingStartTransparency = 0.68,
-		RingFullTransparency = 0.04,
 		ReleaseScale = 1.3,
 		TargetScale = 1.08,
 		FullChargeScale = 1.16,
+	}),
+	ChargeEffect = table.freeze({
+		MinimumAlpha = 0.08,
+		FullInset = 0.05,
+		FullHorizontalSize = Vector2.new(0.22, 0.095),
+		FullVerticalSize = Vector2.new(0.095, 0.22),
+		FullDotSize = 0.21,
+		GlowStartSize = 0.34,
+		GlowFullSize = 0.66,
+		GlowOpacity = 0.12,
 	}),
 	Trajectory = table.freeze({
 		MinimumOpacity = 0.32,

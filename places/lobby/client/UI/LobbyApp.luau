@@ -15,6 +15,17 @@ local Components = UI:WaitForChild("Components")
 local Network = require(Shared:WaitForChild("Network"))
 local EconomyStore = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("EconomyStore"))
 local InventoryModel = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("InventoryModel"))
+local Economy = Shared:WaitForChild("Game"):WaitForChild("Economy")
+local CrateOdds = require(Economy:WaitForChild("CrateOdds"))
+local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
+local ShopViewModel = require(Economy:WaitForChild("ShopViewModel"))
+local Config = ReplicatedStorage:WaitForChild("Config")
+local Bundles = require(Config:WaitForChild("Bundles"))
+local Cosmetics = require(Config:WaitForChild("Cosmetics"))
+local Crates = require(Config:WaitForChild("Crates"))
+local GamePasses = require(Config:WaitForChild("GamePasses"))
+local Products = require(Config:WaitForChild("Products"))
+local Shop = require(Config:WaitForChild("Shop"))
 local LobbyViewModel = require(UI:WaitForChild("Models"):WaitForChild("LobbyViewModel"))
 local Motion = require(UI:WaitForChild("Motion"))
 local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
@@ -23,6 +34,8 @@ local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("No
 local InventoryPage = require(Components:WaitForChild("InventoryPage"))
 local JoinCodeModal = require(Components:WaitForChild("JoinCodeModal"))
 local NotificationModal = require(Components:WaitForChild("NotificationModal"))
+local ShopDetailsModal = require(Components:WaitForChild("ShopDetailsModal"))
+local CrateRevealModal = require(Components:WaitForChild("CrateRevealModal"))
 local PageTransition = require(Components:WaitForChild("PageTransition"))
 local PartyCode = require(Components:WaitForChild("PartyCode"))
 local ShopPage = require(Components:WaitForChild("ShopPage"))
@@ -65,6 +78,22 @@ local EQUIP_ERRORS = {
 	wrong_slot = "That item cannot be equipped in this slot.",
 	invalid_slot = "That inventory slot is invalid.",
 	network_error = "The inventory service is unavailable.",
+}
+
+local SHOP_ERRORS = {
+	busy = "That purchase is already being processed.",
+	network_error = "The shop service is unavailable. Please try again.",
+	marketplace_error = "Roblox purchases are unavailable right now.",
+	no_profile = "Your profile is still loading.",
+	insufficient_bonks = "You do not have enough Bonks.",
+	already_owned = "You already own that item.",
+	not_offered = "That offer has expired.",
+	not_purchasable = "That item cannot be purchased.",
+	paid_random_restricted = "Crates are unavailable for this account.",
+	policy_lookup_failed = "Crates are temporarily unavailable.",
+	invalid_crate = "That crate is unavailable.",
+	crate_roll_failed = "The crate could not be opened. You were not charged.",
+	purchase_failed = "The purchase could not be completed.",
 }
 
 local function useParty(client, notifications)
@@ -182,12 +211,42 @@ local function LobbyContent(props)
 		AnalyticsReporter.menuOpened(currentPage)
 	end, { currentPage })
 	local inventoryTab, setInventoryTab = React.useState("OUTFITS")
+	local selectedShopCardId, setSelectedShopCardId = React.useState(nil)
 	local joinOpen, setJoinOpen = React.useState(false)
 	local codeVisible, setCodeVisible = React.useState(false)
 	local busySlots = React.useRef({})
 	local devTapState = React.useRef({ lastTapAt = 0, tapCount = 0 })
 	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.onChanged)
 	local economyData = props.EconomyData or storeData
+	local shopClient = props.ShopClient
+	assert(shopClient ~= nil, "[LobbyApp] ShopClient is required")
+	local shopSnapshot = useExternalStore(shopClient.snapshot, shopClient.subscribe)
+	local shopModel = React.useMemo(function()
+		return ShopViewModel.build({
+			status = shopSnapshot.status,
+			shopState = shopSnapshot.shopState,
+			economyData = economyData,
+			metadata = shopSnapshot.metadata,
+			ownedPasses = shopSnapshot.ownedPasses,
+			pending = shopSnapshot.pending,
+			now = os.time(),
+			cosmetics = Cosmetics,
+			crates = Crates,
+			bundles = Bundles,
+			gamePasses = GamePasses,
+			products = Products.Catalog,
+			shopConfig = Shop,
+			featuredRotation = FeaturedRotation,
+			crateOdds = CrateOdds,
+		})
+	end, { economyData, shopSnapshot })
+	local selectedShopCard = if selectedShopCardId then shopModel.byId[selectedShopCardId] else nil
+	local crateReveal = React.useMemo(function()
+		if shopSnapshot.reveal == nil then
+			return nil
+		end
+		return ShopViewModel.reveal(shopSnapshot.reveal, Cosmetics)
+	end, { shopSnapshot.reveal })
 	local snapshot, requestBusy = useParty(partyClient, notifications)
 	local presentation = LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy)
 	local equipped = if economyData then economyData.Cosmetics.Equipped else {}
@@ -199,6 +258,28 @@ local function LobbyContent(props)
 	}
 	local characterRenderer = React.useRef(nil)
 	useWorldTransition(currentPage, props.CameraEnabled ~= false)
+
+	React.useEffect(function()
+		if economyData ~= nil and shopSnapshot.status == "Idle" then
+			task.spawn(shopClient.refresh)
+		end
+	end, { economyData, shopSnapshot.status, shopClient })
+
+	React.useEffect(function()
+		local grant = shopSnapshot.grant
+		if grant == nil then
+			return
+		end
+		local description = if grant.kind == "Bonks"
+			then `YOU RECEIVED {grant.amount} BONKS.`
+			else "YOUR PURCHASE HAS BEEN ADDED TO YOUR ACCOUNT."
+		notifications.notify({
+			title = "PURCHASE COMPLETE",
+			description = description,
+			buttonText = "AWESOME!",
+		})
+		shopClient.clearGrant()
+	end, { shopSnapshot.grant, shopClient, notifications.notify })
 
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false then
@@ -278,7 +359,11 @@ local function LobbyContent(props)
 			if not isBack then
 				return
 			end
-			if notifications.request then
+			if crateReveal then
+				shopClient.clearReveal()
+			elseif selectedShopCardId then
+				setSelectedShopCardId(nil)
+			elseif notifications.request then
 				notifications.close(false)
 			elseif joinOpen then
 				setJoinOpen(false)
@@ -289,7 +374,74 @@ local function LobbyContent(props)
 		return function()
 			connection:Disconnect()
 		end
-	end, { notifications.request, notifications.close, joinOpen, currentPage })
+	end, {
+		notifications.request,
+		notifications.close,
+		joinOpen,
+		currentPage,
+		crateReveal,
+		selectedShopCardId,
+		shopClient,
+	})
+
+	local function shopError(reason: string?)
+		AnalyticsReporter.report("PurchaseFailed", { reason = reason or "purchase_failed" })
+		notifications.notify({
+			title = "SHOP",
+			description = SHOP_ERRORS[reason or "purchase_failed"] or "THE PURCHASE COULD NOT BE COMPLETED.",
+			buttonText = "OK",
+		})
+	end
+
+	local function runShopAction(action, onSuccess)
+		task.spawn(function()
+			local ok, reason = action()
+			if not ok then
+				shopError(reason)
+			elseif onSuccess then
+				onSuccess()
+			end
+		end)
+	end
+
+	local function activateShopCard(card)
+		if card.status ~= "Active" or card.owned or card.pending then
+			return
+		end
+		AnalyticsReporter.report("OfferSelected", { offerKey = card.id, offerKind = card.kind })
+		if card.kind == "Crate" or (card.kind == "Cosmetic" and card.productId ~= nil) then
+			setSelectedShopCardId(card.id)
+		elseif card.kind == "Cosmetic" and card.itemId then
+			notifications.confirm({
+				title = "BUY ITEM?",
+				description = `BUY {string.upper(card.displayName)} FOR {card.bonksPrice} BONKS?`,
+				confirmText = "BUY",
+				cancelText = "CANCEL",
+			}, function(confirmed)
+				if confirmed then
+					runShopAction(function()
+						return shopClient.purchaseCosmetic(card.id, card.itemId)
+					end, function()
+						notifications.notify({
+							title = "PURCHASE COMPLETE",
+							description = `{string.upper(card.displayName)} IS NOW IN YOUR INVENTORY.`,
+							buttonText = "AWESOME!",
+						})
+					end)
+				end
+			end)
+		elseif card.passId then
+			AnalyticsReporter.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
+			runShopAction(function()
+				return shopClient.promptGamePass(card.id, card.passId)
+			end)
+		elseif card.productId then
+			AnalyticsReporter.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
+			runShopAction(function()
+				return shopClient.promptProduct(card.id, card.productId)
+			end)
+		end
+	end
 
 	local function equip(entry)
 		if economyData == nil or busySlots.current[entry.category] then
@@ -348,7 +500,14 @@ local function LobbyContent(props)
 						OnEquip = equip,
 					})
 				end
-				return c(ShopPage, { Position = position })
+				return c(ShopPage, {
+					Model = shopModel,
+					Position = position,
+					OnCardActivated = activateShopCard,
+					OnRefresh = function()
+						task.spawn(shopClient.refresh)
+					end,
+				})
 			end,
 		})
 	end
@@ -422,6 +581,48 @@ local function LobbyContent(props)
 				Notification = c(NotificationModal, {
 					Request = notifications.request,
 					OnChoose = notifications.close,
+				}),
+				ShopDetails = c(ShopDetailsModal, {
+					Card = selectedShopCard,
+					OnClose = function()
+						setSelectedShopCardId(nil)
+					end,
+					OnPurchaseBonks = function()
+						local card = selectedShopCard
+						if card == nil then
+							return
+						end
+						setSelectedShopCardId(nil)
+						runShopAction(function()
+							if card.kind == "Crate" and card.crateId then
+								return shopClient.openCrate(card.id, card.crateId)
+							end
+							return shopClient.purchaseCosmetic(card.id, card.itemId)
+						end, function()
+							if card.kind == "Cosmetic" then
+								notifications.notify({
+									title = "PURCHASE COMPLETE",
+									description = `{string.upper(card.displayName)} IS NOW IN YOUR INVENTORY.`,
+									buttonText = "AWESOME!",
+								})
+							end
+						end)
+					end,
+					OnPurchaseRobux = function()
+						local card = selectedShopCard
+						if card == nil or card.productId == nil then
+							return
+						end
+						setSelectedShopCardId(nil)
+						AnalyticsReporter.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
+						runShopAction(function()
+							return shopClient.promptProduct(card.id, card.productId)
+						end)
+					end,
+				}),
+				CrateReveal = c(CrateRevealModal, {
+					Reveal = crateReveal,
+					OnClose = shopClient.clearReveal,
 				}),
 			}),
 			GameVersion = c(GameVersion),

@@ -21,6 +21,7 @@ local entries: { Entry } = {
 	{ Key = "Combat.Dodgeball.ThrowSpeed", Type = "number", Minimum = 10, Maximum = 1000 },
 	{ Key = "Combat.Dodgeball.Gravity", Type = "number", Minimum = 0, Maximum = 500 },
 	{ Key = "Combat.Dodgeball.ThrowCooldown", Type = "number", Minimum = 0, Maximum = 10 },
+	{ Key = "Combat.Dodgeball.Charge.MaxSpeedScale", Type = "number", Minimum = 1, Maximum = 2 },
 	{ Key = "Combat.Dodgeball.MaxFlightTime", Type = "number", Minimum = 0.1, Maximum = 30 },
 	{ Key = "Combat.Dodgeball.WindupDuration", Type = "number", Minimum = 0, Maximum = 5 },
 	{ Key = "Combat.Dodgeball.CatchDistance", Type = "number", Minimum = 0, Maximum = 50 },

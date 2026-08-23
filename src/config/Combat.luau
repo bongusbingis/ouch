@@ -5,7 +5,7 @@
 
 return {
 	Dodgeball = {
-		ThrowSpeed = 200,
+		ThrowSpeed = 140,
 		Gravity = 70,
 
 		-- Held throw. A charged ball is simply faster, which is what makes it
@@ -21,16 +21,6 @@ return {
 			MaxSpeedScale = 1.3,
 		},
 
-		-- Swipe-up throw: slower and pitched up, so it clears cover and drops
-		-- onto someone rather than travelling flat at them.
-		Lob = {
-			-- Speed multiplier. Sane: 0.65-0.9; below 0.65 it barely travels.
-			SpeedScale = 0.82,
-			-- Upward pitch added to the player's aim, in degrees. This is what
-			-- makes the swipe read as a lob rather than a weak throw.
-			-- Sane: 10-30; above 30 it goes nearly straight up.
-			PitchDeg = 20,
-		},
 		-- The arc drawn while a throw is charging. Presentation only: it predicts
 		-- the same parabola the sim will fly, but nothing reads it back.
 		Preview = {
@@ -62,9 +52,10 @@ return {
 		ThrowCooldown = 0.6,
 		ThrowOriginMaxOffset = 6, -- max distance of throw origin from character center
 		MaxFlightTime = 2,
-		-- This should line up with the authored throw/release moment in
-		-- Assets.Animations.Throw. The current clip is about 0.75s, so 0.38s
-		-- leaves enough follow-through after the projectile releases.
+		-- Delay between the throw input and the ball leaving the hand. Zero on
+		-- purpose: the ball is gone the instant the press ends, and the wind-up
+		-- pose held during charge is what telegraphs a throw to opponents.
+		-- Anything above zero is latency the thrower feels on their own input.
 		WindupDuration = 0,
 		ThrowAnimationName = "Throw",
 		MomentumInheritance = 0.3,
@@ -95,6 +86,24 @@ return {
 		RollSettleSpeed = 1.5,
 		RollGroundSnap = 3,
 		RemoteSmoothing = 18,
+		-- Client-side predicted release. Without it the ball sits in the thrower's
+		-- hand for a full round trip after the input, which is the entire moment a
+		-- throw is judged by. Presentation only -- what a throw hits is still
+		-- decided server-side from the server's own release position.
+		Prediction = {
+			-- Longest a predicted ball is drawn flying without the server having
+			-- confirmed it left the hand. Past this the throw is treated as
+			-- refused and the visual returns to wherever the server says the ball
+			-- is. Wants to be comfortably above a bad round trip but short enough
+			-- that a refused throw does not leave a ghost. Sane: 0.3-0.6.
+			MaxSeconds = 0.4,
+		},
+		-- Ceiling on how far ahead an in-flight ball's visual is extrapolated,
+		-- in seconds. The lead applied is network latency plus the smoothing
+		-- time constant, so the drawn ball sits where the authoritative one
+		-- already is instead of trailing it; this is what a latency spike may
+		-- not exceed.
+		MaxLatencyExtrapolation = 0.2,
 		BallFeel = {
 			FlightStretchPerSpeed = 0.01,
 			MaxFlightStretch = 0.16,
@@ -187,6 +196,6 @@ return {
 	-- Simplified hit capsule applied to every character (never per-limb).
 	CharacterCapsule = {
 		Height = 5,
-		Radius = 1.5,
+		Radius = 1.2,
 	},
 }

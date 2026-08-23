@@ -7,6 +7,9 @@ local Replica = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild(
 local EconomyStore = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("EconomyStore")
 )
+local ShopClient = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("ShopClient")
+)
 local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )
@@ -37,9 +40,10 @@ ConfigReplication.startClient({
 	Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates")),
 })
 EconomyStore.start()
+ShopClient.start()
 UIFeedback.start()
 partyClient:start()
-root:render(React.createElement(LobbyApp, { PartyClient = partyClient }))
+root:render(React.createElement(LobbyApp, { PartyClient = partyClient, ShopClient = ShopClient }))
 Replica.RequestData()
 
 script.Destroying:Connect(function()
@@ -50,5 +54,6 @@ script.Destroying:Connect(function()
 		background:destroy()
 	end
 	EconomyStore.stop()
+	ShopClient.stop()
 	UIFeedback.destroy()
 end)

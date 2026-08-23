@@ -283,7 +283,6 @@ type Intent = {
 	aimDir: Vector3,
 	targetId: string?,
 	charge: number?,
-	lob: boolean?,
 }
 
 local pendingIntents: { Intent } = {}
@@ -301,8 +300,7 @@ local function queueIntent(
 	kind: SimTypes.CommandKind,
 	aimDir: Vector3,
 	targetId: string?,
-	charge: number?,
-	lob: boolean?
+	charge: number?
 )
 	if #pendingIntents >= MAX_QUEUED_INTENTS then
 		return
@@ -313,7 +311,6 @@ local function queueIntent(
 		aimDir = aimDir,
 		targetId = targetId,
 		charge = charge,
-		lob = lob,
 	})
 end
 
@@ -354,7 +351,6 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 			-- wider validation cone and falls back to an unguided throw.
 			targetId = intent.targetId,
 			charge = intent.charge,
-			lob = intent.lob,
 			deviceClass = deviceClass,
 			-- Read from the same projection the client reads, so an assist can
 			-- never be stronger on one side than the other.
@@ -469,8 +465,9 @@ function ServerAuthAdapter.start()
 			if charge ~= nil and (typeof(charge) ~= "number" or charge ~= charge or charge < 0 or charge > 1) then
 				return false, "invalid_charge"
 			end
-			-- No input produces a lob any more. Rejecting it outright means a
-			-- client cannot reach a throw style the game no longer offers.
+			-- The lob throw no longer exists anywhere in the sim. Rejecting the
+			-- argument outright means an old client cannot reach a throw style
+			-- the game no longer has, rather than having it silently ignored.
 			if lob ~= nil then
 				return false, "invalid_lob"
 			end

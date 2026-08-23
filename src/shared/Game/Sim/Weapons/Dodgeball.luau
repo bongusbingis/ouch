@@ -147,10 +147,7 @@ local function handleThrow(
 		ball.releaseTargetId = nil
 	end
 	ball.releaseDeviceClass = command.deviceClass or "Mouse"
-	-- A lob and a charge are different gestures and cannot both be true; the
-	-- sim decides that here rather than trusting whatever the client sent.
-	ball.releaseLob = command.lob == true
-	ball.releaseCharge = if ball.releaseLob then 0 else math.clamp(command.charge or 0, 0, 1)
+	ball.releaseCharge = math.clamp(command.charge or 0, 0, 1)
 
 	-- Lead prediction rides on top of the aim the player actually gave, never
 	-- replacing it: the throw is rotated toward where the target will be, capped
@@ -283,7 +280,6 @@ local function tryCatch(
 	ball.releaseAim = nil
 	ball.releaseTargetId = nil
 	ball.releaseCharge = nil
-	ball.releaseLob = nil
 	kitState.catchRemaining = 0
 	kitState.catchDirection = nil
 

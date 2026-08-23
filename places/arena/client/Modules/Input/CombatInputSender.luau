@@ -34,9 +34,6 @@ local listeners: { (string) -> () } = {}
 local buffer = InputBuffer.new()
 -- How a throw was performed, carried alongside the action so a buffered input
 -- replays as the same throw the player made.
--- How a throw was performed, carried alongside the action so a buffered input
--- replays as the same throw. There is no lob: every non-charged throw is the
--- same normal throw whatever gesture produced it.
 type Style = { targetId: string?, charge: number? }
 
 local pendingStyle: Style? = nil
@@ -168,14 +165,14 @@ end
 -- is using. This module no longer watches input at all -- it turns an intent
 -- into a server request and keeps the local visual state in step.
 --
--- There is no lob. A bottom swipe and a middle tap both mean "normal throw",
--- which is the whole point of the second gesture: an easier way to do the same
--- thing, not another thing to learn.
+-- A bottom swipe and a middle tap both mean "normal throw", which is the whole
+-- point of the second gesture: an easier way to do the same thing, not another
+-- thing to learn.
 local function onIntent(intent: string)
 	if intent == "NormalThrow" then
 		local kind = intentForTap()
 		if CombatState.canStartThrow() then
-			CombatState.onThrow()
+			CombatState.onThrow(AimDirector.currentAim())
 		elseif CombatState.canThrowBall() then
 			CombatState.onBlocked()
 		end
@@ -202,7 +199,7 @@ local function onIntent(intent: string)
 		-- Read before advancing the state machine, which resets the charge that
 		-- the style is built from.
 		local style: Style = { charge = CombatState.currentCharge() }
-		CombatState.onThrow()
+		CombatState.onThrow(AimDirector.currentAim())
 		submit("Throw", style)
 	elseif intent == "CancelCharge" then
 		CombatState.cancelCharge()

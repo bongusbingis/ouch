@@ -27,8 +27,8 @@ export type ProductDef = {
 
 local Catalog: { [string]: ProductDef } = {
 	Bonks500 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429022,
+		CatalogStatus = "Active",
 		DisplayName = "Pocket Stash",
 		Description = "A handy boost for your next crate.",
 		DisplayOrder = 310,
@@ -37,8 +37,8 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 500,
 	},
 	Bonks1100 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429164,
+		CatalogStatus = "Active",
 		DisplayName = "Bonks Stack",
 		Description = "A solid stack with a little extra value.",
 		DisplayOrder = 320,
@@ -47,9 +47,9 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 1100,
 	},
 	Bonks2500 = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Big Haul",
+		Id = 3709429259,
+		CatalogStatus = "Active",
+		DisplayName = "Bonks Haul",
 		Description = "A bigger haul for several crate opens.",
 		DisplayOrder = 330,
 		Type = "Bonks",
@@ -57,8 +57,8 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 2500,
 	},
 	Bonks5500 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429349,
+		CatalogStatus = "Active",
 		DisplayName = "Mega Vault",
 		Description = "The biggest Bonks bundle and strongest value.",
 		DisplayOrder = 340,
@@ -67,8 +67,8 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 5500,
 	},
 	DodgeballCrateOpen = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429401,
+		CatalogStatus = "Active",
 		DisplayName = "Dodgeball Crate",
 		Description = "Open one Dodgeball Crate directly.",
 		DisplayOrder = 210,
@@ -77,7 +77,7 @@ local Catalog: { [string]: ProductDef } = {
 		CrateId = "DodgeballCrate",
 	},
 	HammerCrateOpen = {
-		Id = nil,
+		Id = 3709429455,
 		CatalogStatus = "Preview",
 		DisplayName = "Hammer Crate",
 		Description = "Open one Hammer Crate directly.",
@@ -87,7 +87,7 @@ local Catalog: { [string]: ProductDef } = {
 		CrateId = "HammerCrate",
 	},
 	EffectsCrateOpen = {
-		Id = nil,
+		Id = 3709429563,
 		CatalogStatus = "Preview",
 		DisplayName = "Effects Crate",
 		Description = "Open one Effects Crate directly.",

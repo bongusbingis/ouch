@@ -45,6 +45,9 @@ export type Snapshot = {
 	throwCooldown: number,
 	ready: boolean,
 	releaseCharge: number,
+	-- The aim the throw was sent along, so the presentation layer can predict the
+	-- release rather than waiting a round trip to find out where the ball went.
+	releaseAim: Vector3?,
 	releaseRevision: number,
 	cancelRevision: number,
 	blockedRevision: number,
@@ -63,6 +66,7 @@ local snapshot: Snapshot = {
 	throwCooldown = 0,
 	ready = false,
 	releaseCharge = 0,
+	releaseAim = nil,
 	releaseRevision = 0,
 	cancelRevision = 0,
 	blockedRevision = 0,
@@ -221,7 +225,8 @@ end
 
 -- Called at the moment a throw is actually sent. Drives the post-release states
 -- so the pose layer can get out of the animation's way.
-function CombatState.onThrow()
+function CombatState.onThrow(aim: Vector3?)
+	snapshot.releaseAim = if typeof(aim) == "Vector3" and aim.Magnitude > 1e-6 then aim.Unit else nil
 	snapshot.releaseCharge = snapshot.chargeAlpha
 	snapshot.releaseRevision += 1
 	pressedAt = nil

@@ -26,11 +26,21 @@ local WorldAudio = require(script.Parent.WorldAudio)
 local BallVisuals = {}
 
 local HELD_PHASE = 0
+local IN_FLIGHT_PHASE = 2
 local FREE_PHASE = 5
 local TRAIL_ACTIVE_PHASES = {
 	[2] = true,
 	[3] = true,
 	[4] = true,
+}
+
+-- The local player's throw, drawn before the server has confirmed it. Exactly
+-- one can exist, because a player holds at most one ball.
+type PredictedThrow = {
+	ball: BasePart,
+	position: Vector3,
+	velocity: Vector3,
+	elapsed: number,
 }
 
 type FeelState = {
@@ -52,6 +62,8 @@ local restPulses: { [BasePart]: RestPulseState } = {}
 local feelStates: { [BasePart]: FeelState } = {}
 local trailEnabled: { [BasePart]: boolean } = {}
 local seen = EventDedup.new(4096)
+local predicted: PredictedThrow? = nil
+local lastReleaseRevision = 0
 
 local function cframeOffset(offset: Vector3): CFrame
 	return CFrame.new(offset.x, offset.y, offset.z)
@@ -299,6 +311,65 @@ function BallVisuals.onEvent(event: any)
 	end
 end
 
+-- Draws the thrown ball leaving the hand on the frame the input was sent,
+-- instead of after the round trip it takes the server's first in-flight update
+-- to arrive. It starts from the hand the player was watching rather than from
+-- the server's release socket: that is the position they actually saw, and the
+-- server's own is one round trip away by definition.
+--
+-- Nothing here is authoritative. The server decides what a throw hits from its
+-- own release position, and a throw it refuses simply times out back to the
+-- real ball.
+local function beginPrediction(snapshot: CombatState.Snapshot, localId: string)
+	predicted = nil
+	local aim = snapshot.releaseAim
+	if aim == nil then
+		return
+	end
+	local thrown: BasePart? = nil
+	for candidate in visuals do
+		if candidate:GetAttribute("hb") == localId and candidate:GetAttribute("ph") == HELD_PHASE then
+			thrown = candidate
+			break
+		end
+	end
+	if thrown == nil then
+		return
+	end
+	local cfg = Combat.Dodgeball
+	local charge = math.clamp(snapshot.releaseCharge, 0, 1)
+	local speed = cfg.ThrowSpeed * (1 + (cfg.Charge.MaxSpeedScale - 1) * charge)
+	local root = CharacterRig.rootPart(Players.LocalPlayer.Character)
+	local inherited = if root then root.AssemblyLinearVelocity * cfg.MomentumInheritance else Vector3.zero
+	predicted = {
+		ball = thrown,
+		position = (visuals[thrown] :: BasePart).Position,
+		velocity = aim * speed + inherited,
+		elapsed = 0,
+	}
+end
+
+local function stepPrediction(dt: number)
+	local active = predicted
+	if active == nil then
+		return
+	end
+	active.elapsed += dt
+	-- Handed back the moment the server reports the ball anywhere but the hand,
+	-- which covers the throw landing, the throw being refused, and the ball
+	-- changing owner underneath the prediction.
+	if
+		active.ball.Parent == nil
+		or active.ball:GetAttribute("ph") ~= HELD_PHASE
+		or active.elapsed > Combat.Dodgeball.Prediction.MaxSeconds
+	then
+		predicted = nil
+		return
+	end
+	active.velocity -= Vector3.new(0, Combat.Dodgeball.Gravity * dt, 0)
+	active.position += active.velocity * dt
+end
+
 function BallVisuals.start()
 	local folder = Workspace:WaitForChild("Balls")
 	for _, child in folder:GetChildren() do
@@ -325,9 +396,25 @@ function BallVisuals.start()
 	-- enough per frame that the ball visibly separates and judders against it.
 	RunService:BindToRenderStep("BallVisuals", Enum.RenderPriority.Character.Value + 2, function(dt)
 		local alpha = 1 - math.exp(-Combat.Dodgeball.RemoteSmoothing * dt)
+		-- A replicated ball is drawn late by two independent amounts: the hop it
+		-- took to arrive, and the time constant of the smoothing below. At throw
+		-- speed both together are several studs, which is enough for an
+		-- elimination to land visibly before the ball reaches its target. Leading
+		-- the target by that same amount puts the drawn ball where the
+		-- authoritative one already is, leaving the smoothing to do only what it
+		-- is for: absorbing jitter. GetNetworkPing reports one way, in seconds.
+		local lead = math.min(
+			Players.LocalPlayer:GetNetworkPing() + 1 / Combat.Dodgeball.RemoteSmoothing,
+			Combat.Dodgeball.MaxLatencyExtrapolation
+		)
 		local localId = PlayerIds.toId(Players.LocalPlayer)
 		local feelConfig = Combat.Dodgeball.BallFeel
 		local snapshot = CombatState.getSnapshot()
+		if snapshot.releaseRevision ~= lastReleaseRevision then
+			lastReleaseRevision = snapshot.releaseRevision
+			beginPrediction(snapshot, localId)
+		end
+		stepPrediction(dt)
 		for ball, visual in visuals do
 			if ball.Parent == nil then
 				removeBall(ball)
@@ -335,7 +422,11 @@ function BallVisuals.start()
 			end
 			refreshAsset(ball)
 			visual = visuals[ball] :: BasePart
-			local phase = ball:GetAttribute("ph")
+			-- A predicted ball presents as in flight in every respect -- unpinned
+			-- from the hand, stretched, trailing, spinning -- because that is what
+			-- it is; the only thing missing is the server's confirmation.
+			local activePrediction = if predicted ~= nil and predicted.ball == ball then predicted else nil
+			local phase = if activePrediction then IN_FLIGHT_PHASE else ball:GetAttribute("ph")
 			local isLocalHeld = ball:GetAttribute("hb") == localId
 			local isChargeAiming = snapshot.state == "Charging" and snapshot.weapon == "Dodgeball" and isLocalHeld
 			-- A held ball whose holder has another weapon out is stowed, not
@@ -351,7 +442,10 @@ function BallVisuals.start()
 			local state = feelFor(ball, visual)
 			local heldBlend = if isLocalHeld then 1 - math.exp(-dt * 22) else 1
 			local velocity = ball:GetAttribute("vel")
-			local velocityVector = if typeof(velocity) == "Vector3" then velocity else Vector3.zero
+			local velocityVector = if activePrediction
+				then activePrediction.velocity
+				elseif typeof(velocity) == "Vector3" then velocity
+				else Vector3.zero
 			local speed = velocityVector.Magnitude
 
 			state.elapsed += dt
@@ -378,10 +472,17 @@ function BallVisuals.start()
 				)
 			visual.Size = visualSize
 
-			local targetCFrame = heldCFrame or ball.CFrame
+			-- Only extrapolated in flight. A bouncing ball changes direction on
+			-- contact, so leading it would drive the visual through the surface
+			-- it is about to bounce off.
+			local renderPosition = if activePrediction
+				then activePrediction.position
+				elseif phase == IN_FLIGHT_PHASE then ball.Position + velocityVector * lead
+				else ball.Position
+			local targetCFrame = heldCFrame or (ball.CFrame.Rotation + renderPosition)
 			if phase == FREE_PHASE then
 				local extraY = (restingSize.Y - state.baseSize.Y) / 2
-				targetCFrame = CFrame.new(ball.Position + Vector3.new(0, extraY, 0)) * ball.CFrame.Rotation
+				targetCFrame = CFrame.new(renderPosition + Vector3.new(0, extraY, 0)) * ball.CFrame.Rotation
 			end
 			if heldCFrame == nil and speed > 0.05 then
 				local direction = velocityVector.Unit
@@ -392,10 +493,12 @@ function BallVisuals.start()
 				end
 				state.spinAngle = (state.spinAngle + speed / math.max(Combat.Dodgeball.Radius, 0.01) * dt)
 					% (math.pi * 2)
-				targetCFrame = CFrame.lookAt(ball.Position, ball.Position + direction)
+				targetCFrame = CFrame.lookAt(renderPosition, renderPosition + direction)
 					* CFrame.Angles(0, 0, state.spinAngle)
 			end
-			if isLocalHeld then
+			if activePrediction then
+				visual.CFrame = targetCFrame
+			elseif isLocalHeld then
 				visual.CFrame = visual.CFrame:Lerp(targetCFrame, heldBlend)
 			else
 				visual.CFrame = if immediate then targetCFrame else visual.CFrame:Lerp(targetCFrame, alpha)

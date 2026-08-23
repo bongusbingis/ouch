@@ -84,6 +84,46 @@
 
           "AnalyticsService": {
             "$path": "src/server/Modules/AnalyticsService.luau"
+          },
+
+          "BattlePassService": {
+            "$path": "src/server/Modules/BattlePassService.luau"
+          },
+
+          "CrateService": {
+            "$path": "src/server/Modules/CrateService.luau"
+          },
+
+          "DirectPurchaseService": {
+            "$path": "src/server/Modules/DirectPurchaseService.luau"
+          },
+
+          "EconomyService": {
+            "$path": "src/server/Modules/EconomyService.luau"
+          },
+
+          "EntitlementService": {
+            "$path": "src/server/Modules/EntitlementService.luau"
+          },
+
+          "GamePassService": {
+            "$path": "src/server/Modules/GamePassService.luau"
+          },
+
+          "MonetizationService": {
+            "$path": "src/server/Modules/MonetizationService.luau"
+          },
+
+          "PaidRandomPolicyService": {
+            "$path": "src/server/Modules/PaidRandomPolicyService.luau"
+          },
+
+          "RewardService": {
+            "$path": "src/server/Modules/RewardService.luau"
+          },
+
+          "ShopService": {
+            "$path": "src/server/Modules/ShopService.luau"
           }
         }
       }

@@ -19,6 +19,11 @@ local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local c = React.createElement
 
+local function smoothstep(value: number): number
+	local alpha = math.clamp(value, 0, 1)
+	return alpha * alpha * (3 - 2 * alpha)
+end
+
 local function Reticle(props: { snapshot: ThrowUXClient.Snapshot })
 	local state = props.snapshot.state
 	local target = props.snapshot.targetConfidence > 0
@@ -28,8 +33,20 @@ local function Reticle(props: { snapshot: ThrowUXClient.Snapshot })
 	local reducedMotion = useReducedMotion()
 	local pulse, setPulse = React.useState(false)
 	local pulseRevision = React.useRef(0)
+	local observedRevisions = React.useRef({
+		release = props.snapshot.releaseRevision,
+		ready = props.snapshot.readyRevision,
+	})
 
 	React.useEffect(function()
+		local observed = observedRevisions.current
+		local changed = observed.release ~= props.snapshot.releaseRevision
+			or observed.ready ~= props.snapshot.readyRevision
+		observed.release = props.snapshot.releaseRevision
+		observed.ready = props.snapshot.readyRevision
+		if not changed then
+			return
+		end
 		pulseRevision.current += 1
 		local revision = pulseRevision.current
 		setPulse(true)
@@ -47,48 +64,66 @@ local function Reticle(props: { snapshot: ThrowUXClient.Snapshot })
 		then ThrowUX.Reticle.ReleaseScale
 		else if full then ThrowUX.Reticle.FullChargeScale else if target then ThrowUX.Reticle.TargetScale else 1
 	local rotation = if state == "Cancelled" then -5 else 0
+	local restingColor = if target then ThrowUX.Reticle.TargetColor else ThrowUX.Reticle.NeutralColor
+	local color = if charging
+		then restingColor:Lerp(ThrowUX.Reticle.FullChargeColor, props.snapshot.chargeAlpha)
+		else restingColor
 	local styles = ReactSpring.useSpring({
+		Charge = if charging
+			then if reducedMotion then 1 else math.max(props.snapshot.chargeAlpha, ThrowUX.ChargeEffect.MinimumAlpha)
+			else 0,
+		Color = color,
 		Scale = scale,
 		Rotation = rotation,
-		Ring = if charging then math.max(props.snapshot.chargeAlpha, ThrowUX.Reticle.RingMinimumAlpha) else 0,
 		config = { mass = 1, tension = 520, friction = 30 },
 		immediate = reducedMotion,
 	})
-	local color = if full
-		then ThrowUX.Reticle.FullChargeColor
-		else if target then ThrowUX.Reticle.TargetColor else ThrowUX.Reticle.NeutralColor
+	local chargeVisual = React.useMemo(function()
+		local effect = ThrowUX.ChargeEffect
+		return {
+			DotSize = styles.Charge:map(function(value: number)
+				local size = 0.16 + (effect.FullDotSize - 0.16) * smoothstep(value)
+				return UDim2.fromScale(size, size)
+			end),
+			GlowSize = styles.Charge:map(function(value: number)
+				local alpha = smoothstep(value)
+				local size = effect.GlowStartSize + (effect.GlowFullSize - effect.GlowStartSize) * alpha
+				return UDim2.fromScale(size, size)
+			end),
+			GlowTransparency = styles.Charge:map(function(value: number)
+				return 1 - effect.GlowOpacity * smoothstep(value)
+			end),
+			HorizontalSize = styles.Charge:map(function(value: number)
+				local alpha = smoothstep(value)
+				return UDim2.fromScale(
+					0.18 + (effect.FullHorizontalSize.X - 0.18) * alpha,
+					0.08 + (effect.FullHorizontalSize.Y - 0.08) * alpha
+				)
+			end),
+			VerticalSize = styles.Charge:map(function(value: number)
+				local alpha = smoothstep(value)
+				return UDim2.fromScale(
+					0.08 + (effect.FullVerticalSize.X - 0.08) * alpha,
+					0.18 + (effect.FullVerticalSize.Y - 0.18) * alpha
+				)
+			end),
+			LeftPosition = styles.Charge:map(function(value: number)
+				return UDim2.fromScale(0.34 + effect.FullInset * smoothstep(value), 0.5)
+			end),
+			RightPosition = styles.Charge:map(function(value: number)
+				return UDim2.fromScale(0.66 - effect.FullInset * smoothstep(value), 0.5)
+			end),
+			TopPosition = styles.Charge:map(function(value: number)
+				return UDim2.fromScale(0.5, 0.34 + effect.FullInset * smoothstep(value))
+			end),
+			BottomPosition = styles.Charge:map(function(value: number)
+				return UDim2.fromScale(0.5, 0.66 - effect.FullInset * smoothstep(value))
+			end),
+		}
+	end, { styles.Charge })
 	local baseTransparency = if recovery
 		then ThrowUX.Reticle.UnavailableTransparency
 		else ThrowUX.Reticle.ReadyTransparency
-	local ringSize = styles.Ring:map(function(alpha: number)
-		local resolved = ThrowUX.Reticle.RingStartScale
-			+ (ThrowUX.Reticle.RingFullScale - ThrowUX.Reticle.RingStartScale) * alpha
-		return UDim2.fromScale(resolved, resolved)
-	end)
-	local ringThickness = styles.Ring:map(function(alpha: number)
-		return ThrowUX.Reticle.RingStartThickness
-			+ (ThrowUX.Reticle.RingFullThickness - ThrowUX.Reticle.RingStartThickness) * alpha
-	end)
-	local ringTransparency = styles.Ring:map(function(alpha: number)
-		if alpha <= 0.005 then
-			return 1
-		end
-		return ThrowUX.Reticle.RingStartTransparency
-			+ (ThrowUX.Reticle.RingFullTransparency - ThrowUX.Reticle.RingStartTransparency) * alpha
-	end)
-	local ringColor = styles.Ring:map(function(alpha: number)
-		return ThrowUX.Reticle.NeutralColor:Lerp(ThrowUX.Reticle.FullChargeColor, alpha)
-	end)
-	local glowAlpha = styles.Ring:map(function(alpha: number)
-		return math.clamp((alpha - 0.82) / 0.18, 0, 1)
-	end)
-	local glowSize = glowAlpha:map(function(alpha: number)
-		local resolved = 1.2 - alpha * 0.12
-		return UDim2.fromScale(resolved, resolved)
-	end)
-	local glowTransparency = glowAlpha:map(function(alpha: number)
-		return 1 - alpha * 0.42
-	end)
 
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -105,79 +140,63 @@ local function Reticle(props: { snapshot: ThrowUXClient.Snapshot })
 			MinSize = Vector2.new(ThrowUX.Reticle.MinPixels, ThrowUX.Reticle.MinPixels),
 		}),
 		Scale = c("UIScale", { Scale = styles.Scale }),
-		ChargeRing = c("Frame", {
+		ChargeGlow = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
+			BackgroundColor3 = styles.Color,
+			BackgroundTransparency = chargeVisual.GlowTransparency,
+			BorderSizePixel = 0,
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = ringSize,
+			Size = chargeVisual.GlowSize,
+			ZIndex = 19,
 		}, {
-			Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Stroke = c("UIStroke", {
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				Color = ringColor,
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = ringThickness,
-				Transparency = ringTransparency,
-			}),
-		}),
-		FullChargeGlow = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = glowSize,
-		}, {
-			Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Stroke = c("UIStroke", {
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				Color = ThrowUX.Reticle.FullChargeColor,
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = ThrowUX.Reticle.RingFullThickness * 0.55,
-				Transparency = glowTransparency,
-			}),
 		}),
 		Dot = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = color,
+			BackgroundColor3 = styles.Color,
 			BackgroundTransparency = baseTransparency,
 			BorderSizePixel = 0,
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.16, 0.16),
+			Size = chargeVisual.DotSize,
+			ZIndex = 21,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 		}),
 		Left = c("Frame", {
 			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundColor3 = color,
+			BackgroundColor3 = styles.Color,
 			BackgroundTransparency = baseTransparency,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.34, 0.5),
-			Size = UDim2.fromScale(0.18, 0.08),
+			Position = chargeVisual.LeftPosition,
+			Size = chargeVisual.HorizontalSize,
+			ZIndex = 21,
 		}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
 		Right = c("Frame", {
 			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundColor3 = color,
+			BackgroundColor3 = styles.Color,
 			BackgroundTransparency = baseTransparency,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.66, 0.5),
-			Size = UDim2.fromScale(0.18, 0.08),
+			Position = chargeVisual.RightPosition,
+			Size = chargeVisual.HorizontalSize,
+			ZIndex = 21,
 		}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
 		Top = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = color,
+			BackgroundColor3 = styles.Color,
 			BackgroundTransparency = baseTransparency,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.34),
-			Size = UDim2.fromScale(0.08, 0.18),
+			Position = chargeVisual.TopPosition,
+			Size = chargeVisual.VerticalSize,
+			ZIndex = 21,
 		}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
 		Bottom = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = color,
+			BackgroundColor3 = styles.Color,
 			BackgroundTransparency = baseTransparency,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.66),
-			Size = UDim2.fromScale(0.08, 0.18),
+			Position = chargeVisual.BottomPosition,
+			Size = chargeVisual.VerticalSize,
+			ZIndex = 21,
 		}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
 	})
 end

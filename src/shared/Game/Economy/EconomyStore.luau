@@ -8,6 +8,9 @@ export type EconomyData = {
 		Owned: { [string]: boolean },
 		Equipped: { [string]: string? },
 	},
+	Entitlements: {
+		PremiumSeasons: { [string]: boolean },
+	}?,
 }
 
 type ChangedCallback = (data: EconomyData) -> ()
@@ -53,7 +56,7 @@ local function watchProfile(replica: any)
 	profileReplica = replica
 	profileChangeConnection = replica:OnChange(function(_action: string, path: { any })
 		local root = path[1]
-		if root == "Bonks" or root == "Cosmetics" then
+		if root == "Bonks" or root == "Cosmetics" or root == "Entitlements" then
 			notify()
 		end
 	end)

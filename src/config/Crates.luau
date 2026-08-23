@@ -22,6 +22,7 @@ export type CrateStatus = "Active" | "Preview" | "Hidden"
 
 export type CrateDef = {
 	DisplayName: string,
+	DisplayOrder: number,
 	Thumbnail: string,
 	CatalogStatus: CrateStatus,
 	BonksPrice: number?,
@@ -52,6 +53,7 @@ end
 local Catalog: { [string]: CrateDef } = {
 	DodgeballCrate = {
 		DisplayName = "Dodgeball Crate",
+		DisplayOrder = 100,
 		Thumbnail = "",
 		CatalogStatus = "Active",
 		BonksPrice = 500,
@@ -60,6 +62,7 @@ local Catalog: { [string]: CrateDef } = {
 	},
 	HammerCrate = {
 		DisplayName = "Hammer Crate",
+		DisplayOrder = 200,
 		Thumbnail = "",
 		CatalogStatus = "Preview",
 		BonksPrice = 500,
@@ -71,6 +74,7 @@ local Catalog: { [string]: CrateDef } = {
 	-- crates would read as padding.
 	EffectsCrate = {
 		DisplayName = "Effects Crate",
+		DisplayOrder = 300,
 		Thumbnail = "",
 		CatalogStatus = "Preview",
 		BonksPrice = 750,
@@ -80,6 +84,7 @@ local Catalog: { [string]: CrateDef } = {
 }
 
 for crateId, crate in Catalog do
+	assert(crate.DisplayOrder % 1 == 0, `crate {crateId} must define an integer DisplayOrder`)
 	assert(
 		crate.CatalogStatus == "Active" or crate.CatalogStatus == "Preview" or crate.CatalogStatus == "Hidden",
 		`crate {crateId} has an unknown CatalogStatus`

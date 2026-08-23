@@ -65,12 +65,19 @@ function ShopService.ensure(player: Player): any?
 	return data
 end
 
-function ShopService.offersFor(player: Player): { string }
-	local data = ShopService.ensure(player)
+local function offersFrom(data: any?): { string }
 	if data == nil or data.Shop == nil then
 		return {}
 	end
-	return data.Shop.Offers
+	local offers = {}
+	for _, itemId in data.Shop.Offers do
+		table.insert(offers, itemId)
+	end
+	return offers
+end
+
+function ShopService.offersFor(player: Player): { string }
+	return offersFrom(ShopService.ensure(player))
 end
 
 -- Whether this player may buy this item right now. Items in a rotation category
@@ -91,9 +98,10 @@ function ShopService.stateFor(player: Player): any
 	local now = activeTime()
 	local data = ShopService.ensure(player)
 	local owned = if data then data.Cosmetics.Owned else {}
+	local storedOffers = offersFrom(data)
 
 	local offers = {}
-	for _, itemId in ShopService.offersFor(player) do
+	for _, itemId in storedOffers do
 		local item = Cosmetics.Items[itemId]
 		if item ~= nil then
 			table.insert(offers, {
@@ -117,6 +125,7 @@ function ShopService.stateFor(player: Player): any
 	local featured = FeaturedRotation.select(Shop.Featured, now)
 
 	return {
+		serverNow = now,
 		offers = offers,
 		offersExpireAt = FeaturedRotation.nextRotationAt(Shop.Rotation.RotationSeconds, now),
 		featured = if featured then { kind = featured.kind, id = featured.id } else nil,

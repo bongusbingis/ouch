@@ -86,7 +86,7 @@ return function(props: Props)
 				OnActivated = props.OnJoinCode,
 			}, {
 				UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
-				TextLabel = buttonText("JOIN WITH CODE"),
+				TextLabel = buttonText("JOIN PARTY"),
 			}),
 			PlayButton = c(AnimatedButton, {
 				Enabled = props.PlayEnabled,

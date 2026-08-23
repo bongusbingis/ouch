@@ -92,11 +92,13 @@ return function(props: Props)
 
 	for _, definition in DEFINITIONS do
 		local selected = definition.Id == props.CurrentPage
+		local enabled = definition.Enabled
 		buttons[definition.Id] = c(AnimatedButton, {
-			Enabled = definition.Enabled,
+			Enabled = enabled,
 			Native = {
 				BackgroundTransparency = 1,
 				Image = if selected then SELECTED else UNSELECTED,
+				ImageColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(145, 145, 145),
 				LayoutOrder = definition.LayoutOrder,
 				Position = definition.ButtonPosition,
 				ScaleType = Enum.ScaleType.Slice,
@@ -114,6 +116,8 @@ return function(props: Props)
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				Image = definition.Icon,
+				ImageColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(190, 190, 190),
+				ImageTransparency = if enabled then 0 else 0.18,
 				LayoutOrder = 2,
 				Position = definition.IconPosition,
 				Size = definition.IconSize,
@@ -133,7 +137,8 @@ return function(props: Props)
 					Position = definition.LabelPosition,
 					Size = UDim2.fromScale(1.4, if definition.Id == "Inventory" then 0.420305 else 0.42),
 					Text = definition.Label,
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(185, 185, 185),
+					TextTransparency = if enabled then 0 else 0.12,
 				},
 			}),
 		})
