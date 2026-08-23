@@ -50,14 +50,30 @@ authority is unchanged.
 
 ### How touch ownership is coordinated
 
-It isn't — deliberately. This layer never suppresses, redirects or applies camera
-input; `CameraInput` keeps complete ownership of every touch exactly as upstream
-wrote it, and the classifier is a pure observer that only decides whether an
-*attack* also happens.
+The classifier is an observer with one exception. `CameraInput` keeps ownership of
+every touch exactly as upstream wrote it, and the classifier normally only decides
+whether an *attack* also happens. That is why aiming-while-charging works for free:
+the charging finger is still an ordinary camera touch.
 
-That is why aiming-while-charging works for free (the charging finger is still an
-ordinary camera touch), why there is no handoff to snap, and why there is nothing
-to arbitrate: two systems cannot fight over a touch when only one is steering.
+The exception is the bottom swipe. A flick that throws *and* pans the view is
+indistinguishable from a camera drag, which defeats the point of the gesture, so
+while a swipe candidate is alive the camera stops taking touch rotation.
+
+Suppression is expressed as a sensitivity scale of zero rather than by
+intercepting the touch. That matters for two reasons: it works on both of
+upstream's camera input paths (the legacy per-touch accumulator and the newer
+InputAction one), and because the camera consumes **per-frame deltas**, nothing is
+banked up while suppressed — so handing control back cannot snap.
+
+It is released the instant the candidate is ruled out, so the cost to a non-swipe
+is bounded and small:
+
+| Touch starting in the strip | Camera |
+|---|---|
+| Real upward flick | Frozen for the gesture — throws with no pan |
+| Sideways drag | Frozen ~9 px on iPad, then pans normally |
+| Slow upward pan | Frozen until the distance gate or 0.28 s, whichever comes first |
+| Stationary hold | Nothing to suppress; the charge at 0.18 s releases it |
 
 ---
 

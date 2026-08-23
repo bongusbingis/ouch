@@ -9,7 +9,6 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local InventoryConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Inventory"))
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
-local InventoryTrailPreview = require(script.Parent.InventoryTrailPreview)
 
 local c = React.createElement
 local UPDATE_INTERVAL = 1 / 30
@@ -56,26 +55,12 @@ end
 
 local function update(state, dt: number)
 	if GuiService.ReducedMotionEnabled then
-		if state.category == "TrailAssets" then
-			local phase = 0.35 * math.pi * 2 / state.config.TravelSeconds
-			local x = math.sin(phase) * state.config.TravelDistance * 0.5
-			setPivot(state.object, CFrame.new(x, 0, 0) * CFrame.Angles(0, state.baseRotation, 0))
-		else
-			setPivot(state.object, CFrame.Angles(0, state.baseRotation, 0) * state.basePivot)
-		end
-		state.setElapsed(0.35)
+		setPivot(state.object, CFrame.Angles(0, state.baseRotation, 0) * state.basePivot)
 		return
 	end
 	state.elapsed += dt
-	if state.category == "TrailAssets" then
-		local phase = state.elapsed * math.pi * 2 / state.config.TravelSeconds
-		local x = math.sin(phase) * state.config.TravelDistance * 0.5
-		setPivot(state.object, CFrame.new(x, 0, 0) * CFrame.Angles(0, state.baseRotation, 0))
-		state.setElapsed(state.elapsed)
-	else
-		local spin = math.rad(state.config.SpinDegreesPerSecond) * state.elapsed
-		setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
-	end
+	local spin = math.rad(state.config.SpinDegreesPerSecond) * state.elapsed
+	setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
 end
 
 local function stopIfIdle()
@@ -170,7 +155,6 @@ return React.memo(function(props: Props)
 	local viewportRef = React.useRef(nil)
 	local cameraRef = React.useRef(nil)
 	local worldRef = React.useRef(nil)
-	local elapsed, setElapsed = React.useBinding(0)
 	local config = InventoryConfig.Viewport[props.Category]
 	assert(config ~= nil, `[InventoryPreview] no preview config for {props.Category}`)
 
@@ -187,8 +171,6 @@ return React.memo(function(props: Props)
 			local color = props.Definition.PreviewColor
 			assert(color ~= nil, "[InventoryPreview] character colors require PreviewColor")
 			object = characterPreview(color)
-		elseif props.Category == "TrailAssets" then
-			object = CosmeticVisualFactory.create("BallAssets", nil)
 		else
 			object = CosmeticVisualFactory.create(props.Category, props.ItemId)
 		end
@@ -205,7 +187,6 @@ return React.memo(function(props: Props)
 			basePivot = centerObject(object),
 			baseRotation = math.rad(config.RotationDegrees),
 			elapsed = 0,
-			setElapsed = setElapsed,
 			updateAccumulator = 0,
 		}
 		local unregister = register(state)
@@ -218,7 +199,6 @@ return React.memo(function(props: Props)
 		end
 	end, { props.Category, props.ItemId, props.Definition })
 
-	local effectId = props.Definition.EffectId
 	return c("ViewportFrame", {
 		ref = viewportRef,
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -230,13 +210,5 @@ return React.memo(function(props: Props)
 		UIScale = c("UIScale", { Scale = 2 }),
 		PreviewCamera = c("Camera", { ref = cameraRef }),
 		PreviewWorld = c("WorldModel", { ref = worldRef }),
-		TrailPreview = if props.Category == "TrailAssets" and effectId
-			then c(InventoryTrailPreview, {
-				EffectId = effectId,
-				Config = config,
-				Elapsed = elapsed,
-				ZIndex = props.ZIndex,
-			})
-			else nil,
 	})
 end)

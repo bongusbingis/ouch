@@ -19,6 +19,7 @@ local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Util = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util")
 local Spring = require(Util:WaitForChild("Spring"))
 local CharacterRig = require(script.Parent.CharacterRig)
+local EquippedWeapon = require(script.Parent.EquippedWeapon)
 local WorldAudio = require(script.Parent.WorldAudio)
 local HammerGrip = require(script.Parent.HammerGrip)
 
@@ -29,10 +30,10 @@ local appliedAssets: { [Player]: string } = {}
 local visualBaseSizes: { [Player]: Vector3 } = {}
 local visualGripCFrames: { [Player]: CFrame } = {}
 local visualLongAxes: { [Player]: HammerGrip.Axis } = {}
--- Springs outlive the visual (hidden while holding a ball, rebuilt on respawn)
--- so a mid-wobble hammer resumes naturally; cleared only on PlayerRemoving.
+-- Springs outlive the visual (hidden whenever the hammer is not the equipped
+-- weapon, rebuilt on respawn) so a mid-wobble hammer resumes naturally; cleared
+-- only on PlayerRemoving.
 local springs: { [Player]: Spring.Spring } = {}
-local ballsFolder = Workspace:WaitForChild("Balls")
 local seenEvents = EventDedup.new(4096)
 
 local function gripFor(visual: BasePart, baseSize: Vector3): (CFrame, HammerGrip.Axis)
@@ -86,32 +87,6 @@ local function scaleFor(stretch: number, axis: HammerGrip.Axis): Vector3
 		return Vector3.new(cross, cross, along)
 	end
 	return Vector3.new(cross, along, cross)
-end
-
--- Rebuilt once per frame rather than scanned per player: the per-player form
--- walked every ball for every player, which is the product of two counts each
--- frame instead of their sum.
-local ballHolders: { [string]: boolean } = {}
-
-local function refreshBallHolders()
-	table.clear(ballHolders)
-	for _, ball in ballsFolder:GetChildren() do
-		if not ball:IsA("BasePart") then
-			continue
-		end
-		local phase = ball:GetAttribute("ph")
-		if phase ~= 0 and phase ~= 1 then
-			continue
-		end
-		local holder = ball:GetAttribute("hb")
-		if typeof(holder) == "string" then
-			ballHolders[holder] = true
-		end
-	end
-end
-
-local function hasBall(player: Player): boolean
-	return ballHolders[PlayerIds.toId(player)] == true
 end
 
 local function remove(player: Player)
@@ -186,7 +161,6 @@ function HammerVisuals.start()
 	RunService.RenderStepped:Connect(function(dt)
 		local feel = Combat.HammerFeel
 		local now = os.clock()
-		refreshBallHolders()
 		for _, player in Players:GetPlayers() do
 			local character = player.Character
 			if character == nil then
@@ -195,7 +169,7 @@ function HammerVisuals.start()
 			end
 
 			local hand = CharacterRig.rightHand(character)
-			if hand == nil or hasBall(player) then
+			if hand == nil or not EquippedWeapon.isShowing(player, "Hammer") then
 				remove(player)
 				continue
 			end

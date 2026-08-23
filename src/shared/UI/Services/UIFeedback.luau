@@ -107,6 +107,13 @@ function UIFeedback.notification()
 	end
 end
 
+function UIFeedback.haptic(name: "Hover" | "Click" | "Notification")
+	local effect = effects[name]
+	if effect then
+		effect:Play()
+	end
+end
+
 function UIFeedback.destroy()
 	for name, options in sounds do
 		for _, sound in options do

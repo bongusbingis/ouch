@@ -20,11 +20,12 @@ local Util = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitF
 local Spring = require(Util:WaitForChild("Spring"))
 local CharacterRig = require(script.Parent.CharacterRig)
 local CombatState = require(script.Parent.CombatState)
-local TrailVisuals = require(script.Parent.TrailVisuals)
+local EquippedWeapon = require(script.Parent.EquippedWeapon)
 local WorldAudio = require(script.Parent.WorldAudio)
 
 local BallVisuals = {}
 
+local HELD_PHASE = 0
 local FREE_PHASE = 5
 local TRAIL_ACTIVE_PHASES = {
 	[2] = true,
@@ -47,8 +48,6 @@ type RestPulseState = {
 
 local visuals: { [BasePart]: BasePart } = {}
 local appliedAssets: { [BasePart]: string } = {}
-local appliedTrails: { [BasePart]: string } = {}
-local trailHandles: { [BasePart]: TrailVisuals.Handle } = {}
 local restPulses: { [BasePart]: RestPulseState } = {}
 local feelStates: { [BasePart]: FeelState } = {}
 local trailEnabled: { [BasePart]: boolean } = {}
@@ -82,7 +81,7 @@ end
 
 local function setEnabled(root: Instance, className: string, enabled: boolean)
 	for _, child in root:GetDescendants() do
-		if child:IsA(className) and child:GetAttribute("ProceduralTrailCosmetic") ~= true then
+		if child:IsA(className) then
 			(child :: any).Enabled = enabled
 		end
 	end
@@ -166,19 +165,6 @@ local function effectiveAssetId(ball: BasePart): string
 	return if item and item.Category == "BallAssets" and item.Visual ~= nil then itemId else ""
 end
 
-local function effectiveTrailId(ball: BasePart): (string, string?)
-	local owner = ownerFor(ball)
-	if owner == nil then
-		return "", nil
-	end
-	local itemId = (owner:GetAttribute("Equip_TrailAssets") :: string?) or ""
-	local item = Cosmetics.Items[itemId]
-	if item == nil or item.Category ~= "TrailAssets" or item.EffectId == nil then
-		return "", nil
-	end
-	return itemId, item.EffectId
-end
-
 local function feelFor(ball: BasePart, visual: BasePart): FeelState
 	local state = feelStates[ball]
 	if state == nil then
@@ -209,28 +195,6 @@ local function eventVector(value: any): Vector3?
 	return nil
 end
 
-local function destroyTrail(ball: BasePart)
-	local handle = trailHandles[ball]
-	if handle then
-		handle:destroy()
-	end
-	trailHandles[ball] = nil
-	appliedTrails[ball] = nil
-end
-
-local function refreshTrail(ball: BasePart, force: boolean?)
-	local itemId, effectId = effectiveTrailId(ball)
-	if not force and appliedTrails[ball] == itemId then
-		return
-	end
-	destroyTrail(ball)
-	appliedTrails[ball] = itemId
-	local visual = visuals[ball]
-	if visual and effectId then
-		trailHandles[ball] = TrailVisuals.mount(visual, effectId)
-	end
-end
-
 local function buildVisual(ball: BasePart, assetId: string): BasePart
 	local visual = CosmeticVisualFactory.create("BallAssets", if assetId == "" then nil else assetId)
 	visual.Name = `{ball.Name}_Visual`
@@ -253,12 +217,10 @@ local function addBall(ball: BasePart)
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
 	feelFor(ball, visual)
-	refreshTrail(ball, true)
 end
 
 local function removeBall(ball: BasePart)
 	destroyRestPulse(ball)
-	destroyTrail(ball)
 	local visual = visuals[ball]
 	if visual then
 		visual:Destroy()
@@ -276,7 +238,6 @@ local function refreshAsset(ball: BasePart)
 	end
 	local previous = visuals[ball]
 	destroyRestPulse(ball)
-	destroyTrail(ball)
 	local visual = buildVisual(ball, assetId)
 	if previous then
 		visual.CFrame = previous.CFrame
@@ -289,7 +250,6 @@ local function refreshAsset(ball: BasePart)
 	-- no longer describes it and the next frame must re-apply.
 	trailEnabled[ball] = nil
 	feelFor(ball, visual)
-	refreshTrail(ball, true)
 end
 
 function BallVisuals.onEvent(event: any)
@@ -374,12 +334,18 @@ function BallVisuals.start()
 				continue
 			end
 			refreshAsset(ball)
-			refreshTrail(ball)
 			visual = visuals[ball] :: BasePart
 			local phase = ball:GetAttribute("ph")
 			local isLocalHeld = ball:GetAttribute("hb") == localId
 			local isChargeAiming = snapshot.state == "Charging" and snapshot.weapon == "Dodgeball" and isLocalHeld
-			visual.Transparency = if isChargeAiming then 0.5 else 0
+			-- A held ball whose holder has another weapon out is stowed, not
+			-- dropped: they still own it and a Throw with the ball equipped again
+			-- still throws it. Hiding it is what stops a player from appearing to
+			-- carry a dodgeball and a hammer at once. Read per holder rather than
+			-- from the local snapshot so remote players stow correctly too.
+			local holder = PlayerIds.fromId(ball:GetAttribute("hb") :: string?)
+			local stowed = phase == HELD_PHASE and holder ~= nil and not EquippedWeapon.isShowing(holder, "Dodgeball")
+			visual.Transparency = if stowed then 1 else 0
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
 			local state = feelFor(ball, visual)
@@ -389,7 +355,9 @@ function BallVisuals.start()
 			local speed = velocityVector.Magnitude
 
 			state.elapsed += dt
-			if phase == 2 then
+			if isChargeAiming then
+				state.spring.target = -snapshot.chargeAlpha * feelConfig.ChargeSquash
+			elseif phase == 2 then
 				state.spring.target = math.min(speed * feelConfig.FlightStretchPerSpeed, feelConfig.MaxFlightStretch)
 			elseif phase == 4 then
 				state.spring.target = math.sin(state.elapsed * feelConfig.RollWobbleHz * math.pi * 2)
@@ -440,10 +408,6 @@ function BallVisuals.start()
 			if trailEnabled[ball] ~= trailActive then
 				trailEnabled[ball] = trailActive
 				setEnabled(visual, "Trail", trailActive)
-			end
-			local trailHandle = trailHandles[ball]
-			if trailHandle then
-				trailHandle:setEnabled(trailActive)
 			end
 		end
 	end)

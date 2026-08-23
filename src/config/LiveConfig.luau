@@ -66,6 +66,28 @@ local entries: { Entry } = {
 	{ Key = "MapFeatures.JumpPad.FloatFactor", Type = "number", Minimum = 0, Maximum = 1 },
 	{ Key = "MapFeatures.FoamPit.WalkSpeedScale", Type = "number", Minimum = 0.05, Maximum = 1 },
 
+	-- Shop A/B levers. Roblox hands different servers different config snapshots,
+	-- so varying these is the experiment; VariantId is what makes the result
+	-- readable, because it is stamped on every shop analytics row.
+	--
+	-- The bounds are not cosmetic. CrateConfig.spec pins two economic invariants
+	-- -- a crate open must cost less than the cheapest direct buy, and direct buy
+	-- must beat the expected cost of chasing an item in a crate -- and those are
+	-- checked against baked values only. Every combination inside these ranges
+	-- still satisfies both at the price actually charged, discount included.
+	-- Rarity DirectBonks/DupeBonks are deliberately absent: they sit on the other
+	-- side of both invariants, and a live override there could silently make
+	-- crates strictly worse value than buying outright.
+	{ Key = "Shop.VariantId", Type = "string" },
+	{ Key = "Shop.Rotation.OfferCount", Type = "number", Minimum = 1, Maximum = 8 },
+	{ Key = "Shop.Rotation.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },
+	{ Key = "Shop.Featured.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },
+	{ Key = "Shop.Featured.DiscountPercent", Type = "number", Minimum = 0, Maximum = 20 },
+	{ Key = "Shop.Bundle.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },
+	{ Key = "Crates.DodgeballCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 1000 },
+	{ Key = "Crates.HammerCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 1000 },
+	{ Key = "Crates.EffectsCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 1000 },
+
 	{ Key = "Matchmaking.PartyMaxPlayers", Type = "number", Minimum = 1, Maximum = 8 },
 	{ Key = "Matchmaking.MatchTargetPlayers", Type = "number", Minimum = 1, Maximum = 100 },
 	{ Key = "Matchmaking.QueueCandidateLimit", Type = "number", Minimum = 1, Maximum = 500 },

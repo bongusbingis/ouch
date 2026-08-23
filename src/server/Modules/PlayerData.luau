@@ -7,7 +7,6 @@ local Promise = require(ReplicatedStorage.Packages.promise)
 
 local Env = require(script.Parent.Parent.Env)
 local DataConfig = require(game.ReplicatedStorage.Config.Data)
-local ProfileMigrations = require(ReplicatedStorage.Shared.Game.Data.ProfileMigrations)
 
 local Data = {}
 Data._profiles = {}
@@ -119,21 +118,9 @@ local function _loadPlayerData(player)
 
 		profile:AddUserId(player.UserId)
 
-		-- Ordering is load-bearing on all three counts:
-		-- before Reconcile, so a migration can still tell "field absent" from
-		-- "field at the template default"; before Replica.New, because after
-		-- that every write emits a Set and partial migration state becomes
-		-- visible to the client; and never downward, since a rolling deploy
-		-- puts old servers in front of newer profiles.
-		local migrated, reached, migrationError = ProfileMigrations.apply(profile.Data, DataConfig.SchemaVersion)
-		if not migrated then
-			warn(
-				`[Data] Migration to v{DataConfig.SchemaVersion} failed for {player.Name} at v{reached}: {migrationError}`
-			)
-			profile:EndSession()
-			player:Kick("Data load failed.\nPlease rejoin!")
-			return
-		end
+		-- Reconcile before Replica.New: after that every write emits a Set, and
+		-- back-filling template defaults would replicate as a burst of changes
+		-- the client has no reason to see.
 		profile:Reconcile()
 
 		-- Self-cleaning: disconnects after one fire so it doesn't accumulate.
@@ -220,6 +207,7 @@ local function _setProgressionAttributes(player, data)
 	player:SetAttribute("MatchesPlayed", progression.MatchesPlayed)
 	player:SetAttribute("KDR", progression.KDR)
 	player:SetAttribute("TutorialVersion", data.Tutorial.Version)
+	player:SetAttribute("SwipeThrowLearned", data.Onboarding.SwipeThrowLearned == true)
 end
 
 local function _syncLeaderStats(player)
@@ -300,6 +288,16 @@ function Data.markFirstJoin(player, now)
 		return false
 	end
 	d.Onboarding.FirstJoinAt = now or os.time()
+	return true
+end
+
+function Data.markSwipeThrowLearned(player): boolean
+	local d = Data.get(player)
+	if not d or d.Onboarding.SwipeThrowLearned == true then
+		return false
+	end
+	d.Onboarding.SwipeThrowLearned = true
+	player:SetAttribute("SwipeThrowLearned", true)
 	return true
 end
 

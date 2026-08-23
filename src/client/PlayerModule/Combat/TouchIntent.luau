@@ -24,6 +24,25 @@ local TouchRegions = require(script.Parent:WaitForChild("TouchRegions"))
 
 local TouchIntent = {}
 
+export type GestureKind =
+	"Pending"
+	| "SwipeCandidate"
+	| "Camera"
+	| "ChargeStarted"
+	| "SwipeRecognized"
+	| "TapRecognized"
+	| "ChargeReleased"
+	| "Cancelled"
+	| "Ended"
+
+export type GestureEvent = {
+	kind: GestureKind,
+	origin: Vector2?,
+	position: Vector2?,
+	progress: number,
+	fromBottom: boolean,
+}
+
 export type State =
 	-- Undecided. Still able to become any of the below.
 	"Pending"
@@ -50,6 +69,10 @@ type Touch = {
 	lastMovedAt: number,
 	fromBottom: boolean,
 	swipeAlive: boolean,
+	-- While true this touch must not steer the camera. A swipe that pans the view
+	-- while it throws is indistinguishable from a camera drag, which is the whole
+	-- thing this gesture has to be told apart from.
+	suppressCamera: boolean,
 	state: State,
 }
 
@@ -64,6 +87,32 @@ local touches: { [InputObject]: Touch } = {}
 local chargeOwner: InputObject? = nil
 local handlers: Handlers? = nil
 local counters = { taps = 0, cameras = 0, charges = 0, swipes = 0, ambiguous = 0, cancelled = 0 }
+local gestureListeners: { (GestureEvent) -> () } = {}
+
+local function emitGesture(kind: GestureKind, touch: Touch?)
+	local progress = 0
+	if touch and touch.fromBottom then
+		local dx, dy = touch.x - touch.startX, touch.y - touch.startY
+		progress = math.clamp(
+			math.sqrt(dx * dx + dy * dy) / math.max(TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance), 1),
+			0,
+			1
+		)
+	end
+	local event: GestureEvent = {
+		kind = kind,
+		origin = if touch then Vector2.new(touch.startX, touch.startY) else nil,
+		position = if touch then Vector2.new(touch.x, touch.y) else nil,
+		progress = progress,
+		fromBottom = touch ~= nil and touch.fromBottom,
+	}
+	for _, listener in gestureListeners do
+		local ok, err = pcall(listener, event)
+		if not ok then
+			warn("[CombatInput] gesture listener errored: " .. tostring(err))
+		end
+	end
+end
 
 local function log(message: string)
 	if CombatConfig.Debug.LogClassification then
@@ -85,6 +134,14 @@ local function fire(name: string)
 	end
 end
 
+-- Ends a swipe candidate and hands the camera straight back. Releasing on the
+-- same line that kills the candidate is what stops a failed swipe from leaving
+-- the view frozen.
+local function killSwipe(touch: Touch)
+	touch.swipeAlive = false
+	touch.suppressCamera = false
+end
+
 local function distance(touch: Touch): number
 	local dx, dy = touch.x - touch.startX, touch.y - touch.startY
 	return math.sqrt(dx * dx + dy * dy)
@@ -103,7 +160,8 @@ local function claimCamera(touch: Touch, reason: string)
 		return
 	end
 	touch.state = "Camera"
-	touch.swipeAlive = false
+	killSwipe(touch)
+	emitGesture("Camera", touch)
 	counters.cameras += 1
 	log("-> Camera (" .. reason .. ")")
 end
@@ -126,7 +184,7 @@ local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 
 	local duration = now - touch.startedAt
 	if duration > CombatConfig.BottomSwipe.MaxDuration then
-		touch.swipeAlive = false
+		killSwipe(touch)
 		log("swipe cancelled: too slow")
 		return false
 	end
@@ -141,7 +199,7 @@ local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 
 	local upDot = -dy / travel
 	if upDot < CombatConfig.BottomSwipe.DirectionDot then
-		touch.swipeAlive = false
+		killSwipe(touch)
 		log("swipe cancelled: direction")
 		return false
 	end
@@ -149,7 +207,13 @@ local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 	if travel < TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance) then
 		return false
 	end
+	-- Far enough to decide. Too slow at this distance means a deliberate pan, not
+	-- a flick, and it is killed here rather than left alive until the duration
+	-- runs out -- the camera is frozen for as long as the candidate lives, so a
+	-- candidate that cannot win any more must not keep holding it.
 	if touch.velocity < TouchRegions.scale(CombatConfig.BottomSwipe.MinVelocity) then
+		killSwipe(touch)
+		log("swipe cancelled: too slow for the distance")
 		return false
 	end
 	return true
@@ -157,8 +221,9 @@ end
 
 local function beginCharge(touch: Touch, input: InputObject)
 	touch.state = "Charging"
-	touch.swipeAlive = false
+	killSwipe(touch)
 	chargeOwner = input
+	emitGesture("ChargeStarted", touch)
 	counters.charges += 1
 	log("-> Charge")
 	fire("onBeginCharge")
@@ -166,6 +231,16 @@ end
 
 function TouchIntent.setHandlers(value: Handlers)
 	handlers = value
+end
+
+function TouchIntent.onGesture(listener: (GestureEvent) -> ()): () -> ()
+	table.insert(gestureListeners, listener)
+	return function()
+		local index = table.find(gestureListeners, listener)
+		if index then
+			table.remove(gestureListeners, index)
+		end
+	end
 end
 
 function TouchIntent.began(input: InputObject, sunk: boolean)
@@ -194,8 +269,10 @@ function TouchIntent.began(input: InputObject, sunk: boolean)
 		lastMovedAt = now,
 		fromBottom = TouchRegions.isInBottomSwipeRegion(x, y),
 		swipeAlive = TouchRegions.isInBottomSwipeRegion(x, y),
+		suppressCamera = TouchRegions.isInBottomSwipeRegion(x, y),
 		state = "Pending",
 	}
+	emitGesture(if TouchRegions.isInBottomSwipeRegion(x, y) then "SwipeCandidate" else "Pending", touches[input])
 end
 
 function TouchIntent.moved(input: InputObject, sunk: boolean)
@@ -209,6 +286,7 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 		-- longer tracked, so without this chargeOwner stayed set forever and no
 		-- further charge could ever begin.
 		touches[input] = nil
+		emitGesture("Cancelled", touch)
 		if input == chargeOwner then
 			chargeOwner = nil
 			counters.cancelled += 1
@@ -248,6 +326,7 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 		if evaluateBottomSwipe(touch, now) then
 			touch.state = "Consumed"
 			counters.swipes += 1
+			emitGesture("SwipeRecognized", touch)
 			log(("-> NormalThrow (swipe %dpx)"):format(math.floor(touch.maxDrift)))
 			fire("onNormalThrow")
 			return
@@ -255,6 +334,7 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 		-- Still a live swipe candidate: hold off on claiming the camera so a
 		-- fast flick is not stolen by its own speed.
 		if touch.swipeAlive then
+			emitGesture("SwipeCandidate", touch)
 			return
 		end
 	end
@@ -299,6 +379,7 @@ function TouchIntent.ended(input: InputObject)
 	end
 
 	if touch.state == "Charging" then
+		emitGesture("ChargeReleased", touch)
 		log("-> ReleaseCharge")
 		fire("onReleaseCharge")
 		return
@@ -306,6 +387,7 @@ function TouchIntent.ended(input: InputObject)
 	if touch.state ~= "Pending" then
 		-- Camera, Consumed and Ignored all end silently. This is the guard that
 		-- stops one physical action producing two attacks.
+		emitGesture("Ended", touch)
 		return
 	end
 
@@ -314,6 +396,7 @@ function TouchIntent.ended(input: InputObject)
 	local duration = os.clock() - touch.startedAt
 	if touch.maxDrift <= TouchRegions.scale(CombatConfig.Tap.MaxDistance) then
 		counters.taps += 1
+		emitGesture("TapRecognized", touch)
 		log(("-> NormalThrow (tap %.2fs %dpx)"):format(duration, math.floor(touch.maxDrift)))
 		fire("onNormalThrow")
 		return
@@ -323,6 +406,7 @@ function TouchIntent.ended(input: InputObject)
 	-- answer: a missed gesture is cheap, a throw the player did not ask for is
 	-- not.
 	counters.ambiguous += 1
+	emitGesture("Cancelled", touch)
 	log(("-> NoAction (ambiguous %.2fs %dpx)"):format(duration, math.floor(touch.maxDrift)))
 end
 
@@ -331,6 +415,7 @@ end
 -- InputEnded that would otherwise have resolved the gesture.
 function TouchIntent.cancelAll()
 	local hadCharge = chargeOwner ~= nil
+	local hadTouches = next(touches) ~= nil
 	table.clear(touches)
 	chargeOwner = nil
 	if hadCharge then
@@ -338,6 +423,21 @@ function TouchIntent.cancelAll()
 		log("-> CancelCharge (interrupted)")
 		fire("onCancelCharge")
 	end
+	if hadTouches then
+		emitGesture("Cancelled", nil)
+	end
+end
+
+-- True while any touch is mid-swipe. The camera reads this and stops taking
+-- touch rotation for as long as it holds, so an intentional flick throws without
+-- dragging the view with it.
+function TouchIntent.isCameraSuppressed(): boolean
+	for _, touch in touches do
+		if touch.suppressCamera then
+			return true
+		end
+	end
+	return false
 end
 
 function TouchIntent.isCameraTouchActive(): boolean

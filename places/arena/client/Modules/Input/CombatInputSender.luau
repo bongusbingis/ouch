@@ -43,8 +43,14 @@ local pendingStyle: Style? = nil
 
 -- Lets presentation react to the local player's own intent at press time,
 -- without a second place detecting the same input edge.
-function CombatInputSender.onIntent(listener: (string) -> ())
+function CombatInputSender.onIntent(listener: (string) -> ()): () -> ()
 	table.insert(listeners, listener)
+	return function()
+		local index = table.find(listeners, listener)
+		if index then
+			table.remove(listeners, index)
+		end
+	end
 end
 
 local function notify(kind: string)
@@ -96,10 +102,17 @@ end
 -- With no ball held a tap is ambiguous between swinging and catching. The
 -- hammer stays the default; catch only wins when something is genuinely inbound.
 local function intentForTap(): string
-	if CombatState.holdsBall() then
+	if CombatState.canThrowBall() then
 		return "Throw"
 	end
 	return if ballIncoming() then "Catch" else "Throw"
+end
+
+-- Equip is a request like any other: the server owns the equipped weapon and
+-- projects it back. Nothing is predicted here, so a rejected or rate-limited
+-- equip simply leaves the HUD showing what the player actually has.
+local function equip(weapon: string)
+	Network.fireServer("SubmitWeaponEquip", weapon)
 end
 
 local function send(kind: string, style: Style)
@@ -161,20 +174,27 @@ end
 local function onIntent(intent: string)
 	if intent == "NormalThrow" then
 		local kind = intentForTap()
-		CombatState.onThrow()
+		if CombatState.canStartThrow() then
+			CombatState.onThrow()
+		elseif CombatState.canThrowBall() then
+			CombatState.onBlocked()
+		end
 		submit(kind, {})
 	elseif intent == "BeginCharge" then
 		-- Only a held ball can be charged. With the hammer out there is nothing
 		-- to build, so the hold swings immediately rather than entering a charge
 		-- that ReleaseCharge would later discard -- which is why holding longer
 		-- than the charge threshold used to do nothing at all.
-		if CombatState.holdsBall() then
+		if CombatState.canStartThrow() then
 			CombatState.beginCharge(os.clock())
 		else
+			if CombatState.canThrowBall() then
+				CombatState.onBlocked()
+			end
 			submit("Throw", {})
 		end
 	elseif intent == "ReleaseCharge" then
-		if not CombatState.holdsBall() then
+		if not CombatState.canThrowBall() then
 			-- The swing already went out when the charge began.
 			CombatState.endCharge()
 			return
@@ -185,9 +205,13 @@ local function onIntent(intent: string)
 		CombatState.onThrow()
 		submit("Throw", style)
 	elseif intent == "CancelCharge" then
-		CombatState.endCharge()
+		CombatState.cancelCharge()
 	elseif intent == "HammerAttack" then
 		submit("Throw", {})
+	elseif intent == "EquipHammer" then
+		equip("Hammer")
+	elseif intent == "EquipDodgeball" then
+		equip("Dodgeball")
 	end
 end
 

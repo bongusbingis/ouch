@@ -115,12 +115,14 @@ end
 function MockWorld.snapshot(
 	characters: { [string]: CharacterSnapshot },
 	boxes: { Box }?,
-	ballSpawns: { Vec }?
+	ballSpawns: { Vec }?,
+	rules: SimTypes.SimRules?
 ): WorldSnapshot
 	return {
 		characters = characters,
 		collision = MockWorld.collision(boxes or {}),
 		ballSpawns = ballSpawns or {},
+		rules = rules,
 	}
 end
 

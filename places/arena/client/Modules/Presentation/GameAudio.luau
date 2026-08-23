@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Audio = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Audio"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
@@ -117,14 +118,39 @@ local function characterPartFor(playerId: string?): BasePart?
 	return CharacterRig.rootPart(player and player.Character)
 end
 
+-- The elimination effect belongs to whoever got the kill, not to the victim:
+-- it is bought to be shown off on a win, and reading it from the victim would
+-- play a player's own purchase mostly when they lose.
+--
+-- Reads the equip attribute rather than a profile, because a client only has
+-- its own profile and this sound plays for everyone nearby. An unequipped or
+-- unknown equip falls through to Cosmetics.Defaults, which names the same audio
+-- entries this always used -- so nothing changes for a player who owns nothing.
+local function elimEffectFor(playerId: string?): Cosmetics.ElimEffectDef
+	local default = Cosmetics.Defaults.ElimEffectAssets.ElimEffect
+	assert(default ~= nil, "[GameAudio] default ElimEffectAssets cosmetic must define ElimEffect")
+	local player = PlayerIds.fromId(playerId)
+	if player == nil then
+		return default
+	end
+	local itemId = (player:GetAttribute("Equip_ElimEffectAssets") :: string?) or ""
+	local item = Cosmetics.Items[itemId]
+	if item == nil or item.Category ~= "ElimEffectAssets" or item.ElimEffect == nil then
+		return default
+	end
+	return item.ElimEffect
+end
+
 -- Which elimination sound an Elim carries is not a field on the event: a
 -- projectile means the dodgeball, a source without one means the hammer, and
--- neither means the player fell into an elimination zone.
+-- neither means the player fell into an elimination zone. A zone fall has no
+-- eliminator, so it is the one variant no cosmetic can change.
 local function eliminationEffect(event: { [string]: any }): string
-	if event.projectileId ~= nil then
-		return "DodgeballElimination"
+	if event.sourceId == nil and event.projectileId == nil then
+		return "ElimZoneFall"
 	end
-	return if event.sourceId ~= nil then "HammerElimination" else "ElimZoneFall"
+	local effect = elimEffectFor(event.sourceId)
+	return if event.projectileId ~= nil then effect.DodgeballSound else effect.HammerSound
 end
 
 function GameAudio.onEvent(event: { [string]: any })

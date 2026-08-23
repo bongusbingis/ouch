@@ -23,10 +23,20 @@ export type Handlers = {
 	onReleaseCharge: () -> (),
 	onCancelCharge: () -> (),
 	onHammer: () -> (),
+	onEquipHammer: () -> (),
+	onEquipDodgeball: () -> (),
 }
 
 local THROW_GAMEPAD_BUTTON = Enum.KeyCode.ButtonR2
 local HAMMER_GAMEPAD_BUTTON = Enum.KeyCode.ButtonX
+
+-- Weapon slots, numbered as the HUD shows them: slot 1 is the hammer, slot 2 is
+-- the dodgeball. The controller bumpers describe the same pair in the same
+-- order, LB before RB, so the two devices agree on which slot is which.
+local EQUIP_HAMMER_KEY = Enum.KeyCode.One
+local EQUIP_DODGEBALL_KEY = Enum.KeyCode.Two
+local EQUIP_HAMMER_GAMEPAD = Enum.KeyCode.ButtonL1
+local EQUIP_DODGEBALL_GAMEPAD = Enum.KeyCode.ButtonR1
 
 local started = false
 local handlers: Handlers? = nil
@@ -132,8 +142,25 @@ function DeviceInput.start()
 	started = true
 
 	UserInputService.InputBegan:Connect(function(input, sunk)
-		-- sunk means a UI element took it. Clicking a button must never throw.
-		if sunk or not isEnabled() then
+		-- sunk means a UI element took it. Clicking a button must never throw,
+		-- and typing must never change weapon.
+		if sunk then
+			return
+		end
+		-- Choosing a slot is not an attack, so it is deliberately not gated on
+		-- combat being live: a player sets their loadout during the countdown or
+		-- while the vote holds the cursor, which is exactly when they want to. The
+		-- server accepts an equip outside an active match for the same reason, and
+		-- the HUD slots call in ungated too -- all three agree.
+		if input.KeyCode == EQUIP_HAMMER_KEY or input.KeyCode == EQUIP_HAMMER_GAMEPAD then
+			fire("onEquipHammer")
+			return
+		elseif input.KeyCode == EQUIP_DODGEBALL_KEY or input.KeyCode == EQUIP_DODGEBALL_GAMEPAD then
+			fire("onEquipDodgeball")
+			return
+		end
+
+		if not isEnabled() then
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then

@@ -56,36 +56,42 @@ local Definitions: { [string]: SeasonDef } = {
 		XpThresholds = thresholds(TIER_COUNT),
 		-- The free track has to be worth engaging with: it is the on-ramp that
 		-- makes the premium track legible before anyone is asked to pay.
+		-- The cosmetic tiers pay Bonks until there is content to put in them.
+		-- The prototype trails these replaced were deleted, and a season reward
+		-- naming a missing cosmetic fails the validator below at require time --
+		-- so an empty tier is not an option and a placeholder id would be worse.
+		-- Amounts track the rarity each tier used to hold (Common 300, Rare 600,
+		-- Legendary 1500) so repointing one at a real cosmetic later is a
+		-- like-for-like swap.
 		FreeRewards = {
 			[2] = { kind = "Bonks", amount = 250 },
-			[4] = { kind = "Cosmetic", itemId = "TrailCoralGlow" },
+			[4] = { kind = "Bonks", amount = 300 },
 			[6] = { kind = "Bonks", amount = 350 },
-			[9] = { kind = "Cosmetic", itemId = "TrailSlateStreak" },
+			[9] = { kind = "Bonks", amount = 300 },
 			[12] = { kind = "Bonks", amount = 500 },
-			[15] = { kind = "Cosmetic", itemId = "TrailLavenderDrift" },
+			[15] = { kind = "Bonks", amount = 300 },
 			[18] = { kind = "Bonks", amount = 700 },
-			[21] = { kind = "Cosmetic", itemId = "TrailPeachFizz" },
-			[25] = { kind = "Cosmetic", itemId = "TrailAquaLine" },
+			[21] = { kind = "Bonks", amount = 300 },
+			[25] = { kind = "Bonks", amount = 300 },
 		},
 		PremiumRewards = {
-			[1] = { kind = "Cosmetic", itemId = "TrailHoneyGlide" },
+			[1] = { kind = "Bonks", amount = 300 },
 			[3] = { kind = "Bonks", amount = 500 },
-			[5] = { kind = "Cosmetic", itemId = "TrailStaticSnap" },
-			[7] = { kind = "Cosmetic", itemId = "TrailBerryDash" },
+			[5] = { kind = "Bonks", amount = 600 },
+			[7] = { kind = "Bonks", amount = 300 },
 			[8] = { kind = "Bonks", amount = 500 },
-			[10] = { kind = "Cosmetic", itemId = "TrailPollenBurst" },
-			[11] = { kind = "Cosmetic", itemId = "TrailSageWisp" },
+			[10] = { kind = "Bonks", amount = 600 },
+			[11] = { kind = "Bonks", amount = 300 },
 			[13] = { kind = "Bonks", amount = 750 },
-			[14] = { kind = "Cosmetic", itemId = "TrailInkSpill" },
-			[16] = { kind = "Cosmetic", itemId = "TrailCopperArc" },
+			[14] = { kind = "Bonks", amount = 600 },
+			[16] = { kind = "Bonks", amount = 300 },
 			[17] = { kind = "Bonks", amount = 750 },
-			[19] = { kind = "Cosmetic", itemId = "TrailCitrusFlare" },
-			[20] = { kind = "Cosmetic", itemId = "TrailIndigoTrace" },
+			[19] = { kind = "Bonks", amount = 600 },
+			[20] = { kind = "Bonks", amount = 300 },
 			[22] = { kind = "Bonks", amount = 1000 },
-			[23] = { kind = "Cosmetic", itemId = "TrailGlacierEdge" },
-			[24] = { kind = "Cosmetic", itemId = "TrailRubyStreak" },
-			-- Retired permanently when the season ends.
-			[25] = { kind = "Cosmetic", itemId = "TrailPhoenixPlume" },
+			[23] = { kind = "Bonks", amount = 600 },
+			[24] = { kind = "Bonks", amount = 600 },
+			[25] = { kind = "Bonks", amount = 1500 },
 		},
 	},
 }

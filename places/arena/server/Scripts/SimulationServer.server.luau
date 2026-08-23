@@ -20,11 +20,13 @@ local CharacterColorService = require(Modules:WaitForChild("CharacterColorServic
 local CrateService = require(Modules:WaitForChild("CrateService"))
 local EntitlementService = require(Modules:WaitForChild("EntitlementService"))
 local BattlePassService = require(Modules:WaitForChild("BattlePassService"))
+local ShopService = require(Modules:WaitForChild("ShopService"))
 local DirectPurchaseService = require(Modules:WaitForChild("DirectPurchaseService"))
 local MonetizationService = require(Modules:WaitForChild("MonetizationService"))
 local GamePassService = require(Modules:WaitForChild("GamePassService"))
 local PaidRandomPolicyService = require(Modules:WaitForChild("PaidRandomPolicyService"))
 local CmdrService = require(Modules:WaitForChild("CmdrService"))
+local ThrowUXService = require(Modules:WaitForChild("ThrowUXService"))
 
 local RotatingPlatforms = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -77,6 +79,8 @@ ConfigLiveService.start({
 		AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
 		GameModes = require(ConfigRoot:WaitForChild("GameModes")),
 		MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
+		Shop = require(ConfigRoot:WaitForChild("Shop")),
+		Crates = require(ConfigRoot:WaitForChild("Crates")),
 	},
 	holdSimOverrides = function()
 		local phase = MatchService.phase()
@@ -111,10 +115,12 @@ CosmeticsService.start()
 CharacterColorService.start()
 PaidRandomPolicyService.start()
 CrateService.start()
+ShopService.start()
 DirectPurchaseService.start()
 MonetizationService.start()
 GamePassService.start()
 CmdrService.start()
+ThrowUXService.start()
 
 -- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)

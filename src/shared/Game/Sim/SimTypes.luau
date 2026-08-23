@@ -33,10 +33,21 @@ export type CollisionWorld = {
 	sweepSphere: (origin: Vec, displacement: Vec, radius: number) -> SweepHit?,
 }
 
+-- Match rules the sim itself needs. Supplied per tick by the adapter from the
+-- active mode, so the sim reads rules as data and never names a mode.
+export type SimRules = {
+	-- A ball that stops moving goes back to whoever last owned it instead of
+	-- lying where it fell. Absent is treated as false, which is the behaviour
+	-- balls had before modes could ask for anything else -- so a mode the adapter
+	-- cannot resolve degrades to world pickups rather than to something new.
+	preserveDodgeballs: boolean,
+}
+
 export type WorldSnapshot = {
 	characters: { [string]: CharacterSnapshot },
 	collision: CollisionWorld,
 	ballSpawns: { Vec },
+	rules: SimRules?,
 }
 
 export type ProjectilePhase = "Held" | "Windup" | "InFlight" | "Bouncing" | "Rolling" | "Free"
@@ -66,6 +77,14 @@ export type ProjectileState = {
 export type PlayerCombatState = {
 	id: string,
 	weapons: { [string]: any }, -- kit kind -> kit-owned state (cooldowns etc.)
+	-- Which kit a command claimed by more than one weapon routes to. The single
+	-- source of truth for the active weapon: the client's HUD and animation layer
+	-- read a projection of this, never their own guess.
+	equipped: string,
+	-- Previous tick's answer to "does this player hold a ball", used only to spot
+	-- the moment they gain one so it can be auto-equipped. Possession itself still
+	-- lives only in ProjectileState -- this is an edge detector, not a copy.
+	heldBallLastTick: boolean,
 }
 
 export type SimState = {
@@ -76,11 +95,13 @@ export type SimState = {
 	spawnTimers: { number }, -- one per WorldSnapshot.ballSpawns index
 }
 
-export type CommandKind = "Throw" | "Catch"
+export type CommandKind = "Throw" | "Catch" | "Equip"
 
 export type InputCommand = {
 	playerId: string,
 	kind: CommandKind,
+	-- Equip only: the kit kind to make active.
+	weapon: string?,
 	aimOrigin: Vec?,
 	aimDir: Vec?,
 	targetId: string?,

@@ -49,6 +49,10 @@ local listeners: { (boolean) -> () } = {}
 local chargingPredicate: () -> boolean = function()
 	return false
 end
+-- True while a touch is mid-swipe and must not steer the view.
+local suppressPredicate: () -> boolean = function()
+	return false
+end
 
 local function cursorIsRequested(): boolean
 	return next(cursorRequests) ~= nil
@@ -113,6 +117,13 @@ local function apply()
 		if chargingPredicate() then
 			scale *= CombatConfig.Camera.ChargeSensitivityMultiplier
 		end
+		-- A swipe takes the camera out of the equation entirely. Scaling to zero
+		-- rather than intercepting the touch works on both of upstream's camera
+		-- input paths, and because the camera consumes per-frame deltas there is
+		-- nothing banked up to snap when it is handed back.
+		if suppressPredicate() then
+			scale = 0
+		end
 	end
 	CameraInput.setSensitivityScale(scale)
 
@@ -128,6 +139,10 @@ end
 -- ends; it is not a player-facing toggle.
 function CombatCamera.setChargingPredicate(predicate: () -> boolean)
 	chargingPredicate = predicate
+end
+
+function CombatCamera.setCameraSuppressedPredicate(predicate: () -> boolean)
+	suppressPredicate = predicate
 end
 
 function CombatCamera.setEnabled(value: boolean)

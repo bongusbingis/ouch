@@ -15,6 +15,7 @@ local MobileInput = require(script.Parent.Parent.Parent.Parent.Config.MobileInpu
 local Intercept = require(script.Parent.Parent.Sim.Intercept)
 local MovementSpeedService = require(script.Parent.MovementSpeedService)
 local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
+local ModeRegistry = require(script.Parent.Parent.Modes.ModeRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Debug)
@@ -199,11 +200,24 @@ local collisionWorld: SimTypes.CollisionWorld = {
 	end,
 }
 
+local simRules: SimTypes.SimRules = { preserveDodgeballs = false }
+
 local worldSnapshot: SimTypes.WorldSnapshot = {
 	characters = {},
 	collision = collisionWorld,
 	ballSpawns = {},
+	rules = simRules,
 }
+
+-- Resolves the sim-facing rules from whichever mode is running, read off the
+-- replicated MatchState rather than from MatchService, so the adapter keeps no
+-- dependency on match orchestration. Between matches there is no mode and the
+-- rules fall back to the pre-mode behaviour: balls settle as world pickups.
+local function refreshRules()
+	local modeId = if matchState then matchState:GetAttribute("modeId") :: string? else nil
+	local mode = if modeId then ModeRegistry.get(modeId) else nil
+	simRules.preserveDodgeballs = mode ~= nil and mode.rules.PreserveDodgeballs == true
+end
 
 -- Rolling window of each character's velocity, kept here rather than in SimState
 -- because it is a measurement of the engine world, not a sim decision, and the
@@ -253,6 +267,7 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 	-- World ball spawning happens outside the sim (BallSpawner); the sim never
 	-- sees spawn points under this backend.
 	worldSnapshot.characters = characters
+	refreshRules()
 	return worldSnapshot
 end
 
@@ -272,6 +287,14 @@ type Intent = {
 }
 
 local pendingIntents: { Intent } = {}
+-- Equip requests are kept apart from aimed intents: they carry no aim, and they
+-- are a preference rather than an action, so they are not subject to the queue
+-- cap that protects the action path from flooding.
+local pendingEquips: { [string]: string } = {}
+
+local function queueEquip(player: Player, weapon: string)
+	pendingEquips[PlayerIds.toId(player)] = weapon
+end
 
 local function queueIntent(
 	player: Player,
@@ -298,10 +321,20 @@ end
 -- the origin is derived from that character rather than sent by the client.
 local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
-	if matchState == nil or matchState:GetAttribute("phase") ~= "Active" then
+	local active = matchState == nil or matchState:GetAttribute("phase") == "Active"
+	if not active then
 		table.clear(pendingIntents)
-		return commands
 	end
+
+	-- Equips survive the phase gate above on purpose: an inactive match discards
+	-- queued attacks, but choosing a slot during the countdown is exactly when a
+	-- player wants to, and it changes nothing in the world until they attack.
+	for playerId, weapon in pendingEquips do
+		if entries[playerId] ~= nil then
+			table.insert(commands, { playerId = playerId, kind = "Equip", weapon = weapon })
+		end
+	end
+	table.clear(pendingEquips)
 
 	for _, intent in pendingIntents do
 		local entry = entries[intent.playerId]
@@ -399,6 +432,20 @@ function ServerAuthAdapter.start()
 				table.remove(pendingIntents, index)
 			end
 		end
+	end)
+
+	Network.handleProtected("SubmitWeaponEquip", {
+		-- Generous: this is a HUD slot a player may flick between, and a rejected
+		-- equip leaves them holding a weapon they did not choose.
+		rateLimit = 10,
+		validate = function(_player, weapon)
+			if typeof(weapon) ~= "string" or not WeaponRegistry.isKind(weapon) then
+				return false, "invalid_weapon"
+			end
+			return true
+		end,
+	}, function(player, weapon)
+		queueEquip(player, weapon)
 	end)
 
 	Network.handleProtected("SubmitCombatInput", {

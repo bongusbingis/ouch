@@ -20,8 +20,11 @@ export type Config = {
 	Rotation: { Entry },
 }
 
-function FeaturedRotation.periodIndex(config: Config, now: number): number
-	return math.floor(now / config.RotationSeconds)
+-- Bucketing takes the period length rather than a whole config, because three
+-- different schedules now share it: the featured crate, the featured bundle,
+-- and the per-player rotating shop. One formula, one place it can be wrong.
+function FeaturedRotation.periodIndex(rotationSeconds: number, now: number): number
+	return math.floor(now / rotationSeconds)
 end
 
 function FeaturedRotation.select(config: Config, now: number): Entry?
@@ -29,15 +32,15 @@ function FeaturedRotation.select(config: Config, now: number): Entry?
 	if count == 0 then
 		return nil
 	end
-	return config.Rotation[FeaturedRotation.periodIndex(config, now) % count + 1]
+	return config.Rotation[FeaturedRotation.periodIndex(config.RotationSeconds, now) % count + 1]
 end
 
-function FeaturedRotation.nextRotationAt(config: Config, now: number): number
-	return (FeaturedRotation.periodIndex(config, now) + 1) * config.RotationSeconds
+function FeaturedRotation.nextRotationAt(rotationSeconds: number, now: number): number
+	return (FeaturedRotation.periodIndex(rotationSeconds, now) + 1) * rotationSeconds
 end
 
-function FeaturedRotation.secondsUntilRotation(config: Config, now: number): number
-	return math.max(0, FeaturedRotation.nextRotationAt(config, now) - now)
+function FeaturedRotation.secondsUntilRotation(rotationSeconds: number, now: number): number
+	return math.max(0, FeaturedRotation.nextRotationAt(rotationSeconds, now) - now)
 end
 
 -- Rounds in the player's favour, and never below one Bonks so a steep discount

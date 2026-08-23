@@ -20,6 +20,8 @@ ConfigLiveService.start({
 		Matchmaking = require(
 			ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")
 		),
+		Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop")),
+		Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates")),
 	},
 })
 -- No match loop in the lobby; session, onboarding, economy and funnel

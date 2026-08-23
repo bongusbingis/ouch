@@ -10,6 +10,11 @@ export type WeaponKit = {
 	kind: string,
 	-- Command kinds this kit consumes; SimCore routes on these.
 	commands: { [SimTypes.CommandKind]: boolean },
+	-- Set by the kit that a ball in hand belongs to. Gaining a held ball equips
+	-- that kit automatically, so picking one up still means you can throw it
+	-- without a second button. Declared here rather than named in SimCore so the
+	-- core stays free of specific weapons.
+	equipOnHandBall: boolean?,
 	-- Fresh per-player kit state (cooldowns, phase machines).
 	init: () -> any,
 	-- Consume one routed command. Mutates kit state / sim state, appends events.

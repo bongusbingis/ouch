@@ -50,6 +50,8 @@ ConfigReplication.startClient({
 	AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
 	GameModes = require(ConfigRoot:WaitForChild("GameModes")),
 	MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
+	Shop = require(ConfigRoot:WaitForChild("Shop")),
+	Crates = require(ConfigRoot:WaitForChild("Crates")),
 })
 -- The arena is the only place that turns combat on. The lobby leaves it off and
 -- therefore keeps a normal cursor for its menus, with no lobby-side code needed.

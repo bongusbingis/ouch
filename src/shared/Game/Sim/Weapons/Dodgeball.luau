@@ -31,6 +31,8 @@ type KitState = {
 local Dodgeball = {}
 Dodgeball.kind = "Dodgeball"
 Dodgeball.commands = { Throw = true, Catch = true } :: { [SimTypes.CommandKind]: boolean }
+-- A ball in hand is this weapon's ammunition, so gaining one equips it.
+Dodgeball.equipOnHandBall = true
 
 local function config()
 	return Combat.Dodgeball

@@ -35,15 +35,15 @@ planning note and is never displayed as a price.
 A pass grants cosmetics (`EntitlementItemIds`), boosters (`Boosts`), or both.
 
 ```luau
-TrailCollection = {
+EffectCollection = {
     Id = 123456789,
     CatalogStatus = "Active",
-    DisplayName = "Trail Collection",
-    Description = "Five exclusive trails, permanently unlocked.",
+    DisplayName = "Effect Collection",
+    Description = "Exclusive effects, permanently unlocked.",
     DisplayOrder = 410,
     SuggestedRobux = 149,
-    Categories = { "TrailAssets" },
-    EntitlementItemIds = { "TrailCelestialPrism", --[[ ... ]] },
+    Categories = { "TrailAssets", "ElimEffectAssets" },
+    EntitlementItemIds = { "TrailAurora", --[[ ... ]] },
 },
 ```
 

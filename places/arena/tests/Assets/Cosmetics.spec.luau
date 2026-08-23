@@ -8,7 +8,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
-local TrailCosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("TrailCosmetics"))
+local Audio = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Audio"))
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 local Client = StarterPlayer:WaitForChild("StarterPlayerScripts"):WaitForChild("Client")
 local HammerGrip = require(Client:WaitForChild("Modules"):WaitForChild("Presentation"):WaitForChild("HammerGrip"))
@@ -90,16 +90,25 @@ return function()
 			end
 		end)
 
-		it("has a procedural definition for every effect-backed item", function()
+		it("has real audio behind every elimination effect, default included", function()
+			local default = Cosmetics.Defaults.ElimEffectAssets
+			expect(default).to.be.ok()
+			expect(default.ElimEffect).to.be.ok()
+			expect(Audio.Gameplay[default.ElimEffect.DodgeballSound]).to.be.ok()
+			expect(Audio.Gameplay[default.ElimEffect.HammerSound]).to.be.ok()
 			for _, item in Cosmetics.Items do
-				if item.EffectId ~= nil then
-					expect(TrailCosmetics[item.EffectId]).to.be.ok()
+				if item.Category == "ElimEffectAssets" then
+					expect(item.ElimEffect).to.be.ok()
+					expect(Audio.Gameplay[item.ElimEffect.DodgeballSound]).to.be.ok()
+					expect(Audio.Gameplay[item.ElimEffect.HammerSound]).to.be.ok()
 				end
 			end
 		end)
 
 		it("references only purchasable, known cosmetics from crate pools", function()
 			for _, crate in Crates do
+				-- Preview crates are allowed an empty pool; this checks the
+				-- contents of whatever pool a crate does have.
 				for _, itemId in crate.ItemPool do
 					local item = Cosmetics.Items[itemId]
 					expect(item).to.be.ok()

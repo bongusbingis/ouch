@@ -19,6 +19,7 @@ TDM.rules = {
 	RespawnSeconds = 1,
 	WaveRespawnSeconds = 4.5,
 	SpawnInvulnSeconds = 1.5,
+	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
 -- Every player starts holding a ball (and late joiners get one on their

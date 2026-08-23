@@ -19,6 +19,12 @@ export type MatchRules = {
 	-- Who wins when the clock runs out, for modes where surviving to the cap is
 	-- itself the win. Unset means the leading score takes it.
 	TimeCapWinnerId: string?,
+	-- A thrown ball that comes to rest returns to whoever last owned it, so a
+	-- player keeps their ball for the whole match and a throw risks missing
+	-- rather than losing it. False makes a settled ball a world object anyone can
+	-- pick up. A catch transfers ownership either way, so a caught ball becomes
+	-- the catcher's to keep.
+	PreserveDodgeballs: boolean,
 }
 
 export type ScoreScope = "Player" | "Team"

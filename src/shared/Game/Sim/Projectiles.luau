@@ -33,19 +33,69 @@ local function settle(world: WorldSnapshot, position: Vec, radius: number): Vec
 	return position
 end
 
-local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, position: Vec)
-	local radius = Combat[projectile.archetype].Radius
-	projectile.phase = "Free"
-	projectile.position = settle(world, position, radius)
+local function clearFlightState(projectile: ProjectileState)
 	projectile.velocity = vector.zero
 	projectile.targetId = nil
-	projectile.heldBy = nil
 	projectile.flightTime = 0
 	projectile.windupRemaining = 0
 	projectile.releaseAim = nil
 	projectile.releaseTargetId = nil
 	projectile.releaseCharge = nil
 	projectile.releaseLob = nil
+end
+
+local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, position: Vec)
+	local radius = Combat[projectile.archetype].Radius
+	projectile.phase = "Free"
+	projectile.position = settle(world, position, radius)
+	projectile.heldBy = nil
+	clearFlightState(projectile)
+end
+
+-- A ball that has stopped moving. Where it goes is a mode rule: preserving hands
+-- it back to whoever last owned it, so a throw risks missing rather than losing
+-- the ball, while the default leaves it lying there as a pickup.
+--
+-- Ownership is the whole mechanism -- a catch already reassigns ownerId, so a
+-- caught ball is a transfer and comes back to its new owner from then on.
+--
+-- Deliberately not used when a ball is dropped because its holder died or left:
+-- that is a drop, not a rest, and the ball should stay where it fell.
+local function comeToRest(
+	projectile: ProjectileState,
+	state: SimState,
+	world: WorldSnapshot,
+	position: Vec,
+	events: { SimEvent }
+)
+	local rules = world.rules
+	local ownerId = projectile.ownerId
+	if rules ~= nil and rules.preserveDodgeballs and ownerId ~= nil then
+		local owner = world.characters[ownerId]
+		-- Not to a dead or departed owner, and not into a hand that already holds
+		-- one: possession is one ball per player everywhere else in the sim, and a
+		-- second held ball would have no socket to sit in and no way to be thrown.
+		if owner ~= nil and owner.alive and not SimUtil.hasHandBall(state, ownerId) then
+			projectile.phase = "Held"
+			projectile.heldBy = ownerId
+			projectile.position = owner.handPosition
+			clearFlightState(projectile)
+			-- The three other ways a ball reaches a hand all reset this; a return
+			-- is the fourth and must not carry a spent bounce budget into the
+			-- next throw.
+			projectile.bounceCount = 0
+			SimUtil.pushEvent(events, state, {
+				kind = "BallReturned",
+				tick = 0,
+				projectileId = projectile.id,
+				playerId = ownerId,
+				targetId = ownerId,
+				position = projectile.position,
+			})
+			return
+		end
+	end
+	becomeFree(projectile, world, position)
 end
 
 -- Rotates a direction toward world up by the given angle. The axis is
@@ -235,7 +285,7 @@ local function maybeSettleAfterBounce(
 		or speed <= config.SettleSpeed
 		or (hit.normal.y > 0.6 and math.abs(projectile.velocity.y) <= config.SettleVerticalSpeed)
 	then
-		becomeFree(projectile, world, projectile.position)
+		comeToRest(projectile, state, world, projectile.position, events)
 		SimUtil.pushEvent(
 			events,
 			state,
@@ -296,7 +346,7 @@ local function settleRolling(
 	config: typeof(Combat.Dodgeball),
 	events: { SimEvent }
 )
-	becomeFree(projectile, world, projectile.position)
+	comeToRest(projectile, state, world, projectile.position, events)
 	SimUtil.pushEvent(
 		events,
 		state,
@@ -409,7 +459,7 @@ local function stepInFlight(
 )
 	projectile.flightTime += dt
 	if projectile.flightTime > config.MaxFlightTime then
-		becomeFree(projectile, world, projectile.position)
+		comeToRest(projectile, state, world, projectile.position, events)
 		SimUtil.pushEvent(events, state, { kind = "BallLanded", tick = 0, projectileId = projectile.id })
 		return
 	end
@@ -473,7 +523,7 @@ local function stepInFlight(
 					then vector.normalize(projectile.velocity)
 					else nil,
 			})
-			becomeFree(projectile, world, characterHit.position)
+			comeToRest(projectile, state, world, characterHit.position, events)
 			return
 		end
 

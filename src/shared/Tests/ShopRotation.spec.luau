@@ -1,0 +1,165 @@
+--!strict
+
+local T = require(script.Parent.TestKit)
+local ShopRotation = require(script.Parent.Parent.Game.Economy.ShopRotation)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
+local Shop = require(script.Parent.Parent.Parent.Config.Shop)
+local Bundles = require(script.Parent.Parent.Parent.Config.Bundles)
+
+local POOL = { "ItemA", "ItemB", "ItemC", "ItemD", "ItemE", "ItemF" }
+
+local function contains(list: { string }, value: string): boolean
+	return table.find(list, value) ~= nil
+end
+
+T.describe("ShopRotation", function()
+	T.it("draws the same offers for the same player and period", function()
+		local first = ShopRotation.draw(12345, 900, POOL, {}, 3)
+		local second = ShopRotation.draw(12345, 900, POOL, {}, 3)
+		T.expect(table.concat(first, ",")):toEqual(table.concat(second, ","))
+	end)
+
+	T.it("draws different offers for different players in the same period", function()
+		-- The whole point of a per-player rotation. If two users saw the same
+		-- three items the feature would be an expensive global rotation.
+		local differs = false
+		local reference = table.concat(ShopRotation.draw(1, 900, POOL, {}, 3), ",")
+		for userId = 2, 12 do
+			if table.concat(ShopRotation.draw(userId, 900, POOL, {}, 3), ",") ~= reference then
+				differs = true
+				break
+			end
+		end
+		T.expect(differs):toBeTruthy()
+	end)
+
+	T.it("draws different offers for the same player across periods", function()
+		local differs = false
+		local reference = table.concat(ShopRotation.draw(777, 100, POOL, {}, 3), ",")
+		for period = 101, 111 do
+			if table.concat(ShopRotation.draw(777, period, POOL, {}, 3), ",") ~= reference then
+				differs = true
+				break
+			end
+		end
+		T.expect(differs):toBeTruthy()
+	end)
+
+	T.it("never offers an item the player already owns", function()
+		local owned = { ItemA = true, ItemC = true, ItemE = true }
+		for userId = 1, 40 do
+			for _, itemId in ShopRotation.draw(userId, 5, POOL, owned, 3) do
+				T.expect(owned[itemId] ~= true):toBeTruthy()
+			end
+		end
+	end)
+
+	T.it("returns distinct items within one draw", function()
+		for userId = 1, 40 do
+			local seen = {}
+			for _, itemId in ShopRotation.draw(userId, 7, POOL, {}, 4) do
+				T.expect(seen[itemId]):toBeNil()
+				seen[itemId] = true
+			end
+		end
+	end)
+
+	T.it("returns the whole pool rather than erroring when it is smaller than the count", function()
+		local drawn = ShopRotation.draw(42, 3, { "Only" }, {}, 3)
+		T.expect(#drawn):toEqual(1)
+		T.expect(drawn[1]):toEqual("Only")
+	end)
+
+	T.it("returns nothing when the pool is empty", function()
+		-- The shipped state until outfits and emotes exist, so it must be a
+		-- normal answer rather than an error.
+		T.expect(#ShopRotation.draw(42, 3, {}, {}, 3)):toEqual(0)
+	end)
+
+	T.it("returns nothing when the player owns everything", function()
+		local owned = {}
+		for _, itemId in POOL do
+			owned[itemId] = true
+		end
+		T.expect(#ShopRotation.draw(42, 3, POOL, owned, 3)):toEqual(0)
+	end)
+
+	T.it("ignores the caller's pool ordering", function()
+		local reversed = {}
+		for index = #POOL, 1, -1 do
+			table.insert(reversed, POOL[index])
+		end
+		local straight = ShopRotation.draw(9001, 12, POOL, {}, 3)
+		local shuffled = ShopRotation.draw(9001, 12, reversed, {}, 3)
+		T.expect(table.concat(straight, ",")):toEqual(table.concat(shuffled, ","))
+	end)
+
+	T.it("drops the bought item from a redraw, which is why the set is persisted", function()
+		-- Buying one offer shrinks the candidate pool, so recomputing inside the
+		-- same period does not reproduce the previous draw. That is the whole
+		-- reason ShopService stores the result against its period instead of
+		-- deriving it on demand.
+		local drawn = ShopRotation.draw(555, 21, POOL, {}, 3)
+		T.expect(#drawn):toEqual(3)
+		local redrawn = ShopRotation.draw(555, 21, POOL, { [drawn[1]] = true }, 3)
+		T.expect(contains(redrawn, drawn[1])):toEqual(false)
+	end)
+
+	T.it("can reshuffle offers the player did not buy, so a redraw is not idempotent", function()
+		-- The failure mode persistence exists to prevent, demonstrated rather
+		-- than asserted away: for some players a redraw after one purchase
+		-- replaces an offer they deliberately left. Asserting the opposite would
+		-- pass only for seeds where it happens not to bite.
+		local drifted = false
+		for userId = 1, 60 do
+			local drawn = ShopRotation.draw(userId, 21, POOL, {}, 3)
+			if #drawn == 3 then
+				local redrawn = ShopRotation.draw(userId, 21, POOL, { [drawn[1]] = true }, 3)
+				if not contains(redrawn, drawn[2]) or not contains(redrawn, drawn[3]) then
+					drifted = true
+					break
+				end
+			end
+		end
+		T.expect(drifted):toBeTruthy()
+	end)
+
+	T.it("stays inside 2^53 so every platform agrees on the same draw", function()
+		-- Determinism here is not a nicety: two servers disagreeing would show a
+		-- player different offers depending on which one they joined.
+		for userId = 1, 200 do
+			for _, itemId in ShopRotation.draw(userId * 1000003, 4321, POOL, {}, 3) do
+				T.expect(contains(POOL, itemId)):toBeTruthy()
+			end
+		end
+	end)
+
+	T.it("builds its pool from the configured categories and skips free items", function()
+		local pool = ShopRotation.pool(Cosmetics.Items, Shop.Rotation.Categories)
+		for _, itemId in pool do
+			local item = Cosmetics.Items[itemId]
+			T.expect(table.find(Shop.Rotation.Categories, item.Category) ~= nil):toBeTruthy()
+			T.expect(item.AlwaysAvailable ~= true):toBeTruthy()
+		end
+	end)
+
+	T.it("never offers a character color, which every player already has for free", function()
+		local pool = ShopRotation.pool(Cosmetics.Items, { "CharacterColor" })
+		T.expect(#pool):toEqual(0)
+	end)
+
+	T.it("ships a rotation whose categories are real equip slots", function()
+		for _, category in Shop.Rotation.Categories do
+			T.expect(Cosmetics.Slots[category]):toEqual(true)
+		end
+	end)
+
+	T.it("ships a bundle rotation naming only bundles that exist", function()
+		for _, entry in Shop.Bundle.Rotation do
+			T.expect(entry.kind):toEqual("Bundle")
+			T.expect(Bundles.Catalog[entry.id] ~= nil):toBeTruthy()
+		end
+	end)
+end)
+
+return true

@@ -15,12 +15,19 @@ local ReactRoot = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("ReactRoot")
 )
 local ArenaApp = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ArenaApp"))
+local CombatHUD = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("CombatHUD"))
+local ThrowUXClient =
+	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ThrowUXClient"))
 
 local container = ReactRoot.create("ArenaRoot")
 local root = ReactRoblox.createRoot(container)
+local combatContainer = ReactRoot.create("ArenaCombatRoot", Enum.ScreenInsets.None)
+local combatRoot = ReactRoblox.createRoot(combatContainer)
 
 UIFeedback.start()
+ThrowUXClient.start()
 root:render(React.createElement(ArenaApp))
+combatRoot:render(React.createElement(CombatHUD))
 
 -- Reported only once the arena UI is mounted: the server holds the mode vote
 -- until arriving clients say this, so it must not fire before the vote could be
@@ -40,6 +47,9 @@ sendReady()
 
 script.Destroying:Connect(function()
 	root:unmount()
+	combatRoot:unmount()
 	container:Destroy()
+	combatContainer:Destroy()
+	ThrowUXClient.destroy()
 	UIFeedback.destroy()
 end)

@@ -5,6 +5,7 @@ local CosmeticsLogic = require(script.Parent.Parent.Game.Economy.CosmeticsLogic)
 local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
 local Crates = require(script.Parent.Parent.Parent.Config.Crates)
 local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
+local Audio = require(script.Parent.Parent.Parent.Config.Audio)
 
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },
@@ -43,16 +44,57 @@ T.describe("CosmeticsLogic", function()
 		T.expect(entries[6].name):toEqual("Purple")
 	end)
 
-	T.it("registers renderable trail cosmetics in every rarity", function()
-		local counts = { Common = 0, Rare = 0, Legendary = 0, Exclusive = 0 }
-		for _, item in Cosmetics.Items do
-			if item.Category == "TrailAssets" then
-				counts[item.Rarity] += 1
-				T.expect(item.EffectId ~= nil):toBeTruthy()
+	T.it("spreads every openable crate's pool across more than one rarity", function()
+		-- Was a trail-specific rarity census. The prototype trails are gone, so
+		-- this now guards the property that actually mattered: a crate nobody can
+		-- get a rarer drop from is not a crate.
+		for _, crate in Crates do
+			if crate.CatalogStatus == "Active" then
+				local rarities = {}
+				for _, itemId in crate.ItemPool do
+					local item = Cosmetics.Items[itemId]
+					T.expect(item ~= nil):toBeTruthy()
+					rarities[item.Rarity] = true
+				end
+				local distinct = 0
+				for _ in rarities do
+					distinct += 1
+				end
+				T.expect(distinct > 1):toBeTruthy()
 			end
 		end
-		for _, count in counts do
-			T.expect(count > 0):toBeTruthy()
+	end)
+
+	T.it("gives every equip slot that has items a default or an always-available entry", function()
+		-- A slot a player can fill but never clear is a trap: unequipping resolves
+		-- to Defaults[slot], so a slot with items and no default has no way back.
+		local populated = {}
+		for _, item in Cosmetics.Items do
+			if item.AlwaysAvailable ~= true then
+				populated[item.Category] = true
+			end
+		end
+		for slot in populated do
+			T.expect(Cosmetics.Defaults[slot] ~= nil):toBeTruthy()
+		end
+	end)
+
+	T.it("gives the default elimination effect sounds that Config.Audio actually defines", function()
+		local default = Cosmetics.Defaults.ElimEffectAssets
+		T.expect(default ~= nil):toBeTruthy()
+		local effect = default.ElimEffect
+		T.expect(effect ~= nil):toBeTruthy()
+		T.expect(Audio.Gameplay[effect.DodgeballSound] ~= nil):toBeTruthy()
+		T.expect(Audio.Gameplay[effect.HammerSound] ~= nil):toBeTruthy()
+	end)
+
+	T.it("points every elimination effect cosmetic at real audio entries", function()
+		for _, item in Cosmetics.Items do
+			if item.Category == "ElimEffectAssets" then
+				T.expect(item.ElimEffect ~= nil):toBeTruthy()
+				T.expect(Audio.Gameplay[item.ElimEffect.DodgeballSound] ~= nil):toBeTruthy()
+				T.expect(Audio.Gameplay[item.ElimEffect.HammerSound] ~= nil):toBeTruthy()
+			end
 		end
 	end)
 

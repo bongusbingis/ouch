@@ -1,6 +1,7 @@
 --!strict
 
 local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
+local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 
 type SimState = SimTypes.SimState
@@ -15,6 +16,13 @@ type ProjectileState = SimTypes.ProjectileState
 -- is set by the server each tick and replicates natively.
 
 local SimStateCodec = {}
+
+-- The equipped weapon lives on the character model, not on the Player, because
+-- this is sim state: the adapter decodes it back every tick, and a second copy
+-- kept for the client's benefit would be a second thing that could be wrong.
+-- Clients read this same attribute, which is why the name is exported rather
+-- than written out in two places.
+SimStateCodec.EquippedAttribute = "wpn"
 
 local PHASE_TO_NUMBER: { [SimTypes.ProjectilePhase]: number } = {
 	Held = 0,
@@ -76,6 +84,11 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 	for playerId, model in characterModels do
 		state.players[playerId] = {
 			id = playerId,
+			-- Absent on a character that has not been stepped yet, and on every
+			-- fresh spawn, which is what resets a respawning player to the default
+			-- weapon rather than whatever they died holding.
+			equipped = (model:GetAttribute(SimStateCodec.EquippedAttribute) :: string?) or WeaponRegistry.defaultKind(),
+			heldBallLastTick = model:GetAttribute("hadB") == true,
 			weapons = {
 				Dodgeball = {
 					throwCooldown = (model:GetAttribute("dbTc") :: number?) or 0,
@@ -140,6 +153,8 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		if player == nil then
 			continue
 		end
+		setAttributeIfChanged(model, SimStateCodec.EquippedAttribute, player.equipped)
+		setAttributeIfChanged(model, "hadB", player.heldBallLastTick)
 		local kitState = player.weapons.Dodgeball
 		setAttributeIfChanged(model, "dbTc", kitState.throwCooldown)
 		setAttributeIfChanged(model, "dbCc", kitState.catchCooldown)

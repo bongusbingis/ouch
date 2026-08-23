@@ -2,8 +2,6 @@
 
 -- Cosmetic catalog and the visual definitions shared by every place.
 
-local TrailCosmetics = require(script.Parent.TrailCosmetics)
-
 export type RarityDef = {
 	Weight: number,
 	DupeBonks: number,
@@ -30,6 +28,15 @@ export type VisualTemplateDef = {
 	SurfaceMaps: SurfaceMaps?,
 }
 
+-- An elimination effect names entries in Config.Audio.Gameplay rather than
+-- carrying asset ids. The sounds stay owned by the audio config, so a new
+-- effect is an audio entry plus a cosmetic that points at it, and the audio
+-- spec validates every id exactly once.
+export type ElimEffectDef = {
+	DodgeballSound: string,
+	HammerSound: string,
+}
+
 export type ItemDef = {
 	Category: string,
 	Rarity: string,
@@ -41,6 +48,7 @@ export type ItemDef = {
 	SortOrder: number?,
 	PreviewColor: Color3?,
 	Visual: VisualDef?,
+	ElimEffect: ElimEffectDef?,
 }
 
 export type DefaultDef = {
@@ -50,6 +58,7 @@ export type DefaultDef = {
 	SortOrder: number?,
 	PreviewColor: Color3?,
 	Visual: VisualDef?,
+	ElimEffect: ElimEffectDef?,
 }
 
 local Rarities: { [string]: RarityDef } = {
@@ -59,10 +68,15 @@ local Rarities: { [string]: RarityDef } = {
 	Exclusive = { Weight = 0, DupeBonks = 0, DirectBonks = 0, DisplayOrder = 1 },
 }
 
+-- TrailAssets and ElimEffectAssets are both "effects" in the storefront but are
+-- separate slots on purpose: a ball trail and an elimination effect are
+-- unrelated in play, and one slot would make equipping one silently unequip the
+-- other.
 local Slots = {
 	BallAssets = true,
 	HammerAssets = true,
 	TrailAssets = true,
+	ElimEffectAssets = true,
 	EmoteAssets = true,
 	CostumeAssets = true,
 	CharacterColor = true,
@@ -100,6 +114,14 @@ local Defaults: { [string]: DefaultDef } = {
 		Rarity = "Common",
 		Visual = {
 			Template = "Hammer",
+		},
+	},
+	ElimEffectAssets = {
+		DisplayName = "Default Splat",
+		Rarity = "Common",
+		ElimEffect = {
+			DodgeballSound = "DodgeballElimination",
+			HammerSound = "HammerElimination",
 		},
 	},
 	CharacterColor = {
@@ -153,16 +175,6 @@ local Items: { [string]: ItemDef } = {
 	BallPurple = ballAsset("Legendary", "Purple Ball", Color3.fromRGB(98, 37, 209), Color3.fromRGB(150, 80, 220)),
 	BallYellow = ballAsset("Legendary", "Yellow Ball", Color3.fromRGB(255, 255, 0), Color3.fromRGB(240, 210, 60)),
 }
-
-for itemId, definition in TrailCosmetics do
-	Items[itemId] = {
-		Category = "TrailAssets",
-		Rarity = definition.Rarity,
-		DisplayName = definition.DisplayName,
-		EffectId = itemId,
-		Thumbnail = "",
-	}
-end
 
 return {
 	Rarities = Rarities,

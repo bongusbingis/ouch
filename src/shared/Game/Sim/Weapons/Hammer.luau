@@ -166,10 +166,6 @@ function Hammer.handleInput(
 	if kitState.cooldown > 0 or kitState.activeRemaining > 0 or kitState.recoveryRemaining > 0 then
 		return true
 	end
-	if SimUtil.hasHandBall(state, command.playerId) then
-		return false
-	end
-
 	local character = world.characters[command.playerId]
 	local aimDir = command.aimDir
 	if character == nil or not character.alive or aimDir == nil then

@@ -9,7 +9,6 @@ local PlayerModuleEventBus = CommonUtils.get("PlayerModuleEventBus")
 
 local CombatCamera = require(script:WaitForChild("CombatCamera"))
 local CombatConfig = require(script:WaitForChild("CombatConfig"))
-local CombatDebug = require(script:WaitForChild("CombatDebug"))
 local DeviceInput = require(script:WaitForChild("DeviceInput"))
 local TouchIntent = require(script:WaitForChild("TouchIntent"))
 local TouchRegions = require(script:WaitForChild("TouchRegions"))
@@ -33,7 +32,15 @@ local TouchRegions = require(script:WaitForChild("TouchRegions"))
 
 local Combat = {}
 
-export type Intent = "NormalThrow" | "BeginCharge" | "ReleaseCharge" | "CancelCharge" | "HammerAttack"
+export type Intent =
+	"NormalThrow"
+	| "BeginCharge"
+	| "ReleaseCharge"
+	| "CancelCharge"
+	| "HammerAttack"
+	| "EquipHammer"
+	| "EquipDodgeball"
+export type GestureEvent = TouchIntent.GestureEvent
 
 local started = false
 local inputEnabled = false
@@ -76,6 +83,12 @@ local handlers = {
 	onHammer = function()
 		emit("HammerAttack")
 	end,
+	onEquipHammer = function()
+		emit("EquipHammer")
+	end,
+	onEquipDodgeball = function()
+		emit("EquipDodgeball")
+	end,
 }
 
 --==================================================================
@@ -96,6 +109,10 @@ end
 
 function Combat.isInputEnabled(): boolean
 	return inputEnabled
+end
+
+function Combat.isActive(): boolean
+	return isLive()
 end
 
 -- Over-the-shoulder locked camera. Independent of input: a spectator or a
@@ -134,6 +151,26 @@ function Combat.onIntent(listener: (Intent) -> ()): () -> ()
 			table.remove(listeners, index)
 		end
 	end
+end
+
+function Combat.onGesture(listener: (GestureEvent) -> ()): () -> ()
+	return TouchIntent.onGesture(listener)
+end
+
+-- For the HUD's weapon slots to call when tapped. A slot press is unambiguous,
+-- so like the hammer button it bypasses touch classification entirely and can
+-- never be mistaken for a look or a throw. This is how mobile equips: there is
+-- no gesture for it, only the button the player pressed.
+--
+-- Not gated on isLive(): a player may set their slot while the mode vote has the
+-- cursor, or between rounds, and the server accepts an equip outside an active
+-- match for the same reason.
+function Combat.equipHammer()
+	emit("EquipHammer")
+end
+
+function Combat.equipDodgeball()
+	emit("EquipDodgeball")
 end
 
 -- True while a charge is building on any device, for HUD and pose systems that
@@ -184,6 +221,7 @@ function Combat.start()
 		TouchRegions.setExclusion(name, rect)
 	end)
 	CombatCamera.setChargingPredicate(TouchIntent.isCharging)
+	CombatCamera.setCameraSuppressedPredicate(TouchIntent.isCameraSuppressed)
 	CombatCamera.start()
 	TouchIntent.setHandlers(handlers)
 	DeviceInput.setHandlers(handlers)
@@ -206,8 +244,6 @@ function Combat.start()
 	end)
 
 	RunService.Heartbeat:Connect(TouchIntent.step)
-	CombatDebug.start()
-
 	-- Anything that can swallow the release that would have ended a gesture.
 	local player = Players.LocalPlayer
 	player.CharacterRemoving:Connect(cancelEverything)

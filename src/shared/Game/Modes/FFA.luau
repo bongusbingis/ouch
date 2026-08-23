@@ -18,6 +18,7 @@ FFA.rules = {
 	StartingSeconds = 3,
 	RespawnSeconds = 1,
 	SpawnInvulnSeconds = 1.5,
+	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
 function FFA.onMatchStart(ctx: GameMode.ModeContext)

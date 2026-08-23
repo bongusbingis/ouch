@@ -104,6 +104,12 @@ return {
 	--
 	-- It fires the moment it is recognised rather than on release, because a
 	-- flick that waits for the finger to lift feels laggy.
+	--
+	-- While a swipe candidate is alive the camera stops taking touch rotation.
+	-- Without that the flick throws *and* pans, which is exactly the confusion
+	-- between attacking and looking that this whole layer exists to remove. The
+	-- suppression is released the instant the candidate is ruled out, and because
+	-- the camera consumes per-frame deltas there is nothing banked up to snap.
 	BottomSwipe = {
 		Enabled = true,
 
@@ -126,7 +132,11 @@ return {
 		-- Higher: more forgiving of a thumb that starts its arc sideways.
 		-- Too high: a sideways drag stays a swipe candidate for longer than it
 		--   should before falling through to the camera.
-		DirectionSampleMinPixels = { Fraction = 0.035, MinPixels = 16, MaxPixels = 48 } :: Scaled,
+		-- Small on purpose. The camera is suppressed while direction is unknown,
+		-- so this is also the dead zone a sideways drag from the strip pays
+		-- before the view starts moving. Big enough to clear digitizer noise,
+		-- small enough not to be felt. Sane: 8-20px.
+		DirectionSampleMinPixels = { Fraction = 0.012, MinPixels = 9, MaxPixels = 18 } :: Scaled,
 
 		-- Minimum upward travel before the gesture counts.
 		-- Higher: fewer accidental swipes; more thumb travel required.
@@ -134,7 +144,11 @@ return {
 
 		-- The gesture must complete within this long. A slow upward drag is a
 		-- camera pan, not a flick.
-		MaxDuration = 0.45,
+		--
+		-- This also bounds how long the camera can stay suppressed: the view is
+		-- held still while a swipe candidate is alive, so a generous window here
+		-- would let a slow upward pan freeze the camera. Sane: 0.2-0.35.
+		MaxDuration = 0.28,
 
 		-- Minimum speed, in pixels per second. Kept low enough that the gesture
 		-- is not an execution test -- it is a convenience, not a skill check.

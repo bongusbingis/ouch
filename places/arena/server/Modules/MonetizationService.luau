@@ -6,11 +6,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
+local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Bundles"))
 local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
+local RewardService = require(script.Parent.RewardService)
 
 -- Owns ProcessReceipt and its permanent idempotency record. Client prompt
 -- completion never grants products.
@@ -20,7 +22,9 @@ type StartOptions = {
 	players: any?,
 	products: any?,
 	crates: any?,
+	bundles: any?,
 	crateService: any?,
+	rewardService: any?,
 	playerData: any?,
 	analyticsService: any?,
 	network: any?,
@@ -37,7 +41,9 @@ local activeMarketplace: any = MarketplaceService
 local activePlayers: any = Players
 local activeProducts: any = Products
 local activeCrates: any = Crates
+local activeBundles: any = Bundles
 local activeCrateService: any = CrateService
+local activeRewardService: any = RewardService
 local activePlayerData: any = PlayerData
 local activeAnalyticsService: any = AnalyticsService
 local activeNetwork: any = Network
@@ -58,6 +64,47 @@ local handlers: { [string]: Handler } = {
 				kind = "Bonks",
 				productId = receiptInfo.ProductId,
 				amount = def.BonksAmount,
+			}
+	end,
+	-- Robux for one named cosmetic. Deliberately not routed through
+	-- DirectPurchaseService: that path spends Bonks and enforces the rotation
+	-- window, neither of which applies once Roblox has taken the money.
+	Cosmetic = function(player, def, receiptInfo)
+		if type(def.ItemId) ~= "string" then
+			return false, nil
+		end
+		if not activeRewardService.grant(player, { kind = "Cosmetic", itemId = def.ItemId }) then
+			return false, nil
+		end
+		return true,
+			{
+				grantId = tostring(receiptInfo.PurchaseId),
+				kind = "Cosmetic",
+				productId = receiptInfo.ProductId,
+				itemId = def.ItemId,
+			}
+	end,
+	-- A bundle grants every item it names. Items already owned pay the rarity's
+	-- DupeBonks through RewardService rather than failing, so a partially-owned
+	-- bundle still resolves -- returning false here would strand the receipt in
+	-- retries forever with the player already charged.
+	Bundle = function(player, def, receiptInfo)
+		local bundle = activeBundles.Catalog[def.BundleId]
+		if bundle == nil or #bundle.ItemIds == 0 then
+			return false, nil
+		end
+		for _, itemId in bundle.ItemIds do
+			if not activeRewardService.grant(player, { kind = "Cosmetic", itemId = itemId }) then
+				return false, nil
+			end
+		end
+		return true,
+			{
+				grantId = tostring(receiptInfo.PurchaseId),
+				kind = "Bundle",
+				productId = receiptInfo.ProductId,
+				bundleId = def.BundleId,
+				itemIds = bundle.ItemIds,
 			}
 	end,
 }
@@ -123,7 +170,9 @@ function MonetizationService.start(options: StartOptions?)
 	activePlayers = if options and options.players then options.players else Players
 	activeProducts = if options and options.products then options.products else Products
 	activeCrates = if options and options.crates then options.crates else Crates
+	activeBundles = if options and options.bundles then options.bundles else Bundles
 	activeCrateService = if options and options.crateService then options.crateService else CrateService
+	activeRewardService = if options and options.rewardService then options.rewardService else RewardService
 	activePlayerData = if options and options.playerData then options.playerData else PlayerData
 	activeAnalyticsService = if options and options.analyticsService then options.analyticsService else AnalyticsService
 	activeNetwork = if options and options.network then options.network else Network
@@ -139,6 +188,15 @@ function MonetizationService.start(options: StartOptions?)
 				activeCrates[definition.CrateId] ~= nil,
 				`[Monetization] product {productId} references an unknown crate`
 			)
+			assert(
+				activeCrates[definition.CrateId].CatalogStatus == "Active",
+				`[Monetization] product {productId} sells a crate that is not Active`
+			)
+		elseif definition.Type == "Bundle" then
+			assert(
+				activeBundles.Catalog[definition.BundleId] ~= nil,
+				`[Monetization] product {productId} references an unknown bundle`
+			)
 		end
 	end
 	activeMarketplace.ProcessReceipt = processReceipt
@@ -150,7 +208,9 @@ function MonetizationService._resetForTest()
 	activePlayers = Players
 	activeProducts = Products
 	activeCrates = Crates
+	activeBundles = Bundles
 	activeCrateService = CrateService
+	activeRewardService = RewardService
 	activePlayerData = PlayerData
 	activeAnalyticsService = AnalyticsService
 	activeNetwork = Network

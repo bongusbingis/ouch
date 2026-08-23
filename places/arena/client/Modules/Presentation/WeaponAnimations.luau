@@ -150,14 +150,17 @@ end
 -- than off state: it has no charge to wait for, and deferring it would add the
 -- whole press-to-release window to every melee swing.
 function WeaponAnimations.onIntent(kind: string)
-	if kind ~= "Throw" or CombatState.holdsBall() then
+	if kind ~= "Throw" or CombatState.canThrowBall() then
 		return
 	end
 	playOnce("Hammer", "Swing", Animations.FadeTime.Attack, Combat.Hammer.Cooldown)
 end
 
 local function onState(snapshot: CombatState.Snapshot)
-	if snapshot.weapon ~= "Dodgeball" then
+	-- The ball clips all assume a ball in hand. With the dodgeball equipped and
+	-- nothing to throw there is no meaningful ball pose, so the hammer idle is
+	-- what the character falls back to rather than miming an empty throw.
+	if snapshot.weapon ~= "Dodgeball" or not snapshot.holdsBall then
 		stopLoop()
 		playLoop("Hammer", "Idle")
 		return

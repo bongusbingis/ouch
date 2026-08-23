@@ -33,6 +33,8 @@ local root = ReactRoblox.createRoot(container)
 ConfigReplication.startClient({
 	GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes")),
 	Matchmaking = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")),
+	Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop")),
+	Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates")),
 })
 EconomyStore.start()
 UIFeedback.start()

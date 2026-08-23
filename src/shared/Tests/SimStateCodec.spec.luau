@@ -4,6 +4,9 @@ local T = require(script.Parent.TestKit)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 
 local SimStateCodec = require(script.Parent.Parent.Game.Adapters.SimStateCodec)
+local WeaponRegistry = require(script.Parent.Parent.Game.Sim.WeaponRegistry)
+local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
+local MockWorld = require(script.Parent.MockWorld)
 local Combat = require(script.Parent.Parent.Parent.Config.Combat)
 
 type FakeInstance = {
@@ -80,12 +83,83 @@ T.describe("SimStateCodec", function()
 		T.expect(decodedBall.bounceCount):toEqual(1)
 	end)
 
+	T.it("preserves the equipped weapon across encode/decode", function()
+		-- The adapter decodes a fresh SimState every tick, so anything the codec
+		-- does not carry is silently reset one tick after it was set. That is
+		-- exactly what happened to the equipped weapon: switching worked for a
+		-- single tick and then reverted, which reads as the key doing nothing.
+		local ballsFolder = fakeInstance("Balls", "Folder")
+		local character = fakeInstance("Character", "Model")
+		local state = SimTypes.newState()
+		state.players.p1 = {
+			id = "p1",
+			equipped = "Dodgeball",
+			heldBallLastTick = true,
+			weapons = {
+				Dodgeball = { throwCooldown = 0, catchCooldown = 0, catchRemaining = 0, catchDirection = nil },
+				Hammer = {
+					cooldown = 0,
+					activeRemaining = 0,
+					recoveryRemaining = 0,
+					stunRemaining = 0,
+					direction = nil,
+					hitTargetId = nil,
+				},
+			},
+		}
+
+		SimStateCodec.encode(state, ballsFolder :: any, { p1 = character :: any })
+		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
+
+		T.expect(decoded.players.p1.equipped):toEqual("Dodgeball")
+		-- The ball edge detector matters just as much: losing it makes the
+		-- auto-equip fire every tick instead of on pickup, which overwrites the
+		-- player's own choice on the very next frame.
+		T.expect(decoded.players.p1.heldBallLastTick):toEqual(true)
+	end)
+
+	T.it("defaults an unstepped character to the registry default weapon", function()
+		-- A character with no attributes yet, which is every fresh spawn.
+		local ballsFolder = fakeInstance("Balls", "Folder")
+		local character = fakeInstance("Character", "Model")
+		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
+		T.expect(decoded.players.p1.equipped):toEqual(WeaponRegistry.defaultKind())
+		T.expect(decoded.players.p1.heldBallLastTick):toEqual(false)
+	end)
+
+	T.it("keeps an equipped weapon across the decode-step-encode loop the adapter runs", function()
+		-- The unit tests around SimCore call step() directly on a state they own,
+		-- which is not how the server runs it: every tick decodes a fresh state
+		-- from instances, steps it, and encodes it back. A single round trip is
+		-- where per-player state goes missing, so this drives the real loop.
+		local ballsFolder = fakeInstance("Balls", "Folder")
+		local character = fakeInstance("Character", "Model")
+		local models = { p1 = character :: any }
+		local world = MockWorld.snapshot({ p1 = MockWorld.character(vector.create(0, 2.5, 0)) })
+
+		local function tick(commands)
+			local state = SimStateCodec.decode(ballsFolder :: any, models)
+			SimCore.step(state, commands, world, 1 / 60)
+			SimStateCodec.encode(state, ballsFolder :: any, models)
+			return state
+		end
+
+		tick({})
+		tick({ { playerId = "p1", kind = "Equip", weapon = "Dodgeball" } })
+		for _ = 1, 5 do
+			local state = tick({})
+			T.expect(state.players.p1.equipped):toEqual("Dodgeball")
+		end
+	end)
+
 	T.it("preserves hammer kit state across encode/decode", function()
 		local ballsFolder = fakeInstance("Balls", "Folder")
 		local character = fakeInstance("Character", "Model")
 		local state = SimTypes.newState()
 		state.players.p1 = {
 			id = "p1",
+			equipped = "Hammer",
+			heldBallLastTick = false,
 			weapons = {
 				Dodgeball = {
 					throwCooldown = 0.2,

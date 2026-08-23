@@ -1,6 +1,5 @@
 return {
 	Template = {
-		SchemaVersion = 0, -- sentinel; never bump here. Target is DataConfig.SchemaVersion.
 		Bonks = 2500,
 		Level = {
 			Points = 0,
@@ -26,11 +25,20 @@ return {
 		Crates = {
 			Pity = {}, -- { [crateId]: { [rarity]: opens since that rarity last dropped } }
 		},
+		Shop = {
+			-- The rotating shop's drawn offers, stored against the period they
+			-- were drawn for. Persisted rather than recomputed because the draw
+			-- excludes owned items: buying one offer would otherwise reshuffle
+			-- the others on the next recompute.
+			Bucket = -1, -- period index; -1 = never drawn
+			Offers = {}, -- { itemId }
+		},
 		Tutorial = {
 			Version = 0,
 		},
 		Onboarding = {
 			FirstJoinAt = 0, -- unix time, stamped once; 0 = not yet stamped
+			SwipeThrowLearned = false,
 		},
 		Season = {
 			-- Reset wholesale at rollover. Tier is derived from XP, never stored.
@@ -46,8 +54,6 @@ return {
 		},
 		Receipts = {}, -- { [purchaseId]: unix time } for ProcessReceipt idempotency
 	},
-
-	SchemaVersion = 1,
 
 	TutorialVersion = 1,
 

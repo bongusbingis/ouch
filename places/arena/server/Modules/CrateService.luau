@@ -75,6 +75,7 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
 			itemId = result.itemId,
 			source = source,
+			variantId = Shop.VariantId,
 		})
 	end
 
@@ -95,13 +96,27 @@ local function rollAndGrant(player: Player, crateId: string, source: string, ope
 		source = source,
 		isDupe = result.isDupe,
 		pityTriggered = result.pityTriggered,
+		variantId = Shop.VariantId,
 	})
 	Network.fire("CrateOpened", player, payload)
 	return payload
 end
 
 local function logCrateFailure(player: Player, reason: string)
-	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CratePurchaseFailed, 1, { reason = reason })
+	AnalyticsService.logCustomEvent(
+		player,
+		AnalyticsConfig.CustomEvents.CratePurchaseFailed,
+		1,
+		{ reason = reason, variantId = Shop.VariantId }
+	)
+end
+
+-- A crate can only be opened once its content exists. Preview crates are
+-- merchandised as coming soon and Hidden ones are not shown at all; neither can
+-- be rolled, and the odds model would assert on their empty pool if they were.
+function CrateService.isOpenable(crateId: string): boolean
+	local crate = Crates[crateId]
+	return crate ~= nil and crate.CatalogStatus == "Active"
 end
 
 -- Authoritative price. The storefront calls the same function, so the featured
@@ -116,7 +131,7 @@ end
 
 function CrateService.openWithBonks(player: Player, crateId: string): (OpenResult?, string?)
 	local crate = Crates[crateId]
-	if crate == nil or crate.BonksPrice == nil then
+	if crate == nil or crate.BonksPrice == nil or not CrateService.isOpenable(crateId) then
 		logCrateFailure(player, "invalid_crate")
 		return nil, "invalid_crate"
 	end
@@ -140,6 +155,7 @@ function CrateService.openWithBonks(player: Player, crateId: string): (OpenResul
 	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
 		crateId = crateId,
 		source = "Bonks",
+		variantId = Shop.VariantId,
 	})
 
 	local openId = HttpService:GenerateGUID(false)
@@ -162,7 +178,8 @@ function CrateService.openWithBonks(player: Player, crateId: string): (OpenResul
 		price,
 		data.Bonks,
 		AnalyticsConfig.EconomyTransactionTypes.Shop,
-		crateId
+		crateId,
+		{ variantId = Shop.VariantId }
 	)
 	return result, nil
 end
@@ -202,6 +219,14 @@ local function grantRestrictedValue(player: Player, crateId: string, purchaseId:
 end
 
 function CrateService.openFromReceipt(player: Player, crateId: string, purchaseId: string): boolean
+	-- Startup validation refuses an Active product pointing at a non-Active
+	-- crate, so this should be unreachable. It is still handled rather than
+	-- asserted: the player has already been charged, and paying out the crate's
+	-- value is the only outcome that neither strands the receipt nor rolls from
+	-- a pool that may be empty.
+	if not CrateService.isOpenable(crateId) then
+		return grantRestrictedValue(player, crateId, purchaseId, "crate_unavailable")
+	end
 	local allowed, reason = PaidRandomPolicyService.canReceivePaidRandom(player)
 	if not allowed then
 		return grantRestrictedValue(player, crateId, purchaseId, reason or "paid_random_restricted")

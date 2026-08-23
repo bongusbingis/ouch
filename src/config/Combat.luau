@@ -98,6 +98,7 @@ return {
 		BallFeel = {
 			FlightStretchPerSpeed = 0.01,
 			MaxFlightStretch = 0.16,
+			ChargeSquash = 0.08,
 			ImpactImpulseScale = 0.018,
 			MaxImpactSquash = 0.42,
 			SpringFrequencyHz = 9,

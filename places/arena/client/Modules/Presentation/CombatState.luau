@@ -7,9 +7,9 @@ local Workspace = game:GetService("Workspace")
 
 local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
-local PlayerIds = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
-)
+local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local SimStateCodec = require(Adapters:WaitForChild("SimStateCodec"))
 
 -- The local player's visual combat state, and the only place charge is measured.
 --
@@ -32,18 +32,42 @@ local HELD_PHASE = 0
 export type State = "Idle" | "BallEquipped" | "Aiming" | "Charging" | "Throwing" | "FollowThrough" | "Recovering"
 
 export type Snapshot = {
-	-- Which weapon a Throw press would use, mirroring how the sim routes it.
+	-- The equipped weapon, read from the server's projection rather than guessed
+	-- from ball possession. The sim owns the choice; this is a mirror of it.
 	weapon: string,
+	-- Whether a dodgeball is actually in hand. Distinct from weapon: a player can
+	-- have the dodgeball equipped with nothing to throw, and can hold a ball while
+	-- swinging the hammer.
+	holdsBall: boolean,
 	state: State,
 	-- 0-1 hold progress. Non-zero only while Charging.
 	chargeAlpha: number,
+	throwCooldown: number,
+	ready: boolean,
+	releaseCharge: number,
+	releaseRevision: number,
+	cancelRevision: number,
+	blockedRevision: number,
+	readyRevision: number,
 }
 
 local started = false
 local ballsFolder: Folder? = nil
 local listeners: { (Snapshot) -> () } = {}
 
-local snapshot: Snapshot = { weapon = "Hammer", state = "Idle", chargeAlpha = 0 }
+local snapshot: Snapshot = {
+	weapon = "Hammer",
+	holdsBall = false,
+	state = "Idle",
+	chargeAlpha = 0,
+	throwCooldown = 0,
+	ready = false,
+	releaseCharge = 0,
+	releaseRevision = 0,
+	cancelRevision = 0,
+	blockedRevision = 0,
+	readyRevision = 0,
+}
 local pressedAt: number? = nil
 -- Counts down the post-release states. Nil whenever the state is input-driven.
 local stateExpiresAt: number? = nil
@@ -89,12 +113,28 @@ local function evaluate()
 	local now = os.clock()
 	local previousState = snapshot.state
 	local previousCharge = snapshot.chargeAlpha
+	local previousCooldown = snapshot.throwCooldown
+	local previousReady = snapshot.ready
 
-	snapshot.weapon = if holdsBall() then "Dodgeball" else "Hammer"
+	snapshot.holdsBall = holdsBall()
+	-- The character carries it because that is where the sim encodes it. Absent
+	-- until the first server step of a fresh character, which is exactly when the
+	-- default applies anyway.
+	local character = Players.LocalPlayer.Character
+	local equipped = if character then character:GetAttribute(SimStateCodec.EquippedAttribute) :: string? else nil
+	snapshot.weapon = equipped or "Hammer"
+	snapshot.throwCooldown = if character then math.max((character:GetAttribute("dbTc") :: number?) or 0, 0) else 0
+	snapshot.ready = CombatState.canStartThrow()
+	if snapshot.ready and not previousReady then
+		snapshot.readyRevision += 1
+	end
 
 	local expiry = stateExpiresAt
 	if expiry ~= nil then
 		if now < expiry then
+			if previousCooldown ~= snapshot.throwCooldown or previousReady ~= snapshot.ready then
+				publish()
+			end
 			return
 		end
 		-- Post-release states run in a fixed order and then hand back to the
@@ -111,12 +151,18 @@ local function evaluate()
 		return
 	end
 
-	if snapshot.weapon ~= "Dodgeball" then
-		-- The hammer has no charge and no aim pose of its own; it swings from its
-		-- authored clip and this layer stays out of its way.
+	if not CombatState.canThrowBall() then
+		-- Nothing to wind up: either the hammer is out, which swings from its
+		-- authored clip and wants this layer out of the way, or the ball weapon is
+		-- equipped with an empty hand and there is no throw to pose for.
 		snapshot.chargeAlpha = 0
 		snapshot.state = "Idle"
-		if previousState ~= "Idle" or previousCharge ~= 0 then
+		if
+			previousState ~= "Idle"
+			or previousCharge ~= 0
+			or previousCooldown ~= snapshot.throwCooldown
+			or previousReady ~= snapshot.ready
+		then
 			publish()
 		end
 		return
@@ -141,7 +187,12 @@ local function evaluate()
 		snapshot.chargeAlpha = 0
 	end
 
-	if previousState ~= snapshot.state or previousCharge ~= snapshot.chargeAlpha then
+	if
+		previousState ~= snapshot.state
+		or previousCharge ~= snapshot.chargeAlpha
+		or previousCooldown ~= snapshot.throwCooldown
+		or previousReady ~= snapshot.ready
+	then
 		publish()
 	end
 end
@@ -159,9 +210,20 @@ function CombatState.endCharge()
 	evaluate()
 end
 
+function CombatState.cancelCharge()
+	local wasCharging = pressedAt ~= nil or snapshot.state == "Charging"
+	pressedAt = nil
+	if wasCharging then
+		snapshot.cancelRevision += 1
+	end
+	evaluate()
+end
+
 -- Called at the moment a throw is actually sent. Drives the post-release states
 -- so the pose layer can get out of the animation's way.
 function CombatState.onThrow()
+	snapshot.releaseCharge = snapshot.chargeAlpha
+	snapshot.releaseRevision += 1
 	pressedAt = nil
 	enter("Throwing", ThrowPose.Timing.ThrowingSeconds)
 	snapshot.chargeAlpha = 0
@@ -186,8 +248,25 @@ function CombatState.currentCharge(): number
 	return snapshot.chargeAlpha
 end
 
+-- Whether a dodgeball throw is possible right now: the ball weapon is out *and*
+-- there is a ball in hand. Both halves matter -- charging with an empty hand
+-- would build a throw that never happens, and holding a ball while the hammer is
+-- equipped must not start one either.
+function CombatState.canThrowBall(): boolean
+	return snapshot.weapon == "Dodgeball" and snapshot.holdsBall
+end
+
+function CombatState.canStartThrow(): boolean
+	return CombatState.canThrowBall() and snapshot.throwCooldown <= 0 and matchIsActive()
+end
+
+function CombatState.onBlocked()
+	snapshot.blockedRevision += 1
+	publish()
+end
+
 function CombatState.holdsBall(): boolean
-	return snapshot.weapon == "Dodgeball"
+	return snapshot.holdsBall
 end
 
 function CombatState.getSnapshot(): Snapshot

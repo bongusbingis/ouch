@@ -40,9 +40,9 @@ T.describe("FeaturedRotation", function()
 
 	T.it("counts down to the next rotation", function()
 		local start = 4 * WEEK
-		T.expect(FeaturedRotation.nextRotationAt(CONFIG, start)):toEqual(5 * WEEK)
-		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG, start)):toEqual(WEEK)
-		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG, start + WEEK - 30)):toEqual(30)
+		T.expect(FeaturedRotation.nextRotationAt(CONFIG.RotationSeconds, start)):toEqual(5 * WEEK)
+		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG.RotationSeconds, start)):toEqual(WEEK)
+		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG.RotationSeconds, start + WEEK - 30)):toEqual(30)
 	end)
 
 	T.it("discounts only the currently featured crate", function()

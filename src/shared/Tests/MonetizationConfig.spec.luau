@@ -11,8 +11,8 @@ T.describe("MonetizationConfig", function()
 		T.expect(Products.Catalog.Bonks1100.BonksAmount):toEqual(1100)
 		T.expect(Products.Catalog.Bonks2500.BonksAmount):toEqual(2500)
 		T.expect(Products.Catalog.Bonks5500.BonksAmount):toEqual(5500)
-		T.expect(Products.Catalog.BallCrateOpen.SuggestedRobux):toEqual(39)
-		T.expect(Products.Catalog.TrailCrateOpen.SuggestedRobux):toEqual(79)
+		T.expect(Products.Catalog.DodgeballCrateOpen.SuggestedRobux):toEqual(39)
+		T.expect(Products.Catalog.EffectsCrateOpen.SuggestedRobux):toEqual(59)
 		for key, definition in Products.Catalog do
 			if key ~= "SeasonalBattlePass" then
 				T.expect(definition.CatalogStatus):toEqual("Preview")
@@ -24,11 +24,14 @@ T.describe("MonetizationConfig", function()
 	T.it("configures permanent pass previews without inventing missing assets", function()
 		T.expect(next(GamePasses.ById)):toBeNil()
 		T.expect(GamePasses.Catalog.SplatStarter.SuggestedRobux):toEqual(49)
-		T.expect(GamePasses.Catalog.TrailCollection.SuggestedRobux):toEqual(149)
+		T.expect(GamePasses.Catalog.EffectCollection.SuggestedRobux):toEqual(149)
 		T.expect(GamePasses.Catalog.BrawlersClub.SuggestedRobux):toEqual(499)
 		T.expect(GamePasses.Catalog.FoundersPack.SuggestedRobux):toEqual(999)
-		T.expect(#GamePasses.Catalog.TrailCollection.EntitlementItemIds):toEqual(5)
 		-- Slots with no authored content stay merchandised but grant nothing.
+		-- Every pass is in that state right now: the prototype cosmetics they
+		-- used to grant were removed, and a pass is never sold empty, so all of
+		-- them stay Preview until real content lands.
+		T.expect(#GamePasses.Catalog.EffectCollection.EntitlementItemIds):toEqual(0)
 		T.expect(#GamePasses.Catalog.HammerCosmetics.EntitlementItemIds):toEqual(0)
 		T.expect(#GamePasses.Catalog.CharacterCostumes.EntitlementItemIds):toEqual(0)
 		T.expect(#GamePasses.Catalog.EliminationEmotes.EntitlementItemIds):toEqual(0)
@@ -50,14 +53,29 @@ T.describe("MonetizationConfig", function()
 	end)
 
 	T.it("keeps at least one purely cosmetic pass at every price point that has boosts", function()
-		-- A player who refuses boosters must still have something to buy.
+		-- A player who refuses boosters must still have something to buy. Counted
+		-- by declared category rather than granted items: no pass grants anything
+		-- yet, and the guarantee being protected is that cosmetic-only offers
+		-- exist in the ladder, not that they are already stocked.
 		local cosmeticOnly = 0
 		for _, definition in GamePasses.Catalog do
-			if definition.Boosts == nil and #definition.EntitlementItemIds > 0 then
+			if definition.Boosts == nil and #definition.Categories > 0 then
 				cosmeticOnly += 1
 			end
 		end
 		T.expect(cosmeticOnly >= 2):toBeTruthy()
+	end)
+
+	T.it("never sells a pass or bundle that grants nothing", function()
+		-- Preview is how an unstocked offer is merchandised. Going Active with an
+		-- empty grant list is the actual failure, and it is the one thing here
+		-- that must never ship.
+		for key, definition in GamePasses.Catalog do
+			if definition.CatalogStatus == "Active" and definition.Boosts == nil then
+				T.expect(#definition.EntitlementItemIds > 0):toBeTruthy()
+				T.expect(type(key)):toEqual("string")
+			end
+		end
 	end)
 
 	T.it("ships one season pass product per season, each naming a real season", function()

@@ -37,6 +37,7 @@ Infection.rules = {
 	RespawnSeconds = 3,
 	SpawnInvulnSeconds = 1.5,
 	TimeCapWinnerId = Infection.SurvivorTeam,
+	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
 -- Pure rules, kept out of the hooks so they are testable without a DataModel.
