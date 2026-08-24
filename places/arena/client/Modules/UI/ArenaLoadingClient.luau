@@ -13,7 +13,9 @@ local Audio = require(Config:WaitForChild("Audio"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"))
 local GameModes = require(Config:WaitForChild("GameModes"))
 local Loading = require(Config:WaitForChild("Loading"))
-local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ModeOptions = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeOptions"))
+local Network = require(Shared:WaitForChild("Network"))
 
 local ArenaLoadingClient = {}
 
@@ -226,7 +228,7 @@ local function decodeLoadSnapshot(value: string)
 		readyPlayerCount = math.max(0, number(decoded.readyPlayerCount, 0)),
 		deadlineAt = number(decoded.deadlineAt, 0),
 		gateReleased = decoded.gateReleased == true,
-		modeOptions = if #options > 0 then options else table.clone(GameModes.VoteOptions),
+		modeOptions = ModeOptions.resolve(options),
 	}
 	changed()
 end

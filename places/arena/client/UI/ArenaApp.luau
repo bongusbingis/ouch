@@ -101,17 +101,17 @@ return function(props: Props)
 	for _, modeId in options do
 		local definition = GameModes.Modes[modeId]
 		local mode = ModeRegistry.get(modeId)
-		assert(definition ~= nil and definition.Enabled, `[ArenaApp] unavailable configured mode "{modeId}"`)
-		assert(mode ~= nil, `[ArenaApp] unregistered mode "{modeId}"`)
-		table.insert(modes, {
-			Id = modeId,
-			Title = definition.Title,
-			Description = definition.Description,
-			ThumbnailId = imageId(definition.ThumbnailId),
-			SortOrder = definition.SortOrder,
-			VoteCount = vote.voteCounts[modeId] or 0,
-			Selected = vote.selectedModeId == modeId,
-		})
+		if definition ~= nil and definition.Enabled and mode ~= nil then
+			table.insert(modes, {
+				Id = modeId,
+				Title = definition.Title,
+				Description = definition.Description,
+				ThumbnailId = imageId(definition.ThumbnailId),
+				SortOrder = definition.SortOrder,
+				VoteCount = vote.voteCounts[modeId] or 0,
+				Selected = vote.selectedModeId == modeId,
+			})
+		end
 	end
 
 	local votePresented = vote.open and presentedVoteStartsAt == vote.startsAt

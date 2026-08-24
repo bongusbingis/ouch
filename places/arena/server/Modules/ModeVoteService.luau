@@ -9,7 +9,7 @@ local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("GameModes"))
 local Loading = require(Config:WaitForChild("Loading"))
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
-local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
+local ModeOptions = require(Game:WaitForChild("Modes"):WaitForChild("ModeOptions"))
 local ModeVote = require(Game:WaitForChild("Modes"):WaitForChild("ModeVote"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
@@ -76,15 +76,7 @@ local function ensureSnapshotValue(): StringValue
 end
 
 local function configuredOptions(): { string }?
-	local available = {}
-	for _, modeId in ArenaSessionService.modeOptions() do
-		local definition = GameModes.Modes[modeId]
-		if definition == nil or not definition.Enabled or ModeRegistry.get(modeId) == nil then
-			warn(`[ModeVoteService] Ignored unavailable matchmaking mode "{modeId}"`)
-		else
-			table.insert(available, modeId)
-		end
-	end
+	local available = ModeOptions.resolve(ArenaSessionService.modeOptions())
 	return if #available > 0 then available else nil
 end
 

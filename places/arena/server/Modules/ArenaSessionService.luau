@@ -12,11 +12,13 @@ local Loading = require(Config:WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Matchmaking = Shared:WaitForChild("Game"):WaitForChild("Matchmaking")
 local ArenaReadinessGate = require(Matchmaking:WaitForChild("ArenaReadinessGate"))
+local ModeOptions = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeOptions"))
 local Network = require(Shared:WaitForChild("Network"))
 local TeleportPayload = require(Matchmaking:WaitForChild("TeleportPayload"))
 
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local PlayerData = require(script.Parent.PlayerData)
+local Env = require(script.Parent.Parent.Env)
 
 local ArenaSessionService = {}
 
@@ -55,18 +57,6 @@ local loadSnapshotValue: StringValue? = nil
 local loadRevision = 0
 local gateGeneration = 0
 local started = false
-
-local function sameOptions(first: { string }, second: { string }): boolean
-	if #first ~= #second then
-		return false
-	end
-	for index, option in first do
-		if second[index] ~= option then
-			return false
-		end
-	end
-	return true
-end
 
 local function ensureLoadState(): StringValue
 	if loadSnapshotValue then
@@ -269,6 +259,10 @@ local function receive(player: Player)
 		addArrival(player, "Direct")
 		return
 	end
+	if joinData.SourcePlaceId ~= Env.LobbyPlaceId or joinData.SourceGameId ~= game.GameId then
+		reject(player, `[ArenaSessionService] Rejected untrusted teleport origin for {player.Name}`)
+		return
+	end
 
 	local payload, payloadError = TeleportPayload.parse(rawPayload)
 	if not payload then
@@ -276,6 +270,12 @@ local function receive(player: Player)
 			player,
 			`[ArenaSessionService] Rejected teleport data for {player.Name}: {payloadError or "invalid_payload"}`
 		)
+		return
+	end
+
+	local modeOptions = ModeOptions.resolve(payload.modeSelection.options)
+	if #modeOptions == 0 then
+		reject(player, `[ArenaSessionService] Rejected session without an available mode for {player.Name}`)
 		return
 	end
 
@@ -287,13 +287,13 @@ local function receive(player: Player)
 		session = {
 			matchId = payload.matchId,
 			expectedPlayerCount = payload.expectedPlayerCount,
-			modeOptions = table.clone(payload.modeSelection.options),
+			modeOptions = modeOptions,
 		}
 		createGate("Matched", payload.expectedPlayerCount)
 	elseif
 		session.matchId ~= payload.matchId
 		or session.expectedPlayerCount ~= payload.expectedPlayerCount
-		or not sameOptions(session.modeOptions, payload.modeSelection.options)
+		or not ModeOptions.equals(session.modeOptions, modeOptions)
 	then
 		reject(player, `[ArenaSessionService] Rejected mismatched matchmaking session for {player.Name}`)
 		return
