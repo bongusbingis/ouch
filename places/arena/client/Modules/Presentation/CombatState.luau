@@ -57,6 +57,8 @@ export type Snapshot = {
 local started = false
 local ballsFolder: Folder? = nil
 local listeners: { (Snapshot) -> () } = {}
+local characterRemovingConnection: RBXScriptConnection? = nil
+local heartbeat: RBXScriptConnection? = nil
 
 local snapshot: Snapshot = {
 	weapon = "Hammer",
@@ -101,7 +103,7 @@ end
 
 local function matchIsActive(): boolean
 	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
-	return matchState == nil or matchState:GetAttribute("phase") == "Active"
+	return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
 end
 
 local function enter(state: State, duration: number?)
@@ -299,7 +301,7 @@ function CombatState.start()
 	ballsFolder = resolved
 
 	-- Losing the character mid-charge must not leave the pose wound up.
-	Players.LocalPlayer.CharacterRemoving:Connect(function()
+	characterRemovingConnection = Players.LocalPlayer.CharacterRemoving:Connect(function()
 		pressedAt = nil
 		stateExpiresAt = nil
 		snapshot.state = "Idle"
@@ -307,7 +309,23 @@ function CombatState.start()
 		publish()
 	end)
 
-	RunService.Heartbeat:Connect(evaluate)
+	heartbeat = RunService.Heartbeat:Connect(evaluate)
+end
+
+function CombatState.destroy()
+	if characterRemovingConnection then
+		characterRemovingConnection:Disconnect()
+		characterRemovingConnection = nil
+	end
+	if heartbeat then
+		heartbeat:Disconnect()
+		heartbeat = nil
+	end
+	ballsFolder = nil
+	pressedAt = nil
+	stateExpiresAt = nil
+	table.clear(listeners)
+	started = false
 end
 
 return CombatState

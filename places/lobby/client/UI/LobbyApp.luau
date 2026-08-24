@@ -20,6 +20,7 @@ local CrateOdds = require(Economy:WaitForChild("CrateOdds"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local ShopViewModel = require(Economy:WaitForChild("ShopViewModel"))
 local Config = ReplicatedStorage:WaitForChild("Config")
+local Loading = require(Config:WaitForChild("Loading"))
 local Bundles = require(Config:WaitForChild("Bundles"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"))
 local Crates = require(Config:WaitForChild("Crates"))
@@ -33,6 +34,7 @@ local useReducedMotion = require(UI:WaitForChild("Hooks"):WaitForChild("useReduc
 local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("NotificationContext"))
 local InventoryPage = require(Components:WaitForChild("InventoryPage"))
 local JoinCodeModal = require(Components:WaitForChild("JoinCodeModal"))
+local LoadingScreen = require(Components:WaitForChild("LoadingScreen"))
 local NotificationModal = require(Components:WaitForChild("NotificationModal"))
 local ShopDetailsModal = require(Components:WaitForChild("ShopDetailsModal"))
 local CrateRevealModal = require(Components:WaitForChild("CrateRevealModal"))
@@ -113,6 +115,29 @@ local function useParty(client, notifications)
 		end)
 	end, { client, notifications.notify })
 	return client:getSnapshot(), client:isBusy()
+end
+
+local function useLoadingTip(visible: boolean): string?
+	local tip, setTip = React.useState(nil)
+	React.useEffect(function()
+		if not visible then
+			setTip(nil)
+			return
+		end
+		local thread = task.spawn(function()
+			task.wait(Loading.TipDelaySeconds)
+			local index = 1
+			while true do
+				setTip(Loading.Tips[index])
+				index = index % #Loading.Tips + 1
+				task.wait(Loading.TipIntervalSeconds)
+			end
+		end)
+		return function()
+			task.cancel(thread)
+		end
+	end, { visible })
+	return tip
 end
 
 local function useWorldTransition(currentPage: string, enabled: boolean)
@@ -201,8 +226,16 @@ end
 
 local function LobbyContent(props)
 	local partyClient = props.PartyClient
+	local rootRef = React.useRef(nil)
+	local presented = React.useRef(false)
 	local notifications = NotificationContext.useNotification()
 	local currentPage, setCurrentPage = React.useState("SplashScreen")
+	React.useEffect(function()
+		if not presented.current and rootRef.current ~= nil and props.OnPresented then
+			presented.current = true
+			props.OnPresented()
+		end
+	end, { props.OnPresented })
 
 	-- One report per page the player actually lands on. The server maps a Shop
 	-- open onto the purchase funnel's first step and everything else onto a
@@ -248,7 +281,20 @@ local function LobbyContent(props)
 		return ShopViewModel.reveal(shopSnapshot.reveal, Cosmetics)
 	end, { shopSnapshot.reveal })
 	local snapshot, requestBusy = useParty(partyClient, notifications)
+	local teleportStatus = partyClient:getTeleportStatus()
 	local presentation = LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy)
+	local teleportPhase = if snapshot then snapshot.phase else nil
+	local loadingVisible = (teleportPhase == "Assigned" or teleportPhase == "Teleporting")
+		and not (teleportStatus and teleportStatus.state == "Failed")
+	local loadingTitle = if teleportPhase == "Assigned" then "MATCH FOUND" else "TRAVELING TO ARENA"
+	local loadingDetail = if teleportPhase == "Assigned" then "PREPARING YOUR SERVER" else nil
+	if teleportStatus and teleportStatus.state == "Retrying" then
+		loadingTitle = "RECONNECTING"
+		loadingDetail = `ATTEMPT {teleportStatus.attempt} OF {teleportStatus.maxAttempts}`
+	elseif teleportPhase == "Teleporting" then
+		loadingDetail = "THE MATCH IS READY"
+	end
+	local loadingTip = useLoadingTip(loadingVisible)
 	local equipped = if economyData then economyData.Cosmetics.Equipped else {}
 	local skinPreviewState = React.useRef({})
 	skinPreviewState.current = {
@@ -286,13 +332,26 @@ local function LobbyContent(props)
 			return
 		end
 		return partyClient:subscribeErrors(function(errorCode)
+			if errorCode == "party_initialization_failed" then
+				notifications.confirm({
+					title = "PARTY COULD NOT LOAD",
+					description = "CHECK YOUR CONNECTION AND TRY AGAIN.",
+					confirmText = "RETRY",
+					cancelText = "CANCEL",
+				}, function(retry)
+					if retry then
+						partyClient:retryInitialization()
+					end
+				end)
+				return
+			end
 			notifications.notify({
 				title = "PARTY NOTICE",
 				description = partyClient.ErrorMessages[errorCode] or "PARTY REQUEST FAILED",
 				buttonText = "CONFIRM",
 			})
 		end)
-	end, { partyClient, notifications.notify })
+	end, { partyClient, notifications.notify, notifications.confirm })
 
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false then
@@ -513,6 +572,7 @@ local function LobbyContent(props)
 	end
 
 	return c("Frame", {
+		[React.Ref] = rootRef,
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 	}, {
@@ -626,6 +686,12 @@ local function LobbyContent(props)
 				}),
 			}),
 			GameVersion = c(GameVersion),
+		}),
+		Loading = c(LoadingScreen, {
+			Visible = loadingVisible,
+			Title = loadingTitle,
+			Detail = loadingDetail,
+			Tip = loadingTip,
 		}),
 	})
 end

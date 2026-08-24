@@ -37,9 +37,6 @@ local Config = {
 	BanDataStoreName = "OuchMatchmakingBans_v1",
 	BanDataStoreScope = "global",
 
-	TeleportRetryAttempts = 5,
-	TeleportRetryDelay = 1,
-	TeleportFloodedDelay = 15,
 	MatchRecordLifetime = 900,
 
 	PartyTopicPrefix = "ouch:party:v2:",

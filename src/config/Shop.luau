@@ -1,20 +1,6 @@
 --!strict
 
--- Storefront tunables.
---
--- Two rotations live here and they are deliberately different in kind:
---
---   Featured -- one crate, discounted, on a fixed global schedule. Every player
---     on every server sees the same drop at the same time; a per-player version
---     would make the countdown a lie and break word of mouth.
---   Bundle   -- the featured bundle, also global, on its own clock so the two
---     can be scheduled independently.
---   Rotation -- the per-player rotating shop. This one IS tailored: the offers
---     are drawn from the player's own unowned pool so nobody is shown something
---     they already have.
---
--- The discount is real: the server charges the reduced price through the same
--- shared function the storefront displays.
+-- Storefront rotation and pricing tunables.
 
 export type FeaturedEntry = {
 	kind: string,

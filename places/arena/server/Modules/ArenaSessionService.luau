@@ -1,17 +1,22 @@
 --!strict
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local Config = ReplicatedStorage:WaitForChild("Config")
+local AnalyticsConfig = require(Config:WaitForChild("Analytics"))
+local GameModes = require(Config:WaitForChild("GameModes"))
+local Loading = require(Config:WaitForChild("Loading"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Matchmaking = Shared:WaitForChild("Game"):WaitForChild("Matchmaking")
+local ArenaReadinessGate = require(Matchmaking:WaitForChild("ArenaReadinessGate"))
+local Network = require(Shared:WaitForChild("Network"))
+local TeleportPayload = require(Matchmaking:WaitForChild("TeleportPayload"))
+
 local AnalyticsService = require(script.Parent.AnalyticsService)
-local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-local TeleportPayload = require(
-	ReplicatedStorage:WaitForChild("Shared")
-		:WaitForChild("Game")
-		:WaitForChild("Matchmaking")
-		:WaitForChild("TeleportPayload")
-)
+local PlayerData = require(script.Parent.PlayerData)
 
 local ArenaSessionService = {}
 
@@ -20,6 +25,9 @@ export type Snapshot = {
 	expectedPlayerCount: number,
 	modeOptions: { string },
 	arrivedPlayerCount: number,
+	readyPlayerCount: number,
+	deadlineAt: number,
+	gateReleased: boolean,
 }
 
 export type Admission = "Direct" | "Matched" | "Rejected"
@@ -30,14 +38,23 @@ type Session = {
 	modeOptions: { string },
 }
 
+local LOAD_STATE_FOLDER_NAME = "ArenaLoadState"
+local LOAD_SNAPSHOT_NAME = "Snapshot"
+local LOAD_SCHEMA_VERSION = 1
+local READY_ATTRIBUTE = "ArenaReady"
+local READINESS_DEADLINE_SECONDS = Loading.ArenaWaitSeconds
+
 local session: Session? = nil
+local gate: ArenaReadinessGate.State? = nil
 local partyByUserId: { [number]: string } = {}
 local admissionByUserId: { [number]: Admission } = {}
-local readyByUserId: { [number]: boolean } = {}
+local clientReadyByUserId: { [number]: boolean } = {}
 local readyListeners: { (Player) -> () } = {}
+local gateReleasedListeners: { (string) -> () } = {}
+local loadSnapshotValue: StringValue? = nil
+local loadRevision = 0
+local gateGeneration = 0
 local started = false
-
-local READY_ATTRIBUTE = "ArenaReady"
 
 local function sameOptions(first: { string }, second: { string }): boolean
 	if #first ~= #second then
@@ -51,27 +68,57 @@ local function sameOptions(first: { string }, second: { string }): boolean
 	return true
 end
 
-local function arrivedPlayerCount(): number
-	local count = 0
-	for _, player in Players:GetPlayers() do
-		if admissionByUserId[player.UserId] == "Matched" and partyByUserId[player.UserId] ~= nil then
-			count += 1
-		end
+local function ensureLoadState(): StringValue
+	if loadSnapshotValue then
+		return loadSnapshotValue
 	end
-	return count
+
+	local folder = Instance.new("Folder")
+	folder.Name = LOAD_STATE_FOLDER_NAME
+	local snapshot = Instance.new("StringValue")
+	snapshot.Name = LOAD_SNAPSHOT_NAME
+	snapshot.Parent = folder
+	folder.Parent = ReplicatedStorage
+	loadSnapshotValue = snapshot
+	return snapshot
 end
 
--- A client reports ready once its UI exists, so the mode vote is not spent
--- before arriving players can see it. Readiness lives here beside admission
--- because both are per-player arrival facts, and it is projected as an attribute
--- so any client can read it the same way it reads ArenaAdmission.
-local function setReady(player: Player)
-	if readyByUserId[player.UserId] then
-		return
-	end
-	readyByUserId[player.UserId] = true
-	player:SetAttribute(READY_ATTRIBUTE, true)
-	for _, listener in readyListeners do
+local function currentModeOptions(): { string }
+	return if session then table.clone(session.modeOptions) else table.clone(GameModes.VoteOptions)
+end
+
+local function loadSnapshot(): { [string]: any }
+	local activeGate = gate
+	local gateSnapshot = if activeGate
+		then ArenaReadinessGate.snapshot(activeGate)
+		else {
+			expectedPlayerCount = 0,
+			arrivedPlayerCount = 0,
+			readyPlayerCount = 0,
+			deadlineAt = 0,
+			gateReleased = false,
+		}
+	return {
+		schemaVersion = LOAD_SCHEMA_VERSION,
+		expectedPlayerCount = gateSnapshot.expectedPlayerCount,
+		arrivedPlayerCount = gateSnapshot.arrivedPlayerCount,
+		readyPlayerCount = gateSnapshot.readyPlayerCount,
+		deadlineAt = gateSnapshot.deadlineAt,
+		gateReleased = gateSnapshot.gateReleased,
+		modeOptions = currentModeOptions(),
+		revision = loadRevision,
+	}
+end
+
+local function publishLoadState()
+	loadRevision += 1
+	local snapshot = loadSnapshot()
+	snapshot.revision = loadRevision
+	ensureLoadState().Value = HttpService:JSONEncode(snapshot)
+end
+
+local function dispatchReady(player: Player)
+	for _, listener in table.clone(readyListeners) do
 		local ok, err = pcall(listener, player)
 		if not ok then
 			warn(`[ArenaSessionService] ready listener error: {err}`)
@@ -79,16 +126,69 @@ local function setReady(player: Player)
 	end
 end
 
-function ArenaSessionService.isReady(player: Player): boolean
-	return readyByUserId[player.UserId] == true
+local function dispatchGateReleased(reason: string)
+	local snapshot = loadSnapshot()
+	local durationSeconds = if snapshot.deadlineAt > 0
+		then math.clamp(
+			Workspace:GetServerTimeNow() - (snapshot.deadlineAt - READINESS_DEADLINE_SECONDS),
+			0,
+			READINESS_DEADLINE_SECONDS
+		)
+		else 0
+	for _, player in Players:GetPlayers() do
+		if ArenaSessionService.isAdmitted(player) then
+			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaGateReleased, durationSeconds, {
+				reason = reason,
+				timedOut = reason == "deadline",
+				expectedPlayerCount = snapshot.expectedPlayerCount,
+				arrivedPlayerCount = snapshot.arrivedPlayerCount,
+				readyPlayerCount = snapshot.readyPlayerCount,
+			})
+		end
+	end
+	for _, listener in table.clone(gateReleasedListeners) do
+		local ok, err = pcall(listener, reason)
+		if not ok then
+			warn(`[ArenaSessionService] gate listener error: {err}`)
+		end
+	end
 end
 
-function ArenaSessionService.onReady(listener: (Player) -> ())
-	table.insert(readyListeners, listener)
+local function evaluateGate(): (boolean, string?)
+	local activeGate = gate
+	if activeGate == nil then
+		return false, nil
+	end
+	return ArenaReadinessGate.evaluate(activeGate, Workspace:GetServerTimeNow())
 end
 
--- How players actually reach the arena. This is the measurement behind whether
--- the lobby is still earning its place.
+local function scheduleDeadline()
+	local activeGate = gate
+	if activeGate == nil or activeGate.kind ~= "Matched" then
+		return
+	end
+	gateGeneration += 1
+	local generation = gateGeneration
+	local delaySeconds = math.max(activeGate.deadlineAt - Workspace:GetServerTimeNow(), 0)
+	task.delay(delaySeconds, function()
+		if generation ~= gateGeneration or gate ~= activeGate then
+			return
+		end
+		local released, reason = evaluateGate()
+		publishLoadState()
+		if released then
+			dispatchGateReleased(reason or "deadline")
+		end
+	end)
+end
+
+local function createGate(kind: ArenaReadinessGate.Kind, expectedPlayerCount: number)
+	gateGeneration += 1
+	local deadlineAt = if kind == "Matched" then Workspace:GetServerTimeNow() + READINESS_DEADLINE_SECONDS else 0
+	gate = ArenaReadinessGate.new(kind, expectedPlayerCount, deadlineAt)
+	scheduleDeadline()
+end
+
 local function setAdmission(player: Player, admission: Admission)
 	local previous = admissionByUserId[player.UserId]
 	admissionByUserId[player.UserId] = admission
@@ -100,50 +200,165 @@ local function setAdmission(player: Player, admission: Admission)
 	end
 end
 
+local function markReady(player: Player)
+	local activeGate = gate
+	local lateReady = activeGate ~= nil and activeGate.gateReleased
+	if
+		activeGate == nil
+		or not ArenaSessionService.isAdmitted(player)
+		or not clientReadyByUserId[player.UserId]
+		or not PlayerData.isLoaded(player)
+		or not ArenaReadinessGate.markReady(activeGate, player.UserId)
+	then
+		return
+	end
+
+	player:SetAttribute(READY_ATTRIBUTE, true)
+	if lateReady then
+		local snapshot = ArenaReadinessGate.snapshot(activeGate :: ArenaReadinessGate.State)
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaLateReady, 1, {
+			expectedPlayerCount = snapshot.expectedPlayerCount,
+			readyPlayerCount = snapshot.readyPlayerCount,
+		})
+	end
+	local released, reason = evaluateGate()
+	publishLoadState()
+	dispatchReady(player)
+	if released then
+		dispatchGateReleased(reason or "ready")
+	end
+end
+
+local function addArrival(player: Player, admission: Admission)
+	local activeGate = assert(gate, "[ArenaSessionService] admission requires a readiness gate")
+	ArenaReadinessGate.arrive(activeGate, player.UserId)
+	setAdmission(player, admission)
+	publishLoadState()
+	markReady(player)
+end
+
+local function reject(player: Player, warning: string)
+	setAdmission(player, "Rejected")
+	publishLoadState()
+	warn(warning)
+end
+
 local function receive(player: Player)
 	local success, joinData = pcall(player.GetJoinData, player)
 	if not success then
-		setAdmission(player, "Rejected")
-		warn(`[ArenaSessionService] Could not read join data for {player.Name}`)
+		reject(player, `[ArenaSessionService] Could not read join data for {player.Name}`)
 		return
 	end
 
 	local rawPayload = joinData.TeleportData
 	if rawPayload == nil then
-		if partyByUserId[player.UserId] ~= nil then
-			setAdmission(player, "Matched")
-		elseif admissionByUserId[player.UserId] == "Rejected" then
-			setAdmission(player, "Rejected")
-		else
-			setAdmission(player, "Direct")
+		if partyByUserId[player.UserId] ~= nil and session ~= nil then
+			addArrival(player, "Matched")
+			return
 		end
+		if session ~= nil then
+			reject(player, `[ArenaSessionService] Rejected unknown direct arrival in matched session for {player.Name}`)
+			return
+		end
+		if gate == nil then
+			createGate("Direct", 1)
+		elseif gate.kind ~= "Direct" then
+			reject(player, `[ArenaSessionService] Rejected mixed direct arrival for {player.Name}`)
+			return
+		end
+		addArrival(player, "Direct")
 		return
 	end
+
 	local payload, payloadError = TeleportPayload.parse(rawPayload)
 	if not payload then
-		setAdmission(player, "Rejected")
-		warn(`[ArenaSessionService] Rejected teleport data for {player.Name}: {payloadError or "invalid_payload"}`)
+		reject(
+			player,
+			`[ArenaSessionService] Rejected teleport data for {player.Name}: {payloadError or "invalid_payload"}`
+		)
 		return
 	end
 
 	if session == nil then
+		if gate ~= nil then
+			reject(player, `[ArenaSessionService] Rejected matched arrival in direct session for {player.Name}`)
+			return
+		end
 		session = {
 			matchId = payload.matchId,
 			expectedPlayerCount = payload.expectedPlayerCount,
 			modeOptions = table.clone(payload.modeSelection.options),
 		}
+		createGate("Matched", payload.expectedPlayerCount)
 	elseif
 		session.matchId ~= payload.matchId
 		or session.expectedPlayerCount ~= payload.expectedPlayerCount
 		or not sameOptions(session.modeOptions, payload.modeSelection.options)
 	then
-		setAdmission(player, "Rejected")
-		warn(`[ArenaSessionService] Rejected mismatched matchmaking session for {player.Name}`)
+		reject(player, `[ArenaSessionService] Rejected mismatched matchmaking session for {player.Name}`)
 		return
 	end
 
 	partyByUserId[player.UserId] = payload.partyId
-	setAdmission(player, "Matched")
+	addArrival(player, "Matched")
+end
+
+local function clientReady(player: Player)
+	if not ArenaSessionService.isAdmitted(player) then
+		return
+	end
+	clientReadyByUserId[player.UserId] = true
+	markReady(player)
+end
+
+local LOADING_STAGES = {
+	GameLoaded = true,
+	ClientReady = true,
+}
+local PRELOAD_OUTCOMES = {
+	Completed = true,
+	Failed = true,
+	Timeout = true,
+	CompletedAfterTimeout = true,
+}
+
+local function loadingTelemetry(player: Player, payload)
+	if payload.kind == "Stage" and LOADING_STAGES[payload.stage] then
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaLoadingStage, payload.durationMs, {
+			stage = payload.stage,
+		})
+	elseif payload.kind == "Preload" and PRELOAD_OUTCOMES[payload.outcome] then
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaPreload, payload.durationMs, {
+			outcome = payload.outcome,
+		})
+	elseif payload.kind == "BallotImpression" then
+		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ModeVoteImpression, 1, {
+			startsAt = payload.startsAt,
+		})
+	end
+end
+
+local function validLoadingTelemetry(_player: Player, payload)
+	if typeof(payload) ~= "table" or typeof(payload.kind) ~= "string" then
+		return false, "invalid_payload"
+	end
+	if payload.kind == "Stage" then
+		return LOADING_STAGES[payload.stage] == true
+			and typeof(payload.durationMs) == "number"
+			and payload.durationMs >= 0
+			and payload.durationMs <= 120000,
+			"invalid_stage"
+	elseif payload.kind == "Preload" then
+		return PRELOAD_OUTCOMES[payload.outcome] == true
+			and typeof(payload.durationMs) == "number"
+			and payload.durationMs >= 0
+			and payload.durationMs <= 120000,
+			"invalid_preload"
+	elseif payload.kind == "BallotImpression" then
+		return typeof(payload.startsAt) == "number" and payload.startsAt > 0 and payload.startsAt < math.huge,
+			"invalid_ballot"
+	end
+	return false, "invalid_kind"
 end
 
 function ArenaSessionService.start()
@@ -151,12 +366,23 @@ function ArenaSessionService.start()
 		return
 	end
 	started = true
+	ensureLoadState()
+	publishLoadState()
 
-	Network.handleProtected("ArenaClientReady", { rateLimit = 4 }, setReady)
+	Network.handleProtected("ArenaClientReady", { rateLimit = 4 }, clientReady)
+	Network.handleProtected("ReportArenaLoadingEvent", {
+		rateLimit = 12,
+		validate = validLoadingTelemetry,
+	}, loadingTelemetry)
+	PlayerData.onLoaded(markReady)
 
 	Players.PlayerAdded:Connect(receive)
 	Players.PlayerRemoving:Connect(function(player)
-		readyByUserId[player.UserId] = nil
+		clientReadyByUserId[player.UserId] = nil
+		local activeGate = gate
+		if activeGate and ArenaReadinessGate.leave(activeGate, player.UserId) then
+			publishLoadState()
+		end
 	end)
 	for _, player in Players:GetPlayers() do
 		receive(player)
@@ -167,12 +393,20 @@ function ArenaSessionService.getSnapshot(): Snapshot?
 	if session == nil then
 		return nil
 	end
+	local gateSnapshot = ArenaReadinessGate.snapshot(assert(gate, "matched session requires a readiness gate"))
 	return {
 		matchId = session.matchId,
 		expectedPlayerCount = session.expectedPlayerCount,
 		modeOptions = table.clone(session.modeOptions),
-		arrivedPlayerCount = arrivedPlayerCount(),
+		arrivedPlayerCount = gateSnapshot.arrivedPlayerCount,
+		readyPlayerCount = gateSnapshot.readyPlayerCount,
+		deadlineAt = gateSnapshot.deadlineAt,
+		gateReleased = gateSnapshot.gateReleased,
 	}
+end
+
+function ArenaSessionService.modeOptions(): { string }
+	return currentModeOptions()
 end
 
 function ArenaSessionService.partyIdFor(player: Player): string?
@@ -182,6 +416,48 @@ end
 function ArenaSessionService.isAdmitted(player: Player): boolean
 	local admission = admissionByUserId[player.UserId]
 	return admission == "Direct" or admission == "Matched"
+end
+
+function ArenaSessionService.isReady(player: Player): boolean
+	return gate ~= nil and ArenaReadinessGate.isReady(gate, player.UserId)
+end
+
+function ArenaSessionService.isPlayable(player: Player): boolean
+	return ArenaSessionService.isAdmitted(player) and ArenaSessionService.isReady(player)
+end
+
+function ArenaSessionService.canOpenVote(): boolean
+	return gate ~= nil and gate.gateReleased
+end
+
+function ArenaSessionService.onReady(listener: (Player) -> ()): () -> ()
+	table.insert(readyListeners, listener)
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(readyListeners, listener)
+		if index then
+			table.remove(readyListeners, index)
+		end
+	end
+end
+
+function ArenaSessionService.onGateReleased(listener: (string) -> ()): () -> ()
+	table.insert(gateReleasedListeners, listener)
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(gateReleasedListeners, listener)
+		if index then
+			table.remove(gateReleasedListeners, index)
+		end
+	end
 end
 
 return ArenaSessionService

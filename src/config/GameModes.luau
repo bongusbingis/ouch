@@ -15,13 +15,13 @@ local modes = {
 		ThumbnailId = "",
 		SortOrder = 2,
 	},
-	-- Infection = {
-	-- 	Enabled = true,
-	-- 	Title = "INFECTION",
-	-- 	Description = "One player starts infected. Survive to the clock, or join them.",
-	-- 	ThumbnailId = "",
-	-- 	SortOrder = 3,
-	-- },
+	Infection = {
+		Enabled = false,
+		Title = "INFECTION",
+		Description = "One player starts infected. Survive to the clock, or join them.",
+		ThumbnailId = "",
+		SortOrder = 3,
+	},
 }
 
 local voteOptions = {}
@@ -41,9 +41,6 @@ end)
 -- neither can be changed live without the two drifting apart.
 return {
 	VoteDurationSeconds = 10,
-	-- Longest the ballot is held back waiting for arriving clients to report their
-	-- UI ready. A client that never reports never blocks a match past this.
-	ClientReadyWaitSeconds = 10,
 	Modes = table.freeze(modes),
 	VoteOptions = table.freeze(voteOptions),
 }

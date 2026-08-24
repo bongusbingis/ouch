@@ -388,10 +388,7 @@ function AnalyticsService.registerGauge(name: string, read: () -> number)
 	gauges[name] = read
 end
 
--- Round-trip time is the input to the largest known fairness gap (see
--- docs/hitreg-audit.md F1), and it cannot be inferred from anything else we log,
--- so it is sampled directly. Per player, because the whole point is comparing
--- one connection against another.
+-- Sample round-trip time per player for hit registration analysis.
 local function sampleLatency()
 	for _, player in Players:GetPlayers() do
 		local ok, ping = pcall(function()

@@ -69,7 +69,7 @@ This triangle is the entire balance foundation and should not be diluted with ad
 ### 4.3 Match Arrival and Mode Selection
 
 - Lobby matchmaking teleports the completed group into a reserved arena server with a versioned payload containing the match identity, party identity, expected player count, and allowed mode-vote options.
-- The first admitted player opens a 10-second server-authoritative game-mode vote. Delayed teleport arrivals join the vote at its authoritative remaining time rather than restarting it.
+- A 20-second arrival/readiness gate opens the 10-second server-authoritative game-mode vote once every expected player is ready, or with the ready roster when the deadline passes. The gate never opens with zero ready clients. Late-ready players receive at least five visible voting seconds, within a ten-second aggregate extension cap, then join the active match idempotently if necessary.
 - Each player has one changeable ballot. If nobody votes, the server chooses randomly from all offered modes; a tie is resolved randomly among only the tied leaders.
 - FFA and TDM are the enabled launch options. Infection has a disabled configuration stub for a later rules pass; Battle Royale is not offered.
 - After voting selects a registered mode, a 3-second `Starting` phase begins. Combat inputs are suppressed until it reaches `Active`.

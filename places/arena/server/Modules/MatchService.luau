@@ -48,6 +48,7 @@ local waveTimer = 0
 local externalEventSequence = 0
 local started = false
 local startingMatch = false
+local watchedPlayers: { [number]: RBXScriptConnection } = {}
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
 	table.insert(listeners, listener)
@@ -119,7 +120,7 @@ end
 local function matchPlayers(): { Player }
 	local result = {}
 	for _, player in Players:GetPlayers() do
-		if ArenaSessionService.isAdmitted(player) then
+		if ArenaSessionService.isPlayable(player) then
 			table.insert(result, player)
 		end
 	end
@@ -393,6 +394,9 @@ local function syncCharacterTeam(player: Player, character: Model)
 end
 
 local function onCharacterAdded(player: Player, character: Model)
+	if not ArenaSessionService.isPlayable(player) then
+		return
+	end
 	syncCharacterTeam(player, character)
 	EliminationService.up(player)
 	local key = PlayerIds.toId(player)
@@ -409,7 +413,7 @@ local function onCharacterAdded(player: Player, character: Model)
 end
 
 local function watchPlayer(player: Player)
-	if not ArenaSessionService.isAdmitted(player) then
+	if not ArenaSessionService.isPlayable(player) or watchedPlayers[player.UserId] ~= nil then
 		return
 	end
 	if scoreScope() == "Team" and playerTeam(player) == nil then
@@ -417,7 +421,7 @@ local function watchPlayer(player: Player)
 	end
 	setScore(player, 0)
 	syncPlayers()
-	player.CharacterAdded:Connect(function(character)
+	watchedPlayers[player.UserId] = player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
 	end)
 	local character = player.Character
@@ -550,6 +554,10 @@ end
 -- Called with authoritative (server-side) sim events from the adapter.
 function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.kind == "BallCaught" then
+		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
+		if catcher == nil or not ArenaSessionService.isPlayable(catcher) then
+			return false
+		end
 		dispatch(table.clone(event))
 		Network.fire("CombatFeed", nil, {
 			kind = "BallCaught",
@@ -565,6 +573,14 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 		return false
 	end
 	if state.phase ~= "Active" then
+		return false
+	end
+	local target = PlayerIds.fromId(event.targetId)
+	if target == nil or not ArenaSessionService.isPlayable(target) then
+		return false
+	end
+	local source = PlayerIds.fromId(event.sourceId)
+	if event.sourceId ~= nil and (source == nil or not ArenaSessionService.isPlayable(source)) then
 		return false
 	end
 	local activeMode = assert(mode, "[MatchService] active phase without a selected mode")
@@ -747,7 +763,15 @@ function MatchService.start()
 	Players.PlayerAdded:Connect(function(player)
 		task.defer(watchPlayer, player)
 	end)
+	ArenaSessionService.onReady(function(player)
+		watchPlayer(player)
+	end)
 	Players.PlayerRemoving:Connect(function(player)
+		local watchedConnection = watchedPlayers[player.UserId]
+		if watchedConnection then
+			watchedConnection:Disconnect()
+			watchedPlayers[player.UserId] = nil
+		end
 		local key = PlayerIds.toId(player)
 		respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 		pendingWaveRespawns[key] = nil

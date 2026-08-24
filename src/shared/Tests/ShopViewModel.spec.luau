@@ -102,11 +102,11 @@ T.describe("ShopViewModel", function()
 		T.expect(card.bonksPrice):toEqual(425)
 	end)
 
-	T.it("keeps preview catalog entries visible but disabled", function()
+	T.it("keeps previews disabled and active products pending metadata", function()
 		local model = build(nil)
 		T.expect(model.byId["Bundle:StarterOutfitBundle"].status):toEqual("Preview")
 		T.expect(model.byId["Crate:HammerCrate"].status):toEqual("Preview")
-		T.expect(model.byId["Product:Bonks500"].status):toEqual("Preview")
+		T.expect(model.byId["Product:Bonks500"].status):toEqual("Loading")
 	end)
 end)
 

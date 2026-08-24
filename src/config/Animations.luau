@@ -1,25 +1,7 @@
 --!strict
 
--- The single registry of combat animations. Every clip the game plays is named
--- here once; nothing else in the codebase names an animation.
---
--- A clip's Name is the child of ReplicatedStorage.Assets.Animations that holds
--- it, following the project rule that assets are authored in Studio and
--- referenced by name. Replacing a rough prototype with a proper animation is
--- therefore a Studio operation -- point the existing Animation instance at a new
--- AnimationId -- and needs no code change at all.
---
--- Required clips must exist or the game is broken, and are fetched with
--- WaitForChild so a missing one surfaces loudly. Optional clips are the polish
--- passes that may not be authored yet: they are looked up leniently, and the
--- system simply does without them. That is what lets this ship today with two
--- prototype animations and improve as more are made, with no code edits.
---
--- Markers are the contract between an animation and gameplay. A clip that
--- declares one is expected to carry a KeyframeMarker of that name, and the
--- combat code listens for it rather than guessing at timings with a wait.
--- A missing marker is survivable: the state machine falls back to the durations
--- in Config.ThrowPose.Timing.
+-- Combat animation registry. Required clips use WaitForChild; optional clips
+-- may be absent. Markers use Config.ThrowPose.Timing as a fallback.
 
 export type Clip = {
 	-- Child name under ReplicatedStorage.Assets.Animations.

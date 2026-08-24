@@ -8,42 +8,18 @@ return {
 		ThrowSpeed = 140,
 		Gravity = 70,
 
-		-- Held throw. A charged ball is simply faster, which is what makes it
-		-- flatter, longer and harder to dodge -- the arc is not special-cased.
-		-- It cannot hit harder than a normal throw, because a dodgeball hit
-		-- already eliminates outright.
 		Charge = {
-			-- Speed multiplier at full charge; the uncharged throw is 1.
-			-- Sane: 1.15-1.6. The catch test samples closest approach over a
-			-- tick, so speed does not break it geometrically -- what shrinks is
-			-- the defender's reaction time, and past 1.6 that is short enough
-			-- that a full charge is effectively uncatchable.
+			-- Speed multiplier at full charge.
 			MaxSpeedScale = 1.3,
 		},
 
-		-- The arc drawn while a throw is charging. Presentation only: it predicts
-		-- the same parabola the sim will fly, but nothing reads it back.
+		-- Presentation-only throw preview.
 		Preview = {
-			-- How quickly the drawn arc follows the camera, in spring Hz. The arc
-			-- is smoothed rather than tracking raw aim, because a beam redrawn
-			-- from an unfiltered look vector shimmers with every frame of input
-			-- noise. Lower is calmer but lags the camera; higher is tighter and
-			-- shows more jitter. Sane: 12-30.
 			FollowFrequency = 20,
-			-- Damping for that follow. At or just above 1 it settles without
-			-- overshoot, which is what an aiming aid wants -- a bouncy arc reads
-			-- as inaccurate.
 			FollowDamping = 1,
-			-- How many straight pieces the flight path is sampled into when
-			-- looking for the impact point. Higher is a more exact landing spot
-			-- at the cost of that many short raycasts per frame. Sane: 8-16.
 			ImpactSamples = 12,
-			-- Beam subdivisions. Purely visual smoothness of the curve itself.
 			Segments = 32,
-			-- Field-of-view pulled in at full charge, in degrees. Negative zooms
-			-- in. Scales with charge rather than snapping on press.
 			FovAtFullCharge = -12,
-			-- How fast the field of view follows, in spring Hz. Sane: 6-14.
 			FovFrequency = 9,
 		},
 
@@ -86,16 +62,8 @@ return {
 		RollSettleSpeed = 1.5,
 		RollGroundSnap = 3,
 		RemoteSmoothing = 18,
-		-- Client-side predicted release. Without it the ball sits in the thrower's
-		-- hand for a full round trip after the input, which is the entire moment a
-		-- throw is judged by. Presentation only -- what a throw hits is still
-		-- decided server-side from the server's own release position.
+		-- Client-side presentation prediction; hit resolution remains server-side.
 		Prediction = {
-			-- Longest a predicted ball is drawn flying without the server having
-			-- confirmed it left the hand. Past this the throw is treated as
-			-- refused and the visual returns to wherever the server says the ball
-			-- is. Wants to be comfortably above a bad round trip but short enough
-			-- that a refused throw does not leave a ghost. Sane: 0.3-0.6.
 			MaxSeconds = 0.4,
 		},
 		-- Ceiling on how far ahead an in-flight ball's visual is extrapolated,

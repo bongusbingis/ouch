@@ -9,18 +9,8 @@ local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
 
--- The client's single source of aim truth. Aim is the camera look direction on
--- every device: the player always points the camera themselves, and assists
--- only bias what happens afterwards. Touch used to override aim with the
--- direction to an auto-acquired target, which meant the camera was decorative
--- and the throw was not really the player's -- that is what the assists below
--- replace.
---
--- Selection is sticky: acquiring needs the target inside the narrow cone,
--- holding it only needs the wider sticky cone, so a lock does not flicker
--- between two enemies standing near each other. Confidence falls off toward the
--- edge of that cone so every assist that scales by it fades out smoothly rather
--- than snapping off. InputRouter feeds the aim into the Aim action.
+-- Camera direction is the aim source. Assist selection is sticky and confidence
+-- falls toward zero at the edge of its cone.
 
 local AimDirector = {}
 

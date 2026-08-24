@@ -2,8 +2,10 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = ServerScriptService:WaitForChild("Server"):WaitForChild("Modules")
-local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local ArenaSessionService = require(Modules:WaitForChild("ArenaSessionService"))
+ArenaSessionService.start()
+
+local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local PlayerAssistService = require(Modules:WaitForChild("PlayerAssistService"))
 local ArenaReturnService = require(Modules:WaitForChild("ArenaReturnService"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
@@ -86,15 +88,14 @@ MatchService.onEvent(function(event)
 	end
 end)
 
+ArenaReturnService.start()
 PlayerAssistService.start()
 InputSetup.start()
-ArenaSessionService.start()
 BallService.start()
 MapFeatureService.start()
 RotatingPlatforms.startMover()
 MatchService.start()
 ModeVoteService.start()
-ArenaReturnService.start()
 AnalyticsService.start(MatchService)
 CombatPoseService.start()
 -- Reported per match rather than read by AnalyticsService directly, so shared

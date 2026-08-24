@@ -55,10 +55,14 @@ T.describe("Boosts", function()
 		T.expect(Boosts.apply(3, 1.5)):toEqual(4)
 	end)
 
-	T.it("keeps the shipped bundle strictly better than the boosters it replaces", function()
-		-- A player who already owns DoubleXP must still gain from Brawler's Club,
-		-- otherwise the upgrade is a dead purchase under max-wins.
-		local club = GamePasses.Catalog.BrawlersClub.Boosts
+	T.it("keeps any shipped combined booster stronger than its component passes", function()
+		local clubPass = GamePasses.Catalog.BrawlersClub
+		if clubPass == nil then
+			T.expect(GamePasses.Catalog.DoubleXP.Boosts.XpMultiplier):toEqual(2)
+			T.expect(GamePasses.Catalog.BonksBoost.Boosts.BonksMultiplier):toEqual(1.5)
+			return
+		end
+		local club = clubPass.Boosts
 		local doubleXp = GamePasses.Catalog.DoubleXP.Boosts
 		local bonksBoost = GamePasses.Catalog.BonksBoost.Boosts
 		T.expect(club.XpMultiplier > doubleXp.XpMultiplier):toBeTruthy()

@@ -86,4 +86,16 @@ function ModeVote.choose(state: State, chooseIndex: (number) -> number): string
 	return finalists[index]
 end
 
+function ModeVote.extendForLateReady(
+	currentEndsAt: number,
+	maximumEndsAt: number,
+	now: number,
+	minimumVisibleSeconds: number
+): number
+	if now >= currentEndsAt or currentEndsAt - now >= minimumVisibleSeconds then
+		return currentEndsAt
+	end
+	return math.max(currentEndsAt, math.min(now + minimumVisibleSeconds, maximumEndsAt))
+end
+
 return table.freeze(ModeVote)

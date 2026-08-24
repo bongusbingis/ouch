@@ -95,35 +95,35 @@ return React.memo(function(props)
 		}),
 
 		Badge = if card.badge
-				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
-					MaxTextSize = 20,
-					Native = {
-						AnchorPoint = Vector2.new(0, 0.5),
-						AutomaticSize = Enum.AutomaticSize.X,
-						BackgroundColor3 = Color3.fromRGB(52, 52, 52),
-						BackgroundTransparency = 0.12,
-						FontFace = Font.new(
-							"rbxasset://fonts/families/SourceSansPro.json",
-							Enum.FontWeight.Bold,
-							Enum.FontStyle.Normal
-						),
-						Position = UDim2.fromScale(0.04, 0.12),
-						Size = UDim2.fromScale(0, 0.125),
-						Text = string.upper(card.badge),
-						TextColor3 = Color3.new(1, 1, 1),
-						ZIndex = 8,
-					},
-				}, {
-					UICorner = c("UICorner", { CornerRadius = UDim.new(0.35, 0) }),
-					UIPadding = c("UIPadding", {
-						PaddingBottom = UDim.new(0, 2),
-						PaddingLeft = UDim.new(0, 16),
-						PaddingRight = UDim.new(0, 16),
-						PaddingTop = UDim.new(0, 2),
-					}),
-				})
-				else nil,
+			then c(ResponsiveText, {
+				MeasurementFont = Enum.Font.SourceSansBold,
+				MaxTextSize = 20,
+				Native = {
+					AnchorPoint = Vector2.new(0, 0.5),
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundColor3 = Color3.fromRGB(52, 52, 52),
+					BackgroundTransparency = 0.12,
+					FontFace = Font.new(
+						"rbxasset://fonts/families/SourceSansPro.json",
+						Enum.FontWeight.Bold,
+						Enum.FontStyle.Normal
+					),
+					Position = UDim2.fromScale(0.04, 0.12),
+					Size = UDim2.fromScale(0, 0.125),
+					Text = string.upper(card.badge),
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 8,
+				},
+			}, {
+				UICorner = c("UICorner", { CornerRadius = UDim.new(0.35, 0) }),
+				UIPadding = c("UIPadding", {
+					PaddingBottom = UDim.new(0, 2),
+					PaddingLeft = UDim.new(0, 16),
+					PaddingRight = UDim.new(0, 16),
+					PaddingTop = UDim.new(0, 2),
+				}),
+			})
+			else nil,
 
 		Background = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -159,7 +159,7 @@ return React.memo(function(props)
 				ScaleType = Enum.ScaleType.Tile,
 				TileSize = UDim2.fromOffset(264, 264),
 			}),
-		
+
 			InfoBackdrop = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundColor3 = Color3.fromRGB(32, 39, 48),

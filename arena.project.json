@@ -21,6 +21,12 @@
       }
     },
 
+    "ReplicatedFirst": {
+      "LoadingBootstrap": {
+        "$path": "src/client/LoadingBootstrap.client.luau"
+      }
+    },
+
     "ServerScriptService": {
       "Server": {
         "$path": "places/arena/server/Server.server.luau",

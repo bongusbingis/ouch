@@ -24,6 +24,7 @@ local angle = 0
 local origin: BasePart? = nil
 local blur: BlurEffect? = nil
 local renderConnection: RBXScriptConnection? = nil
+local voteDisconnect: (() -> ())? = nil
 
 local function frame(deltaTime: number)
 	local part = origin
@@ -96,7 +97,7 @@ function VoteCamera.start()
 	assert(part:IsA("BasePart"), "[VoteCamera] Workspace.Assets.Arena.MapOrigin must be a BasePart")
 	origin = part
 
-	ModeVoteClient.subscribe(function(snapshot)
+	voteDisconnect = ModeVoteClient.subscribe(function(snapshot)
 		if snapshot.admitted and snapshot.open then
 			activate()
 		else
@@ -112,6 +113,12 @@ end
 
 function VoteCamera.destroy()
 	deactivate()
+	if voteDisconnect then
+		voteDisconnect()
+		voteDisconnect = nil
+	end
+	origin = nil
+	started = false
 end
 
 return VoteCamera

@@ -93,8 +93,6 @@ local entries: { Entry } = {
 	{ Key = "Matchmaking.MatchTargetPlayers", Type = "number", Minimum = 1, Maximum = 100 },
 	{ Key = "Matchmaking.QueueCandidateLimit", Type = "number", Minimum = 1, Maximum = 500 },
 	{ Key = "Matchmaking.WorkerPollInterval", Type = "number", Minimum = 0.5, Maximum = 30 },
-	{ Key = "Matchmaking.TeleportRetryAttempts", Type = "number", Minimum = 1, Maximum = 10 },
-	{ Key = "Matchmaking.TeleportFloodedDelay", Type = "number", Minimum = 1, Maximum = 120 },
 }
 
 return table.freeze({

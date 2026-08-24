@@ -1,5 +1,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Players = game:GetService("Players")
+
+while ReplicatedFirst:GetAttribute("ReactLoadingPresented") ~= true do
+	ReplicatedFirst:GetAttributeChangedSignal("ReactLoadingPresented"):Wait()
+end
 local StarterPlayer = game:GetService("StarterPlayer")
 
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
@@ -44,6 +49,19 @@ local RotatingPlatforms = require(
 		:WaitForChild("RotatingPlatforms")
 )
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local ArenaLoadingClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
+
+local connections = {}
+local optionalSystems = {}
+
+local function startOptional(name, callback)
+	local ok, err = pcall(callback)
+	optionalSystems[name] = ok
+	if not ok then
+		warn(`[SimulationClient] Optional {name} unavailable: {err}`)
+	end
+	return ok
+end
 
 ConfigReplication.startClient({
 	Combat = require(ConfigRoot:WaitForChild("Combat")),
@@ -57,52 +75,121 @@ ConfigReplication.startClient({
 -- therefore keeps a normal cursor for its menus, with no lobby-side code needed.
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 Combat.setCameraEnabled(true)
-Combat.setInputEnabled(true)
+Combat.setInputEnabled(false)
 
 AssistConfig.start()
 -- Before the arm and animation layers: both read its snapshot, and the input
 -- sender pushes presses into it.
 CombatState.start()
-ArmIK.start()
 InputRouter.start()
 CameraAssist.start()
-BallVisuals.start()
-DamageFeedback.start()
-DeathEffects.start()
-HammerVisuals.start()
-SplatEffects.start()
-MatchAudio.start()
-PlayerHighlights.start()
-JumpPadVisuals.start()
-RotatingPlatforms.load()
-PlatformRider.start()
--- Started last: it waits on the authored Arena.MapOrigin, so a missing part
--- surfaces as an infinite-yield warning without stalling the modules above.
+CombatInputSender.start()
 VoteCamera.start()
-DebugVisuals.start()
-ThrowPoseTuner.start()
-ChargeAim.start()
+ArenaLoadingClient.markSimulationReady()
+
+startOptional("ArmIK", ArmIK.start)
+startOptional("BallVisuals", BallVisuals.start)
+startOptional("DamageFeedback", DamageFeedback.start)
+startOptional("DeathEffects", DeathEffects.start)
+startOptional("HammerVisuals", HammerVisuals.start)
+startOptional("SplatEffects", SplatEffects.start)
+startOptional("MatchAudio", MatchAudio.start)
+startOptional("PlayerHighlights", PlayerHighlights.start)
+startOptional("JumpPadVisuals", JumpPadVisuals.start)
+startOptional("RotatingPlatforms", RotatingPlatforms.load)
+startOptional("PlatformRider", PlatformRider.start)
+startOptional("DebugVisuals", DebugVisuals.start)
+startOptional("ThrowPoseTuner", ThrowPoseTuner.start)
+startOptional("ChargeAim", ChargeAim.start)
+if startOptional("WeaponAnimations", WeaponAnimations.start) then
+	table.insert(connections, CombatInputSender.onIntent(WeaponAnimations.onIntent))
+end
+
+local matchState: Folder? = nil
+local matchStateConnection: RBXScriptConnection? = nil
+local function updateCombatInput()
+	Combat.setInputEnabled(
+		Players.LocalPlayer:GetAttribute("ArenaReady") == true
+			and matchState ~= nil
+			and matchState:GetAttribute("phase") == "Active"
+	)
+end
+
+local function attachMatchState(folder: Folder)
+	if matchStateConnection then
+		matchStateConnection:Disconnect()
+	end
+	matchState = folder
+	matchStateConnection = folder:GetAttributeChangedSignal("phase"):Connect(updateCombatInput)
+	updateCombatInput()
+end
+
+local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
+if existingMatchState and existingMatchState:IsA("Folder") then
+	attachMatchState(existingMatchState)
+end
+table.insert(
+	connections,
+	ReplicatedStorage.ChildAdded:Connect(function(child)
+		if child.Name == "MatchState" and child:IsA("Folder") then
+			attachMatchState(child)
+		end
+	end)
+)
+table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
 
 -- Presentation only. These are the server's authoritative events, replayed here
 -- purely to drive effects; nothing in this path decides an outcome.
-Network.on("CombatSimEvent", function(events)
-	for _, event in events do
-		BallVisuals.onEvent(event)
-		HammerVisuals.onEvent(event)
-		SplatEffects.onEvent(event)
-		GameAudio.onEvent(event)
-		DebugVisuals.onEvent(event)
-		if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
-			print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+table.insert(
+	connections,
+	Network.on("CombatSimEvent", function(events)
+		for _, event in events do
+			if optionalSystems.BallVisuals then
+				BallVisuals.onEvent(event)
+			end
+			if optionalSystems.HammerVisuals then
+				HammerVisuals.onEvent(event)
+			end
+			if optionalSystems.SplatEffects then
+				SplatEffects.onEvent(event)
+			end
+			GameAudio.onEvent(event)
+			if optionalSystems.DebugVisuals then
+				DebugVisuals.onEvent(event)
+			end
+			if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
+				print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+			end
+		end
+	end)
+)
+
+table.insert(
+	connections,
+	Network.on("DamageFeedback", function(event)
+		if optionalSystems.DamageFeedback then
+			DamageFeedback.onEvent(event)
+		end
+		if optionalSystems.DeathEffects then
+			DeathEffects.notifyElim(event)
+		end
+	end)
+)
+
+script.Destroying:Connect(function()
+	Combat.setInputEnabled(false)
+	if matchStateConnection then
+		matchStateConnection:Disconnect()
+	end
+	for _, connection in connections do
+		if typeof(connection) == "RBXScriptConnection" then
+			connection:Disconnect()
+		else
+			connection()
 		end
 	end
+	InputRouter.destroy()
+	CombatInputSender.destroy()
+	CombatState.destroy()
+	VoteCamera.destroy()
 end)
-
-Network.on("DamageFeedback", function(event)
-	DamageFeedback.onEvent(event)
-	DeathEffects.notifyElim(event)
-end)
-
-WeaponAnimations.start()
-CombatInputSender.onIntent(WeaponAnimations.onIntent)
-CombatInputSender.start()

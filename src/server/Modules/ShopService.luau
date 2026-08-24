@@ -80,9 +80,7 @@ function ShopService.offersFor(player: Player): { string }
 	return offersFrom(ShopService.ensure(player))
 end
 
--- Whether this player may buy this item right now. Items in a rotation category
--- are sold only while offered -- that is what makes the rotation real rather
--- than decorative. Everything else is always purchasable.
+-- Rotation items are purchasable only while offered.
 function ShopService.isPurchasable(player: Player, itemId: string): boolean
 	local item = Cosmetics.Items[itemId]
 	if item == nil then

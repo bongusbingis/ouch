@@ -1,20 +1,6 @@
 --!strict
 
--- Every feel-related tuning value for combat input and the combat camera.
---
--- This is the one file a designer should need to open. Nothing below is
--- referenced from more than one place, and no threshold is duplicated in a
--- module. If a value has to be changed in two places to change one behaviour,
--- that is a bug in this file, not in the caller.
---
--- Touch thresholds are expressed as a fraction of the viewport's smaller
--- dimension and then clamped to a pixel range. A phone and a tablet then need
--- roughly the same *physical* thumb travel, which raw pixel constants cannot
--- express: 40px is a flick on a phone and a twitch on a tablet.
---
--- Every value has a working default. Nothing here needs setup before playing,
--- but none of it is finished either -- these are starting points chosen to be
--- sane, and real numbers only come out of testing on real devices.
+-- Combat input and camera tuning.
 
 export type Scaled = {
 	-- Fraction of the smaller viewport dimension.
@@ -25,9 +11,6 @@ export type Scaled = {
 }
 
 return {
-	--==================================================================
-	-- TAP -- the quick "throw now" gesture
-	--==================================================================
 	Tap = {
 		-- Note: there is no tap duration here. Charge.HoldDelay already defines
 		-- the window -- a touch still undecided at that point becomes a charge --
@@ -42,9 +25,6 @@ return {
 		MaxDistance = { Fraction = 0.022, MinPixels = 10, MaxPixels = 26 } :: Scaled,
 	},
 
-	--==================================================================
-	-- CAMERA -- when a touch stops being a possible attack
-	--==================================================================
 	Camera = {
 		-- Movement past this hands the touch to the camera permanently. It is
 		-- deliberately close to Tap.MaxDistance: the band between them is the
@@ -76,9 +56,6 @@ return {
 		-- the same need without taking ownership of the camera.
 	},
 
-	--==================================================================
-	-- CHARGE -- press and hold
-	--==================================================================
 	Charge = {
 		-- How long a touch must be held before it becomes a charge. The single
 		-- most important number for how mobile combat feels.
@@ -95,9 +72,6 @@ return {
 		HoldSlop = { Fraction = 0.05, MinPixels = 18, MaxPixels = 60 } :: Scaled,
 	},
 
-	--==================================================================
-	-- BOTTOM SWIPE -- alternate gesture for the same normal throw
-	--==================================================================
 	-- This is NOT a separate attack. It produces exactly the normal throw a tap
 	-- produces. It exists so players who rest their thumb low on the screen have
 	-- a natural way to attack without reaching for the middle.
@@ -132,10 +106,7 @@ return {
 		-- Higher: more forgiving of a thumb that starts its arc sideways.
 		-- Too high: a sideways drag stays a swipe candidate for longer than it
 		--   should before falling through to the camera.
-		-- Small on purpose. The camera is suppressed while direction is unknown,
-		-- so this is also the dead zone a sideways drag from the strip pays
-		-- before the view starts moving. Big enough to clear digitizer noise,
-		-- small enough not to be felt. Sane: 8-20px.
+		-- Dead zone used while swipe direction is unknown.
 		DirectionSampleMinPixels = { Fraction = 0.012, MinPixels = 9, MaxPixels = 18 } :: Scaled,
 
 		-- Minimum upward travel before the gesture counts.
@@ -145,9 +116,7 @@ return {
 		-- The gesture must complete within this long. A slow upward drag is a
 		-- camera pan, not a flick.
 		--
-		-- This also bounds how long the camera can stay suppressed: the view is
-		-- held still while a swipe candidate is alive, so a generous window here
-		-- would let a slow upward pan freeze the camera. Sane: 0.2-0.35.
+		-- Also bounds the duration of camera suppression.
 		MaxDuration = 0.28,
 
 		-- Minimum speed, in pixels per second. Kept low enough that the gesture

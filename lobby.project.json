@@ -33,6 +33,12 @@
       }
     },
 
+    "ReplicatedFirst": {
+      "LoadingBootstrap": {
+        "$path": "src/client/LoadingBootstrap.client.luau"
+      }
+    },
+
     "ServerStorage": {
       "Tests": {
         "$path": "places/lobby/tests",

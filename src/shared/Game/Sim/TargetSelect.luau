@@ -6,20 +6,13 @@ local SimUtil = require(script.Parent.SimUtil)
 type Vec = SimTypes.Vec
 type WorldSnapshot = SimTypes.WorldSnapshot
 
--- Scored target selection, shared by every weapon that needs to answer "who is
--- the player pointing at". Extracted so the dodgeball's soft lock and the
--- hammer's melee assists cannot drift apart in what counts as a valid target --
--- a difference there would show up as the ball and the swing disagreeing about
--- who you were aiming at, which is exactly the kind of bug nobody can describe.
+-- Shared scored target selection for weapon assists.
 --
 -- Scoring is angle first, distance as a small tiebreak, so the enemy nearest the
 -- centre of aim wins and two at the same angle resolve by proximity. Iteration
 -- is over sorted keys, so the result is identical for identical inputs.
 --
--- Confidence is a normalized 0-1 measure of how well centred the pick is: full
--- through the middle of the cone, tapering to zero at its edge. Assists scale by
--- it so they fade out at the boundary instead of switching off, which is what
--- makes an assist feel like part of the aim rather than a mechanism.
+-- Confidence is normalized within the target cone so assists fade at its edge.
 
 local TargetSelect = {}
 

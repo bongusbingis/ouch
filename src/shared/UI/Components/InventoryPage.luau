@@ -9,6 +9,7 @@ local InventoryModel = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("InventoryModel")
 )
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local ActivityDots = require(script.Parent.ActivityDots)
 local InventoryPreview = require(script.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
@@ -211,6 +212,9 @@ return function(props: Props)
 	local ownedKey = ownershipKey(props.Data)
 	local sections = React.useMemo(function()
 		local result = {}
+		if props.Data == nil then
+			return result
+		end
 		local owned = if props.Data then props.Data.Cosmetics.Owned else {}
 		for _, tab in InventoryConfig.Tabs do
 			if tab.Id == selectedTab then
@@ -266,6 +270,7 @@ return function(props: Props)
 	for layoutOrder, definition in InventoryConfig.Tabs do
 		local active = selectedTab == definition.Id
 		tabs[definition.Id] = c(AnimatedButton, {
+			Enabled = props.Data ~= nil,
 			Native = {
 				BackgroundTransparency = 1,
 				Image = if active then "rbxassetid://94748581468730" else "rbxassetid://136021539696619",
@@ -328,16 +333,41 @@ return function(props: Props)
 			SliceCenter = Rect.new(31, 41, 978, 620),
 			SliceScale = 0.5,
 		}, {
-			CategoriesHolder = c("ScrollingFrame", {
-				ref = scrollerRef,
-				Active = true,
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				CanvasSize = UDim2.fromOffset(0, 0),
-				Position = UDim2.fromScale(0.0341613, 0.0426996),
-				ScrollBarImageColor3 = Color3.new(),
-				Size = UDim2.fromScale(0.94076, 0.907841),
-			}, categoryChildren),
+			CategoriesHolder = if props.Data
+				then c("ScrollingFrame", {
+					ref = scrollerRef,
+					Active = true,
+					AutomaticCanvasSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					CanvasSize = UDim2.fromOffset(0, 0),
+					Position = UDim2.fromScale(0.0341613, 0.0426996),
+					ScrollBarImageColor3 = Color3.new(),
+					Size = UDim2.fromScale(0.94076, 0.907841),
+				}, categoryChildren)
+				else c("Frame", {
+					BackgroundTransparency = 1,
+					Size = UDim2.fromScale(1, 1),
+				}, {
+					Status = c(ResponsiveText, {
+						MeasurementFont = Enum.Font.LuckiestGuy,
+						Native = {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundTransparency = 1,
+							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+							Position = UDim2.fromScale(0.5, 0.44),
+							Size = UDim2.fromScale(0.75, 0.12),
+							Text = "SYNCING INVENTORY",
+							TextColor3 = Color3.new(1, 1, 1),
+						},
+					}),
+					Activity = c(ActivityDots, {
+						Active = true,
+						Native = {
+							Position = UDim2.fromScale(0.5, 0.58),
+							Size = UDim2.fromScale(0.12, 0.055),
+						},
+					}),
+				}),
 		}),
 		Frame = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),

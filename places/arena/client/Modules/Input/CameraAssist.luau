@@ -12,23 +12,8 @@ local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local UserInputService = game:GetService("UserInputService")
 
--- Camera adhesion and aim friction, applied on top of whatever camera the
--- player is already using.
---
--- This deliberately does not fork PlayerModule. Roblox's default camera derives
--- each frame's rotation from the camera's *current* look vector plus that
--- frame's rotate input, so a rotation written after it has run persists into the
--- next frame instead of being discarded. That makes a post-camera pass the
--- cheapest correct place to do this: no vendored copy of PlayerModule to keep in
--- sync, and every camera mode the player can pick keeps working.
---
--- Adhesion pulls the camera along with a target's angular drift so a strafing
--- enemy does not slide out from under the reticle. Friction damps the player's
--- own rotation while the reticle is over a target, so fine adjustment near an
--- enemy is easier than sweeping past them. Both scale by target confidence and
--- by the player's per-player assist strengths, and both are inert at strength 0
--- and on devices whose DeviceScale zeroes them -- which is how mouse and
--- keyboard stay untouched.
+-- Camera adhesion and aim friction. This runs after PlayerModule's camera pass
+-- and is inert when the configured assist strength is zero.
 
 local CameraAssist = {}
 

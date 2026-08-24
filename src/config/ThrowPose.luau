@@ -1,17 +1,7 @@
 --!strict
 
--- Tuning for the throwing-arm pose: the wind-up, the pause at the top of it, and
--- the hand-off back to the authored throw.
---
--- Scope is deliberately narrow. Nothing here moves the torso, head or facing,
--- and nothing is driven by the camera except the direction the ball is presented
--- along. The character's body is the animation's business; this layer owns one
--- arm, and only while a ball is in hand.
---
--- The wind-up is expressed in the character's own space rather than in camera
--- space, so the hand draws back to the same readable spot every time regardless
--- of where the player is looking. That predictability is what makes a charged
--- throw feel like a committed action instead of a cursor.
+-- Throwing-arm pose tuning. The procedural layer owns the arm while a ball is
+-- held; the authored animation owns the rest of the character.
 
 return {
 	Enabled = true,
@@ -24,21 +14,13 @@ return {
 		-- Measure once for your rig and leave it.
 		ShoulderOffset = vector.create(1.5, 1, 0),
 
-		-- Resting hold: how far in front of the shoulder the hand presents the
-		-- ball, in studs, along aim. R15 shoulder-to-hand is about 2.8 studs
-		-- fully extended, so staying under that keeps a bend in the elbow
-		-- instead of locking it straight. Sane: 1.8-2.5.
+		-- Resting hand distance from the shoulder along aim, in studs.
 		ReadyDistance = 2.2,
 
-		-- The wind-up spot, in character space relative to the shoulder
-		-- (right, up, back). This is the pose the hand pauses at while the
-		-- player holds charge, so it is the single most important value here for
-		-- how a charged throw reads. Back and up gives a classic overhand coil.
+		-- Wind-up position relative to the shoulder (right, up, back).
 		WindupOffset = vector.create(0.5, 0.75, 2),
 
-		-- How much further the wind-up reaches at full charge, as a fraction.
-		-- This is the cartoon dial: 0 means a full charge looks like a light one,
-		-- 0.5 means it visibly winds up half again as far. Sane: 0.15-0.6.
+		-- Additional wind-up distance at full charge, as a fraction.
 		ChargeStretch = 0.35,
 
 		-- Elbow pole, in character space relative to the shoulder (right, up,
@@ -47,7 +29,7 @@ return {
 		PoleOffset = vector.create(2.2, -0.4, 1.4),
 
 		-- Solver smoothing in seconds. Small, because the springs below already
-		-- do the shaping and stacking two smoothers reads as lag.
+		-- The springs provide the primary shaping; avoid stacking smoothers.
 		SmoothTime = 0.04,
 	},
 
@@ -87,11 +69,9 @@ return {
 	-- Spring shaping. Frequency is in Hz; damping at 1 settles without overshoot,
 	-- below 1 overshoots and springs back.
 	Motion = {
-		-- How fast the hand travels to the wind-up spot. Sane: 6-16.
+		-- How fast the hand travels to the wind-up spot.
 		WindupFrequency = 11,
-		-- Deliberately under 1 so the hand overshoots the wind-up slightly and
-		-- settles back into it. That small bounce is most of what makes the
-		-- action read as cartoony rather than mechanical. Sane: 0.55-0.9.
+		-- Underdamped wind-up motion.
 		WindupDamping = 0.62,
 		-- Returning to the resting hold. Calmer, no bounce wanted here.
 		ReturnFrequency = 9,
@@ -101,7 +81,7 @@ return {
 		WeightFrequency = 14,
 		WeightDamping = 1,
 		-- Multiplier applied to the frequencies above on touch, where finger
-		-- noise would otherwise show up in the arm. Sane: 0.6-1.
+		-- Frequency multiplier for touch input.
 		TouchFrequencyScale = 0.8,
 	},
 
@@ -120,7 +100,7 @@ return {
 	-- at a distance.
 	Remote = {
 		Enabled = true,
-		-- Charge reports per second from each client. Sane: 8-15.
+		-- Charge reports per second from each client.
 		ReportHz = 12,
 		-- Smallest charge change worth a report, so a still player stops sending.
 		MinReportDelta = 0.05,

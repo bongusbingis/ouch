@@ -85,6 +85,10 @@ function mockPartyClient:isBusy()
 	return false
 end
 
+function mockPartyClient:getTeleportStatus()
+	return nil
+end
+
 function mockPartyClient:subscribe(callback)
 	callback(snapshot, nil, "Subscribed")
 	return function() end
@@ -101,6 +105,7 @@ end
 function mockPartyClient:toggleMatchmaking() end
 function mockPartyClient:promptInvite() end
 function mockPartyClient:kick(_targetUserId) end
+function mockPartyClient:retryInitialization() end
 
 return function(target: Instance)
 	local root = ReactRoblox.createRoot(target)

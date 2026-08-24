@@ -80,7 +80,8 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		if model == nil then
 			continue
 		end
-		if player:GetAttribute("ArenaAdmission") == "Rejected" then
+		local admission = player:GetAttribute("ArenaAdmission")
+		if (admission ~= "Direct" and admission ~= "Matched") or player:GetAttribute("ArenaReady") ~= true then
 			table.insert(excluded, model)
 			continue
 		end
@@ -292,6 +293,9 @@ local pendingIntents: { Intent } = {}
 local pendingEquips: { [string]: string } = {}
 
 local function queueEquip(player: Player, weapon: string)
+	if player:GetAttribute("ArenaReady") ~= true then
+		return
+	end
 	pendingEquips[PlayerIds.toId(player)] = weapon
 end
 
@@ -302,6 +306,9 @@ local function queueIntent(
 	targetId: string?,
 	charge: number?
 )
+	if player:GetAttribute("ArenaReady") ~= true then
+		return
+	end
 	if #pendingIntents >= MAX_QUEUED_INTENTS then
 		return
 	end
@@ -318,7 +325,7 @@ end
 -- the origin is derived from that character rather than sent by the client.
 local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
-	local active = matchState == nil or matchState:GetAttribute("phase") == "Active"
+	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
 	if not active then
 		table.clear(pendingIntents)
 	end

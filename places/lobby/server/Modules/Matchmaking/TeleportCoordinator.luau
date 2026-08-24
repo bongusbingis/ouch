@@ -1,9 +1,9 @@
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
 local TeleportPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.TeleportPayload)
+local TeleportRetryCoordinator = require(ReplicatedStorage.Shared.Game.Matchmaking.TeleportRetryCoordinator)
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local TeleportCoordinator = {}
@@ -12,19 +12,21 @@ TeleportCoordinator.__index = TeleportCoordinator
 function TeleportCoordinator.new(matchRepository)
 	local self = setmetatable({
 		_matchRepository = matchRepository,
-		_states = {},
-		_failureHandler = nil,
+		_retry = TeleportRetryCoordinator.new("Arena"),
 	}, TeleportCoordinator)
-
-	TeleportService.TeleportInitFailed:Connect(function(player, result, message, placeId, options)
-		self:_handleInitFailure(player, result, message, placeId, options)
-	end)
 
 	return self
 end
 
 function TeleportCoordinator:SetFailureHandler(handler)
-	self._failureHandler = handler
+	self._retry:SetFailureHandler(function(player, reason)
+		self._retry:Clear(player)
+		handler(player, reason)
+	end)
+end
+
+function TeleportCoordinator:SetStatusHandler(handler)
+	self._retry:SetStatusHandler(handler)
 end
 
 function TeleportCoordinator:ReserveServer()
@@ -43,45 +45,11 @@ function TeleportCoordinator:ReserveServer()
 end
 
 function TeleportCoordinator:IsTeleporting(player)
-	local state = self._states[player.UserId]
-	return state ~= nil and state.active == true
+	return self._retry:IsTeleporting(player)
 end
 
 function TeleportCoordinator:Clear(player)
-	self._states[player.UserId] = nil
-end
-
-function TeleportCoordinator:_fail(player, message)
-	self._states[player.UserId] = nil
-	if self._failureHandler then
-		self._failureHandler(player, message)
-	end
-end
-
-function TeleportCoordinator:_handleInitFailure(player, result, message, placeId, options)
-	local state = self._states[player.UserId]
-	if not state or not state.active then
-		return
-	end
-
-	if state.attempts >= Config.TeleportRetryAttempts then
-		self:_fail(player, message)
-		return
-	end
-
-	state.attempts += 1
-	local delay = result == Enum.TeleportResult.Flooded and Config.TeleportFloodedDelay or Config.TeleportRetryDelay
-
-	task.delay(delay, function()
-		if player.Parent ~= Players then
-			return
-		end
-
-		local success, retryError = pcall(TeleportService.TeleportAsync, TeleportService, placeId, { player }, options)
-		if not success then
-			self:_handleInitFailure(player, Enum.TeleportResult.Failure, retryError, placeId, options)
-		end
-	end)
+	self._retry:Clear(player)
 end
 
 function TeleportCoordinator:TeleportParty(matchId, partyId, partyPlayers)
@@ -102,11 +70,6 @@ function TeleportCoordinator:TeleportParty(matchId, partyId, partyPlayers)
 	for _, player in partyPlayers do
 		if expected[player.UserId] and not self:IsTeleporting(player) then
 			table.insert(players, player)
-			self._states[player.UserId] = {
-				active = true,
-				attempts = 1,
-				matchId = matchId,
-			}
 		end
 	end
 
@@ -114,25 +77,16 @@ function TeleportCoordinator:TeleportParty(matchId, partyId, partyPlayers)
 		return true
 	end
 
-	local options = Instance.new("TeleportOptions")
-	options.ReservedServerAccessCode = matchRecord.reservedServerAccessCode
-	options:SetTeleportData(TeleportPayload.build(matchRecord, partyId))
+	return self._retry:Begin(matchRecord.arenaPlaceId, players, function(_retryPlayers)
+		local options = Instance.new("TeleportOptions")
+		options.ReservedServerAccessCode = matchRecord.reservedServerAccessCode
+		options:SetTeleportData(TeleportPayload.build(matchRecord, partyId))
+		return options
+	end)
+end
 
-	local success, teleportError =
-		pcall(TeleportService.TeleportAsync, TeleportService, matchRecord.arenaPlaceId, players, options)
-	if not success then
-		for _, player in players do
-			self:_handleInitFailure(
-				player,
-				Enum.TeleportResult.Failure,
-				teleportError,
-				matchRecord.arenaPlaceId,
-				options
-			)
-		end
-	end
-
-	return success, teleportError
+function TeleportCoordinator:Destroy()
+	self._retry:Destroy()
 end
 
 return TeleportCoordinator

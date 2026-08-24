@@ -7,15 +7,7 @@ local GameMode = require(script.Parent.GameMode)
 -- Infection. One player starts infected; every survivor an infected eliminates
 -- joins them. Infected win the moment the last survivor falls, survivors win if
 -- any are still standing when the clock runs out.
---
--- The asymmetry is carried entirely by ball possession rather than new weapon
--- code: survivors hold a ball so a Throw press routes to the dodgeball, and
--- infected never receive one so the same press routes to the hammer. That is
--- the existing WeaponRegistry ordering, not a special case.
---
--- Survivors can knock an infected down but never reduce their number: an
--- eliminated infected respawns infected. Only one direction is permanent, which
--- is what makes the mode a countdown rather than a deathmatch.
+-- Survivors receive balls; infected do not. Eliminated infected respawn infected.
 
 local Infection = {}
 

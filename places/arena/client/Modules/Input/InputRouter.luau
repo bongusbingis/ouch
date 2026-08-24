@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AimDirector = require(script.Parent.AimDirector)
+local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 -- Client side of the input layer. Hardware actions are handled by their
@@ -17,7 +18,9 @@ local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local InputRouter = {}
 
-local modeVoteState: Folder? = nil
+local started = false
+local modeVoteOpen = false
+local connections: { any } = {}
 
 -- Mouse lock, cursor visibility and the shoulder offset all belong to
 -- PlayerModule.Combat now. This used to write UserInputService directly, which
@@ -25,13 +28,7 @@ local modeVoteState: Folder? = nil
 -- property every frame. All that is left here is telling Combat when a menu
 -- needs the pointer.
 local function updateCursorOwnership()
-	local voteState = modeVoteState
-	local player = Players.LocalPlayer
-	local voting = voteState ~= nil
-		and voteState:GetAttribute("open") == true
-		and player:GetAttribute("ArenaAdmission") ~= "Rejected"
-
-	if voting then
+	if modeVoteOpen then
 		Combat.requestCursor("ModeVote")
 	else
 		Combat.releaseCursor("ModeVote")
@@ -47,27 +44,52 @@ local function reportDeviceClass()
 			Network.fireServer("ReportDeviceClass", deviceClass)
 		end
 	end
-	UserInputService.LastInputTypeChanged:Connect(report)
+	table.insert(connections, UserInputService.LastInputTypeChanged:Connect(report))
 	report()
 end
 
 function InputRouter.start()
+	if started then
+		return
+	end
+	started = true
 	local player = Players.LocalPlayer
-	local replicatedVoteState = ReplicatedStorage:WaitForChild("ModeVoteState")
-	assert(replicatedVoteState:IsA("Folder"), "[InputRouter] ReplicatedStorage.ModeVoteState must be a Folder")
-	modeVoteState = replicatedVoteState
 	local context = player:WaitForChild(InputConfig.ContextName)
 	local aimAction = context:WaitForChild("Aim")
 	local aimBinding = aimAction:WaitForChild("AimFeed") :: InputBinding
 
 	reportDeviceClass()
+	table.insert(
+		connections,
+		ModeVoteClient.subscribe(function(snapshot)
+			modeVoteOpen = snapshot.admitted and snapshot.open
+			updateCursorOwnership()
+		end)
+	)
 	updateCursorOwnership()
 
-	RunService.RenderStepped:Connect(function()
-		updateCursorOwnership()
-		AimDirector.update()
-		aimBinding:Fire(AimDirector.currentAim())
-	end)
+	table.insert(
+		connections,
+		RunService.RenderStepped:Connect(function()
+			updateCursorOwnership()
+			AimDirector.update()
+			aimBinding:Fire(AimDirector.currentAim())
+		end)
+	)
+end
+
+function InputRouter.destroy()
+	for _, connection in connections do
+		if typeof(connection) == "RBXScriptConnection" then
+			connection:Disconnect()
+		else
+			connection()
+		end
+	end
+	table.clear(connections)
+	modeVoteOpen = false
+	Combat.releaseCursor("ModeVote")
+	started = false
 end
 
 return InputRouter

@@ -13,30 +13,8 @@ local Spring =
 local AimDirector = require(script.Parent.Parent.Input.AimDirector)
 local CombatState = require(script.Parent.CombatState)
 
--- The throwing arm: presenting the ball, winding up, pausing at the top of the
--- wind-up, and getting out of the way for the throw.
---
--- This is the only procedural layer on the character. Nothing here moves the
--- torso, head or facing -- the body is the authored animation's job. A
--- camera-driven spine was tried and removed: it made the character read as a
--- turret rather than a cartoon.
---
--- The pose is a blend, never full control. Weight is capped in configuration
--- well below 1 and collapses to zero through the release and follow-through, so
--- the authored clip owns the fast, characterful part of the motion. An arm
--- pinned to a target during follow-through is the single thing that makes a
--- throw look robotic.
---
--- The wind-up target lives in the character's own space, not the camera's, so
--- the hand draws back to the same readable spot every time. It is reached by an
--- under-damped spring, so the hand overshoots slightly and settles -- that small
--- bounce is most of what makes the action feel cartoony. While charge is held
--- the target stops moving and the hand simply stays there: the pause is the
--- spring arriving and having nowhere else to go.
---
--- Everything is measured from a configured shoulder offset rather than the
--- animated limb, because feeding the solver's own output back into its input
--- makes the pose crawl.
+-- Procedural throwing-arm pose. It owns the arm while a ball is held and leaves
+-- the torso, facing, and throw animation to their existing owners.
 
 local ArmIK = {}
 

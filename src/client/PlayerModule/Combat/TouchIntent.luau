@@ -3,24 +3,8 @@
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
 local TouchRegions = require(script.Parent:WaitForChild("TouchRegions"))
 
--- Per-touch classification: deciding whether a finger meant to attack or to look
--- around, and never confusing the two.
---
--- Each touch owns a small record and a state. State only moves forward, and the
--- important edge is one-way: once a touch has been claimed by the camera it can
--- never produce an attack, no matter what the finger does afterwards. That single
--- rule removes almost every accidental throw, because the overwhelmingly common
--- accident is "I was moving the camera and it attacked".
---
--- This module is a pure observer of the camera. It never suppresses, redirects
--- or applies camera input -- CameraInput keeps complete ownership of every
--- touch, exactly as upstream wrote it. That is what makes aiming while charging
--- work for free, and it means there is no arbitration to lose: two systems
--- cannot fight over a touch when only one of them is steering.
---
--- When a touch is ambiguous, nothing happens. A missed gesture costs a player
--- one repeat; a false attack costs them a cooldown, their position, and their
--- trust in the controls.
+-- Per-touch classification for attack and camera gestures. Camera input remains
+-- owned by CameraInput; a touch claimed by the camera cannot attack.
 
 local TouchIntent = {}
 
@@ -153,9 +137,7 @@ local function claimCamera(touch: Touch, reason: string)
 	if touch.state == "Camera" then
 		return
 	end
-	-- A charge that is already running is not undone by later movement: the
-	-- player is aiming, which is the whole point of being able to charge and
-	-- look at the same time.
+	-- Movement does not cancel an active charge.
 	if touch.state == "Charging" or touch.state == "Consumed" then
 		return
 	end

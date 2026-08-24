@@ -31,6 +31,8 @@ local CombatInputSender = {}
 
 local started = false
 local listeners: { (string) -> () } = {}
+local intentDisconnect: (() -> ())? = nil
+local heartbeat: RBXScriptConnection? = nil
 local buffer = InputBuffer.new()
 -- How a throw was performed, carried alongside the action so a buffered input
 -- replays as the same throw the player made.
@@ -129,7 +131,7 @@ local function actionable(): boolean
 		return false
 	end
 	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
-	return matchState == nil or matchState:GetAttribute("phase") == "Active"
+	return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
 end
 
 -- Actionable input is sent immediately, so no device pays a frame of latency
@@ -218,8 +220,23 @@ function CombatInputSender.start()
 	end
 	started = true
 
-	Combat.onIntent(onIntent)
-	RunService.Heartbeat:Connect(flush)
+	intentDisconnect = Combat.onIntent(onIntent)
+	heartbeat = RunService.Heartbeat:Connect(flush)
+end
+
+function CombatInputSender.destroy()
+	if intentDisconnect then
+		intentDisconnect()
+		intentDisconnect = nil
+	end
+	if heartbeat then
+		heartbeat:Disconnect()
+		heartbeat = nil
+	end
+	table.clear(listeners)
+	pendingStyle = nil
+	buffer = InputBuffer.new()
+	started = false
 end
 
 return CombatInputSender

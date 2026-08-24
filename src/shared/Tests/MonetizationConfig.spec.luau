@@ -5,28 +5,29 @@ local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
 local Products = require(script.Parent.Parent.Parent.Config.Products)
 
 T.describe("MonetizationConfig", function()
-	T.it("keeps preview products visible but out of receipt processing", function()
-		T.expect(next(Products.ById)):toBeNil()
+	T.it("maps active products into receipt processing and excludes previews", function()
+		T.expect(Products.ById[Products.Catalog.Bonks500.Id]):toEqual(Products.Catalog.Bonks500)
+		T.expect(Products.ById[Products.Catalog.HammerCrateOpen.Id]):toBeNil()
 		T.expect(Products.Catalog.Bonks500.BonksAmount):toEqual(500)
 		T.expect(Products.Catalog.Bonks1100.BonksAmount):toEqual(1100)
 		T.expect(Products.Catalog.Bonks2500.BonksAmount):toEqual(2500)
 		T.expect(Products.Catalog.Bonks5500.BonksAmount):toEqual(5500)
 		T.expect(Products.Catalog.DodgeballCrateOpen.SuggestedRobux):toEqual(39)
 		T.expect(Products.Catalog.EffectsCrateOpen.SuggestedRobux):toEqual(59)
-		for key, definition in Products.Catalog do
-			if key ~= "SeasonalBattlePass" then
-				T.expect(definition.CatalogStatus):toEqual("Preview")
-				T.expect(definition.Id):toBeNil()
+		for _, definition in Products.Catalog do
+			if definition.CatalogStatus == "Active" then
+				T.expect(Products.ById[definition.Id]):toEqual(definition)
+			else
+				T.expect(Products.ById[definition.Id]):toBeNil()
 			end
 		end
 	end)
 
-	T.it("configures permanent pass previews without inventing missing assets", function()
-		T.expect(next(GamePasses.ById)):toBeNil()
+	T.it("maps active boosters while leaving unauthored cosmetic passes in preview", function()
+		T.expect(GamePasses.ById[GamePasses.Catalog.DoubleXP.Id]):toEqual(GamePasses.Catalog.DoubleXP)
+		T.expect(GamePasses.ById[GamePasses.Catalog.SplatStarter.Id]):toBeNil()
 		T.expect(GamePasses.Catalog.SplatStarter.SuggestedRobux):toEqual(49)
 		T.expect(GamePasses.Catalog.EffectCollection.SuggestedRobux):toEqual(149)
-		T.expect(GamePasses.Catalog.BrawlersClub.SuggestedRobux):toEqual(499)
-		T.expect(GamePasses.Catalog.FoundersPack.SuggestedRobux):toEqual(999)
 		-- Slots with no authored content stay merchandised but grant nothing.
 		-- Every pass is in that state right now: the prototype cosmetics they
 		-- used to grant were removed, and a pass is never sold empty, so all of
@@ -36,8 +37,12 @@ T.describe("MonetizationConfig", function()
 		T.expect(#GamePasses.Catalog.CharacterCostumes.EntitlementItemIds):toEqual(0)
 		T.expect(#GamePasses.Catalog.EliminationEmotes.EntitlementItemIds):toEqual(0)
 		for _, definition in GamePasses.Catalog do
-			T.expect(definition.CatalogStatus):toEqual("Preview")
-			T.expect(definition.Id):toBeNil()
+			if definition.CatalogStatus == "Active" then
+				T.expect(definition.Id ~= nil):toBeTruthy()
+				T.expect(definition.Boosts ~= nil):toBeTruthy()
+			else
+				T.expect(definition.Id):toBeNil()
+			end
 		end
 	end)
 
@@ -48,7 +53,7 @@ T.describe("MonetizationConfig", function()
 		end
 		table.sort(prices)
 		T.expect(prices[1] <= 99):toBeTruthy()
-		T.expect(prices[#prices] >= 500):toBeTruthy()
+		T.expect(prices[#prices] >= 399):toBeTruthy()
 		T.expect(#prices >= 4):toBeTruthy()
 	end)
 

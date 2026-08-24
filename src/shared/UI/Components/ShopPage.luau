@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local ActivityDots = require(script.Parent.ActivityDots)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopCard = require(script.Parent.Shop.ShopCard)
 local ShopCountdown = require(script.Parent.Shop.ShopCountdown)
@@ -87,6 +88,16 @@ return function(props)
 					Size = UDim2.fromScale(0.3, 0.35),
 					Text = "RETRY",
 					OnActivated = props.OnRefresh,
+				})
+				else nil,
+			Activity = if model.status ~= "Error"
+				then c(ActivityDots, {
+					Active = true,
+					Native = {
+						Position = UDim2.fromScale(0.5, 0.68),
+						Size = UDim2.fromScale(0.1, 0.2),
+						ZIndex = 6,
+					},
 				})
 				else nil,
 		})

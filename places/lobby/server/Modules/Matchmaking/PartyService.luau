@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local Loading = require(ReplicatedStorage.Config.Loading)
 local DevSoloPlay = require(ReplicatedStorage.Shared.Matchmaking.DevSoloPlay)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
@@ -37,6 +38,7 @@ function PartyService.new(
 		_busy = {},
 		_initializing = {},
 		_teleportDispatching = {},
+		_teleportPresentationReady = {},
 		_colorConnections = {},
 		_colorRevisions = {},
 		_queueChangedHandler = nil,
@@ -138,10 +140,43 @@ function PartyService:_maybeTeleport(party)
 
 	self._teleportDispatching[party.partyId] = true
 	task.spawn(function()
+		local presentationDeadline = os.clock() + Loading.TeleportPresentationFallbackSeconds
+		while not self._destroyed and os.clock() < presentationDeadline do
+			local allPresented = true
+			for _, player in self:_getLocalPlayers(party.partyId) do
+				if not self._teleportPresentationReady[player.UserId] then
+					allPresented = false
+					break
+				end
+			end
+			if allPresented then
+				break
+			end
+			task.wait(0.1)
+		end
+
+		local current = self._cache[party.partyId]
+		if self._destroyed or current == nil or current.phase ~= "Teleporting" or current.matchId ~= party.matchId then
+			self._teleportDispatching[party.partyId] = nil
+			return
+		end
+
+		local currentPlayers = self:_getLocalPlayers(party.partyId)
+		if #currentPlayers == 0 then
+			self._teleportDispatching[party.partyId] = nil
+			return
+		end
 		self:_reportFunnel(party.partyId, "Teleporting", { matchId = party.matchId })
-		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, partyPlayers)
+		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, currentPlayers)
 		self._teleportDispatching[party.partyId] = nil
 	end)
+end
+
+function PartyService:HandleTeleportPresentationReady(player)
+	if player.Parent == Players then
+		self._teleportPresentationReady[player.UserId] = true
+		player:SetAttribute("TeleportPresentationReady", true)
+	end
 end
 
 function PartyService:_applyParty(party, reason)
@@ -1059,6 +1094,7 @@ function PartyService:Start()
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
+		self._teleportPresentationReady[player.UserId] = nil
 		self._colorRevisions[player.UserId] = (self._colorRevisions[player.UserId] or 0) + 1
 		local colorConnection = self._colorConnections[player]
 		if colorConnection then
@@ -1112,6 +1148,7 @@ function PartyService:Shutdown()
 		end
 	end
 	self._partyBus:Destroy()
+	self._teleportCoordinator:Destroy()
 end
 
 return PartyService

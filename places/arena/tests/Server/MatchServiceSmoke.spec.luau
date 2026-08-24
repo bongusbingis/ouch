@@ -28,7 +28,7 @@ return function()
 			expect(MatchService.phase()).to.equal("Idle")
 		end)
 
-		it("dispatches combat events to onEvent listeners", function()
+		it("rejects combat events for players outside the playable roster", function()
 			local seen = {}
 			MatchService.onEvent(function(event)
 				table.insert(seen, event)
@@ -36,15 +36,13 @@ return function()
 
 			local caught = { kind = "BallCaught", tick = 5, playerId = "1" }
 			expect(MatchService.handleCombatEvent(caught)).to.equal(false)
-			expect(#seen).to.equal(1)
-			expect(seen[1].kind).to.equal("BallCaught")
-			expect(seen[1] == caught).to.equal(false)
+			expect(#seen).to.equal(0)
 
 			-- Elims for unknown victims are rejected before any scoring.
 			expect(MatchService.handleCombatEvent({ kind = "Elim", tick = 6, sourceId = "1", targetId = "2" })).to.equal(
 				false
 			)
-			expect(#seen).to.equal(1)
+			expect(#seen).to.equal(0)
 		end)
 	end)
 end

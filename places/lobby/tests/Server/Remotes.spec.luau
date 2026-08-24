@@ -7,6 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local EXPECTED_REMOTES = {
 	PartyRequest = "RemoteFunction",
 	PartyPacket = "RemoteEvent",
+	TeleportPresentationReady = "RemoteEvent",
+	TeleportStatus = "RemoteEvent",
 }
 
 return function()

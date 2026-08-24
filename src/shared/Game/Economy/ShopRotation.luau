@@ -1,22 +1,7 @@
 --!strict
 
--- The per-player rotating shop: which cosmetics a given player is offered in a
--- given period.
---
--- Deterministic from (userId, periodIndex) alone. Nothing here reads a clock,
--- an Instance, or a global Random, so the same player on any server in the same
--- period draws the same offers and the whole thing is testable headlessly.
---
--- The draw excludes what the player already owns, which is exactly why the
--- result must be persisted rather than recomputed: buying one of three offers
--- shrinks the candidate pool, and a recompute would silently reshuffle the two
--- the player did not buy. ShopService stores the drawn set against the period
--- it was drawn for and only redraws when the period changes.
---
--- The generator is Park-Miller: state = (16807 * state) % (2^31 - 1). Its
--- largest intermediate product is about 3.6e13, comfortably inside the 2^53
--- integers a Luau number represents exactly, so every platform agrees bit for
--- bit. A larger textbook multiplier would overflow that and quietly diverge.
+-- Deterministic per-player shop rotation. Draws are persisted for the period
+-- because purchases change the candidate pool.
 
 local ShopRotation = {}
 
@@ -29,9 +14,6 @@ local function step(state: number): number
 	return (MULTIPLIER * state) % MODULUS
 end
 
--- Mixed with distinct odd multipliers so neighbouring users and neighbouring
--- periods do not land on neighbouring seeds, then advanced twice to shake out
--- the low-entropy first output Park-Miller gives a small seed.
 local function seedFor(userId: number, periodIndex: number): number
 	local mixed = (math.abs(userId) % MODULUS) * 40503 % MODULUS
 	mixed = (mixed + (math.abs(periodIndex) % MODULUS) * 2851) % MODULUS

@@ -13,9 +13,22 @@ local WriteThroughProxy = require(
 
 local Data = {}
 Data._profiles = {}
+Data._loaded = {}
+Data._loadGeneration = {}
+
+local loadedListeners = {}
 
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
+
+local function _notifyLoaded(player)
+	for _, listener in table.clone(loadedListeners) do
+		local ok, err = pcall(listener, player)
+		if not ok then
+			warn(`[Data] Loaded listener failed for {player.Name}: {err}`)
+		end
+	end
+end
 
 export type ProgressionDelta = {
 	Elims: number?,
@@ -101,6 +114,8 @@ local function _loadPlayerData(player)
 			end
 			Data._profiles[player.UserId].Replica:Destroy()
 			Data._profiles[player.UserId] = nil
+			Data._loaded[player.UserId] = nil
+			Data._loadGeneration[player.UserId] = (Data._loadGeneration[player.UserId] or 0) + 1
 			if player:IsDescendantOf(PlayersService) then
 				player:Kick("Your data has been released.\nPlease rejoin!")
 			end
@@ -195,6 +210,25 @@ end
 function Data.get(player)
 	local entry = Data._profiles[player.UserId]
 	return entry and entry.Data
+end
+
+function Data.isLoaded(player)
+	return Data._loaded[player.UserId] == true
+end
+
+function Data.onLoaded(listener)
+	table.insert(loadedListeners, listener)
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(loadedListeners, listener)
+		if index then
+			table.remove(loadedListeners, index)
+		end
+	end
 end
 
 function Data.addBonks(player, amount)
@@ -306,6 +340,9 @@ function Data.addFieldForTesting(player, field, amount)
 end
 
 function Data.load(player)
+	local generation = (Data._loadGeneration[player.UserId] or 0) + 1
+	Data._loadGeneration[player.UserId] = generation
+	Data._loaded[player.UserId] = nil
 	return _loadPlayerData(player)
 		:andThen(function()
 			_buildLeaderStats(player):await()
@@ -316,6 +353,15 @@ function Data.load(player)
 			end
 		end)
 		:andThen(function()
+			if
+				Data._loadGeneration[player.UserId] ~= generation
+				or Data._profiles[player.UserId] == nil
+				or not player:IsDescendantOf(PlayersService)
+			then
+				return
+			end
+			Data._loaded[player.UserId] = true
+			_notifyLoaded(player)
 			print(`[Data] Loaded profile for {player.Name} ({player.UserId})`)
 		end)
 		:catch(function(err)
@@ -329,6 +375,8 @@ function Data.save(player)
 		return
 	end
 	Data._profiles[player.UserId] = nil
+	Data._loaded[player.UserId] = nil
+	Data._loadGeneration[player.UserId] = (Data._loadGeneration[player.UserId] or 0) + 1
 	if entry.ReadyConnection then
 		entry.ReadyConnection:Disconnect()
 		entry.ReadyConnection = nil
