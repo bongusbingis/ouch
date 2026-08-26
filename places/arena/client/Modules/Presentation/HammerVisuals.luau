@@ -1,3 +1,8 @@
+-- Name: HammerVisuals.luau
+-- Author: Jack C.
+-- Description: Renders every player's equipped hammer: clones the cosmetic carrier, solves its grip onto the hand, scales and springs it through swings, and hosts the swing audio.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -30,9 +35,6 @@ local appliedAssets: { [Player]: string } = {}
 local visualBaseSizes: { [Player]: Vector3 } = {}
 local visualGripCFrames: { [Player]: CFrame } = {}
 local visualLongAxes: { [Player]: HammerGrip.Axis } = {}
--- Springs outlive the visual (hidden whenever the hammer is not the equipped
--- weapon, rebuilt on respawn) so a mid-wobble hammer resumes naturally; cleared
--- only on PlayerRemoving.
 local springs: { [Player]: Spring.Spring } = {}
 local seenEvents = EventDedup.new(4096)
 
@@ -78,8 +80,6 @@ end
 
 local function scaleFor(stretch: number, axis: HammerGrip.Axis): Vector3
 	local along = 1 + stretch
-	-- Volume-preserving: cross-axes thin as the hammer stretches and fatten
-	-- as it squashes.
 	local cross = 1 / math.sqrt(along)
 	if axis == "X" then
 		return Vector3.new(along, cross, cross)
@@ -176,7 +176,6 @@ function HammerVisuals.start()
 
 			local spring = springFor(player)
 			Spring.step(spring, feel.SpringFrequencyHz, feel.SpringDampingRatio, dt)
-			-- Per-player phase offset desyncs idle wobble between hammers.
 			local phase = (player.UserId % 100) * 0.618
 			local wobble = feel.IdleWobbleAmplitude * math.sin((now + phase) * feel.IdleWobbleHz * 2 * math.pi)
 			local stretch = math.clamp(spring.position + wobble, feel.MinStretch, feel.MaxStretch)
@@ -189,8 +188,6 @@ function HammerVisuals.start()
 			local handWorld = handGripCFrame(character, hand)
 
 			visual.Size = Vector3.new(baseSize.X * scale.X, baseSize.Y * scale.Y, baseSize.Z * scale.Z)
-			-- Size scales about the part center while the grip point remains local;
-			-- this correction keeps that point fixed on the hand.
 			visual.CFrame = handWorld
 				* itemGrip:Inverse()
 				* CFrame.new(gripLocal.X * (1 - scale.X), gripLocal.Y * (1 - scale.Y), gripLocal.Z * (1 - scale.Z))
@@ -199,7 +196,6 @@ function HammerVisuals.start()
 end
 
 function HammerVisuals.onEvent(event: any)
-	-- HammerSwing is absent on purpose: GameAudio plays it from config ids.
 	local soundNames = {
 		HammerHit = "Hit",
 		HammerMiss = "Miss",

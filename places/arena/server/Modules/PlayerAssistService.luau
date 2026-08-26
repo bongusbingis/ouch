@@ -1,3 +1,8 @@
+-- Name: PlayerAssistService.luau
+-- Author: Jack C.
+-- Description: Resolves each player's aim-assist scalars from config and device class and projects them onto the player so both the sim and the client read the same values.
+-- Created: 2026-08-19
+
 --!strict
 
 local ConfigService = game:GetService("ConfigService")
@@ -8,21 +13,6 @@ local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChi
 local AssistResolver = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Config"):WaitForChild("AssistResolver")
 )
-
--- Resolves each player's assist scalars through
--- ConfigService:GetConfigForPlayerAsync, so an experience config condition can
--- hold half the population at a different strength and the difference shows up
--- in telemetry.
---
--- This is deliberately not LiveConfigService. That one installs a single global
--- snapshot into the shared config tables, which by construction cannot express
--- a per-player value. Here each player gets their own resolved set, projected
--- onto value objects under their own Player so their client can read it and
--- nobody else's.
---
--- Every failure path lands on the baked defaults in Config.PlayerAssist: an
--- unavailable config service, a rejected value, or a player who left mid-resolve
--- all leave assists at their shipped strength rather than off or wild.
 
 local PlayerAssistService = {}
 
@@ -42,10 +32,6 @@ local function folderFor(player: Player): Folder
 	return folder
 end
 
--- One value object per entry, mirroring how ConfigState projects the global set.
--- Revision is bumped last, but consumers re-read every value on any change
--- rather than trusting it as a commit barrier: attributes and children do not
--- replicate in write order.
 local function project(player: Player, resolved: { [string]: any })
 	local folder = folderFor(player)
 	for _, entry in PlayerAssist.Entries do
@@ -75,8 +61,6 @@ local function apply(player: Player, rawValues: { [string]: any })
 	project(player, resolved)
 end
 
--- Reads every declared key, or none: one failed read abandons the pass so a
--- partial set never replaces a good one.
 local function readValues(snapshot: any): { [string]: any }?
 	local rawValues = {}
 	for _, entry in PlayerAssist.Entries do
@@ -110,8 +94,6 @@ local function acquire(player: Player)
 	if player.Parent ~= Players then
 		return
 	end
-	-- Defaults are projected first so the client always has a complete set to
-	-- read, even if the config service never answers.
 	apply(player, {})
 
 	local ok, snapshot = pcall(ConfigService.GetConfigForPlayerAsync, ConfigService, player)
@@ -139,12 +121,10 @@ local function acquire(player: Player)
 	refresh(player)
 end
 
--- Resolved scalars for a player, for the sim to attach to their commands.
 function PlayerAssistService.get(player: Player): { [string]: any }
 	return resolvedByPlayer[player] or PlayerAssist.Defaults
 end
 
--- Effective 0-1 strength for one feature on this player's active device.
 function PlayerAssistService.strength(player: Player, feature: string): number
 	local deviceClass = player:GetAttribute("DeviceClass") :: string?
 	local scale = AssistResolver.scaleFor(PlayerAssist.DeviceScale, deviceClass)

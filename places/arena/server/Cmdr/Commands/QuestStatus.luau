@@ -1,3 +1,8 @@
+-- Name: QuestStatus.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-quest-status: shows active daily quest progress for a player.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

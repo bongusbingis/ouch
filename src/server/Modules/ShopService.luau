@@ -1,3 +1,8 @@
+-- Name: ShopService.luau
+-- Author: Jack C.
+-- Description: Sole owner of the stored shop state: draws each player's rotating offers deterministically for the current period, persists them so a purchase cannot reshuffle the rest, and answers whether an item is currently purchasable.
+-- Created: 2026-08-22
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -12,17 +17,6 @@ local ShopRotation = require(Economy:WaitForChild("ShopRotation"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local DirectPurchase = require(Economy:WaitForChild("DirectPurchase"))
 local PlayerData = require(script.Parent.PlayerData)
-
--- Owns profile.Shop: which rotating offers a player currently has, and the
--- period they were drawn for.
---
--- The draw itself is pure (ShopRotation) and depends only on userId and the
--- period index, so two servers agree without talking. What must be stored is
--- the *result*, because the draw excludes owned items -- recomputing after a
--- purchase would reshuffle the offers the player did not buy.
---
--- The featured crate and featured bundle are not stored at all: both are global
--- functions of the clock, so every client derives them independently.
 
 local ShopService = {}
 
@@ -40,9 +34,6 @@ local function rotationPool(): { string }
 	return ShopRotation.pool(Cosmetics.Items, Shop.Rotation.Categories)
 end
 
--- Draws when the stored period is stale, and only then. One assignment to
--- data.Shop, not a nested mutation: the write-through proxy replicates a Set
--- per assignment, and mutating Offers in place would never reach the client.
 function ShopService.ensure(player: Player): any?
 	local data = activePlayerData.get(player)
 	if data == nil then
@@ -80,7 +71,6 @@ function ShopService.offersFor(player: Player): { string }
 	return offersFrom(ShopService.ensure(player))
 end
 
--- Rotation items are purchasable only while offered.
 function ShopService.isPurchasable(player: Player, itemId: string): boolean
 	local item = Cosmetics.Items[itemId]
 	if item == nil then
@@ -145,8 +135,6 @@ function ShopService.fireState(player: Player)
 	activeNetwork.fire("ShopStateChanged", player, ShopService.stateFor(player))
 end
 
--- An idle player would otherwise not cross a rotation boundary until they next
--- opened the shop.
 local function sweep()
 	for _, player in activePlayers:GetPlayers() do
 		local before = activePlayerData.get(player)

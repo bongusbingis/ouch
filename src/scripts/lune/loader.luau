@@ -1,8 +1,9 @@
---!strict
+-- Name: loader.luau
+-- Author: Jack C.
+-- Description: Builds a fake instance tree from Rojo's sourcemap so modules written with Roblox-style requires can be loaded and run headlessly under Lune.
+-- Created: 2026-07-12
 
--- Sourcemap-based module loader: builds a fake Instance tree from Rojo's
--- sourcemap.json so ModuleScripts written with Roblox-style requires
--- (`require(script.Parent.X)`) run headlessly under Lune.
+--!strict
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -34,8 +35,6 @@ local FakeCFrame = {
 	identity = setmetatable({ Position = vector.zero }, fakeCFrameMeta),
 }
 
--- Real Color3 exposes both R/G/B and legacy r/g/b accessors; keep both so
--- headless modules can read either.
 local function fakeColor3(r: number, g: number, b: number)
 	return { R = r, G = g, B = b, r = r, g = g, b = b }
 end

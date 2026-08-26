@@ -1,7 +1,9 @@
+-- Name: Config.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec checking the shipped lobby matchmaking configuration is coherent: a real arena place, usable party bounds, a reachable relaxing population target, positive lifetimes, and separated store namespaces.
+-- Created: 2026-08-18
+
 --!strict
--- In-place checks on the lobby's matchmaking configuration. These run against
--- the built lobby place, so they catch a config that parses fine in isolation
--- but is incoherent as shipped.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -29,8 +31,6 @@ return function()
 			local previous = ladder[1]
 			for index = 2, #ladder do
 				local step = ladder[index]
-				-- Later rungs must wait longer and never demand more players, or a
-				-- queue could tighten instead of opening up as it ages.
 				expect(step.AfterSeconds > previous.AfterSeconds).to.equal(true)
 				expect(step.MinimumPlayers <= previous.MinimumPlayers).to.equal(true)
 				previous = step

@@ -1,3 +1,8 @@
+-- Name: NotificationModal.luau
+-- Author: Jack C.
+-- Description: The shared notification and confirmation modal, rendering a title, message, and action buttons for whatever the notification context has queued.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")

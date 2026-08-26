@@ -1,3 +1,8 @@
+-- Name: ShopSection.luau
+-- Author: Jack C.
+-- Description: One titled storefront section, laying out its cards and its rotation countdown.
+-- Created: 2026-08-23
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

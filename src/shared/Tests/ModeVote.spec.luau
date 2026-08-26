@@ -1,3 +1,8 @@
+-- Name: ModeVote.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the pure ballot: one vote per player, removal of departed voters, random selection when nobody votes or leaders tie, and the capped late-ready extension.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -26,9 +31,7 @@ T.describe("ModeVote", function()
 		T.expect(not ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
 		ModeVote.cast(state, 2, "TDM")
 		T.expect(ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
-		-- A voter who is not listed cannot satisfy the roster on someone's behalf.
 		T.expect(not ModeVote.allVoted(state, { 1, 2, 3 })):toBeTruthy()
-		-- An empty roster never counts as everyone having voted.
 		T.expect(not ModeVote.allVoted(state, {})):toBeTruthy()
 	end)
 

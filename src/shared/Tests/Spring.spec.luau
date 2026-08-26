@@ -1,12 +1,12 @@
+-- Name: Spring.spec.luau
+-- Author: Jack C.
+-- Description: Spec that the damped spring settles on its target and stays stable and finite across low frame rates and every frequency the game configures.
+-- Created: 2026-07-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)
 local Spring = require(script.Parent.Parent.Game.Util.Spring)
-
--- Stability is the point of these. An unstable spring does not merely look
--- wrong: its position runs away to infinity within a few frames, and anything
--- driven by it (an IK target, a part CFrame) becomes non-finite and stays that
--- way for the rest of the session.
 
 local function settle(frequency: number, damping: number, fps: number, seconds: number): number
 	local spring = Spring.new(0)
@@ -23,7 +23,6 @@ T.describe("Spring", function()
 	end)
 
 	T.it("stays stable at the frequencies the throw pose uses", function()
-		-- 14Hz diverged at 60fps before the integration was substepped.
 		T.expect(settle(14, 1, 60, 2)):toBeNear(1, 1e-3)
 		T.expect(settle(11, 0.62, 60, 2)):toBeNear(1, 1e-3)
 	end)
@@ -35,7 +34,6 @@ T.describe("Spring", function()
 	end)
 
 	T.it("stays stable at frequencies far above anything configured", function()
-		-- Headroom, so a tuning session cannot produce a permanently broken pose.
 		T.expect(settle(40, 1, 60, 3)):toBeNear(1, 1e-2)
 	end)
 
@@ -61,8 +59,6 @@ T.describe("Spring", function()
 			maxUnder = math.max(maxUnder, under.position)
 			maxCritical = math.max(maxCritical, critical.position)
 		end
-		-- The bounce is what makes the wind-up read as cartoony rather than
-		-- mechanical, so it is a behaviour worth pinning.
 		T.expect(maxUnder > 1):toBeTruthy()
 		T.expect(maxCritical <= 1.001):toBeTruthy()
 	end)

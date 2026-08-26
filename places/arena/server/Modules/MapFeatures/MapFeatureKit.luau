@@ -1,13 +1,9 @@
---!strict
+-- Name: MapFeatureKit.luau
+-- Author: Jack C.
+-- Description: The interface every authored map feature implements, naming the arena scriptables folder it drives and the optional per-player, per-world, and forget hooks the feature service calls.
+-- Created: 2026-08-18
 
--- The interface every authored map feature implements. Adding a feature (fans,
--- jump pads, moving obstacles) means one module satisfying this type plus a
--- MapFeatureRegistry entry — MapFeatureService, the arena, and the match
--- lifecycle do not change.
---
--- folderName is the folder under Workspace.Assets.Arena.Scriptables whose direct
--- BasePart children this kit drives. The service discovers those parts, keeps
--- them current as the folder changes, and drives the hooks below each Heartbeat.
+--!strict
 
 export type Context = {
 	instances: { Instance },
@@ -17,17 +13,9 @@ export type Context = {
 
 export type MapFeatureKit = {
 	folderName: string,
-	-- Class of direct child this kit drives, defaulting to BasePart. Kits that
-	-- drive authored Models (a trampoline, a rig) declare "Model" instead.
 	instanceClass: string?,
-	-- Per-Heartbeat per-alive-player update. The common shape: react to a player
-	-- being inside one of this kit's parts.
 	tickPlayer: ((context: Context, player: Player, root: BasePart) -> ())?,
-	-- Per-Heartbeat update independent of players, for features that move or
-	-- animate their own parts. Optional.
 	tickWorld: ((context: Context) -> ())?,
-	-- Drop any per-player state this kit accumulated. Called when a player
-	-- leaves and when the kit is unbound.
 	forget: ((player: Player?) -> ())?,
 }
 

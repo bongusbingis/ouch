@@ -1,9 +1,9 @@
---!strict
+-- Name: Spring.luau
+-- Author: Jack C.
+-- Description: Damped spring for presentation feel, pure number maths with deterministic steps and a clamped timestep so frame hitches cannot destabilize it.
+-- Created: 2026-07-18
 
--- Damped spring for presentation feel (squash/stretch, wobble). Pure number
--- math with deterministic semi-implicit Euler steps so it runs headlessly
--- under Lune. dt is clamped so frame hitches cannot destabilize the
--- integration.
+--!strict
 
 local Spring = {}
 
@@ -14,13 +14,6 @@ export type Spring = {
 }
 
 local MAX_STEP = 1 / 30
--- Semi-implicit Euler only stays stable while omega * h is small. Past roughly
--- 1 it oscillates, and past 2 it diverges outright -- the position runs away to
--- infinity within a handful of frames and never recovers, because there is no
--- restoring force strong enough to pull an infinite value back. A spring at
--- 14Hz crosses that line at 60fps, so the integration is substepped to keep
--- each step well inside the stable region rather than trusting callers to pick
--- timid frequencies.
 local SAFE_OMEGA_STEP = 0.35
 local MAX_SUBSTEPS = 12
 

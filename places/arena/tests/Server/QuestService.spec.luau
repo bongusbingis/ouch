@@ -1,8 +1,9 @@
+-- Name: QuestService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec for the quest service injection seam and the guard paths reachable without loaded profiles.
+-- Created: 2026-07-16
+
 --!nonstrict
--- QuestService through its injection seam: start(matchService) wiring and the
--- guard paths reachable without profiles. Real profile flows (ProfileStore →
--- DataStores, PlayerAdded) need real players and stay covered by the pure
--- QuestLogic specs; the cloud environment cannot emulate them.
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -27,13 +28,11 @@ return function()
 			expect(#listeners).to.equal(1)
 			expect(listeners[1]).to.equal(QuestService.handleMatchEvent)
 
-			-- start is guarded: a second start must not double-register.
 			QuestService.start(fakeMatchService)
 			expect(#listeners).to.equal(1)
 		end)
 
 		it("claim reports profile_not_ready for players without loaded data", function()
-			-- FakePlayer.Parent is nil, so the profile wait exits immediately.
 			local player = FakePlayer.new(500001)
 			local ok, reason = QuestService.claim(player, "any_quest")
 			expect(ok).to.equal(false)

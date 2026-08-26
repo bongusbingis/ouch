@@ -1,3 +1,8 @@
+-- Name: MatchmakingScript.server.luau
+-- Author: Jack C.
+-- Description: Lobby server entry point for matchmaking: constructs the repositories, party bus, party service, matchmaker, and teleport coordinator and starts the matchmaking tick.
+-- Created: 2026-08-15
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AnalyticsConfig = require(ReplicatedStorage.Config.Analytics)

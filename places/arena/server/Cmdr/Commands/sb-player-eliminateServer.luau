@@ -1,3 +1,8 @@
+-- Name: sb-player-eliminateServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-player-eliminate, routing through the match service elimination seam so scoring, quests, and respawn scheduling all run.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

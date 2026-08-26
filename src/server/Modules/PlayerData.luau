@@ -1,3 +1,8 @@
+-- Name: PlayerData.luau
+-- Author: Jack C.
+-- Description: Loads, saves, and replicates player profiles, exposing a write-through proxy so mutations replicate automatically, plus the balance, XP, and progression mutators every other service goes through.
+-- Created: 2026-07-12
+
 local PlayersService = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,11 +20,14 @@ local Data = {}
 Data._profiles = {}
 Data._loaded = {}
 Data._loadGeneration = {}
+Data._writeLeaseCounts = {}
+Data._pendingSaves = {}
 
 local loadedListeners = {}
 
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
+local WRITE_LEASE_TIMEOUT_SECONDS = 10
 
 local function _notifyLoaded(player)
 	for _, listener in table.clone(loadedListeners) do
@@ -93,12 +101,8 @@ local function _loadPlayerData(player)
 
 		profile:AddUserId(player.UserId)
 
-		-- Reconcile before Replica.New: after that every write emits a Set, and
-		-- back-filling template defaults would replicate as a burst of changes
-		-- the client has no reason to see.
 		profile:Reconcile()
 
-		-- Self-cleaning: disconnects after one fire so it doesn't accumulate.
 		local sessionConn
 		sessionConn = profile.OnSessionEnd:Connect(function()
 			if sessionConn then
@@ -115,6 +119,8 @@ local function _loadPlayerData(player)
 			Data._profiles[player.UserId].Replica:Destroy()
 			Data._profiles[player.UserId] = nil
 			Data._loaded[player.UserId] = nil
+			Data._writeLeaseCounts[player.UserId] = nil
+			Data._pendingSaves[player.UserId] = nil
 			Data._loadGeneration[player.UserId] = (Data._loadGeneration[player.UserId] or 0) + 1
 			if player:IsDescendantOf(PlayersService) then
 				player:Kick("Your data has been released.\nPlease rejoin!")
@@ -276,8 +282,6 @@ function Data.completeTutorial(player): boolean
 	return true
 end
 
--- Stamped once, on the first session that ever loads this profile. The starter
--- offer window is measured from it, so it must never be rewritten on later joins.
 function Data.markFirstJoin(player, now)
 	local d = Data.get(player)
 	if not d or d.Onboarding.FirstJoinAt > 0 then
@@ -369,20 +373,77 @@ function Data.load(player)
 		end)
 end
 
-function Data.save(player)
-	local entry = Data._profiles[player.UserId]
-	if not entry then
+local function _finishSave(userId, entry)
+	if Data._profiles[userId] ~= entry then
 		return
 	end
-	Data._profiles[player.UserId] = nil
-	Data._loaded[player.UserId] = nil
-	Data._loadGeneration[player.UserId] = (Data._loadGeneration[player.UserId] or 0) + 1
+	Data._profiles[userId] = nil
+	Data._pendingSaves[userId] = nil
+	Data._writeLeaseCounts[userId] = nil
 	if entry.ReadyConnection then
 		entry.ReadyConnection:Disconnect()
 		entry.ReadyConnection = nil
 	end
 	entry.Replica:Destroy()
 	entry.Profile:EndSession()
+end
+
+function Data.acquireWriteLease(player)
+	local userId = player.UserId
+	local entry = Data._profiles[userId]
+	if entry == nil or Data._pendingSaves[userId] ~= nil then
+		return nil
+	end
+
+	Data._writeLeaseCounts[userId] = (Data._writeLeaseCounts[userId] or 0) + 1
+	local released = false
+	return function()
+		if released then
+			return
+		end
+		released = true
+		local count = Data._writeLeaseCounts[userId]
+		if count == nil then
+			return
+		end
+		if count > 1 then
+			Data._writeLeaseCounts[userId] = count - 1
+			return
+		end
+		Data._writeLeaseCounts[userId] = nil
+		local pending = Data._pendingSaves[userId]
+		if pending and pending.Entry == entry then
+			_finishSave(userId, entry)
+		end
+	end
+end
+
+function Data.save(player)
+	local userId = player.UserId
+	local entry = Data._profiles[userId]
+	if not entry or Data._pendingSaves[userId] ~= nil then
+		return
+	end
+	Data._loaded[userId] = nil
+	Data._loadGeneration[userId] = (Data._loadGeneration[userId] or 0) + 1
+	if entry.ReadyConnection then
+		entry.ReadyConnection:Disconnect()
+		entry.ReadyConnection = nil
+	end
+	if (Data._writeLeaseCounts[userId] or 0) == 0 then
+		_finishSave(userId, entry)
+		return
+	end
+
+	local pending = { Entry = entry }
+	Data._pendingSaves[userId] = pending
+	task.delay(WRITE_LEASE_TIMEOUT_SECONDS, function()
+		if Data._pendingSaves[userId] ~= pending then
+			return
+		end
+		warn(`[Data] Timed out waiting for profile writes for user {userId}; closing the profile session`)
+		_finishSave(userId, entry)
+	end)
 end
 
 return Data

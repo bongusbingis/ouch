@@ -1,3 +1,8 @@
+-- Name: ArenaApp.luau
+-- Author: Jack C.
+-- Description: Root React component for the arena, rendering the loading screen, the game-mode ballot, and the in-match menu from their adapters' snapshots.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +24,8 @@ local ArenaTeleportClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaTeleportClient"))
 local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+local PostMatchClient =
+	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("PostMatchClient"))
 
 local c = React.createElement
 
@@ -57,7 +64,7 @@ local function useLoadingTip(visible: boolean): string?
 	return tip
 end
 
-local function loadingCopy(loading, vote, teleportStatus)
+local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 	if teleportStatus then
 		if teleportStatus.state == "Failed" then
 			return "RETURN FAILED", "WE COULD NOT REACH THE LOBBY"
@@ -86,6 +93,8 @@ local function loadingCopy(loading, vote, teleportStatus)
 		return "GETTING EVERYONE READY", `{loading.readyPlayerCount} OF {loading.expectedPlayerCount} READY`
 	elseif vote.open then
 		return "GETTING THE VOTE READY", nil
+	elseif loading.matchPhase == "Results" and not hasResult then
+		return "JOINING NEXT ROUND", "THIS ROUND IS WRAPPING UP"
 	end
 	return "JOINING MATCH", nil
 end
@@ -94,6 +103,7 @@ return function(props: Props)
 	local loading = useExternalStore(ArenaLoadingClient.getSnapshot, ArenaLoadingClient.subscribe)
 	local vote = useExternalStore(ModeVoteClient.getSnapshot, ModeVoteClient.subscribe)
 	local teleportStatus = useExternalStore(ArenaTeleportClient.getSnapshot, ArenaTeleportClient.subscribe)
+	local postMatch = useExternalStore(PostMatchClient.getSnapshot, PostMatchClient.subscribe)
 	local hostPresented, setHostPresented = React.useState(false)
 	local presentedVoteStartsAt, setPresentedVoteStartsAt = React.useState(-1)
 	local options = if #vote.options > 0 then vote.options else loading.modeOptions
@@ -114,14 +124,19 @@ return function(props: Props)
 		end
 	end
 
-	local votePresented = vote.open and presentedVoteStartsAt == vote.startsAt
-	local matchVisible = loading.matchPhase == "Active"
-		or loading.matchPhase == "Results"
-		or loading.matchPhase == "Intermission"
+	local clientReady = loading.localReady and loading.serverReady
+	local canPresentVote = clientReady and vote.admitted and vote.open
+	local votePresented = canPresentVote and presentedVoteStartsAt == vote.startsAt
+	local matchVisible = clientReady
+		and (
+			loading.matchPhase == "Active"
+			or loading.matchPhase == "Intermission"
+			or (loading.matchPhase == "Results" and postMatch.result ~= nil)
+		)
 	local returning = teleportStatus ~= nil and teleportStatus.state ~= "Complete"
 	local loadingVisible = not hostPresented or returning or (not votePresented and not matchVisible)
 	local tip = useLoadingTip(loadingVisible and not returning)
-	local title, detail = loadingCopy(loading, vote, teleportStatus)
+	local title, detail = loadingCopy(loading, vote, teleportStatus, postMatch.result ~= nil)
 	local primaryAction = nil
 	local secondaryAction = nil
 	if teleportStatus and teleportStatus.state == "Failed" then
@@ -169,7 +184,7 @@ return function(props: Props)
 			})
 			else nil,
 		GameModeSelect = c(GameModeSelect, {
-			Active = vote.admitted and vote.open,
+			Active = canPresentVote,
 			Prepared = vote.admitted and #modes > 0,
 			Modes = modes,
 			EndsAt = vote.endsAt,

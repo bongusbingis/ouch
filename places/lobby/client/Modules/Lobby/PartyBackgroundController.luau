@@ -1,3 +1,8 @@
+-- Name: PartyBackgroundController.luau
+-- Author: Jack C.
+-- Description: Controls the lobby background scene camera and its transitions while the party and matchmaking UI is shown.
+-- Created: 2026-08-15
+
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 

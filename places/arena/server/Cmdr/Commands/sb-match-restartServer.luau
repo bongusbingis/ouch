@@ -1,3 +1,8 @@
+-- Name: sb-match-restartServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-match-restart, restarting the match through the match service's developer mode-selection seam.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

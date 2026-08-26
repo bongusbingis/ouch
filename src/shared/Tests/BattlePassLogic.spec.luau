@@ -1,3 +1,8 @@
+-- Name: BattlePassLogic.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the pure season pass rules: tier derivation from XP, progress into the next tier, active season selection, claim legality, what is owed, and stored state normalization.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -59,7 +64,6 @@ T.describe("BattlePassLogic", function()
 		T.expect(BattlePassLogic.activeSeason(defs, 999)):toBeNil()
 		T.expect(BattlePassLogic.activeSeason(defs, 1000).Id):toEqual("T1")
 		T.expect(BattlePassLogic.activeSeason(defs, 1999).Id):toEqual("T1")
-		-- EndsAt is exclusive, so the rest gap starts immediately.
 		T.expect(BattlePassLogic.activeSeason(defs, 2000)):toBeNil()
 	end)
 
@@ -159,17 +163,12 @@ T.describe("BattlePassLogic", function()
 	T.it("ships a season whose full track is reachable in a sane number of hours", function()
 		local season = Seasons.Definitions.S1
 		local total = season.XpThresholds[season.TierCount]
-		-- ~1,650 XP/hour from ProgressionXP at roughly ten matches an hour.
 		local hours = total / 1650
 		T.expect(hours > 5):toBeTruthy()
 		T.expect(hours < 20):toBeTruthy()
 	end)
 
 	T.it("gives the shipped free track real rewards, not just a premium teaser", function()
-		-- Reward *kind* is deliberately not asserted. The free track's cosmetic
-		-- tiers pay Bonks while the effect catalog is being rebuilt, and pinning
-		-- the kind here would block that without protecting anything: what makes
-		-- the free track worth playing is that it pays out often and materially.
 		local season = Seasons.Definitions.S1
 		local freeCount = 0
 		local freeValue = 0

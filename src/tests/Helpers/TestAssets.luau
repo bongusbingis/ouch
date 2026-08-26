@@ -1,7 +1,9 @@
+-- Name: TestAssets.luau
+-- Author: Jack C.
+-- Description: Fail-fast lookups for Studio-authored assets inside specs, surfacing a missing asset as a named failure instead of hanging the cloud task.
+-- Created: 2026-07-16
+
 --!strict
--- Fail-fast lookups for Studio-authored assets inside specs. WaitForChild on a
--- missing asset would hang the cloud task until its 5-minute cap; FindFirstChild
--- plus assert surfaces the same setup problem as an immediate, named failure.
 
 local TestAssets = {}
 

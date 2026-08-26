@@ -1,13 +1,13 @@
+-- Name: Infection.luau
+-- Author: Jack C.
+-- Description: Infection game mode: picks patient zero, converts eliminated survivors to the infected side instead of scoring, and hands the win to the survivors if the clock runs out.
+-- Created: 2026-08-19
+
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
 local GameMode = require(script.Parent.GameMode)
-
--- Infection. One player starts infected; every survivor an infected eliminates
--- joins them. Infected win the moment the last survivor falls, survivors win if
--- any are still standing when the clock runs out.
--- Survivors receive balls; infected do not. Eliminated infected respawn infected.
 
 local Infection = {}
 
@@ -19,8 +19,6 @@ Infection.InfectedTeam = "Infected"
 Infection.teams = { Infection.SurvivorTeam, Infection.InfectedTeam }
 Infection.rules = {
 	MinPlayers = 2,
-	-- Not a score race; the mode ends on total conversion or the clock. Kept
-	-- above any reachable conversion count so it never ends the match itself.
 	ScoreTarget = math.huge,
 	TimeCapSeconds = 180,
 	ResultsSeconds = 8,
@@ -32,8 +30,6 @@ Infection.rules = {
 	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
--- Pure rules, kept out of the hooks so they are testable without a DataModel.
-
 function Infection.countSurvivors(teamIds: { string? }): number
 	local survivors = 0
 	for _, teamId in teamIds do
@@ -44,8 +40,6 @@ function Infection.countSurvivors(teamIds: { string? }): number
 	return survivors
 end
 
--- Index of the player who starts infected. Takes the chooser so a test can pin
--- the pick, matching how ModeVote resolves ties.
 function Infection.pickPatientZero(playerCount: number, chooseIndex: (number) -> number): number?
 	if playerCount < 2 then
 		return nil
@@ -62,10 +56,6 @@ function Infection.isConversion(sourceTeam: string?, targetTeam: string?): boole
 	return sourceTeam == Infection.InfectedTeam and targetTeam == Infection.SurvivorTeam
 end
 
--- Server hooks.
-
--- Created on first use rather than at module scope: modes are required by the
--- headless specs, which have no engine globals.
 local random: Random? = nil
 
 local function randomIndex(count: number): number
@@ -98,8 +88,6 @@ function Infection.onMatchStart(ctx: GameMode.ModeContext)
 	end
 end
 
--- Late joiners arrive as infected: dropping a fresh survivor into a match the
--- infection is already winning would hand the survivors a free extra life.
 function Infection.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, isFirstSpawn: boolean)
 	if isFirstSpawn and ctx.getPlayerTeam(player) == nil then
 		ctx.setPlayerTeam(player, Infection.InfectedTeam)
@@ -123,8 +111,6 @@ function Infection.onElim(ctx: GameMode.ModeContext, sourceId: string?, targetId
 		return
 	end
 
-	-- The dropped ball is released by the sim when its holder dies, so a
-	-- converted survivor arrives on the infected side unarmed.
 	ctx.setPlayerTeam(target, Infection.InfectedTeam)
 
 	if Infection.countSurvivors(teamsOf(ctx)) == 0 then

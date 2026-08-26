@@ -1,6 +1,9 @@
---!strict
+-- Name: MatchAudio.luau
+-- Author: Jack C.
+-- Description: Drives match music and the results whistle from the replicated match phase, starting, crossfading, and stopping tracks as the match moves between phases.
+-- Created: 2026-07-25
 
--- Client presentation for phase-driven match music and the results whistle.
+--!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

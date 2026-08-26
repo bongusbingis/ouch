@@ -1,3 +1,8 @@
+-- Name: WriteThroughProxy.luau
+-- Author: Jack C.
+-- Description: Wraps a profile table so nested reads stay writable and every assignment is forwarded to the replication writer, keeping one copy of the data.
+-- Created: 2026-08-23
+
 --!strict
 
 local WriteThroughProxy = {}

@@ -1,3 +1,8 @@
+-- Name: init.luau
+-- Author: Jack C.
+-- Description: The combat input layer's public surface: raw device input in, device-independent intents out, so the rest of the game never touches the input service or mouse behavior directly for combat.
+-- Created: 2026-08-20
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -12,23 +17,6 @@ local CombatConfig = require(script:WaitForChild("CombatConfig"))
 local DeviceInput = require(script:WaitForChild("DeviceInput"))
 local TouchIntent = require(script:WaitForChild("TouchIntent"))
 local TouchRegions = require(script:WaitForChild("TouchRegions"))
-
--- The combat input layer: raw device input in, device-independent intent out.
---
--- This is the whole public surface. The game never touches UserInputService,
--- MouseBehavior or MouseIconEnabled for combat purposes -- it enables combat,
--- listens for intents, and asks for the cursor when a menu needs one.
---
---   raw input  ->  classification  ->  intent  ->  weapon systems
---
--- Intents are requests, not outcomes. Whether a throw is legal, what it costs,
--- how far it goes and whether it hits are all decisions for the weapon and
--- server code downstream. Nothing here knows a dodgeball from a hammer beyond
--- which button was pressed.
---
--- Defaults are off with a free cursor. The lobby is a menu and must keep its
--- pointer; the arena turns combat on when a match starts. That way a place that
--- never mentions this module behaves exactly like stock Roblox.
 
 local Combat = {}
 
@@ -55,9 +43,6 @@ local function emit(intent: Intent)
 	end
 end
 
--- Combat input is live only when it is switched on and the camera is actually
--- in combat mode. Tying them together means a menu that asks for the cursor also
--- silences attacks, with no second flag for callers to remember.
 local function isLive(): boolean
 	return inputEnabled and CombatCamera.isActive()
 end
@@ -91,12 +76,6 @@ local handlers = {
 	end,
 }
 
---==================================================================
--- Public API
---==================================================================
-
--- Master switch for producing combat intents. Off during results, cutscenes,
--- intermission, the lobby, or anywhere attacking makes no sense.
 function Combat.setInputEnabled(value: boolean)
 	if inputEnabled == value then
 		return
@@ -115,8 +94,6 @@ function Combat.isActive(): boolean
 	return isLive()
 end
 
--- Over-the-shoulder locked camera. Independent of input: a spectator or a
--- cutscene may want the framing without the attacks, and vice versa.
 function Combat.setCameraEnabled(value: boolean)
 	CombatCamera.setEnabled(value)
 end
@@ -125,13 +102,7 @@ function Combat.isCameraEnabled(): boolean
 	return CombatCamera.isEnabled()
 end
 
--- Ask for the pointer back while a menu is open, keyed by who wants it. Combat
--- input goes quiet for as long as any request is outstanding, and the cursor
--- only returns to the game when the last requester releases.
 function Combat.requestCursor(reason: string)
-	-- Guarded because callers poll this every frame. Unguarded, cancelEverything
-	-- ran 60x a second for the whole mode vote, clearing the touch table before
-	-- any gesture could be tracked.
 	if CombatCamera.isCursorRequested(reason) then
 		return
 	end
@@ -157,14 +128,6 @@ function Combat.onGesture(listener: (GestureEvent) -> ()): () -> ()
 	return TouchIntent.onGesture(listener)
 end
 
--- For the HUD's weapon slots to call when tapped. A slot press is unambiguous,
--- so like the hammer button it bypasses touch classification entirely and can
--- never be mistaken for a look or a throw. This is how mobile equips: there is
--- no gesture for it, only the button the player pressed.
---
--- Not gated on isLive(): a player may set their slot while the mode vote has the
--- cursor, or between rounds, and the server accepts an equip outside an active
--- match for the same reason.
 function Combat.equipHammer()
 	emit("EquipHammer")
 end
@@ -173,21 +136,14 @@ function Combat.equipDodgeball()
 	emit("EquipDodgeball")
 end
 
--- True while a charge is building on any device, for HUD and pose systems that
--- want to reflect it without tracking presses themselves.
 function Combat.isCharging(): boolean
 	return TouchIntent.isCharging()
 end
 
--- Screen space owned by a HUD control, so touches there never become attacks.
--- Pass nil to clear. The hammer button is the expected caller.
 function Combat.registerHudExclusion(name: string, rect: TouchRegions.Rect?)
 	TouchRegions.setExclusion(name, rect)
 end
 
--- For an on-screen hammer button to call directly. A button press is
--- unambiguous, so it bypasses classification entirely -- the touch belongs to
--- the hammer from the moment it lands and can never become a look or a throw.
 function Combat.hammerPressed()
 	if not isLive() then
 		return
@@ -195,9 +151,6 @@ function Combat.hammerPressed()
 	emit("HammerAttack")
 end
 
--- True while any touch is being used to look around. Presentation systems that
--- want to know the player is actively aiming read this rather than keeping their
--- own touch listener.
 function Combat.isCameraTouchActive(): boolean
 	return TouchIntent.isCameraTouchActive()
 end
@@ -214,9 +167,6 @@ function Combat.start()
 
 	TouchRegions.start()
 
-	-- The movement stick and jump button report their own rectangles. Position
-	-- guessing cannot work here: a dynamic thumbstick materialises wherever the
-	-- player's thumb lands, so only the control itself knows where it is.
 	PlayerModuleEventBus:subscribe("HUD_REGION"):Connect(function(name: string, rect: TouchRegions.Rect?)
 		TouchRegions.setExclusion(name, rect)
 	end)
@@ -237,14 +187,11 @@ function Combat.start()
 	UserInputService.TouchMoved:Connect(function(input, sunk)
 		TouchIntent.moved(input, sunk)
 	end)
-	-- Not gated: a release has to resolve its own gesture even if combat was
-	-- switched off mid-press, or the charge never unwinds.
 	UserInputService.TouchEnded:Connect(function(input)
 		TouchIntent.ended(input)
 	end)
 
 	RunService.Heartbeat:Connect(TouchIntent.step)
-	-- Anything that can swallow the release that would have ended a gesture.
 	local player = Players.LocalPlayer
 	player.CharacterRemoving:Connect(cancelEverything)
 	CombatCamera.onChanged(function(active)

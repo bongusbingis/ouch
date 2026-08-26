@@ -1,3 +1,8 @@
+-- Name: CombatInputSender.luau
+-- Author: Jack C.
+-- Description: Turns local combat intents (throw, charge, catch, hammer swing, weapon equip) into server submissions over the combat remotes, buffering inputs that arrive while an action is not yet legal.
+-- Created: 2026-08-18
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -15,18 +20,6 @@ local AimDirector = require(script.Parent.AimDirector)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local CombatState = require(script.Parent.Parent.Presentation.CombatState)
 
--- Sends throw and catch intent to the server. Intent only: the server decides
--- whether the action is legal, where it starts from, and what it hits.
---
--- Input is classified upstream in PlayerModule.Combat, which owns every device
--- and every touch. What arrives here is already device-independent intent, so
--- there is one code path regardless of whether the player tapped, clicked,
--- flicked or pulled a trigger.
---
--- There are only two throws: a normal one and a charged one. Every gesture that
--- is not a hold produces the normal throw, so a tap, a click, a bottom swipe and
--- a trigger pull all arrive here identically.
-
 local CombatInputSender = {}
 
 local started = false
@@ -34,14 +27,10 @@ local listeners: { (string) -> () } = {}
 local intentDisconnect: (() -> ())? = nil
 local heartbeat: RBXScriptConnection? = nil
 local buffer = InputBuffer.new()
--- How a throw was performed, carried alongside the action so a buffered input
--- replays as the same throw the player made.
 type Style = { targetId: string?, charge: number? }
 
 local pendingStyle: Style? = nil
 
--- Lets presentation react to the local player's own intent at press time,
--- without a second place detecting the same input edge.
 function CombatInputSender.onIntent(listener: (string) -> ()): () -> ()
 	table.insert(listeners, listener)
 	return function()
@@ -61,9 +50,6 @@ local function notify(kind: string)
 	end
 end
 
--- A ball is inbound when projecting its current velocity forward passes close
--- to the player. Only used to decide which intent a tap means; the server still
--- validates the catch independently.
 local function ballIncoming(): boolean
 	local settings = MobileInput.ContextualCatch
 	if not settings.Enabled then
@@ -85,7 +71,6 @@ local function ballIncoming(): boolean
 			continue
 		end
 		local toPlayer = root.Position - ball.Position
-		-- Moving away rather than toward us.
 		if toPlayer:Dot(velocity) <= 0 then
 			continue
 		end
@@ -98,8 +83,6 @@ local function ballIncoming(): boolean
 	return false
 end
 
--- With no ball held a tap is ambiguous between swinging and catching. The
--- hammer stays the default; catch only wins when something is genuinely inbound.
 local function intentForTap(): string
 	if CombatState.canThrowBall() then
 		return "Throw"
@@ -107,9 +90,6 @@ local function intentForTap(): string
 	return if ballIncoming() then "Catch" else "Throw"
 end
 
--- Equip is a request like any other: the server owns the equipped weapon and
--- projects it back. Nothing is predicted here, so a rejected or rate-limited
--- equip simply leaves the HUD showing what the player actually has.
 local function equip(weapon: string)
 	Network.fireServer("SubmitWeaponEquip", weapon)
 end
@@ -123,8 +103,6 @@ local function send(kind: string, style: Style)
 	notify(kind)
 end
 
--- The only non-actionable states the client can know for itself. Anything else
--- (cooldowns, windups) is the server's business and is not guessed at here.
 local function actionable(): boolean
 	local character = Players.LocalPlayer.Character
 	if character == nil or character:GetAttribute("CombatAlive") == false then
@@ -134,12 +112,6 @@ local function actionable(): boolean
 	return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
 end
 
--- Actionable input is sent immediately, so no device pays a frame of latency
--- for the buffer existing. Only input that provably cannot fire yet waits, and
--- only for a short window; inputs that land a hair early otherwise feel dropped.
---
--- This lives on the game side deliberately: it is a weapon-cooldown concern,
--- and PlayerModule has no business knowing when a throw is legal.
 local function submit(kind: string, style: Style)
 	if actionable() or not MobileInput.Buffer.Enabled then
 		send(kind, style)
@@ -162,14 +134,6 @@ local function flush()
 	send(action, style)
 end
 
--- Combat intents arrive already classified by PlayerModule: it decided whether
--- a press was a tap, a hold, a look or a flick, on whichever device the player
--- is using. This module no longer watches input at all -- it turns an intent
--- into a server request and keeps the local visual state in step.
---
--- A bottom swipe and a middle tap both mean "normal throw", which is the whole
--- point of the second gesture: an easier way to do the same thing, not another
--- thing to learn.
 local function onIntent(intent: string)
 	if intent == "NormalThrow" then
 		local kind = intentForTap()
@@ -180,10 +144,6 @@ local function onIntent(intent: string)
 		end
 		submit(kind, {})
 	elseif intent == "BeginCharge" then
-		-- Only a held ball can be charged. With the hammer out there is nothing
-		-- to build, so the hold swings immediately rather than entering a charge
-		-- that ReleaseCharge would later discard -- which is why holding longer
-		-- than the charge threshold used to do nothing at all.
 		if CombatState.canStartThrow() then
 			CombatState.beginCharge(os.clock())
 		else
@@ -194,12 +154,9 @@ local function onIntent(intent: string)
 		end
 	elseif intent == "ReleaseCharge" then
 		if not CombatState.canThrowBall() then
-			-- The swing already went out when the charge began.
 			CombatState.endCharge()
 			return
 		end
-		-- Read before advancing the state machine, which resets the charge that
-		-- the style is built from.
 		local style: Style = { charge = CombatState.currentCharge() }
 		CombatState.onThrow(AimDirector.currentAim())
 		submit("Throw", style)

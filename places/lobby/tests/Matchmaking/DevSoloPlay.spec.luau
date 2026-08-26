@@ -1,3 +1,8 @@
+-- Name: DevSoloPlay.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec that the developer solo-play gate admits only sufficiently ranked group members and rejects players whose rank cannot be read.
+-- Created: 2026-08-20
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

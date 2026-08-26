@@ -1,11 +1,9 @@
---!strict
+-- Name: BallPreservation.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the ball preservation rule: a settled ball returns to whoever last owned it, a catch transfers ownership, and dead, departed, or already-holding owners are skipped.
+-- Created: 2026-08-22
 
--- PreserveDodgeballs decides what happens to a ball that stops moving: it goes
--- back to whoever last owned it, or it lies where it fell as a pickup.
---
--- Ownership is the entire mechanism. A catch reassigns ownerId, so a caught ball
--- is a transfer and returns to its new owner from then on -- there is no separate
--- notion of who a ball "belongs to" that could disagree with ownerId.
+--!strict
 
 local T = require(script.Parent.TestKit)
 local MockWorld = require(script.Parent.MockWorld)
@@ -24,8 +22,6 @@ local function world(preserve: boolean?): SimTypes.WorldSnapshot
 	}, { MockWorld.ground() }, nil, rules)
 end
 
--- A ball already in flight and about to run out of time, which is the cheapest
--- deterministic way to reach a resting state.
 local function inFlightBall(state: SimTypes.SimState, ownerId: string)
 	state.projectiles.ball_0001 = {
 		id = "ball_0001",
@@ -78,9 +74,6 @@ T.describe("Ball preservation", function()
 	end)
 
 	T.it("treats absent rules as not preserving", function()
-		-- A snapshot with no rules is what the adapter produces between matches,
-		-- when no mode is resolved. Falling back to the pre-flag behaviour means a
-		-- wiring mistake looks like the old game, not like something new.
 		local snapshot = world(nil)
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -90,8 +83,6 @@ T.describe("Ball preservation", function()
 	end)
 
 	T.it("re-equips the ball weapon when a preserved ball comes home", function()
-		-- The return lands in an empty hand, which is a pickup, so the same
-		-- auto-equip that covers being granted a ball covers this too.
 		local snapshot = world(true)
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -103,8 +94,6 @@ T.describe("Ball preservation", function()
 	end)
 
 	T.it("makes a caught ball the catcher's, so it later returns to them", function()
-		-- The transfer rule, end to end: p2's ball is caught by p1, and from that
-		-- moment it settles back to p1 rather than to the player who threw it.
 		local snapshot = world(true)
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -146,7 +135,6 @@ T.describe("Ball preservation", function()
 		T.expect(caught):toBeTruthy()
 		T.expect(state.projectiles.ball_0001.ownerId):toEqual("p1")
 
-		-- Now send it back out and let it come to rest.
 		state.projectiles.ball_0001.phase = "InFlight"
 		state.projectiles.ball_0001.heldBy = nil
 		state.projectiles.ball_0001.position = vector.create(0, 6, 8)
@@ -178,8 +166,6 @@ T.describe("Ball preservation", function()
 	end)
 
 	T.it("does not put a second ball in a hand that already holds one", function()
-		-- Possession is one ball per player everywhere else in the sim; a second
-		-- held ball would have no socket to sit in and no way to be thrown.
 		local snapshot = world(true)
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -208,8 +194,6 @@ T.describe("Ball preservation", function()
 	end)
 
 	T.it("clears the spent bounce budget on a returned ball", function()
-		-- Every other way a ball reaches a hand resets this; a return is the
-		-- fourth and must not carry a spent budget into the next throw.
 		local snapshot = world(true)
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)

@@ -1,13 +1,9 @@
---!strict
+-- Name: fetch-live-place.luau
+-- Author: Jack C.
+-- Description: Downloads the currently published place file through Open Cloud's asset delivery API, resolving the signed CDN location and writing the resulting place bytes to disk.
+-- Created: 2026-07-21
 
--- Downloads the currently-published place file via Open Cloud's Asset
--- Delivery API (a place's placeId doubles as an assetId). Two-step fetch:
---   1. GET /asset-delivery-api/v1/assetId/{placeId} -> a signed CDN location
---   2. GET that location -> the actual .rbxl bytes
--- The API key needs the legacy-asset:manage scope granted for this place.
--- Usage (from repo root):
---   lune run src/scripts/lune/fetch-live-place.luau <output.rbxl>
--- Env: ROBLOX_API_KEY, ROBLOX_PLACE_ID
+--!strict
 
 local fs = require("@lune/fs")
 local net = require("@lune/net")

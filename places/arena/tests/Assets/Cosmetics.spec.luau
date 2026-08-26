@@ -1,5 +1,9 @@
+-- Name: Cosmetics.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec validating the authored cosmetic carriers, their meshes and textures, the hammer grip axis, elimination effect audio, and that crate pools only reference real purchasable items.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Validates cosmetic carriers, procedural effects, and crate pools.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -39,17 +43,12 @@ return function()
 			local appearance = TestAssets.get(carrier, "SurfaceAppearance")
 			local maps = Cosmetics.VisualTemplates.Hammer.SurfaceMaps
 			expect(appearance:IsA("SurfaceAppearance")).to.equal(true)
-			-- Some cloud/test environments lack the Plugin capability to read
-			-- certain SurfaceAppearance fields (ColorMap). Guard the read and
-			-- skip this assertion when unavailable so tests remain portable.
 			local ok, colorId = pcall(function()
 				return numericAssetId(appearance.ColorMap)
 			end)
 			if ok and colorId then
 				expect(colorId).to.equal(maps.ColorMapId)
 			end
-			-- Guard reads for other SurfaceAppearance maps which may be plugin-only
-			-- in some cloud test environments.
 			local ok_metal, metalId = pcall(function()
 				return numericAssetId(appearance.MetalnessMap)
 			end)
@@ -107,8 +106,6 @@ return function()
 
 		it("references only purchasable, known cosmetics from crate pools", function()
 			for _, crate in Crates do
-				-- Preview crates are allowed an empty pool; this checks the
-				-- contents of whatever pool a crate does have.
 				for _, itemId in crate.ItemPool do
 					local item = Cosmetics.Items[itemId]
 					expect(item).to.be.ok()

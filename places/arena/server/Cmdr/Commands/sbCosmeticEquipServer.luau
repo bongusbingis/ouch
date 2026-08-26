@@ -1,3 +1,8 @@
+-- Name: sbCosmeticEquipServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-cosmetic-equip, equipping a named cosmetic into its configured slot for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

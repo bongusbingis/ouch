@@ -1,3 +1,8 @@
+-- Name: SimStateCodec.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the simulation state codec: velocity, equipped weapon, and hammer state surviving encode and decode, and the equipped weapon surviving the full decode-step-encode loop.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -84,10 +89,6 @@ T.describe("SimStateCodec", function()
 	end)
 
 	T.it("preserves the equipped weapon across encode/decode", function()
-		-- The adapter decodes a fresh SimState every tick, so anything the codec
-		-- does not carry is silently reset one tick after it was set. That is
-		-- exactly what happened to the equipped weapon: switching worked for a
-		-- single tick and then reverted, which reads as the key doing nothing.
 		local ballsFolder = fakeInstance("Balls", "Folder")
 		local character = fakeInstance("Character", "Model")
 		local state = SimTypes.newState()
@@ -112,14 +113,10 @@ T.describe("SimStateCodec", function()
 		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
 
 		T.expect(decoded.players.p1.equipped):toEqual("Dodgeball")
-		-- The ball edge detector matters just as much: losing it makes the
-		-- auto-equip fire every tick instead of on pickup, which overwrites the
-		-- player's own choice on the very next frame.
 		T.expect(decoded.players.p1.heldBallLastTick):toEqual(true)
 	end)
 
 	T.it("defaults an unstepped character to the registry default weapon", function()
-		-- A character with no attributes yet, which is every fresh spawn.
 		local ballsFolder = fakeInstance("Balls", "Folder")
 		local character = fakeInstance("Character", "Model")
 		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
@@ -128,10 +125,6 @@ T.describe("SimStateCodec", function()
 	end)
 
 	T.it("keeps an equipped weapon across the decode-step-encode loop the adapter runs", function()
-		-- The unit tests around SimCore call step() directly on a state they own,
-		-- which is not how the server runs it: every tick decodes a fresh state
-		-- from instances, steps it, and encodes it back. A single round trip is
-		-- where per-player state goes missing, so this drives the real loop.
 		local ballsFolder = fakeInstance("Balls", "Folder")
 		local character = fakeInstance("Character", "Model")
 		local models = { p1 = character :: any }

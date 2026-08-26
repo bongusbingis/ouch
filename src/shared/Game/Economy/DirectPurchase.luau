@@ -1,8 +1,9 @@
---!strict
+-- Name: DirectPurchase.luau
+-- Author: Jack C.
+-- Description: Pure rules for buying one named cosmetic outright with Bonks, shared by the server transaction and the client storefront so both agree on price and eligibility.
+-- Created: 2026-08-12
 
--- Pure rules for buying one named cosmetic outright with Bonks, shared by the
--- server transaction and the client storefront so both agree on price and
--- eligibility. Rarities with DirectBonks 0 are grant-only and never purchasable.
+--!strict
 
 local DirectPurchase = {}
 
@@ -53,8 +54,6 @@ function DirectPurchase.evaluate(
 	return price, nil
 end
 
--- Deterministic catalog for the storefront: every purchasable item, cheapest
--- first, then by id so two clients never disagree on ordering.
 function DirectPurchase.catalog(
 	items: { [string]: ItemDef },
 	rarities: { [string]: RarityDef }

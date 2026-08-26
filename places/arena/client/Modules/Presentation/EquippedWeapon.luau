@@ -1,3 +1,8 @@
+-- Name: EquippedWeapon.luau
+-- Author: Jack C.
+-- Description: Reads which weapon a character currently has equipped from the replicated sim attribute, the single source consulted by the HUD and animation layer.
+-- Created: 2026-08-22
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,14 +12,6 @@ local SimStateCodec = require(Adapters:WaitForChild("SimStateCodec"))
 local WeaponRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Sim"):WaitForChild("WeaponRegistry")
 )
-
--- Which weapon any player currently has out, for presentation.
---
--- Reads the attribute SimStateCodec writes onto the character, which is the sim's
--- own copy rather than a projection made for the client, so it answers for remote
--- players as well as the local one. Every visual that shows a weapon asks here;
--- deciding it locally is how the hammer ended up hidden whenever a ball was held
--- long after possession stopped being what chose the weapon.
 
 local EquippedWeapon = {}
 

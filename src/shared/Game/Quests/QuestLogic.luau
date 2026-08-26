@@ -1,3 +1,8 @@
+-- Name: QuestLogic.luau
+-- Author: Jack C.
+-- Description: Pure quest rules: deterministic daily selection, UTC daily keys and reset times, mapping match and combat events to progress, and building clamped payloads for the client.
+-- Created: 2026-07-13
+
 --!strict
 
 export type Reward = {

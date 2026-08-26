@@ -1,9 +1,9 @@
---!strict
+-- Name: run-tests.luau
+-- Author: Jack C.
+-- Description: Headless test runner that refreshes the Rojo sourcemap, loads every shared spec module through the fake-instance loader, and exits nonzero on failure.
+-- Created: 2026-07-12
 
--- Headless test runner: refreshes the Rojo sourcemap, loads every
--- ReplicatedStorage.Shared.Tests.*.spec module through the fake-Instance
--- loader, and exits nonzero on failure.
--- Usage (from repo root): lune run src/scripts/lune/run-tests.luau
+--!strict
 
 local process = require("@lune/process")
 local Loader = require("./loader")

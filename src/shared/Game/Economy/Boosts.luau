@@ -1,8 +1,9 @@
---!strict
+-- Name: Boosts.luau
+-- Author: Jack C.
+-- Description: Pure booster stacking that takes the best owned multiplier per type rather than compounding, so overlapping passes cannot run away.
+-- Created: 2026-08-12
 
--- Pure booster stacking. Max-wins per multiplier type rather than multiplicative
--- so owning several overlapping passes cannot compound into a runaway rate, and
--- so a bundle that advertises a bigger number is always the one that applies.
+--!strict
 
 local Boosts = {}
 
@@ -26,8 +27,6 @@ function Boosts.multipliers(catalog: { [string]: PassDef }, owned: { [string]: b
 	return { Xp = xp, Bonks = bonks }
 end
 
--- Awarded amounts floor so a multiplier can never mint a fractional Bonks unit,
--- and never fall below the unboosted amount.
 function Boosts.apply(amount: number, multiplier: number): number
 	return math.max(amount, math.floor(amount * multiplier))
 end

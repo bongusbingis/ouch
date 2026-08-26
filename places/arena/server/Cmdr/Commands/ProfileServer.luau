@@ -1,3 +1,8 @@
+-- Name: ProfileServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-profile, formatting a player's balances, progression, owned counts, and equipped cosmetics into a readable summary.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

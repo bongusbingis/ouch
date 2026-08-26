@@ -1,3 +1,8 @@
+-- Name: MonetizationService.luau
+-- Author: Jack C.
+-- Description: Owns receipt processing: records receipts in the profile for idempotency, dispatches to the registered handler per product type, and leaves unknown or failed receipts for Roblox to retry.
+-- Created: 2026-07-13
+
 --!strict
 
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -13,9 +18,6 @@ local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local RewardService = require(script.Parent.RewardService)
-
--- Owns ProcessReceipt and its permanent idempotency record. Client prompt
--- completion never grants products.
 
 type StartOptions = {
 	marketplace: any?,
@@ -66,9 +68,6 @@ local handlers: { [string]: Handler } = {
 				amount = def.BonksAmount,
 			}
 	end,
-	-- Robux for one named cosmetic. Deliberately not routed through
-	-- DirectPurchaseService: that path spends Bonks and enforces the rotation
-	-- window, neither of which applies once Roblox has taken the money.
 	Cosmetic = function(player, def, receiptInfo)
 		if type(def.ItemId) ~= "string" then
 			return false, nil
@@ -84,10 +83,6 @@ local handlers: { [string]: Handler } = {
 				itemId = def.ItemId,
 			}
 	end,
-	-- A bundle grants every item it names. Items already owned pay the rarity's
-	-- DupeBonks through RewardService rather than failing, so a partially-owned
-	-- bundle still resolves -- returning false here would strand the receipt in
-	-- retries forever with the player already charged.
 	Bundle = function(player, def, receiptInfo)
 		local bundle = activeBundles.Catalog[def.BundleId]
 		if bundle == nil or #bundle.ItemIds == 0 then

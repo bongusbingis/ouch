@@ -1,3 +1,8 @@
+-- Name: QuestResetServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-quest-reset, clearing stored daily quest progress and claim flags for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

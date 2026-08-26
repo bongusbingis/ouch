@@ -1,3 +1,8 @@
+-- Name: GameModeSelect.luau
+-- Author: Jack C.
+-- Description: The game mode ballot screen: lays out the mode cards, the countdown bar, and the local player's selection, purely from the snapshot passed in.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")

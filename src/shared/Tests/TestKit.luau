@@ -1,8 +1,9 @@
---!strict
+-- Name: TestKit.luau
+-- Author: Jack C.
+-- Description: Minimal pure-Luau describe, it, and expect framework so specs register as a side effect of being required and run headlessly under Lune.
+-- Created: 2026-07-12
 
--- Minimal describe/it/expect framework, pure Luau so specs run headlessly
--- under Lune (TestEZ's instance-walking bootstrap can't). Specs require this
--- module directly and register suites as a side effect; the runner calls run().
+--!strict
 
 export type Expectation = {
 	toEqual: (self: Expectation, expected: any) -> (),
@@ -70,7 +71,6 @@ function TestKit.expect(value: any): Expectation
 	return expectation :: Expectation
 end
 
--- Prints a summary and returns the failure count.
 function TestKit.run(): number
 	local failures = 0
 	for _, result in results do

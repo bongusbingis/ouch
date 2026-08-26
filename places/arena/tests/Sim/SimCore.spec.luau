@@ -1,7 +1,9 @@
+-- Name: SimCore.spec.luau
+-- Author: Jack C.
+-- Description: In-place port of the end-to-end sim spec, replaying a deterministic pickup, throw, curve, and elimination scenario and pinning command arrival-order canonicalization.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud port of the SimCore end-to-end spec: the same deterministic
--- pickup→throw→curve→elim scenario as the Lune suite, plus live-only
--- strictness: command arrival-order canonicalization across two throwers.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -19,16 +21,12 @@ local function eventLine(event): string
 	return `{event.tick}:{event.kind}:{event.projectileId or ""}:{event.targetId or ""}`
 end
 
--- Full scenario: player picks up a spawned ball, throws at a strafing dummy
--- with soft-lock, ball curves and eliminates it. Replayed twice to pin
--- end-to-end determinism (same events at the same ticks).
 local function runScenario(): { string }
 	local state = SimCore.newState()
 	state.projectiles.ball_0001 = BallFixture.held("ball_0001", "p1", vector.create(0.9, 2.9, -0.25))
 	local log = {}
 
 	for tick = 1, 240 do
-		-- Dummy strafes on Z; scripted from the tick so both runs agree.
 		local dummyZ = 4 * math.sin(tick / 30)
 		local world = MockWorld.snapshot({
 			p1 = MockWorld.character(vector.create(0, 2.5, 0)),
@@ -55,8 +53,6 @@ local function runScenario(): { string }
 	return log
 end
 
--- Two players throw on the same tick; the caller controls the command array
--- order so runs can pin that SimCore's canonical sort erases arrival order.
 local function runTwoThrowers(reversed: boolean): { string }
 	local state = SimCore.newState()
 	state.projectiles.ball_0001 = BallFixture.held("ball_0001", "p1", vector.create(0.9, 2.9, -0.25))

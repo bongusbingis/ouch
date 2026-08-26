@@ -1,3 +1,8 @@
+-- Name: ThrowPoseTuner.luau
+-- Author: Jack C.
+-- Description: Developer-only live tuning harness that binds keys to the throw-pose config values so arm offsets and timings can be adjusted in Studio without editing the config module.
+-- Created: 2026-08-20
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,24 +11,6 @@ local Workspace = game:GetService("Workspace")
 
 local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
 local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
-
--- Live tuning for the throw pose, so a value can be dialled in during a test
--- session instead of stopping, editing, and rejoining for every guess.
---
--- Mirrors Config.ThrowPose into a folder of Value objects under Workspace and
--- writes edits straight back into the config table the pose modules already
--- read. There is no second resolved copy: ArmIK reads the table every frame, so
--- dragging a value moves the arm on the next frame.
---
--- Studio only and off by default. The folder is created by the client and
--- replicates nowhere, so it is a scratchpad for whoever is testing and cannot
--- reach a live server. Values are never written back to disk -- once a number
--- feels right, copy it into src/config/ThrowPose.luau, which stays the source of
--- truth.
---
--- The tree is walked generically rather than from a list of paths, so a value
--- added to the config shows up here with no extra work and none of the usual
--- drift between a config and its editor.
 
 local ThrowPoseTuner = {}
 
@@ -35,9 +22,6 @@ local function enabled(): boolean
 	return Debug.StudioVisuals == true and Debug.ThrowPoseTuner == true and RunService:IsStudio()
 end
 
--- Vector config values are authored with vector.create, whose typeof is
--- "vector"; Vector3Value needs a real Vector3, so the two are converted at the
--- boundary in both directions.
 local function isVector(value: any): boolean
 	return typeof(value) == "vector" or typeof(value) == "Vector3"
 end
@@ -76,8 +60,6 @@ local function bind(container: Instance, holder: { [string]: any }, key: string,
 end
 
 local function mirror(container: Instance, holder: { [string]: any }, prefix: string)
-	-- Sorted so the folder reads the same way every session; Instance children
-	-- are otherwise ordered by insertion, and pairs order is not stable.
 	local keys: { string } = {}
 	for key in holder do
 		table.insert(keys, key)

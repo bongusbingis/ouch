@@ -1,3 +1,8 @@
+-- Name: DamageFeedback.luau
+-- Author: Jack C.
+-- Description: Shakes the camera and plays the local hit reaction when the local player is struck, deduplicating sim events that can be broadcast more than once.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")

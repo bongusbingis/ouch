@@ -1,3 +1,8 @@
+-- Name: InventoryPage.luau
+-- Author: Jack C.
+-- Description: The locker page: renders every cosmetic category as scrollable cards with ownership and equip state and drives the live item preview.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -1,8 +1,9 @@
+-- Name: SimStateCodec.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec running the sim state codec against real instances so attribute typing, ball CFrame storage, authored rotation, and the replication attribute limits are all exercised for real.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud version of the SimStateCodec spec. Unlike the Lune port, this runs
--- against real Instances: real attribute storage/typing, real CFrame math for
--- ball position + authored rotation (a no-op under the Lune loader's
--- CFrame stub), and the replication limits the codec's short names exist for.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -15,8 +16,6 @@ local SimStateCodec = require(Game:WaitForChild("Adapters"):WaitForChild("SimSta
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))
 
--- Codec I/O doubles, not gameplay assets: the codec's contract is any BasePart
--- under a balls folder plus character Models; game balls stay BallService clones.
 local function makeBallsFolder(ballNames: { string }): (Folder, { [string]: BasePart })
 	local folder = Instance.new("Folder")
 	folder.Name = "Balls"

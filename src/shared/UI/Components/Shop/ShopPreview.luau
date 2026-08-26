@@ -1,3 +1,8 @@
+-- Name: ShopPreview.luau
+-- Author: Jack C.
+-- Description: Wraps the live item preview for use inside storefront cards and modals.
+-- Created: 2026-08-23
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

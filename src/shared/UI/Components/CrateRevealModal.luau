@@ -1,3 +1,8 @@
+-- Name: CrateRevealModal.luau
+-- Author: Jack C.
+-- Description: Modal that reveals what a crate opening produced, showing the item preview, its rarity, and any duplicate refund.
+-- Created: 2026-08-23
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

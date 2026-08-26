@@ -1,10 +1,13 @@
+-- Name: Volume.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the map feature volume test: inclusion inside the box, exclusion past any axis, surfaces counting as inside, and vertical-only padding.
+-- Created: 2026-08-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)
 local Volume = require(script.Parent.Parent.Game.MapFeatures.Volume)
 
--- Offsets are already in the part's local space, which is what containsOffset
--- takes; the CFrame transform that produces them is an engine call.
 local size = Vector3.new(10, 4, 10)
 
 T.describe("Volume", function()

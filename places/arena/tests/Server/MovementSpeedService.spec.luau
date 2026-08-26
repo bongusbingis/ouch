@@ -1,6 +1,9 @@
+-- Name: MovementSpeedService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec that named walk-speed modifiers replace, compose, and clear correctly and are only applied during the synchronized adapter step.
+-- Created: 2026-07-16
+
 --!nonstrict
--- MovementSpeedService queues named server modifiers and applies their product
--- only during the synchronized adapter step.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")

@@ -1,6 +1,9 @@
---!strict
+-- Name: ClientAudio.luau
+-- Author: Jack C.
+-- Description: Owns dynamic Sound playback on the client and the single runtime audio mix, exposing master, music, and effects volume controls that every client sound routes through.
+-- Created: 2026-07-25
 
--- Client-owned dynamic Sound playback and the single runtime audio mix.
+--!strict
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

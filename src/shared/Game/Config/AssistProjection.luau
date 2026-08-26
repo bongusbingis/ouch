@@ -1,18 +1,12 @@
+-- Name: AssistProjection.luau
+-- Author: Jack C.
+-- Description: Reads and writes the per-player aim-assist projection, turning resolved assist scalars into replicated values and back for the client.
+-- Created: 2026-08-19
+
 --!strict
 
 local PlayerAssist = require(script.Parent.Parent.Parent.Parent.Config.PlayerAssist)
 local AssistResolver = require(script.Parent.AssistResolver)
-
--- Reads a player's projected AssistConfig folder into resolved strengths. Both
--- sides use it: the server adapter attaches the result to sim commands, the
--- client reads its own for camera assists, and both land on the same numbers
--- because the same rules run over the same projection.
---
--- Cached per folder and invalidated by comparing the revision attribute rather
--- than by connecting to it, so there is no per-player connection to clean up and
--- a folder that is destroyed simply falls out of the weak-keyed cache. Revision
--- is only ever used to detect that something changed, never as a commit barrier:
--- the whole folder is re-read on any bump.
 
 local AssistProjection = {}
 
@@ -42,8 +36,6 @@ local function entryFor(folder: Folder): Cached
 	return fresh
 end
 
--- Resolved values for a folder, or the baked defaults when the projection has
--- not arrived yet.
 function AssistProjection.resolved(folder: Folder?): { [string]: any }
 	if folder == nil then
 		return PlayerAssist.Defaults
@@ -51,8 +43,6 @@ function AssistProjection.resolved(folder: Folder?): { [string]: any }
 	return entryFor(folder).resolved
 end
 
--- Every feature's effective 0-1 strength on the given device, in one table ready
--- to attach to a sim command. Zero means inert.
 function AssistProjection.strengths(folder: Folder?, deviceClass: string?): { [string]: number }
 	local scale = AssistResolver.scaleFor(PlayerAssist.DeviceScale, deviceClass)
 	if folder == nil then

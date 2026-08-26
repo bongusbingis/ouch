@@ -1,3 +1,8 @@
+-- Name: MatchSim.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the pure match phase machine: the starting countdown, scoring rules, win conditions at the score target and time cap, mid-match joins and leaves, and the mode registry surface.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)

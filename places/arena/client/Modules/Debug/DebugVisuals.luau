@@ -1,3 +1,8 @@
+-- Name: DebugVisuals.luau
+-- Author: Jack C.
+-- Description: Developer-only on-screen debug drawing for combat: renders aim cones, soft-lock targets, predicted ball trajectories, bounce normals, and arm-pose state as temporary world lines and shapes, gated behind the debug config flags.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -206,7 +211,6 @@ local function drawCone(camera: Camera, angleDeg: number, range: number, color: 
 		slice.Color = color
 		slice.Transparency = transparency or 0.88
 		slice.Size = Vector3.new(thickness, math.max(radius * 2, 0.05), math.max(radius * 2, 0.05))
-		-- Cylinder length is its local X axis. Align that axis with camera forward.
 		slice.CFrame = CFrame.fromMatrix(center, forward, up, -right)
 	end
 
@@ -397,8 +401,6 @@ local function drawBounceNormals()
 	end
 end
 
--- Pose layer. Draws what the procedural systems are using rather than
--- recomputing an approximation, so what you see is what the solver sees.
 local lastReadout = ""
 
 local function drawPoseDebug(character: Model?)
@@ -416,9 +418,6 @@ local function drawPoseDebug(character: Model?)
 		drawSphereRings(origin, 0.35, Color3.fromRGB(255, 200, 0), 0.2)
 	end
 
-	-- The configured shoulder, not the animated limb: this is the frame the
-	-- solver actually measures from, so drawing the real bone would show
-	-- something the maths never sees.
 	local shoulderOffset = ThrowPose.Arm.ShoulderOffset
 	local shoulder = (root.CFrame * CFrame.new(shoulderOffset.x, shoulderOffset.y, shoulderOffset.z)).Position
 
@@ -458,7 +457,6 @@ local function drawPoseDebug(character: Model?)
 			snapshot.chargeAlpha,
 			weight
 		)
-		-- Only on change: a per-frame print at this rate is unreadable and slow.
 		if readout ~= lastReadout then
 			lastReadout = readout
 			print(readout)

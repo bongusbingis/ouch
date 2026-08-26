@@ -1,3 +1,8 @@
+-- Name: VoteLoadingBar.luau
+-- Author: Jack C.
+-- Description: The countdown bar on the mode ballot, filling from server time so every client shows the same remaining window.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

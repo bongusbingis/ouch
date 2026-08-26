@@ -1,3 +1,8 @@
+-- Name: QuestSet.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-quest-set: sets progress on an active daily quest.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

@@ -1,3 +1,8 @@
+-- Name: GameAudio.luau
+-- Author: Jack C.
+-- Description: Maps sim events to the one-shot sounds declared in the audio config, spawning world-space emitters for spatial cues and routing flat cues to local playback, including the three elimination variants.
+-- Created: 2026-08-19
+
 --!strict
 
 local Debris = game:GetService("Debris")
@@ -11,11 +16,6 @@ local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local ClientAudio = require(script.Parent.ClientAudio)
 local CharacterRig = require(script.Parent.CharacterRig)
-
--- One entry point for gameplay one-shots. Callers name the event; where the
--- sound comes from and how it reaches the player are decided by
--- Config.Audio.Gameplay, so adding variance or switching an effect to a local
--- cue is a config change rather than a code change.
 
 local GameAudio = {}
 
@@ -47,8 +47,6 @@ local function emitterFor(host: Instance): AudioEmitter
 	return emitter
 end
 
--- A world sound needs something to emit from. Events that only give a point in
--- space get a throwaway anchor rather than every caller inventing one.
 local function anchorAt(position: Vector3): BasePart
 	local anchor = Instance.new("Part")
 	anchor.Name = "GameAudioAnchor"
@@ -89,8 +87,6 @@ local function playLocal(effect, assetId: string, effectName: string)
 	})
 end
 
--- `at` is where the sound belongs: an instance to emit from, or a bare point.
--- Ignored entirely by local effects, which have no position.
 function GameAudio.play(effectName: string, at: (Instance | Vector3)?)
 	local effect = definition(effectName)
 	local assetId = pickAssetId(effect)
@@ -118,14 +114,6 @@ local function characterPartFor(playerId: string?): BasePart?
 	return CharacterRig.rootPart(player and player.Character)
 end
 
--- The elimination effect belongs to whoever got the kill, not to the victim:
--- it is bought to be shown off on a win, and reading it from the victim would
--- play a player's own purchase mostly when they lose.
---
--- Reads the equip attribute rather than a profile, because a client only has
--- its own profile and this sound plays for everyone nearby. An unequipped or
--- unknown equip falls through to Cosmetics.Defaults, which names the same audio
--- entries this always used -- so nothing changes for a player who owns nothing.
 local function elimEffectFor(playerId: string?): Cosmetics.ElimEffectDef
 	local default = Cosmetics.Defaults.ElimEffectAssets.ElimEffect
 	assert(default ~= nil, "[GameAudio] default ElimEffectAssets cosmetic must define ElimEffect")
@@ -141,10 +129,6 @@ local function elimEffectFor(playerId: string?): Cosmetics.ElimEffectDef
 	return item.ElimEffect
 end
 
--- Which elimination sound an Elim carries is not a field on the event: a
--- projectile means the dodgeball, a source without one means the hammer, and
--- neither means the player fell into an elimination zone. A zone fall has no
--- eliminator, so it is the one variant no cosmetic can change.
 local function eliminationEffect(event: { [string]: any }): string
 	if event.sourceId == nil and event.projectileId == nil then
 		return "ElimZoneFall"
@@ -158,8 +142,6 @@ function GameAudio.onEvent(event: { [string]: any })
 	if kind ~= "Elim" and kind ~= "HammerSwing" and kind ~= "BallThrown" and kind ~= "BallBounced" then
 		return
 	end
-	-- Broadcast events can arrive more than once; a repeated sound is far more
-	-- noticeable than a repeated particle.
 	if not seenEvents.markSeen(event) then
 		return
 	end
@@ -179,7 +161,6 @@ function GameAudio.onEvent(event: { [string]: any })
 		return
 	end
 
-	-- Ball sounds emit from the ball itself, which the visuals already track.
 	local balls = Workspace:FindFirstChild("Balls")
 	local ball = balls and event.projectileId and balls:FindFirstChild(event.projectileId)
 	if ball then

@@ -1,6 +1,9 @@
---!strict
+-- Name: MatchAudioLogic.luau
+-- Author: Jack C.
+-- Description: Pure rules behind match audio: which music mode a match phase maps to, when the results whistle fires, and how the next track is picked without immediately repeating.
+-- Created: 2026-07-25
 
--- Pure phase routing and non-repeating track selection for match audio.
+--!strict
 
 local MatchAudioLogic = {}
 

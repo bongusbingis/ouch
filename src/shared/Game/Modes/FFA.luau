@@ -1,10 +1,13 @@
+-- Name: FFA.luau
+-- Author: Jack C.
+-- Description: Free-for-all game mode: its match rules and the server hooks that provision a ball per entrant and score every elimination individually.
+-- Created: 2026-07-13
+
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
 local GameMode = require(script.Parent.GameMode)
-
--- Classic FFA: each entrant receives one persistent contested ball.
 
 local FFA = {}
 FFA.id = "FFA"

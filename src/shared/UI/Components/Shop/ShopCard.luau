@@ -1,3 +1,8 @@
+-- Name: ShopCard.luau
+-- Author: Jack C.
+-- Description: One storefront card: the item preview, name, price button, and the placeholder or preview state for offers that are not yet purchasable.
+-- Created: 2026-08-23
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

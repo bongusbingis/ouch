@@ -1,6 +1,9 @@
---!strict
+-- Name: EconomyStore.luau
+-- Author: Jack C.
+-- Description: Client-side projection of the replicated profile economy data, exposing a snapshot and change subscription the storefront and inventory UI read from.
+-- Created: 2026-07-16
 
--- Client projection of the replicated GameProfile economy data.
+--!strict
 
 export type EconomyData = {
 	Bonks: number,

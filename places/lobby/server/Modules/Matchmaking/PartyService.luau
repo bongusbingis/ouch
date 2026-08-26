@@ -1,3 +1,8 @@
+-- Name: PartyService.luau
+-- Author: Jack C.
+-- Description: Owns lobby party behavior end to end: request handling and validation, cross-server party state, member colors, queue toggling, analytics funnels, teleport hand-off, and restoring parties returning from the arena.
+-- Created: 2026-08-15
+
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,6 +13,7 @@ local DevSoloPlay = require(ReplicatedStorage.Shared.Matchmaking.DevSoloPlay)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
+local ReturnPartyPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPartyPolicy)
 local AnalyticsConfig = require(ReplicatedStorage.Config.Analytics)
 local AnalyticsService = require(script.Parent.Parent.AnalyticsService)
 local PartyModel = require(script.Parent.PartyModel)
@@ -89,8 +95,6 @@ function PartyService:_getLocalPlayers(partyId)
 	return players
 end
 
--- Matchmaking telemetry is reported per local member: the funnel is a per-player
--- journey, and a party's members may be spread across lobby servers.
 function PartyService:_reportFunnel(partyId, stepKey, fields)
 	local step = AnalyticsConfig.MatchmakingFunnelSteps[stepKey]
 	for _, player in self:_getLocalPlayers(partyId) do
@@ -477,9 +481,22 @@ function PartyService:_joinTarget(player, target, requireFriendAccess)
 	return updated
 end
 
--- Returns the party to place the arriving player in, and whether joining it
--- requires friendship. A player coming back from a match rejoins their own party
--- and is not friend-gated; an invite still is.
+function PartyService:_restoreReturningParty(player, returning)
+	return self._partyRepository:UpdateParty(returning.partyId, function(current)
+		local action = ReturnPartyPolicy.resolve(current, returning, player.UserId)
+		if action == nil then
+			return nil
+		end
+		if action == "Keep" then
+			return current
+		end
+
+		local nextParty = PartyModel.clone(current)
+		PartyModel.returnToLobby(nextParty)
+		return PartyModel.touch(nextParty, os.time())
+	end)
+end
+
 function PartyService:_resolveArrivalTarget(player)
 	local function isFriend(userId)
 		local success, result = pcall(player.IsFriendsWith, player, userId)
@@ -488,14 +505,14 @@ function PartyService:_resolveArrivalTarget(player)
 
 	local joinData = player:GetJoinData()
 
-	local returning = ReturnPayload.parse(joinData.TeleportData)
+	local returning = if joinData.SourcePlaceId == Config.ArenaPlaceId and joinData.SourceGameId == game.GameId
+		then ReturnPayload.parse(joinData.TeleportData)
+		else nil
 	if returning then
-		local party = self._partyRepository:GetParty(returning.partyId)
+		local party = self:_restoreReturningParty(player, returning)
 		if party then
 			return party, false
 		end
-		-- The record expired while the match ran. Regroup on whichever member
-		-- got here first and made one, rather than everyone landing solo.
 		for _, userId in returning.memberUserIds do
 			if userId ~= player.UserId then
 				local partyId = self._partyRepository:GetUserPartyId(userId)
@@ -864,6 +881,7 @@ function PartyService:_startDevSoloPlay(player)
 		parties = {
 			{
 				partyId = party.partyId,
+				leaderUserId = player.UserId,
 				memberUserIds = { player.UserId },
 			},
 		},

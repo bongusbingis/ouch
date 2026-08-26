@@ -1,9 +1,9 @@
---!strict
+-- Name: Rotation.luau
+-- Author: Jack C.
+-- Description: Pure rotation schedule for authored spinning geometry, deriving the angle from the synchronized clock alone so machines never drift apart.
+-- Created: 2026-08-18
 
--- Pure rotation schedule for authored spinning geometry. The angle is a
--- function of the synchronized clock alone, never of accumulated frame deltas,
--- so the server and every predicting client compute the same pose for the same
--- instant instead of drifting apart at different frame rates.
+--!strict
 
 local Rotation = {}
 

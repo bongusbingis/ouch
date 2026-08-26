@@ -1,3 +1,8 @@
+-- Name: PartyTeamAllocator.spec.luau
+-- Author: Jack C.
+-- Description: Spec that team assignment keeps parties together while finding the closest balance, deterministically for the same entrants.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)

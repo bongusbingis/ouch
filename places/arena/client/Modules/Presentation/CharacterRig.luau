@@ -1,7 +1,9 @@
---!strict
+-- Name: CharacterRig.luau
+-- Author: Jack C.
+-- Description: Central lookup for character rig part names and grip transforms, including the R15/R6 fallback for the throwing hand, so no presentation module hardcodes rig conventions.
+-- Created: 2026-07-16
 
--- Rig-name lookups shared by presentation modules, including the R15/R6
--- naming fallback for the throwing hand. Keep every rig-name convention here.
+--!strict
 
 local CharacterRig = {}
 
@@ -28,9 +30,6 @@ function CharacterRig.dodgeballGripCFrame(character: Model?): CFrame?
 	return nil
 end
 
--- R15 characters carry a built-in "RightGripAttachment" on RightHand (the
--- same reference frame Roblox's own Tool grip alignment uses); R6 and custom
--- avatars may not have one, so callers must handle nil.
 function CharacterRig.rightHandGripCFrame(character: Model?): CFrame?
 	local hand = CharacterRig.rightHand(character)
 	if hand == nil then

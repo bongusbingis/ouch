@@ -1,6 +1,9 @@
+-- Name: DevSoloPlay.luau
+-- Author: Jack C.
+-- Description: Developer-only gate for the hidden solo-play path, checking group rank so the server can authorize a single-player match request.
+-- Created: 2026-08-20
+
 --!strict
--- Developer-only gate for the hidden solo-play debug path. The server owns the
--- check; the client only counts taps and asks once.
 
 local DevSoloPlay = {}
 

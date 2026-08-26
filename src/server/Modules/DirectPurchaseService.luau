@@ -1,3 +1,8 @@
+-- Name: DirectPurchaseService.luau
+-- Author: Jack C.
+-- Description: Handles buying a single named cosmetic outright with Bonks, enforcing price, ownership, affordability, and whether the item is currently offered.
+-- Created: 2026-08-12
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,15 +18,6 @@ local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local ShopService = require(script.Parent.ShopService)
-
--- Owns the guaranteed Bonks-for-cosmetic path, and the only place Bonks buys a
--- cosmetic. Nothing here is random, so it is deliberately outside
--- PaidRandomPolicyService's gate. Bonks is deducted only after CosmeticsService
--- reports the item as newly granted.
---
--- Availability is asked of ShopService rather than decided here: a cosmetic in
--- a rotating-shop category is buyable only while that player is actually being
--- offered it, which is what stops the rotation from being decorative.
 
 local DirectPurchaseService = {}
 

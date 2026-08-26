@@ -856,7 +856,7 @@
             <token name="SecondaryModifier">0</token>
             <int64 name="SourceAssetId">-1</int64>
             <BinaryString name="Tags"></BinaryString>
-            <token name="Type">0</token>
+            <token name="Type">1</token>
             <Ref name="UIButton">null</Ref>
             <Ref name="UIModifier">null</Ref>
             <token name="Up">0</token>
@@ -1347,7 +1347,7 @@
             <token name="SecondaryModifier">0</token>
             <int64 name="SourceAssetId">-1</int64>
             <BinaryString name="Tags"></BinaryString>
-            <token name="Type">0</token>
+            <token name="Type">1</token>
             <Ref name="UIButton">null</Ref>
             <Ref name="UIModifier">null</Ref>
             <token name="Up">0</token>
@@ -1531,7 +1531,7 @@
             <token name="SecondaryModifier">0</token>
             <int64 name="SourceAssetId">-1</int64>
             <BinaryString name="Tags"></BinaryString>
-            <token name="Type">0</token>
+            <token name="Type">1</token>
             <Ref name="UIButton">null</Ref>
             <Ref name="UIModifier">null</Ref>
             <token name="Up">0</token>
@@ -1574,7 +1574,7 @@
             <token name="SecondaryModifier">0</token>
             <int64 name="SourceAssetId">-1</int64>
             <BinaryString name="Tags"></BinaryString>
-            <token name="Type">0</token>
+            <token name="Type">1</token>
             <Ref name="UIButton">null</Ref>
             <Ref name="UIModifier">null</Ref>
             <token name="Up">0</token>
@@ -1660,7 +1660,7 @@
             <token name="SecondaryModifier">0</token>
             <int64 name="SourceAssetId">-1</int64>
             <BinaryString name="Tags"></BinaryString>
-            <token name="Type">0</token>
+            <token name="Type">1</token>
             <Ref name="UIButton">null</Ref>
             <Ref name="UIModifier">null</Ref>
             <token name="Up">0</token>
@@ -2843,7 +2843,7 @@
             <token name="SecondaryModifier">0</token>
             <int64 name="SourceAssetId">-1</int64>
             <BinaryString name="Tags"></BinaryString>
-            <token name="Type">0</token>
+            <token name="Type">1</token>
             <Ref name="UIButton">null</Ref>
             <Ref name="UIModifier">null</Ref>
             <token name="Up">0</token>

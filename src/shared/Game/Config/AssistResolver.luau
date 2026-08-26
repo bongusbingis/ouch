@@ -1,9 +1,9 @@
---!strict
+-- Name: AssistResolver.luau
+-- Author: Jack C.
+-- Description: Pure resolution of a player's aim-assist scalars: raw config values in, validated and device-scaled numbers out, plus the cohort label used for analytics.
+-- Created: 2026-08-19
 
--- Pure resolution of a player's assist scalars: raw config values in, validated
--- and device-scaled numbers out. Kept separate from the service so the rules
--- that decide whether an assist is active, and how strongly, are testable
--- without a config service, a player, or a DataModel.
+--!strict
 
 local AssistResolver = {}
 
@@ -15,8 +15,6 @@ export type Entry = {
 	Maximum: number?,
 }
 
--- Validates one raw value against its declared entry, falling back to the
--- default rather than letting a bad config reach gameplay.
 function AssistResolver.coerce(entry: Entry, raw: any): any
 	if typeof(raw) ~= entry.Type then
 		return entry.Default
@@ -44,9 +42,6 @@ function AssistResolver.resolve(entries: { Entry }, rawValues: { [string]: any }
 	return resolved
 end
 
--- Effective 0-1 strength for one feature. Disabled, a zero strength, and a zero
--- device scale all collapse to the same answer, so a rollback by any of the
--- three routes behaves identically.
 function AssistResolver.strength(
 	resolved: { [string]: any },
 	deviceScale: { [string]: number },
@@ -70,11 +65,6 @@ function AssistResolver.scaleFor(deviceScales: { [string]: { [string]: number } 
 	return deviceScales[deviceClass or "Mouse"] or deviceScales.Mouse
 end
 
--- Which A/B cohort a player's resolved assists put them in. Deliberately coarse:
--- analytics dimensions want low cardinality, and the question a config
--- experiment actually asks is "did anything change for this player", not "by
--- exactly how much". A richer label would need the config layer to expose a
--- variant id, which it does not.
 function AssistResolver.bucket(entries: { Entry }, resolved: { [string]: any }): string
 	for _, entry in entries do
 		if resolved[entry.Key] ~= entry.Default then

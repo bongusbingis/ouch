@@ -1,3 +1,8 @@
+-- Name: ShopClient.luau
+-- Author: Jack C.
+-- Description: Client adapter for the storefront: fetches offers, requests marketplace metadata, sends purchase and crate-open requests, and publishes the reveal and grant results for the UI.
+-- Created: 2026-08-23
+
 --!strict
 
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -19,6 +24,10 @@ export type Snapshot = {
 }
 
 local ShopClient = {}
+
+export type StartOptions = {
+	DeferMarketplaceData: boolean?,
+}
 
 local started = false
 local refreshGeneration = 0
@@ -194,7 +203,7 @@ local function loadMarketplaceData()
 	end
 end
 
-function ShopClient.start()
+function ShopClient.start(options: StartOptions?)
 	if started then
 		return
 	end
@@ -234,7 +243,15 @@ function ShopClient.start()
 			end
 		end)
 	)
-	loadMarketplaceData()
+	if not (options and options.DeferMarketplaceData) then
+		loadMarketplaceData()
+	end
+end
+
+function ShopClient.ensureMarketplaceData()
+	if started then
+		loadMarketplaceData()
+	end
 end
 
 function ShopClient.refresh(): (boolean, string?)

@@ -1,3 +1,8 @@
+-- Name: ShopDetailsModal.luau
+-- Author: Jack C.
+-- Description: Modal showing the full detail for one offer, including crate contents, disclosed odds, and pity information, with the purchase action.
+-- Created: 2026-08-23
+
 --!strict
 
 local GuiService = game:GetService("GuiService")

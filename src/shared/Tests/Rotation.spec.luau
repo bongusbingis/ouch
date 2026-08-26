@@ -1,3 +1,8 @@
+-- Name: Rotation.spec.luau
+-- Author: Jack C.
+-- Description: Spec that the rotation schedule derives its angle from the clock alone, wraps a full turn, agrees across machines, and honours a per-model speed.
+-- Created: 2026-08-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -16,8 +21,6 @@ T.describe("Rotation", function()
 	end)
 
 	T.it("gives two machines the same pose for the same instant", function()
-		-- The property the whole approach rests on: no frame-delta accumulation,
-		-- so a client and the server agree without exchanging anything.
 		T.expect(Rotation.angleAt(1234.5, 37)):toBeNear(Rotation.angleAt(1234.5, 37), 1e-9)
 	end)
 

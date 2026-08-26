@@ -1,9 +1,9 @@
---!strict
+-- Name: DataConfig.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the profile template every service writes through, since a missing branch fails silently rather than erroring: starting balances, owned branches, and positive progression awards.
+-- Created: 2026-08-22
 
--- The profile template is the shape every service writes through. It had no
--- headless coverage once the migration spec was removed, and it is the one
--- config a typo in breaks silently: a missing branch does not error, it just
--- reconciles into existence empty and the owning service reads nil forever.
+--!strict
 
 local T = require(script.Parent.TestKit)
 local DataConfig = require(script.Parent.Parent.Parent.Config.Data)
@@ -26,9 +26,6 @@ T.describe("Data config", function()
 	end)
 
 	T.it("starts the rotating shop in a state that forces a first draw", function()
-		-- Bucket must never match a real period index, or a brand new profile
-		-- would be treated as already drawn and the player would see no offers
-		-- until the next rotation.
 		local template = DataConfig.Template
 		T.expect(type(template.Shop.Offers)):toEqual("table")
 		T.expect(#template.Shop.Offers):toEqual(0)
@@ -36,9 +33,6 @@ T.describe("Data config", function()
 	end)
 
 	T.it("cannot collide with a real period index for any supported rotation", function()
-		-- Period indices are floor(now / RotationSeconds) and time is positive,
-		-- so any negative sentinel is unreachable. Pinned because shortening the
-		-- rotation raises the index rather than lowering it.
 		T.expect(math.floor(0 / Shop.Rotation.RotationSeconds) > DataConfig.Template.Shop.Bucket):toBeTruthy()
 	end)
 

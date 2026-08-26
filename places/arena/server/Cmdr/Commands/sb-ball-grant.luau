@@ -1,3 +1,8 @@
+-- Name: sb-ball-grant.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-ball-grant: grants a held ball to players who are not already holding one.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

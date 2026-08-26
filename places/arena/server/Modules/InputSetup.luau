@@ -1,3 +1,8 @@
+-- Name: InputSetup.luau
+-- Author: Jack C.
+-- Description: Materializes the declarative input map as an InputContext, InputAction, and InputBinding tree under each player, and owns the validated device-class attribute the sim adapter reads.
+-- Created: 2026-07-12
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -5,11 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-
--- Materializes the declarative input map as an InputContext under each Player.
--- InputContexts must be descendants of a Player so the engine knows ownership.
--- Action state is read on the client, which sends throw/catch intent to the
--- server. Also owns the client-reported DeviceClass attribute.
 
 local InputSetup = {}
 

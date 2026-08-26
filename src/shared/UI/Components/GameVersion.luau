@@ -1,3 +1,8 @@
+-- Name: GameVersion.luau
+-- Author: Jack C.
+-- Description: Small corner label showing the running game version.
+-- Created: 2026-08-17
+
 --!strict
 
 local MarketplaceService = game:GetService("MarketplaceService")

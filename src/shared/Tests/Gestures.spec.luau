@@ -1,3 +1,8 @@
+-- Name: Gestures.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the touch gesture classifier: taps, holds, charge ramping, drag promotion with buffered movement, swipe direction and tolerance, and double-tap pairing.
+-- Created: 2026-08-19
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -38,7 +43,6 @@ T.describe("Gestures", function()
 		Gestures.step(touch, settings, 0.3)
 		T.expect(Gestures.charge(touch, settings, 0.25)):toBeNear(0, 1e-6)
 		T.expect(Gestures.charge(touch, settings, 0.25 + 0.35)):toBeNear(0.5, 1e-6)
-		-- Clamped, never past 1 however long it is held.
 		T.expect(Gestures.charge(touch, settings, 10)):toBeNear(1, 1e-6)
 	end)
 
@@ -56,10 +60,8 @@ T.describe("Gestures", function()
 		Gestures.move(touch, 108, 100, 4, 0, settings)
 		Gestures.move(touch, 125, 100, 17, 0, settings)
 		local dx, dy = Gestures.takePendingDelta(touch)
-		-- All three samples, including the two before promotion.
 		T.expect(dx):toBeNear(25, 1e-6)
 		T.expect(dy):toBeNear(0, 1e-6)
-		-- Consumed once only, so the camera cannot be moved twice by it.
 		local againX = Gestures.takePendingDelta(touch)
 		T.expect(againX):toBeNear(0, 1e-6)
 	end)

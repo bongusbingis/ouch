@@ -1,3 +1,8 @@
+-- Name: sbCrateOpenFree.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-crate-open-free: rolls a crate without charging Bonks and fires the normal reveal event.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

@@ -1,3 +1,8 @@
+-- Name: sbCosmeticRevokeServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-cosmetic-revoke, removing ownership of a named cosmetic and unequipping it if it was in use.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

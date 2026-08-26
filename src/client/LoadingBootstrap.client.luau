@@ -1,3 +1,8 @@
+-- Name: LoadingBootstrap.client.luau
+-- Author: Jack C.
+-- Description: Earliest-running client script that adopts the arriving teleport loading screen, suppresses the default Roblox one, and tears both down once the React loading screen reports itself on screen.
+-- Created: 2026-08-24
+
 --!strict
 
 local Players = game:GetService("Players")

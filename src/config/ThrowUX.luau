@@ -28,13 +28,17 @@ return table.freeze({
 		GlowOpacity = 0.12,
 	}),
 	Trajectory = table.freeze({
+		PhysicsUpdateHz = 20,
+		WorldDotSpacingStuds = 7,
+		MinimumVisibleDots = 4,
 		MinimumOpacity = 0.32,
 		MaximumOpacity = 0.94,
 		MinimumDotPixels = 5,
 		MaximumDotPixels = 13,
 		EndpointPixels = 32,
 		EndpointTransparency = 0.28,
-		ScreenSmoothing = 0.42,
+		ScreenSmoothing = 0.72,
+		MaximumSmoothingDistancePixels = 8,
 	}),
 	Swipe = table.freeze({
 		OriginPixels = 36,

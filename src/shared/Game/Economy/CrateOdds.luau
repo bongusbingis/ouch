@@ -1,11 +1,9 @@
---!strict
+-- Name: CrateOdds.luau
+-- Author: Jack C.
+-- Description: Builds the single deterministic crate probability model used by both rolling and public odds disclosure, allocating displayed percentages so they sum to exactly one hundred.
+-- Created: 2026-08-11
 
--- Builds the single deterministic crate probability model consumed by both
--- rolling and storefront disclosure.
---
--- Displayed percentages use largest-remainder allocation because Roblox's paid
--- random items policy requires disclosed probabilities to sum to exactly 100%;
--- rounding each outcome independently does not (9 items at 11.11% sum to 99.99).
+--!strict
 
 local CrateOdds = {}
 
@@ -75,9 +73,6 @@ function CrateOdds.build(
 	}
 end
 
--- Hamilton/largest-remainder allocation: floor every share, then hand the
--- leftover units to the largest fractional parts. Ties break on input index so
--- the result is identical on every client and server.
 local function allocate(values: { number }, precision: number): { number }
 	local scale = 10 ^ precision
 	local totalUnits = math.round(100 * scale)

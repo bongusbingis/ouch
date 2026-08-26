@@ -1,13 +1,9 @@
---!strict
+-- Name: ConfigRuntime.luau
+-- Author: Jack C.
+-- Description: Applies validated overrides onto the live config tables, capturing each leaf's shipped value on first override and restoring it exactly when the override disappears.
+-- Created: 2026-08-18
 
--- Applies validated overrides onto the live Config module tables. The config
--- tables stay the single source of truth every consumer already reads, so an
--- override is a write into that table rather than a second resolved copy that
--- could drift from it.
---
--- The baked value of each leaf is captured the first time it is overridden and
--- restored exactly when the override later disappears, which is what lets the
--- game fall back to its shipped values without a restart.
+--!strict
 
 local ConfigOverrides = require(script.Parent.ConfigOverrides)
 
@@ -46,8 +42,6 @@ local function write(key: string, value: any): boolean
 	return ConfigOverrides.writePath(moduleTable, path, value)
 end
 
--- Installs exactly the given override set: keys present are written, keys that
--- were applied before and are absent now are restored to their baked value.
 function ConfigRuntime.apply(accepted: { [string]: any }): { [string]: any }
 	local changed = {}
 
@@ -83,8 +77,6 @@ function ConfigRuntime.activeOverrides(): { [string]: any }
 	return table.clone(applied)
 end
 
--- Restores every baked value and forgets registrations. Used by specs and by
--- teardown; gameplay reverts through apply instead.
 function ConfigRuntime.clear()
 	ConfigRuntime.apply({})
 	modules = {}

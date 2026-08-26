@@ -1,3 +1,8 @@
+-- Name: SimUtil.luau
+-- Author: Jack C.
+-- Description: Predicates and helpers shared across every weapon and projectile module, including deterministic key ordering, team and line-of-sight checks, and event emission.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
@@ -6,11 +11,6 @@ type Vec = SimTypes.Vec
 type SimState = SimTypes.SimState
 type SimEvent = SimTypes.SimEvent
 type WorldSnapshot = SimTypes.WorldSnapshot
-
--- Helpers shared by the sim modules. sortedKeys exists because plain pairs()
--- order is unspecified, which would silently break client/server resimulation
--- agreement; the predicates live here so every weapon and the projectile
--- subsystem apply identical team and occlusion rules.
 
 local SimUtil = {}
 
@@ -65,10 +65,6 @@ function SimUtil.hasLineOfSight(
 	return hit == nil or hit.distance >= distance - target.radius
 end
 
--- Resolved 0-1 strength of one assist feature for the player who issued this
--- command, or 0 when the adapter attached nothing. Every weapon reads assists
--- through here so a missing set can never mean "full strength" in one kit and
--- "off" in another.
 function SimUtil.assistStrength(command: SimTypes.InputCommand, feature: string): number
 	local assist = command.assist
 	if assist == nil then

@@ -1,3 +1,8 @@
+-- Name: BallVisuals.luau
+-- Author: Jack C.
+-- Description: Renders every dodgeball in the world: clones the equipped ball cosmetic, smooths replicated ball positions, drives held/windup/flight/bounce effects and squash-stretch springs, and predicts the local player's own throws.
+-- Created: 2026-07-12
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -7,12 +12,19 @@ local Workspace = game:GetService("Workspace")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local ProjectileTrajectory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Sim")
+		:WaitForChild("ProjectileTrajectory")
+)
 local CosmeticVisualFactory = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
 		:WaitForChild("Cosmetics")
 		:WaitForChild("CosmeticVisualFactory")
 )
+local ChargeAim = require(script.Parent.ChargeAim)
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
@@ -34,8 +46,6 @@ local TRAIL_ACTIVE_PHASES = {
 	[4] = true,
 }
 
--- The local player's throw, drawn before the server has confirmed it. Exactly
--- one can exist, because a player holds at most one ball.
 type PredictedThrow = {
 	ball: BasePart,
 	position: Vector3,
@@ -103,8 +113,6 @@ local function ownerFor(ball: BasePart): Player?
 	return PlayerIds.fromId(ball:GetAttribute("ow") :: string?)
 end
 
--- Particles only for Throw and Bounce; those two sounds come from GameAudio's
--- config ids instead, so playing them here as well would double them.
 local SOUNDLESS_EFFECTS = { Throw = true, Bounce = true }
 
 local function playOptional(ball: BasePart, name: string, intensity: number?)
@@ -165,8 +173,6 @@ local function updateRestPulse(ball: BasePart, visual: BasePart, active: boolean
 		+ (config.BrightOutlineTransparency - config.DimOutlineTransparency) * wave
 end
 
--- The ball keeps its last owner's equipped asset after release and settlement.
--- Recovery clears ownership, returning genuinely neutral balls to the default.
 local function effectiveAssetId(ball: BasePart): string
 	local owner = ownerFor(ball)
 	if owner == nil then
@@ -258,8 +264,6 @@ local function refreshAsset(ball: BasePart)
 	visuals[ball] = visual
 	appliedAssets[ball] = assetId
 	feelStates[ball] = nil
-	-- The rebuilt visual carries its template's trail state, so the cached flag
-	-- no longer describes it and the next frame must re-apply.
 	trailEnabled[ball] = nil
 	feelFor(ball, visual)
 end
@@ -311,15 +315,6 @@ function BallVisuals.onEvent(event: any)
 	end
 end
 
--- Draws the thrown ball leaving the hand on the frame the input was sent,
--- instead of after the round trip it takes the server's first in-flight update
--- to arrive. It starts from the hand the player was watching rather than from
--- the server's release socket: that is the position they actually saw, and the
--- server's own is one round trip away by definition.
---
--- Nothing here is authoritative. The server decides what a throw hits from its
--- own release position, and a throw it refuses simply times out back to the
--- real ball.
 local function beginPrediction(snapshot: CombatState.Snapshot, localId: string)
 	predicted = nil
 	local aim = snapshot.releaseAim
@@ -337,14 +332,14 @@ local function beginPrediction(snapshot: CombatState.Snapshot, localId: string)
 		return
 	end
 	local cfg = Combat.Dodgeball
-	local charge = math.clamp(snapshot.releaseCharge, 0, 1)
-	local speed = cfg.ThrowSpeed * (1 + (cfg.Charge.MaxSpeedScale - 1) * charge)
 	local root = CharacterRig.rootPart(Players.LocalPlayer.Character)
 	local inherited = if root then root.AssemblyLinearVelocity * cfg.MomentumInheritance else Vector3.zero
+	local launchVelocity = ChargeAim.recentLaunchVelocity(aim, snapshot.releaseCharge)
+		or aim * ProjectileTrajectory.launchSpeed(cfg, snapshot.releaseCharge) + inherited
 	predicted = {
 		ball = thrown,
 		position = (visuals[thrown] :: BasePart).Position,
-		velocity = aim * speed + inherited,
+		velocity = launchVelocity,
 		elapsed = 0,
 	}
 end
@@ -355,9 +350,6 @@ local function stepPrediction(dt: number)
 		return
 	end
 	active.elapsed += dt
-	-- Handed back the moment the server reports the ball anywhere but the hand,
-	-- which covers the throw landing, the throw being refused, and the ball
-	-- changing owner underneath the prediction.
 	if
 		active.ball.Parent == nil
 		or active.ball:GetAttribute("ph") ~= HELD_PHASE
@@ -388,21 +380,8 @@ function BallVisuals.start()
 		end
 	end)
 
-	-- After the animator (Character) and the arm IK (Character + 1). A held ball
-	-- is positioned from the hand's transform, so reading it at the default
-	-- RenderStepped priority reads last frame's pose: the ball renders where the
-	-- hand used to be while the hand renders where it now is. Standing still the
-	-- error is invisible, but a running arm swing or a wind-up moves the hand far
-	-- enough per frame that the ball visibly separates and judders against it.
 	RunService:BindToRenderStep("BallVisuals", Enum.RenderPriority.Character.Value + 2, function(dt)
 		local alpha = 1 - math.exp(-Combat.Dodgeball.RemoteSmoothing * dt)
-		-- A replicated ball is drawn late by two independent amounts: the hop it
-		-- took to arrive, and the time constant of the smoothing below. At throw
-		-- speed both together are several studs, which is enough for an
-		-- elimination to land visibly before the ball reaches its target. Leading
-		-- the target by that same amount puts the drawn ball where the
-		-- authoritative one already is, leaving the smoothing to do only what it
-		-- is for: absorbing jitter. GetNetworkPing reports one way, in seconds.
 		local lead = math.min(
 			Players.LocalPlayer:GetNetworkPing() + 1 / Combat.Dodgeball.RemoteSmoothing,
 			Combat.Dodgeball.MaxLatencyExtrapolation
@@ -422,18 +401,10 @@ function BallVisuals.start()
 			end
 			refreshAsset(ball)
 			visual = visuals[ball] :: BasePart
-			-- A predicted ball presents as in flight in every respect -- unpinned
-			-- from the hand, stretched, trailing, spinning -- because that is what
-			-- it is; the only thing missing is the server's confirmation.
 			local activePrediction = if predicted ~= nil and predicted.ball == ball then predicted else nil
 			local phase = if activePrediction then IN_FLIGHT_PHASE else ball:GetAttribute("ph")
 			local isLocalHeld = ball:GetAttribute("hb") == localId
 			local isChargeAiming = snapshot.state == "Charging" and snapshot.weapon == "Dodgeball" and isLocalHeld
-			-- A held ball whose holder has another weapon out is stowed, not
-			-- dropped: they still own it and a Throw with the ball equipped again
-			-- still throws it. Hiding it is what stops a player from appearing to
-			-- carry a dodgeball and a hammer at once. Read per holder rather than
-			-- from the local snapshot so remote players stow correctly too.
 			local holder = PlayerIds.fromId(ball:GetAttribute("hb") :: string?)
 			local stowed = phase == HELD_PHASE and holder ~= nil and not EquippedWeapon.isShowing(holder, "Dodgeball")
 			visual.Transparency = if stowed then 1 else 0
@@ -472,9 +443,6 @@ function BallVisuals.start()
 				)
 			visual.Size = visualSize
 
-			-- Only extrapolated in flight. A bouncing ball changes direction on
-			-- contact, so leading it would drive the visual through the surface
-			-- it is about to bounce off.
 			local renderPosition = if activePrediction
 				then activePrediction.position
 				elseif phase == IN_FLIGHT_PHASE then ball.Position + velocityVector * lead
@@ -506,8 +474,6 @@ function BallVisuals.start()
 
 			updateRestPulse(ball, visual, phase == FREE_PHASE, dt)
 			local trailActive = TRAIL_ACTIVE_PHASES[phase] == true
-			-- Only on change: setEnabled walks every descendant, which is far too
-			-- much to repeat per ball per frame just to re-assert the same value.
 			if trailEnabled[ball] ~= trailActive then
 				trailEnabled[ball] = trailActive
 				setEnabled(visual, "Trail", trailActive)

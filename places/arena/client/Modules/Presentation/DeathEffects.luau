@@ -1,3 +1,8 @@
+-- Name: DeathEffects.luau
+-- Author: Jack C.
+-- Description: Plays the local elimination sequence: desaturates the screen, pulls the camera into a spectator zoom, and holds it until the respawn timer configured by the active mode elapses.
+-- Created: 2026-07-13
+
 --!strict
 
 local Lighting = game:GetService("Lighting")

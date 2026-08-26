@@ -1,3 +1,8 @@
+-- Name: BanPolicy.luau
+-- Author: Jack C.
+-- Description: Pure interpretation of a stored ban record, distinguishing permanent bans, live temporary bans, expired ones, and malformed entries.
+-- Created: 2026-08-17
+
 --!strict
 
 local BanPolicy = {}

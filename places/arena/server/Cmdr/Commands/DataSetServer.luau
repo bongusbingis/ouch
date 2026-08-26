@@ -1,3 +1,8 @@
+-- Name: DataSetServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-data-set, writing an absolute value to the named profile field through PlayerData for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

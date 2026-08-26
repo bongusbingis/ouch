@@ -1,3 +1,8 @@
+-- Name: sbStatusServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-status, gathering match phase, combat and ball state, world position, profile balances, and equipped cosmetics into one diagnostic dump.
+-- Created: 2026-07-15
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

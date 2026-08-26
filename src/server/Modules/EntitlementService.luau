@@ -1,3 +1,8 @@
+-- Name: EntitlementService.luau
+-- Author: Jack C.
+-- Description: Caches which game passes each player owns and derives the best applicable XP and Bonks multipliers from them, exposing a readiness signal so awards never apply a half-known set.
+-- Created: 2026-08-12
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -7,14 +12,6 @@ local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild
 local Boosts = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
 )
-
--- Sole owner of per-session game-pass ownership. The platform is the source of
--- truth (MarketplaceService), so ownership is never written to the profile: a
--- refunded pass would otherwise leave a permanent booster flag nothing clears.
--- GamePassService is the only caller of setOwnership; everything else reads.
---
--- An absent entry means "not looked up yet", which is deliberately distinct
--- from false -- callers that must not silently drop a boost await readiness.
 
 local EntitlementService = {}
 
@@ -72,8 +69,6 @@ function EntitlementService.ownsAny(player: Player): boolean
 	return false
 end
 
--- Ready once every boost-granting pass has a recorded answer. Passes without
--- boosts cannot change a multiplier, so they never hold this up.
 function EntitlementService.isReady(player: Player): boolean
 	local entries = ownedByUserId[player.UserId]
 	if entries == nil then

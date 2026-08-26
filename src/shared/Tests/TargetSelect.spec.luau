@@ -1,3 +1,8 @@
+-- Name: TargetSelect.spec.luau
+-- Author: Jack C.
+-- Description: Spec for soft-lock selection and steering: nearest to the centre of aim, tie breaking by distance, cone and range limits, teammates and the dead ignored, confidence scoring, and clamped steering.
+-- Created: 2026-08-19
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -84,7 +89,6 @@ T.describe("TargetSelect", function()
 	end)
 
 	T.it("fades confidence toward the edge of the cone", function()
-		-- Just inside a 40 degree cone, past the 0.6 fade start.
 		local offset = math.tan(math.rad(38)) * 20
 		local world = worldWith({ e1 = MockWorld.character(vector.create(20, 2.5, offset)) })
 		local id, confidence = TargetSelect.pick(world, "p1", ORIGIN, FORWARD, options())

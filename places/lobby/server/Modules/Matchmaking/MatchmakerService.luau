@@ -1,3 +1,8 @@
+-- Name: MatchmakerService.luau
+-- Author: Jack C.
+-- Description: Runs the matchmaking tick: reads queued candidates, selects and claims a viable set under the population policy, reconciles stale claims, and creates the match record the teleport coordinator acts on.
+-- Created: 2026-08-15
+
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -207,6 +212,7 @@ function MatchmakerService:_createMatch(parties, accessCode, matchId)
 		local ids = memberIds(party)
 		table.insert(matchParties, {
 			partyId = party.partyId,
+			leaderUserId = party.leaderUserId,
 			memberUserIds = ids,
 		})
 		for _, userId in ids do

@@ -1,3 +1,8 @@
+-- Name: ArenaService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec that the arena service resolves the authored arena without modifying it and teleports players onto the right spawn pool for team and non-team modes.
+-- Created: 2026-08-17
+
 --!nonstrict
 
 local ServerScriptService = game:GetService("ServerScriptService")

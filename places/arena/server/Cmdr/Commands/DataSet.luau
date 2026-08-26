@@ -1,3 +1,8 @@
+-- Name: DataSet.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-data-set: sets a numeric profile field for one or more players.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

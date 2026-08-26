@@ -1,3 +1,8 @@
+-- Name: GameModeCard.luau
+-- Author: Jack C.
+-- Description: One selectable game mode card on the vote ballot, showing its art, name, live vote count, and selection state.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,8 +23,6 @@ local THUMBNAIL_BOUNDS =
 	TextMetrics.fitAspect(TextMetrics.scaleBounds(CARD_BOUNDS, Vector2.new(0.822196, 0.661131)), 1.7)
 local VOTE_COUNT_BOUNDS = TextMetrics.scaleBounds(THUMBNAIL_BOUNDS, Vector2.new(0.613327, 0.160588)) - Vector2.new(2, 2)
 local VOTE_COUNT_STROKE = TextMetrics.scaledTextStroke(3.8, "000", Enum.Font.Highway, VOTE_COUNT_BOUNDS)
--- The checkmark was authored at 100x100 pixels against REFERENCE_VIEWPORT; it is stored as a
--- card-relative scale so it tracks the card at every viewport size.
 local CHECKMARK_SCALE = Vector2.new(100 / CARD_BOUNDS.X, 100 / CARD_BOUNDS.Y)
 local titleStrokes: { [string]: number } = {}
 

@@ -1,3 +1,8 @@
+-- Name: TDM.luau
+-- Author: Jack C.
+-- Description: Team deathmatch game mode: its match rules and the server hooks that assign teams, provision balls, and score eliminations to the scorer's team.
+-- Created: 2026-07-13
+
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
@@ -22,9 +27,6 @@ TDM.rules = {
 	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
--- Every player starts holding a ball (and late joiners get one on their
--- first spawn), so per-team ball counts always match team sizes — no ground
--- spawns to contest.
 function TDM.onMatchStart(ctx: GameMode.ModeContext)
 	for _, player in ctx.getPlayers() do
 		ctx.balls.grantHeldBall(player)

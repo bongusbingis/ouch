@@ -1,3 +1,8 @@
+-- Name: Config.luau
+-- Author: Jack C.
+-- Description: Lobby matchmaking tunables: arena place id, party bounds, queue and store lifetimes, retry policy, and the memory store namespaces separating Studio from live.
+-- Created: 2026-08-15
+
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -47,6 +52,4 @@ local Config = {
 
 Config.MemoryStoreNamespace = RunService:IsStudio() and "OuchDev_v2" or "OuchLive_v2"
 
--- Left unfrozen so Config.LiveConfig may override the matchmaking scalars it
--- declares; every other field is written only here.
 return Config

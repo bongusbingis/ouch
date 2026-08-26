@@ -1,14 +1,9 @@
---!strict
+-- Name: StarterOffer.luau
+-- Author: Jack C.
+-- Description: Pure eligibility rules for the one-time starter offer window, deciding only whether an ordinary game pass is merchandised more prominently.
+-- Created: 2026-08-12
 
--- Pure eligibility rules for the one-time starter offer.
---
--- The offer grants nothing on its own -- it only decides whether to merchandise
--- an ordinary game pass more prominently -- so it is safe for the client to
--- evaluate. The purchase itself still goes through the normal server-verified
--- game-pass flow.
---
--- The window is real: once it elapses the offer genuinely stops being shown.
--- Nothing here manufactures scarcity that does not exist.
+--!strict
 
 local StarterOffer = {}
 
@@ -25,8 +20,6 @@ export type State = {
 
 local INACTIVE: State = { active = false, expiresAt = 0, secondsRemaining = 0 }
 
--- A player counts as converted the moment they own anything or hold any
--- receipt; the offer is for first purchases only.
 function StarterOffer.hasPurchased(receipts: { [string]: any }?, ownsAnyPass: boolean): boolean
 	if ownsAnyPass then
 		return true

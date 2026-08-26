@@ -1,3 +1,8 @@
+-- Name: InventoryPreview.luau
+-- Author: Jack C.
+-- Description: Renders a live rotating 3D preview of a cosmetic or character inside a UI frame, only animating while it is actually on screen.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")

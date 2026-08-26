@@ -1,3 +1,8 @@
+-- Name: BattlePassService.luau
+-- Author: Jack C.
+-- Description: Server owner of season pass state: adopts the active season, accrues season XP, gates and grants premium ownership idempotently, validates claims, and settles what is owed at a season rollover.
+-- Created: 2026-08-12
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -16,13 +21,6 @@ local BattlePassLogic = require(
 local PlayerData = require(script.Parent.PlayerData)
 local RewardService = require(script.Parent.RewardService)
 local AnalyticsService = require(script.Parent.AnalyticsService)
-
--- Owns season pass state: season XP, claimed tiers, and premium ownership.
---
--- Rollover mirrors QuestService.ensureData: compare the stored season id with
--- the one derived from config plus the clock, and on a mismatch pay out
--- everything still owed *before* resetting, so nothing is lost to timing.
--- Entitlements is a sibling of Season precisely so rollover never touches it.
 
 local BattlePassService = {}
 
@@ -76,8 +74,6 @@ local function premiumProductId(seasonId: string): number?
 	return nil
 end
 
--- Pays out everything the stored season still owes. Resolved by stored id, not
--- the active one, so an archived season still settles correctly.
 local function grantUnclaimedTiers(player: Player, data: any)
 	local stored = BattlePassLogic.readState(data.Season)
 	local season = activeSeasons.Definitions[stored.Id]
@@ -111,8 +107,6 @@ function BattlePassService.ensureData(player: Player): any
 	local activeId = if season then season.Id else ""
 	if data.Season.Id ~= activeId then
 		grantUnclaimedTiers(player, data)
-		-- One assignment, one Replica Set: mutating the nested claim maps in
-		-- place would not replicate.
 		data.Season = BattlePassLogic.blankState(activeId)
 	end
 	return data
@@ -160,8 +154,6 @@ function BattlePassService.grantPremium(player: Player, seasonId: string?): bool
 	if data == nil then
 		return false
 	end
-	-- Returns true even when already set: MonetizationService records the
-	-- receipt only after this succeeds, so a retry must resolve cleanly.
 	data.Entitlements.PremiumSeasons[seasonId] = true
 	BattlePassService.fireState(player)
 	return true
@@ -181,7 +173,6 @@ local function claimOne(player: Player, data: any, season: any, tier: number, tr
 		return false, grantReason or "grant_failed"
 	end
 
-	-- Marked only after the grant succeeds, so a failed grant stays claimable.
 	local field = if track == "Premium" then "ClaimedPremium" else "ClaimedFree"
 	data.Season[field][tostring(tier)] = true
 	activeAnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.SeasonTierClaimed, 1, {
@@ -233,8 +224,6 @@ function BattlePassService.claimAll(player: Player): (any?, string?, number)
 	return state, nil, claimed
 end
 
--- An idle lobby player would otherwise not cross a season boundary until they
--- next earned XP or opened the menu.
 local function sweep()
 	for _, player in activePlayers:GetPlayers() do
 		local before = activePlayerData.get(player)

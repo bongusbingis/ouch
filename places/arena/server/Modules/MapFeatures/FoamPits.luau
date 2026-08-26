@@ -1,3 +1,8 @@
+-- Name: FoamPits.luau
+-- Author: Jack C.
+-- Description: Map feature kit for foam pits: applies a named movement-speed modifier while a player's root is inside an authored pit volume and clears it on exit.
+-- Created: 2026-08-18
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,10 +12,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local Volume = require(Shared:WaitForChild("MapFeatures"):WaitForChild("Volume"))
 local MovementSpeedService = require(Shared:WaitForChild("Adapters"):WaitForChild("MovementSpeedService"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
-
--- Slows a player while their root is inside a pit volume. WalkSpeed is never
--- written directly: the slow is a named MovementSpeedService modifier, which is
--- the sole owner of WalkSpeed.
 
 local FoamPits = {}
 

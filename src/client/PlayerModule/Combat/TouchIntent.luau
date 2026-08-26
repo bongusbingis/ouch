@@ -1,10 +1,12 @@
+-- Name: TouchIntent.luau
+-- Author: Jack C.
+-- Description: Classifies touch input into combat intents, tracking each finger's lifecycle to separate camera drags from taps, charged holds, and bottom-screen swipes.
+-- Created: 2026-08-20
+
 --!strict
 
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
 local TouchRegions = require(script.Parent:WaitForChild("TouchRegions"))
-
--- Per-touch classification for attack and camera gestures. Camera input remains
--- owned by CameraInput; a touch claimed by the camera cannot attack.
 
 local TouchIntent = {}
 
@@ -27,17 +29,7 @@ export type GestureEvent = {
 	fromBottom: boolean,
 }
 
-export type State =
-	-- Undecided. Still able to become any of the below.
-	"Pending"
-	-- Moved enough to be a look. Permanently disqualified from attacking.
-	| "Camera"
-	-- Held still long enough to be a charge. Still free to aim.
-	| "Charging"
-	-- Already produced its action. Cannot produce another.
-	| "Consumed"
-	-- Started somewhere that is not gameplay, or was cancelled.
-	| "Ignored"
+export type State = "Pending" | "Camera" | "Charging" | "Consumed" | "Ignored"
 
 type Touch = {
 	startX: number,
@@ -45,17 +37,12 @@ type Touch = {
 	x: number,
 	y: number,
 	startedAt: number,
-	-- Furthest the finger has been from where it landed. Peak rather than
-	-- current, so returning to the start does not re-qualify a drag as a tap.
 	maxDrift: number,
 	velocity: number,
 	hasVelocity: boolean,
 	lastMovedAt: number,
 	fromBottom: boolean,
 	swipeAlive: boolean,
-	-- While true this touch must not steer the camera. A swipe that pans the view
-	-- while it throws is indistinguishable from a camera drag, which is the whole
-	-- thing this gesture has to be told apart from.
 	suppressCamera: boolean,
 	state: State,
 }
@@ -118,9 +105,6 @@ local function fire(name: string)
 	end
 end
 
--- Ends a swipe candidate and hands the camera straight back. Releasing on the
--- same line that kills the candidate is what stops a failed swipe from leaving
--- the view frozen.
 local function killSwipe(touch: Touch)
 	touch.swipeAlive = false
 	touch.suppressCamera = false
@@ -131,13 +115,10 @@ local function distance(touch: Touch): number
 	return math.sqrt(dx * dx + dy * dy)
 end
 
--- Hands the touch to the camera for good. Idempotent, because several signals
--- can independently conclude the same thing on the same frame.
 local function claimCamera(touch: Touch, reason: string)
 	if touch.state == "Camera" then
 		return
 	end
-	-- Movement does not cancel an active charge.
 	if touch.state == "Charging" or touch.state == "Consumed" then
 		return
 	end
@@ -148,16 +129,12 @@ local function claimCamera(touch: Touch, reason: string)
 	log("-> Camera (" .. reason .. ")")
 end
 
--- Everything an upward flick has to satisfy. Several independent signals rather
--- than one threshold, because any single one of them fires constantly during
--- ordinary camera panning.
 local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 	if not touch.swipeAlive or touch.state ~= "Pending" then
 		return false
 	end
 
 	local dx = touch.x - touch.startX
-	-- Screen Y grows downward, so travelling up is negative.
 	local dy = touch.y - touch.startY
 	local travel = math.sqrt(dx * dx + dy * dy)
 	if travel <= 1e-3 then
@@ -171,10 +148,6 @@ local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 		return false
 	end
 
-	-- Direction is only meaningful once the finger has actually gone somewhere.
-	-- Judging it on the first 1-5px sample rejected nearly every real swipe,
-	-- because that sample is dominated by digitizer noise and by the sideways
-	-- roll a thumb makes as it starts to flick.
 	if travel < TouchRegions.scale(CombatConfig.BottomSwipe.DirectionSampleMinPixels) then
 		return false
 	end
@@ -189,10 +162,6 @@ local function evaluateBottomSwipe(touch: Touch, now: number): boolean
 	if travel < TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance) then
 		return false
 	end
-	-- Far enough to decide. Too slow at this distance means a deliberate pan, not
-	-- a flick, and it is killed here rather than left alive until the duration
-	-- runs out -- the camera is frozen for as long as the candidate lives, so a
-	-- candidate that cannot win any more must not keep holding it.
 	if touch.velocity < TouchRegions.scale(CombatConfig.BottomSwipe.MinVelocity) then
 		killSwipe(touch)
 		log("swipe cancelled: too slow for the distance")
@@ -226,8 +195,6 @@ function TouchIntent.onGesture(listener: (GestureEvent) -> ()): () -> ()
 end
 
 function TouchIntent.began(input: InputObject, sunk: boolean)
-	-- Roblox already knows when UI swallowed a touch. Trusting that is both
-	-- cheaper and more accurate than trying to work it out from geometry.
 	if sunk then
 		touches[input] = nil
 		return
@@ -263,10 +230,6 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 		return
 	end
 	if sunk then
-		-- UI took the touch mid-gesture. Drop it rather than guessing -- but hand
-		-- back the charge first. ended() returns early for a touch that is no
-		-- longer tracked, so without this chargeOwner stayed set forever and no
-		-- further charge could ever begin.
 		touches[input] = nil
 		emitGesture("Cancelled", touch)
 		if input == chargeOwner then
@@ -285,13 +248,8 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 		local stepX, stepY = x - touch.x, y - touch.y
 		local sampled = math.sqrt(stepX * stepX + stepY * stepY) / dt
 		if touch.hasVelocity then
-			-- Smoothed so one noisy sample cannot claim the camera on its own.
 			touch.velocity = touch.velocity * 0.5 + sampled * 0.5
 		else
-			-- Seeded from the first real sample rather than blended up from zero.
-			-- Ramping from zero meant the estimate read low for several frames, so
-			-- every speed threshold was silently stricter than its configured
-			-- value, and more so the lower the frame rate.
 			touch.velocity = sampled
 			touch.hasVelocity = true
 		end
@@ -313,8 +271,6 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 			fire("onNormalThrow")
 			return
 		end
-		-- Still a live swipe candidate: hold off on claiming the camera so a
-		-- fast flick is not stolen by its own speed.
 		if touch.swipeAlive then
 			emitGesture("SwipeCandidate", touch)
 			return
@@ -328,8 +284,6 @@ function TouchIntent.moved(input: InputObject, sunk: boolean)
 	end
 end
 
--- Time-driven promotion. A finger that lands and never moves produces no move
--- events at all, so the charge threshold has to be checked on a clock.
 function TouchIntent.step()
 	local now = os.clock()
 	for input, touch in touches do
@@ -367,14 +321,10 @@ function TouchIntent.ended(input: InputObject)
 		return
 	end
 	if touch.state ~= "Pending" then
-		-- Camera, Consumed and Ignored all end silently. This is the guard that
-		-- stops one physical action producing two attacks.
 		emitGesture("Ended", touch)
 		return
 	end
 
-	-- Still Pending means the hold threshold was never reached, so the only
-	-- question left is whether the finger stayed put.
 	local duration = os.clock() - touch.startedAt
 	if touch.maxDrift <= TouchRegions.scale(CombatConfig.Tap.MaxDistance) then
 		counters.taps += 1
@@ -384,17 +334,11 @@ function TouchIntent.ended(input: InputObject)
 		return
 	end
 
-	-- Neither clearly a tap nor clearly a look. Doing nothing is the right
-	-- answer: a missed gesture is cheap, a throw the player did not ask for is
-	-- not.
 	counters.ambiguous += 1
 	emitGesture("Cancelled", touch)
 	log(("-> NoAction (ambiguous %.2fs %dpx)"):format(duration, math.floor(touch.maxDrift)))
 end
 
--- Drops every touch and unwinds a charge if one was running. Used for death,
--- respawn, menus, focus loss and teardown -- anything that can swallow the
--- InputEnded that would otherwise have resolved the gesture.
 function TouchIntent.cancelAll()
 	local hadCharge = chargeOwner ~= nil
 	local hadTouches = next(touches) ~= nil
@@ -410,9 +354,6 @@ function TouchIntent.cancelAll()
 	end
 end
 
--- True while any touch is mid-swipe. The camera reads this and stops taking
--- touch rotation for as long as it holds, so an intentional flick throws without
--- dragging the view with it.
 function TouchIntent.isCameraSuppressed(): boolean
 	for _, touch in touches do
 		if touch.suppressCamera then

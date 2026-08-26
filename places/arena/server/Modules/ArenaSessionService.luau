@@ -1,3 +1,8 @@
+-- Name: ArenaSessionService.luau
+-- Author: Jack C.
+-- Description: Owns the arena server's matchmaking session identity: validates arriving teleport payloads and their source place, tracks admission and party identity across reconnects, and gates the start of play on client readiness.
+-- Created: 2026-08-17
+
 --!strict
 
 local HttpService = game:GetService("HttpService")
@@ -40,6 +45,12 @@ type Session = {
 	modeOptions: { string },
 }
 
+type PartyContext = {
+	partyId: string,
+	leaderUserId: number,
+	memberUserIds: { number },
+}
+
 local LOAD_STATE_FOLDER_NAME = "ArenaLoadState"
 local LOAD_SNAPSHOT_NAME = "Snapshot"
 local LOAD_SCHEMA_VERSION = 1
@@ -49,14 +60,65 @@ local READINESS_DEADLINE_SECONDS = Loading.ArenaWaitSeconds
 local session: Session? = nil
 local gate: ArenaReadinessGate.State? = nil
 local partyByUserId: { [number]: string } = {}
+local partyById: { [string]: PartyContext } = {}
 local admissionByUserId: { [number]: Admission } = {}
 local clientReadyByUserId: { [number]: boolean } = {}
+local roundEligibleByUserId: { [number]: boolean } = {}
 local readyListeners: { (Player) -> () } = {}
+local roundEligibilityListeners: { (Player, boolean) -> () } = {}
 local gateReleasedListeners: { (string) -> () } = {}
 local loadSnapshotValue: StringValue? = nil
 local loadRevision = 0
 local gateGeneration = 0
 local started = false
+
+local function sameMembers(first: { number }, second: { number }): boolean
+	if #first ~= #second then
+		return false
+	end
+	for _, userId in first do
+		if not table.find(second, userId) then
+			return false
+		end
+	end
+	return true
+end
+
+local function registerParty(player: Player, partyId: string, payloadParty: TeleportPayload.PartyContext?): boolean
+	local current = partyById[partyId]
+	if payloadParty then
+		if not table.find(payloadParty.memberUserIds, player.UserId) then
+			return false
+		end
+		if
+			current
+			and (
+				current.leaderUserId ~= payloadParty.leaderUserId
+				or not sameMembers(current.memberUserIds, payloadParty.memberUserIds)
+			)
+		then
+			return false
+		end
+		if current == nil then
+			partyById[partyId] = {
+				partyId = partyId,
+				leaderUserId = payloadParty.leaderUserId,
+				memberUserIds = table.clone(payloadParty.memberUserIds),
+			}
+		end
+	elseif current == nil then
+		partyById[partyId] = {
+			partyId = partyId,
+			leaderUserId = player.UserId,
+			memberUserIds = { player.UserId },
+		}
+	elseif not table.find(current.memberUserIds, player.UserId) then
+		table.insert(current.memberUserIds, player.UserId)
+		table.sort(current.memberUserIds)
+	end
+	partyByUserId[player.UserId] = partyId
+	return true
+end
 
 local function ensureLoadState(): StringValue
 	if loadSnapshotValue then
@@ -167,6 +229,7 @@ local function scheduleDeadline()
 		local released, reason = evaluateGate()
 		publishLoadState()
 		if released then
+			gateGeneration += 1
 			dispatchGateReleased(reason or "deadline")
 		end
 	end)
@@ -215,6 +278,7 @@ local function markReady(player: Player)
 	publishLoadState()
 	dispatchReady(player)
 	if released then
+		gateGeneration += 1
 		dispatchGateReleased(reason or "ready")
 	end
 end
@@ -223,6 +287,10 @@ local function addArrival(player: Player, admission: Admission)
 	local activeGate = assert(gate, "[ArenaSessionService] admission requires a readiness gate")
 	ArenaReadinessGate.arrive(activeGate, player.UserId)
 	setAdmission(player, admission)
+	if roundEligibleByUserId[player.UserId] == nil then
+		roundEligibleByUserId[player.UserId] = true
+	end
+	player:SetAttribute("ArenaRoundEligible", roundEligibleByUserId[player.UserId])
 	publishLoadState()
 	markReady(player)
 end
@@ -299,7 +367,10 @@ local function receive(player: Player)
 		return
 	end
 
-	partyByUserId[player.UserId] = payload.partyId
+	if not registerParty(player, payload.partyId, payload.party) then
+		reject(player, `[ArenaSessionService] Rejected inconsistent party context for {player.Name}`)
+		return
+	end
 	addArrival(player, "Matched")
 end
 
@@ -413,6 +484,43 @@ function ArenaSessionService.partyIdFor(player: Player): string?
 	return partyByUserId[player.UserId]
 end
 
+function ArenaSessionService.partyMemberUserIdsFor(player: Player): { number }
+	local partyId = partyByUserId[player.UserId]
+	local party = if partyId then partyById[partyId] else nil
+	return if party then table.clone(party.memberUserIds) else { player.UserId }
+end
+
+function ArenaSessionService.partyPlayersFor(player: Player): { Player }
+	local partyId = partyByUserId[player.UserId]
+	if partyId == nil then
+		return if player.Parent == Players and ArenaSessionService.isAdmitted(player) then { player } else {}
+	end
+	local result = {}
+	for _, candidate in Players:GetPlayers() do
+		if partyByUserId[candidate.UserId] == partyId and ArenaSessionService.isAdmitted(candidate) then
+			table.insert(result, candidate)
+		end
+	end
+	table.sort(result, function(a, b)
+		return a.UserId < b.UserId
+	end)
+	return result
+end
+
+function ArenaSessionService.effectiveLeaderUserIdFor(player: Player): number
+	local players = ArenaSessionService.partyPlayersFor(player)
+	local partyId = partyByUserId[player.UserId]
+	local party = if partyId then partyById[partyId] else nil
+	if party then
+		for _, candidate in players do
+			if candidate.UserId == party.leaderUserId then
+				return party.leaderUserId
+			end
+		end
+	end
+	return if players[1] then players[1].UserId else player.UserId
+end
+
 function ArenaSessionService.isAdmitted(player: Player): boolean
 	local admission = admissionByUserId[player.UserId]
 	return admission == "Direct" or admission == "Matched"
@@ -424,6 +532,24 @@ end
 
 function ArenaSessionService.isPlayable(player: Player): boolean
 	return ArenaSessionService.isAdmitted(player) and ArenaSessionService.isReady(player)
+end
+
+function ArenaSessionService.isRoundEligible(player: Player): boolean
+	return ArenaSessionService.isPlayable(player) and roundEligibleByUserId[player.UserId] ~= false
+end
+
+function ArenaSessionService.setRoundEligible(player: Player, eligible: boolean)
+	if not ArenaSessionService.isAdmitted(player) or roundEligibleByUserId[player.UserId] == eligible then
+		return
+	end
+	roundEligibleByUserId[player.UserId] = eligible
+	player:SetAttribute("ArenaRoundEligible", eligible)
+	for _, listener in table.clone(roundEligibilityListeners) do
+		local ok, err = pcall(listener, player, eligible)
+		if not ok then
+			warn(`[ArenaSessionService] round eligibility listener error: {err}`)
+		end
+	end
 end
 
 function ArenaSessionService.canOpenVote(): boolean
@@ -441,6 +567,21 @@ function ArenaSessionService.onReady(listener: (Player) -> ()): () -> ()
 		local index = table.find(readyListeners, listener)
 		if index then
 			table.remove(readyListeners, index)
+		end
+	end
+end
+
+function ArenaSessionService.onRoundEligibilityChanged(listener: (Player, boolean) -> ()): () -> ()
+	table.insert(roundEligibilityListeners, listener)
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(roundEligibilityListeners, listener)
+		if index then
+			table.remove(roundEligibilityListeners, index)
 		end
 	end
 end

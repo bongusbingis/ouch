@@ -1,7 +1,9 @@
---!strict
+-- Name: ShopRotation.luau
+-- Author: Jack C.
+-- Description: Deterministic per-player shop draw seeded from the player and the period, excluding already-owned items, whose result is persisted because purchases change the candidate pool.
+-- Created: 2026-08-22
 
--- Deterministic per-player shop rotation. Draws are persisted for the period
--- because purchases change the candidate pool.
+--!strict
 
 local ShopRotation = {}
 
@@ -21,9 +23,6 @@ local function seedFor(userId: number, periodIndex: number): number
 	return step(step(state))
 end
 
--- Every item in the given categories that a rotation is allowed to offer.
--- AlwaysAvailable items are excluded: they are free to equip, so offering one
--- for sale would be selling something the player already has.
 function ShopRotation.pool(items: { [string]: ItemDef }, categories: { string }): { string }
 	local wanted: { [string]: boolean } = {}
 	for _, category in categories do
@@ -39,9 +38,6 @@ function ShopRotation.pool(items: { [string]: ItemDef }, categories: { string })
 	return pool
 end
 
--- Draws up to `count` distinct unowned ids. Returns fewer only when the pool
--- holds fewer, and an empty list when there is nothing left to offer -- which
--- is the normal state before any rotation content exists.
 function ShopRotation.draw(
 	userId: number,
 	periodIndex: number,
@@ -55,8 +51,6 @@ function ShopRotation.draw(
 			table.insert(candidates, itemId)
 		end
 	end
-	-- Sorted before drawing so the caller's pool ordering cannot change the
-	-- result. Pool order is already deterministic; this makes it not matter.
 	table.sort(candidates)
 
 	local total = #candidates

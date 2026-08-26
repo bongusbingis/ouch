@@ -1,3 +1,8 @@
+-- Name: ArenaLoadingClient.luau
+-- Author: Jack C.
+-- Description: Owns the arena loading gate on the client: preloads critical assets, tracks streaming and initialization progress, reports readiness to the server, and publishes a snapshot the loading screen renders.
+-- Created: 2026-08-24
+
 --!strict
 
 local CollectionService = game:GetService("CollectionService")
@@ -339,16 +344,30 @@ local function criticalInstances(): { Instance }
 end
 
 local function beginPreload(currentGeneration: number)
+	local ids = criticalContentIds()
+	local totalUnits = #ids + 1
+	local completedIds = 0
+	local instancesComplete = false
 	local completedBatches = 0
-	local function batchComplete()
+	local function updateProgress()
+		local completedUnits = completedIds + if instancesComplete then 1 else 0
+		localState.preloadProgress = math.clamp(completedUnits / totalUnits, 0, 1)
+		changed()
+	end
+	local function batchComplete(kind: "Ids" | "Instances")
 		if destroyed or generation ~= currentGeneration then
 			return
 		end
+		if kind == "Ids" then
+			completedIds = #ids
+		else
+			instancesComplete = true
+		end
 		completedBatches += 1
+		updateProgress()
 		if completedBatches == 2 then
 			localState.worldReady = true
 			localState.preloadReady = true
-			localState.preloadProgress = 1
 			report("Preload", {
 				outcome = if localState.preloadTimedOut
 					then "CompletedAfterTimeout"
@@ -373,8 +392,6 @@ local function beginPreload(currentGeneration: number)
 	end)
 
 	task.spawn(function()
-		local ids = criticalContentIds()
-		local completed = 0
 		local seen = {}
 		pcall(function()
 			ContentProvider:PreloadAsync(ids, function(contentId, status)
@@ -386,13 +403,12 @@ local function beginPreload(currentGeneration: number)
 				end
 				if not seen[contentId] then
 					seen[contentId] = true
-					completed += 1
-					localState.preloadProgress = math.clamp(completed / math.max(#ids, 1), 0, 1)
-					changed()
+					completedIds += 1
+					updateProgress()
 				end
 			end)
 		end)
-		batchComplete()
+		batchComplete("Ids")
 	end)
 
 	task.spawn(function()
@@ -403,7 +419,7 @@ local function beginPreload(currentGeneration: number)
 				localState.preloadFailed = true
 			end
 		end
-		batchComplete()
+		batchComplete("Instances")
 	end)
 end
 
@@ -476,24 +492,12 @@ function ArenaLoadingClient.markBallotPresented(startsAt: number)
 end
 
 function ArenaLoadingClient.retryInitialization()
-	if destroyed or not localState.gameLoaded or isLocalReady() then
+	if destroyed or isLocalReady() then
 		return
 	end
-	generation += 1
-	local currentGeneration = generation
-	readyTaskRunning = false
 	localState.fatalError = nil
-	localState.preloadReady = false
-	localState.preloadTimedOut = false
-	localState.preloadFailed = false
-	localState.preloadProgress = 0
-	localState.worldReady = false
-	localState.streamReady = false
-	preloadStartedAt = os.clock()
 	changed()
-	beginPreload(currentGeneration)
-	beginStreaming(currentGeneration)
-	scheduleInitializationTimeout(currentGeneration)
+	scheduleInitializationTimeout(generation)
 end
 
 function ArenaLoadingClient.start()

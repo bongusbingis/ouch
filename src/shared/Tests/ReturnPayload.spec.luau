@@ -1,3 +1,8 @@
+-- Name: ReturnPayload.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the arena-to-lobby return payload: round tripping, not aliasing the caller's member list, and rejecting wrong schemas, malformed identity, and bad member lists.
+-- Created: 2026-08-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)

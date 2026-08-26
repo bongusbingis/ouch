@@ -1,3 +1,8 @@
+-- Name: EventDedup.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the event dedup guard: single admission, identity fields, clearing, and eviction at the cap.
+-- Created: 2026-07-16
+
 --!strict
 
 local T = require(script.Parent.TestKit)

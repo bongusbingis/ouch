@@ -1,3 +1,8 @@
+-- Name: CosmeticsLogic.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the shipped cosmetic catalog and equip rules: slot and ownership validation, category defaults, crate pool spread, and that every exclusive item is obtainable and backed by real audio.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -45,9 +50,6 @@ T.describe("CosmeticsLogic", function()
 	end)
 
 	T.it("spreads every openable crate's pool across more than one rarity", function()
-		-- Was a trail-specific rarity census. The prototype trails are gone, so
-		-- this now guards the property that actually mattered: a crate nobody can
-		-- get a rarer drop from is not a crate.
 		for _, crate in Crates do
 			if crate.CatalogStatus == "Active" then
 				local rarities = {}
@@ -66,8 +68,6 @@ T.describe("CosmeticsLogic", function()
 	end)
 
 	T.it("gives every equip slot that has items a default or an always-available entry", function()
-		-- A slot a player can fill but never clear is a trap: unequipping resolves
-		-- to Defaults[slot], so a slot with items and no default has no way back.
 		local populated = {}
 		for _, item in Cosmetics.Items do
 			if item.AlwaysAvailable ~= true then
@@ -99,8 +99,6 @@ T.describe("CosmeticsLogic", function()
 	end)
 
 	T.it("makes every Exclusive cosmetic obtainable from some game pass", function()
-		-- Exclusives never drop from crates and are not directly purchasable, so
-		-- one that no pass grants is unobtainable dead content.
 		local granted = {}
 		for _, definition in GamePasses.Catalog do
 			for _, itemId in definition.EntitlementItemIds do

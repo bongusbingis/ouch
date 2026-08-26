@@ -1,10 +1,11 @@
+-- Name: Scramble.luau
+-- Author: Jack C.
+-- Description: Scramble game mode: its match rules and the server hooks for its ball provisioning, spawning, and scoring behavior.
+-- Created: 2026-07-13
+
 --!strict
 
 local GameMode = require(script.Parent.GameMode)
-
--- Everyone starts holding one ball; no world spawns. Once thrown, a ball must
--- be picked back up (or stolen after someone else's throw). Respawning after
--- a death grants nothing, so the ball count in play stays fixed.
 
 local Scramble = {}
 Scramble.id = "Scramble"

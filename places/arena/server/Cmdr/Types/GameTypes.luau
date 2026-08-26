@@ -1,3 +1,8 @@
+-- Name: GameTypes.luau
+-- Author: Jack C.
+-- Description: Registers the game-specific Cmdr argument types (cosmetics, crates, quests, profile fields) so commands can accept validated, autocompleted game identifiers.
+-- Created: 2026-07-15
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

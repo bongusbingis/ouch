@@ -1,3 +1,8 @@
+-- Name: EntitlementService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec for the entitlement cache: booster multiplier selection, readiness across pending pass lookups, and cache invalidation when a player leaves.
+-- Created: 2026-08-12
+
 --!nonstrict
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -86,7 +91,6 @@ return function()
 			local player = fixture()
 			EntitlementService.setOwnership(player, "DoubleXP", false)
 			EntitlementService.setOwnership(player, "BrawlersClub", false)
-			-- TrailCollection is still unknown, but grants no boost.
 			expect(EntitlementService.isReady(player)).to.equal(true)
 		end)
 

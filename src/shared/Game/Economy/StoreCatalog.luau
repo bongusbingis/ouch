@@ -1,7 +1,9 @@
---!strict
+-- Name: StoreCatalog.luau
+-- Author: Jack C.
+-- Description: Produces the deterministic storefront projection, keeping preview offers visible without platform ids and omitting hidden ones.
+-- Created: 2026-08-08
 
--- Produces the deterministic storefront projection. Preview offers remain
--- visible with no platform id; Hidden offers are omitted.
+--!strict
 
 export type OfferKind = "GamePass" | "Product"
 export type CatalogStatus = "Preview" | "Active"

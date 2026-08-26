@@ -1,22 +1,14 @@
+-- Name: TouchRegions.luau
+-- Author: Jack C.
+-- Description: Defines and tests the on-screen touch regions used by combat input, including HUD exclusion rectangles registered by UI and the bottom swipe region.
+-- Created: 2026-08-20
+
 --!strict
 
 local GuiService = game:GetService("GuiService")
 local Workspace = game:GetService("Workspace")
 
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
-
--- Screen geometry for touch classification: where the open gameplay area is,
--- where the bottom swipe strip is, and which rectangles belong to HUD controls
--- that must never produce a combat action.
---
--- Everything is derived from the current viewport rather than authored in
--- pixels, so a phone and a tablet get proportionally the same layout. Thresholds
--- resolve against the *smaller* viewport dimension: on a landscape phone that is
--- the height, and it is the dimension a thumb actually has to travel across.
---
--- Geometry is cached and only rebuilt when the viewport or the topbar inset
--- actually changes. Recomputing this per touch event would be pure waste -- it
--- is identical for every touch in a frame.
 
 local TouchRegions = {}
 
@@ -30,8 +22,6 @@ local function refreshViewport()
 	local camera = Workspace.CurrentCamera
 	if camera then
 		local size = camera.ViewportSize
-		-- A zero viewport happens for a frame during startup and on some device
-		-- rotations; keeping the last good value avoids dividing by nothing.
 		if size.X > 0 and size.Y > 0 then
 			viewport = size
 		end
@@ -39,7 +29,6 @@ local function refreshViewport()
 	topInset = GuiService:GetGuiInset().Y
 end
 
--- Resolves a fraction-with-clamps threshold into pixels for this screen.
 function TouchRegions.scale(scaled: CombatConfig.Scaled): number
 	local reference = math.min(viewport.X, viewport.Y)
 	return math.clamp(reference * scaled.Fraction, scaled.MinPixels, scaled.MaxPixels)
@@ -53,19 +42,11 @@ local function contains(rect: Rect, x: number, y: number): boolean
 	return x >= rect.minX and x <= rect.maxX and y >= rect.minY and y <= rect.maxY
 end
 
--- HUD controls register the screen space they occupy. This is how the hammer
--- button, and anything else the game draws, stay out of the classifier without
--- the classifier needing to know they exist.
---
--- Registering by rectangle rather than by walking the GUI tree is deliberate:
--- a hierarchy scan per touch is expensive, and most of the tree is decorative
--- and should not block input anyway.
 function TouchRegions.setExclusion(name: string, rect: Rect?)
 	exclusions[name] = rect
 end
 
 function TouchRegions.isExcluded(x: number, y: number): boolean
-	-- Above the inset is Roblox's topbar, which is never gameplay.
 	if y <= topInset then
 		return true
 	end
@@ -77,10 +58,6 @@ function TouchRegions.isExcluded(x: number, y: number): boolean
 	return false
 end
 
--- The open gameplay area: everything that is not topbar and not a registered
--- HUD control. Movement is not carved out by position here -- ControlModule
--- tells us which touch it actually owns, which is far more reliable than
--- guessing where a dynamic thumbstick happened to appear.
 function TouchRegions.isGameplayArea(x: number, y: number): boolean
 	if x < 0 or y < 0 or x > viewport.X or y > viewport.Y then
 		return false
@@ -88,9 +65,6 @@ function TouchRegions.isGameplayArea(x: number, y: number): boolean
 	return not TouchRegions.isExcluded(x, y)
 end
 
--- The bottom strip an upward flick may start from. Deliberately not the whole
--- bottom edge: the ends are where the movement stick and combat buttons live,
--- and a swipe starting under a thumb that is steering would be a disaster.
 function TouchRegions.bottomSwipeRect(): Rect
 	local config = CombatConfig.BottomSwipe
 	local height = viewport.Y * config.RegionHeightFraction
@@ -122,7 +96,6 @@ function TouchRegions.start()
 		watch(Workspace.CurrentCamera)
 		refreshViewport()
 	end)
-	-- Covers rotation, safe-area changes, and the topbar resizing.
 	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(refreshViewport)
 end
 

@@ -1,8 +1,9 @@
+-- Name: ScriptedRandom.luau
+-- Author: Jack C.
+-- Description: Deterministic stand-in for a random source that returns queued values, so specs can pin probability-driven outcomes exactly.
+-- Created: 2026-07-16
+
 --!strict
--- Deterministic Random stand-in for pinning distributions in specs:
--- NextNumber returns queued fractions [0,1), NextInteger returns queued picks
--- (clamped to the requested range). Queues return their fallback (0 / min)
--- once exhausted.
 
 local ScriptedRandom = {}
 

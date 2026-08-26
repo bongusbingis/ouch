@@ -1,3 +1,8 @@
+-- Name: AnimatedButton.luau
+-- Author: Jack C.
+-- Description: The shared button component: hover, press, and release motion, sound and haptic feedback, and gamepad selection handling, used by every screen instead of raw buttons.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")

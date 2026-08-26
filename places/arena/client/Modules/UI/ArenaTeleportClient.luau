@@ -1,3 +1,8 @@
+-- Name: ArenaTeleportClient.luau
+-- Author: Jack C.
+-- Description: Client adapter for the return-to-lobby teleport, publishing the teleport status the UI shows and exposing retry, stay, and manual return actions.
+-- Created: 2026-08-24
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

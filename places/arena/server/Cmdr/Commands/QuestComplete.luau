@@ -1,3 +1,8 @@
+-- Name: QuestComplete.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-quest-complete: completes an active daily quest without claiming it.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

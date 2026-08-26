@@ -1,18 +1,9 @@
---!strict
+-- Name: test-and-deploy.luau
+-- Author: Jack C.
+-- Description: Deploy pipeline: uploads the merged place as a saved version, runs the in-place test suite against that exact version through Open Cloud, and publishes only when the suite is green.
+-- Created: 2026-07-16
 
--- Save → test → publish, gated on the cloud test suite:
---   1. uploads the merged place as a Saved (unpublished) version,
---   2. runs the TestEZ suite via the Open Cloud Luau Execution API against
---      that exact version,
---   3. publishes the same artifact only when the suite is green.
--- With --test-only, skips both uploads and runs the suite against the current
--- version of the place.
--- Usage (from repo root):
---   lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only]
--- Env: ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID, ROBLOX_PLACE_ID
--- Exit codes: 0 = tests green (and published unless --test-only);
---             1 = tests failed or a step errored (nothing published);
---             2 = Open Cloud busy/rate-limited after retries (nothing published).
+--!strict
 
 local fs = require("@lune/fs")
 local net = require("@lune/net")

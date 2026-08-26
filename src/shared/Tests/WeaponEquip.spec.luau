@@ -1,8 +1,9 @@
---!strict
+-- Name: WeaponEquip.spec.luau
+-- Author: Jack C.
+-- Description: Spec pinning the rules the equipped-weapon field obeys: the registry default, switching on command, auto-equipping on picking up a ball, deliberate switches winning, and equips costing no action budget.
+-- Created: 2026-08-22
 
--- The equipped weapon replaced a derivation. Ball possession used to decide
--- which weapon a Throw reached, in three places that had to agree; now one
--- field decides, and these pin the rules that field obeys.
+--!strict
 
 local T = require(script.Parent.TestKit)
 local MockWorld = require(script.Parent.MockWorld)
@@ -72,8 +73,6 @@ T.describe("Weapon equip", function()
 	end)
 
 	T.it("defaults to a weapon that works with nothing in hand", function()
-		-- Defaulting to the ball weapon would give every player a slot that does
-		-- nothing until they find a ball.
 		T.expect(WeaponRegistry.defaultKind()):toEqual("Hammer")
 		T.expect(WeaponRegistry.isKind(WeaponRegistry.defaultKind())):toBeTruthy()
 	end)
@@ -96,8 +95,6 @@ T.describe("Weapon equip", function()
 	end)
 
 	T.it("swings the hammer while holding a ball", function()
-		-- The behaviour the old derivation made impossible: holding a ball used to
-		-- mean the hammer refused to swing at all.
 		local snapshot = world()
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -117,9 +114,6 @@ T.describe("Weapon equip", function()
 		SimCore.step(state, { equipCommand("Dodgeball") }, snapshot, DT)
 		local events = SimCore.step(state, { throwCommand() }, snapshot, DT)
 		T.expect(countEvents(events, "HammerSwing")):toEqual(0)
-		-- Left the hand. Not pinned to a specific phase: whether the windup is
-		-- still running by the end of the step is a timing detail of the throw,
-		-- not the routing rule under test.
 		T.expect(state.projectiles.ball_0001.heldBy):toBeNil()
 	end)
 
@@ -133,8 +127,6 @@ T.describe("Weapon equip", function()
 	end)
 
 	T.it("equips the ball weapon the moment a ball reaches the hand", function()
-		-- Otherwise every match would start with players holding a ball they had
-		-- to press a key before they could throw.
 		local snapshot = world()
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -154,8 +146,6 @@ T.describe("Weapon equip", function()
 	end)
 
 	T.it("does not re-equip on later ticks once the player has switched away", function()
-		-- The auto-equip fires on the transition into holding a ball, not while
-		-- holding one, or a manual choice would be overwritten every tick.
 		local snapshot = world()
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -169,8 +159,6 @@ T.describe("Weapon equip", function()
 	end)
 
 	T.it("spends no action budget on an equip, so equip and throw land together", function()
-		-- Only one action per player resolves per tick. If equipping consumed it,
-		-- a HUD tap followed immediately by an attack would swallow the attack.
 		local snapshot = world()
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)
@@ -181,9 +169,6 @@ T.describe("Weapon equip", function()
 	end)
 
 	T.it("keeps catching available while the hammer is equipped", function()
-		-- Catch is claimed by one weapon, so it routes regardless of the equipped
-		-- one. Gating it would make a ball unobtainable for anyone holding the
-		-- hammer, with no way out of that state.
 		local snapshot = world()
 		local state = SimCore.newState()
 		SimCore.step(state, {}, snapshot, DT)

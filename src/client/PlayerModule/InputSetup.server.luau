@@ -1,7 +1,9 @@
+-- Name: InputSetup.server.luau
+-- Author: Jack C.
+-- Description: Server script that creates the input action and binding instances the player module expects and signals when input setup is complete.
+-- Created: 2026-08-20
+
 --!strict
---[[
-    InputSetup - This ServerScript performs instance modification and signals input setup is complete.
-]]--
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -16,7 +18,6 @@ local FFlagUserPlayerScriptsCameraTouchUsesIAS = FlagUtil.getUserFlag("UserPlaye
 local FFlagUserPlayerScriptsDynamicThumbstickUsesIAS = FlagUtil.getUserFlag("UserPlayerScriptsDynamicThumbstickUsesIAS")
 local FFlagUserPlayerScriptsClassicThumbstickUsesIAS = FlagUtil.getUserFlag("UserPlayerScriptsClassicThumbstickUsesIAS")
 local FFlagUserPlayerScriptsUseScriptableBindings = FlagUtil.getUserFlag("UserPlayerScriptsUseScriptableBindings")
-local FFlagUserPlayerScriptsSAuthDirectAPIs = FlagUtil.getUserFlag("UserPlayerScriptsSAuthDirectAPIs")
 local FFlagUserPlayerScriptsThumbstickContext = FlagUtil.getUserFlag("UserPlayerScriptsThumbstickContext")
 local FFlagUserPlayerScriptsPlayerControlState = FlagUtil.getUserFlag("UserPlayerScriptsPlayerControlState")
 
@@ -31,13 +32,9 @@ local CONNECTIONS = {
 	INPUTS_SETUP = "INPUTS_SETUP",
 }
 
---[[ Input Setup ]]
 if FFlagUserPlayerScriptsTapToMoveUsesIAS2 then
 	local characterContext = StarterPlayer.PlayerModule.InputContexts.CharacterContext
 
-	-- GAME MODIFICATION (Combat): guarded, matching the neighbouring blocks. The
-	-- shipped InputContexts model was captured after this script had already run,
-	-- so it already contains these; without a guard every boot adds a duplicate.
 	if not characterContext.ClickToMoveAction:FindFirstChild("TouchBinding") then
 		local touchBinding = Instance.new("InputBinding")
 		touchBinding.Name = "TouchBinding"
@@ -87,10 +84,6 @@ if FFlagUserPlayerScriptsDynamicThumbstickUsesIAS or FFlagUserPlayerScriptsClass
 	local inputContexts = StarterPlayer.PlayerModule.InputContexts
 	local characterContext = inputContexts.CharacterContext
 
-	-- GAME MODIFICATION (Combat): guarded for the same reason as above. A second
-	-- ThumbstickAction is worse than a wasted instance -- DynamicThumbstick binds
-	-- its UIModifier through WaitForChild and can attach to the dead one, leaving
-	-- a thumbstick that renders but does not respond.
 	local existingContext = if FFlagUserPlayerScriptsThumbstickContext
 		then inputContexts:FindFirstChild("TransformerContext")
 		else nil
@@ -128,47 +121,30 @@ if FFlagUserPlayerScriptsUseScriptableBindings then
 	local cameraAction = cameraContext:FindFirstChild("CameraAction")
 	local rotationAction = characterContext:FindFirstChild("RotationAction")
 
-	if moveAction and not moveAction:FindFirstChild("DynamicThumbstickScriptableBinding") then
-		local dynamicThumbstickBinding = Instance.new("InputBinding")
-		dynamicThumbstickBinding.Name = "DynamicThumbstickScriptableBinding"
-		if FFlagUserPlayerScriptsSAuthDirectAPIs then dynamicThumbstickBinding.Type = Enum.InputBindingType.Scriptable end
-		dynamicThumbstickBinding.Parent = moveAction
+	local function ensureScriptableBinding(action: Instance?, bindingName: string)
+		if action == nil then
+			return
+		end
+
+		local existing = action:FindFirstChild(bindingName)
+		if existing ~= nil then
+			assert(existing:IsA("InputBinding"), `{action:GetFullName()}.{bindingName} must be an InputBinding`)
+			existing.Type = Enum.InputBindingType.Scriptable
+			return
+		end
+
+		local binding = Instance.new("InputBinding")
+		binding.Name = bindingName
+		binding.Type = Enum.InputBindingType.Scriptable
+		binding.Parent = action
 	end
 
-	if moveAction and not moveAction:FindFirstChild("ClassicThumbstickScriptableBinding") then
-		local classicThumbstickBinding = Instance.new("InputBinding")
-		classicThumbstickBinding.Name = "ClassicThumbstickScriptableBinding"
-		if FFlagUserPlayerScriptsSAuthDirectAPIs then classicThumbstickBinding.Type = Enum.InputBindingType.Scriptable end
-		classicThumbstickBinding.Parent = moveAction
-	end
-
-	if moveAction and not moveAction:FindFirstChild("ClickToMoveScriptableBinding") then
-		local clickToMoveBinding = Instance.new("InputBinding")
-		clickToMoveBinding.Name = "ClickToMoveScriptableBinding"
-		if FFlagUserPlayerScriptsSAuthDirectAPIs then clickToMoveBinding.Type = Enum.InputBindingType.Scriptable end
-		clickToMoveBinding.Parent = moveAction
-	end
-
-	if jumpAction and not jumpAction:FindFirstChild("ClickToMoveScriptableBinding") then
-		local clickToMoveBinding = Instance.new("InputBinding")
-		clickToMoveBinding.Name = "ClickToMoveScriptableBinding"
-		if FFlagUserPlayerScriptsSAuthDirectAPIs then clickToMoveBinding.Type = Enum.InputBindingType.Scriptable end
-		clickToMoveBinding.Parent = jumpAction
-	end
-
-	if cameraAction and not cameraAction:FindFirstChild("CameraScriptableBinding") then
-		local cameraScriptableBinding = Instance.new("InputBinding")
-		cameraScriptableBinding.Name = "CameraScriptableBinding"
-		if FFlagUserPlayerScriptsSAuthDirectAPIs then cameraScriptableBinding.Type = Enum.InputBindingType.Scriptable end
-		cameraScriptableBinding.Parent = cameraAction
-	end
-
-	if rotationAction and not rotationAction:FindFirstChild("RotationScriptableBinding") then
-		local rotationScriptableBinding = Instance.new("InputBinding")
-		rotationScriptableBinding.Name = "RotationScriptableBinding"
-		if FFlagUserPlayerScriptsSAuthDirectAPIs then rotationScriptableBinding.Type = Enum.InputBindingType.Scriptable end
-		rotationScriptableBinding.Parent = rotationAction
-	end
+	ensureScriptableBinding(moveAction, "DynamicThumbstickScriptableBinding")
+	ensureScriptableBinding(moveAction, "ClassicThumbstickScriptableBinding")
+	ensureScriptableBinding(moveAction, "ClickToMoveScriptableBinding")
+	ensureScriptableBinding(jumpAction, "ClickToMoveScriptableBinding")
+	ensureScriptableBinding(cameraAction, "CameraScriptableBinding")
+	ensureScriptableBinding(rotationAction, "RotationScriptableBinding")
 end
 
 if not FFlagUserPlayerScriptsPlayerControlState then
@@ -177,16 +153,20 @@ if not FFlagUserPlayerScriptsPlayerControlState then
 
 		local function createAction(abilityName: string)
 			local inputContexts = player:FindFirstChild("InputContexts")
-			if not inputContexts then return end
+			if not inputContexts then
+				return
+			end
 			local characterContext = inputContexts:FindFirstChild("CharacterContext")
-			if not characterContext then return end
+			if not characterContext then
+				return
+			end
 
 			local action = Instance.new("InputAction")
 			action.Name = abilityName .. "Action"
 			if FFlagUserPlayerScriptsUseScriptableBindings then
 				local scriptableBinding = Instance.new("InputBinding")
 				scriptableBinding.Name = "ScriptableBinding"
-				if FFlagUserPlayerScriptsSAuthDirectAPIs then scriptableBinding.Type = Enum.InputBindingType.Scriptable end
+				scriptableBinding.Type = Enum.InputBindingType.Scriptable
 				scriptableBinding.Parent = action
 			end
 			action.Parent = characterContext
@@ -195,8 +175,6 @@ if not FFlagUserPlayerScriptsPlayerControlState then
 		if avatarAbilitiesInterface:isEnabled() then
 			local inputContexts = player:FindFirstChild("InputContexts")
 			if not inputContexts then
-				-- We aren't able to create new instances or wait while in a BindToSimulation update
-				-- Creating these objects will be done asynchronously. It will take two calls of attemptCreateActionsIfAbsent() to create the hierarchy
 				task.spawn(function()
 					InputReplication.CloneInputsIfAbsent(player)
 				end)
@@ -238,8 +216,5 @@ if not FFlagUserPlayerScriptsPlayerControlState then
 	end
 end
 
--- [[ End Input Setup ]]
-
--- Set shared state and publish so server auth can proceed
 PlayerModuleEventBus.data.inputsSetupComplete = true
 PlayerModuleEventBus:publish(CONNECTIONS.INPUTS_SETUP)

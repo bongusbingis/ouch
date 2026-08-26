@@ -1,3 +1,8 @@
+-- Name: GamePassService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec for game pass reconciliation: idempotent cosmetic grants on join and after purchase, ownership caching including negative results, and rejection of passes naming unknown cosmetics.
+-- Created: 2026-08-08
+
 --!nonstrict
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -169,8 +174,6 @@ return function()
 				error("network down")
 			end
 			GamePassService.start(fixture.options)
-			-- A failed lookup must stay unknown so the boost is retried, not
-			-- cached as "does not own".
 			expect(#fixture.ownershipWrites).to.equal(0)
 		end)
 

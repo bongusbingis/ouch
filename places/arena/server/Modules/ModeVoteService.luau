@@ -1,3 +1,8 @@
+-- Name: ModeVoteService.luau
+-- Author: Jack C.
+-- Description: Sole owner of the authoritative game-mode ballot: opens the vote for admitted ready players, counts validated votes, extends for late arrivals, resolves ties randomly, and projects a coherent snapshot for the UI.
+-- Created: 2026-08-17
+
 --!strict
 
 local HttpService = game:GetService("HttpService")
@@ -43,7 +48,7 @@ local beginVote: () -> ()
 local function playablePlayers(): { Player }
 	local result = {}
 	for _, player in Players:GetPlayers() do
-		if ArenaSessionService.isPlayable(player) then
+		if ArenaSessionService.isRoundEligible(player) then
 			table.insert(result, player)
 		end
 	end
@@ -230,7 +235,7 @@ end
 
 local function submitVote(player: Player, modeId: string)
 	local activeVote = vote
-	if activeVote == nil or not ArenaSessionService.isPlayable(player) then
+	if activeVote == nil or not ArenaSessionService.isRoundEligible(player) then
 		return
 	end
 	if Workspace:GetServerTimeNow() >= voteEndsAt then
@@ -270,6 +275,22 @@ function ModeVoteService.start()
 			startWinner()
 		else
 			task.defer(beginVote)
+		end
+	end)
+	ArenaSessionService.onRoundEligibilityChanged(function(player, eligible)
+		local activeVote = vote
+		if activeVote and not eligible and ModeVote.remove(activeVote, player.UserId) then
+			player:SetAttribute(SELECTION_ATTRIBUTE, nil)
+			publish()
+		end
+		if eligible then
+			if activeVote then
+				extendForLateReady()
+			else
+				task.defer(beginVote)
+			end
+		elseif #playablePlayers() == 0 and (activeVote ~= nil or pendingWinner ~= nil) then
+			cancelVote()
 		end
 	end)
 	Players.PlayerAdded:Connect(function()

@@ -1,3 +1,8 @@
+-- Name: ShopCountdown.luau
+-- Author: Jack C.
+-- Description: Countdown label showing the time remaining until the next shop or featured rotation, driven by the shared shop clock.
+-- Created: 2026-08-23
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

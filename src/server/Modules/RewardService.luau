@@ -1,3 +1,8 @@
+-- Name: RewardService.luau
+-- Author: Jack C.
+-- Description: Single entry point for granting rewards, dispatching each reward type to its registered handler so quests, passes, and crates all award through one path.
+-- Created: 2026-07-13
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -5,13 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
-
--- Dispatches reward grants by kind, mirroring MonetizationService.registerHandler.
---
--- Duplicate cosmetics resolve as GrantOrRefund: an already-owned item pays the
--- rarity's DupeBonks instead. Returning false there would leave the reward
--- permanently unclaimable, since callers only mark a reward claimed once the
--- grant succeeds -- and it reuses the exact dupe economics crates already use.
 
 local RewardService = {}
 

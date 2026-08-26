@@ -1,3 +1,8 @@
+-- Name: CombatDebug.luau
+-- Author: Jack C.
+-- Description: Developer-only overlay showing live combat input state, touch regions, gestures, and camera ownership for diagnosing input problems on device.
+-- Created: 2026-08-20
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -7,17 +12,6 @@ local CombatCamera = require(script.Parent:WaitForChild("CombatCamera"))
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
 local TouchIntent = require(script.Parent:WaitForChild("TouchIntent"))
 local TouchRegions = require(script.Parent:WaitForChild("TouchRegions"))
-
--- On-screen view of what the classifier is thinking. Off by default and gated
--- behind CombatConfig.Debug.Enabled.
---
--- Exists because gesture bugs are almost impossible to reason about after the
--- fact: "it threw when I didn't mean it to" contains no information about which
--- threshold was crossed. Watching the live state, drift and velocity while
--- reproducing the problem turns that into a specific number to change.
---
--- Every element is created once and then only updated. A debug view that
--- allocates instances per frame changes the timing of the thing it is measuring.
 
 local CombatDebug = {}
 
@@ -52,7 +46,6 @@ local function build()
 	screen.Name = "CombatInputDebug"
 	screen.ResetOnSpawn = false
 	screen.IgnoreGuiInset = true
-	-- Must never eat the input it is reporting on.
 	screen.DisplayOrder = 1000
 	screen.Parent = playerGui
 	gui = screen
@@ -135,8 +128,6 @@ function CombatDebug.start()
 	end
 	started = true
 
-	-- Built regardless so the flag can be flipped live in Studio without a
-	-- rejoin; the ScreenGui simply stays disabled until it is.
 	build()
 	RunService.RenderStepped:Connect(update)
 end

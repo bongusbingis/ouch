@@ -1,3 +1,8 @@
+-- Name: RotatingPlatforms.luau
+-- Author: Jack C.
+-- Description: Spins the authored rotating platform assemblies from a pure function of the synchronized clock, with a server-only mover and a client-side load so both sides agree without fighting over the same anchored parts.
+-- Created: 2026-08-18
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,19 +11,6 @@ local Workspace = game:GetService("Workspace")
 
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
 local Rotation = require(script.Parent.Rotation)
-
--- Spins each assembly authored under Workspace.Assets.Arena.Scriptables.Rotating.
--- Every child folder there is one assembly: an "Origin" BasePart whose up axis is
--- the axis of rotation, and an "Assembly" Model that turns about it. The
--- Assembly keeps the pose it was authored in relative to Origin.
---
--- Only the server drives the motion; clients receive the pose through ordinary
--- replication. Both sides moving the same anchored assembly would fight, with
--- each write undone by the other's, so `load` builds the registry everywhere but
--- `startMover` is server-only.
---
--- Speed is Config.MapFeatures.Rotating.DegreesPerSecond, overridable per
--- assembly with a numeric "RotationSpeed" attribute on that assembly's Origin.
 
 local RotatingPlatforms = {}
 
@@ -48,15 +40,10 @@ function RotatingPlatforms.all(): { Platform }
 	return platforms
 end
 
--- Bounds of the assembly where it actually is, not where the clock says it
--- should be: on a client that is the replicated pose, which is what the player
--- is standing on.
 function RotatingPlatforms.currentBounds(platform: Platform): CFrame
 	return platform.assembly:GetPivot() * platform.pivotToBounds
 end
 
--- Re-posing an assembly that has not turned is wasted work on every descendant,
--- and re-seats the ground contact of anyone standing on it.
 local MINIMUM_TURN_RADIANS = 1e-5
 
 local function step()
@@ -86,8 +73,6 @@ local function build(folder: Folder): Platform
 		degreesPerSecond = (origin:GetAttribute("RotationSpeed") :: number?) or MapFeatures.Rotating.DegreesPerSecond,
 		boundsSize = boundsSize,
 		pivotToBounds = pivot:Inverse() * boundsCFrame,
-		-- Farthest the assembly can ever be from its axis. Constant because it
-		-- only rotates about that axis, so it makes a cheap rejection test.
 		reach = (boundsCFrame.Position - origin.Position).Magnitude + boundsSize.Magnitude / 2,
 	}
 end

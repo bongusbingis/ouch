@@ -1,3 +1,8 @@
+-- Name: CharacterColorLogic.spec.luau
+-- Author: Jack C.
+-- Description: Spec for character color resolution from an equipped cosmetic, including the fallback for empty, unknown, and wrong-category equips.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)

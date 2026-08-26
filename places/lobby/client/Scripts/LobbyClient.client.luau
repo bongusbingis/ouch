@@ -1,3 +1,8 @@
+-- Name: LobbyClient.client.luau
+-- Author: Jack C.
+-- Description: Lobby client entry point: starts the party adapter, background controller, teleport presentation, and mounts the lobby React root.
+-- Created: 2026-08-15
+
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

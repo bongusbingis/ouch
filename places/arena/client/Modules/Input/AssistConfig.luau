@@ -1,3 +1,8 @@
+-- Name: AssistConfig.luau
+-- Author: Jack C.
+-- Description: Client-side reader for the per-player aim-assist strengths the server projects onto the player, re-reading them whenever the projection changes.
+-- Created: 2026-08-19
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -7,14 +12,6 @@ local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChi
 local AssistResolver = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Config"):WaitForChild("AssistResolver")
 )
-
--- Client's view of its own assist scalars, projected by PlayerAssistService onto
--- a folder under this Player. Re-validated here against the same rules the
--- server used, so a malformed projection lands on defaults rather than reaching
--- the camera.
---
--- Reads every value on any change rather than trusting the revision attribute as
--- a commit barrier: attributes and child values do not replicate in write order.
 
 local AssistConfig = {}
 
@@ -32,8 +29,6 @@ local function reread(folder: Folder)
 	resolved = AssistResolver.resolve(PlayerAssist.Entries, rawValues)
 end
 
--- Effective 0-1 strength for a feature on the given device. Zero means inert;
--- callers should skip the work entirely rather than scaling by zero.
 function AssistConfig.strength(feature: string, deviceClass: string): number
 	local scale = AssistResolver.scaleFor(PlayerAssist.DeviceScale, deviceClass)
 	return AssistResolver.strength(resolved, scale, feature)

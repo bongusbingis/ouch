@@ -1,3 +1,8 @@
+-- Name: PopulationPolicy.luau
+-- Author: Jack C.
+-- Description: Pure rule for how many players a match needs, relaxing the requirement as the oldest queued ticket waits and clamping to a viable range.
+-- Created: 2026-08-17
+
 --!strict
 
 local PopulationPolicy = {}

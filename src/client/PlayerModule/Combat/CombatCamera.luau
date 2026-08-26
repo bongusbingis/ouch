@@ -1,3 +1,8 @@
+-- Name: CombatCamera.luau
+-- Author: Jack C.
+-- Description: Owns combat camera behavior and mouse cursor ownership: locks the camera for aiming, suppresses it while charging or when a menu asks for the cursor, and notifies listeners when that state changes.
+-- Created: 2026-08-20
+
 --!strict
 
 local RunService = game:GetService("RunService")
@@ -6,34 +11,6 @@ local UserInputService = game:GetService("UserInputService")
 local CameraModule = require(script.Parent.Parent:WaitForChild("CameraModule"))
 local CameraInput = require(script.Parent.Parent:WaitForChild("CameraModule"):WaitForChild("CameraInput"))
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
-
--- The over-the-shoulder combat camera, and the single owner of mouse lock and
--- cursor visibility.
---
--- This replaces Roblox's shift lock as a *game* mode rather than a player
--- toggle. The player never presses Shift for it; the game decides when combat is
--- happening and the camera follows. Shift itself is left unbound and free for
--- gameplay to use later.
---
--- Two concepts that Roblox deliberately couples are separated here:
---
---   mouse lock + shoulder offset   -- how the camera is framed and controlled
---   character follows camera yaw   -- whether the body turns to match
---
--- Upstream ties both to inMouseLockedMode inside BaseCamera:UpdateMouseBehavior,
--- so you cannot have one without the other. This module publishes the two as
--- separate pieces of state that BaseCamera then applies, which is what makes
--- CharacterFollowsCameraYaw = false valid: identical camera, identical controls,
--- the body simply stops turning on its own and faces where it is walking.
---
--- Body yaw is expressed as a RotationType and nothing else. Root rotation stays
--- owned by the engine and ControlModule; this module never touches AutoRotate or
--- the root CFrame.
---
--- Cursor release is reference counted. Several things can independently need a
--- pointer -- a shop, a settings panel, a results screen -- and the cursor should
--- only come back when the last of them is finished. A plain boolean loses that
--- and leaves the player cursorless in a menu.
 
 local CombatCamera = {}
 
@@ -44,12 +21,9 @@ local started = false
 local cursorRequests: { [string]: boolean } = {}
 local appliedCursor: boolean? = nil
 local listeners: { (boolean) -> () } = {}
--- Set by the facade. Kept as a predicate rather than a require so this module
--- stays independent of the classifier.
 local chargingPredicate: () -> boolean = function()
 	return false
 end
--- True while a touch is mid-swipe and must not steer the view.
 local suppressPredicate: () -> boolean = function()
 	return false
 end
@@ -58,14 +32,6 @@ local function cursorIsRequested(): boolean
 	return next(cursorRequests) ~= nil
 end
 
--- Three things must agree before the camera engages:
---   enabled                  -- runtime, set by the place. Starts false, which
---                               is what leaves the lobby with a normal cursor.
---   config.Enabled           -- kill switch for testing. Ships true.
---   no outstanding cursor request
---
--- A menu open over combat therefore behaves exactly like combat is off, without
--- the game having to turn combat off and on around every panel.
 local function isActive(): boolean
 	return enabled and CombatConfig.CombatCamera.Enabled and not cursorIsRequested()
 end
@@ -80,54 +46,34 @@ local function notify()
 	end
 end
 
--- Applied every frame rather than only on change, because the active camera
--- controller is swapped out whenever the camera mode changes and a freshly
--- created controller knows nothing about our state. Re-asserting is a few
--- boolean writes and removes a whole class of "camera silently reverted" bugs.
---
--- The individual engine writes underneath are still change-gated, so this costs
--- nothing when the state is steady.
 local function apply()
 	local config = CombatConfig.CombatCamera
 	local active = isActive()
 
-	-- Everything below is state, not engine writes. BaseCamera:UpdateMouseBehavior
-	-- runs after this each frame and is the single writer of MouseBehavior and
-	-- RotationType; it reads what we set here. Writing those properties from here
-	-- as well is what let the two fight, with whichever ran last winning.
 	local controller = (CameraModule :: any).activeCameraController
 	if controller then
 		controller:SetIsMouseLocked(active)
 		if active then
 			controller:SetMouseLockOffset(config.ShoulderOffset)
 		end
-		-- nil hands rotation back to stock behaviour when combat is off.
 		controller.combatRotationType = if not active
 			then nil
 			elseif config.CharacterFollowsCameraYaw then Enum.RotationType.CameraRelative
 			else Enum.RotationType.MovementRelative
 	end
 
-	-- Fine aim while a charge is building, and the overall mouse feel knob. One
-	-- multiplier covering every device, so no single device ends up with a
-	-- different effective sensitivity than the others.
 	local scale = 1
 	if active then
 		scale = config.MouseSensitivityMultiplier
 		if chargingPredicate() then
 			scale *= CombatConfig.Camera.ChargeSensitivityMultiplier
 		end
-		-- A swipe takes the camera out of the equation entirely. Scaling to zero
-		-- rather than intercepting the touch works on both of upstream's camera
-		-- input paths, and because the camera consumes per-frame deltas there is
-		-- nothing banked up to snap when it is handed back.
 		if suppressPredicate() then
 			scale = 0
 		end
 	end
 	CameraInput.setSensitivityScale(scale)
 
-	-- Cursor visibility has no other owner, so it is written here.
 	local hideCursor = active and config.HideMouseCursor
 	if appliedCursor ~= hideCursor and UserInputService.MouseEnabled then
 		appliedCursor = hideCursor
@@ -135,8 +81,6 @@ local function apply()
 	end
 end
 
--- Turns combat framing on or off. The game calls this when a match starts and
--- ends; it is not a player-facing toggle.
 function CombatCamera.setChargingPredicate(predicate: () -> boolean)
 	chargingPredicate = predicate
 end
@@ -162,8 +106,6 @@ function CombatCamera.isActive(): boolean
 	return isActive()
 end
 
--- Asks for the pointer back, keyed by who wants it. The cursor returns only once
--- every requester has released, so overlapping menus cannot strand each other.
 function CombatCamera.requestCursor(reason: string)
 	if cursorRequests[reason] then
 		return
@@ -186,8 +128,6 @@ function CombatCamera.releaseCursor(reason: string)
 	notify()
 end
 
--- Fires with the effective active state, so combat input can gate itself on the
--- same signal the camera uses rather than tracking its own idea of "in combat".
 function CombatCamera.onChanged(listener: (boolean) -> ()): () -> ()
 	table.insert(listeners, listener)
 	listener(isActive())
@@ -205,12 +145,8 @@ function CombatCamera.start()
 	end
 	started = true
 
-	-- Just ahead of the camera's own update, so the controller reads this
-	-- frame's state rather than last frame's.
 	RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value - 1, apply)
 
-	-- Losing focus with the mouse locked strands the player pointerless over
-	-- whatever took focus.
 	UserInputService.WindowFocusReleased:Connect(function()
 		CombatCamera.requestCursor("WindowFocus")
 	end)

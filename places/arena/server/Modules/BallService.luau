@@ -1,3 +1,8 @@
+-- Name: BallService.luau
+-- Author: Jack C.
+-- Description: The only creator of ball instances: clones the Studio-authored default ball into the world balls folder, grants held balls to match entrants, seeds their sim attributes, and handles recovery and timed ground spawns.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -14,9 +19,6 @@ local CosmeticVisualFactory = require(
 local PlayerIds = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
 )
-
--- Sole creator of replicated ball instances. Provisioning is outside the
--- deterministic sim and currently grants one persistent ball per entrant.
 
 local BallService = {}
 
@@ -113,7 +115,6 @@ function BallService.start()
 
 	ballsFolder()
 
-	-- Recovery loop: recycle out-of-bounds balls onto configured recovery points
 	task.spawn(function()
 		while started do
 			if recoveryThreshold and #recoveryPoints > 0 then
@@ -141,7 +142,6 @@ function BallService.start()
 		end
 	end)
 
-	-- Ground spawn loop: spawn free balls at active points without stacking
 	task.spawn(function()
 		while started do
 			if groundSpawnEnabled and #groundSpawnPoints > 0 then

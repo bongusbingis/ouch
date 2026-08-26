@@ -1,18 +1,19 @@
+-- Name: WeaponRegistry.luau
+-- Author: Jack C.
+-- Description: Lists every weapon kit, resolves which kit a command routes to, and names the default and the kit auto-equipped on picking up a ball.
+-- Created: 2026-07-12
+
 --!strict
 
 local WeaponKit = require(script.Parent.WeaponKit)
 local Dodgeball = require(script.Parent.Weapons.Dodgeball)
 local Hammer = require(script.Parent.Weapons.Hammer)
 
--- Registration order is iteration order; keep it deterministic and explicit.
 local kits: { WeaponKit.WeaponKit } = {
 	Dodgeball,
 	Hammer,
 }
 
--- What a player has out before they choose. The hammer, because it is the only
--- weapon that works with nothing in hand: defaulting to the dodgeball would give
--- every player a slot that does nothing until they find a ball.
 local DEFAULT_KIND = "Hammer"
 
 local WeaponRegistry = {}
@@ -34,7 +35,6 @@ function WeaponRegistry.isKind(kind: string): boolean
 	return false
 end
 
--- The kit a ball in hand belongs to, or nil if no kit claims one.
 function WeaponRegistry.handBallKind(): string?
 	for _, kit in kits do
 		if kit.equipOnHandBall then

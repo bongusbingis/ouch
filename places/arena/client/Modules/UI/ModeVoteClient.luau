@@ -1,3 +1,8 @@
+-- Name: ModeVoteClient.luau
+-- Author: Jack C.
+-- Description: Client adapter for the authoritative game-mode ballot, decoding the replicated vote snapshot into the shape the mode-select UI renders and submitting the local player's vote.
+-- Created: 2026-08-17
+
 --!strict
 
 local HttpService = game:GetService("HttpService")
@@ -8,7 +13,6 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 
 local ModeVoteClient = {}
 
--- Decode the full projected vote state; rendering is owned by the UI.
 export type Snapshot = {
 	admitted: boolean,
 	open: boolean,

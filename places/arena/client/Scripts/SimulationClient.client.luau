@@ -1,3 +1,8 @@
+-- Name: SimulationClient.client.luau
+-- Author: Jack C.
+-- Description: Arena client entry point for gameplay: starts every input, presentation, and audio module and wires them to the replicated match and combat state.
+-- Created: 2026-07-12
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Players = game:GetService("Players")
@@ -22,37 +27,24 @@ local InputRouter = require(InputModules:WaitForChild("InputRouter"))
 local CombatInputSender = require(InputModules:WaitForChild("CombatInputSender"))
 local AssistConfig = require(InputModules:WaitForChild("AssistConfig"))
 local CameraAssist = require(InputModules:WaitForChild("CameraAssist"))
-local PlatformRider = require(Client:WaitForChild("Modules"):WaitForChild("Movement"):WaitForChild("PlatformRider"))
 local Presentation = Client:WaitForChild("Modules"):WaitForChild("Presentation")
-local BallVisuals = require(Presentation:WaitForChild("BallVisuals"))
-local DamageFeedback = require(Presentation:WaitForChild("DamageFeedback"))
-local DeathEffects = require(Presentation:WaitForChild("DeathEffects"))
-local HammerVisuals = require(Presentation:WaitForChild("HammerVisuals"))
-local SplatEffects = require(Presentation:WaitForChild("SplatEffects"))
-local MatchAudio = require(Presentation:WaitForChild("MatchAudio"))
-local GameAudio = require(Presentation:WaitForChild("GameAudio"))
-local JumpPadVisuals = require(Presentation:WaitForChild("JumpPadVisuals"))
-local PlayerHighlights = require(Presentation:WaitForChild("PlayerHighlights"))
-local WeaponAnimations = require(Presentation:WaitForChild("WeaponAnimations"))
 local CombatState = require(Presentation:WaitForChild("CombatState"))
-local ArmIK = require(Presentation:WaitForChild("ArmIK"))
 local VoteCamera = require(Presentation:WaitForChild("VoteCamera"))
 local DebugModules = Client:WaitForChild("Modules"):WaitForChild("Debug")
-local ThrowPoseTuner = require(DebugModules:WaitForChild("ThrowPoseTuner"))
-local DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
-local ChargeAim = require(Presentation:WaitForChild("ChargeAim"))
-
-local RotatingPlatforms = require(
-	ReplicatedStorage:WaitForChild("Shared")
-		:WaitForChild("Game")
-		:WaitForChild("MapFeatures")
-		:WaitForChild("RotatingPlatforms")
-)
+local Movement = Client:WaitForChild("Modules"):WaitForChild("Movement")
+local MapFeatures = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures")
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ArenaLoadingClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
 
 local connections = {}
 local optionalSystems = {}
+local BallVisuals
+local DamageFeedback
+local DeathEffects
+local HammerVisuals
+local SplatEffects
+local GameAudio
+local DebugVisuals
 
 local function startOptional(name, callback)
 	local ok, err = pcall(callback)
@@ -71,15 +63,11 @@ ConfigReplication.startClient({
 	Shop = require(ConfigRoot:WaitForChild("Shop")),
 	Crates = require(ConfigRoot:WaitForChild("Crates")),
 })
--- The arena is the only place that turns combat on. The lobby leaves it off and
--- therefore keeps a normal cursor for its menus, with no lobby-side code needed.
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 Combat.setCameraEnabled(true)
 Combat.setInputEnabled(false)
 
 AssistConfig.start()
--- Before the arm and animation layers: both read its snapshot, and the input
--- sender pushes presses into it.
 CombatState.start()
 InputRouter.start()
 CameraAssist.start()
@@ -87,23 +75,62 @@ CombatInputSender.start()
 VoteCamera.start()
 ArenaLoadingClient.markSimulationReady()
 
-startOptional("ArmIK", ArmIK.start)
-startOptional("BallVisuals", BallVisuals.start)
-startOptional("DamageFeedback", DamageFeedback.start)
-startOptional("DeathEffects", DeathEffects.start)
-startOptional("HammerVisuals", HammerVisuals.start)
-startOptional("SplatEffects", SplatEffects.start)
-startOptional("MatchAudio", MatchAudio.start)
-startOptional("PlayerHighlights", PlayerHighlights.start)
-startOptional("JumpPadVisuals", JumpPadVisuals.start)
-startOptional("RotatingPlatforms", RotatingPlatforms.load)
-startOptional("PlatformRider", PlatformRider.start)
-startOptional("DebugVisuals", DebugVisuals.start)
-startOptional("ThrowPoseTuner", ThrowPoseTuner.start)
-startOptional("ChargeAim", ChargeAim.start)
-if startOptional("WeaponAnimations", WeaponAnimations.start) then
+startOptional("ArmIK", function()
+	require(Presentation:WaitForChild("ArmIK")).start()
+end)
+startOptional("BallVisuals", function()
+	BallVisuals = require(Presentation:WaitForChild("BallVisuals"))
+	BallVisuals.start()
+end)
+startOptional("DamageFeedback", function()
+	DamageFeedback = require(Presentation:WaitForChild("DamageFeedback"))
+	DamageFeedback.start()
+end)
+startOptional("DeathEffects", function()
+	DeathEffects = require(Presentation:WaitForChild("DeathEffects"))
+	DeathEffects.start()
+end)
+startOptional("HammerVisuals", function()
+	HammerVisuals = require(Presentation:WaitForChild("HammerVisuals"))
+	HammerVisuals.start()
+end)
+startOptional("SplatEffects", function()
+	SplatEffects = require(Presentation:WaitForChild("SplatEffects"))
+	SplatEffects.start()
+end)
+startOptional("MatchAudio", function()
+	require(Presentation:WaitForChild("MatchAudio")).start()
+end)
+startOptional("GameAudio", function()
+	GameAudio = require(Presentation:WaitForChild("GameAudio"))
+end)
+startOptional("PlayerHighlights", function()
+	require(Presentation:WaitForChild("PlayerHighlights")).start()
+end)
+startOptional("JumpPadVisuals", function()
+	require(Presentation:WaitForChild("JumpPadVisuals")).start()
+end)
+startOptional("RotatingPlatforms", function()
+	require(MapFeatures:WaitForChild("RotatingPlatforms")).load()
+end)
+startOptional("PlatformRider", function()
+	require(Movement:WaitForChild("PlatformRider")).start()
+end)
+startOptional("DebugVisuals", function()
+	DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
+	DebugVisuals.start()
+end)
+startOptional("ThrowPoseTuner", function()
+	require(DebugModules:WaitForChild("ThrowPoseTuner")).start()
+end)
+startOptional("ChargeAim", function()
+	require(Presentation:WaitForChild("ChargeAim")).start()
+end)
+startOptional("WeaponAnimations", function()
+	local WeaponAnimations = require(Presentation:WaitForChild("WeaponAnimations"))
+	WeaponAnimations.start()
 	table.insert(connections, CombatInputSender.onIntent(WeaponAnimations.onIntent))
-end
+end)
 
 local matchState: Folder? = nil
 local matchStateConnection: RBXScriptConnection? = nil
@@ -138,8 +165,6 @@ table.insert(
 )
 table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
 
--- Presentation only. These are the server's authoritative events, replayed here
--- purely to drive effects; nothing in this path decides an outcome.
 table.insert(
 	connections,
 	Network.on("CombatSimEvent", function(events)
@@ -153,7 +178,9 @@ table.insert(
 			if optionalSystems.SplatEffects then
 				SplatEffects.onEvent(event)
 			end
-			GameAudio.onEvent(event)
+			if optionalSystems.GameAudio then
+				GameAudio.onEvent(event)
+			end
 			if optionalSystems.DebugVisuals then
 				DebugVisuals.onEvent(event)
 			end

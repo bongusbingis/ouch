@@ -1,3 +1,8 @@
+-- Name: StoreCatalog.spec.luau
+-- Author: Jack C.
+-- Description: Spec that the storefront projection lists only enabled offers in deterministic order with stable tie breakers, keeps previews visible, and omits hidden offers.
+-- Created: 2026-08-08
+
 --!strict
 
 local T = require(script.Parent.TestKit)

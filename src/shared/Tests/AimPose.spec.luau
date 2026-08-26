@@ -1,3 +1,8 @@
+-- Name: AimPose.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the pure throwing-arm pose maths: how charge raises the solver weight without ever reaching full control, and how charge stretches the wind-up reach.
+-- Created: 2026-08-20
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -28,8 +33,6 @@ T.describe("AimPose", function()
 	end)
 
 	T.it("reaches the full wind-up immediately at no charge", function()
-		-- The coil is a committed action, not something that creeps outward from
-		-- nothing, so an uncharged wind-up is still a full one.
 		T.expect(AimPose.windupReach(0, 0.35)):toBeNear(1, 1e-9)
 	end)
 

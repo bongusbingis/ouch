@@ -1,3 +1,8 @@
+-- Name: sb-match-time.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-match-time: sets the remaining time of the active match in seconds.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

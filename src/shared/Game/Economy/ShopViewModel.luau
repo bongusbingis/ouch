@@ -1,3 +1,8 @@
+-- Name: ShopViewModel.luau
+-- Author: Jack C.
+-- Description: Builds the storefront view model: turns catalog, crate, bundle, pass, and product configuration plus live ownership into the ordered sections and cards the shop UI renders.
+-- Created: 2026-08-23
+
 --!strict
 
 local ShopViewModel = {}
@@ -364,7 +369,6 @@ local function passCard(args: any, key: string, definition: any): Card
 			then info.name
 			else definition.DisplayName,
 		description = definition.Description,
-		--hintText = "PERMANENT ACCOUNT UPGRADE",
 		status = if owned then "Owned" else status,
 		badge = "PERMANENT",
 		thumbnail = thumbnail,

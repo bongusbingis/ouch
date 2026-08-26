@@ -1,3 +1,8 @@
+-- Name: sbCrateOpenFreeServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-crate-open-free, rolling and granting a crate without a currency charge while still firing the reveal event the client renders.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

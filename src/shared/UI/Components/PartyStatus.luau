@@ -1,3 +1,8 @@
+-- Name: PartyStatus.luau
+-- Author: Jack C.
+-- Description: Compact party status line showing member count and the current queue state.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

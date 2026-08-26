@@ -1,8 +1,14 @@
+-- Name: Projectiles.luau
+-- Author: Jack C.
+-- Description: The generic swept-projectile subsystem: fixed-tick kinematics, homing, swept collision against characters and static geometry with substepping to prevent tunneling, and the held, windup, flight, bounce, and roll phase machine.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
 local SimUtil = require(script.Parent.SimUtil)
 local CollisionWorld = require(script.Parent.CollisionWorld)
+local ProjectileTrajectory = require(script.Parent.ProjectileTrajectory)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local AimAssist = require(script.Parent.Parent.Parent.Parent.Config.AimAssist)
 
@@ -12,14 +18,8 @@ type WorldSnapshot = SimTypes.WorldSnapshot
 type ProjectileState = SimTypes.ProjectileState
 type SimEvent = SimTypes.SimEvent
 
--- Generic swept-projectile subsystem: fixed-tick kinematics, homing steering,
--- swept-sphere collision vs. capsules and statics, substepped to prevent
--- tunneling. Archetype params come from Config.Combat; the dodgeball is the
--- only archetype for now.
-
 local Projectiles = {}
 
-local MAX_SUBSTEPS = 8
 local DEFAULT_MAX_CONTACTS_PER_STEP = 4
 local DEFAULT_MIN_BOUNCE_NORMAL_SPEED = 1.5
 local SETTLE_DROP = 50
@@ -51,15 +51,6 @@ local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, pos
 	clearFlightState(projectile)
 end
 
--- A ball that has stopped moving. Where it goes is a mode rule: preserving hands
--- it back to whoever last owned it, so a throw risks missing rather than losing
--- the ball, while the default leaves it lying there as a pickup.
---
--- Ownership is the whole mechanism -- a catch already reassigns ownerId, so a
--- caught ball is a transfer and comes back to its new owner from then on.
---
--- Deliberately not used when a ball is dropped because its holder died or left:
--- that is a drop, not a rest, and the ball should stay where it fell.
 local function comeToRest(
 	projectile: ProjectileState,
 	state: SimState,
@@ -71,17 +62,11 @@ local function comeToRest(
 	local ownerId = projectile.ownerId
 	if rules ~= nil and rules.preserveDodgeballs and ownerId ~= nil then
 		local owner = world.characters[ownerId]
-		-- Not to a dead or departed owner, and not into a hand that already holds
-		-- one: possession is one ball per player everywhere else in the sim, and a
-		-- second held ball would have no socket to sit in and no way to be thrown.
 		if owner ~= nil and owner.alive and not SimUtil.hasHandBall(state, ownerId) then
 			projectile.phase = "Held"
 			projectile.heldBy = ownerId
 			projectile.position = owner.handPosition
 			clearFlightState(projectile)
-			-- The three other ways a ball reaches a hand all reset this; a return
-			-- is the fourth and must not carry a spent bounce budget into the
-			-- next throw.
 			projectile.bounceCount = 0
 			SimUtil.pushEvent(events, state, {
 				kind = "BallReturned",
@@ -120,31 +105,6 @@ local function releasePosition(world: WorldSnapshot, from: Vec, aim: Vec, config
 		return hit.position + hit.normal * config.ContactSeparation
 	end
 	return from + displacement
-end
-
-local function steer(
-	velocity: Vec,
-	from: Vec,
-	targetPos: Vec,
-	turnRateRad: number,
-	breakAngleRad: number,
-	dt: number
-): Vec
-	local speed = vector.magnitude(velocity)
-	if speed <= 1e-6 then
-		return velocity
-	end
-	local currentDir = velocity / speed
-	local toTarget = targetPos - from
-	if vector.magnitude(toTarget) <= 1e-6 then
-		return velocity
-	end
-	local desiredDir = vector.normalize(toTarget)
-
-	local angleError = math.acos(math.clamp(vector.dot(currentDir, desiredDir), -1, 1))
-	local decay = if breakAngleRad > 0 then math.clamp(1 - angleError / breakAngleRad, 0, 1) else 1
-	local maxTurn = turnRateRad * decay * dt
-	return CollisionWorld.rotateToward(currentDir, desiredDir, maxTurn) * speed
 end
 
 type CharacterHit = {
@@ -212,14 +172,10 @@ local function stepWindup(
 
 	local row = AimAssist[projectile.releaseDeviceClass or "Mouse"] or AimAssist.Mouse
 	local aim = vector.normalize(projectile.releaseAim)
-	-- Charge only changes speed. A faster ball is already flatter, longer and
-	-- harder to react to, so there is no separate arc to tune.
-	local charge = math.clamp(projectile.releaseCharge or 0, 0, 1)
-	local speed = config.ThrowSpeed * (1 + (config.Charge.MaxSpeedScale - 1) * charge)
 	projectile.phase = "InFlight"
 	projectile.heldBy = nil
 	projectile.position = releasePosition(world, holder.throwPosition, aim, config)
-	projectile.velocity = aim * speed + holder.velocity * config.MomentumInheritance
+	projectile.velocity = ProjectileTrajectory.launchVelocity(config, aim, holder.velocity, projectile.releaseCharge)
 	projectile.targetId = projectile.releaseTargetId
 	projectile.effectiveRadius = config.Radius + config.HitForgiveness + row.MagnetismRadius
 	projectile.flightTime = 0
@@ -348,7 +304,7 @@ local function advanceBouncing(
 	end
 
 	local speed = vector.magnitude(projectile.velocity)
-	local substeps = math.clamp(math.ceil(speed * dt / math.max(config.Radius, 0.5)), 1, MAX_SUBSTEPS)
+	local substeps = ProjectileTrajectory.substepCount(speed, dt, config.Radius)
 	local subDt = dt / substeps
 	local maxContacts = config.MaxBounceContactsPerStep or DEFAULT_MAX_CONTACTS_PER_STEP
 	local gravity = vector.create(0, -config.Gravity, 0)
@@ -460,7 +416,7 @@ local function stepInFlight(
 	end
 
 	local speed = vector.magnitude(projectile.velocity)
-	local substeps = math.clamp(math.ceil(speed * dt / math.max(config.Radius, 0.5)), 1, MAX_SUBSTEPS)
+	local substeps = ProjectileTrajectory.substepCount(speed, dt, config.Radius)
 	local subDt = dt / substeps
 	local gravity = vector.create(0, -config.Gravity, 0)
 	local characterIds = SimUtil.sortedKeys(world.characters)
@@ -468,7 +424,7 @@ local function stepInFlight(
 	for substepIndex = 1, substeps do
 		projectile.velocity += gravity * subDt
 		if target then
-			projectile.velocity = steer(
+			projectile.velocity = ProjectileTrajectory.steer(
 				projectile.velocity,
 				projectile.position,
 				chestPosition(target),

@@ -1,3 +1,8 @@
+-- Name: LiveConfigRegistry.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the live config allowlist: every key names a real config leaf with a usable range, projects onto a distinct attribute name within the length limit, and stays within the cloud key limit.
+-- Created: 2026-08-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -27,14 +32,11 @@ T.describe("LiveConfig registry", function()
 		end
 	end)
 
-	-- A key whose leaf was renamed or deleted would otherwise sit in the registry
-	-- advertising a config that can never be applied.
 	T.it("points every key at a config leaf that actually exists", function()
 		local configRoot = script.Parent.Parent.Parent.Config
 		for _, entry in LiveConfig.Entries do
 			local moduleName, path = ConfigOverrides.parseKey(entry.Key)
 			local moduleScript = configRoot:FindFirstChild(moduleName :: string)
-			-- Modules that only exist in the other place cannot be resolved here.
 			if moduleScript == nil then
 				continue
 			end

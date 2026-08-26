@@ -1,3 +1,8 @@
+-- Name: CmdrService.luau
+-- Author: Jack C.
+-- Description: Installs the Cmdr developer console in the arena, registering the game's commands and argument types and restricting who may open it based on the environment configuration.
+-- Created: 2026-07-15
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -7,8 +12,6 @@ local RunService = game:GetService("RunService")
 local Env = require(script.Parent.Parent.Env)
 
 local CmdrService = {}
-
--- Cmdr UI visibility is advisory; the server BeforeRun hook is the access boundary.
 
 local ACCESS_ATTRIBUTE = "CmdrAccess"
 local READY_ATTRIBUTE = "SplatBrawlReady"

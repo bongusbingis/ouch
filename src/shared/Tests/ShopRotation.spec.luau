@@ -1,3 +1,8 @@
+-- Name: ShopRotation.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the per-player shop draw: determinism per player and period, exclusion of owned items, distinct results, pool edge cases, and why the drawn set must be persisted.
+-- Created: 2026-08-22
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -20,8 +25,6 @@ T.describe("ShopRotation", function()
 	end)
 
 	T.it("draws different offers for different players in the same period", function()
-		-- The whole point of a per-player rotation. If two users saw the same
-		-- three items the feature would be an expensive global rotation.
 		local differs = false
 		local reference = table.concat(ShopRotation.draw(1, 900, POOL, {}, 3), ",")
 		for userId = 2, 12 do
@@ -71,8 +74,6 @@ T.describe("ShopRotation", function()
 	end)
 
 	T.it("returns nothing when the pool is empty", function()
-		-- The shipped state until outfits and emotes exist, so it must be a
-		-- normal answer rather than an error.
 		T.expect(#ShopRotation.draw(42, 3, {}, {}, 3)):toEqual(0)
 	end)
 
@@ -95,10 +96,6 @@ T.describe("ShopRotation", function()
 	end)
 
 	T.it("drops the bought item from a redraw, which is why the set is persisted", function()
-		-- Buying one offer shrinks the candidate pool, so recomputing inside the
-		-- same period does not reproduce the previous draw. That is the whole
-		-- reason ShopService stores the result against its period instead of
-		-- deriving it on demand.
 		local drawn = ShopRotation.draw(555, 21, POOL, {}, 3)
 		T.expect(#drawn):toEqual(3)
 		local redrawn = ShopRotation.draw(555, 21, POOL, { [drawn[1]] = true }, 3)
@@ -106,10 +103,6 @@ T.describe("ShopRotation", function()
 	end)
 
 	T.it("can reshuffle offers the player did not buy, so a redraw is not idempotent", function()
-		-- The failure mode persistence exists to prevent, demonstrated rather
-		-- than asserted away: for some players a redraw after one purchase
-		-- replaces an offer they deliberately left. Asserting the opposite would
-		-- pass only for seeds where it happens not to bite.
 		local drifted = false
 		for userId = 1, 60 do
 			local drawn = ShopRotation.draw(userId, 21, POOL, {}, 3)
@@ -125,8 +118,6 @@ T.describe("ShopRotation", function()
 	end)
 
 	T.it("stays inside 2^53 so every platform agrees on the same draw", function()
-		-- Determinism here is not a nicety: two servers disagreeing would show a
-		-- player different offers depending on which one they joined.
 		for userId = 1, 200 do
 			for _, itemId in ShopRotation.draw(userId * 1000003, 4321, POOL, {}, 3) do
 				T.expect(contains(POOL, itemId)):toBeTruthy()

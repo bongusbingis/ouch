@@ -1,3 +1,8 @@
+-- Name: Hammer.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the hammer weapon kit: routing against held balls, closest-target-in-front hits, team rules, the cooldown and recovery phases, and assisted swing turning and lunging.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -173,8 +178,6 @@ T.describe("Hammer kit", function()
 		return nil
 	end
 
-	-- Enemy at 45 degrees off aim, inside the melee cone but well outside the
-	-- swing box, so only an assist could turn the swing toward them.
 	local function offAxisWorld(distance: number): SimTypes.WorldSnapshot
 		local offset = distance / math.sqrt(2)
 		return world({ e1 = MockWorld.character(vector.create(offset, 2.5, offset)) })

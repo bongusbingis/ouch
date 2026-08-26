@@ -1,3 +1,8 @@
+-- Name: TopBar.luau
+-- Author: Jack C.
+-- Description: The persistent top bar showing balances and the menu navigation actions.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,18 +14,21 @@ local c = React.createElement
 local SELECTED = "rbxassetid://94748581468730"
 local UNSELECTED = "rbxassetid://136021539696619"
 
-type TabDefinition = {
+export type TabDefinition = {
 	Id: string,
 	Label: string,
 	Icon: string,
 	LayoutOrder: number?,
-	IconPosition: UDim2,
-	IconSize: UDim2,
-	LabelPosition: UDim2,
-	ButtonPosition: UDim2,
-	ButtonSize: UDim2,
+	IconPosition: UDim2?,
+	IconSize: UDim2?,
+	LabelPosition: UDim2?,
+	LabelSize: UDim2?,
+	ButtonPosition: UDim2?,
+	ButtonSize: UDim2?,
 	ZIndex: number?,
-	Enabled: boolean,
+	Enabled: boolean?,
+	ButtonRef: any?,
+	OnSelectionGained: ((GuiButton) -> ())?,
 }
 
 local DEFINITIONS: { TabDefinition } = {
@@ -77,6 +85,7 @@ local DEFINITIONS: { TabDefinition } = {
 export type Props = {
 	CurrentPage: string,
 	OnNavigate: (string) -> (),
+	Tabs: { TabDefinition }?,
 }
 
 return function(props: Props)
@@ -90,19 +99,20 @@ return function(props: Props)
 		}),
 	}
 
-	for _, definition in DEFINITIONS do
+	for _, definition in props.Tabs or DEFINITIONS do
 		local selected = definition.Id == props.CurrentPage
-		local enabled = definition.Enabled
+		local enabled = definition.Enabled ~= false
 		buttons[definition.Id] = c(AnimatedButton, {
+			ButtonRef = definition.ButtonRef,
 			Enabled = enabled,
 			Native = {
 				BackgroundTransparency = 1,
 				Image = if selected then SELECTED else UNSELECTED,
 				ImageColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(145, 145, 145),
 				LayoutOrder = definition.LayoutOrder,
-				Position = definition.ButtonPosition,
+				Position = definition.ButtonPosition or UDim2.fromScale(0.418851, 0.25),
 				ScaleType = Enum.ScaleType.Slice,
-				Size = definition.ButtonSize,
+				Size = definition.ButtonSize or UDim2.fromScale(0.242, 0.75),
 				SliceCenter = Rect.new(224, 202, 770, 474),
 				SliceScale = 0.2,
 				ZIndex = definition.ZIndex,
@@ -110,6 +120,7 @@ return function(props: Props)
 			OnActivated = function()
 				props.OnNavigate(definition.Id)
 			end,
+			OnSelectionGained = definition.OnSelectionGained,
 		}, {
 			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1.3 }),
 			ImageLabel = c("ImageLabel", {
@@ -119,8 +130,8 @@ return function(props: Props)
 				ImageColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(190, 190, 190),
 				ImageTransparency = if enabled then 0 else 0.18,
 				LayoutOrder = 2,
-				Position = definition.IconPosition,
-				Size = definition.IconSize,
+				Position = definition.IconPosition or UDim2.fromScale(0.5, 0.5),
+				Size = definition.IconSize or UDim2.fromScale(0.5, 0.65),
 			}),
 			Label = c(ResponsiveText, {
 				HostName = "Label",
@@ -134,8 +145,9 @@ return function(props: Props)
 						Enum.FontWeight.Bold,
 						Enum.FontStyle.Normal
 					),
-					Position = definition.LabelPosition,
-					Size = UDim2.fromScale(1.4, if definition.Id == "Inventory" then 0.420305 else 0.42),
+					Position = definition.LabelPosition or UDim2.fromScale(0.5, 0),
+					Size = definition.LabelSize
+						or UDim2.fromScale(1.4, if definition.Id == "Inventory" then 0.420305 else 0.42),
 					Text = definition.Label,
 					TextColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(185, 185, 185),
 					TextTransparency = if enabled then 0 else 0.12,

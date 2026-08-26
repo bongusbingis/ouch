@@ -1,3 +1,8 @@
+-- Name: CameraAssist.luau
+-- Author: Jack C.
+-- Description: Applies rotational friction and adhesion to the camera when the player is aiming near a valid target, making gamepad and touch aiming stick without taking control away.
+-- Created: 2026-08-19
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -11,9 +16,6 @@ local AssistConfig = require(script.Parent.AssistConfig)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local UserInputService = game:GetService("UserInputService")
-
--- Camera adhesion and aim friction. This runs after PlayerModule's camera pass
--- and is inert when the configured assist strength is zero.
 
 local CameraAssist = {}
 
@@ -34,9 +36,6 @@ local function targetRoot(target: Model?): BasePart?
 	return nil
 end
 
--- Removes a fraction of the rotation the player applied this frame. Measured
--- against the previous frame's camera rather than against raw touch deltas, so
--- it damps by what actually happened rather than by what was requested.
 local function applyFriction(camera: Camera, previous: CFrame, reduction: number)
 	local delta = previous:ToObjectSpace(camera.CFrame.Rotation)
 	local axis, angle = delta:ToAxisAngle()
@@ -46,8 +45,6 @@ local function applyFriction(camera: Camera, previous: CFrame, reduction: number
 	camera.CFrame = camera.CFrame * CFrame.fromAxisAngle(axis, -angle * reduction)
 end
 
--- Rotates the camera to follow how far the target moved across it since last
--- frame, capped so the pull can never outrun the player's own input.
 local function applyAdhesion(
 	camera: Camera,
 	previousDirection: Vector3,
@@ -75,6 +72,11 @@ local function applyAdhesion(
 end
 
 local function update(dt: number)
+	if not Combat.isActive() then
+		lastRotation = nil
+		lastTargetDirection = nil
+		return
+	end
 	local camera = workspace.CurrentCamera
 	local character = Players.LocalPlayer.Character
 	if camera == nil or character == nil then
@@ -109,8 +111,6 @@ local function update(dt: number)
 	local device = AimDirector.deviceClass()
 
 	local friction = AssistConfig.strength("Friction", device) * confidence
-	-- Friction only means anything while the player is turning the camera; off a
-	-- drag there is nothing to damp and applying it would fight adhesion.
 	if friction > 0 and previousRotation ~= nil and Combat.isCameraTouchActive() then
 		applyFriction(camera, previousRotation, friction * MobileInput.Assist.FrictionMaxReduction)
 	end
@@ -120,15 +120,7 @@ local function update(dt: number)
 		applyAdhesion(camera, previousDirection, direction, adhesion, dt)
 	end
 
-	-- Adhesion moved the camera, so the baseline friction measures against next
-	-- frame must be the pose the player is actually looking from now.
 	lastRotation = camera.CFrame.Rotation
-
-	-- The shoulder offset used to be applied here as a post-hoc lateral shove of
-	-- the camera CFrame. It is now owned by PlayerModule.Combat.CombatCamera,
-	-- which sets it through the camera controller's own mouse-lock offset. Two
-	-- systems each nudging the camera sideways produced a doubled, drifting
-	-- offset that neither one could account for.
 end
 
 function CameraAssist.start()
@@ -137,7 +129,6 @@ function CameraAssist.start()
 	end
 	started = true
 
-	-- Runs after the default camera has written its CFrame for this frame.
 	RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value + 1, update)
 end
 

@@ -1,3 +1,8 @@
+-- Name: Hammer.luau
+-- Author: Jack C.
+-- Description: The inflatable hammer weapon kit: a cooldown, active dash, and recovery phase machine plus the closest-target-in-front hit resolution and assisted swing turning.
+-- Created: 2026-07-13
+
 --!strict
 
 local Sim = script.Parent.Parent
@@ -40,14 +45,6 @@ local function horizontal(direction: Vec): Vec?
 	return flat / magnitude
 end
 
--- Melee assists, applied once at swing time and never after: the swing commits
--- to a direction and a dash speed, and the rest of the phase machine plays out
--- against whatever the world does next. Steering an in-flight swing would let a
--- player track a dodging target, which is the whiff-punish window the GDD is
--- built around.
---
--- Both are inert at strength 0 and on any device whose DeviceScale zeroes them,
--- which is how mouse and keyboard keep the swing they have always had.
 local function assistSwing(command: InputCommand, world: WorldSnapshot, origin: Vec, direction: Vec): (Vec, number)
 	local cfg = config()
 	local assist = MobileInput.Assist
@@ -62,8 +59,6 @@ local function assistSwing(command: InputCommand, world: WorldSnapshot, origin: 
 		rangeStuds = cfg.Range * assist.MeleeAcquireRangeScale,
 		coneDeg = assist.MeleeConeDeg,
 		fadeStartFraction = assist.ConeFadeStartFraction,
-		-- No line-of-sight test: at contact range the sweep starts inside the
-		-- target's own capsule and would report itself as an obstruction.
 		lineOfSightRadius = nil,
 	})
 	if targetId == nil or confidence <= 0 then
@@ -73,8 +68,6 @@ local function assistSwing(command: InputCommand, world: WorldSnapshot, origin: 
 	local target = world.characters[targetId]
 	local assisted = direction
 	if autoFace > 0 then
-		-- Steer flat: the swing box is decided in the horizontal plane, so
-		-- pitching toward a target above or below would tilt it for nothing.
 		local flatTarget = vector.create(target.position.x, origin.y, target.position.z)
 		local steered = horizontal(
 			TargetSelect.steer(
@@ -90,9 +83,6 @@ local function assistSwing(command: InputCommand, world: WorldSnapshot, origin: 
 		end
 	end
 
-	-- Lunge only closes a gap that exists. A target already inside the swing box
-	-- needs no help being reached, and dashing harder at them would push the
-	-- swing straight past.
 	if lunge > 0 then
 		local distance = vector.magnitude(target.position - origin)
 		if distance > cfg.Range then
@@ -198,8 +188,6 @@ function Hammer.handleInput(
 		position = character.position,
 		normal = nil,
 		direction = direction,
-		-- Dash speed for this swing. The adapter applies it, so a lunge is one
-		-- number on the event rather than a second movement path.
 		magnitude = dashSpeed,
 	})
 

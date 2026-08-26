@@ -1,3 +1,8 @@
+-- Name: ShopPage.story.luau
+-- Author: Jack C.
+-- Description: Studio story previewing the storefront page built from the shipped shop configuration.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

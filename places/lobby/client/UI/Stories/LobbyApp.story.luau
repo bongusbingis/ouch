@@ -1,3 +1,8 @@
+-- Name: LobbyApp.story.luau
+-- Author: Jack C.
+-- Description: Studio story that mounts the lobby app against mocked party and shop clients so the whole lobby UI can be previewed without a server.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

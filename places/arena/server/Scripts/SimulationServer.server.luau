@@ -1,3 +1,8 @@
+-- Name: SimulationServer.server.luau
+-- Author: Jack C.
+-- Description: Arena server entry point: starts every gameplay, economy, and analytics service in order and wires sim events through to animations, feedback, and progression consumers.
+-- Created: 2026-07-12
+
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -17,6 +22,7 @@ local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
 local CombatPoseService = require(Modules:WaitForChild("CombatPoseService"))
 local ProgressionService = require(Modules:WaitForChild("ProgressionService"))
 local QuestService = require(Modules:WaitForChild("QuestService"))
+local PostMatchService = require(Modules:WaitForChild("PostMatchService"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
 local EconomyService = require(Modules:WaitForChild("EconomyService"))
@@ -98,18 +104,16 @@ MatchService.start()
 ModeVoteService.start()
 AnalyticsService.start(MatchService)
 CombatPoseService.start()
--- Reported per match rather than read by AnalyticsService directly, so shared
--- simulation code keeps no dependency on a server-only reporting service.
 AnalyticsService.registerGauge("droppedSimMs", ServerAuthAdapter.takeDroppedMilliseconds)
 CosmeticsService.start()
 CharacterColorService.start()
 EconomyService.start()
 ProgressionService.start(MatchService)
 QuestService.start(MatchService)
+PostMatchService.start()
 CmdrService.start()
 ThrowUXService.start()
 
--- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
 	if acceptedElim or event.kind ~= "Elim" then

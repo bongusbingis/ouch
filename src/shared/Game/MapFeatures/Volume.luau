@@ -1,13 +1,9 @@
---!strict
+-- Name: Volume.luau
+-- Author: Jack C.
+-- Description: Volume test shared by every authored map feature, deciding when a character's root counts as inside a feature part with extra vertical padding.
+-- Created: 2026-08-18
 
--- Volume test shared by every authored map feature. A character counts as
--- inside a feature part when its root sits within that part's box, with extra
--- vertical padding so a root hovering just above a floor-level pad or pit still
--- registers.
---
--- The bounds comparison is split from the transform so it stays pure and
--- spec-tested; `contains` is only the engine call that puts the point into the
--- part's local space.
+--!strict
 
 local Volume = {}
 

@@ -1,3 +1,8 @@
+-- Name: TeleportCoordinator.luau
+-- Author: Jack C.
+-- Description: Reserves an arena server for a matched party and teleports its members with the built payload, reporting status and delegating retries to the shared retry coordinator.
+-- Created: 2026-08-15
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 

@@ -1,3 +1,8 @@
+-- Name: ConfigLiveService.luau
+-- Author: Jack C.
+-- Description: Reads the Roblox experience config snapshot, validates every declared override against its type and range, installs it into the live config tables, and restores the shipped value when an override disappears.
+-- Created: 2026-08-18
+
 --!strict
 
 local ConfigService = game:GetService("ConfigService")
@@ -9,19 +14,6 @@ local ConfigFolder = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game
 local ConfigOverrides = require(ConfigFolder:WaitForChild("ConfigOverrides"))
 local ConfigRuntime = require(ConfigFolder:WaitForChild("ConfigRuntime"))
 
--- Reads Roblox experience configs and installs the validated overrides declared
--- in Config.LiveConfig, then mirrors exactly the active set to clients through
--- ReplicatedStorage.ConfigState.
---
--- Every engine call is guarded: if ConfigService never loads, stops responding,
--- or returns an unusable snapshot, the game keeps running on the values baked
--- into src/config and simply retries. A resync is all-or-nothing so a partial
--- read can never install a half-applied set.
---
--- Overrides for modules the deterministic sim reads are held at their current
--- values while a match is running and adopted at the next match boundary, so
--- the server never changes combat constants underneath a running match.
-
 local ConfigLiveService = {}
 
 local started = false
@@ -30,14 +22,6 @@ local holdSimOverrides: (() -> boolean)? = nil
 local stateFolder: Folder? = nil
 local revision = 0
 
--- One value object per active override, rather than attributes: server-authority
--- replication caps an instance's total attribute payload at 1024 bytes, which 50
--- keys blow straight through, and it replicates a changed value property as a
--- small typed delta. A key with no override has no child at all, which is how
--- absence stays distinguishable from a legitimate value of 0.
---
--- revision is a single attribute bumped last, so a client reacting to it reads a
--- fully written set. This is the commit pattern ModeVoteState uses.
 local VALUE_CLASS: { [string]: string } = {
 	number = "NumberValue",
 	boolean = "BoolValue",
@@ -94,8 +78,6 @@ local function shouldHold(): boolean
 	return ok and result == true
 end
 
--- Reads every declared key, or nothing at all: a single failed read aborts the
--- resync so the currently applied set survives a transient outage untouched.
 local function readRawValues(): { [string]: any }?
 	local current = snapshot
 	if current == nil then
@@ -113,10 +95,6 @@ local function readRawValues(): { [string]: any }?
 	return rawValues
 end
 
--- Installs the current snapshot. Overrides for sim-critical modules are applied
--- only when the caller forces it or no match is running; otherwise the values
--- already in force are pinned so a match never changes constants underneath a
--- predicting client.
 local function install(force: boolean?)
 	local current = snapshot
 	if current == nil then
@@ -157,8 +135,6 @@ local function install(force: boolean?)
 	publish()
 end
 
--- Adopts the sim overrides held back during a match. Re-reads the snapshot so a
--- key deleted mid-match is reverted at the boundary too.
 function ConfigLiveService.releaseLatched()
 	install(true)
 end

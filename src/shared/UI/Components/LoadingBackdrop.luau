@@ -1,3 +1,8 @@
+-- Name: LoadingBackdrop.luau
+-- Author: Jack C.
+-- Description: The shared full-screen backdrop the loading and transition screens are drawn on.
+-- Created: 2026-08-24
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

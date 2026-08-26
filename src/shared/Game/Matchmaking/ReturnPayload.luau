@@ -1,3 +1,8 @@
+-- Name: ReturnPayload.luau
+-- Author: Jack C.
+-- Description: Builds and parses the teleport payload the arena sends back to the lobby, validating the party identity, match id, and member list against the schema.
+-- Created: 2026-08-18
+
 --!strict
 
 local ReturnPayload = {}
@@ -12,11 +17,6 @@ export type Payload = {
 	matchId: string,
 	memberUserIds: { number },
 }
-
--- Carried on the arena to lobby teleport so a party can be put back together on
--- arrival. It names the party and everyone who was still in it at the end of the
--- match, because the party record may have expired while the match ran and the
--- lobby then has nothing else to rebuild from.
 
 local function validId(value: any): boolean
 	return typeof(value) == "string" and #value > 0 and #value <= 100

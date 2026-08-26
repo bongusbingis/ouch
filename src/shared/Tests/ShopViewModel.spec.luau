@@ -1,3 +1,8 @@
+-- Name: ShopViewModel.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the storefront view model: stable section order, empty sections omitted, aspirational crate previews, live ownership over snapshot ownership, and the same featured discount the server charges.
+-- Created: 2026-08-23
+
 --!strict
 
 local T = require(script.Parent.TestKit)

@@ -1,3 +1,8 @@
+-- Name: CrateService.luau
+-- Author: Jack C.
+-- Description: Handles crate opening from both the Bonks purchase path and Robux receipts through one roll-and-grant routine, applying the pure roll model and firing the reveal event the client renders.
+-- Created: 2026-07-13
+
 --!strict
 
 local HttpService = game:GetService("HttpService")
@@ -21,9 +26,6 @@ local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
-
--- Owns both crate payment paths and emits one identified result payload for
--- client reveal deduplication.
 
 local CrateService = {}
 
@@ -111,16 +113,11 @@ local function logCrateFailure(player: Player, reason: string)
 	)
 end
 
--- A crate can only be opened once its content exists. Preview crates are
--- merchandised as coming soon and Hidden ones are not shown at all; neither can
--- be rolled, and the odds model would assert on their empty pool if they were.
 function CrateService.isOpenable(crateId: string): boolean
 	local crate = Crates[crateId]
 	return crate ~= nil and crate.CatalogStatus == "Active"
 end
 
--- Authoritative price. The storefront calls the same function, so the featured
--- discount it advertises is the one actually charged.
 function CrateService.priceFor(crateId: string, now: number?): number?
 	local crate = Crates[crateId]
 	if crate == nil or crate.BonksPrice == nil then
@@ -184,9 +181,6 @@ function CrateService.openWithBonks(player: Player, crateId: string): (OpenResul
 	return result, nil
 end
 
--- Roblox has already charged this receipt, so a restricted player must still be
--- made whole: pay the crate's Bonks value instead of rolling a random item.
--- Returning false here would strand the purchase in ProcessReceipt retries.
 local function grantRestrictedValue(player: Player, crateId: string, purchaseId: string, reason: string): boolean
 	local crate = Crates[crateId]
 	local data = PlayerData.get(player)
@@ -219,11 +213,6 @@ local function grantRestrictedValue(player: Player, crateId: string, purchaseId:
 end
 
 function CrateService.openFromReceipt(player: Player, crateId: string, purchaseId: string): boolean
-	-- Startup validation refuses an Active product pointing at a non-Active
-	-- crate, so this should be unreachable. It is still handled rather than
-	-- asserted: the player has already been charged, and paying out the crate's
-	-- value is the only outcome that neither strands the receipt nor rolls from
-	-- a pool that may be empty.
 	if not CrateService.isOpenable(crateId) then
 		return grantRestrictedValue(player, crateId, purchaseId, "crate_unavailable")
 	end

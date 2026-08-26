@@ -1,3 +1,8 @@
+-- Name: VoteCamera.luau
+-- Author: Jack C.
+-- Description: Moves the camera to the authored vote framing while the game-mode ballot is open and returns it to the player on close.
+-- Created: 2026-08-18
+
 --!strict
 
 local Lighting = game:GetService("Lighting")
@@ -8,11 +13,6 @@ local Workspace = game:GetService("Workspace")
 
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("UI"))
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
-
--- Orbits the camera around the arena's authored MapOrigin while the mode vote is
--- open, and blurs the world behind the ballot. Presentation only: it derives
--- entirely from the replicated vote snapshot and owns nothing but the camera
--- mode and the blur it creates.
 
 local VoteCamera = {}
 

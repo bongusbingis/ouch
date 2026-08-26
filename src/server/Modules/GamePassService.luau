@@ -1,3 +1,8 @@
+-- Name: GamePassService.luau
+-- Author: Jack C.
+-- Description: Reconciles game pass ownership on join and after purchase, granting the cosmetics a pass entitles idempotently and recording ownership for the entitlement cache.
+-- Created: 2026-08-08
+
 --!strict
 
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -10,11 +15,6 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local EntitlementService = require(script.Parent.EntitlementService)
 local PlayerData = require(script.Parent.PlayerData)
-
--- Reconciles permanent platform pass ownership into idempotent cosmetic grants,
--- and is the only writer of EntitlementService's session ownership cache. Every
--- definitive ownership answer is recorded, including false, so booster-only
--- passes (which grant no items) still resolve.
 
 type StartOptions = {
 	marketplace: any?,
@@ -132,7 +132,6 @@ end
 
 local function reconcilePass(player: Player, passId: number): (boolean?, number)
 	local owned = ownsPass(player, passId)
-	-- nil means the lookup failed, which must not be cached as "does not own".
 	if owned ~= nil then
 		recordOwnership(passId, player, owned)
 	end

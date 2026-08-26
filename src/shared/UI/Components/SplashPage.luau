@@ -1,3 +1,8 @@
+-- Name: SplashPage.luau
+-- Author: Jack C.
+-- Description: The lobby splash page with the play action and party status, the first screen a player sees in the lobby.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

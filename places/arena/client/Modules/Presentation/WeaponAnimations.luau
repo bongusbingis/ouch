@@ -1,3 +1,8 @@
+-- Name: WeaponAnimations.luau
+-- Author: Jack C.
+-- Description: Plays the local character's weapon animation clips directly from its own combat intents so they are not delayed by a server round trip, resolving clips per weapon and state.
+-- Created: 2026-08-18
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -7,27 +12,11 @@ local Animations = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
 local CombatState = require(script.Parent.CombatState)
 
--- Plays the local player's combat animations, driven by the visual state
--- machine rather than by raw input.
---
--- Everything is played on the local character the instant the state changes, so
--- a press is never waiting on a round trip. Playing locally also means the
--- animation replicates outward by itself and stays the only copy -- the server
--- must never play these too, or the clip restarts on the actor mid-motion.
---
--- Purely cosmetic. The server decides whether an action happens at all; if it
--- rejects a throw, the worst case is an animation that played for nothing.
---
--- Clip names and which of them are required live in Config.Animations. This
--- module knows how to play a clip and when, never which asset it is.
-
 local WeaponAnimations = {}
 
 local started = false
 local animator: Animator? = nil
 local tracks: { [string]: AnimationTrack } = {}
--- Clips that are configured but absent from the Studio assets. Remembered so a
--- missing optional animation is looked up once rather than every play.
 local missing: { [string]: boolean } = {}
 local lastPlayedAt: { [string]: number } = {}
 local currentLoop: AnimationTrack? = nil
@@ -58,12 +47,9 @@ local function resolve(weapon: string, name: string): AnimationTrack?
 
 	local instance: Instance?
 	if clip.Required then
-		-- Required assets are waited for: a missing one is a setup error and the
-		-- infinite-yield warning is the correct way to surface it.
 		instance = folder():WaitForChild(clip.Name)
 		assert(instance and instance:IsA("Animation"), "[WeaponAnimations] " .. clip.Name .. " must be an Animation")
 	else
-		-- Optional clips legitimately may not be authored yet.
 		instance = folder():FindFirstChild(clip.Name)
 		if instance == nil or not instance:IsA("Animation") then
 			missing[key] = true
@@ -76,16 +62,11 @@ local function resolve(weapon: string, name: string): AnimationTrack?
 	loaded.Looped = clip.Looped
 	tracks[key] = loaded
 
-	-- The release marker is what hands the throw over to its follow-through. A
-	-- clip without one still works; the state machine's timer covers it.
 	if weapon == "Dodgeball" and name == "Throw" then
 		loaded:GetMarkerReachedSignal("Release"):Connect(function()
 			CombatState.onReleaseMarker()
 		end)
 	elseif weapon == "Dodgeball" and name == "Charge" then
-		-- Freezing on the marker holds the wound pose for as long as the player
-		-- keeps charging, so the clip only has to cover the wind-up itself
-		-- rather than the longest possible hold.
 		loaded:GetMarkerReachedSignal("Charged"):Connect(function()
 			loaded:AdjustSpeed(0)
 		end)
@@ -99,8 +80,6 @@ local function stopLoop()
 		if track.IsPlaying then
 			track:Stop(Animations.FadeTime.Hold)
 		end
-		-- A charge clip frozen on its marker has to be released, or the next
-		-- wind-up starts already stopped at the wound pose.
 		track:AdjustSpeed(1)
 	end
 	currentLoop = nil
@@ -124,8 +103,6 @@ local function playOnce(weapon: string, name: string, fadeTime: number, cooldown
 	if track == nil or track.IsPlaying then
 		return
 	end
-	-- The cooldown gate stops a press the server will reject from replaying the
-	-- clip; IsPlaying alone leaves a gap whenever the cooldown outlasts it.
 	local key = clipKey(weapon, name)
 	local now = os.clock()
 	if cooldown and now - (lastPlayedAt[key] or -math.huge) < cooldown then
@@ -146,9 +123,6 @@ local function onCharacter(character: Model)
 	animator = resolved
 end
 
--- The hammer swing is the one action still driven straight off input rather
--- than off state: it has no charge to wait for, and deferring it would add the
--- whole press-to-release window to every melee swing.
 function WeaponAnimations.onIntent(kind: string)
 	if kind ~= "Throw" or CombatState.canThrowBall() then
 		return
@@ -157,9 +131,6 @@ function WeaponAnimations.onIntent(kind: string)
 end
 
 local function onState(snapshot: CombatState.Snapshot)
-	-- The ball clips all assume a ball in hand. With the dodgeball equipped and
-	-- nothing to throw there is no meaningful ball pose, so the hammer idle is
-	-- what the character falls back to rather than miming an empty throw.
 	if snapshot.weapon ~= "Dodgeball" or not snapshot.holdsBall then
 		stopLoop()
 		playLoop("Hammer", "Idle")

@@ -1,3 +1,8 @@
+-- Name: LoadingScreen.story.luau
+-- Author: Jack C.
+-- Description: Studio story previewing the loading screen at a fixed progress state.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

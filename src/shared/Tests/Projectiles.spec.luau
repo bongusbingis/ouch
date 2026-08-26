@@ -1,3 +1,8 @@
+-- Name: Projectiles.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the projectile subsystem: straight flight and flight-time limits, determinism, homing clamps and lock breaking, no tunneling through thin walls, bounce and roll settling, and charged release speeds.
+-- Created: 2026-07-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -118,7 +123,6 @@ T.describe("Projectiles", function()
 	T.it("breaks lock past the break angle", function()
 		withConfig({ Gravity = 0 }, function()
 			local state = SimTypes.newState()
-			-- Target at 90 degrees off the flight path, beyond HomingBreakAngleDeg.
 			local target = MockWorld.character(vector.create(0, 3, 30))
 			local world = MockWorld.snapshot({ dummy = target })
 			local ball = makeBall(state, {

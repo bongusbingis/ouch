@@ -1,13 +1,9 @@
---!strict
+-- Name: CrateConfig.spec.luau
+-- Author: Jack C.
+-- Description: Spec guarding the shipped crate configuration: disclosed odds summing to exactly one hundred, pity only for droppable rarities, and the price guarantees between direct buying and crate chasing.
+-- Created: 2026-08-12
 
--- Guards the shipped crate configuration rather than synthetic fixtures: the
--- odds-disclosure and pity guarantees are published to players, so they must
--- hold for the real pools.
---
--- Only Active crates are checked. A Preview crate is merchandised as coming
--- soon and cannot be opened, and its pool is empty until its content exists --
--- building an odds model for one is exactly the assert CrateOdds is meant to
--- raise, not a case to tolerate.
+--!strict
 
 local T = require(script.Parent.TestKit)
 local Crates = require(script.Parent.Parent.Parent.Config.Crates)
@@ -106,8 +102,6 @@ T.describe("Crate configuration", function()
 	end)
 
 	T.it("keeps direct buying cheaper than chasing one specific item through crates", function()
-		-- If targeting an item cost more than gambling for it, the guaranteed
-		-- path would be pointless and nobody would ever take it.
 		for _, crate in activeCrates() do
 			local price = crate.BonksPrice
 			if price ~= nil then
@@ -123,8 +117,6 @@ T.describe("Crate configuration", function()
 	end)
 
 	T.it("keeps one crate open cheaper than the cheapest direct buy", function()
-		-- The inverse guard: crates must stay the value play for breadth, or
-		-- there is no reason to open one.
 		local cheapest = cheapestDirect()
 		for _, crate in Crates do
 			if crate.BonksPrice ~= nil then
@@ -134,9 +126,6 @@ T.describe("Crate configuration", function()
 	end)
 
 	T.it("holds both price guarantees at the discounted price actually charged", function()
-		-- The two guards above read the baked BonksPrice, but a featured crate is
-		-- charged less than that, so the discounted price is the one a player
-		-- really pays. Checked explicitly because nothing else covers it.
 		for crateId, crate in activeCrates() do
 			local price = crate.BonksPrice
 			if price ~= nil then
@@ -156,10 +145,6 @@ T.describe("Crate configuration", function()
 	end)
 
 	T.it("bounds every live crate price so an A/B variant cannot break either guarantee", function()
-		-- Crate prices and the featured discount are live-overridable, so the
-		-- guarantees have to survive the worst combination the allowlist permits,
-		-- not just the baked one. Without this, an experiment could quietly make
-		-- crates a worse deal than buying outright.
 		local worstDiscount = liveBound("Shop.Featured.DiscountPercent", "Maximum")
 		T.expect(worstDiscount ~= nil):toBeTruthy()
 		local cheapest = cheapestDirect()
@@ -170,8 +155,6 @@ T.describe("Crate configuration", function()
 			T.expect(minimum ~= nil):toBeTruthy()
 			T.expect(maximum ~= nil):toBeTruthy()
 
-			-- Cheapest a player could ever be charged: lowest allowed price, then
-			-- the deepest allowed discount on top.
 			local floorPrice = FeaturedRotation.discountedPrice(minimum :: number, worstDiscount :: number)
 			local model = CrateOdds.build(crate, Cosmetics.Items, Cosmetics.Rarities)
 			for _, outcome in model.outcomes do
@@ -180,7 +163,6 @@ T.describe("Crate configuration", function()
 					T.expect(directBonks < floorPrice / outcome.probability):toBeTruthy()
 				end
 			end
-			-- Dearest it could ever be, which must still beat a direct buy.
 			T.expect((maximum :: number) < cheapest):toBeTruthy()
 		end
 	end)

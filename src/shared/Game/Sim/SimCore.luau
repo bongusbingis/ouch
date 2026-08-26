@@ -1,3 +1,8 @@
+-- Name: SimCore.luau
+-- Author: Jack C.
+-- Description: The pure fixed-tick simulation step: syncs players, applies weapon equips, canonically sorts commands, routes them to the equipped weapon kit, ticks weapons and projectiles, and returns mutated state plus an ordered event list.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
@@ -9,10 +14,6 @@ type SimState = SimTypes.SimState
 type WorldSnapshot = SimTypes.WorldSnapshot
 type InputCommand = SimTypes.InputCommand
 type SimEvent = SimTypes.SimEvent
-
--- The single deterministic combat step, run by the authoritative server.
--- Owns no engine state: characters and geometry arrive
--- via the snapshot, time is the tick counter.
 
 local SimCore = {}
 
@@ -40,15 +41,6 @@ local function syncPlayers(state: SimState, world: WorldSnapshot)
 	end
 end
 
--- Which kits may answer this command for this player.
---
--- A command only one weapon claims routes to it whatever is equipped. That is
--- what keeps Catch available while the hammer is out -- requiring the dodgeball
--- to be equipped before a ball could be caught would make the ball unobtainable
--- for anyone holding the hammer, and there would be no way out of that.
---
--- When more than one weapon claims a command, the equipped one decides. This is
--- the whole of the routing rule; there is no per-weapon special case.
 local function kitsFor(state: SimState, playerId: string, kind: string)
 	local claiming = WeaponRegistry.forCommand(kind)
 	if #claiming <= 1 then
@@ -63,9 +55,6 @@ local function kitsFor(state: SimState, playerId: string, kind: string)
 	return claiming
 end
 
--- Gaining a ball equips whichever weapon uses one. Runs before equip commands so
--- a player who deliberately switches away on the same tick keeps their choice,
--- and before the action loop so a ball granted this tick can be thrown on it.
 local function autoEquipOnPickup(state: SimState)
 	local handBallKind = WeaponRegistry.handBallKind()
 	if handBallKind == nil then
@@ -81,9 +70,6 @@ local function autoEquipOnPickup(state: SimState)
 	end
 end
 
--- Equip is a preference, not an action: it is applied in its own pass so it
--- never consumes the one action a player gets per tick, and so an equip and a
--- throw sent together resolve as "switch, then throw with the new weapon".
 local function applyEquips(state: SimState, commands: { InputCommand })
 	for _, command in commands do
 		if command.kind ~= "Equip" then
@@ -98,8 +84,6 @@ local function applyEquips(state: SimState, commands: { InputCommand })
 	end
 end
 
--- Canonical command order: the server may receive different arrival orders
--- than they were sent in; sorting keeps a tick reproducible.
 local function sortCommands(commands: { InputCommand })
 	table.sort(commands, function(a, b)
 		if a.playerId ~= b.playerId then

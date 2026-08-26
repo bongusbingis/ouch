@@ -1,3 +1,8 @@
+-- Name: ShopPriceButton.luau
+-- Author: Jack C.
+-- Description: The price button on a storefront card, rendering the currency, amount, any discount, and its pending or disabled state.
+-- Created: 2026-08-23
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

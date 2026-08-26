@@ -1,3 +1,8 @@
+-- Name: sb-cooldowns-resetServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-cooldowns-reset, queueing a weapon-state reset on the sim adapter for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

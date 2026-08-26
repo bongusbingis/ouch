@@ -1,3 +1,8 @@
+-- Name: Protocol.luau
+-- Author: Jack C.
+-- Description: Shared wire protocol for lobby party traffic: join-code normalization, request validation, success and failure envelopes, cross-server message shapes, and invite data encoding.
+-- Created: 2026-08-15
+
 local HttpService = game:GetService("HttpService")
 
 local Config = require(script.Parent.Config)

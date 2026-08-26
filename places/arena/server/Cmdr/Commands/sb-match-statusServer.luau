@@ -1,3 +1,8 @@
+-- Name: sb-match-statusServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-match-status, formatting the current phase, mode, time remaining, and per-player scores.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

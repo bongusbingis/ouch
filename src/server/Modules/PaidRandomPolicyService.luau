@@ -1,3 +1,8 @@
+-- Name: PaidRandomPolicyService.luau
+-- Author: Jack C.
+-- Description: Decides whether a player may be offered paid random items, so restricted regions and accounts see crates as preview-only rather than purchasable.
+-- Created: 2026-08-08
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -5,10 +10,6 @@ local PolicyService = game:GetService("PolicyService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
-
--- Owns the server cache of Roblox's per-player paid-random-item policy and
--- gates every crate path -- earned Bonks and Robux receipts alike -- but only
--- once a Bonks or Crate product is actually purchasable.
 
 type StartOptions = {
 	players: any?,

@@ -1,3 +1,8 @@
+-- Name: Infection.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the infection mode rules: survivor counting, conversion only on an infected elimination, patient zero selection, and the survivors winning on the clock.
+-- Created: 2026-08-19
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -7,8 +12,6 @@ T.describe("Infection", function()
 	T.it("counts only players still on the survivor side", function()
 		T.expect(Infection.countSurvivors({ "Survivors", "Survivors", "Infected" })):toEqual(2)
 		T.expect(Infection.countSurvivors({ "Infected", "Infected" })):toEqual(0)
-		-- A player with no team yet must not be mistaken for a survivor, or the
-		-- match would never reach total conversion.
 		T.expect(Infection.countSurvivors({ nil, "Infected" })):toEqual(0)
 		T.expect(Infection.countSurvivors({})):toEqual(0)
 	end)

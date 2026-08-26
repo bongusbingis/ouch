@@ -1,3 +1,8 @@
+-- Name: UIFeedback.luau
+-- Author: Jack C.
+-- Description: Owns the sound and haptic feedback for user interface interactions: hover, click, and notification cues shared by every component.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

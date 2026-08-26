@@ -1,11 +1,9 @@
---!strict
+-- Name: BattlePassLogic.luau
+-- Author: Jack C.
+-- Description: Pure season pass rules: which season is live, what tier an XP total buys, what is still owed, and whether a claim is legal, with time always passed in.
+-- Created: 2026-08-12
 
--- Pure season-pass rules: which season is live, what tier an XP total buys,
--- what is still owed, and whether a claim is legal.
---
--- `now` is always a parameter and no Instance, Player, or clock is touched, so
--- the whole ruleset is exercisable headlessly. Tier is derived from stored XP
--- and never persisted -- storing both would let them drift.
+--!strict
 
 local BattlePassLogic = {}
 
@@ -59,8 +57,6 @@ function BattlePassLogic.blankState(seasonId: string): SeasonState
 	}
 end
 
--- Defensive copy, mirroring QuestLogic.copyEntries: callers mutate the copy and
--- reassign wholesale, because Replica only replicates on assignment.
 function BattlePassLogic.readState(raw: any): SeasonState
 	if type(raw) ~= "table" then
 		return BattlePassLogic.blankState("")
@@ -92,8 +88,6 @@ function BattlePassLogic.activeSeason(definitions: { [string]: SeasonDef }, now:
 	return best
 end
 
--- Clamped to the season's tier count. XP above the final threshold keeps
--- accumulating in storage so the number stays honest, but buys no more tiers.
 function BattlePassLogic.tierForXp(season: SeasonDef, xp: number): number
 	local tier = 0
 	for index, threshold in season.XpThresholds do
@@ -154,8 +148,6 @@ function BattlePassLogic.canClaim(
 	return true, nil
 end
 
--- The shared kernel behind claim, claimAll, and the rollover sweep, so "what is
--- this player owed" has exactly one implementation. Deterministic order.
 function BattlePassLogic.unclaimedTiers(season: SeasonDef, state: SeasonState, hasPremium: boolean): { OwedTier }
 	local owed: { OwedTier } = {}
 	for tier = 1, season.TierCount do

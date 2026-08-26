@@ -1,3 +1,8 @@
+-- Name: InputRouter.luau
+-- Author: Jack C.
+-- Description: Feeds the aim vector into the Aim input action every frame, pulses the Throw action on touch taps, reports the player's device class to the server, and owns whether the mouse cursor is released for menus.
+-- Created: 2026-07-12
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -12,21 +17,13 @@ local AimDirector = require(script.Parent.AimDirector)
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
--- Client side of the input layer. Hardware actions are handled by their
--- InputBindings; the router feeds aim each frame and exposes touch catch for
--- the next HUD without owning any UI.
-
 local InputRouter = {}
 
 local started = false
 local modeVoteOpen = false
+local combatWasActive = false
 local connections: { any } = {}
 
--- Mouse lock, cursor visibility and the shoulder offset all belong to
--- PlayerModule.Combat now. This used to write UserInputService directly, which
--- fought CameraUtils inside the camera stack -- two owners writing the same
--- property every frame. All that is left here is telling Combat when a menu
--- needs the pointer.
 local function updateCursorOwnership()
 	if modeVoteOpen then
 		Combat.requestCursor("ModeVote")
@@ -72,8 +69,14 @@ function InputRouter.start()
 		connections,
 		RunService.RenderStepped:Connect(function()
 			updateCursorOwnership()
-			AimDirector.update()
-			aimBinding:Fire(AimDirector.currentAim())
+			local combatActive = Combat.isActive()
+			if combatActive then
+				AimDirector.update()
+				aimBinding:Fire(AimDirector.currentAim())
+			elseif combatWasActive then
+				AimDirector.reset()
+			end
+			combatWasActive = combatActive
 		end)
 	)
 end
@@ -88,6 +91,8 @@ function InputRouter.destroy()
 	end
 	table.clear(connections)
 	modeVoteOpen = false
+	combatWasActive = false
+	AimDirector.reset()
 	Combat.releaseCursor("ModeVote")
 	started = false
 end

@@ -1,7 +1,9 @@
+-- Name: Animations.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec asserting that every required combat animation clip declared in config is actually authored in Studio with a valid animation priority.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Validates the Studio-authored combat animations declared in Config.Animations.
--- Only required clips are asserted: optional ones are the polish passes that may
--- not be authored yet, and the animation layer is built to run without them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")

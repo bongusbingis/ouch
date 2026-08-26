@@ -1,3 +1,8 @@
+-- Name: JoinCodeModal.story.luau
+-- Author: Jack C.
+-- Description: Studio story previewing the party join-code modal.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

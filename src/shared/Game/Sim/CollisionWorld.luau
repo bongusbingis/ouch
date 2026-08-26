@@ -1,12 +1,14 @@
+-- Name: CollisionWorld.luau
+-- Author: Jack C.
+-- Description: Pure collision maths for the simulation: closest points on segments, swept sphere against capsule tests, and the clamped rotation helper used for homing.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
 
 type Vec = SimTypes.Vec
 type CharacterSnapshot = SimTypes.CharacterSnapshot
-
--- Pure geometry shared by every CollisionWorld implementation and by the
--- projectile sweep itself. No engine types.
 
 local CollisionWorld = {}
 
@@ -22,8 +24,6 @@ function CollisionWorld.closestPointOnSegment(point: Vec, a: Vec, b: Vec): Vec
 	return a + ab * t
 end
 
--- Closest-approach parameters (s along segment p1->q1, t along p2->q2).
--- Ericson, Real-Time Collision Detection §5.1.9.
 function CollisionWorld.segmentSegmentClosest(p1: Vec, q1: Vec, p2: Vec, q2: Vec): (number, number)
 	local d1 = q1 - p1
 	local d2 = q2 - p2
@@ -64,10 +64,6 @@ export type CapsuleSweepHit = {
 	position: Vec,
 }
 
--- Sphere travelling from `from` to `to` against a capsule (segment capA-capB
--- with combined radius already summed into `sumRadius`). Returns the earliest
--- contact, found by bisecting the distance function along the path — exact
--- enough given the caller substeps paths to roughly one ball radius.
 function CollisionWorld.sweptSphereVsCapsule(
 	from: Vec,
 	to: Vec,
@@ -103,8 +99,6 @@ function CollisionWorld.sweptSphereVsCapsule(
 	return { fraction = hi, position = from + (to - from) * hi }
 end
 
--- Rotates unit vector `dir` toward unit vector `desired` by at most `maxAngle`
--- radians (Rodrigues rotation). This is the homing steering primitive.
 function CollisionWorld.rotateToward(dir: Vec, desired: Vec, maxAngle: number): Vec
 	if maxAngle <= 0 then
 		return dir
@@ -128,7 +122,6 @@ function CollisionWorld.rotateToward(dir: Vec, desired: Vec, maxAngle: number): 
 	return dir * cosA + vector.cross(axis, dir) * sinA + axis * (vector.dot(axis, dir) * (1 - cosA))
 end
 
--- Capsule axis endpoints (bottom, top) for a character snapshot.
 function CollisionWorld.capsuleEndpoints(character: CharacterSnapshot): (Vec, Vec)
 	local halfAxis = math.max(character.height / 2 - character.radius, 0)
 	local offset = vector.create(0, halfAxis, 0)

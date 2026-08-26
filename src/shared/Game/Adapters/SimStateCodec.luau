@@ -1,3 +1,8 @@
+-- Name: SimStateCodec.luau
+-- Author: Jack C.
+-- Description: Encodes and decodes simulation state to and from the attributes on ball and character instances, the between-tick source of truth that replicates to clients for presentation.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
@@ -7,21 +12,8 @@ local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 type SimState = SimTypes.SimState
 type ProjectileState = SimTypes.ProjectileState
 
--- Attributes on the ball instances are the between-tick source of truth and
--- replicate to clients for presentation. The adapter decodes a fresh
--- SimState every simulation step and encodes the result back. Names are kept
--- short for the replication limits (first 64 attributes, <=50-char names).
---
--- Ball position is NOT an attribute — it lives in the part's CFrame, which
--- is set by the server each tick and replicates natively.
-
 local SimStateCodec = {}
 
--- The equipped weapon lives on the character model, not on the Player, because
--- this is sim state: the adapter decodes it back every tick, and a second copy
--- kept for the client's benefit would be a second thing that could be wrong.
--- Clients read this same attribute, which is why the name is exported rather
--- than written out in two places.
 SimStateCodec.EquippedAttribute = "wpn"
 
 local PHASE_TO_NUMBER: { [SimTypes.ProjectilePhase]: number } = {
@@ -83,9 +75,6 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 	for playerId, model in characterModels do
 		state.players[playerId] = {
 			id = playerId,
-			-- Absent on a character that has not been stepped yet, and on every
-			-- fresh spawn, which is what resets a respawning player to the default
-			-- weapon rather than whatever they died holding.
 			equipped = (model:GetAttribute(SimStateCodec.EquippedAttribute) :: string?) or WeaponRegistry.defaultKind(),
 			heldBallLastTick = model:GetAttribute("hadB") == true,
 			weapons = {

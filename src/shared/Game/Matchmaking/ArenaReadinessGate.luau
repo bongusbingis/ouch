@@ -1,3 +1,8 @@
+-- Name: ArenaReadinessGate.luau
+-- Author: Jack C.
+-- Description: Pure readiness gate for an arriving arena session, releasing once every expected player is ready or the deadline passes with at least one ready player, and never opening an empty one.
+-- Created: 2026-08-24
+
 --!strict
 
 local ArenaReadinessGate = {}

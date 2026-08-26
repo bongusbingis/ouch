@@ -1,3 +1,8 @@
+-- Name: SplashPage.story.luau
+-- Author: Jack C.
+-- Description: Studio story previewing the lobby splash page.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

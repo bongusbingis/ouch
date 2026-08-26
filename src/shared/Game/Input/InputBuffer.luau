@@ -1,12 +1,9 @@
---!strict
+-- Name: InputBuffer.luau
+-- Author: Jack C.
+-- Description: One-slot input buffer that holds an action arriving during a cooldown and fires it the instant it becomes legal, so late touch inputs are not silently dropped.
+-- Created: 2026-08-19
 
--- One-slot input buffer. A throw or swing that arrives during a cooldown tail
--- or a non-actionable state waits a short window and fires the instant the
--- action becomes legal, instead of being silently dropped.
---
--- Mobile touch latency plus a lower framerate means taps land late; without
--- this they feel like the game missed them. One slot only: a newer input
--- replaces an older one, because the player's latest intent is the real one.
+--!strict
 
 local InputBuffer = {}
 
@@ -29,8 +26,6 @@ function InputBuffer.clear(buffer: Buffer)
 	buffer.queuedAt = 0
 end
 
--- Returns the buffered action if one is still within its window, clearing it.
--- An expired entry is dropped silently rather than firing late.
 function InputBuffer.take(buffer: Buffer, now: number, windowSeconds: number): string?
 	local action = buffer.action
 	if action == nil then

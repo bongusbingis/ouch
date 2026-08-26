@@ -1,3 +1,8 @@
+-- Name: ShopPage.luau
+-- Author: Jack C.
+-- Description: The storefront page, rendering the ordered sections and cards from the shop view model with their loading and countdown states.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

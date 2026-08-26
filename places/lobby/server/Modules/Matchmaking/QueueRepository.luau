@@ -1,3 +1,8 @@
+-- Name: QueueRepository.luau
+-- Author: Jack C.
+-- Description: Persistence for the matchmaking queue in the shared memory store: enqueue, refresh, remove, and read the current candidate tickets.
+-- Created: 2026-08-15
+
 local MemoryStoreService = game:GetService("MemoryStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

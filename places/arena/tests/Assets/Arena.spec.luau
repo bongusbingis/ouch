@@ -1,3 +1,8 @@
+-- Name: Arena.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec asserting the permanent authored arena exists with its map, scriptables, and spawn folders populated.
+-- Created: 2026-08-17
+
 --!nonstrict
 
 local ServerStorage = game:GetService("ServerStorage")

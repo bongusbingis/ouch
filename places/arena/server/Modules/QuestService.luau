@@ -1,3 +1,8 @@
+-- Name: QuestService.luau
+-- Author: Jack C.
+-- Description: Server owner of daily quest state: assigns the deterministic daily set, advances progress from deduplicated match and combat events, handles claims, and grants rewards through the reward service.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -35,9 +40,6 @@ local function activeEntries(data: any): { QuestEntry }
 	return QuestLogic.copyEntries(data.Quests.Active)
 end
 
--- A quest completed but not claimed before reset would otherwise be silently
--- discarded when Active is replaced below; grant it here so finishing a
--- quest never loses its reward to timing.
 local function grantCompletedUnclaimed(data: any, player: Player)
 	for _, entry in ipairs(activeEntries(data)) do
 		if entry.claimed then

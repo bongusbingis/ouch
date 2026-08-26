@@ -1,22 +1,28 @@
+-- Name: TeleportPresentationClient.luau
+-- Author: Jack C.
+-- Description: Mounts the teleport loading screen the lobby shows while a party is being sent to the arena, and reports back when it is on screen.
+-- Created: 2026-08-24
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
-
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactRoblox = require(Packages:WaitForChild("react-roblox"))
 local UI = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI")
 local LoadingScreen = require(UI:WaitForChild("Components"):WaitForChild("LoadingScreen"))
 local ReactRoot = require(UI:WaitForChild("Services"):WaitForChild("ReactRoot"))
+local TeleportGui = require(UI:WaitForChild("Services"):WaitForChild("TeleportGui"))
 
 local TeleportPresentationClient = {}
 
 function TeleportPresentationClient.start(onReady: () -> ())
 	local container = ReactRoot.createDetached("ArenaTeleportGui", Enum.ScreenInsets.None, 1000)
+	TeleportGui.prepare(container)
 	local root = ReactRoblox.createRoot(container)
 	local destroyed = false
 	local registered = false
+	local registering = false
 
 	root:render(React.createElement(LoadingScreen, {
 		Visible = true,
@@ -24,16 +30,24 @@ function TeleportPresentationClient.start(onReady: () -> ())
 		Title = "TRAVELING TO ARENA",
 		Detail = "THE MATCH IS READY",
 		OnPresented = function()
-			if destroyed or registered then
+			if destroyed or registered or registering then
 				return
 			end
-			local success, message = pcall(TeleportService.SetTeleportGui, TeleportService, container)
-			if not success then
-				warn(`[TeleportPresentationClient] Could not register teleport UI: {message}`)
-				return
-			end
-			registered = true
-			onReady()
+			registering = true
+			task.spawn(function()
+				local success, message = TeleportGui.register(container, function()
+					return destroyed
+				end)
+				registering = false
+				if not success then
+					if message ~= "cancelled" then
+						warn(`[TeleportPresentationClient] Could not register teleport UI: {message}`)
+					end
+					return
+				end
+				registered = true
+				onReady()
+			end)
 		end,
 	}))
 

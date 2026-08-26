@@ -1,3 +1,8 @@
+-- Name: Boosts.spec.luau
+-- Author: Jack C.
+-- Description: Spec for booster stacking: best-of rather than compounding, ignoring cosmetic-only passes, and that no shipped booster touches anything but XP and Bonks.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -32,7 +37,6 @@ T.describe("Boosts", function()
 
 	T.it("takes the best of overlapping boosters rather than compounding them", function()
 		local result = Boosts.multipliers(CATALOG, { DoubleXP = true, BonksBoost = true, Club = true })
-		-- Multiplicative would be 2 * 2.5 = 5x XP; max-wins keeps it at 2.5.
 		T.expect(result.Xp):toEqual(2.5)
 		T.expect(result.Bonks):toEqual(1.5)
 	end)

@@ -1,19 +1,13 @@
+-- Name: ThrowPoseConfig.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the throw pose configuration: every section and value the arm module indexes, reach within the arm's limits, weights within the ceiling, and stable under-damped motion values.
+-- Created: 2026-08-20
+
 --!strict
 
 local T = require(script.Parent.TestKit)
 local Animations = require(script.Parent.Parent.Parent.Config.Animations)
 local ThrowPose = require(script.Parent.Parent.Parent.Config.ThrowPose)
-
--- Shape checks for the two config modules behind the throwing-arm pose.
---
--- These exist because the code that reads them runs only on a client, which the
--- headless suite never executes: a missing key there is not a test failure, it
--- is a nil index during a playtest. Asserting the shape here turns that class of
--- mistake back into something CI catches.
---
--- Deliberately about structure, not values. Tuning numbers are meant to change
--- freely, so these pin only what the code indexes and the few relationships that
--- would be wrong rather than merely different.
 
 local STATES = { "Idle", "BallEquipped", "Aiming", "Charging", "Throwing", "FollowThrough", "Recovering" }
 
@@ -39,15 +33,10 @@ T.describe("ThrowPose config", function()
 	end)
 
 	T.it("keeps the resting hold inside the arm's reach", function()
-		-- R15 shoulder to hand is about 2.8 studs. Past that the target is
-		-- unreachable and the solver locks the elbow straight.
 		T.expect(ThrowPose.Arm.ReadyDistance < 2.8):toBeTruthy()
 	end)
 
 	T.it("winds the hand back rather than forward", function()
-		-- Roblox characters face -Z, so a wind-up must be positive Z to be behind
-		-- the shoulder. A negative value here would push the hand out in front,
-		-- which is a present, not a coil.
 		T.expect(ThrowPose.Arm.WindupOffset.z > 0):toBeTruthy()
 	end)
 
@@ -68,19 +57,12 @@ T.describe("ThrowPose config", function()
 	end)
 
 	T.it("yields the arm to the authored animation through the throw", function()
-		-- The invariant that actually matters. Taking the arm while a ball is
-		-- merely held is correct -- the only competing motion there is locomotion
-		-- arm swing, which fights the pose. Taking it during the throw is not:
-		-- that clip is the entire performance.
 		local weights = ThrowPose.Weights
 		T.expect(weights.Throwing < 0.3):toBeTruthy()
 		T.expect(weights.Throwing < weights.Charging * 0.5):toBeTruthy()
 	end)
 
 	T.it("hands the arm back to the animation for the follow-through", function()
-		-- The one weight with a correctness meaning rather than a taste meaning:
-		-- anything above zero here drags the hand back toward its target during
-		-- the most characterful part of the throw.
 		T.expect(ThrowPose.Weights.FollowThrough):toEqual(0)
 	end)
 
@@ -110,8 +92,6 @@ T.describe("ThrowPose config", function()
 	end)
 
 	T.it("keeps the wind-up under-damped so the hand settles with a bounce", function()
-		-- Damping at or above 1 removes the overshoot entirely, which is what
-		-- makes the action read as mechanical.
 		T.expect(ThrowPose.Motion.WindupDamping < 1):toBeTruthy()
 	end)
 

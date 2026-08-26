@@ -1,3 +1,8 @@
+-- Name: ActivityDots.luau
+-- Author: Jack C.
+-- Description: Animated loading dots component used wherever the UI is waiting on the server, respecting the reduced-motion preference.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

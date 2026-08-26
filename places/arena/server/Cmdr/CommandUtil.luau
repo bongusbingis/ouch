@@ -1,3 +1,8 @@
+-- Name: CommandUtil.luau
+-- Author: Jack C.
+-- Description: Shared helper for Cmdr command implementations that runs an action over a list of players and formats a single per-player success and failure summary string.
+-- Created: 2026-07-15
+
 --!strict
 
 local CommandUtil = {}
