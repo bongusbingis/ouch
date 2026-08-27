@@ -218,6 +218,7 @@ return function(props: Props)
 			Position = UDim2.fromScale(0.863158, -0.0652306),
 			Size = UDim2.fromScale(CHECKMARK_SCALE.X, CHECKMARK_SCALE.Y),
 			Visible = mode.Selected,
+			ZIndex = 6,
 		}, {
 			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1,

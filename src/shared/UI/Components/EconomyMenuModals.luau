@@ -31,6 +31,9 @@ return function(props: Props)
 		CrateReveal = c(CrateRevealModal, {
 			Reveal = controller.crateReveal,
 			OnClose = controller.closeReveal,
+			OnOpenAgain = if controller.crateReplay then controller.openAgain else nil,
+			OpenAgainEnabled = controller.crateReplay ~= nil and controller.crateReplay.affordable,
+			OpenAgainText = if controller.crateReplay then controller.crateReplay.label else nil,
 		}),
 	})
 end

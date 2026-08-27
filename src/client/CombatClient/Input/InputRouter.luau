@@ -14,7 +14,11 @@ local UserInputService = game:GetService("UserInputService")
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AimDirector = require(script.Parent.AimDirector)
-local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+-- The mode ballot is arena-only, and this module is shared by both places, so a
+-- missing ModeVoteClient in the lobby is expected rather than a missing asset.
+local uiModules = script.Parent.Parent:FindFirstChild("UI")
+local modeVoteModule = if uiModules then uiModules:FindFirstChild("ModeVoteClient") else nil
+local ModeVoteClient = if modeVoteModule then require(modeVoteModule) :: any else nil
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local InputRouter = {}
@@ -56,13 +60,15 @@ function InputRouter.start()
 	local aimBinding = aimAction:WaitForChild("AimFeed") :: InputBinding
 
 	reportDeviceClass()
-	table.insert(
-		connections,
-		ModeVoteClient.subscribe(function(snapshot)
-			modeVoteOpen = snapshot.admitted and snapshot.open
-			updateCursorOwnership()
-		end)
-	)
+	if ModeVoteClient then
+		table.insert(
+			connections,
+			ModeVoteClient.subscribe(function(snapshot)
+				modeVoteOpen = snapshot.admitted and snapshot.open
+				updateCursorOwnership()
+			end)
+		)
+	end
 	updateCursorOwnership()
 
 	table.insert(

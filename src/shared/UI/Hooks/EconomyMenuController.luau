@@ -12,6 +12,7 @@ local React = require(Packages:WaitForChild("react"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
 local Economy = Shared:WaitForChild("Game"):WaitForChild("Economy")
+local CrateBatch = require(Economy:WaitForChild("CrateBatch"))
 local CrateOdds = require(Economy:WaitForChild("CrateOdds"))
 local EconomyStore = require(Economy:WaitForChild("EconomyStore"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
@@ -54,6 +55,8 @@ local SHOP_ERRORS = {
 	policy_unavailable = "Crates are temporarily unavailable.",
 	invalid_crate = "That crate is unavailable.",
 	crate_roll_failed = "The crate could not be opened. You were not charged.",
+	invalid_quantity = "That open quantity is unavailable.",
+	rate_limited = "You are opening crates too quickly. Try again in a moment.",
 	purchase_failed = "The purchase could not be completed.",
 }
 
@@ -71,12 +74,14 @@ export type Controller = {
 	selectedShopCard: ShopViewModel.Card?,
 	selectedShopCardId: string?,
 	crateReveal: any?,
+	crateReplay: any?,
 	activateShopCard: (ShopViewModel.Card) -> (),
 	equip: (InventoryModel.Entry) -> (),
 	refreshShop: () -> (),
 	closeSelectedShopCard: () -> (),
 	closeReveal: () -> (),
-	purchaseSelectedBonks: () -> (),
+	openAgain: () -> (),
+	purchaseSelectedBonks: (number?) -> (),
 	purchaseSelectedRobux: () -> (),
 	CloseTopLayer: () -> boolean,
 	CloseAll: () -> (),
@@ -111,6 +116,7 @@ function EconomyMenuController.use(options: Options): Controller
 			shopConfig = Shop,
 			featuredRotation = FeaturedRotation,
 			crateOdds = CrateOdds,
+			crateBatch = CrateBatch,
 		})
 	end, { economyData, shopSnapshot })
 	local selectedShopCard = if selectedShopCardId then shopModel.byId[selectedShopCardId] else nil
@@ -120,6 +126,28 @@ function EconomyMenuController.use(options: Options): Controller
 		end
 		return ShopViewModel.reveal(shopSnapshot.reveal, Cosmetics)
 	end, { shopSnapshot.reveal })
+	-- What an "open again" from the reveal would repeat: the same crate at the
+	-- same quantity, priced and gated live so a player who can no longer afford
+	-- it sees a disabled button instead of a failed purchase.
+	local crateReplay = React.useMemo(function()
+		if crateReveal == nil or crateReveal.crateId == nil then
+			return nil
+		end
+		local crate = Crates[crateReveal.crateId]
+		if crate == nil or crate.CatalogStatus ~= "Active" or crate.BonksPrice == nil then
+			return nil
+		end
+		local unit = FeaturedRotation.priceFor(Shop.Featured, crateReveal.crateId, crate.BonksPrice, os.time())
+		local total = CrateBatch.totalPrice(unit, crateReveal.count)
+		local balance = if economyData then economyData.Bonks else 0
+		return {
+			crateId = crateReveal.crateId,
+			count = crateReveal.count,
+			total = total,
+			affordable = balance >= total,
+			label = if crateReveal.count > 1 then `AGAIN {crateReveal.count}x  {total}` else `AGAIN  {total}`,
+		}
+	end, { crateReveal, economyData })
 
 	React.useEffect(function()
 		mounted.current = true
@@ -264,7 +292,18 @@ function EconomyMenuController.use(options: Options): Controller
 		shopClient.clearReveal()
 	end, { shopClient })
 
-	local purchaseSelectedBonks = React.useCallback(function()
+	local openAgain = React.useCallback(function()
+		local replay = crateReplay
+		if replay == nil or not replay.affordable then
+			return
+		end
+		shopClient.clearReveal()
+		runShopAction(function()
+			return shopClient.openCrate(`Crate:{replay.crateId}`, replay.crateId, replay.count)
+		end, nil)
+	end, { crateReplay, runShopAction, shopClient })
+
+	local purchaseSelectedBonks = React.useCallback(function(count: number?)
 		local card = selectedShopCard
 		if card == nil then
 			return
@@ -272,7 +311,7 @@ function EconomyMenuController.use(options: Options): Controller
 		setSelectedShopCardId(nil)
 		runShopAction(function()
 			if card.kind == "Crate" and card.crateId then
-				return shopClient.openCrate(card.id, card.crateId)
+				return shopClient.openCrate(card.id, card.crateId, count)
 			end
 			return shopClient.purchaseCosmetic(card.id, card.itemId)
 		end, function()
@@ -328,6 +367,8 @@ function EconomyMenuController.use(options: Options): Controller
 		selectedShopCard = selectedShopCard,
 		selectedShopCardId = selectedShopCardId,
 		crateReveal = crateReveal,
+		crateReplay = crateReplay,
+		openAgain = openAgain,
 		activateShopCard = activateShopCard,
 		equip = equip,
 		refreshShop = refreshShop,

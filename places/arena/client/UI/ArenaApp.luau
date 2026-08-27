@@ -6,6 +6,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local Config = ReplicatedStorage:WaitForChild("Config")
@@ -26,8 +27,11 @@ local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 local PostMatchClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("PostMatchClient"))
+local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local c = React.createElement
+
+local CURSOR_REASON = "LoadingAction"
 
 export type Props = {
 	OnPresented: (() -> ())?,
@@ -168,6 +172,18 @@ return function(props: Props)
 			OnActivated = ArenaTeleportClient.returnToLobby,
 		}
 	end
+
+	local actionable = primaryAction ~= nil or secondaryAction ~= nil
+	React.useEffect(function()
+		if actionable then
+			Combat.requestCursor(CURSOR_REASON)
+		else
+			Combat.releaseCursor(CURSOR_REASON)
+		end
+		return function()
+			Combat.releaseCursor(CURSOR_REASON)
+		end
+	end, { actionable })
 
 	return c("Frame", {
 		BackgroundTransparency = 1,

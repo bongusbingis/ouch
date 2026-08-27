@@ -76,6 +76,9 @@ return {
 			FlightStretchPerSpeed = 0.01,
 			MaxFlightStretch = 0.16,
 			ChargeSquash = 0.08,
+			-- The held ball sits between the camera and whatever is being aimed at,
+			-- so it fades while charging rather than blocking the shot.
+			ChargeAimTransparency = 0.55,
 			ImpactImpulseScale = 0.018,
 			MaxImpactSquash = 0.42,
 			SpringFrequencyHz = 9,

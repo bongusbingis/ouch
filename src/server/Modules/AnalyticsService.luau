@@ -384,7 +384,10 @@ function AnalyticsService.start(matchService: any?)
 	Network.handleProtected("ReportAnalyticsEvent", {
 		rateLimit = 10,
 		validate = function(_player, payload)
-			return typeof(payload) == "table" and typeof(payload.kind) == "string", "invalid_payload"
+			if typeof(payload) ~= "table" or typeof(payload.kind) ~= "string" then
+				return false, "invalid_payload"
+			end
+			return AnalyticsLogic.routeUIEvent(payload :: AnalyticsLogic.UIEventPayload) ~= nil, "unknown_kind"
 		end,
 	}, handleReport)
 

@@ -22,6 +22,7 @@ local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegist
 local PartyTeamAllocator = require(Game:WaitForChild("Modes"):WaitForChild("PartyTeamAllocator"))
 local PlayerIds = require(Game:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local PostMatchResult = require(Game:WaitForChild("PostMatch"):WaitForChild("PostMatchResult"))
+local DevSoloPlay = require(Game:WaitForChild("Matchmaking"):WaitForChild("DevSoloPlay"))
 local Network = require(Shared:WaitForChild("Network"))
 
 local ArenaService = require(script.Parent.ArenaService)
@@ -738,6 +739,28 @@ function MatchService.endForTesting(): (boolean, string?)
 	return true
 end
 
+function MatchService.devEndMatchForPlayer(player: Player): (boolean, string?)
+	local activeMode = mode
+	if activeMode == nil then
+		return false, "no_selected_mode"
+	end
+	local winnerId: string?
+	if scoreScope() == "Team" then
+		winnerId = playerTeam(player)
+		if winnerId == nil then
+			return false, "no_team"
+		end
+	else
+		winnerId = PlayerIds.toId(player)
+	end
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.finish(state, activeMode.rules, "DevSkip", events, winnerId) then
+		return false, "match_not_active"
+	end
+	handleMatchEvents(events)
+	return true
+end
+
 function MatchService.setTimeForTesting(seconds: number): (boolean, string?)
 	if state.phase ~= "Active" then
 		return false, "match_not_active"
@@ -802,6 +825,18 @@ function MatchService.start()
 
 	ArenaService.start()
 	ensureStateFolder()
+
+	Network.handleProtected("DevEndMatch", {
+		rateLimit = 2,
+		validate = function(player)
+			return DevSoloPlay.canUse(player), "not_authorized"
+		end,
+	}, function(player)
+		local ok, reason = MatchService.devEndMatchForPlayer(player)
+		if not ok then
+			warn(`[MatchService] DevEndMatch refused for {player.Name}: {reason}`)
+		end
+	end)
 
 	Players.PlayerAdded:Connect(function(player)
 		task.defer(watchPlayer, player)

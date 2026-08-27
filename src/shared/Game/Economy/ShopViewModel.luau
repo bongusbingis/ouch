@@ -43,6 +43,8 @@ export type Card = {
 	previewItems: { PreviewItem },
 	odds: { OddsEntry }?,
 	pity: { [string]: number }?,
+	openQuantities: { number }?,
+	bonksAvailable: number?,
 	definition: any,
 }
 
@@ -186,7 +188,9 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 		then `{bonksPrice} BONKS  |  WAS {originalBonksPrice}`
 		else if bonksPrice ~= nil
 			then `{bonksPrice} BONKS`
-			else if robuxPrice ~= nil then `R$ {robuxPrice}` else "RANDOM COSMETIC REWARD"
+			else if robuxPrice ~= nil
+				then `{args.shopConfig.RobuxSymbol}{robuxPrice}`
+				else "RANDOM COSMETIC REWARD"
 	return {
 		id = cardId,
 		kind = "Crate",
@@ -211,6 +215,8 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 		previewItems = previews,
 		odds = odds,
 		pity = crate.Pity,
+		openQuantities = args.crateBatch.quantitiesFor(crate),
+		bonksAvailable = args.bonks,
 		definition = crate,
 	}
 end
@@ -490,16 +496,36 @@ function ShopViewModel.build(options: any): Model
 	return model
 end
 
+local function revealEntry(entry: any, cosmetics: any): any
+	local definition = cosmetics.Items[entry.itemId]
+	return {
+		itemId = entry.itemId,
+		displayName = if definition then definition.DisplayName else entry.itemId,
+		rarity = entry.rarity,
+		isDupe = entry.isDupe == true,
+		bonksRefund = entry.bonksRefund or 0,
+		pityTriggered = entry.pityTriggered,
+		preview = if definition then previewItem(entry.itemId, cosmetics) else nil,
+	}
+end
+
 function ShopViewModel.reveal(result: any, cosmetics: any): any
-	local definition = cosmetics.Items[result.itemId]
+	local entries = {}
+	local totalRefund = 0
+	local pityTriggered = nil
+	for _, entry in result.results or {} do
+		local projected = revealEntry(entry, cosmetics)
+		totalRefund += projected.bonksRefund
+		pityTriggered = pityTriggered or projected.pityTriggered
+		table.insert(entries, projected)
+	end
 	return {
 		openId = result.openId,
-		itemId = result.itemId,
-		displayName = if definition then definition.DisplayName else result.itemId,
-		rarity = result.rarity,
-		isDupe = result.isDupe == true,
-		bonksRefund = result.bonksRefund or 0,
-		preview = if definition then previewItem(result.itemId, cosmetics) else nil,
+		crateId = result.crateId,
+		count = #entries,
+		results = entries,
+		totalRefund = totalRefund,
+		pityTriggered = pityTriggered,
 	}
 end
 

@@ -59,10 +59,14 @@ local function notify()
 	end
 end
 
+-- Clearing a field has to go through this sentinel: `{ reveal = nil }` is an
+-- empty table in Luau, so passing nil directly would silently clear nothing.
+local CLEAR = table.freeze({})
+
 local function update(changes: { [string]: any })
 	local nextState = table.clone(state)
 	for key, value in changes do
-		nextState[key] = value
+		nextState[key] = if value == CLEAR then nil else value
 	end
 	state = nextState
 	notify()
@@ -294,13 +298,13 @@ function ShopClient.purchaseCosmetic(_cardId: string, itemId: string): (boolean,
 	return true, nil
 end
 
-function ShopClient.openCrate(_cardId: string, crateId: string): (boolean, string?)
+function ShopClient.openCrate(_cardId: string, crateId: string, count: number?): (boolean, string?)
 	local pendingKey = `Crate:{crateId}`
 	if state.pending[pendingKey] then
 		return false, "busy"
 	end
 	setPending(pendingKey, true)
-	local ok, result, reason = pcall(Network.call, "OpenCrate", crateId)
+	local ok, result, reason = pcall(Network.call, "OpenCrate", crateId, count)
 	setPending(pendingKey, false)
 	if not ok then
 		return false, "network_error"
@@ -346,13 +350,13 @@ end
 
 function ShopClient.clearReveal()
 	if state.reveal ~= nil then
-		update({ reveal = nil })
+		update({ reveal = CLEAR })
 	end
 end
 
 function ShopClient.clearGrant()
 	if state.grant ~= nil then
-		update({ grant = nil })
+		update({ grant = CLEAR })
 	end
 end
 

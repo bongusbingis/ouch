@@ -16,6 +16,7 @@ local GamePasses = require(Config:WaitForChild("GamePasses"))
 local Products = require(Config:WaitForChild("Products"))
 local Shop = require(Config:WaitForChild("Shop"))
 local Economy = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy")
+local CrateBatch = require(Economy:WaitForChild("CrateBatch"))
 local CrateOdds = require(Economy:WaitForChild("CrateOdds"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local ShopViewModel = require(Economy:WaitForChild("ShopViewModel"))
@@ -51,6 +52,7 @@ local model = ShopViewModel.build({
 	shopConfig = Shop,
 	featuredRotation = FeaturedRotation,
 	crateOdds = CrateOdds,
+	crateBatch = CrateBatch,
 })
 
 return function(target: Instance)

@@ -18,6 +18,7 @@ PartyClient.__index = PartyClient
 
 PartyClient.ErrorMessages = {
 	arena_not_configured = "MATCH PLACE IS NOT CONFIGURED",
+	banned = "YOU ARE BANNED FROM MATCHMAKING",
 	busy = "PLEASE WAIT...",
 	internal_error = "PARTY SERVICE UNAVAILABLE",
 	invalid_args = "INVALID PARTY REQUEST",
@@ -33,12 +34,14 @@ PartyClient.ErrorMessages = {
 	party_initialization_failed = "PARTY SERVICE COULD NOT LOAD",
 	rate_limited = "TOO MANY REQUESTS",
 	teleport_failed = "TELEPORT FAILED - TRY AGAIN",
+	too_many_code_attempts = "TOO MANY ATTEMPTS - TRY AGAIN LATER",
 }
 
 PartyClient.JoinCodeErrorMessages = {
 	invalid_code = "PARTY CODE NOT FOUND",
 	party_full = "THAT PARTY IS FULL",
 	party_not_found = "PARTY CODE NOT FOUND",
+	too_many_code_attempts = "TOO MANY ATTEMPTS - TRY AGAIN LATER",
 }
 
 function PartyClient.new()

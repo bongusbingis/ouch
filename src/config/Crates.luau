@@ -27,8 +27,15 @@ export type CrateDef = {
 	CatalogStatus: CrateStatus,
 	BonksPrice: number?,
 	Pity: { [string]: number }?,
+	OpenQuantities: { number }?,
 	ItemPool: { string },
 }
+
+-- Bulk opens are charged at a straight multiple of BonksPrice: no volume
+-- discount, so the per-open price guarantees asserted in CrateConfig.spec hold
+-- for every quantity. The first entry must be 1 -- a crate must always be
+-- openable one at a time.
+local OPEN_QUANTITIES = { 1, 5, 10 }
 
 local Cosmetics = require(script.Parent.Cosmetics)
 
@@ -58,6 +65,7 @@ local Catalog: { [string]: CrateDef } = {
 		CatalogStatus = "Active",
 		BonksPrice = 500,
 		Pity = { Rare = 5, Legendary = 25 },
+		OpenQuantities = OPEN_QUANTITIES,
 		ItemPool = poolOf({ "BallAssets" }),
 	},
 	HammerCrate = {
@@ -67,6 +75,7 @@ local Catalog: { [string]: CrateDef } = {
 		CatalogStatus = "Preview",
 		BonksPrice = 500,
 		Pity = { Rare = 5, Legendary = 25 },
+		OpenQuantities = OPEN_QUANTITIES,
 		ItemPool = poolOf({ "HammerAssets" }),
 	},
 	-- Trails and elimination effects are separate equip slots but one crate:
@@ -79,6 +88,7 @@ local Catalog: { [string]: CrateDef } = {
 		CatalogStatus = "Preview",
 		BonksPrice = 750,
 		Pity = { Rare = 5, Legendary = 25 },
+		OpenQuantities = OPEN_QUANTITIES,
 		ItemPool = poolOf({ "TrailAssets", "ElimEffectAssets" }),
 	},
 }
@@ -94,6 +104,18 @@ for crateId, crate in Catalog do
 	end
 	if crate.BonksPrice ~= nil then
 		assert(crate.BonksPrice > 0, `crate {crateId} must have a positive BonksPrice`)
+	end
+	if crate.OpenQuantities ~= nil then
+		assert(#crate.OpenQuantities > 0, `crate {crateId} must offer at least one open quantity`)
+		assert(crate.OpenQuantities[1] == 1, `crate {crateId} must offer a single open as its first quantity`)
+		local previous = 0
+		for _, quantity in crate.OpenQuantities do
+			assert(
+				quantity % 1 == 0 and quantity > previous,
+				`crate {crateId} open quantities must be ascending positive integers`
+			)
+			previous = quantity
+		end
 	end
 end
 

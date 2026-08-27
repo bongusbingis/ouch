@@ -32,7 +32,7 @@ local listeners: { (Snapshot) -> () } = {}
 local connections: { RBXScriptConnection } = {}
 local state: Snapshot = {
 	open = false,
-	page = "Inventory",
+	page = "Shop",
 	available = false,
 	inputMethod = "KeyboardMouse",
 }
@@ -199,7 +199,7 @@ function ArenaMenuClient.destroy()
 	closeInterceptor = nil
 	state = {
 		open = false,
-		page = "Inventory",
+		page = "Shop",
 		available = false,
 		inputMethod = "KeyboardMouse",
 	}

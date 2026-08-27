@@ -12,6 +12,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local ReactSpring = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react-spring"))
 local Motion = require(script.Parent.Parent.Motion)
 local InventoryConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Inventory"))
+local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop"))
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
@@ -33,6 +34,65 @@ local function pityText(pity: { [string]: number }?): string
 		table.insert(entries, `{string.upper(rarity)} GUARANTEED BY {pity[rarity]} OPENS`)
 	end
 	return table.concat(entries, "  •  ")
+end
+
+local function withSeparators(value: number): string
+	local text = tostring(math.floor(value))
+	local out = text
+	while true do
+		local replaced, count = string.gsub(out, "^(%-?%d+)(%d%d%d)", "%1,%2")
+		out = replaced
+		if count == 0 then
+			break
+		end
+	end
+	return out
+end
+
+-- One row, one shape: every option reads as "how many" over "what it costs", so
+-- the quantities compare at a glance instead of each carrying its own format.
+-- Robux is the same shape but the red variant, because it is a different
+-- currency and must not look like one more Bonks tier.
+local function quantityButtons(card, quantities: { number }, firstButtonRef, props, hasRobux: boolean)
+	local unitPrice = card.bonksPrice or 0
+	local balance = card.bonksAvailable or 0
+	local slots = #quantities + (if hasRobux then 1 else 0)
+	local width = math.min(0.22, 0.92 / slots)
+	local gap = (1 - width * slots) / (slots + 1)
+	local children = {}
+	for index, quantity in quantities do
+		local total = unitPrice * quantity
+		local affordable = card.bonksPrice ~= nil and balance >= total
+		children[`Open{quantity}`] = c(ShopPriceButton, {
+			ButtonRef = if index == 1 then firstButtonRef else nil,
+			Enabled = affordable and not card.pending,
+			Position = UDim2.fromScale(gap * index + width * (index - 0.5), 1),
+			Size = UDim2.fromScale(width, 0.88),
+			Text = `{quantity}x`,
+			SubText = withSeparators(total),
+			SubTextColor = if affordable then Color3.fromRGB(255, 240, 190) else Color3.fromRGB(255, 176, 176),
+			OnActivated = function()
+				props.OnPurchaseBonks(quantity)
+			end,
+			ZIndex = 104,
+		})
+	end
+	if hasRobux then
+		local index = #quantities + 1
+		children.Robux = c(ShopPriceButton, {
+			Enabled = not card.pending,
+			Red = true,
+			Position = UDim2.fromScale(gap * index + width * (index - 0.5), 1),
+			Size = UDim2.fromScale(width, 0.88),
+			Text = "1x",
+			SubText = `{ShopConfig.RobuxSymbol}{card.robuxPrice}`,
+			SubTextColor = Color3.fromRGB(255, 255, 255),
+			SubTextSize = 26,
+			OnActivated = props.OnPurchaseRobux,
+			ZIndex = 104,
+		})
+	end
+	return children
 end
 
 return function(props)
@@ -123,6 +183,9 @@ return function(props)
 	local hasBonks = card.bonksPrice ~= nil
 	local hasRobux = card.productId ~= nil and card.robuxPrice ~= nil
 	local bonksText = if card.affordable then `{card.bonksPrice} BONKS` else `NEED {card.bonksPrice} BONKS`
+	local quantities = if card.kind == "Crate" then card.openQuantities else nil
+	local isBulk = quantities ~= nil and #quantities > 1
+
 	return c("Frame", {
 		Active = true,
 		BackgroundColor3 = Color3.new(),
@@ -235,35 +298,44 @@ return function(props)
 				OnActivated = props.OnClose,
 				ZIndex = 105,
 			}),
-			Buttons = c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.08, 0.77),
-				Size = UDim2.fromScale(0.84, 0.17),
-				ZIndex = 103,
-			}, {
-				Bonks = if hasBonks
-					then c(ShopPriceButton, {
-						ButtonRef = firstButtonRef,
-						Enabled = card.affordable and not card.pending,
-						Position = if hasRobux then UDim2.fromScale(0.25, 1) else UDim2.fromScale(0.38, 1),
-						Size = if hasRobux then UDim2.fromScale(0.44, 0.72) else UDim2.fromScale(0.58, 0.72),
-						Text = bonksText,
-						OnActivated = props.OnPurchaseBonks,
-						ZIndex = 104,
-					})
-					else nil,
-				Robux = if hasRobux
-					then c(ShopPriceButton, {
-						ButtonRef = if hasBonks then nil else firstButtonRef,
-						Enabled = not card.pending,
-						Position = UDim2.fromScale(0.75, 1),
-						Size = UDim2.fromScale(0.44, 0.72),
-						Text = `R$ {card.robuxPrice}`,
-						OnActivated = props.OnPurchaseRobux,
-						ZIndex = 104,
-					})
-					else nil,
-			}),
+			Buttons = if isBulk
+				then c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromScale(0.06, 0.735),
+					Size = UDim2.fromScale(0.88, 0.205),
+					ZIndex = 103,
+				}, quantityButtons(card, quantities :: { number }, firstButtonRef, props, hasRobux))
+				else c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromScale(0.08, 0.77),
+					Size = UDim2.fromScale(0.84, 0.17),
+					ZIndex = 103,
+				}, {
+					Bonks = if hasBonks
+						then c(ShopPriceButton, {
+							ButtonRef = firstButtonRef,
+							Enabled = card.affordable and not card.pending,
+							Position = if hasRobux then UDim2.fromScale(0.25, 1) else UDim2.fromScale(0.38, 1),
+							Size = if hasRobux then UDim2.fromScale(0.44, 0.72) else UDim2.fromScale(0.58, 0.72),
+							Text = bonksText,
+							OnActivated = function()
+								props.OnPurchaseBonks(1)
+							end,
+							ZIndex = 104,
+						})
+						else nil,
+					Robux = if hasRobux
+						then c(ShopPriceButton, {
+							ButtonRef = if hasBonks then nil else firstButtonRef,
+							Enabled = not card.pending,
+							Position = UDim2.fromScale(0.75, 1),
+							Size = UDim2.fromScale(0.44, 0.72),
+							Text = `{ShopConfig.RobuxSymbol}{card.robuxPrice}`,
+							OnActivated = props.OnPurchaseRobux,
+							ZIndex = 104,
+						})
+						else nil,
+				}),
 		}),
 	})
 end

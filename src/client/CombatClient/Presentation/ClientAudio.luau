@@ -11,6 +11,9 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local AudioConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Audio"))
+local SettingsStore = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Settings"):WaitForChild("SettingsStore")
+)
 
 local ClientAudio = {}
 
@@ -186,5 +189,29 @@ function ClientAudio._resetForTest()
 	levels.Music = AudioConfig.Mix.MusicVolume
 	levels.Effects = AudioConfig.Mix.EffectsVolume
 end
+
+local SETTING_TO_LEVEL = {
+	MasterVolume = "Master",
+	MusicVolume = "Music",
+	EffectsVolume = "Effects",
+}
+
+local function applySetting(id: string)
+	local level = SETTING_TO_LEVEL[id]
+	if level == nil then
+		return
+	end
+	local value = SettingsStore.get(id)
+	if typeof(value) ~= "number" then
+		return
+	end
+	levels[level] = normalizedVolume(value)
+	refreshVolumes()
+end
+
+for id in SETTING_TO_LEVEL do
+	applySetting(id)
+end
+SettingsStore.subscribe(applySetting)
 
 return ClientAudio

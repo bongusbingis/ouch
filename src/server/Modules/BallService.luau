@@ -103,6 +103,21 @@ function BallService.grantHeldBall(player: Player): boolean
 	return true
 end
 
+-- Removes every ball a player owns. Ball lifetime belongs to this service, so
+-- callers that need a player emptyhanded ask here rather than destroying
+-- instances they did not create.
+function BallService.clearOwned(player: Player): number
+	local playerId = PlayerIds.toId(player)
+	local removed = 0
+	for _, ball in ballsFolder():GetChildren() do
+		if ball:IsA("BasePart") and ball:GetAttribute("ow") == playerId then
+			ball:Destroy()
+			removed += 1
+		end
+	end
+	return removed
+end
+
 function BallService.clearAll()
 	ballsFolder():ClearAllChildren()
 end

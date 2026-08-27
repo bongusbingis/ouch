@@ -14,6 +14,9 @@ local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Co
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local SettingsStore = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Settings"):WaitForChild("SettingsStore")
+)
 
 local DamageFeedback = {}
 
@@ -47,7 +50,9 @@ end
 
 function DamageFeedback.onEvent(event: any)
 	if event.kind == "Elim" and event.targetId == PlayerIds.toId(localPlayer) and seen.markSeen(event) then
-		shake()
+		if SettingsStore.get("CameraShake") ~= false then
+			shake()
+		end
 	end
 end
 

@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local InventoryConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Inventory"))
+local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop"))
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.ShopPriceButton)
 local ShopPreview = require(script.Parent.ShopPreview)
@@ -51,7 +52,7 @@ local function actionText(card): string
 		return `{card.bonksPrice} BONKS`
 	end
 	if card.robuxPrice ~= nil then
-		return `{card.robuxPrice}`
+		return `{ShopConfig.RobuxSymbol}{card.robuxPrice}`
 	end
 	return "VIEW"
 end

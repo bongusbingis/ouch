@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
 local Loading = require(ReplicatedStorage.Config.Loading)
-local DevSoloPlay = require(ReplicatedStorage.Shared.Matchmaking.DevSoloPlay)
+local DevSoloPlay = require(ReplicatedStorage.Shared.Game.Matchmaking.DevSoloPlay)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
@@ -47,6 +47,7 @@ function PartyService.new(
 		_teleportPresentationReady = {},
 		_colorConnections = {},
 		_colorRevisions = {},
+		_joinCodeFailures = {},
 		_queueChangedHandler = nil,
 		_destroyed = false,
 	}, PartyService)
@@ -617,10 +618,44 @@ function PartyService:_partyForPlayer(player)
 	return party
 end
 
+function PartyService:_checkJoinCodeLockout(userId)
+	local entry = self._joinCodeFailures[userId]
+	if entry == nil then
+		return true
+	end
+	if os.clock() < entry.lockedUntil then
+		return false
+	end
+	if os.clock() >= entry.windowExpiresAt then
+		self._joinCodeFailures[userId] = nil
+	end
+	return true
+end
+
+function PartyService:_recordJoinCodeFailure(userId)
+	local entry = self._joinCodeFailures[userId]
+	local now = os.clock()
+	if entry == nil or now >= entry.windowExpiresAt then
+		entry = { count = 0, windowExpiresAt = now + Config.JoinCodeLockoutSeconds, lockedUntil = 0 }
+		self._joinCodeFailures[userId] = entry
+	end
+	entry.count += 1
+	if entry.count >= Config.JoinCodeMaxFailures then
+		entry.lockedUntil = now + Config.JoinCodeLockoutSeconds
+		entry.windowExpiresAt = entry.lockedUntil
+		entry.count = 0
+	end
+end
+
 function PartyService:_joinByCode(player, payload)
+	if not self:_checkJoinCodeLockout(player.UserId) then
+		return Protocol.failure(Protocol.Errors.TooManyCodeAttempts)
+	end
+
 	local code = Protocol.normalizeCode(payload.code)
 	local target = self._partyRepository:GetPartyByCode(code)
 	if not target then
+		self:_recordJoinCodeFailure(player.UserId)
 		return Protocol.failure(Protocol.Errors.InvalidCode)
 	end
 
@@ -629,6 +664,7 @@ function PartyService:_joinByCode(player, payload)
 		return Protocol.failure(joinError or Protocol.Errors.NotFound)
 	end
 
+	self._joinCodeFailures[player.UserId] = nil
 	return Protocol.success(PartyModel.toSnapshot(party))
 end
 
@@ -750,7 +786,9 @@ function PartyService:_startMatchmaking(player)
 	end
 
 	local hasBannedMember = self._banRepository:HasBannedMember(checkedMemberIds, os.time())
-	if hasBannedMember ~= false then
+	if hasBannedMember == true then
+		return Protocol.failure(Protocol.Errors.Banned)
+	elseif hasBannedMember ~= false then
 		return Protocol.failure(Protocol.Errors.MatchmakingUnavailable)
 	end
 
@@ -1113,6 +1151,7 @@ function PartyService:Start()
 
 	Players.PlayerRemoving:Connect(function(player)
 		self._teleportPresentationReady[player.UserId] = nil
+		self._joinCodeFailures[player.UserId] = nil
 		self._colorRevisions[player.UserId] = (self._colorRevisions[player.UserId] or 0) + 1
 		local colorConnection = self._colorConnections[player]
 		if colorConnection then

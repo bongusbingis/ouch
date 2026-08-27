@@ -32,6 +32,10 @@ export type GestureEvent = TouchIntent.GestureEvent
 
 local started = false
 local inputEnabled = false
+-- While a weapon is forced, the player's own equip controls go quiet. The
+-- programmatic equipHammer/equipDodgeball below deliberately bypass this: they
+-- are how the forced weapon gets set in the first place.
+local weaponLocked = false
 local listeners: { (Intent) -> () } = {}
 
 local function emit(intent: Intent)
@@ -69,9 +73,15 @@ local handlers = {
 		emit("HammerAttack")
 	end,
 	onEquipHammer = function()
+		if weaponLocked then
+			return
+		end
 		emit("EquipHammer")
 	end,
 	onEquipDodgeball = function()
+		if weaponLocked then
+			return
+		end
 		emit("EquipDodgeball")
 	end,
 }
@@ -84,6 +94,14 @@ function Combat.setInputEnabled(value: boolean)
 	if not value then
 		cancelEverything()
 	end
+end
+
+function Combat.setWeaponLocked(value: boolean)
+	weaponLocked = value
+end
+
+function Combat.isWeaponLocked(): boolean
+	return weaponLocked
 end
 
 function Combat.isInputEnabled(): boolean

@@ -39,6 +39,8 @@ local Config = {
 	CloudRetryAttempts = 4,
 	CloudRetryBaseDelay = 0.25,
 	CloudRetryMaximumDelay = 2,
+	JoinCodeMaxFailures = 5,
+	JoinCodeLockoutSeconds = 30,
 	BanDataStoreName = "OuchMatchmakingBans_v1",
 	BanDataStoreScope = "global",
 

@@ -36,13 +36,13 @@ return function(props)
 	}, {
 		TextLabel = c(ResponsiveText, {
 			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 28,
+			MaxTextSize = if props.SubText then 26 else 28,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.56),
-				Size = UDim2.fromScale(0.82, 0.6),
+				Position = if props.SubText then UDim2.fromScale(0.5, 0.4) else UDim2.fromScale(0.5, 0.56),
+				Size = if props.SubText then UDim2.fromScale(0.84, 0.38) else UDim2.fromScale(0.82, 0.6),
 				Text = props.Text,
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = (props.ZIndex or 8) + 1,
@@ -53,5 +53,30 @@ return function(props)
 				Thickness = 0.06,
 			}),
 		}),
+		SubLabel = if props.SubText
+			then c(ResponsiveText, {
+				MeasurementFont = Enum.Font.SourceSansBold,
+				MaxTextSize = props.SubTextSize or 20,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = Font.new(
+						"rbxasset://fonts/families/SourceSansPro.json",
+						Enum.FontWeight.Bold,
+						Enum.FontStyle.Normal
+					),
+					Position = UDim2.fromScale(0.5, 0.72),
+					Size = UDim2.fromScale(0.88, 0.3),
+					Text = props.SubText,
+					TextColor3 = props.SubTextColor or Color3.fromRGB(255, 240, 190),
+					ZIndex = (props.ZIndex or 8) + 1,
+				},
+			}, {
+				UIStroke = c("UIStroke", {
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					Thickness = 0.08,
+				}),
+			})
+			else nil,
 	})
 end

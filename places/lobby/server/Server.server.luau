@@ -14,6 +14,9 @@ local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
 local EconomyService = require(Modules:WaitForChild("EconomyService"))
+local SettingsService = require(Modules:WaitForChild("SettingsService"))
+local OnboardingService = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingService"))
+local OnboardingCombat = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingCombat"))
 
 ConfigLiveService.start({
 	modules = {
@@ -29,6 +32,9 @@ AnalyticsService.start()
 CosmeticsService.start()
 CharacterColorService.start()
 EconomyService.start()
+SettingsService.start()
+OnboardingCombat.start()
+OnboardingService.start()
 
 Players.PlayerAdded:Connect(function(player)
 	PlayerData.load(player)

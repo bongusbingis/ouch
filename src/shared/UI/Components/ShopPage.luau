@@ -118,12 +118,13 @@ return function(props)
 	end
 
 	return c("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://136021539696619",
 		LayoutOrder = 5,
-		Position = props.Position or UDim2.fromScale(-0.005, 0.127),
+		Position = props.Position or UDim2.fromScale(0.5, 0.56),
 		ScaleType = Enum.ScaleType.Slice,
-		Size = UDim2.fromScale(0.602, 0.748),
+		Size = UDim2.fromScale(0.94, 0.82),
 		SliceCenter = Rect.new(224, 202, 770, 474),
 		SliceScale = 0.06,
 	}, {
@@ -187,6 +188,9 @@ return function(props)
 				end,
 			}, content),
 		}),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1.08 }),
+		UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
+			AspectRatio = 1.7,
+			AspectType = Enum.AspectType.FitWithinMaxSize,
+		}),
 	})
 end

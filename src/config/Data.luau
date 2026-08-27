@@ -39,7 +39,15 @@ return {
 		Onboarding = {
 			FirstJoinAt = 0, -- unix time, stamped once; 0 = not yet stamped
 			SwipeThrowLearned = false,
+			-- First-session training. Status/Checkpoint are written only by
+			-- OnboardingService and interpreted by Shared.Game.Onboarding.
+			Status = "NotStarted",
+			Checkpoint = "Intro",
+			Version = 0,
+			SkippedAtStep = "",
 		},
+		Settings = {}, -- { [settingId]: value }; keys are lazily written by SettingsService
+
 		Season = {
 			-- Reset wholesale at rollover. Tier is derived from XP, never stored.
 			Id = "",

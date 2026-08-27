@@ -14,6 +14,7 @@ local GamePasses = require(Config.GamePasses)
 local Products = require(Config.Products)
 local Shop = require(Config.Shop)
 local Economy = script.Parent.Parent.Game.Economy
+local CrateBatch = require(Economy.CrateBatch)
 local CrateOdds = require(Economy.CrateOdds)
 local FeaturedRotation = require(Economy.FeaturedRotation)
 local ShopViewModel = require(Economy.ShopViewModel)
@@ -46,6 +47,7 @@ local function build(overrides)
 		shopConfig = Shop,
 		featuredRotation = FeaturedRotation,
 		crateOdds = CrateOdds,
+		crateBatch = CrateBatch,
 	}
 	for key, value in overrides or {} do
 		options[key] = value

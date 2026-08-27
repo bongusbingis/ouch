@@ -21,6 +21,7 @@ Protocol.Actions = table.freeze({
 
 Protocol.Errors = table.freeze({
 	ArenaNotConfigured = "arena_not_configured",
+	Banned = "banned",
 	Busy = "busy",
 	Internal = "internal_error",
 	InvalidCode = "invalid_code",
@@ -33,6 +34,7 @@ Protocol.Errors = table.freeze({
 	NotReady = "party_not_ready",
 	PartyFull = "party_full",
 	RateLimited = "rate_limited",
+	TooManyCodeAttempts = "too_many_code_attempts",
 	TeleportFailed = "teleport_failed",
 })
 

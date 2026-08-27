@@ -51,8 +51,8 @@ local PAGE_POSITIONS = {
 		offscreen = UDim2.fromScale(-1.5, 0.14282),
 	},
 	Shop = {
-		onscreen = UDim2.fromScale(-0.005, 0.127),
-		offscreen = UDim2.fromScale(-1.5, 0.127),
+		onscreen = UDim2.fromScale(0.5, 0.56),
+		offscreen = UDim2.fromScale(-1, 0.56),
 	},
 	Settings = {
 		onscreen = UDim2.fromScale(0.0211629, 0.14282),
@@ -448,7 +448,7 @@ local function ArenaMenuContent(props)
 						OnRefresh = controller.refreshShop,
 					})
 				end
-				return c(SettingsPage, { Position = position })
+				return c(SettingsPage, { Position = position, Place = "Arena" })
 			end,
 		})
 	end

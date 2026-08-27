@@ -31,6 +31,8 @@ local LoadingScreen = require(Components:WaitForChild("LoadingScreen"))
 local NotificationModal = require(Components:WaitForChild("NotificationModal"))
 local PageTransition = require(Components:WaitForChild("PageTransition"))
 local PartyCode = require(Components:WaitForChild("PartyCode"))
+local OnboardingOverlay = require(Components:WaitForChild("Onboarding"):WaitForChild("OnboardingOverlay"))
+local SettingsPage = require(Components:WaitForChild("SettingsPage"))
 local ShopPage = require(Components:WaitForChild("ShopPage"))
 local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytics"))
 local SplashPage = require(Components:WaitForChild("SplashPage"))
@@ -52,8 +54,12 @@ local PAGE_POSITIONS = {
 		offscreen = UDim2.fromScale(-1.5, 0.14282),
 	},
 	Shop = {
-		onscreen = UDim2.fromScale(-0.005, 0.127),
-		offscreen = UDim2.fromScale(-1.5, 0.127),
+		onscreen = UDim2.fromScale(0.5, 0.56),
+		offscreen = UDim2.fromScale(-1, 0.56),
+	},
+	Settings = {
+		onscreen = UDim2.fromScale(0.0211629, 0.14282),
+		offscreen = UDim2.fromScale(-1.5, 0.14282),
 	},
 }
 
@@ -62,6 +68,11 @@ local PAGE_BACKGROUND_COLORS = {
 	Inventory = Color3.fromRGB(232, 225, 7),
 	Shop = Color3.fromRGB(142, 31, 232),
 }
+
+-- Settings has no establishing shot of its own authored in Studio yet, so it
+-- borrows Inventory's camera and background color rather than requiring a new
+-- Views.Party.SettingsCamera part before the page is navigable.
+local WORLD_CAMERA_PAGE = { Settings = "Inventory" }
 
 local function useParty(client, notifications)
 	local _, forceUpdate = React.useReducer(function(revision: number, _action: any)
@@ -127,12 +138,13 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 		local camera = Workspace.CurrentCamera
 		assert(camera ~= nil, "[LobbyApp] Workspace.CurrentCamera is required")
 		local party = Workspace:WaitForChild("Views"):WaitForChild("Party")
-		local target = party:WaitForChild(`{currentPage}Camera`)
-		assert(target:IsA("BasePart"), `[LobbyApp] Views.Party.{currentPage}Camera must be a BasePart`)
+		local cameraPage = WORLD_CAMERA_PAGE[currentPage] or currentPage
+		local target = party:WaitForChild(`{cameraPage}Camera`)
+		assert(target:IsA("BasePart"), `[LobbyApp] Views.Party.{cameraPage}Camera must be a BasePart`)
 		local partyBackground = party:WaitForChild("Background")
 		assert(partyBackground:IsA("BasePart"), "[LobbyApp] Views.Party.Background must be a BasePart")
-		local pageColor = PAGE_BACKGROUND_COLORS[currentPage]
-		assert(pageColor ~= nil, `[LobbyApp] No background color configured for {currentPage}`)
+		local pageColor = PAGE_BACKGROUND_COLORS[cameraPage]
+		assert(pageColor ~= nil, `[LobbyApp] No background color configured for {cameraPage}`)
 		background.current = partyBackground
 		camera.CameraType = Enum.CameraType.Scriptable
 		if not initialized.current or reducedMotion then
@@ -185,22 +197,47 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 		return function()
 			connection:Disconnect()
 			api.stop()
+			-- The loop pins CameraType to Scriptable every frame; without handing
+			-- it back the camera stays frozen on the last lobby framing and the
+			-- player can neither look around nor use the combat camera.
+			local camera = Workspace.CurrentCamera
+			if camera then
+				camera.CameraType = Enum.CameraType.Custom
+			end
 		end
 	end, { enabled })
 end
 
 local function LobbyContent(props)
 	local partyClient = props.PartyClient
+	local onboardingClient = props.OnboardingClient
 	local rootRef = React.useRef(nil)
 	local presented = React.useRef(false)
 	local notifications = NotificationContext.useNotification()
 	local currentPage, setCurrentPage = React.useState("SplashScreen")
+
+	local onboarding, setOnboarding = React.useState(function()
+		return if onboardingClient then onboardingClient.getSnapshot() else nil
+	end)
 	React.useEffect(function()
-		if not presented.current and rootRef.current ~= nil and props.OnPresented then
+		if onboardingClient == nil then
+			return
+		end
+		return onboardingClient.subscribe(setOnboarding)
+	end, { onboardingClient })
+
+	-- Training owns the screen until eligibility resolves, so the normal lobby
+	-- never flashes in front of a new player and then gets yanked away.
+	local onboardingActive = onboarding ~= nil and onboarding.active == true
+	local onboardingResolved = onboarding == nil or onboarding.resolved == true
+	local lobbyVisible = onboardingResolved and not onboardingActive
+
+	React.useEffect(function()
+		if not presented.current and rootRef.current ~= nil and props.OnPresented and onboardingResolved then
 			presented.current = true
 			props.OnPresented()
 		end
-	end, { props.OnPresented })
+	end, { props.OnPresented, onboardingResolved })
 
 	React.useEffect(function()
 		UIAnalytics.menuOpened(currentPage)
@@ -238,10 +275,12 @@ local function LobbyContent(props)
 		hammerItemId = equipped.HammerAssets,
 	}
 	local characterRenderer = React.useRef(nil)
-	useWorldTransition(currentPage, props.CameraEnabled ~= false)
+	-- Training drives its own combat camera, so the lobby's establishing-shot
+	-- transition must stay out of the way until onboarding hands back over.
+	useWorldTransition(currentPage, props.CameraEnabled ~= false and not onboardingActive)
 
 	React.useEffect(function()
-		if props.WorldPresentationEnabled == false then
+		if props.WorldPresentationEnabled == false or onboardingActive then
 			return
 		end
 		return partyClient:subscribeErrors(function(errorCode)
@@ -267,7 +306,7 @@ local function LobbyContent(props)
 	end, { partyClient, notifications.notify, notifications.confirm })
 
 	React.useEffect(function()
-		if props.WorldPresentationEnabled == false then
+		if props.WorldPresentationEnabled == false or onboardingActive then
 			return
 		end
 		local renderer = PartyCharacterRenderer.new(Players.LocalPlayer.UserId, function(targetUserId, username)
@@ -295,7 +334,7 @@ local function LobbyContent(props)
 			disconnect()
 			renderer:destroy()
 		end
-	end, { partyClient, notifications.confirm, props.WorldPresentationEnabled })
+	end, { partyClient, notifications.confirm, props.WorldPresentationEnabled, onboardingActive })
 
 	React.useEffect(function()
 		local renderer = characterRenderer.current
@@ -380,13 +419,17 @@ local function LobbyContent(props)
 						OnTabChanged = economyMenu.setInventoryTab,
 						OnEquip = economyMenu.equip,
 					})
+				elseif pageName == "Settings" then
+					return c(SettingsPage, { Position = position, Place = "Lobby" })
+				elseif pageName == "Shop" then
+					return c(ShopPage, {
+						Model = economyMenu.shopModel,
+						Position = position,
+						OnCardActivated = economyMenu.activateShopCard,
+						OnRefresh = economyMenu.refreshShop,
+					})
 				end
-				return c(ShopPage, {
-					Model = economyMenu.shopModel,
-					Position = position,
-					OnCardActivated = economyMenu.activateShopCard,
-					OnRefresh = economyMenu.refreshShop,
-				})
+				return nil
 			end,
 		})
 	end
@@ -396,9 +439,16 @@ local function LobbyContent(props)
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 	}, {
+		Onboarding = if onboardingClient
+			then c(OnboardingOverlay, {
+				Snapshot = onboarding,
+				OnSkip = onboardingClient.skip,
+			})
+			else nil,
 		BaseClip = c("Frame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
+			Visible = lobbyVisible,
 		}, {
 			Views = c("Frame", {
 				BackgroundTransparency = 1,

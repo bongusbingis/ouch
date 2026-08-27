@@ -42,7 +42,6 @@ local DEFINITIONS: { TabDefinition } = {
 		LabelPosition = UDim2.fromScale(0.499999, 0),
 		ButtonPosition = UDim2.fromScale(0.418851, 0.25),
 		ButtonSize = UDim2.fromScale(0.242, 0.75),
-		Enabled = false,
 	},
 	{
 		Id = "Inventory",
@@ -160,7 +159,7 @@ return function(props: Props)
 		BackgroundColor3 = Color3.fromRGB(63, 63, 63),
 		BorderColor3 = Color3.new(),
 		BorderSizePixel = 0,
-		Size = UDim2.fromScale(1, 0.113754),
+		Size = UDim2.new(1, 36, 0.113754, 0),
 	}, {
 		PageTabs = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),

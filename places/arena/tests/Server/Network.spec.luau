@@ -30,6 +30,11 @@ local EXPECTED_REMOTES = {
 	TeleportStatus = "RemoteEvent",
 	RequestLobbyReturn = "RemoteEvent",
 	SubmitCombatInput = "RemoteEvent",
+	SetClientSetting = "RemoteEvent",
+	OnboardingState = "RemoteEvent",
+	OnboardingReady = "RemoteFunction",
+	OnboardingAction = "RemoteEvent",
+	OnboardingDebug = "RemoteEvent",
 	CombatSimEvent = "UnreliableRemoteEvent",
 	JumpPadImpulse = "UnreliableRemoteEvent",
 }

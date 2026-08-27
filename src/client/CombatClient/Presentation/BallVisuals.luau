@@ -407,7 +407,7 @@ function BallVisuals.start()
 			local isChargeAiming = snapshot.state == "Charging" and snapshot.weapon == "Dodgeball" and isLocalHeld
 			local holder = PlayerIds.fromId(ball:GetAttribute("hb") :: string?)
 			local stowed = phase == HELD_PHASE and holder ~= nil and not EquippedWeapon.isShowing(holder, "Dodgeball")
-			visual.Transparency = if stowed then 1 else 0
+			visual.Transparency = if stowed then 1 elseif isChargeAiming then feelConfig.ChargeAimTransparency else 0
 			local heldCFrame = if phase == 0 or phase == 1 then heldVisualCFrame(ball) else nil
 			local immediate = ball:GetAttribute("hb") == localId or phase == 1
 			local state = feelFor(ball, visual)

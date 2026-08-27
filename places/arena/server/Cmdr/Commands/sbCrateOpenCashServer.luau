@@ -14,11 +14,19 @@ local CrateService = require(Modules:WaitForChild("CrateService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
 
-local function describe(result): string
-	if result.isDupe then
-		return `{result.itemId} ({result.rarity}, duplicate, +{result.bonksRefund} Bonks)`
+local function describeEntry(entry): string
+	if entry.isDupe then
+		return `{entry.itemId} ({entry.rarity}, duplicate, +{entry.bonksRefund} Bonks)`
 	end
-	return `{result.itemId} ({result.rarity}, new)`
+	return `{entry.itemId} ({entry.rarity}, new)`
+end
+
+local function describe(result): string
+	local parts = {}
+	for _, entry in result.results do
+		table.insert(parts, describeEntry(entry))
+	end
+	return table.concat(parts, ", ")
 end
 
 return function(_context, players: { Player }, crateId: string): string
@@ -34,7 +42,10 @@ return function(_context, players: { Player }, crateId: string): string
 		if result then
 			local data = PlayerData.get(player)
 			local balance = if data then data.Bonks else "unavailable"
-			table.insert(output, `{player.Name}: {describe(result)} | cost={crate.BonksPrice or 0} balance={balance}`)
+			table.insert(
+				output,
+				`{player.Name}: {describe(result)} | cost={(crate.BonksPrice or 0) * result.count} balance={balance}`
+			)
 		else
 			table.insert(output, `{player.Name}: failed ({reason or "unknown"})`)
 		end

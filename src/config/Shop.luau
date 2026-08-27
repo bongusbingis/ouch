@@ -78,8 +78,11 @@ assert(
 )
 assert(#Rotation.Categories > 0, "shop rotation must draw from at least one category")
 
+local RobuxSymbol = "\u{E002}"
+
 return {
 	VariantId = VariantId,
+	RobuxSymbol = RobuxSymbol,
 	Featured = Featured,
 	Bundle = Bundle,
 	Rotation = Rotation,

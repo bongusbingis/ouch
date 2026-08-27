@@ -44,4 +44,20 @@ return {
 	-- Prints state, charge and IK weight. Text rather than geometry, so it is
 	-- separate from the drawing flags above.
 	PoseStateReadout = true,
+
+	-- Tap-corner gesture that lets a dev/tester end the active match solo and
+	-- declare themselves the winner, for exercising the post-match flow
+	-- without a second player. Gated server-side by DevSoloPlay.canUse.
+	DevMatchSkip = {
+		Enabled = true,
+		CornerScale = 0.15,
+		TapCount = 10,
+		TapWindowSeconds = 1.25,
+	},
+
+	-- Adds a handful of non-persisted example settings (both toggle variants,
+	-- every slider mode, a disabled row, and a Lobby-only row) to the real
+	-- Settings menu so every control mode can be exercised without real
+	-- settings existing yet. Never written to a player's profile.
+	SettingsShowExamples = true,
 }

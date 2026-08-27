@@ -12,10 +12,29 @@ local ClientAudio = require(script.Parent.ClientAudio)
 
 local WorldAudio = {}
 
-local combatAudio = SoundService:WaitForChild("CombatAudio")
+-- Resolved on first use rather than at require time: this module is shared by
+-- both places, and a top-level WaitForChild here would hang the whole client
+-- startup chain in any place whose SoundService has no authored CombatAudio.
+local combatAudio: Instance? = nil
+local resolvedCombatAudio = false
+
+local function audioRoot(): Instance?
+	if not resolvedCombatAudio then
+		resolvedCombatAudio = true
+		combatAudio = SoundService:WaitForChild("CombatAudio", 5)
+		if combatAudio == nil then
+			warn("[WorldAudio] SoundService.CombatAudio is not authored here; spatial one-shots are inactive")
+		end
+	end
+	return combatAudio
+end
 
 local function findAudioPlayer(groupName: string, soundName: string): AudioPlayer?
-	local group = combatAudio:FindFirstChild(groupName)
+	local root = audioRoot()
+	if root == nil then
+		return nil
+	end
+	local group = root:FindFirstChild(groupName)
 	if group == nil then
 		return nil
 	end
