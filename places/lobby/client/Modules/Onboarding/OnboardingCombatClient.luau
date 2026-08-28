@@ -89,6 +89,16 @@ function OnboardingCombatClient.start()
 	local GameAudio = startOptional("GameAudio", function()
 		return require(presentation:WaitForChild("GameAudio")) :: any
 	end)
+	if GameAudio then
+		table.insert(
+			connections,
+			Network.on("OnboardingState", function(packet)
+				if typeof(packet) == "table" and packet.reason == "hit" then
+					GameAudio.play("OnboardingEnemyKilled")
+				end
+			end)
+		)
+	end
 	startOptional("WeaponAnimations", function()
 		local module = require(presentation:WaitForChild("WeaponAnimations")) :: any
 		module.start()

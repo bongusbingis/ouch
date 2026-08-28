@@ -28,6 +28,7 @@ export type Snapshot = {
 	state: State,
 	chargeAlpha: number,
 	throwCooldown: number,
+	hammerCooldown: number,
 	ready: boolean,
 	releaseCharge: number,
 	releaseAim: Vector3?,
@@ -49,6 +50,7 @@ local snapshot: Snapshot = {
 	state = "Idle",
 	chargeAlpha = 0,
 	throwCooldown = 0,
+	hammerCooldown = 0,
 	ready = false,
 	releaseCharge = 0,
 	releaseAim = nil,
@@ -96,8 +98,11 @@ end
 local function evaluate()
 	local now = os.clock()
 	local previousState = snapshot.state
+	local previousWeapon = snapshot.weapon
+	local previousHoldsBall = snapshot.holdsBall
 	local previousCharge = snapshot.chargeAlpha
 	local previousCooldown = snapshot.throwCooldown
+	local previousHammerCooldown = snapshot.hammerCooldown
 	local previousReady = snapshot.ready
 
 	snapshot.holdsBall = holdsBall()
@@ -105,6 +110,7 @@ local function evaluate()
 	local equipped = if character then character:GetAttribute(SimStateCodec.EquippedAttribute) :: string? else nil
 	snapshot.weapon = equipped or "Hammer"
 	snapshot.throwCooldown = if character then math.max((character:GetAttribute("dbTc") :: number?) or 0, 0) else 0
+	snapshot.hammerCooldown = if character then math.max((character:GetAttribute("hmCd") :: number?) or 0, 0) else 0
 	snapshot.ready = CombatState.canStartThrow()
 	if snapshot.ready and not previousReady then
 		snapshot.readyRevision += 1
@@ -113,7 +119,13 @@ local function evaluate()
 	local expiry = stateExpiresAt
 	if expiry ~= nil then
 		if now < expiry then
-			if previousCooldown ~= snapshot.throwCooldown or previousReady ~= snapshot.ready then
+			if
+				previousWeapon ~= snapshot.weapon
+				or previousHoldsBall ~= snapshot.holdsBall
+				or previousCooldown ~= snapshot.throwCooldown
+				or previousHammerCooldown ~= snapshot.hammerCooldown
+				or previousReady ~= snapshot.ready
+			then
 				publish()
 			end
 			return
@@ -136,7 +148,10 @@ local function evaluate()
 		if
 			previousState ~= "Idle"
 			or previousCharge ~= 0
+			or previousWeapon ~= snapshot.weapon
+			or previousHoldsBall ~= snapshot.holdsBall
 			or previousCooldown ~= snapshot.throwCooldown
+			or previousHammerCooldown ~= snapshot.hammerCooldown
 			or previousReady ~= snapshot.ready
 		then
 			publish()
@@ -156,8 +171,11 @@ local function evaluate()
 
 	if
 		previousState ~= snapshot.state
+		or previousWeapon ~= snapshot.weapon
+		or previousHoldsBall ~= snapshot.holdsBall
 		or previousCharge ~= snapshot.chargeAlpha
 		or previousCooldown ~= snapshot.throwCooldown
+		or previousHammerCooldown ~= snapshot.hammerCooldown
 		or previousReady ~= snapshot.ready
 	then
 		publish()

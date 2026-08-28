@@ -73,16 +73,10 @@ local handlers = {
 		emit("HammerAttack")
 	end,
 	onEquipHammer = function()
-		if weaponLocked then
-			return
-		end
-		emit("EquipHammer")
+		Combat.requestWeaponEquip("Hammer")
 	end,
 	onEquipDodgeball = function()
-		if weaponLocked then
-			return
-		end
-		emit("EquipDodgeball")
+		Combat.requestWeaponEquip("Dodgeball")
 	end,
 }
 
@@ -144,6 +138,20 @@ end
 
 function Combat.onGesture(listener: (GestureEvent) -> ()): () -> ()
 	return TouchIntent.onGesture(listener)
+end
+
+function Combat.requestWeaponEquip(kind: string): boolean
+	if weaponLocked or not isLive() then
+		return false
+	end
+	if kind == "Hammer" then
+		emit("EquipHammer")
+		return true
+	elseif kind == "Dodgeball" then
+		emit("EquipDodgeball")
+		return true
+	end
+	return false
 end
 
 function Combat.equipHammer()

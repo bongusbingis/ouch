@@ -61,15 +61,17 @@ return {
 		-- near miss during the first lesson should still read as a hit.
 		TargetLeniencyStuds = 5,
 		EscalatedLeniencyStuds = 9,
-		MinimumChargeAlpha = 0.35,
+		-- Low enough that a real hold counts, high enough that a reflexive tap
+		-- does not. A hit that does not count reads as a miss.
+		MinimumChargeAlpha = 0.25,
 	},
 
 	Assist = {
 		-- Training throws curve toward the dummy so a first attempt lands. The
-		-- cone keeps it honest: a throw the player clearly did not aim near the
-		-- target is left alone rather than yanked across the arena.
-		TurnRateDegPerSecond = 260,
-		AcquireConeDeg = 55,
+		-- cone is wide enough that a player who pointed anywhere near the target
+		-- connects; past it they are aiming somewhere else on purpose.
+		TurnRateDegPerSecond = 320,
+		AcquireConeDeg = 100,
 		MaxRangeStuds = 140,
 	},
 

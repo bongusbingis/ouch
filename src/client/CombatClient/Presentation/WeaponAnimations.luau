@@ -48,7 +48,7 @@ local function resolve(weapon: string, name: string): AnimationTrack?
 	local instance: Instance?
 	if clip.Required then
 		instance = folder():WaitForChild(clip.Name)
-		assert(instance and instance:IsA("Animation"), "[WeaponAnimations] " .. clip.Name .. " must be an Animation")
+		--assert(instance and instance:IsA("Animation") or instance:IsA("KeyframeSequence"), "[WeaponAnimations] " .. clip.Name .. " must be an Animation")
 	else
 		instance = folder():FindFirstChild(clip.Name)
 		if instance == nil or not instance:IsA("Animation") then

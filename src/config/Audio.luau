@@ -98,6 +98,13 @@ return {
 				"rbxassetid://93903966058481",
 			},
 		},
+		OnboardingEnemyKilled = {
+			Scope = "Local",
+			Volume = 1,
+			AssetIds = {
+				"rbxassetid://18835016448",
+			},
+		},
 	},
 
 	Effects = {

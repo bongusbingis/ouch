@@ -6,9 +6,11 @@
 --!strict
 
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
+local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 
 local DeviceInput = {}
 
@@ -25,10 +27,10 @@ export type Handlers = {
 local THROW_GAMEPAD_BUTTON = Enum.KeyCode.ButtonR2
 local HAMMER_GAMEPAD_BUTTON = Enum.KeyCode.ButtonX
 
-local EQUIP_HAMMER_KEY = Enum.KeyCode.One
-local EQUIP_DODGEBALL_KEY = Enum.KeyCode.Two
-local EQUIP_HAMMER_GAMEPAD = Enum.KeyCode.ButtonL1
-local EQUIP_DODGEBALL_GAMEPAD = Enum.KeyCode.ButtonR1
+local EQUIP_HAMMER_KEY = InputConfig.WeaponEquip.Hammer.Keyboard
+local EQUIP_DODGEBALL_KEY = InputConfig.WeaponEquip.Dodgeball.Keyboard
+local EQUIP_HAMMER_GAMEPAD = InputConfig.WeaponEquip.Hammer.Gamepad
+local EQUIP_DODGEBALL_GAMEPAD = InputConfig.WeaponEquip.Dodgeball.Gamepad
 
 local started = false
 local handlers: Handlers? = nil

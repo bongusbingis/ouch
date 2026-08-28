@@ -14,6 +14,7 @@ local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitFo
 local PlayerIds = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds")
 )
+local AimDirector = require(script.Parent.Parent:WaitForChild("Input"):WaitForChild("AimDirector"))
 
 local OnboardingTargets = {}
 
@@ -47,6 +48,10 @@ local function rescan()
 			end
 		end
 	end
+
+	-- The reticle treats a dummy like any other target, so aiming at one reads
+	-- as a lock rather than as aiming at scenery.
+	AimDirector.setExtraTargets(targets)
 
 	local live: { [Model]: boolean } = {}
 	for _, target in targets do
@@ -130,6 +135,7 @@ function OnboardingTargets.destroy()
 		connection = nil
 	end
 	table.clear(targets)
+	AimDirector.setExtraTargets({})
 	table.clear(lastPositions)
 	table.clear(lostListeners)
 	started = false

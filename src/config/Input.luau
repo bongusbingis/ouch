@@ -17,6 +17,16 @@ export type ActionDef = {
 
 return {
 	ContextName = "CombatInput",
+	WeaponEquip = {
+		Hammer = {
+			Keyboard = Enum.KeyCode.One,
+			Gamepad = Enum.KeyCode.ButtonL1,
+		},
+		Dodgeball = {
+			Keyboard = Enum.KeyCode.Two,
+			Gamepad = Enum.KeyCode.ButtonR1,
+		},
+	},
 	-- Lateral offset, in studs, applied to the camera while the mouse is
 	-- locked to center. Positive moves the camera to the right, making the
 	Actions = {

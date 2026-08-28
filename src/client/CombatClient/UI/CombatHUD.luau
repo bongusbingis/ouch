@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
+local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -16,6 +17,8 @@ local CombatConfig = require(Config:WaitForChild("Combat"))
 local ThrowUX = require(Config:WaitForChild("ThrowUX"))
 local SharedUI = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI")
 local ResponsiveText = require(SharedUI:WaitForChild("Components"):WaitForChild("ResponsiveText"))
+local CombatToolbar = require(SharedUI:WaitForChild("Components"):WaitForChild("CombatToolbar"))
+local CombatToolbarViewModel = require(SharedUI:WaitForChild("Models"):WaitForChild("CombatToolbarViewModel"))
 local useExternalStore = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local useReducedMotion = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
 local ChargeAim = require(script.Parent.Parent.Modules.Presentation.ChargeAim)
@@ -23,6 +26,31 @@ local ThrowUXClient = require(script.Parent.Parent.Modules.UI.ThrowUXClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local c = React.createElement
+
+local function useEquippedWeaponCosmetics()
+	local player = Players.LocalPlayer
+	local cosmetics, setCosmetics = React.useState(function()
+		return {
+			ball = player:GetAttribute("Equip_BallAssets") :: string?,
+			hammer = player:GetAttribute("Equip_HammerAssets") :: string?,
+		}
+	end)
+	React.useEffect(function()
+		local function update()
+			setCosmetics({
+				ball = player:GetAttribute("Equip_BallAssets") :: string?,
+				hammer = player:GetAttribute("Equip_HammerAssets") :: string?,
+			})
+		end
+		local ballConnection = player:GetAttributeChangedSignal("Equip_BallAssets"):Connect(update)
+		local hammerConnection = player:GetAttributeChangedSignal("Equip_HammerAssets"):Connect(update)
+		return function()
+			ballConnection:Disconnect()
+			hammerConnection:Disconnect()
+		end
+	end, {})
+	return cosmetics
+end
 
 local function smoothstep(value: number): number
 	local alpha = math.clamp(value, 0, 1)
@@ -389,6 +417,15 @@ end
 
 return function()
 	local snapshot = useExternalStore(ThrowUXClient.getSnapshot, ThrowUXClient.subscribe)
+	local cosmetics = useEquippedWeaponCosmetics()
+	local toolbarModel = CombatToolbarViewModel.fromSnapshot({
+		active = snapshot.active,
+		weapon = snapshot.weapon,
+		holdsBall = snapshot.holdsBall,
+		throwCooldown = snapshot.throwCooldown,
+		hammerCooldown = snapshot.hammerCooldown,
+		weaponLocked = snapshot.weaponLocked,
+	}, snapshot.inputType)
 	local debugText = string.format(
 		"%s  charge %.2f  cooldown %.2f  target %.2f  %s %.2f",
 		snapshot.state,
@@ -423,6 +460,13 @@ return function()
 				Thickness = 0.035,
 				Transparency = 0.2,
 			}),
+		}),
+		Toolbar = c(CombatToolbar, {
+			Model = toolbarModel,
+			BallItemId = cosmetics.ball,
+			HammerItemId = cosmetics.hammer,
+			OnEquip = Combat.requestWeaponEquip,
+			RegisterExclusion = Combat.registerHudExclusion,
 		}),
 		Hammer = c(HammerButton, { visible = snapshot.active and snapshot.inputType == "Touch" }),
 		Debug = c(ResponsiveText, {

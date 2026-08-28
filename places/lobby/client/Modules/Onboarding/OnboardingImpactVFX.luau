@@ -5,11 +5,13 @@
 
 --!strict
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Onboarding"))
+local OnboardingClient = require(script.Parent:WaitForChild("OnboardingClient"))
 local OnboardingTargets = require(script.Parent:WaitForChild("OnboardingTargets"))
 
 local OnboardingImpactVFX = {}
@@ -28,6 +30,8 @@ local started = false
 local effects: { Effect } = {}
 local connection: RBXScriptConnection? = nil
 local unsubscribe: (() -> ())? = nil
+local unsubscribeCue: (() -> ())? = nil
+local celebrated = false
 
 local function newPart(color: Color3, size: Vector3, cframe: CFrame): BasePart
 	local part = Instance.new("Part")
@@ -88,6 +92,29 @@ local function burst(_target: Model, at: Vector3)
 	spawnConfetti(at, style)
 end
 
+-- Finishing is the biggest moment in the flow, so it gets the same burst the
+-- dummies do, thrown from the player themselves.
+local function onSnapshot(snapshot: any)
+	if not snapshot.active or snapshot.cue ~= "Done" then
+		celebrated = false
+		return
+	end
+	if celebrated then
+		return
+	end
+	celebrated = true
+	local character = Players.LocalPlayer.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return
+	end
+	local style = OnboardingConfig.Impact
+	spawnRing(root.Position, style)
+	for _ = 1, 3 do
+		spawnConfetti(root.Position + Vector3.new(0, 2, 0), style)
+	end
+end
+
 local function step(delta: number)
 	for index = #effects, 1, -1 do
 		local effect = effects[index]
@@ -115,6 +142,7 @@ function OnboardingImpactVFX.start()
 	end
 	started = true
 	unsubscribe = OnboardingTargets.onLost(burst)
+	unsubscribeCue = OnboardingClient.subscribe(onSnapshot)
 	connection = RunService.RenderStepped:Connect(step)
 end
 
@@ -127,6 +155,11 @@ function OnboardingImpactVFX.destroy()
 		unsubscribe()
 		unsubscribe = nil
 	end
+	if unsubscribeCue then
+		unsubscribeCue()
+		unsubscribeCue = nil
+	end
+	celebrated = false
 	for _, effect in effects do
 		effect.part:Destroy()
 	end

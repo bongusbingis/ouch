@@ -34,6 +34,11 @@ export type Gesture = {
 
 export type Snapshot = {
 	active: boolean,
+	weapon: string,
+	holdsBall: boolean,
+	throwCooldown: number,
+	hammerCooldown: number,
+	weaponLocked: boolean,
 	state: ThrowUXViewModel.State,
 	chargeAlpha: number,
 	cooldownAlpha: number,
@@ -52,6 +57,11 @@ export type Snapshot = {
 local EMPTY_GESTURE: Gesture = { kind = "None", origin = nil, position = nil, progress = 0, visible = false }
 local snapshot: Snapshot = {
 	active = false,
+	weapon = "Hammer",
+	holdsBall = false,
+	throwCooldown = 0,
+	hammerCooldown = 0,
+	weaponLocked = false,
 	state = "Idle",
 	chargeAlpha = 0,
 	cooldownAlpha = 0,
@@ -89,6 +99,11 @@ local onboardingWasVisible = false
 local function publish(nextSnapshot: Snapshot)
 	if
 		snapshot.active == nextSnapshot.active
+		and snapshot.weapon == nextSnapshot.weapon
+		and snapshot.holdsBall == nextSnapshot.holdsBall
+		and snapshot.throwCooldown == nextSnapshot.throwCooldown
+		and snapshot.hammerCooldown == nextSnapshot.hammerCooldown
+		and snapshot.weaponLocked == nextSnapshot.weaponLocked
 		and snapshot.state == nextSnapshot.state
 		and snapshot.chargeAlpha == nextSnapshot.chargeAlpha
 		and snapshot.cooldownAlpha == nextSnapshot.cooldownAlpha
@@ -220,6 +235,11 @@ local function update(dt: number)
 	local targetConfidence = math.floor(AimDirector.currentConfidence() * 20 + 0.5) / 20
 	publish({
 		active = active,
+		weapon = combat.weapon,
+		holdsBall = combat.holdsBall,
+		throwCooldown = combat.throwCooldown,
+		hammerCooldown = combat.hammerCooldown,
+		weaponLocked = Combat.isWeaponLocked(),
 		state = ThrowUXViewModel.state({
 			weapon = combat.weapon,
 			holdsBall = combat.holdsBall,

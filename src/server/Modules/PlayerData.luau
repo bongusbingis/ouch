@@ -28,7 +28,7 @@ local loadedListeners = {}
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
 
-_dataStore = _dataStore.Mock
+-- _dataStore = _dataStore.Mock
 
 local WRITE_LEASE_TIMEOUT_SECONDS = 10
 

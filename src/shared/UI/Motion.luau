@@ -10,6 +10,7 @@ return table.freeze({
 	Camera = table.freeze({ mass = 1, tension = 170, friction = 26 }),
 	Control = table.freeze({ mass = 1, tension = 1500, friction = 35 }),
 	Modal = table.freeze({ mass = 1, tension = 700, friction = 45 }),
+	Pop = table.freeze({ mass = 1, tension = 900, friction = 17 }),
 	Controls = table.freeze({
 		Standard = table.freeze({ hover = 1.055, pressed = 0.93, rotation = -1 }),
 		Primary = table.freeze({ hover = 1.035, pressed = 0.95, rotation = -0.5 }),

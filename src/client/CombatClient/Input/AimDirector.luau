@@ -24,6 +24,7 @@ type Vec = vector
 local currentTarget: Model? = nil
 local currentAimDir: Vector3 = Vector3.zAxis
 local currentConfidence = 0
+local extraTargets: { Model } = {}
 
 local presentationParams = RaycastParams.new()
 presentationParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -160,6 +161,14 @@ local function confidenceFor(angleDeg: number, coneDeg: number): number
 	return 1 - (fraction - fadeStart) / (1 - fadeStart)
 end
 
+-- Additional models the reticle may lock onto, registered by whatever owns
+-- them. Deliberately not offered to the trajectory target: that one drives the
+-- previewed arc's homing, and a preview that curves differently to the throw
+-- would teach the wrong thing.
+function AimDirector.setExtraTargets(models: { Model })
+	extraTargets = models
+end
+
 local function selectPresentationTarget(camera: Camera, character: Model): (Model?, number)
 	local row = deviceRow()
 	local localTeamId = character:GetAttribute("TeamId")
@@ -169,14 +178,22 @@ local function selectPresentationTarget(camera: Camera, character: Model): (Mode
 	end
 	refreshPresentationExclusions(character)
 
+	local candidates: { Model } = {}
+	for _, player in Players:GetPlayers() do
+		if player ~= Players.LocalPlayer and player.Character ~= nil then
+			table.insert(candidates, player.Character)
+		end
+	end
+	for _, model in extraTargets do
+		if model.Parent ~= nil then
+			table.insert(candidates, model)
+		end
+	end
+
 	local best: Model? = nil
 	local bestScore = math.huge
 	local bestConfidence = 0
-	for _, player in Players:GetPlayers() do
-		local targetCharacter = player.Character
-		if player == Players.LocalPlayer or targetCharacter == nil then
-			continue
-		end
+	for _, targetCharacter in candidates do
 		local root = presentationRoot(targetCharacter, localTeamId)
 		if root == nil then
 			continue

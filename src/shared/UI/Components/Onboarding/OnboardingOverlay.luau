@@ -1,6 +1,6 @@
 -- Name: OnboardingOverlay.luau
 -- Author: Jack C.
--- Description: The first-session training overlay: a short contextual prompt with a device-appropriate input hint, escalating assistance, the optional mobile swipe tip, a discreet skip action, and the completion celebration. Presentation only -- every value it renders comes from the onboarding snapshot passed in.
+-- Description: The first-session training overlay: a prompt that pops in on every new instruction, an animated demonstration of the input it is asking for, how far through the player is, a discreet skip, and the completion celebration. Presentation only -- every value it renders comes from the onboarding snapshot passed in.
 -- Created: 2026-08-26
 
 --!strict
@@ -12,6 +12,7 @@ local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Motion = require(script.Parent.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Parent.Hooks.useReducedMotion)
+local useEntrance = require(script.Parent.Parent.Parent.Hooks.useEntrance)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local GestureHint = require(script.Parent.GestureHint)
@@ -49,6 +50,51 @@ local INPUT_HINT: { [string]: { [string]: string } } = {
 }
 
 local SKILLS = { "THROW", "BONK", "POWER" }
+local LESSONS = { "NormalThrow", "Hammer", "ChargedThrow", "Practice" }
+
+local function lessonProgress(step: string): number
+	if step == "Celebration" then
+		return #LESSONS
+	end
+	local index = table.find(LESSONS, step)
+	return if index then index - 1 else 0
+end
+
+local function ProgressPips(props: { done: number, reducedMotion: boolean })
+	local pips: { [string]: any } = {
+		Layout = c("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0, 8),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}),
+	}
+	for index = 1, #LESSONS do
+		local complete = index <= props.done
+		local active = index == props.done + 1
+		pips[`Pip{index}`] = c("Frame", {
+			BackgroundColor3 = if complete then SUCCESS else PANEL,
+			BackgroundTransparency = if complete then 0 elseif active then 0.15 else 0.55,
+			LayoutOrder = index,
+			Size = if active then UDim2.fromOffset(26, 10) else UDim2.fromOffset(14, 10),
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			Stroke = c("UIStroke", {
+				Color = if active then ACCENT else Color3.fromRGB(30, 30, 30),
+				Thickness = 2,
+				Transparency = if complete or active then 0.1 else 0.6,
+			}),
+		})
+	end
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.5, 0.026),
+		Size = UDim2.fromOffset(160, 12),
+		ZIndex = 61,
+	}, pips)
+end
 
 export type Props = {
 	Snapshot: any,
@@ -68,6 +114,7 @@ return function(props: Props)
 		config = Motion.Modal,
 		immediate = reducedMotion,
 	})
+	local entrance = useEntrance(cue, Motion.Pop, reducedMotion)
 
 	if not active then
 		return nil
@@ -80,12 +127,15 @@ return function(props: Props)
 	local title = if snapshot.succeeded and not celebrating then "NICE!" else copy.title
 	local detail = if snapshot.hintLevel and snapshot.hintLevel >= 2 then copy.detail else nil
 	local gesture = GESTURE_FOR_CUE[cue]
+	local done = lessonProgress(snapshot.step or "Intro")
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 60,
 	}, {
+		Progress = if celebrating then nil else c(ProgressPips, { done = done, reducedMotion = reducedMotion }),
+
 		Gesture = if gesture and not snapshot.succeeded
 			then c(GestureHint, {
 				Gesture = gesture,
@@ -127,6 +177,11 @@ return function(props: Props)
 					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 					Thickness = 0.055,
 				}),
+				Pop = c("UIScale", {
+					Scale = entrance.Alpha:map(function(alpha: number)
+						return 0.55 + 0.45 * alpha
+					end),
+				}),
 			}),
 			Detail = if detail
 				then c(ResponsiveText, {
@@ -167,6 +222,7 @@ return function(props: Props)
 						}),
 					}
 					for index, name in SKILLS do
+						local appearAt = (index - 1) * 0.22
 						cells[name] = c(ResponsiveText, {
 							MeasurementFont = Enum.Font.LuckiestGuy,
 							MaxTextSize = 26,
@@ -179,6 +235,12 @@ return function(props: Props)
 								TextColor3 = SUCCESS,
 								ZIndex = 62,
 							},
+						}, {
+							Pop = c("UIScale", {
+								Scale = entrance.Alpha:map(function(alpha: number)
+									return 0.2 + 0.8 * math.clamp((alpha - appearAt) / 0.4, 0, 1)
+								end),
+							}),
 						})
 					end
 					return cells
