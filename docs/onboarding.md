@@ -131,7 +131,7 @@ persistence, and the transition out. No other system decides tutorial progress.
 | `src/shared/Game/Onboarding/OnboardingState.luau` | The status model: eligibility, resume point, the CoreComplete moment, skip, and explicit version migration. |
 | `src/shared/Game/Onboarding/OnboardingLayout.luau` | Ring geometry: slot allocation, spawn, target and portal positions, fall height. Native `vector`, no engine types. |
 | `src/shared/Game/Onboarding/OnboardingAnalytics.luau` | Fixed funnel step numbers and the low-cardinality property builders. |
-| `src/shared/UI/Models/OnboardingViewModel.luau` | Snapshot → headline, input glyph, gesture caption, hint. |
+| `src/shared/UI/Models/OnboardingViewModel.luau` | Snapshot → headline, gesture notation, hint, and the placement rule that keeps the indicator off everything else. |
 | `src/shared/Game/Adapters/CombatSession.luau` | Who is fighting, here. |
 
 ### Shared, engine
@@ -139,8 +139,10 @@ persistence, and the transition out. No other system decides tutorial progress.
 | File | Role |
 |---|---|
 | `src/config/Onboarding.luau` | Every onboarding tunable. Nothing else carries a magic number. |
-| `src/shared/UI/Components/OnboardingOverlay.luau` | Prompt, glyph, hint, swipe tip, skip, party choice, completion card. |
-| `src/shared/UI/Stories/OnboardingOverlay.story.luau` | Every step × every device × every variant, previewable in Studio. |
+| `src/shared/UI/Components/GestureGlyph.luau` | The one way the game draws "do this input", used by training and by the arena's swipe tip. |
+| `src/shared/UI/Components/OnboardingOverlay.luau` | The chrome: instruction panel, skip, party choice, completion card. |
+| `src/shared/UI/Components/OnboardingGestureLayer.luau` | Places the indicator at the real input point, uninset. |
+| `src/shared/UI/Stories/OnboardingOverlay.story.luau` | Every step × every device × every variant, plus the four notations side by side. |
 
 ### Lobby server
 
@@ -237,35 +239,109 @@ throw can never reach the lobby crowd and a lobby player is never a target.
 
 ## 6. UI / UX
 
-The overlay uses the game's own language: LuckiestGuy, `ResponsiveText`,
-`AnimatedButton`, the shared `Motion` springs, and heavy dark strokes.
+The training UI is built from the game's own kit: the same nine-slice panel
+(`124751224634629`) and button art (`136021539696619` / `94748581468730`) the
+loading screen, notification modal and shop use, LuckiestGuy headlines with the
+shared dark stroke (`24, 41, 48`), HighwayGothic for secondary lines, and the
+shared `Motion` springs. There is no bespoke panel treatment anywhere in it.
 
-- **Prompt** — centre-top, above the reticle, never under the aim point or a
-  thumb. Three words at most, plus the glyph for the device actually in use.
-- **Device prompts** are derived, not baked: `OnboardingViewModel` maps the
-  step's input to `LMB` / `TAP` / `RT` / `X` from the real bindings in
-  `Config.Input` and `PlayerModule.Combat.DeviceInput`. Switching device
-  mid-step updates the prompt and never resets progress.
-- **Mobile** — the mandatory path is **tap**. Swipe-up is offered once, after
-  the throw lesson is already understood, as a fading tip that disappears the
-  moment the player uses it and never gates anything.
-- **Skip** — a small top-corner control. First press arms it (`SKIP?`), second
-  press within `SkipConfirmSeconds` commits. Works with mouse, touch and
-  controller focus.
-- **Party choice** — `YOUR PARTY IS READY!` with `JOIN MATCH` / `KEEP
-  TRAINING`, gamepad-focused on the join button.
-- **Completion** — `READY!` with the three ticked skills, held briefly.
-- **Responsive** — every element is scale-positioned with `UISizeConstraint`
-  bounds, and the overlay root uses `DeviceSafeInsets`, so cutouts and rounded
-  corners are respected. The hammer button's exclusion rect is already
-  registered with `Combat.registerHudExclusion`, so nothing in the overlay
-  steals a touch from the throw region or the thumbstick.
-- **Reduced motion** — `useReducedMotion` disables every spring, and
-  `OnboardingClient.effectScale()` returns 0, which turns off camera shake and
-  haptics together. Comprehension never depends on motion, colour or sound: the
-  headline text alone states the action.
+### Two roots, on purpose
 
----
+| Root | Insets | Holds |
+|---|---|---|
+| `OnboardingRoot` | `DeviceSafeInsets` | Instruction panel, skip, party choice, completion card |
+| `OnboardingGestureRoot` | `None` | The input indicator only |
+
+The indicator has to be drawn in **raw viewport pixels**, because that is the
+coordinate space `TouchIntent` classifies taps, holds and swipes in. Drawing it
+in an inset-adjusted root would put the picture a topbar's height away from
+where the finger is actually read. The chrome has the opposite requirement and
+gets the safe-area root.
+
+### The gesture notation
+
+`GestureGlyph` is the one component that draws "do this input", and it uses the
+established touch documentation notation rather than inventing symbols:
+
+| Kind | Drawn as | Means |
+|---|---|---|
+| `Tap` | Filled dot, ring leaving it and fading | Contact and release |
+| `Hold` | Ringed dot, ring closing onto the dot | Contact that stays down |
+| `Swipe` | Dot running a trail to a chevron | Contact that travels, and which way |
+| `Action` | The platform's own key glyph on a plate | Press this button |
+| `ActionHold` | That glyph inside the closing ring | Press and hold this button |
+
+The timings are not decorative. The hold ring closes over exactly
+`CombatConfig.Charge.HoldDelay`, the real delay before a press becomes a
+charge, and the swipe trail runs exactly `TouchRegions.scale(BottomSwipe.MinDistance)`,
+the real distance a swipe must travel to register.
+
+### Platform-correct glyphs, by construction
+
+Mouse and gamepad prompts are drawn by **`InputActionLabel`** bound to the real
+`Throw` `InputAction`. The engine resolves the glyph for the device in the
+player's hands — Xbox art on an Xbox pad, PlayStation art on a DualSense — and
+re-resolves on a device switch with no scripting on our side. Its resolution
+order is binding `DisplayImage` → `GetImageForKeyCode` → binding `DisplayName`
+→ `GetStringForKeyCode`, so `Config.Input` now carries a `DisplayName` per
+binding: the mouse binding says `LMB` rather than falling through to
+`"MouseLeftButton"`, and the gamepad binding deliberately leaves it unset so the
+platform's own button art wins. A client too old for `InputActionLabel` falls
+back to the binding's text, decided once by a probe.
+
+Touch keeps the drawn notation, because a gesture is a motion rather than a
+button and no glyph can state it.
+
+### Where the indicator sits, and why it cannot collide
+
+`OnboardingViewModel.gesturePlacement` is pure and spec-tested. It reads the
+real regions from `Combat.inputGeometry()` — press centre, swipe rect, tap drift,
+hold delay — rather than assuming any of them, and derives the reticle's largest
+extent the same way the combat HUD sizes it. The rule:
+
+- **Below the reticle** whenever the whole assembly fits above the swipe region.
+  That is the direction the eye already travels, and it is inside the region a
+  tap or a hold is read in.
+- **Beside the reticle** when the viewport is too short for that — which is real
+  on phone landscape. Still inside the same region, still clear of the reticle,
+  clamped to stay on screen, and far from both the thumbstick and the hammer
+  button.
+
+Measured on the shipped values:
+
+| Viewport | Glyph band | Reticle band | Swipe region top | Placement |
+|---|---|---|---|---|
+| 1920×1080 | 607–712 | 507–573 | 778 | below |
+| 1366×768 | 444–527 | 358–410 | 553 | below |
+| 896×414 | 203–271 | 181–233 | 298 | beside (x 512) |
+| 844×390 | 191–259 | 169–221 | 281 | beside (x 486) |
+| 1180×820 | 470–558 | 384–436 | 590 | below |
+| 820×1180 | 650–738 | 564–616 | 850 | below |
+
+Nothing in the indicator is a `GuiButton`, so it cannot sink a touch in the very
+region it is pointing at.
+
+### The rest of the chrome
+
+- **Instruction panel** — top band, nine-slice, headline plus at most one
+  clarifying line. It tints to the highlight yellow and overshoots on a success.
+- **Skip** — top-right, on the real button art. First press arms it (`SKIP?`),
+  a second press inside `SkipConfirmSeconds` commits. Mouse, touch and
+  controller focus all reach it.
+- **Party choice** — the game's own `NotificationModal`, so it looks like every
+  other confirmation and gets its gamepad focus handling for free. It replaced a
+  hand-rolled bottom bar that sat on top of the jump button and the thumbstick.
+- **Completion** — the same panel with `READY!` and the three earned skills on
+  button chips.
+- **Swipe-throw tip** — owned by `ThrowUXClient`, which already ran its show,
+  dismiss and persist lifecycle. Training does not draw a second one; it
+  installs a gate (`ThrowUXClient.setHintGate`) so the tip is held back until the
+  throw lesson has been passed. The tip itself is now the `Swipe` notation drawn
+  inside the real swipe rect, which the arena gets too.
+- **Reduced motion** — every spring goes immediate through `useReducedMotion`,
+  and `OnboardingClient.effectScale()` returns zero, which turns off camera
+  shake and haptics together. Comprehension never depends on motion, colour or
+  sound: the headline alone states the action.
 
 ## 7. Persistence
 
@@ -390,7 +466,51 @@ session's step and attempt count.
 
 ---
 
-## 11. Prototype asset replacement list
+## 11. Effects and audio
+
+Impacts already run the game's real presentation: a dummy is a simulation
+character, so a hit on one produces the same `Elim` event a hit on a player
+does, and `SplatEffects`, `GameAudio` and `DamageFeedback` respond to it
+without knowing training exists. What onboarding adds on top is the comedy and
+the punctuation.
+
+| Beat | Effect |
+|---|---|
+| Any dummy hit | The rig squashes through its own `BodyWidthScale`/`BodyHeightScale`, then launches and cartwheels on an axis derived from the hit direction. A neon ring snaps outward from the impact point and fades. |
+| Hammer hit | Same, at full strength: the heaviest camera shake and the strongest haptic of the session. |
+| Assistance escalating | The target spotlight widens and brightens rather than a new symbol appearing. |
+| Charged throw too weak | A short "not quite" cue and a light haptic; the dummy still flies, the lesson still stands. |
+| Third mechanic landing | Its own cue on top of the step success, because CoreComplete is the moment that matters. |
+| Celebration | Two confetti waves rather than one pop, an impact ring, and the exit portal opening rather than appearing. |
+
+Camera shake goes through the same `CameraShaker` the arena's damage feedback
+uses, so an onboarding impact reads exactly like a match one. Every effect and
+haptic passes through `OnboardingClient.effectScale()`, which returns zero under
+reduced motion, so the whole layer turns down together.
+
+### Sounds
+
+Every onboarding cue is declared in `Config.Audio.Gameplay` and played through
+`GameAudio`, the same path the rest of the game's one-shots use. **Every id is
+currently a placeholder borrowed from a sound this game already ships**, so
+training is audible and testable today; replacing one is a change to its
+`AssetIds` and nothing else.
+
+| Key | Scope | When it fires | What it should become |
+|---|---|---|---|
+| `OnboardingStepStart` | Local | A lesson's prompt appears | Short, bright, rising two-note "here we go" sting. Soft attack, ~0.25 s. Must not compete with the prompt animation. |
+| `OnboardingStepSuccess` | Local | A lesson is passed | Bright confirmation chime with a fast decay, ~0.35 s. Should feel like a reward, not a UI click. Ideally three variants that rise in pitch across the three lessons. |
+| `OnboardingCoreComplete` | Local | The third mandatory mechanic lands | Bigger, warmer version of the success cue with a low body under it, ~0.6 s. The "you've got it" moment. |
+| `OnboardingDummyLaunch` | World | A dummy is knocked flying | Cartoon whoosh with an inflatable squeak on the front. Comedic, not violent. Needs 3–4 variants so a run of hits does not repeat. ~0.5 s. |
+| `OnboardingChargeShort` | Local | A charged throw released too weakly | Deflating, downward "nope" — a short descending blip. Must read as "not yet", never as failure. ~0.3 s. |
+| `OnboardingHint` | Local | Assistance escalates | Very soft, low-priority attention cue. Quieter than everything else in the list. ~0.2 s. |
+| `OnboardingCelebration` | Local | The `READY!` card appears | Short musical sting with confetti-pop transients, ~1.2 s. Should resolve upward and stop cleanly; it is followed immediately by the lobby. |
+| `OnboardingPortalOpen` | World | The exit portal opens | Airy, magical whoosh that swells and settles, ~0.8 s. Positioned at the portal so it pulls the ear toward the way out. |
+| `OnboardingReveal` | Local | Training hands over to the lobby | Soft transitional swell, ~0.4 s. Should feel like a door closing behind the player rather than another reward. |
+
+---
+
+## 12. Prototype asset replacement list
 
 ### Good enough for production testing
 
@@ -412,9 +532,8 @@ session's step and attempt count.
 | Exit portal | `OnboardingWorld.buildPortal` | Currently a neon slab with a sparkle emitter; wants a real doorway with an opening animation. |
 | Instruction signage | — | Floating in-world signs would let the overlay carry even less text. |
 | Confetti / star burst | `OnboardingWorld.buildBurst` | Placeholder particle; wants authored sprites. |
-| Completion music sting | `OnboardingClient` `Celebration` | Currently borrows `JumpPadBounce`. Add a `Config.Audio.Gameplay.OnboardingComplete` entry and swap the one call site. |
-| Input glyphs | `OnboardingViewModel.GLYPHS` | Text (`LMB`, `RT`, `X`) rather than icons. Replace the values with image ids and the component's `Label` with an `ImageLabel`. |
-| Swipe finger glyph | `OnboardingOverlay.SwipeHint` | A moving dot; wants a hand sprite. |
+| Every onboarding sound | `Config.Audio.Gameplay.Onboarding*` | Nine placeholders borrowed from shipped sounds. Section 11 says what each should become. |
+| Gesture indicator | `GestureGlyph` | Procedural dot/ring/trail/chevron. Correct notation and on-style, but a painted hand or finger sprite would sell touch gestures harder. Every shape is one component. |
 
 ### Studio setup the lobby place still needs
 
@@ -429,9 +548,13 @@ Everything degrades gracefully without them — training is fully playable today
 | `SoundService.CombatAudio` (Dodgeball/Hammer groups) | arena place | The legacy `Windup`/`Pickup`/`Landing`/`Hit`/`Miss` cues are silent; every config-driven sound still plays. |
 | A Cmdr client script in `StarterPlayerScripts` | arena place | `sb-onboarding` still registers but the console cannot be opened; the Studio command bar entry point still works. |
 
+Mouse and controller prompts need no art at all: they are resolved by the engine
+from the real binding, and a controller player already sees their own platform's
+button.
+
 ---
 
-## 12. Values that genuinely need playtesting
+## 13. Values that genuinely need playtesting
 
 Centralised in `src/config/Onboarding.luau` so they can be moved without
 touching code:
@@ -452,6 +575,10 @@ touching code:
 - `Effects.CameraImpulseStuds` and `Effects.HapticStrength.*` — impact weight,
   which is exactly the kind of thing that reads differently on a phone.
 - `SkipCornerInset` and skip prominence — discoverable without competing.
+- `UI.Gesture.SizeScale` and `UI.Gesture.ClearancePixels` — how big the input
+  indicator is and how much room it keeps. Widening the clearance past the space
+  a laptop viewport has pushes the indicator from below the reticle to beside
+  it, so the placement spec is the fastest way to see the effect of a change.
 
 **Deliberately not implemented, pending a playtest call:** the practice bots do
 not throw. The player is invulnerable for the whole session, so an incoming
@@ -462,26 +589,31 @@ wind-up animation on the bots rather than a real projectile.
 
 ---
 
-## 13. Manual test checklist
+## 14. Manual test checklist
 
 **Brand-new PC player** — join → training starts with no lobby flash → `THROW!`
 with `LMB` → dummy launches → `BONK!` → `HOLD FOR POWER!` → practice → `READY!`
 → lobby with Play emphasised.
 
-**Brand-new mobile player** — tap throws; the prompt reads `TAP`, never `LMB`.
-After the throw lesson the swipe tip appears once and fades. Hold charges. The
-`BONK` button appears for the hammer step. No overlay element overlaps the
-thumbstick, jump, hammer button, or the bottom swipe region.
+**Brand-new mobile player** — tap throws; the indicator is a dot with a ripple
+and the word `TAP`, never `LMB`. On the charge lesson it becomes a ringed dot
+whose ring closes at the real hold delay. On a phone the indicator sits beside
+the reticle rather than under it. After the throw lesson the swipe tip appears
+inside the real swipe region, running the real recognition distance, and fades.
+No overlay element overlaps the thumbstick, jump, hammer button, or the bottom
+swipe region, and tapping where the indicator is still throws.
 
 **Tablet** — same, at a larger viewport: prompt and glyph stay proportional
 (`UISizeConstraint` maxima), skip stays in the corner, the party choice does not
 stretch past `MaxSize`.
 
-**Controller** — prompts read `RT` and `X`. Skip is reachable by focus. The
-party choice focuses `JOIN MATCH`. The camera stays gamepad-driven.
+**Controller** — the indicator shows the pad's own trigger art, and a
+PlayStation pad shows PlayStation art rather than Xbox. Skip is reachable by
+focus. The party choice focuses `JOIN MATCH`. The camera stays gamepad-driven.
 
-**Hot device switch** — start on mouse, pick up a controller mid-step: the
-prompt changes, the step does not restart, the target stays.
+**Hot device switch** — start on mouse, pick up a controller mid-step: the glyph
+swaps to the pad's art, the verb changes from `CLICK` to `PRESS`, the step does
+not restart, and the target stays.
 
 **Returning completed player** — join → lobby, no training, no flash.
 **Returning CoreComplete player** — join → lobby; the practice fight is not

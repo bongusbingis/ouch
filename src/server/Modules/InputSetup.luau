@@ -46,6 +46,12 @@ local function buildContext(player: Player)
 			elseif bindingDef.KeyCode then
 				binding.KeyCode = bindingDef.KeyCode
 			end
+			-- What an InputActionLabel draws for this binding. Left unset, the
+			-- engine falls back to its own glyph for the key, which is what a
+			-- gamepad binding wants.
+			if bindingDef.DisplayName then
+				binding.DisplayName = bindingDef.DisplayName
+			end
 			binding.Parent = action
 		end
 	end

@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local GestureGlyph = require(script.Parent.Parent.Components.GestureGlyph)
 local OnboardingOverlay = require(script.Parent.Parent.Components.OnboardingOverlay)
 local StoryRoot = require(script.Parent.StoryRoot)
 
@@ -32,7 +33,6 @@ local function Story()
 		partyReady = variant == "PartyReady",
 		celebrating = variant == "Celebration",
 		revealed = false,
-		swipeHint = variant == "SwipeHint",
 		revision = 1,
 	}
 
@@ -59,6 +59,42 @@ local function Story()
 			BackgroundColor3 = Color3.fromRGB(96, 176, 214),
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
+		}),
+		Gestures = c("Frame", {
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 1,
+			Position = UDim2.fromScale(0.97, 0.55),
+			Size = UDim2.fromOffset(120, 460),
+			ZIndex = 60,
+		}, {
+			Layout = c("UIListLayout", {
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				Padding = UDim.new(0, 46),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+			}),
+			Tap = c(GestureGlyph, { Kind = "Tap", Label = "TAP", SizePixels = 54, Native = { LayoutOrder = 1 } }),
+			Hold = c(GestureGlyph, {
+				Kind = "Hold",
+				Label = "HOLD",
+				HoldSeconds = 0.18,
+				SizePixels = 54,
+				Native = { LayoutOrder = 2 },
+			}),
+			Action = c(GestureGlyph, {
+				Kind = "Action",
+				Label = "CLICK",
+				FallbackText = "LMB",
+				SizePixels = 54,
+				Native = { LayoutOrder = 3 },
+			}),
+			Swipe = c(GestureGlyph, {
+				Kind = "Swipe",
+				Label = "SWIPE UP",
+				TravelPixels = 92,
+				SizePixels = 44,
+				Native = { LayoutOrder = 4 },
+			}),
 		}),
 		Overlay = c(OnboardingOverlay, {
 			Snapshot = snapshot,
@@ -94,9 +130,6 @@ local function Story()
 			end),
 			Escalated = control("ESCALATED HINT", 5, function()
 				setVariant("Escalated")
-			end),
-			Swipe = control("SWIPE HINT", 6, function()
-				setVariant("SwipeHint")
 			end),
 			Party = control("PARTY READY", 7, function()
 				setVariant("PartyReady")

@@ -7,6 +7,11 @@ export type BindingDef = {
 	Name: string?,
 	KeyCode: Enum.KeyCode?,
 	Scriptable: boolean?,
+	-- What an InputActionLabel prints when the engine has no glyph for this
+	-- binding's key. Without it a mouse prompt reads "MouseLeftButton"; gamepad
+	-- bindings deliberately leave it unset so the platform's own button art
+	-- wins, which is what makes an Xbox pad show A and a DualSense show Cross.
+	DisplayName: string?,
 }
 
 export type ActionDef = {
@@ -24,20 +29,20 @@ return {
 			Name = "Throw",
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton },
+				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton, DisplayName = "LMB" },
 				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonR2 },
 				-- Pulsed by InputRouter on non-GUI screen taps (touch devices).
-				{ Name = "TouchFeed", Scriptable = true },
+				{ Name = "TouchFeed", Scriptable = true, DisplayName = "TAP" },
 			},
 		},
 		{
 			Name = "Catch",
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseRightButton },
+				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseRightButton, DisplayName = "RMB" },
 				{ Name = "Keyboard", KeyCode = Enum.KeyCode.F },
 				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonL2 },
-				{ Name = "TouchFeed", Scriptable = true },
+				{ Name = "TouchFeed", Scriptable = true, DisplayName = "TAP" },
 			},
 		},
 		{

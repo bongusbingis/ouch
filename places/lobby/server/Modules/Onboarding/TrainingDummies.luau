@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Onboarding"))
@@ -147,6 +148,22 @@ function TrainingDummies.setForgiveness(id: string, extraStuds: number)
 	end
 end
 
+-- The rig carries its own proportion scales, so a squash is a change to those
+-- rather than a second model or a hand-built animation.
+local function squash(dummy: Dummy)
+	local humanoid = dummy.humanoid
+	local width = humanoid:FindFirstChild("BodyWidthScale")
+	local height = humanoid:FindFirstChild("BodyHeightScale")
+	if not (width and width:IsA("NumberValue") and height and height:IsA("NumberValue")) then
+		return
+	end
+	width.Value = 1.32
+	height.Value = 0.68
+	local info = TweenInfo.new(0.34, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
+	TweenService:Create(width, info, { Value = 1 }):Play()
+	TweenService:Create(height, info, { Value = 1 }):Play()
+end
+
 -- The comedy beat: a hit dummy squashes, spins, and sails away. It is a
 -- presentation move, not a gameplay one, so it happens on the server purely so
 -- every client sees the same launch.
@@ -168,9 +185,12 @@ function TrainingDummies.knockOut(id: string, direction: Vector3?)
 			descendant.CanCollide = false
 		end
 	end
+	squash(dummy)
 	dummy.root.Anchored = false
 	dummy.root:ApplyImpulse((unit * 40 + Vector3.new(0, 65, 0)) * dummy.root.AssemblyMass)
-	dummy.root:ApplyAngularImpulse(Vector3.new(0, 1, 0) * dummy.root.AssemblyMass * 25)
+	-- Tumbling on more than one axis reads as a cartwheel rather than a spin on
+	-- the spot, which is what sells the launch.
+	dummy.root:ApplyAngularImpulse(Vector3.new(unit.Z, 1, -unit.X).Unit * dummy.root.AssemblyMass * 32)
 end
 
 function TrainingDummies.isKnockedOut(id: string): boolean
@@ -193,6 +213,14 @@ function TrainingDummies.restore(id: string)
 		end
 	end
 	dummy.humanoid.PlatformStand = false
+	local width = dummy.humanoid:FindFirstChild("BodyWidthScale")
+	local height = dummy.humanoid:FindFirstChild("BodyHeightScale")
+	if width and width:IsA("NumberValue") then
+		width.Value = 1
+	end
+	if height and height:IsA("NumberValue") then
+		height.Value = 1
+	end
 	dummy.model:PivotTo(CFrame.new(dummy.homePosition + Vector3.new(0, 3, 0)))
 	dummy.model:SetAttribute("CombatAlive", true)
 end

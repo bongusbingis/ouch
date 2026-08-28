@@ -16,8 +16,10 @@ local CombatConfig = require(Config:WaitForChild("Combat"))
 local ThrowUX = require(Config:WaitForChild("ThrowUX"))
 local SharedUI = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI")
 local ResponsiveText = require(SharedUI:WaitForChild("Components"):WaitForChild("ResponsiveText"))
+local GestureGlyph = require(SharedUI:WaitForChild("Components"):WaitForChild("GestureGlyph"))
 local useExternalStore = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local useReducedMotion = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
+local useViewportSize = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useViewportSize"))
 local ChargeAim = require(script.Parent.Parent.Modules.Presentation.ChargeAim)
 local ThrowUXClient = require(script.Parent.Parent.Modules.UI.ThrowUXClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
@@ -308,6 +310,35 @@ local function SwipeFeedback(props: { snapshot: ThrowUXClient.Snapshot })
 	})
 end
 
+-- The swipe-throw hint, drawn inside the region a swipe must actually start in
+-- and running the real recognition distance, so the picture is the instruction
+-- rather than an approximation of it.
+local function SwipeHint(props: { visible: boolean })
+	local viewport = useViewportSize()
+	local geometry = React.useMemo(function()
+		return Combat.inputGeometry()
+	end, { viewport })
+	if not props.visible or not geometry.swipeEnabled or viewport.X <= 0 then
+		return nil
+	end
+	local travel = geometry.swipeDistancePixels
+	local size = math.clamp(math.min(viewport.X, viewport.Y) * 0.06, 34, 58)
+	-- Sat low in the swipe region so the whole stroke it draws stays inside the
+	-- band a swipe has to begin in.
+	local startY = geometry.swipeRect.maxY - size - travel * 0.35
+	return c(GestureGlyph, {
+		Kind = "Swipe",
+		Label = ThrowUX.Onboarding.Text,
+		TravelPixels = travel,
+		SizePixels = size,
+		Native = {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromOffset(viewport.X * 0.5, startY),
+			ZIndex = 35,
+		},
+	})
+end
+
 local function HammerButton(props: { visible: boolean })
 	local ref = React.useRef(nil)
 	local pressing, setPressing = React.useState(false)
@@ -402,28 +433,7 @@ return function()
 		Trajectory = c(Trajectory),
 		Reticle = c(Reticle, { snapshot = snapshot }),
 		Swipe = c(SwipeFeedback, { snapshot = snapshot }),
-		Onboarding = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.76),
-				Size = UDim2.fromScale(0.34, 0.07),
-				Text = ThrowUX.Onboarding.Text .. "  ↑",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextTransparency = 0.12,
-				Visible = snapshot.onboardingVisible,
-				ZIndex = 35,
-			},
-		}, {
-			Stroke = c("UIStroke", {
-				Color = Color3.fromRGB(77, 77, 77),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.035,
-				Transparency = 0.2,
-			}),
-		}),
+		SwipeHint = c(SwipeHint, { visible = snapshot.onboardingVisible }),
 		Hammer = c(HammerButton, { visible = snapshot.active and snapshot.inputType == "Touch" }),
 		Debug = c(ResponsiveText, {
 			MeasurementFont = Enum.Font.Code,

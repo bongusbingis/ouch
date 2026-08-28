@@ -150,11 +150,30 @@ local function onGesture(event)
 	end
 end
 
+-- Whoever else is on screen decides when this hint is welcome; the module still
+-- decides everything else about it. Training uses this to hold the swipe tip
+-- back until the throw lesson has already been passed.
+local hintGate: (() -> boolean)? = nil
+
+function ThrowUXClient.setHintGate(gate: (() -> boolean)?)
+	hintGate = gate
+end
+
+local function hintAllowed(): boolean
+	local gate = hintGate
+	if gate == nil then
+		return true
+	end
+	local ok, allowed = pcall(gate)
+	return ok and allowed == true
+end
+
 local function onboardingVisible(now: number, inputType: string, ready: boolean): boolean
 	if
 		not ThrowUX.Onboarding.Enabled
 		or inputType ~= "Touch"
 		or not ready
+		or not hintAllowed()
 		or Players.LocalPlayer:GetAttribute("SwipeThrowLearned") == true
 		or swipeSuccesses >= ThrowUX.Onboarding.SuccessesToDismiss
 		or (onboardingShows >= ThrowUX.Onboarding.MaxShowsPerSession and not onboardingWasVisible)

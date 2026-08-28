@@ -5,7 +5,9 @@
 
 --!strict
 
+local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Onboarding"))
@@ -251,23 +253,87 @@ function OnboardingWorld.moveSpotlight(slot: number, position: Vector3?)
 	end
 	if position == nil then
 		marker.Transparency = 1
+		marker:SetAttribute("Escalated", false)
 		return
 	end
 	marker.Transparency = 0.25
 	marker.CFrame = CFrame.new(position - Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0, math.rad(90))
 end
 
-function OnboardingWorld.openPortal(slot: number)
+-- Assistance escalating is the one time the target should shout. It widens and
+-- brightens rather than adding a new symbol the player has to interpret.
+function OnboardingWorld.emphasizeTarget(slot: number, emphasized: boolean)
+	local marker = OnboardingWorld.spotlight(slot)
+	if marker == nil or marker:GetAttribute("Escalated") == emphasized then
+		return
+	end
+	marker:SetAttribute("Escalated", emphasized)
+	local prototype = OnboardingConfig.Prototype
+	local scale = if emphasized then 1.55 else 1
+	local light = marker:FindFirstChildOfClass("PointLight")
+	TweenService:Create(marker, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.2, 9 * scale, 9 * scale),
+		Transparency = if emphasized then 0.1 else 0.25,
+	}):Play()
+	if light then
+		TweenService:Create(light, TweenInfo.new(0.35), {
+			Brightness = prototype.SpotlightBrightness * (if emphasized then 2.2 else 1),
+			Range = 24 * scale,
+		}):Play()
+	end
+end
+
+-- A flat ring that snaps outward from a landed hit and fades. It reads as the
+-- impact having weight without competing with the elimination splat the real
+-- combat presentation already plays.
+function OnboardingWorld.impactRing(slot: number, position: Vector3)
+	local ring = rings[slot]
+	if ring == nil then
+		return
+	end
+	local burst = cylinder(
+		"Impact",
+		ring,
+		0.2,
+		4,
+		CFrame.new(position) * CFrame.Angles(math.rad(90), 0, 0),
+		OnboardingConfig.Prototype.AccentColor
+	)
+	burst.CanCollide = false
+	burst.Material = Enum.Material.Neon
+	burst.Transparency = 0.1
+	TweenService:Create(burst, TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.2, 22, 22),
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(burst, 0.6)
+end
+
+-- The way out earns a moment: the doorway opens rather than appearing, so the
+-- player reads it as somewhere to go next.
+function OnboardingWorld.openPortal(slot: number): Vector3?
 	local ring = rings[slot]
 	local portal = ring and ring:FindFirstChild("Portal")
 	if portal == nil or not portal:IsA("BasePart") then
-		return
+		return nil
 	end
-	portal.Transparency = 0.35
+	local full = portal:GetAttribute("OpenSize")
+	if typeof(full) ~= "Vector3" then
+		full = portal.Size
+		portal:SetAttribute("OpenSize", full)
+	end
+	portal.Size = Vector3.new((full :: Vector3).X * 0.15, 0.6, (full :: Vector3).Z)
+	portal.Transparency = 1
+	TweenService:Create(portal, TweenInfo.new(0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = full :: Vector3,
+		Transparency = 0.3,
+	}):Play()
 	local emitter = portal:FindFirstChildOfClass("ParticleEmitter")
 	if emitter then
+		emitter.Rate = 34
 		emitter.Enabled = true
 	end
+	return portal.Position
 end
 
 function OnboardingWorld.celebrate(slot: number, at: Vector3)
@@ -279,8 +345,15 @@ function OnboardingWorld.celebrate(slot: number, at: Vector3)
 	anchor.CFrame = CFrame.new(at)
 	local emitter = anchor:FindFirstChildOfClass("ParticleEmitter")
 	if emitter then
-		emitter:Emit(140)
+		emitter:Emit(160)
+		-- A second, slower wave so the burst has a tail rather than a single pop.
+		task.delay(0.16, function()
+			if emitter.Parent ~= nil then
+				emitter:Emit(90)
+			end
+		end)
 	end
+	OnboardingWorld.impactRing(slot, at)
 end
 
 function OnboardingWorld.destroy(slot: number)

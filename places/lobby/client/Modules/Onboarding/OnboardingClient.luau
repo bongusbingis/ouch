@@ -25,8 +25,10 @@ local CameraShaker = require(ReplicatedStorage:WaitForChild("Packages"):WaitForC
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local Client = Players.LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
-local Presentation = Client:WaitForChild("Modules"):WaitForChild("Presentation")
+local ClientModules = Client:WaitForChild("Modules")
+local Presentation = ClientModules:WaitForChild("Presentation")
 local GameAudio = require(Presentation:WaitForChild("GameAudio"))
+local ThrowUXClient = require(ClientModules:WaitForChild("UI"):WaitForChild("ThrowUXClient"))
 
 local OnboardingClient = {}
 
@@ -49,7 +51,6 @@ export type Snapshot = {
 	partyReady: boolean,
 	celebrating: boolean,
 	revealed: boolean,
-	swipeHint: boolean,
 	revision: number,
 }
 
@@ -67,7 +68,6 @@ local state: Snapshot = {
 	partyReady = false,
 	celebrating = false,
 	revealed = false,
-	swipeHint = false,
 	revision = 0,
 }
 local snapshot: Snapshot = table.clone(state)
@@ -75,8 +75,9 @@ local snapshot: Snapshot = table.clone(state)
 local listeners: { (Snapshot) -> () } = {}
 local connections: { any } = {}
 local successRevision = 0
-local swipeHintRevision = 0
-local swipeHintShown = false
+-- The swipe tip is ThrowUXClient's to show; onboarding only says when it is
+-- welcome, which is once the throw lesson is already behind the player.
+local swipeHintAllowed = false
 local started = false
 local cameraShake: any = nil
 
@@ -150,6 +151,15 @@ local function haptic(strength: number)
 	UIFeedback.haptic(if strength >= 0.5 then "Notification" else "Click")
 end
 
+-- Local cues are personal feedback and route through the shared audio config,
+-- so swapping a placeholder id is a config change and nothing else.
+local function cue(effectName: string, at: (Instance | Vector3)?)
+	local ok, err = pcall(GameAudio.play, effectName, at)
+	if not ok then
+		warn(`[OnboardingClient] cue {effectName} failed: {err}`)
+	end
+end
+
 local function impulseCamera(scale: number)
 	local magnitude = OnboardingConfig.Effects.CameraImpulseStuds * scale * effectScale()
 	if cameraShake == nil or magnitude <= 1e-3 then
@@ -171,40 +181,10 @@ local function showSuccess(text: string)
 	end)
 end
 
--- The swipe gesture is an alternative to the tap, never a requirement. It is
--- offered once, after the throw lesson is already understood, and disappears on
--- its own or the moment the player uses it.
-local function offerSwipeHint()
-	if swipeHintShown or deviceClass() ~= "Touch" then
-		return
-	end
-	if Players.LocalPlayer:GetAttribute("SwipeThrowLearned") == true then
-		return
-	end
-	swipeHintShown = true
-	swipeHintRevision += 1
-	local revision = swipeHintRevision
-	task.delay(OnboardingConfig.UI.SwipeHintDelaySeconds, function()
-		if swipeHintRevision ~= revision or state.route ~= "Training" then
-			return
-		end
-		state.swipeHint = true
-		publish()
-		task.delay(OnboardingConfig.UI.SwipeHintDurationSeconds, function()
-			if swipeHintRevision == revision then
-				state.swipeHint = false
-				publish()
-			end
-		end)
-	end)
-end
-
-local function dismissSwipeHint()
-	swipeHintRevision += 1
-	if state.swipeHint then
-		state.swipeHint = false
-		publish()
-	end
+-- The swipe gesture is an alternative to the tap, never a requirement, so it is
+-- only allowed on screen once the tap has already taught the throw.
+local function allowSwipeHint()
+	swipeHintAllowed = true
 end
 
 local function applyStep(stepId: string)
@@ -218,24 +198,32 @@ end
 local EVENTS: { [string]: ({ [string]: any }) -> () } = {
 	StepStarted = function(payload)
 		applyStep(payload.stepId)
+		cue("OnboardingStepStart")
 	end,
 	StepCompleted = function(payload)
 		local step = OnboardingSteps.get(payload.stepId)
 		showSuccess(payload.success or (step and step.Success) or "NICE!")
 		haptic(OnboardingConfig.Effects.HapticStrength.Hit)
+		cue("OnboardingStepSuccess")
+		if payload.coreComplete then
+			cue("OnboardingCoreComplete")
+			haptic(OnboardingConfig.Effects.HapticStrength.FullCharge)
+		end
 		if payload.stepId == "NormalThrow" then
-			offerSwipeHint()
+			allowSwipeHint()
 		end
 	end,
 	TargetKnockedOut = function(payload)
-		local strength = if payload.stepId == "Hammer"
-			then OnboardingConfig.Effects.HapticStrength.Bonk
-			else OnboardingConfig.Effects.HapticStrength.Hit
-		haptic(strength)
-		impulseCamera(if payload.stepId == "Hammer" then 1 else 0.6)
+		local hammer = payload.stepId == "Hammer"
+		haptic(
+			if hammer then OnboardingConfig.Effects.HapticStrength.Bonk else OnboardingConfig.Effects.HapticStrength.Hit
+		)
+		impulseCamera(if hammer then 1 else 0.6)
+		cue("OnboardingDummyLaunch", if typeof(payload.position) == "Vector3" then payload.position else nil)
 	end,
 	ChargeTooWeak = function()
 		haptic(OnboardingConfig.Effects.HapticStrength.ChargeTick)
+		cue("OnboardingChargeShort")
 	end,
 	HintNudge = function()
 		state.hint = "Nudge"
@@ -243,16 +231,20 @@ local EVENTS: { [string]: ({ [string]: any }) -> () } = {
 	end,
 	HintEscalated = function()
 		state.hint = "Escalated"
+		cue("OnboardingHint")
 		publish()
 	end,
 	PracticeProgress = function()
 		haptic(OnboardingConfig.Effects.HapticStrength.Hit)
 	end,
-	Celebration = function()
+	Celebration = function(payload)
 		state.celebrating = true
 		haptic(OnboardingConfig.Effects.HapticStrength.Complete)
 		impulseCamera(1.2)
-		pcall(GameAudio.play, "JumpPadBounce", Workspace.CurrentCamera)
+		cue("OnboardingCelebration")
+		if typeof(payload.portal) == "Vector3" then
+			cue("OnboardingPortalOpen", payload.portal)
+		end
 		publish()
 	end,
 	PartyReady = function()
@@ -264,6 +256,7 @@ local EVENTS: { [string]: ({ [string]: any }) -> () } = {
 		state.celebrating = false
 		state.partyReady = false
 		state.revealed = true
+		cue("OnboardingReveal")
 		publish()
 	end,
 }
@@ -278,8 +271,6 @@ local function onRouteChanged()
 		state.stepId = ""
 		state.prompt = ""
 		state.hint = ""
-		state.swipeHint = false
-		dismissSwipeHint()
 	end
 	applyTrainingMode(route == "Training")
 	publish()
@@ -343,6 +334,11 @@ function OnboardingClient.start()
 	applyTrainingMode(false)
 	onRouteChanged()
 
+	-- ThrowUXClient owns the swipe tip; training only decides when it is welcome.
+	ThrowUXClient.setHintGate(function()
+		return swipeHintAllowed or state.route ~= "Training"
+	end)
+
 	table.insert(connections, player:GetAttributeChangedSignal(ROUTE_ATTRIBUTE):Connect(onRouteChanged))
 	table.insert(
 		connections,
@@ -366,14 +362,6 @@ function OnboardingClient.start()
 			if resolved ~= state.deviceClass then
 				state.deviceClass = resolved
 				publish()
-			end
-		end)
-	)
-	table.insert(
-		connections,
-		Combat.onGesture(function(event)
-			if event.kind == "SwipeRecognized" then
-				dismissSwipeHint()
 			end
 		end)
 	)
@@ -410,6 +398,7 @@ function OnboardingClient.destroy()
 	end
 	table.clear(connections)
 	table.clear(listeners)
+	ThrowUXClient.setHintGate(nil)
 	if cameraShake then
 		cameraShake:Stop()
 		cameraShake = nil

@@ -50,8 +50,6 @@ return {
 		StepAdvanceSeconds = 0.55,
 		-- The whole celebration, from the last bot falling to the lobby reveal.
 		CelebrationSeconds = 2.4,
-		-- Fade in and out of the world transition at the end.
-		TransitionSeconds = 0.8,
 		-- A dummy that was knocked out returns after this long, so a missed
 		-- follow-up throw is never a dead end.
 		DummyRespawnSeconds = 1.6,
@@ -100,14 +98,39 @@ return {
 	},
 
 	UI = {
-		PromptEnterSeconds = 0.18,
+		-- How long the success beat stays on the panel before the next prompt.
 		PromptSuccessHoldSeconds = 0.45,
-		-- The optional mobile swipe hint: shown after the throw lesson, fades
-		-- itself, and never gates progression.
-		SwipeHintDelaySeconds = 1.2,
-		SwipeHintDurationSeconds = 4,
 		-- Skip stays discoverable without competing with the world.
 		SkipCornerInset = 0.02,
+
+		-- The instruction panel, in the game's own nine-slice treatment. It sits
+		-- in the top band so it clears the reticle, every touch region and the
+		-- centre where the confirmation modal appears.
+		Panel = {
+			TopScale = 0.045,
+			WidthScale = 0.44,
+			HeightScale = 0.16,
+			AspectRatio = 3.4,
+			MaxPixels = Vector2.new(760, 224),
+			MinPixels = Vector2.new(300, 88),
+		},
+
+		-- The floating input indicator. Its position is computed from the real
+		-- touch regions rather than set here; these are only its size, colour and
+		-- the gap it keeps from the reticle and the swipe region.
+		Gesture = {
+			SizeScale = 0.07,
+			MinPixels = 44,
+			MaxPixels = 68,
+			-- Gap the indicator keeps from the reticle above it and the swipe
+			-- region below it. Widening this past the room a laptop viewport has
+			-- pushes the indicator to sit beside the reticle instead.
+			ClearancePixels = 16,
+			-- Height of the word under the glyph, as a fraction of the glyph.
+			LabelScale = 0.55,
+			Color = Color3.fromRGB(255, 224, 78),
+			InkColor = Color3.fromRGB(24, 41, 48),
+		},
 	},
 
 	Effects = {

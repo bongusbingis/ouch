@@ -187,6 +187,10 @@ local container = ReactRoot.create("LobbyRoot")
 local root = ReactRoblox.createRoot(container)
 local onboardingContainer = ReactRoot.create("OnboardingRoot", Enum.ScreenInsets.DeviceSafeInsets, 900)
 local onboardingRoot = ReactRoblox.createRoot(onboardingContainer)
+-- Uninset on purpose: the gesture indicator is drawn in the same pixel space
+-- the touch classifier reads, which is the raw viewport.
+local gestureContainer = ReactRoot.create("OnboardingGestureRoot", Enum.ScreenInsets.None, 110)
+local gestureRoot = ReactRoblox.createRoot(gestureContainer)
 local combatContainer = ReactRoot.create("LobbyCombatRoot", Enum.ScreenInsets.None, 100)
 local combatRoot = ReactRoblox.createRoot(combatContainer)
 
@@ -216,11 +220,13 @@ local function applyRoute(training: boolean)
 	if training and not overlayMounted then
 		overlayMounted = true
 		startCombatClient()
-		onboardingRoot:render(React.createElement(OnboardingApp, { OnPresented = markPresented }))
+		onboardingRoot:render(React.createElement(OnboardingApp.Chrome, { OnPresented = markPresented }))
+		gestureRoot:render(React.createElement(OnboardingApp.Gestures))
 		combatRoot:render(React.createElement(CombatHUD))
 	elseif not training and overlayMounted then
 		overlayMounted = false
 		onboardingRoot:render(nil)
+		gestureRoot:render(nil)
 		combatRoot:render(nil)
 	end
 	renderLobby(training)
@@ -239,9 +245,11 @@ Replica.RequestData()
 script.Destroying:Connect(function()
 	root:unmount()
 	onboardingRoot:unmount()
+	gestureRoot:unmount()
 	combatRoot:unmount()
 	container:Destroy()
 	onboardingContainer:Destroy()
+	gestureContainer:Destroy()
 	combatContainer:Destroy()
 	for _, connection in combatConnections do
 		if typeof(connection) == "RBXScriptConnection" then

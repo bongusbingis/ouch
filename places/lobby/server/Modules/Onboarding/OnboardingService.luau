@@ -85,9 +85,10 @@ local function toVector3(value: vector): Vector3
 	return Vector3.new(value.x, value.y, value.z)
 end
 
--- Sim events carry directions as native vectors, but a few are already Vector3
--- by the time a listener sees them; both are accepted rather than assumed.
-local function directionOf(value: any): Vector3?
+-- Sim events carry positions and directions as native vectors, but a few are
+-- already Vector3 by the time a listener sees them; both are accepted rather
+-- than assumed.
+local function worldVector(value: any): Vector3?
 	if typeof(value) == "Vector3" then
 		return value
 	elseif typeof(value) == "vector" then
@@ -216,6 +217,7 @@ local function enterStep(session: Session, step: OnboardingSteps.Step)
 	session.ballCheckedAt = os.clock()
 	session.attempts = 0
 	session.escalated = false
+	OnboardingWorld.emphasizeTarget(session.slot, false)
 	session.advanceAt = nil
 	session.practiceKnockouts = 0
 	session.practiceStartedAt = nil
@@ -264,11 +266,12 @@ local function enterStep(session: Session, step: OnboardingSteps.Step)
 	)
 end
 
-local function persistStep(session: Session, stepId: string)
+local function persistStep(session: Session, stepId: string): boolean
 	local updated = PlayerData.updateOnboarding(session.player, function(state)
 		return OnboardingState.completeStep(state, stepId)
 	end)
-	if updated ~= nil and updated.Status == "CoreComplete" then
+	local earnedCore = updated ~= nil and updated.Status == "CoreComplete" and stepId == OnboardingSteps.lastCore().Id
+	if earnedCore then
 		AnalyticsService.logCustomEvent(
 			session.player,
 			AnalyticsConfig.CustomEvents.OnboardingCoreComplete,
@@ -276,6 +279,7 @@ local function persistStep(session: Session, stepId: string)
 			{ deviceClass = deviceClass(session.player), resumed = session.resumed }
 		)
 	end
+	return earnedCore
 end
 
 local endSession
@@ -286,8 +290,8 @@ local function completeStep(session: Session)
 		return
 	end
 	logStepEvent(session, AnalyticsConfig.CustomEvents.OnboardingStepCompleted, os.clock() - session.stepStartedAt)
-	persistStep(session, step.Id)
-	fire(session.player, "StepCompleted", { stepId = step.Id, success = step.Success })
+	local earnedCore = persistStep(session, step.Id)
+	fire(session.player, "StepCompleted", { stepId = step.Id, success = step.Success, coreComplete = earnedCore })
 
 	local nextStep = OnboardingSteps.after(step.Id)
 	if nextStep == nil then
@@ -296,8 +300,8 @@ local function completeStep(session: Session)
 		clearStepWorld(session)
 		local frame = OnboardingLayout.frame(session.slot)
 		OnboardingWorld.celebrate(session.slot, toVector3(frame.spawn))
-		OnboardingWorld.openPortal(session.slot)
-		fire(session.player, "Celebration", { completed = OnboardingSteps.coreIds() })
+		local portal = OnboardingWorld.openPortal(session.slot)
+		fire(session.player, "Celebration", { completed = OnboardingSteps.coreIds(), portal = portal })
 		return
 	end
 	session.advanceAt = os.clock() + OnboardingConfig.Timing.StepAdvanceSeconds
@@ -316,13 +320,18 @@ local function escalate(session: Session)
 	if session.dummyId then
 		TrainingDummies.setForgiveness(session.dummyId, OnboardingConfig.Training.EscalatedForgiveness)
 	end
+	OnboardingWorld.emphasizeTarget(session.slot, true)
 	setHint(session, "Escalated")
 	fire(session.player, "HintEscalated", { stepId = session.step.Id })
 end
 
-local function knockOutTarget(session: Session, targetId: string, direction: Vector3?)
+local function knockOutTarget(session: Session, targetId: string, direction: Vector3?, at: Vector3?)
+	local position = at or TrainingDummies.position(targetId)
 	TrainingDummies.knockOut(targetId, direction)
-	fire(session.player, "TargetKnockedOut", { stepId = session.step.Id })
+	if position then
+		OnboardingWorld.impactRing(session.slot, position)
+	end
+	fire(session.player, "TargetKnockedOut", { stepId = session.step.Id, position = position })
 end
 
 -- Sim events are the only thing that completes a step: the player has to
@@ -374,7 +383,7 @@ local function onSimEvent(event: { [string]: any })
 	end
 
 	local step = session.step
-	knockOutTarget(session, targetId, directionOf(event.direction))
+	knockOutTarget(session, targetId, worldVector(event.direction), worldVector(event.position))
 
 	if step.Demands == "DodgeballElim" and usedDodgeball then
 		completeStep(session)

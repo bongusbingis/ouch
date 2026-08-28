@@ -66,6 +66,23 @@ local FakeNumberRange = {
 	end,
 }
 
+-- Config modules name enum items at module scope, which is meaningful in the
+-- engine and inert here. Each item resolves to a stable stub so a module that
+-- merely stores one loads, and comparing the same item twice still matches.
+local FakeEnum = setmetatable({}, {
+	__index = function(enums, enumName: string)
+		local items = setmetatable({}, {
+			__index = function(cache, itemName: string)
+				local item = { Name = itemName, Value = 0, EnumType = enumName }
+				rawset(cache, itemName, item)
+				return item
+			end,
+		})
+		rawset(enums, enumName, items)
+		return items
+	end,
+})
+
 function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
 	local moduleCache: { [Node]: any } = {}
@@ -158,6 +175,7 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 				script = node,
 				require = requireImpl,
 				vector = vector,
+				Enum = FakeEnum,
 				CFrame = FakeCFrame,
 				Color3 = FakeColor3,
 				Vector3 = FakeVector3,

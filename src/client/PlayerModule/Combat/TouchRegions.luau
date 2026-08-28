@@ -76,6 +76,17 @@ function TouchRegions.bottomSwipeRect(): Rect
 	}
 end
 
+function TouchRegions.topInset(): number
+	return topInset
+end
+
+-- The middle of the area a tap or a hold is actually read in: the whole
+-- viewport minus the platform's top inset. UI that points at "where you press"
+-- asks for this rather than assuming screen centre.
+function TouchRegions.gameplayCenter(): Vector2
+	return Vector2.new(viewport.X / 2, (topInset + viewport.Y) / 2)
+end
+
 function TouchRegions.isInBottomSwipeRegion(x: number, y: number): boolean
 	if not CombatConfig.BottomSwipe.Enabled then
 		return false

@@ -98,6 +98,59 @@ return {
 				"rbxassetid://93903966058481",
 			},
 		},
+
+		-- First-session onboarding. Every id below is a PLACEHOLDER borrowed from
+		-- a sound this game already ships, so training is audible and testable
+		-- today; docs/onboarding.md says what each one should eventually be.
+		-- Replacing one is a change to its AssetIds and nothing else.
+		OnboardingStepStart = {
+			Scope = "Local",
+			Volume = 0.5,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
+		OnboardingStepSuccess = {
+			Scope = "Local",
+			Volume = 0.8,
+			AssetIds = { "rbxassetid://122835655736085" },
+		},
+		OnboardingDummyLaunch = {
+			Scope = "World",
+			Volume = 1.5,
+			AssetIds = {
+				"rbxassetid://123922570136163",
+				"rbxassetid://135468135163946",
+			},
+		},
+		OnboardingChargeShort = {
+			Scope = "Local",
+			Volume = 0.7,
+			AssetIds = { "rbxassetid://8254243230" },
+		},
+		OnboardingHint = {
+			Scope = "Local",
+			Volume = 0.45,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
+		OnboardingCoreComplete = {
+			Scope = "Local",
+			Volume = 0.9,
+			AssetIds = { "rbxassetid://124993589864467" },
+		},
+		OnboardingCelebration = {
+			Scope = "Local",
+			Volume = 0.85,
+			AssetIds = { "rbxassetid://9120681039" },
+		},
+		OnboardingPortalOpen = {
+			Scope = "World",
+			Volume = 1.2,
+			AssetIds = { "rbxassetid://6746569988" },
+		},
+		OnboardingReveal = {
+			Scope = "Local",
+			Volume = 0.6,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
 	},
 
 	Effects = {

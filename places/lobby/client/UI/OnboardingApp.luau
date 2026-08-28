@@ -1,6 +1,6 @@
 -- Name: OnboardingApp.luau
 -- Author: Jack C.
--- Description: React root for the first-session training overlay, subscribing to the onboarding client's snapshot and handing its actions back to the server adapter.
+-- Description: React roots for the first-session training UI: the chrome, which respects the device's safe area, and the input indicator, which must not, because it is drawn in the same pixel space the touch classifier reads.
 -- Created: 2026-08-27
 
 --!strict
@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local SharedUI = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI")
+local OnboardingGestureLayer = require(SharedUI:WaitForChild("Components"):WaitForChild("OnboardingGestureLayer"))
 local OnboardingOverlay = require(SharedUI:WaitForChild("Components"):WaitForChild("OnboardingOverlay"))
 local useExternalStore = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 
@@ -28,7 +29,11 @@ export type Props = {
 	OnPresented: (() -> ())?,
 }
 
-return function(props: Props)
+local OnboardingApp = {}
+
+-- The chrome: panel, skip, party choice, completion card. Mounted in a
+-- safe-area root so nothing lands under a notch or the platform topbar.
+function OnboardingApp.Chrome(props: Props)
 	local snapshot = useExternalStore(OnboardingClient.getSnapshot, OnboardingClient.subscribe)
 	local presented = React.useRef(false)
 
@@ -46,3 +51,12 @@ return function(props: Props)
 		OnKeepTraining = OnboardingClient.keepTraining,
 	})
 end
+
+-- The input indicator, mounted uninset so its pixel positions are the same
+-- coordinates the touch classifier decides taps, holds and swipes in.
+function OnboardingApp.Gestures()
+	local snapshot = useExternalStore(OnboardingClient.getSnapshot, OnboardingClient.subscribe)
+	return c(OnboardingGestureLayer, { Snapshot = snapshot })
+end
+
+return OnboardingApp

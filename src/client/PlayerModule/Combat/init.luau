@@ -159,6 +159,36 @@ function Combat.getConfig()
 	return CombatConfig
 end
 
+export type InputGeometry = {
+	viewport: Vector2,
+	-- Where a tap or a hold is read: the whole viewport below the platform inset.
+	pressCenter: Vector2,
+	-- How far a finger may drift and still count as a tap, in pixels.
+	tapDriftPixels: number,
+	-- How long a press must be held before it becomes a charge, in seconds.
+	holdDelaySeconds: number,
+	-- The region a bottom swipe must START inside, in viewport pixels.
+	swipeRect: TouchRegions.Rect,
+	-- How far that swipe must travel to register, in pixels.
+	swipeDistancePixels: number,
+	swipeEnabled: boolean,
+}
+
+-- The real geometry of every touch region, in viewport pixels. Instructional UI
+-- reads it from here instead of re-deriving it from the config, so a prompt
+-- that points at "where to press" cannot drift from where input is read.
+function Combat.inputGeometry(): InputGeometry
+	return {
+		viewport = TouchRegions.viewportSize(),
+		pressCenter = TouchRegions.gameplayCenter(),
+		tapDriftPixels = TouchRegions.scale(CombatConfig.Tap.MaxDistance),
+		holdDelaySeconds = CombatConfig.Charge.HoldDelay,
+		swipeRect = TouchRegions.bottomSwipeRect(),
+		swipeDistancePixels = TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance),
+		swipeEnabled = CombatConfig.BottomSwipe.Enabled,
+	}
+end
+
 function Combat.start()
 	if started then
 		return

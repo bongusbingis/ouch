@@ -1,11 +1,10 @@
 -- Name: OnboardingOverlay.luau
 -- Author: Jack C.
--- Description: The training overlay: the contextual prompt and input glyph, the escalating hint line, the optional mobile swipe tip, the corner skip control, the party-ready choice, and the completion card, all driven from one snapshot.
+-- Description: The training chrome: the instruction panel, the corner skip control, the party-ready choice, and the completion card, all in the game's own panel and button treatment.
 -- Created: 2026-08-27
 
 --!strict
 
-local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -14,6 +13,7 @@ local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Config = ReplicatedStorage:WaitForChild("Config")
 local OnboardingConfig = require(Config:WaitForChild("Onboarding"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local NotificationModal = require(script.Parent.NotificationModal)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
@@ -21,10 +21,17 @@ local OnboardingViewModel = require(script.Parent.Parent.Models.OnboardingViewMo
 
 local c = React.createElement
 
-local FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
-local INK = Color3.new(1, 1, 1)
-local ACCENT = Color3.fromRGB(102, 232, 255)
-local SHADOW = Color3.fromRGB(24, 22, 48)
+-- The game's own kit. Every surface here is the same nine-slice panel and
+-- button art the loading screen, the notification modal and the shop use, so
+-- training does not read as a different product.
+local PANEL_IMAGE = "rbxassetid://124751224634629"
+local PANEL_SLICE = Rect.new(31, 41, 978, 620)
+local BLUE_BUTTON = "rbxassetid://136021539696619"
+local BUTTON_SLICE = Rect.new(198, 228, 841, 468)
+local INK = Color3.fromRGB(24, 41, 48)
+local HIGHLIGHT = Color3.fromRGB(255, 224, 78)
+local HEADLINE_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local BODY_FONT = Font.new("rbxasset://fonts/families/HighwayGothic.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
 
 export type Props = {
 	Snapshot: any,
@@ -33,122 +40,98 @@ export type Props = {
 	OnKeepTraining: () -> (),
 }
 
-local function shoutedText(text: string, size: UDim2, position: UDim2, color: Color3, zIndex: number)
-	return c(ResponsiveText, {
-		MeasurementFont = Enum.Font.LuckiestGuy,
-		Native = {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			FontFace = FONT,
-			Position = position,
-			Size = size,
-			Text = text,
-			TextColor3 = color,
-			ZIndex = zIndex,
-		},
-	}, {
-		Stroke = c("UIStroke", {
-			Color = SHADOW,
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			Thickness = 0.09,
-		}),
+local function textStroke(thickness: number)
+	return c("UIStroke", {
+		Color = INK,
+		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+		Thickness = thickness,
+		Transparency = 0.08,
 	})
 end
 
--- The prompt sits high and centred: near enough to the reticle to be read
--- without looking away, far enough from it never to sit under the aim point or
--- a thumb.
-local function Prompt(props: { snapshot: any })
+local function headline(text: string, maxTextSize: number, position: UDim2, size: UDim2, zIndex: number)
+	return c(ResponsiveText, {
+		HostName = "Headline",
+		MeasurementFont = Enum.Font.LuckiestGuy,
+		MaxTextSize = maxTextSize,
+		Native = {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			FontFace = HEADLINE_FONT,
+			Position = position,
+			Size = size,
+			Text = text,
+			TextColor3 = Color3.new(1, 1, 1),
+			ZIndex = zIndex,
+		},
+	}, { Stroke = textStroke(0.045) })
+end
+
+-- One panel, top-centre, holding the verb and at most one clarifying line. The
+-- world does the teaching; this only names the action.
+local function InstructionPanel(props: { snapshot: any })
 	local model = OnboardingViewModel.prompt(props.snapshot)
 	local hint = OnboardingViewModel.hintText(props.snapshot)
 	local reducedMotion = useReducedMotion()
 	local success = props.snapshot.success ~= ""
+	local layout = OnboardingConfig.UI.Panel
 	local styles = ReactSpring.useSpring({
-		Scale = if not model.visible then 0.7 else if success then 1.12 else 1,
-		Transparency = if model.visible then 0 else 1,
+		Scale = if not model.visible then 0.78 else if success then 1.06 else 1,
+		Rotation = if success then -1.5 else 0,
 		config = Motion.Control,
 		immediate = reducedMotion,
 	})
 	if not model.visible then
 		return nil
 	end
-	return c("Frame", {
+	return c("ImageLabel", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.5, 0.06),
-		Size = UDim2.fromScale(0.62, 0.24),
+		Image = PANEL_IMAGE,
+		ImageColor3 = if success then HIGHLIGHT else Color3.new(1, 1, 1),
+		Position = UDim2.fromScale(0.5, layout.TopScale),
+		Rotation = styles.Rotation,
+		ScaleType = Enum.ScaleType.Slice,
+		Size = UDim2.fromScale(layout.WidthScale, layout.HeightScale),
+		SliceCenter = PANEL_SLICE,
+		SliceScale = 0.35,
 		ZIndex = 20,
 	}, {
 		Scale = c("UIScale", { Scale = styles.Scale }),
-		Headline = shoutedText(model.headline, UDim2.fromScale(1, 0.5), UDim2.fromScale(0.5, 0.28), INK, 21),
-		Glyph = if model.glyph ~= ""
-			then c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundColor3 = SHADOW,
-				BackgroundTransparency = 0.25,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.56),
-				Size = UDim2.fromScale(0.24, 0.24),
-				ZIndex = 21,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0.28, 0) }),
-				Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(220, 74), MinSize = Vector2.new(84, 36) }),
-				Stroke = c("UIStroke", {
-					Color = ACCENT,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = 0.06,
-				}),
-				Label = shoutedText(model.glyph, UDim2.fromScale(0.86, 0.72), UDim2.fromScale(0.5, 0.5), ACCENT, 22),
-			})
-			else nil,
-		Caption = if model.caption ~= ""
-			then shoutedText(model.caption, UDim2.fromScale(0.8, 0.12), UDim2.fromScale(0.5, 0.87), INK, 21)
-			else nil,
-		Hint = if hint ~= ""
-			then shoutedText(hint, UDim2.fromScale(1, 0.13), UDim2.fromScale(0.5, 1.02), ACCENT, 21)
-			else nil,
-	})
-end
-
--- Offered, never required: the tap already taught the throw, and this is the
--- second way to do the same thing.
-local function SwipeHint(props: { visible: boolean })
-	local reducedMotion = useReducedMotion()
-	local styles = ReactSpring.useSpring({
-		Offset = if props.visible then 1 else 0,
-		Transparency = if props.visible then 0 else 1,
-		config = { mass = 1, tension = 260, friction = 22 },
-		loop = props.visible and not reducedMotion,
-		immediate = reducedMotion,
-	})
-	if not props.visible then
-		return nil
-	end
-	return c("Frame", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.5, 0.82),
-		Size = UDim2.fromScale(0.5, 0.16),
-		ZIndex = 20,
-	}, {
-		Label = shoutedText("SWIPE UP TO THROW TOO", UDim2.fromScale(1, 0.45), UDim2.fromScale(0.5, 0.7), INK, 21),
-		Finger = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = ACCENT,
-			BorderSizePixel = 0,
-			Position = styles.Offset:map(function(value: number)
-				return UDim2.fromScale(0.5, 0.36 - value * 0.22)
-			end),
-			Size = UDim2.fromOffset(18, 18),
-			ZIndex = 21,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		Aspect = c("UIAspectRatioConstraint", { AspectRatio = layout.AspectRatio }),
+		Bounds = c("UISizeConstraint", {
+			MaxSize = layout.MaxPixels,
+			MinSize = layout.MinPixels,
 		}),
+		Headline = headline(
+			model.headline,
+			58,
+			UDim2.fromScale(0.5, if hint ~= "" then 0.4 else 0.5),
+			UDim2.fromScale(0.86, 0.42),
+			21
+		),
+		Hint = if hint ~= ""
+			then c(ResponsiveText, {
+				HostName = "Hint",
+				MeasurementFont = Enum.Font.Highway,
+				MaxTextSize = 30,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = BODY_FONT,
+					Position = UDim2.fromScale(0.5, 0.72),
+					Size = UDim2.fromScale(0.84, 0.2),
+					Text = hint,
+					TextColor3 = HIGHLIGHT,
+					ZIndex = 21,
+				},
+			}, { Stroke = textStroke(0.06) })
+			else nil,
 	})
 end
 
--- Discoverable, never dominant. Two presses: the first arms it, the second
--- inside the confirm window commits, so a stray tap costs nothing.
+-- Discoverable without competing. The first press arms it, a second press
+-- inside the confirm window commits, so a stray tap never costs the tutorial.
 local function SkipControl(props: { visible: boolean, onSkip: () -> () })
 	local armed, setArmed = React.useState(false)
 	local armRevision = React.useRef(0)
@@ -157,6 +140,11 @@ local function SkipControl(props: { visible: boolean, onSkip: () -> () })
 			setArmed(false)
 		end
 	end, { props.visible })
+	React.useEffect(function()
+		return function()
+			armRevision.current += 1
+		end
+	end, {})
 	if not props.visible then
 		return nil
 	end
@@ -165,12 +153,14 @@ local function SkipControl(props: { visible: boolean, onSkip: () -> () })
 		Style = "Standard",
 		Native = {
 			AnchorPoint = Vector2.new(1, 0),
-			BackgroundColor3 = SHADOW,
-			BackgroundTransparency = if armed then 0.05 else 0.45,
-			BorderSizePixel = 0,
-			Image = "",
+			BackgroundTransparency = 1,
+			Image = BLUE_BUTTON,
+			ImageColor3 = if armed then HIGHLIGHT else Color3.new(1, 1, 1),
 			Position = UDim2.fromScale(1 - inset, inset),
-			Size = UDim2.fromScale(0.13, 0.062),
+			ScaleType = Enum.ScaleType.Slice,
+			Size = UDim2.fromScale(0.135, 0.09),
+			SliceCenter = BUTTON_SLICE,
+			SliceScale = 0.12,
 			ZIndex = 30,
 		},
 		OnActivated = function()
@@ -188,94 +178,23 @@ local function SkipControl(props: { visible: boolean, onSkip: () -> () })
 			end)
 		end,
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0.35, 0) }),
-		Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(200, 56), MinSize = Vector2.new(92, 30) }),
-		Stroke = c("UIStroke", {
-			Color = if armed then ACCENT else INK,
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			Thickness = 0.05,
-		}),
-		Label = shoutedText(
+		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 3.1 }),
+		Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(220, 71), MinSize = Vector2.new(104, 34) }),
+		Label = headline(
 			if armed then "SKIP?" else "SKIP",
-			UDim2.fromScale(0.82, 0.66),
-			UDim2.fromScale(0.5, 0.54),
-			if armed then ACCENT else INK,
+			26,
+			UDim2.fromScale(0.5, 0.56),
+			UDim2.fromScale(0.78, 0.56),
 			31
 		),
-	})
-end
-
--- A real match always outranks training. The player is asked rather than
--- yanked, and the harder choice is never the default focus.
-local function PartyReady(props: { visible: boolean, onJoin: () -> (), onKeep: () -> () })
-	local joinRef = React.useRef(nil)
-	React.useEffect(function()
-		if not props.visible then
-			return
-		end
-		task.defer(function()
-			local button = joinRef.current
-			if button and button.Parent and button.Visible and button.Selectable then
-				GuiService.SelectedObject = button
-			end
-		end)
-	end, { props.visible })
-	if not props.visible then
-		return nil
-	end
-	local function choice(text: string, order: number, color: Color3, onActivated: () -> (), buttonRef: any?)
-		return c(AnimatedButton, {
-			ButtonRef = buttonRef,
-			Style = "Primary",
-			Native = {
-				BackgroundColor3 = color,
-				BorderSizePixel = 0,
-				Image = "",
-				LayoutOrder = order,
-				Size = UDim2.fromScale(0.46, 1),
-				ZIndex = 41,
-			},
-			OnActivated = onActivated,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0.3, 0) }),
-			Label = shoutedText(text, UDim2.fromScale(0.86, 0.6), UDim2.fromScale(0.5, 0.5), INK, 42),
-		})
-	end
-	return c("Frame", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundColor3 = SHADOW,
-		BackgroundTransparency = 0.1,
-		BorderSizePixel = 0,
-		Position = UDim2.fromScale(0.5, 0.96),
-		Size = UDim2.fromScale(0.56, 0.2),
-		ZIndex = 40,
-	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
-		Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(720, 190) }),
-		Title = shoutedText("YOUR PARTY IS READY!", UDim2.fromScale(0.9, 0.34), UDim2.fromScale(0.5, 0.26), INK, 41),
-		Buttons = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.92),
-			Size = UDim2.fromScale(0.9, 0.42),
-		}, {
-			Layout = c("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				Padding = UDim.new(0.04, 0),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-			}),
-			Join = choice("JOIN MATCH", 1, Color3.fromRGB(76, 196, 122), props.onJoin, joinRef),
-			Keep = choice("KEEP TRAINING", 2, Color3.fromRGB(96, 92, 140), props.onKeep),
-		}),
 	})
 end
 
 local function Completion(props: { visible: boolean })
 	local reducedMotion = useReducedMotion()
 	local styles = ReactSpring.useSpring({
-		Scale = if props.visible then 1 else 0.6,
+		Scale = if props.visible then 1 else 0.62,
+		Rotation = if props.visible then 0 else -3,
 		config = Motion.Modal,
 		immediate = reducedMotion,
 	})
@@ -286,36 +205,64 @@ local function Completion(props: { visible: boolean })
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0.04, 0),
+			Padding = UDim.new(0.03, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
 	}
-	for index, label in OnboardingViewModel.completedSkills() do
-		skills[`Skill{index}`] = c("Frame", {
+	for index, skill in OnboardingViewModel.completedSkills() do
+		skills[`Skill{index}`] = c("ImageLabel", {
 			BackgroundTransparency = 1,
+			Image = BLUE_BUTTON,
+			ImageColor3 = HIGHLIGHT,
 			LayoutOrder = index,
-			Size = UDim2.fromScale(0.28, 1),
+			ScaleType = Enum.ScaleType.Slice,
+			Size = UDim2.fromScale(0.3, 1),
+			SliceCenter = BUTTON_SLICE,
+			SliceScale = 0.1,
+			ZIndex = 51,
 		}, {
-			Label = shoutedText(`✓ {label}`, UDim2.fromScale(1, 0.8), UDim2.fromScale(0.5, 0.5), ACCENT, 51),
+			Label = headline(skill, 26, UDim2.fromScale(0.5, 0.56), UDim2.fromScale(0.82, 0.5), 52),
 		})
 	end
-	return c("Frame", {
+	return c("ImageLabel", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.5, 0.42),
-		Size = UDim2.fromScale(0.7, 0.4),
+		Image = PANEL_IMAGE,
+		Position = UDim2.fromScale(0.5, 0.47),
+		Rotation = styles.Rotation,
+		ScaleType = Enum.ScaleType.Slice,
+		Size = UDim2.fromScale(0.42, 0.28),
+		SliceCenter = PANEL_SLICE,
+		SliceScale = 0.4,
 		ZIndex = 50,
 	}, {
 		Scale = c("UIScale", { Scale = styles.Scale }),
-		Headline = shoutedText("READY!", UDim2.fromScale(1, 0.55), UDim2.fromScale(0.5, 0.36), INK, 51),
+		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 2.3 }),
+		Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(860, 374), MinSize = Vector2.new(360, 157) }),
+		Headline = headline("READY!", 78, UDim2.fromScale(0.5, 0.33), UDim2.fromScale(0.8, 0.34), 51),
 		Skills = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
+			AnchorPoint = Vector2.new(0.5, 1),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.72),
-			Size = UDim2.fromScale(0.92, 0.2),
+			Position = UDim2.fromScale(0.5, 0.86),
+			Size = UDim2.fromScale(0.86, 0.24),
+			ZIndex = 51,
 		}, skills),
 	})
+end
+
+-- A real match outranks training, so the choice is put in the game's own
+-- confirmation modal rather than in a bespoke bar that would sit on top of the
+-- jump button and the thumbstick.
+local function partyRequest()
+	return {
+		Title = "YOUR PARTY IS READY!",
+		Description = "YOUR PARTY IS HEADING INTO A MATCH.",
+		Buttons = {
+			{ Color = "Blue" :: "Blue", Text = "JOIN MATCH", Value = true },
+			{ Color = "Red" :: "Red", Text = "KEEP TRAINING", Value = false },
+		},
+	}
 end
 
 return function(props: Props)
@@ -323,21 +270,27 @@ return function(props: Props)
 	if snapshot.route ~= "Training" then
 		return nil
 	end
+	local partyOpen = snapshot.partyReady == true
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 	}, {
-		Prompt = c(Prompt, { snapshot = snapshot }),
-		SwipeHint = c(SwipeHint, { visible = snapshot.swipeHint }),
+		Panel = if partyOpen then nil else c(InstructionPanel, { snapshot = snapshot }),
 		Skip = c(SkipControl, {
-			visible = OnboardingViewModel.skipVisible(snapshot, OnboardingConfig.Eligibility.SkipEnabled),
+			visible = OnboardingViewModel.skipVisible(snapshot, OnboardingConfig.Eligibility.SkipEnabled)
+				and not partyOpen,
 			onSkip = props.OnSkip,
 		}),
-		PartyReady = c(PartyReady, {
-			visible = snapshot.partyReady,
-			onJoin = props.OnJoinPartyMatch,
-			onKeep = props.OnKeepTraining,
+		Completion = c(Completion, { visible = snapshot.celebrating and not partyOpen }),
+		PartyReady = c(NotificationModal, {
+			Request = if partyOpen then partyRequest() else nil,
+			OnChoose = function(joinMatch)
+				if joinMatch then
+					props.OnJoinPartyMatch()
+				else
+					props.OnKeepTraining()
+				end
+			end,
 		}),
-		Completion = c(Completion, { visible = snapshot.celebrating }),
 	})
 end
