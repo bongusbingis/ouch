@@ -16,6 +16,9 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local InputBuffer = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("InputBuffer")
 )
+local CombatSession = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("CombatSession")
+)
 local AimDirector = require(script.Parent.AimDirector)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local CombatState = require(script.Parent.Parent.Presentation.CombatState)
@@ -108,8 +111,7 @@ local function actionable(): boolean
 	if character == nil or character:GetAttribute("CombatAlive") == false then
 		return false
 	end
-	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
-	return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
+	return CombatSession.isLive()
 end
 
 local function submit(kind: string, style: Style)

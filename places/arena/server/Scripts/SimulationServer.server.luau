@@ -37,6 +37,7 @@ local RotatingPlatforms = require(
 )
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
+local CombatSession = require(Adapters:WaitForChild("CombatSession"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
@@ -128,4 +129,14 @@ ServerAuthAdapter.onEvent(function(event)
 	end
 end)
 
+CombatSession.setHost({
+	isParticipant = function(player)
+		local admission = player:GetAttribute("ArenaAdmission")
+		return (admission == "Direct" or admission == "Matched") and player:GetAttribute("ArenaReady") == true
+	end,
+	isLive = function()
+		local matchState = ReplicatedStorage:FindFirstChild("MatchState")
+		return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
+	end,
+})
 ServerAuthAdapter.start()

@@ -56,6 +56,8 @@ local definitions = {
 	CombatSimEvent = "unreliable",
 	JumpPadImpulse = "unreliable",
 	ReportAnalyticsEvent = "event",
+	OnboardingAction = "function",
+	OnboardingEvent = "event",
 }
 local rateLimitCounters = {}
 

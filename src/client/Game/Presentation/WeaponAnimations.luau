@@ -45,16 +45,15 @@ local function resolve(weapon: string, name: string): AnimationTrack?
 		return nil
 	end
 
-	local instance: Instance?
-	if clip.Required then
-		instance = folder():WaitForChild(clip.Name)
-		assert(instance and instance:IsA("Animation"), "[WeaponAnimations] " .. clip.Name .. " must be an Animation")
-	else
-		instance = folder():FindFirstChild(clip.Name)
-		if instance == nil or not instance:IsA("Animation") then
+	local instance = folder():FindFirstChild(clip.Name)
+	if instance == nil or not instance:IsA("Animation") then
+		-- Required clips are waited on by the preload thread, which carries the
+		-- infinite-yield diagnostic; they are never latched as missing so they
+		-- start playing the moment the asset does arrive.
+		if not clip.Required then
 			missing[key] = true
-			return nil
 		end
+		return nil
 	end
 
 	local loaded = current:LoadAnimation(instance :: Animation)
@@ -112,6 +111,19 @@ local function playOnce(weapon: string, name: string, fadeTime: number, cooldown
 	track:Play(fadeTime)
 end
 
+-- Waited on off the input path so a place missing an authored clip surfaces the
+-- usual infinite-yield warning without stalling the thread that threw the ball.
+local function preloadRequiredClips()
+	for _, clips in Animations.Clips do
+		for _, clip in clips do
+			if clip.Required then
+				local instance = folder():WaitForChild(clip.Name)
+				assert(instance:IsA("Animation"), "[WeaponAnimations] " .. clip.Name .. " must be an Animation")
+			end
+		end
+	end
+end
+
 local function onCharacter(character: Model)
 	table.clear(tracks)
 	table.clear(missing)
@@ -155,6 +167,8 @@ function WeaponAnimations.start()
 		return
 	end
 	started = true
+
+	task.spawn(preloadRequiredClips)
 
 	local player = Players.LocalPlayer
 	player.CharacterAdded:Connect(onCharacter)

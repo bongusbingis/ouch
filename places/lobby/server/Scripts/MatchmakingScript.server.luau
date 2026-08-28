@@ -19,7 +19,9 @@ local PartyRepository = require(matchmaking.PartyRepository)
 local PartyService = require(matchmaking.PartyService)
 local QueueRepository = require(matchmaking.QueueRepository)
 local TeleportCoordinator = require(matchmaking.TeleportCoordinator)
-local AnalyticsService = require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("AnalyticsService"))
+local Modules = script.Parent.Parent:WaitForChild("Modules")
+local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
+local OnboardingService = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingService"))
 
 local partyRepository = PartyRepository.new()
 local queueRepository = QueueRepository.new()
@@ -60,6 +62,11 @@ teleportCoordinator:SetStatusHandler(function(player, state, packet)
 end)
 partyService:SetQueueChangedHandler(function()
 	matchmakerService:Tick()
+end)
+-- Onboarding reacts to the party phase and never writes it, so a training
+-- player's party keeps working exactly as it would without training.
+partyService:SetSnapshotObserver(function(player, snapshot)
+	OnboardingService.notifyPartyPhase(player, snapshot.phase)
 end)
 
 Network.handleProtected("PartyRequest", {

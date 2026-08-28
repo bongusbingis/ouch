@@ -47,7 +47,8 @@ Each project also blocks the other place ID. Do not add a `default.project.json`
 |---|---|
 | `src/shared/` | `ReplicatedStorage.Shared` (both places) |
 | `src/config/` | `ReplicatedStorage.Config` (both places) |
-| `src/server/` | Server modules **both places load**: PlayerData, ConfigLiveService, CosmeticsService, CharacterColorService, AnalyticsService, and `Env` |
+| `src/server/` | Server modules **both places load**: PlayerData, ConfigLiveService, CosmeticsService, CharacterColorService, AnalyticsService, BallService, CmdrService, InputSetup, and `Env` |
+| `src/client/Game/` | The combat runtime **both places load**, mapped into each place's `PlayerScripts.Client.Modules` (`Input/`, `Presentation/`) plus `UI/ThrowUXClient` and `UI/CombatHUD` |
 | `src/scripts/` | Tooling; not mapped into either place |
 | `src/tests/` | Shared in-place test harness (`Runner`, `Helpers`), mapped into both places' `ServerStorage.Tests` |
 | `Packages/` | `ReplicatedStorage.Packages` |
@@ -60,6 +61,8 @@ Each project also blocks the other place ID. Do not add a `default.project.json`
 | `places/lobby/tests/` | Lobby-specific specs, merged into `ServerStorage.Tests` |
 
 `src/` is shared by both places and nothing else; anything place-specific lives under `places/`. The shared server modules stay in `src/server/` and are mapped into each place's `Server.Modules` by both project files, so a module's location tells you whether the lobby depends on it.
+
+The combat runtime is shared for the same reason: the lobby's first-session onboarding fights with the real systems. Both project files overlay `src/client/Game/` and the arena's own presentation modules (`VoteCamera`, `MatchAudio`, `MatchAudioLogic`, `PlayerHighlights`, `JumpPadVisuals`) back into one `Client.Modules.Presentation` folder, so the arena's runtime tree is exactly what it always was and every relative require inside it still resolves. Adding a combat client module means deciding which of the two directories it belongs in, not editing require paths.
 
 Arena entry points: `places/arena/server/Server.server.luau` (PlayerData load/save lifecycle only), `places/arena/server/Scripts/SimulationServer.server.luau` (starts all services, wires sim events to animations/feedback), `places/arena/client/Scripts/SimulationClient.client.luau` (starts all client modules). Lobby entry points: `places/lobby/server/Server.server.luau`, `places/lobby/server/Scripts/MatchmakingScript.server.luau`, and `places/lobby/client/Scripts/LobbyClient.client.luau`.
 
@@ -88,6 +91,12 @@ Weapon animations are started by the acting player's own client (`WeaponAnimatio
 
 **Security invariant (GDD §8):** hits, catches, eliminations, and respawn timing are server-authoritative. Clients send inputs and render feedback; never trust client raycasts or client-reported hits.
 
+**Who is fighting, and when.** `CombatSession` is the single owner of that question and the only thing any combat module asks. Each place's server installs one host at startup — the arena's is the match (`ArenaAdmission`/`ArenaReady` plus `MatchState.phase == "Active"`), the lobby's is an active onboarding session — and the answer is projected onto one `CombatLive` player attribute that every client module reads. No combat module names an arena attribute or a match phase, which is what lets the same code run in both places. The adapter also takes `registerCharacterSource` (non-player sim characters, keyed by opaque id exactly as players are, optionally widening their own hit radius), `setRuleOverride` (a host with no game mode states its rules directly), and `equipWeapon` (a server-side equip, for a scripted context that must put a specific weapon in a player's hand).
+
+### First-session onboarding — `places/lobby/server/Modules/Onboarding/`
+
+`OnboardingService` is the single owner of the first-session flow and the only thing that decides what step a player is on: eligibility from the profile, one training ring per player, step transitions driven by **sim events** rather than button presses, checkpoint persistence, the funnel, party overrides, and the handover to the normal lobby. Pure rules live in `src/shared/Game/Onboarding/` (`OnboardingSteps`, `OnboardingState`, `OnboardingLayout`, `OnboardingAnalytics`) and are spec-tested. Status is persisted in the profile under `Onboarding` and written only through `PlayerData.updateOnboarding`, which takes a pure `OnboardingState` transition; `CoreComplete` is stamped the instant the third mandatory mechanic lands, so a disconnect one second later never costs the player the tutorial again. Training dummies are registered character sources, so the real dodgeball and hammer hit them by the real rules and no sim module is aware training exists. Per-player isolation is spatial: `OnboardingLayout` allocates a grid slot far above the lobby, and `CombatSession` makes a player a combat character only while they hold a session. Onboarding never writes party state — it observes `PartyService:SetSnapshotObserver` and gets out of the way when a real match is ready. See `docs/onboarding.md`.
+
 ### Match orchestration — `src/server/Modules/`
 
 - **MatchService** (the largest service) drives `MatchSim` with the selected mode's rules and owns the match lifecycle: arena teleports, ball provisioning via mode hooks, elimination consequences, and respawn scheduling. Only ModeVoteService (plus explicit developer/test tooling) calls its server-only `beginMode(modeId)` seam. Replicated UI surface: `ReplicatedStorage.MatchState` folder attributes (`phase`, `timeRemaining`, `winnerId`, `modeId`), per-player `MatchScore` attribute, leaderstats `Elims`, and `MatchService.onEvent` for killfeed-style consumers. Respawns use per-player generation counters so a new death/leave cancels a stale scheduled respawn; TDM uses synchronized wave respawns (`WaveRespawnSeconds`).
@@ -115,11 +124,11 @@ Weapon animations are started by the acting player's own client (`WeaponAnimatio
 
 **No competitive advantage:** nothing purchasable may affect combat outcomes — no weapon, movement, damage, cooldown, or health value is ever for sale (GDD §2, §7). Progression boosters (XP/Bonks multipliers) are permitted and live in `GamePasses.Boosts`; they change earn *rate* only. If a proposed offer would change who wins a fight, it is out of scope regardless of how it is framed.
 
-### Client — `places/arena/client/Modules/`
+### Client — `src/client/Game/` (shared) and `places/arena/client/Modules/` (arena-only)
 
 - **Input/**: `InputRouter` feeds `AimDirector`'s aim into the `Aim` InputAction every frame, pulses `Throw` on touch taps, and reports mouse, touch, or gamepad device class. It releases the centered mouse only while the authoritative mode vote is open. `AimDirector` owns aim/soft-lock target selection.
 - **Presentation/** (BallVisuals, HammerVisuals, DamageFeedback, DeathEffects, WorldAudio; CharacterRig owns rig-name lookups like the R15/R6 right-hand fallback): rendering and audio feedback *only* — they react to sim events, attributes, and remotes and hold no gameplay authority. Effects on the ball template (trails, emitters, sounds) are Studio-authored and enabled/disabled by phase; broadcast events can arrive more than once, so effects must deduplicate (test at 0/100/150/200 ms latency per `docs/dodgeball-studio-setup.md`).
-- **UI/**: every arena UI is React; there is no imperative or Studio-authored UI left in this place. `ArenaApp` is the arena React root and renders the shared `GameModeSelect` from `ModeVoteClient`'s derived replicated snapshot. Presentational components never require Network or own gameplay state; client-to-server actions stay in the arena adapter. Shared interaction, responsive text, feedback, and motion primitives live under `src/shared/UI`.
+- **UI/**: every arena UI is React; there is no imperative or Studio-authored UI left in this place. The combat HUD (reticle, trajectory, swipe feedback, touch hammer button) and `ThrowUXClient` are shared, because onboarding needs the real one. `ArenaApp` is the arena React root and renders the shared `GameModeSelect` from `ModeVoteClient`'s derived replicated snapshot. Presentational components never require Network or own gameplay state; client-to-server actions stay in the arena adapter. Shared interaction, responsive text, feedback, and motion primitives live under `src/shared/UI`.
 
 ### Networking — `src/shared/Network.luau`
 
@@ -129,7 +138,7 @@ The single place remotes are declared: add to its `definitions` table (name → 
 
 ### Config — `src/config/`
 
-All tunables live here and nowhere else: combat feel (`Combat`, cmdr-tunable at runtime; units are studs/seconds/degrees), aim assist per device class (`AimAssist`), input map (`Input`), game-mode vote metadata/timing (`GameModes`), arena features (`MapFeatures`, pending the `Scriptables` pass), data template + XP/Bonks tables (`Data`), quests, cosmetics, crates, products, UI, debug flags. New gameplay constants go in the matching config module, not inline.
+All tunables live here and nowhere else: combat feel (`Combat`, cmdr-tunable at runtime; units are studs/seconds/degrees), aim assist per device class (`AimAssist`), input map (`Input`), game-mode vote metadata/timing (`GameModes`), arena features (`MapFeatures`, pending the `Scriptables` pass), data template + XP/Bonks tables (`Data`), first-session onboarding (`Onboarding`), quests, cosmetics, crates, products, UI, debug flags. New gameplay constants go in the matching config module, not inline.
 
 **Live configs (`LiveConfig` + `ConfigLiveService`).** `src/config/LiveConfig.luau` is the allowlist of leaves that Roblox experience configs (`ConfigService`) may override at runtime; a leaf not declared there can never be changed live. `ConfigLiveService` (server, both places) reads the snapshot, validates every value against the declared type and range, and installs it by writing into the config table consumers already read — there is no second resolved copy to drift from it. The baked value of each leaf is captured on first override and restored exactly when the override disappears, so **the game always falls back to the values in `src/config`** when the config APIs fail, and a resync is all-or-nothing so a partial read cannot install a half-applied set. `ConfigSnapshot.UpdateAvailable` drives refreshes, with a periodic resync as a safety net.
 

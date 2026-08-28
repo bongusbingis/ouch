@@ -238,7 +238,17 @@ local function LobbyContent(props)
 		hammerItemId = equipped.HammerAssets,
 	}
 	local characterRenderer = React.useRef(nil)
-	useWorldTransition(currentPage, props.CameraEnabled ~= false)
+	local suppressed = props.Suppressed == true
+	-- Suppressed means hidden, never unmounted: the party adapter, the shop
+	-- store, and every piece of lobby state keep running underneath training, so
+	-- the reveal is a re-render rather than a rebuild.
+	local emphasizePlay = React.useRef(false)
+	local wasSuppressed = React.useRef(suppressed)
+	if wasSuppressed.current and not suppressed then
+		emphasizePlay.current = true
+	end
+	wasSuppressed.current = suppressed
+	useWorldTransition(currentPage, props.CameraEnabled ~= false and not suppressed)
 
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false then
@@ -362,6 +372,7 @@ local function LobbyContent(props)
 						ShowMatchmakingActivity = presentation.showMatchmakingActivity,
 						PlayText = presentation.playText,
 						PlayEnabled = presentation.playEnabled,
+						EmphasizePlay = emphasizePlay.current,
 						OnPlay = function()
 							task.spawn(partyClient.toggleMatchmaking, partyClient)
 						end,
@@ -399,6 +410,7 @@ local function LobbyContent(props)
 		BaseClip = c("Frame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
+			Visible = not suppressed,
 		}, {
 			Views = c("Frame", {
 				BackgroundTransparency = 1,

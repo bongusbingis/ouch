@@ -20,6 +20,7 @@ local PlayerAssist = require(script.Parent.Parent.Parent.Parent.Config.PlayerAss
 local MobileInput = require(script.Parent.Parent.Parent.Parent.Config.MobileInput)
 local Intercept = require(script.Parent.Parent.Sim.Intercept)
 local MovementSpeedService = require(script.Parent.MovementSpeedService)
+local CombatSession = require(script.Parent.CombatSession)
 local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local ModeRegistry = require(script.Parent.Parent.Modes.ModeRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
@@ -36,7 +37,6 @@ local BALLS_FOLDER_NAME = "Balls"
 
 local listeners: { (SimEvent) -> () } = {}
 local pendingWeaponResets: { [string]: boolean } = {}
-local matchState: Folder? = nil
 local started = false
 
 local function trace(message: string)
@@ -63,11 +63,30 @@ local function dispatch(events: { SimEvent })
 	end
 end
 
-type CharacterEntry = {
+export type CharacterEntry = {
 	model: Model,
 	root: BasePart,
-	player: Player,
+	player: Player?,
+	-- A registered source may widen its own hit radius; nothing else can. This
+	-- is how onboarding makes a target more forgiving without loosening the
+	-- weapon that hits it.
+	radius: number?,
 }
+
+export type CharacterSource = () -> { [string]: CharacterEntry }
+
+local characterSources: { [string]: CharacterSource } = {}
+
+-- Non-player sim characters (training dummies, practice bots). The sim keys
+-- characters by opaque string ids, so a registered entry fights by exactly the
+-- same rules a player does; nothing downstream is aware it is not a player.
+function ServerAuthAdapter.registerCharacterSource(name: string, source: CharacterSource)
+	characterSources[name] = source
+end
+
+function ServerAuthAdapter.unregisterCharacterSource(name: string)
+	characterSources[name] = nil
+end
 
 local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 	local entries: { [string]: CharacterEntry } = {}
@@ -77,8 +96,7 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		if model == nil then
 			continue
 		end
-		local admission = player:GetAttribute("ArenaAdmission")
-		if (admission ~= "Direct" and admission ~= "Matched") or player:GetAttribute("ArenaReady") ~= true then
+		if not CombatSession.isLive(player) then
 			table.insert(excluded, model)
 			continue
 		end
@@ -88,6 +106,19 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		end
 		entries[PlayerIds.toId(player)] = { model = model, root = root, player = player }
 		table.insert(excluded, model)
+	end
+	for name, source in characterSources do
+		local ok, extra = pcall(source)
+		if not ok then
+			warn(`[ServerAuthAdapter] character source {name} errored: {extra}`)
+			continue
+		end
+		for id, entry in extra :: { [string]: CharacterEntry } do
+			if entries[id] == nil then
+				entries[id] = entry
+				table.insert(excluded, entry.model)
+			end
+		end
 	end
 	return entries, excluded
 end
@@ -138,7 +169,21 @@ local worldSnapshot: SimTypes.WorldSnapshot = {
 	rules = simRules,
 }
 
+local ruleOverride: SimTypes.SimRules? = nil
+
+-- A host with no game mode (the lobby's onboarding session) states its rules
+-- directly instead of having them resolved from a replicated mode id.
+function ServerAuthAdapter.setRuleOverride(rules: SimTypes.SimRules?)
+	ruleOverride = rules
+end
+
 local function refreshRules()
+	local override = ruleOverride
+	if override then
+		simRules.preserveDodgeballs = override.preserveDodgeballs
+		return
+	end
+	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
 	local modeId = if matchState then matchState:GetAttribute("modeId") :: string? else nil
 	local mode = if modeId then ModeRegistry.get(modeId) else nil
 	simRules.preserveDodgeballs = mode ~= nil and mode.rules.PreserveDodgeballs == true
@@ -170,7 +215,7 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 			throwPosition = throwPosition(entry),
 			velocity = entry.root.AssemblyLinearVelocity,
 			height = capsule.Height,
-			radius = capsule.Radius,
+			radius = entry.radius or capsule.Radius,
 			alive = entry.model:GetAttribute("CombatAlive") ~= false,
 			teamId = entry.model:GetAttribute("TeamId") :: string?,
 			invulnerable = entry.model:GetAttribute("minv") == true,
@@ -206,10 +251,21 @@ local pendingIntents: { Intent } = {}
 local pendingEquips: { [string]: string } = {}
 
 local function queueEquip(player: Player, weapon: string)
-	if player:GetAttribute("ArenaReady") ~= true then
+	if not CombatSession.isLive(player) then
 		return
 	end
 	pendingEquips[PlayerIds.toId(player)] = weapon
+end
+
+-- Equipping on the player's behalf. Onboarding's melee lesson needs the hammer
+-- in hand on every device, and the routing rule sends a Throw to the equipped
+-- kit, so the choice has to be stated rather than implied.
+function ServerAuthAdapter.equipWeapon(player: Player, weapon: string): boolean
+	if not WeaponRegistry.isKind(weapon) then
+		return false
+	end
+	queueEquip(player, weapon)
+	return true
 end
 
 local function queueIntent(
@@ -219,7 +275,7 @@ local function queueIntent(
 	targetId: string?,
 	charge: number?
 )
-	if player:GetAttribute("ArenaReady") ~= true then
+	if not CombatSession.isLive(player) then
 		return
 	end
 	if #pendingIntents >= MAX_QUEUED_INTENTS then
@@ -236,8 +292,7 @@ end
 
 local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
-	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
-	if not active then
+	if not CombatSession.isLive() then
 		table.clear(pendingIntents)
 	end
 
@@ -253,9 +308,13 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 		if entry == nil or entry.model:GetAttribute("CombatAlive") == false then
 			continue
 		end
+		local commandPlayer = entry.player
+		if commandPlayer == nil then
+			continue
+		end
 		local aimDir = vector.normalize(intent.aimDir)
-		local deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse"
-		local projected = entry.player:FindFirstChild(PlayerAssist.FolderName)
+		local deviceClass = (commandPlayer:GetAttribute("DeviceClass") :: string?) or "Mouse"
+		local projected = commandPlayer:FindFirstChild(PlayerAssist.FolderName)
 		local assistFolder = if projected and projected:IsA("Folder") then projected else nil
 		table.insert(commands, {
 			playerId = intent.playerId,
@@ -273,8 +332,15 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 end
 
 local function step(dt: number)
+	CombatSession.refresh()
 	local ballsFolder = Workspace:FindFirstChild(BALLS_FOLDER_NAME)
 	if ballsFolder == nil then
+		return
+	end
+	-- With nobody live and nothing in flight there is no state to advance, so a
+	-- place that only fights some of the time (the lobby, or the arena between
+	-- matches) does not pay for a full step every frame.
+	if not CombatSession.isLive() and #ballsFolder:GetChildren() == 0 then
 		return
 	end
 
@@ -326,11 +392,8 @@ function ServerAuthAdapter.start()
 		return
 	end
 
-	local resolvedMatchState = ReplicatedStorage:WaitForChild("MatchState")
-	assert(resolvedMatchState:IsA("Folder"), "[ServerAuthAdapter] ReplicatedStorage.MatchState must be a Folder")
-	matchState = resolvedMatchState
-
 	Players.PlayerRemoving:Connect(function(player)
+		CombatSession.forget(player)
 		local id = PlayerIds.toId(player)
 		pendingWeaponResets[id] = nil
 		for index = #pendingIntents, 1, -1 do

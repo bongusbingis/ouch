@@ -15,6 +15,7 @@ local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Co
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
 local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
+local CombatSession = require(SharedGame:WaitForChild("Adapters"):WaitForChild("CombatSession"))
 local Intercept = require(SharedGame:WaitForChild("Sim"):WaitForChild("Intercept"))
 
 local AimDirector = {}
@@ -39,6 +40,45 @@ local velocityHistories: { [Model]: { Vec } } = setmetatable({}, { __mode = "k" 
 
 local function toVec(value: Vector3): Vec
 	return vector.create(value.X, value.Y, value.Z)
+end
+
+export type Candidate = { id: string, character: Model, player: Player? }
+export type CharacterSource = () -> { [string]: Model }
+
+local characterSources: { [string]: CharacterSource } = {}
+
+-- The client mirror of ServerAuthAdapter.registerCharacterSource: non-player
+-- sim characters the local player can aim at. Registering here is what keeps
+-- reticle and trajectory targeting from special-casing them.
+function AimDirector.registerCharacterSource(name: string, source: CharacterSource)
+	characterSources[name] = source
+end
+
+function AimDirector.unregisterCharacterSource(name: string)
+	characterSources[name] = nil
+end
+
+-- Exposed so the trajectory preview sweeps against exactly the set the reticle
+-- can target, dummies included.
+function AimDirector.candidates(): { Candidate }
+	local list: { Candidate } = {}
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		if player ~= Players.LocalPlayer and character ~= nil then
+			table.insert(list, { id = PlayerIds.toId(player), character = character, player = player })
+		end
+	end
+	for name, source in characterSources do
+		local ok, extra = pcall(source)
+		if not ok then
+			warn(`[AimDirector] character source {name} errored: {extra}`)
+			continue
+		end
+		for id, character in extra :: { [string]: Model } do
+			table.insert(list, { id = id, character = character, player = nil })
+		end
+	end
+	return list
 end
 
 function AimDirector.deviceClass(): string
@@ -75,13 +115,14 @@ local function presentationVisible(camera: Camera, targetRoot: BasePart): boolea
 	return hit == nil or hit.Instance:IsDescendantOf(targetRoot.Parent :: Instance)
 end
 
-local function refreshTrajectoryExclusions()
+local function refreshTrajectoryExclusions(list: { Candidate })
 	table.clear(trajectoryExclusions)
-	for _, player in Players:GetPlayers() do
-		local character = player.Character
-		if character ~= nil then
-			table.insert(trajectoryExclusions, character)
-		end
+	local localCharacter = Players.LocalPlayer.Character
+	if localCharacter ~= nil then
+		table.insert(trajectoryExclusions, localCharacter)
+	end
+	for _, candidate in list do
+		table.insert(trajectoryExclusions, candidate.character)
 	end
 	local balls = Workspace:FindFirstChild("Balls")
 	if balls ~= nil then
@@ -122,15 +163,15 @@ local function presentationRoot(character: Model, localTeamId: any): BasePart?
 	return root
 end
 
-local function trajectoryRoot(player: Player, character: Model, localTeamId: any): BasePart?
-	local admission = player:GetAttribute("ArenaAdmission")
-	if (admission ~= "Direct" and admission ~= "Matched") or player:GetAttribute("ArenaReady") ~= true then
+local function trajectoryRoot(candidate: Candidate, localTeamId: any): BasePart?
+	local player = candidate.player
+	if player ~= nil and not CombatSession.isLive(player) then
 		return nil
 	end
-	if character:GetAttribute("minv") == true then
+	if candidate.character:GetAttribute("minv") == true then
 		return nil
 	end
-	return presentationRoot(character, localTeamId)
+	return presentationRoot(candidate.character, localTeamId)
 end
 
 local function sampleVelocity(character: Model, root: BasePart)
@@ -172,11 +213,8 @@ local function selectPresentationTarget(camera: Camera, character: Model): (Mode
 	local best: Model? = nil
 	local bestScore = math.huge
 	local bestConfidence = 0
-	for _, player in Players:GetPlayers() do
-		local targetCharacter = player.Character
-		if player == Players.LocalPlayer or targetCharacter == nil then
-			continue
-		end
+	for _, candidate in AimDirector.candidates() do
+		local targetCharacter = candidate.character
 		local root = presentationRoot(targetCharacter, localTeamId)
 		if root == nil then
 			continue
@@ -248,17 +286,15 @@ function AimDirector.currentTrajectoryTarget(): Model?
 	local localTeamId = character:GetAttribute("TeamId")
 	local row = deviceRow()
 	local cosCone = math.cos(math.rad(row.SelectionConeDeg))
-	refreshTrajectoryExclusions()
+	local list = AimDirector.candidates()
+	refreshTrajectoryExclusions(list)
 
 	local best: Model? = nil
 	local bestId: string? = nil
 	local bestScore = math.huge
-	for _, player in Players:GetPlayers() do
-		local targetCharacter = player.Character
-		if player == Players.LocalPlayer or targetCharacter == nil then
-			continue
-		end
-		local root = trajectoryRoot(player, targetCharacter, localTeamId)
+	for _, candidate in list do
+		local targetCharacter = candidate.character
+		local root = trajectoryRoot(candidate, localTeamId)
 		if root == nil then
 			continue
 		end
@@ -272,7 +308,7 @@ function AimDirector.currentTrajectoryTarget(): Model?
 			continue
 		end
 		local score = math.acos(math.clamp(dot, -1, 1)) + distance * 1e-3
-		local id = PlayerIds.toId(player)
+		local id = candidate.id
 		if score < bestScore or (score == bestScore and (bestId == nil or id < bestId)) then
 			best = targetCharacter
 			bestId = id

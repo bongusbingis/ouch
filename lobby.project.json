@@ -2,8 +2,12 @@
   "name": "ouch-lobby",
   "serveAddress": "0.0.0.0",
   "servePort": 34873,
-  "servePlaceIds": [130584867985467],
-  "blockedPlaceIds": [121997450145716],
+  "servePlaceIds": [
+    130584867985467
+  ],
+  "blockedPlaceIds": [
+    121997450145716
+  ],
   "globIgnorePaths": [
     "**/_Index/**/*.server.lua",
     "**/_Index/**/*.server.luau",
@@ -14,139 +18,152 @@
   ],
   "tree": {
     "$className": "DataModel",
-
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared",
-
         "Matchmaking": {
           "$path": "places/lobby/shared/Matchmaking"
         }
       },
-
       "Config": {
         "$path": "src/config"
       },
-
       "Packages": {
         "$path": "Packages"
       }
     },
-
     "ReplicatedFirst": {
       "LoadingBootstrap": {
         "$path": "src/client/LoadingBootstrap.client.luau"
       }
     },
-
     "ServerStorage": {
       "Tests": {
         "$path": "places/lobby/tests",
-
         "Runner": {
           "$path": "src/tests/Runner.luau"
         },
-
         "Helpers": {
           "$path": "src/tests/Helpers"
         }
       }
     },
-
     "ServerScriptService": {
       "Server": {
         "$path": "places/lobby/server/Server.server.luau",
-
         "Env": {
           "$path": "src/server/Env.luau"
         },
-
         "Scripts": {
           "$path": "places/lobby/server/Scripts"
         },
-
         "Modules": {
           "$path": "places/lobby/server/Modules",
-
           "PlayerData": {
             "$path": "src/server/Modules/PlayerData.luau"
           },
-
           "CombatPoseService": {
             "$path": "src/server/Modules/CombatPoseService.luau"
           },
-
           "ConfigLiveService": {
             "$path": "src/server/Modules/ConfigLiveService.luau"
           },
-
           "CosmeticsService": {
             "$path": "src/server/Modules/CosmeticsService.luau"
           },
-
           "CharacterColorService": {
             "$path": "src/server/Modules/CharacterColorService.luau"
           },
-
           "AnalyticsService": {
             "$path": "src/server/Modules/AnalyticsService.luau"
           },
-
           "BattlePassService": {
             "$path": "src/server/Modules/BattlePassService.luau"
           },
-
           "CrateService": {
             "$path": "src/server/Modules/CrateService.luau"
           },
-
           "DirectPurchaseService": {
             "$path": "src/server/Modules/DirectPurchaseService.luau"
           },
-
           "EconomyService": {
             "$path": "src/server/Modules/EconomyService.luau"
           },
-
           "EntitlementService": {
             "$path": "src/server/Modules/EntitlementService.luau"
           },
-
           "GamePassService": {
             "$path": "src/server/Modules/GamePassService.luau"
           },
-
           "MonetizationService": {
             "$path": "src/server/Modules/MonetizationService.luau"
           },
-
           "PaidRandomPolicyService": {
             "$path": "src/server/Modules/PaidRandomPolicyService.luau"
           },
-
           "RewardService": {
             "$path": "src/server/Modules/RewardService.luau"
           },
-
           "ShopService": {
             "$path": "src/server/Modules/ShopService.luau"
+          },
+          "BallService": {
+            "$path": "src/server/Modules/BallService.luau"
+          },
+          "InputSetup": {
+            "$path": "src/server/Modules/InputSetup.luau"
+          },
+          "CmdrService": {
+            "$path": "src/server/Modules/CmdrService.luau"
+          },
+          "ThrowUXService": {
+            "$path": "src/server/Modules/ThrowUXService.luau"
           }
+        },
+        "Cmdr": {
+          "$path": "places/lobby/server/Cmdr"
         }
       }
     },
-
     "StarterPlayer": {
       "PlayerModule": {
         "$path": "src/client/PlayerModule"
       },
-
       "$className": "StarterPlayer",
-
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-
         "Client": {
-          "$path": "places/lobby/client"
+          "$className": "Folder",
+          "Scripts": {
+            "$path": "places/lobby/client/Scripts"
+          },
+          "UI": {
+            "$path": "places/lobby/client/UI",
+            "CombatHUD": {
+              "$path": "src/client/Game/UI/CombatHUD.luau"
+            }
+          },
+          "Modules": {
+            "$className": "Folder",
+            "Lobby": {
+              "$path": "places/lobby/client/Modules/Lobby"
+            },
+            "Onboarding": {
+              "$path": "places/lobby/client/Modules/Onboarding"
+            },
+            "Input": {
+              "$path": "src/client/Game/Input"
+            },
+            "Presentation": {
+              "$path": "src/client/Game/Presentation"
+            },
+            "UI": {
+              "$className": "Folder",
+              "ThrowUXClient": {
+                "$path": "src/client/Game/UI/ThrowUXClient.luau"
+              }
+            }
+          }
         }
       }
     }

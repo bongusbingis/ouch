@@ -1,6 +1,6 @@
 -- Name: InputRouter.luau
 -- Author: Jack C.
--- Description: Feeds the aim vector into the Aim input action every frame, pulses the Throw action on touch taps, reports the player's device class to the server, and owns whether the mouse cursor is released for menus.
+-- Description: Feeds the aim vector into the Aim input action every frame, reports the player's device class to the server, and resets the aim director when combat goes inactive.
 -- Created: 2026-07-12
 
 --!strict
@@ -14,23 +14,13 @@ local UserInputService = game:GetService("UserInputService")
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AimDirector = require(script.Parent.AimDirector)
-local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local InputRouter = {}
 
 local started = false
-local modeVoteOpen = false
 local combatWasActive = false
 local connections: { any } = {}
-
-local function updateCursorOwnership()
-	if modeVoteOpen then
-		Combat.requestCursor("ModeVote")
-	else
-		Combat.releaseCursor("ModeVote")
-	end
-end
 
 local function reportDeviceClass()
 	local reported: string? = nil
@@ -56,19 +46,10 @@ function InputRouter.start()
 	local aimBinding = aimAction:WaitForChild("AimFeed") :: InputBinding
 
 	reportDeviceClass()
-	table.insert(
-		connections,
-		ModeVoteClient.subscribe(function(snapshot)
-			modeVoteOpen = snapshot.admitted and snapshot.open
-			updateCursorOwnership()
-		end)
-	)
-	updateCursorOwnership()
 
 	table.insert(
 		connections,
 		RunService.RenderStepped:Connect(function()
-			updateCursorOwnership()
 			local combatActive = Combat.isActive()
 			if combatActive then
 				AimDirector.update()
@@ -90,10 +71,8 @@ function InputRouter.destroy()
 		end
 	end
 	table.clear(connections)
-	modeVoteOpen = false
 	combatWasActive = false
 	AimDirector.reset()
-	Combat.releaseCursor("ModeVote")
 	started = false
 end
 

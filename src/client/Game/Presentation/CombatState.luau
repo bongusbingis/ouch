@@ -13,6 +13,7 @@ local Workspace = game:GetService("Workspace")
 local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
 local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
+local CombatSession = require(Adapters:WaitForChild("CombatSession"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local SimStateCodec = require(Adapters:WaitForChild("SimStateCodec"))
 
@@ -84,8 +85,7 @@ local function holdsBall(): boolean
 end
 
 local function matchIsActive(): boolean
-	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
-	return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
+	return CombatSession.isLive()
 end
 
 local function enter(state: State, duration: number?)

@@ -34,6 +34,9 @@ export type Props = {
 	ShowMatchmakingActivity: boolean,
 	PlayText: string,
 	PlayEnabled: boolean,
+	-- Set once, for a player arriving straight out of training. A short entrance
+	-- on the button they should press next, not an arrow that nags.
+	EmphasizePlay: boolean?,
 	OnPlay: () -> (),
 	OnInvite: () -> (),
 	OnJoinCode: () -> (),
@@ -95,6 +98,7 @@ return function(props: Props)
 			}),
 			PlayButton = c(AnimatedButton, {
 				Enabled = props.PlayEnabled,
+				EntranceDelay = if props.EmphasizePlay then 0.25 else nil,
 				Style = "Primary",
 				Native = {
 					AutoButtonColor = props.PlayEnabled,

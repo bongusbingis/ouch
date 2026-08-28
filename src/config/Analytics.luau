@@ -9,6 +9,19 @@ local Analytics = {
 	Funnels = {
 		ShopPurchase = "ShopPurchase",
 		Matchmaking = "Matchmaking",
+		Onboarding = "Onboarding",
+	},
+
+	-- The first-session funnel. Step numbers are fixed forever: they are how a
+	-- drop-off is read, so a redesign bumps Config.Onboarding.Version rather
+	-- than renumbering these. Steps 2-5 line up with OnboardingSteps.Ordered.
+	OnboardingFunnelSteps = {
+		Started = { step = 1, name = "Started" },
+		NormalThrow = { step = 2, name = "NormalThrow" },
+		Hammer = { step = 3, name = "Hammer" },
+		ChargedThrow = { step = 4, name = "ChargedThrow" },
+		Practice = { step = 5, name = "Practice" },
+		Completed = { step = 6, name = "Completed" },
 	},
 
 	ShopFunnelSteps = {
@@ -57,6 +70,19 @@ local Analytics = {
 		-- docs/hitreg-audit.md that reading the code cannot.
 		InputLatency = "InputLatency",
 		CombatSummary = "CombatSummary",
+		-- First-session onboarding. Milestone-only: nothing here is emitted per
+		-- frame, per input, or per projectile step.
+		OnboardingEligible = "OnboardingEligible",
+		OnboardingStarted = "OnboardingStarted",
+		OnboardingResumed = "OnboardingResumed",
+		OnboardingStepStarted = "OnboardingStepStarted",
+		OnboardingStepCompleted = "OnboardingStepCompleted",
+		OnboardingCoreComplete = "OnboardingCoreComplete",
+		OnboardingCompleted = "OnboardingCompleted",
+		OnboardingSkipped = "OnboardingSkipped",
+		OnboardingAbandoned = "OnboardingAbandoned",
+		OnboardingError = "OnboardingError",
+		OnboardingLobbyRevealed = "OnboardingLobbyRevealed",
 	},
 
 	-- Every custom event and funnel step carries these, stamped centrally so no

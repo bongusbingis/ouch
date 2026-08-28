@@ -107,6 +107,16 @@ function BallService.clearAll()
 	ballsFolder():ClearAllChildren()
 end
 
+-- Removes every ball a given sim id holds or owns. Sessions that end need their
+-- balls gone without disturbing anyone else's.
+function BallService.clearOwned(ownerId: string)
+	for _, ball in ballsFolder():GetChildren() do
+		if ball:IsA("BasePart") and (ball:GetAttribute("hb") == ownerId or ball:GetAttribute("ow") == ownerId) then
+			ball:Destroy()
+		end
+	end
+end
+
 function BallService.start()
 	if started then
 		return

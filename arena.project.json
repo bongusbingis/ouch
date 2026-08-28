@@ -2,139 +2,170 @@
   "name": "ouch-proto",
   "serveAddress": "0.0.0.0",
   "servePort": 34872,
-  "servePlaceIds": [121997450145716],
-  "blockedPlaceIds": [130584867985467],
+  "servePlaceIds": [
+    121997450145716
+  ],
+  "blockedPlaceIds": [
+    130584867985467
+  ],
   "tree": {
     "$className": "DataModel",
-
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared"
       },
-
       "Config": {
         "$path": "src/config"
       },
-
       "Packages": {
         "$path": "Packages"
       }
     },
-
     "ReplicatedFirst": {
       "LoadingBootstrap": {
         "$path": "src/client/LoadingBootstrap.client.luau"
       }
     },
-
     "ServerScriptService": {
       "Server": {
         "$path": "places/arena/server/Server.server.luau",
-
         "Cmdr": {
           "$path": "places/arena/server/Cmdr"
         },
-
         "Scripts": {
           "$path": "places/arena/server/Scripts"
         },
-
         "Env": {
           "$path": "src/server/Env.luau"
         },
-
         "Modules": {
           "$path": "places/arena/server/Modules",
-
           "PlayerData": {
             "$path": "src/server/Modules/PlayerData.luau"
           },
-
           "CombatPoseService": {
             "$path": "src/server/Modules/CombatPoseService.luau"
           },
-
           "ConfigLiveService": {
             "$path": "src/server/Modules/ConfigLiveService.luau"
           },
-
           "CosmeticsService": {
             "$path": "src/server/Modules/CosmeticsService.luau"
           },
-
           "CharacterColorService": {
             "$path": "src/server/Modules/CharacterColorService.luau"
           },
-
           "AnalyticsService": {
             "$path": "src/server/Modules/AnalyticsService.luau"
           },
-
           "BattlePassService": {
             "$path": "src/server/Modules/BattlePassService.luau"
           },
-
           "CrateService": {
             "$path": "src/server/Modules/CrateService.luau"
           },
-
           "DirectPurchaseService": {
             "$path": "src/server/Modules/DirectPurchaseService.luau"
           },
-
           "EconomyService": {
             "$path": "src/server/Modules/EconomyService.luau"
           },
-
           "EntitlementService": {
             "$path": "src/server/Modules/EntitlementService.luau"
           },
-
           "GamePassService": {
             "$path": "src/server/Modules/GamePassService.luau"
           },
-
           "MonetizationService": {
             "$path": "src/server/Modules/MonetizationService.luau"
           },
-
           "PaidRandomPolicyService": {
             "$path": "src/server/Modules/PaidRandomPolicyService.luau"
           },
-
           "RewardService": {
             "$path": "src/server/Modules/RewardService.luau"
           },
-
           "ShopService": {
             "$path": "src/server/Modules/ShopService.luau"
+          },
+          "BallService": {
+            "$path": "src/server/Modules/BallService.luau"
+          },
+          "CmdrService": {
+            "$path": "src/server/Modules/CmdrService.luau"
+          },
+          "InputSetup": {
+            "$path": "src/server/Modules/InputSetup.luau"
+          },
+          "ThrowUXService": {
+            "$path": "src/server/Modules/ThrowUXService.luau"
           }
         }
       }
     },
-
     "ServerStorage": {
       "Tests": {
         "$path": "places/arena/tests",
-
         "Runner": {
           "$path": "src/tests/Runner.luau"
         },
-
         "Helpers": {
           "$path": "src/tests/Helpers"
         }
       }
     },
-
     "StarterPlayer": {
       "PlayerModule": {
         "$path": "src/client/PlayerModule"
       },
-
       "StarterPlayerScripts": {
         "Client": {
-          "$path": "places/arena/client"
+          "$className": "Folder",
+          "Scripts": {
+            "$path": "places/arena/client/Scripts"
+          },
+          "UI": {
+            "$path": "places/arena/client/UI",
+            "CombatHUD": {
+              "$path": "src/client/Game/UI/CombatHUD.luau"
+            }
+          },
+          "Modules": {
+            "$className": "Folder",
+            "Debug": {
+              "$path": "places/arena/client/Modules/Debug"
+            },
+            "Movement": {
+              "$path": "places/arena/client/Modules/Movement"
+            },
+            "Input": {
+              "$path": "src/client/Game/Input"
+            },
+            "Presentation": {
+              "$path": "src/client/Game/Presentation",
+              "JumpPadVisuals": {
+                "$path": "places/arena/client/Modules/Presentation/JumpPadVisuals.luau"
+              },
+              "MatchAudio": {
+                "$path": "places/arena/client/Modules/Presentation/MatchAudio.luau"
+              },
+              "MatchAudioLogic": {
+                "$path": "places/arena/client/Modules/Presentation/MatchAudioLogic.luau"
+              },
+              "PlayerHighlights": {
+                "$path": "places/arena/client/Modules/Presentation/PlayerHighlights.luau"
+              },
+              "VoteCamera": {
+                "$path": "places/arena/client/Modules/Presentation/VoteCamera.luau"
+              }
+            },
+            "UI": {
+              "$path": "places/arena/client/Modules/UI",
+              "ThrowUXClient": {
+                "$path": "src/client/Game/UI/ThrowUXClient.luau"
+              }
+            }
+          }
         }
       }
     }

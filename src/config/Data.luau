@@ -39,6 +39,13 @@ return {
 		Onboarding = {
 			FirstJoinAt = 0, -- unix time, stamped once; 0 = not yet stamped
 			SwipeThrowLearned = false,
+			-- First-session onboarding. Written only by PlayerData through the
+			-- onboarding mutators; OnboardingState owns what the values mean.
+			Version = 0, -- Config.Onboarding.Version this state belongs to
+			Status = "NotStarted", -- NotStarted | InProgress | CoreComplete | Completed | Skipped
+			Checkpoint = "", -- last completed step id; "" = none
+			SkippedAt = "", -- step id the player skipped on; "" = never skipped
+			Sessions = 0, -- onboarding sessions started, for abandonment analysis
 		},
 		Season = {
 			-- Reset wholesale at rollover. Tier is derived from XP, never stored.

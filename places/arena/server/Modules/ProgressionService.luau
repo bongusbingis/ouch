@@ -291,9 +291,7 @@ local function commitMatch(_event: MatchEvent)
 	local winnerId = result.winnerId :: string?
 	for _, contestant in result.contestants do
 		local id = contestant.playerId
-		local playerWon = winnerId ~= nil
-			and winnerId ~= ""
-			and (id == winnerId or contestant.teamId == winnerId)
+		local playerWon = winnerId ~= nil and winnerId ~= "" and (id == winnerId or contestant.teamId == winnerId)
 
 		local committedProgress = table.clone(progressByPlayerId[id] or blank())
 		committedProgress.MatchesPlayed += 1

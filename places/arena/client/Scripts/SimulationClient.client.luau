@@ -35,6 +35,10 @@ local Movement = Client:WaitForChild("Modules"):WaitForChild("Movement")
 local MapFeatures = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures")
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ArenaLoadingClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
+local ModeVoteClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+local CombatSession = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("CombatSession")
+)
 
 local connections = {}
 local optionalSystems = {}
@@ -132,38 +136,20 @@ startOptional("WeaponAnimations", function()
 	table.insert(connections, CombatInputSender.onIntent(WeaponAnimations.onIntent))
 end)
 
-local matchState: Folder? = nil
-local matchStateConnection: RBXScriptConnection? = nil
-local function updateCombatInput()
-	Combat.setInputEnabled(
-		Players.LocalPlayer:GetAttribute("ArenaReady") == true
-			and matchState ~= nil
-			and matchState:GetAttribute("phase") == "Active"
-	)
-end
+table.insert(connections, CombatSession.observeLocal(Combat.setInputEnabled))
 
-local function attachMatchState(folder: Folder)
-	if matchStateConnection then
-		matchStateConnection:Disconnect()
-	end
-	matchState = folder
-	matchStateConnection = folder:GetAttributeChangedSignal("phase"):Connect(updateCombatInput)
-	updateCombatInput()
-end
-
-local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
-if existingMatchState and existingMatchState:IsA("Folder") then
-	attachMatchState(existingMatchState)
-end
+-- The mode vote is the arena's own reason to hand the cursor back; the shared
+-- input router does not know the vote exists.
 table.insert(
 	connections,
-	ReplicatedStorage.ChildAdded:Connect(function(child)
-		if child.Name == "MatchState" and child:IsA("Folder") then
-			attachMatchState(child)
+	ModeVoteClient.subscribe(function(snapshot)
+		if snapshot.admitted and snapshot.open then
+			Combat.requestCursor("ModeVote")
+		else
+			Combat.releaseCursor("ModeVote")
 		end
 	end)
 )
-table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
 
 table.insert(
 	connections,
@@ -205,9 +191,7 @@ table.insert(
 
 script.Destroying:Connect(function()
 	Combat.setInputEnabled(false)
-	if matchStateConnection then
-		matchStateConnection:Disconnect()
-	end
+	Combat.releaseCursor("ModeVote")
 	for _, connection in connections do
 		if typeof(connection) == "RBXScriptConnection" then
 			connection:Disconnect()

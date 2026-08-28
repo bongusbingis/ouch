@@ -22,6 +22,7 @@ local Sim = SharedGame:WaitForChild("Sim")
 local CollisionWorld = require(Sim:WaitForChild("CollisionWorld"))
 local Intercept = require(Sim:WaitForChild("Intercept"))
 local ProjectileTrajectory = require(Sim:WaitForChild("ProjectileTrajectory"))
+local CombatSession = require(Adapters:WaitForChild("CombatSession"))
 local DodgeballRelease = require(Adapters:WaitForChild("DodgeballRelease"))
 local AimDirector = require(script.Parent.Parent.Input.AimDirector)
 local AssistConfig = require(script.Parent.Parent.Input.AssistConfig)
@@ -169,18 +170,14 @@ local function refreshCollisionCharacters(localCharacter: Model): number
 	local localTeamId = localCharacter:GetAttribute("TeamId")
 	local capsule = Combat.CharacterCapsule
 	local halfAxis = math.max(capsule.Height / 2 - capsule.Radius, 0)
-	for _, player in Players:GetPlayers() do
-		if player == Players.LocalPlayer then
+	for _, candidate in AimDirector.candidates() do
+		local player = candidate.player
+		if player ~= nil and not CombatSession.isLive(player) then
 			continue
 		end
-		local admission = player:GetAttribute("ArenaAdmission")
-		if (admission ~= "Direct" and admission ~= "Matched") or player:GetAttribute("ArenaReady") ~= true then
-			continue
-		end
-		local character = player.Character
+		local character = candidate.character
 		if
-			character == nil
-			or character:GetAttribute("CombatAlive") == false
+			character:GetAttribute("CombatAlive") == false
 			or character:GetAttribute("minv") == true
 			or (localTeamId ~= nil and character:GetAttribute("TeamId") == localTeamId)
 		then

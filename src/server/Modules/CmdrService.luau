@@ -1,6 +1,6 @@
 -- Name: CmdrService.luau
 -- Author: Jack C.
--- Description: Installs the Cmdr developer console in the arena, registering the game's commands and argument types and restricting who may open it based on the environment configuration.
+-- Description: Installs the Cmdr developer console for a place, registering that place's commands and argument types and restricting who may open it based on the environment configuration.
 -- Created: 2026-07-15
 
 --!strict
@@ -68,7 +68,12 @@ function CmdrService.start()
 	end)
 
 	local root = script.Parent.Parent:WaitForChild("Cmdr")
-	cmdr:RegisterTypesIn(root:WaitForChild("Types"))
+	-- A place whose commands use only Cmdr's built-in argument types ships no
+	-- Types folder, so its absence is legitimate rather than a setup problem.
+	local types = root:FindFirstChild("Types")
+	if types then
+		cmdr:RegisterTypesIn(types)
+	end
 	cmdr:RegisterCommandsIn(root:WaitForChild("Commands"))
 	cmdr:RegisterDefaultCommands({ "Help" })
 	cmdr.ReplicatedRoot:SetAttribute(READY_ATTRIBUTE, true)

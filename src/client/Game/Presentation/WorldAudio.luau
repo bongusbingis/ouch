@@ -12,9 +12,15 @@ local ClientAudio = require(script.Parent.ClientAudio)
 
 local WorldAudio = {}
 
-local combatAudio = SoundService:WaitForChild("CombatAudio")
-
+-- The legacy Studio-authored templates only exist in the arena; the lobby
+-- serves the same cues from Config.Audio.Gameplay through GameAudio, so this
+-- looks the folder up lazily and stays silent where it is absent rather than
+-- yielding a place that never had it.
 local function findAudioPlayer(groupName: string, soundName: string): AudioPlayer?
+	local combatAudio = SoundService:FindFirstChild("CombatAudio")
+	if combatAudio == nil then
+		return nil
+	end
 	local group = combatAudio:FindFirstChild(groupName)
 	if group == nil then
 		return nil

@@ -12,6 +12,13 @@ local Promise = require(ReplicatedStorage.Packages.promise)
 
 local Env = require(script.Parent.Parent.Env)
 local DataConfig = require(game.ReplicatedStorage.Config.Data)
+local OnboardingConfig = require(game.ReplicatedStorage.Config.Onboarding)
+local OnboardingState = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Onboarding")
+		:WaitForChild("OnboardingState")
+)
 local WriteThroughProxy = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
 )
@@ -193,6 +200,58 @@ local function _setProgressionAttributes(player, data)
 	player:SetAttribute("SwipeThrowLearned", data.Onboarding.SwipeThrowLearned == true)
 end
 
+-- The client never receives raw onboarding state; it reads this projection, so
+-- the profile stays the only writable copy.
+local function _setOnboardingAttributes(player, state)
+	player:SetAttribute("OnboardingStatus", state.Status)
+	player:SetAttribute("OnboardingCheckpoint", state.Checkpoint)
+end
+
+local function _readOnboarding(player)
+	local d = Data.get(player)
+	if d == nil then
+		return nil
+	end
+	return OnboardingState.normalize(d.Onboarding)
+end
+
+local function _writeOnboarding(player, state)
+	local d = Data.get(player)
+	if d == nil then
+		return false
+	end
+	local onboarding = d.Onboarding
+	onboarding.Version = state.Version
+	onboarding.Status = state.Status
+	onboarding.Checkpoint = state.Checkpoint
+	onboarding.SkippedAt = state.SkippedAt
+	onboarding.Sessions = state.Sessions
+	_setOnboardingAttributes(player, state)
+	return true
+end
+
+function Data.getOnboarding(player)
+	return _readOnboarding(player)
+end
+
+-- Every onboarding write goes through here: the caller supplies a pure
+-- transition from OnboardingState and never touches the profile fields.
+function Data.updateOnboarding(player, transform)
+	local state = _readOnboarding(player)
+	if state == nil then
+		return nil
+	end
+	local migrated = OnboardingState.migrate(state, OnboardingConfig.Version)
+	local next_ = transform(migrated)
+	if next_ == nil then
+		return nil
+	end
+	if not _writeOnboarding(player, next_) then
+		return nil
+	end
+	return next_
+end
+
 local function _syncLeaderStats(player)
 	local entry = Data._profiles[player.UserId]
 	local leaderStats = player:FindFirstChild("leaderstats")
@@ -354,6 +413,7 @@ function Data.load(player)
 			if d then
 				_recalculateKDR(d)
 				_syncLeaderStats(player)
+				_setOnboardingAttributes(player, OnboardingState.normalize(d.Onboarding))
 			end
 		end)
 		:andThen(function()

@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
 local Loading = require(ReplicatedStorage.Config.Loading)
-local DevSoloPlay = require(ReplicatedStorage.Shared.Matchmaking.DevSoloPlay)
+local DevSoloPlay = require(ReplicatedStorage.Shared.Game.Matchmaking.DevSoloPlay)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
@@ -62,14 +62,28 @@ function PartyService:SetQueueChangedHandler(handler)
 	self._queueChangedHandler = handler
 end
 
+-- Lets another system watch each member's party phase without reading or
+-- writing party state itself; this service stays the only owner of it.
+function PartyService:SetSnapshotObserver(observer)
+	self._snapshotObserver = observer
+end
+
 function PartyService:_sendSnapshot(player, party, reason)
+	local snapshot = PartyModel.toSnapshot(party)
 	Network.fire("PartyPacket", player, {
 		kind = "Snapshot",
 		revision = party.revision,
 		reason = reason,
-		snapshot = PartyModel.toSnapshot(party),
+		snapshot = snapshot,
 		serverTime = os.time(),
 	})
+	local observer = self._snapshotObserver
+	if observer then
+		local ok, err = pcall(observer, player, snapshot, reason)
+		if not ok then
+			warn(`[PartyService] snapshot observer failed for {player.Name}: {err}`)
+		end
+	end
 end
 
 function PartyService:_sendError(player, errorCode)
