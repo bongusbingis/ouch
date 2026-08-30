@@ -9,6 +9,7 @@ export type Expectation = {
 	toEqual: (self: Expectation, expected: any) -> (),
 	toBeNear: (self: Expectation, expected: number, epsilon: number?) -> (),
 	toBeTruthy: (self: Expectation) -> (),
+	toBeFalsy: (self: Expectation) -> (),
 	toBeNil: (self: Expectation) -> (),
 }
 
@@ -59,6 +60,12 @@ function TestKit.expect(value: any): Expectation
 	function expectation.toBeTruthy(_)
 		if not value then
 			error(`expected truthy, got {tostring(value)}`, 2)
+		end
+	end
+
+	function expectation.toBeFalsy(_)
+		if value then
+			error(`expected falsy, got {tostring(value)}`, 2)
 		end
 	end
 

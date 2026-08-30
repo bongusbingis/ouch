@@ -54,6 +54,7 @@ export type ItemDef = {
 export type DefaultDef = {
 	DisplayName: string,
 	Rarity: string,
+	EffectId: string?,
 	SplatColor: Color3?,
 	SortOrder: number?,
 	PreviewColor: Color3?,
@@ -77,6 +78,7 @@ local Slots = {
 	HammerAssets = true,
 	TrailAssets = true,
 	ElimEffectAssets = true,
+	ImpactEffectAssets = true,
 	EmoteAssets = true,
 	CostumeAssets = true,
 	CharacterColor = true,
@@ -123,6 +125,15 @@ local Defaults: { [string]: DefaultDef } = {
 			DodgeballSound = "DodgeballElimination",
 			HammerSound = "HammerElimination",
 		},
+	},
+	-- EffectId names the authored particle template under
+	-- Assets.Cosmetics.Effects.Impact; Config.CosmeticEffects binds the slot to
+	-- the events that fire it. Impact effects have no world Visual/preview yet, so
+	-- the slot is intentionally absent from Config.Inventory.Tabs.
+	ImpactEffectAssets = {
+		DisplayName = "Default Impact",
+		Rarity = "Common",
+		EffectId = "DefaultImpact",
 	},
 	CharacterColor = {
 		DisplayName = "Cyan",
@@ -174,6 +185,14 @@ local Items: { [string]: ItemDef } = {
 	BallPink = ballAsset("Rare", "Pink Ball", Color3.fromRGB(255, 102, 204), Color3.fromRGB(240, 120, 190)),
 	BallPurple = ballAsset("Legendary", "Purple Ball", Color3.fromRGB(98, 37, 209), Color3.fromRGB(150, 80, 220)),
 	BallYellow = ballAsset("Legendary", "Yellow Ball", Color3.fromRGB(255, 255, 0), Color3.fromRGB(240, 210, 60)),
+
+	ConfettiImpact = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Confetti Impact",
+		Thumbnail = "",
+		EffectId = "ConfettiImpact",
+	},
 }
 
 return {

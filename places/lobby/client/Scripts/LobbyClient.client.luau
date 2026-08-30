@@ -52,6 +52,13 @@ local ReactRoot = require(
 )
 local LobbyApp = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("LobbyApp"))
 local CombatHUD = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("CombatHUD"))
+local OnboardingGestureLayer = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Components")
+		:WaitForChild("Onboarding")
+		:WaitForChild("OnboardingGestureLayer")
+)
 
 local partyClient = PartyClient.new()
 local teleportPresentation = TeleportPresentationClient.start(function()
@@ -103,7 +110,12 @@ root:render(React.createElement(LobbyApp, {
 		ReplicatedFirst:SetAttribute("ReactLoadingPresented", true)
 	end,
 }))
-combatRoot:render(React.createElement(CombatHUD))
+combatRoot:render(React.createElement(React.Fragment, nil, {
+	CombatHUD = React.createElement(CombatHUD),
+	OnboardingGestures = React.createElement(OnboardingGestureLayer, {
+		OnboardingClient = OnboardingClient,
+	}),
+}))
 Replica.RequestData()
 
 script.Destroying:Connect(function()

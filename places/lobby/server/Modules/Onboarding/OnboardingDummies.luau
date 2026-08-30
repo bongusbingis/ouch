@@ -6,6 +6,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Onboarding"))
 
@@ -162,6 +163,19 @@ function OnboardingDummies.update(dummy: Dummy, now: number, chaseTarget: Vector
 	end
 end
 
+local function squash(dummy: Dummy)
+	local width = dummy.humanoid:FindFirstChild("BodyWidthScale")
+	local height = dummy.humanoid:FindFirstChild("BodyHeightScale")
+	if not (width and width:IsA("NumberValue") and height and height:IsA("NumberValue")) then
+		return
+	end
+	width.Value = 1.28
+	height.Value = 0.72
+	local tween = TweenInfo.new(0.34, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
+	TweenService:Create(width, tween, { Value = 1 }):Play()
+	TweenService:Create(height, tween, { Value = 1 }):Play()
+end
+
 function OnboardingDummies.knock(dummy: Dummy, fromPosition: Vector3)
 	if dummy.knocked then
 		return
@@ -195,8 +209,11 @@ function OnboardingDummies.knock(dummy: Dummy, fromPosition: Vector3)
 		away = Vector3.new(0, 1, 0)
 	end
 	local direction = (away.Unit + Vector3.new(0, 1.6, 0)).Unit
+	squash(dummy)
 	dummy.root:ApplyImpulse(direction * dummy.root.AssemblyMass * 90)
-	dummy.root:ApplyAngularImpulse(Vector3.new(math.random(-40, 40), math.random(-40, 40), math.random(-40, 40)))
+	local flat = Vector3.new(direction.X, 0, direction.Z)
+	local axis = if flat.Magnitude > 1e-3 then Vector3.new(0, 1, 0):Cross(flat.Unit) else Vector3.new(1, 0, 0)
+	dummy.root:ApplyAngularImpulse((axis + Vector3.new(0, 0.25, 0)).Unit * dummy.root.AssemblyMass * 36)
 end
 
 function OnboardingDummies.destroy(dummy: Dummy)

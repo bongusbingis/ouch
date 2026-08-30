@@ -185,6 +185,47 @@ function Combat.getConfig()
 	return CombatConfig
 end
 
+export type InputGeometry = {
+	viewport: Vector2,
+	-- Where a tap or a hold is read: the whole viewport below the platform inset.
+	pressCenter: Vector2,
+	-- How far a finger may drift and still count as a tap, in pixels.
+	tapDriftPixels: number,
+	-- How long a press must be held before it becomes a charge, in seconds.
+	holdDelaySeconds: number,
+	-- The region a bottom swipe must START inside, in viewport pixels.
+	swipeRect: TouchRegions.Rect,
+	-- A representative free point inside that region, biased to the aiming thumb,
+	-- for a prompt that must land where the swipe is actually performed.
+	swipeAnchor: Vector2,
+	-- Where the movement stick is read, in viewport pixels.
+	moveRect: TouchRegions.Rect,
+	-- The on-screen primary action button (the touch hammer/BONK control), if it
+	-- is currently shown, so a prompt can point at the real control.
+	actionButtonRect: TouchRegions.Rect?,
+	-- How far that swipe must travel to register, in pixels.
+	swipeDistancePixels: number,
+	swipeEnabled: boolean,
+}
+
+-- The real geometry of every touch region, in viewport pixels. Instructional UI
+-- reads it from here instead of re-deriving it from the config, so a prompt
+-- that points at "where to press" cannot drift from where input is read.
+function Combat.inputGeometry(): InputGeometry
+	return {
+		viewport = TouchRegions.viewportSize(),
+		pressCenter = TouchRegions.gameplayCenter(),
+		tapDriftPixels = TouchRegions.scale(CombatConfig.Tap.MaxDistance),
+		holdDelaySeconds = CombatConfig.Charge.HoldDelay,
+		swipeRect = TouchRegions.bottomSwipeRect(),
+		swipeAnchor = TouchRegions.bottomSwipeAnchor(),
+		moveRect = TouchRegions.thumbstickRect(),
+		actionButtonRect = TouchRegions.getExclusion("HammerButton"),
+		swipeDistancePixels = TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance),
+		swipeEnabled = CombatConfig.BottomSwipe.Enabled,
+	}
+end
+
 function Combat.start()
 	if started then
 		return

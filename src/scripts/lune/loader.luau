@@ -66,6 +66,24 @@ local FakeNumberRange = {
 	end,
 }
 
+-- Enum members are only ever compared and passed through by the pure modules
+-- under test, so each one resolves to a single stable table carrying its name.
+-- Two references to the same member are the same value, which is all an
+-- equality check or a lookup key needs.
+local FakeEnum = setmetatable({}, {
+	__index = function(enums, enumName: string)
+		local members = setmetatable({}, {
+			__index = function(self, memberName: string)
+				local member = { Name = memberName, EnumType = enumName }
+				rawset(self, memberName, member)
+				return member
+			end,
+		})
+		rawset(enums, enumName, members)
+		return members
+	end,
+})
+
 function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
 	local moduleCache: { [Node]: any } = {}
@@ -163,6 +181,7 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 				Vector3 = FakeVector3,
 				Vector2 = FakeVector2,
 				NumberRange = FakeNumberRange,
+				Enum = FakeEnum,
 			},
 			injectGlobals = true,
 		})

@@ -10,12 +10,19 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
+local InputConfig = require(Config:WaitForChild("Input"))
 local OnboardingConfig = require(Config:WaitForChild("Onboarding"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local UIFeedback = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
+)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local AimDirector = require(script.Parent.Parent:WaitForChild("Input"):WaitForChild("AimDirector"))
+local GameAudio = require(script.Parent.Parent:WaitForChild("Presentation"):WaitForChild("GameAudio"))
+local ThrowUXClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ThrowUXClient"))
 
 local OnboardingClient = {}
 
@@ -57,6 +64,13 @@ local state: Snapshot = {
 }
 
 local lastAttemptAt = os.clock()
+
+local function playCue(name: string)
+	local ok, err = pcall(GameAudio.play, name)
+	if not ok then
+		warn(`[OnboardingClient] audio cue {name} failed: {err}`)
+	end
+end
 
 -- The same vocabulary the rest of combat uses (Config.AimAssist keys, the
 -- DeviceClass attribute, the sim's release device). A second naming scheme here
@@ -140,6 +154,8 @@ local function tickHints()
 	if level ~= state.hintLevel then
 		publish({ hintLevel = level })
 		if level == 2 then
+			playCue("OnboardingHint")
+			UIFeedback.haptic("Click")
 			Network.fireServer("OnboardingAction", "Attempt", "escalated")
 		end
 	end
@@ -149,6 +165,7 @@ local function onServerState(packet: any)
 	if typeof(packet) ~= "table" then
 		return
 	end
+	local wasActive = state.active
 	if packet.active ~= true then
 		publish({
 			active = false,
@@ -166,10 +183,14 @@ local function onServerState(packet: any)
 		if camera then
 			camera.CameraType = Enum.CameraType.Custom
 		end
+		if wasActive then
+			playCue("OnboardingReveal")
+		end
 		return
 	end
 
 	local changedStep = packet.step ~= state.step
+	local entering = not state.active
 	lastAttemptAt = os.clock()
 
 	publish({
@@ -183,6 +204,21 @@ local function onServerState(packet: any)
 		celebrating = packet.step == "Celebration",
 		waypoint = packet.waypoint or CLEAR,
 	})
+
+	if packet.reason == "hit" then
+		playCue("OnboardingStepSuccess")
+		UIFeedback.haptic("Notification")
+		if packet.step == "ChargedThrow" then
+			playCue("OnboardingCoreComplete")
+		end
+	elseif entering or changedStep then
+		if packet.step == "Celebration" then
+			playCue("OnboardingCelebration")
+			UIFeedback.haptic("Notification")
+		else
+			playCue("OnboardingStepStart")
+		end
+	end
 
 	-- Every lesson before the free-for-all teaches one weapon, so the player is
 	-- given it and their own equip controls stay inert until the mini-fight.
@@ -207,9 +243,24 @@ function OnboardingClient.start()
 		return
 	end
 	started = true
+	ThrowUXClient.setHintGate(function()
+		return not state.active or (state.step ~= "Intro" and state.step ~= "NormalThrow")
+	end)
+	local inputContext = Players.LocalPlayer:WaitForChild(InputConfig.ContextName)
+	assert(inputContext:IsA("InputContext"), `[OnboardingClient] {InputConfig.ContextName} must be an InputContext`)
+	local skipAction = inputContext:WaitForChild("OnboardingSkip")
+	assert(skipAction:IsA("InputAction"), "[OnboardingClient] CombatInput.OnboardingSkip must be an InputAction")
 
 	table.insert(connections, Network.on("OnboardingState", onServerState))
 	table.insert(disposers, Combat.onIntent(onIntent))
+	table.insert(
+		connections,
+		skipAction.Pressed:Connect(function()
+			if state.active and not state.celebrating then
+				OnboardingClient.skip()
+			end
+		end)
+	)
 	table.insert(
 		connections,
 		UserInputService.LastInputTypeChanged:Connect(function()
@@ -264,6 +315,7 @@ function OnboardingClient.destroy()
 	Combat.setInputEnabled(false)
 	Combat.setCameraEnabled(false)
 	Combat.setWeaponLocked(false)
+	ThrowUXClient.setHintGate(nil)
 	table.clear(listeners)
 	started = false
 end

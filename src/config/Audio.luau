@@ -98,12 +98,43 @@ return {
 				"rbxassetid://93903966058481",
 			},
 		},
-		OnboardingEnemyKilled = {
+		OnboardingStepStart = {
 			Scope = "Local",
-			Volume = 1,
+			Volume = 0.5,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
+		OnboardingStepSuccess = {
+			Scope = "Local",
+			Volume = 0.8,
+			AssetIds = { "rbxassetid://122835655736085" },
+		},
+		OnboardingDummyLaunch = {
+			Scope = "World",
+			Volume = 1.5,
 			AssetIds = {
-				"rbxassetid://18835016448",
+				"rbxassetid://123922570136163",
+				"rbxassetid://135468135163946",
 			},
+		},
+		OnboardingHint = {
+			Scope = "Local",
+			Volume = 0.45,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
+		OnboardingCoreComplete = {
+			Scope = "Local",
+			Volume = 0.9,
+			AssetIds = { "rbxassetid://124993589864467" },
+		},
+		OnboardingCelebration = {
+			Scope = "Local",
+			Volume = 0.85,
+			AssetIds = { "rbxassetid://9120681039" },
+		},
+		OnboardingReveal = {
+			Scope = "Local",
+			Volume = 0.6,
+			AssetIds = { "rbxassetid://117503154823137" },
 		},
 	},
 

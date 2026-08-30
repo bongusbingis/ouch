@@ -18,9 +18,13 @@ local ThrowUX = require(Config:WaitForChild("ThrowUX"))
 local SharedUI = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI")
 local ResponsiveText = require(SharedUI:WaitForChild("Components"):WaitForChild("ResponsiveText"))
 local CombatToolbar = require(SharedUI:WaitForChild("Components"):WaitForChild("CombatToolbar"))
+local WeaponViewport = require(SharedUI:WaitForChild("Components"):WaitForChild("WeaponViewport"))
+local GestureGlyph =
+	require(SharedUI:WaitForChild("Components"):WaitForChild("Onboarding"):WaitForChild("GestureGlyph"))
 local CombatToolbarViewModel = require(SharedUI:WaitForChild("Models"):WaitForChild("CombatToolbarViewModel"))
 local useExternalStore = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local useReducedMotion = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
+local useViewportSize = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useViewportSize"))
 local ChargeAim = require(script.Parent.Parent.Modules.Presentation.ChargeAim)
 local ThrowUXClient = require(script.Parent.Parent.Modules.UI.ThrowUXClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
@@ -336,12 +340,37 @@ local function SwipeFeedback(props: { snapshot: ThrowUXClient.Snapshot })
 	})
 end
 
-local function HammerButton(props: { visible: boolean })
+local function SwipeHint(props: { visible: boolean })
+	local viewport = useViewportSize()
+	local geometry = React.useMemo(function()
+		return Combat.inputGeometry()
+	end, { viewport })
+	if not props.visible or not geometry.swipeEnabled or viewport.X <= 0 then
+		return nil
+	end
+	local travel = geometry.swipeDistancePixels
+	local size = math.clamp(math.min(viewport.X, viewport.Y) * 0.06, 34, 58)
+	return c(GestureGlyph, {
+		Kind = "Swipe",
+		Label = ThrowUX.Onboarding.Text,
+		TravelPixels = travel,
+		SizePixels = size,
+		Native = {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromOffset(viewport.X * 0.5, geometry.swipeRect.maxY - size - travel * 0.35),
+			ZIndex = 35,
+		},
+	})
+end
+
+local function HammerButton(props: { visible: boolean, itemId: string?, cooldownProgress: number })
 	local ref = React.useRef(nil)
 	local pressing, setPressing = React.useState(false)
 	local reducedMotion = useReducedMotion()
 	local styles = ReactSpring.useSpring({
-		Scale = if pressing then 0.88 else 1,
+		Scale = if pressing then 0.9 else 1,
+		IconColor = if props.cooldownProgress < 1 then Color3.fromRGB(202, 218, 220) else Color3.new(1, 1, 1),
+		Progress = math.clamp(props.cooldownProgress, 0, 1),
 		config = { mass = 1, tension = 700, friction = 30 },
 		immediate = reducedMotion,
 	})
@@ -374,11 +403,11 @@ local function HammerButton(props: { visible: boolean })
 		Active = props.visible,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.fromRGB(242, 24, 76),
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Image = "",
 		Position = UDim2.fromScale(0.9, 0.58),
-		Selectable = props.visible,
+		Selectable = false,
 		Size = UDim2.fromScale(0.09, 0.09),
 		Visible = props.visible,
 		ZIndex = 40,
@@ -394,23 +423,75 @@ local function HammerButton(props: { visible: boolean })
 	}, {
 		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
 		Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(104, 104), MinSize = Vector2.new(72, 72) }),
-		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 		Scale = c("UIScale", { Scale = styles.Scale }),
-		Stroke = c("UIStroke", {
-			Color = Color3.new(1, 1, 1),
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			Thickness = 0.055,
+		Shadow = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = Color3.fromRGB(24, 41, 48),
+			BackgroundTransparency = 0.34,
+			BorderSizePixel = 0,
+			Position = UDim2.fromScale(0.5, 0.55),
+			Size = UDim2.fromScale(0.94, 0.94),
+			ZIndex = 39,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 		}),
-		Label = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			Native = {
+		Plate = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = Color3.fromRGB(242, 24, 76),
+			BorderSizePixel = 0,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.94, 0.94),
+			ZIndex = 40,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			Stroke = c("UIStroke", {
+				Color = Color3.new(1, 1, 1),
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = 0.045,
+			}),
+			Icon = c("CanvasGroup", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Size = UDim2.fromScale(1, 1),
-				Text = "BONK",
-				TextColor3 = Color3.new(1, 1, 1),
+				GroupColor3 = styles.IconColor,
+				Position = UDim2.fromScale(0.5, 0.46),
+				Size = UDim2.fromScale(0.76, 0.76),
 				ZIndex = 41,
-			},
+			}, {
+				Preview = c(WeaponViewport, { Weapon = "Hammer", ItemId = props.itemId, ZIndex = 41 }),
+			}),
+			ReadyDot = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Color3.fromRGB(255, 224, 78),
+				BackgroundTransparency = if props.cooldownProgress >= 1 then 0 else 1,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.9),
+				Size = UDim2.fromScale(0.16, 0.055),
+				ZIndex = 43,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			}),
+			Cooldown = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Color3.fromRGB(24, 41, 48),
+				BackgroundTransparency = if props.cooldownProgress < 1 then 0.1 else 1,
+				BorderSizePixel = 0,
+				ClipsDescendants = true,
+				Position = UDim2.fromScale(0.5, 0.82),
+				Size = UDim2.fromScale(0.56, 0.055),
+				ZIndex = 44,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Fill = c("Frame", {
+					BackgroundColor3 = Color3.fromRGB(255, 224, 78),
+					BorderSizePixel = 0,
+					Size = styles.Progress:map(function(value: number)
+						return UDim2.fromScale(value, 1)
+					end),
+					ZIndex = 45,
+				}, {
+					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				}),
+			}),
 		}),
 	})
 end
@@ -425,7 +506,11 @@ return function()
 		throwCooldown = snapshot.throwCooldown,
 		hammerCooldown = snapshot.hammerCooldown,
 		weaponLocked = snapshot.weaponLocked,
+		throwState = snapshot.state,
+		chargeAlpha = snapshot.chargeAlpha,
 	}, snapshot.inputType)
+	local hammerCooldownProgress = 1
+		- math.clamp(snapshot.hammerCooldown / math.max(CombatConfig.Hammer.Cooldown, 1e-3), 0, 1)
 	local debugText = string.format(
 		"%s  charge %.2f  cooldown %.2f  target %.2f  %s %.2f",
 		snapshot.state,
@@ -439,28 +524,7 @@ return function()
 		Trajectory = c(Trajectory),
 		Reticle = c(Reticle, { snapshot = snapshot }),
 		Swipe = c(SwipeFeedback, { snapshot = snapshot }),
-		Onboarding = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.76),
-				Size = UDim2.fromScale(0.34, 0.07),
-				Text = ThrowUX.Onboarding.Text .. "  ↑",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextTransparency = 0.12,
-				Visible = snapshot.onboardingVisible,
-				ZIndex = 35,
-			},
-		}, {
-			Stroke = c("UIStroke", {
-				Color = Color3.fromRGB(77, 77, 77),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.035,
-				Transparency = 0.2,
-			}),
-		}),
+		SwipeHint = c(SwipeHint, { visible = snapshot.onboardingVisible }),
 		Toolbar = c(CombatToolbar, {
 			Model = toolbarModel,
 			BallItemId = cosmetics.ball,
@@ -468,7 +532,11 @@ return function()
 			OnEquip = Combat.requestWeaponEquip,
 			RegisterExclusion = Combat.registerHudExclusion,
 		}),
-		Hammer = c(HammerButton, { visible = snapshot.active and snapshot.inputType == "Touch" }),
+		Hammer = c(HammerButton, {
+			visible = snapshot.active and snapshot.inputType == "Touch" and snapshot.weapon == "Hammer",
+			itemId = cosmetics.hammer,
+			cooldownProgress = hammerCooldownProgress,
+		}),
 		Debug = c(ResponsiveText, {
 			MeasurementFont = Enum.Font.Code,
 			Native = {

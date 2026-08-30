@@ -8,10 +8,11 @@ local function snapshot(overrides)
 		active = true,
 		weapon = "Hammer",
 		holdsBall = false,
-		ready = false,
 		throwCooldown = 0,
 		hammerCooldown = 0,
 		weaponLocked = false,
+		throwState = "Idle",
+		chargeAlpha = 0,
 	}
 	for key, item in overrides or {} do
 		value[key] = item
@@ -20,36 +21,95 @@ local function snapshot(overrides)
 end
 
 T.describe("CombatToolbarViewModel", function()
-	T.it("keeps both slots stable when no ball is held", function()
+	T.it("keeps both action slots stable and marks a missing ball unavailable", function()
 		local model = ViewModel.fromSnapshot(snapshot(), "Touch")
 		T.expect(model.visible):toBeTruthy()
 		T.expect(#model.slots):toEqual(2)
 		T.expect(model.slots[1].weapon):toEqual("Dodgeball")
-		T.expect(model.slots[1].available):toBeFalsy()
+		T.expect(model.slots[1].state.kind):toEqual("Unavailable")
 		T.expect(model.slots[2].weapon):toEqual("Hammer")
+		T.expect(model.slots[2].selected):toBeTruthy()
 	end)
 
-	T.it("marks the held dodgeball equipped without changing slot order", function()
-		local model = ViewModel.fromSnapshot(snapshot({ weapon = "Dodgeball", holdsBall = true }), "Mouse")
-		T.expect(#model.slots):toEqual(2)
-		T.expect(model.slots[1].inputLabel):toEqual("2")
-		T.expect(model.slots[2].inputLabel):toEqual("1")
-		T.expect(model.slots[1].equipped):toBeTruthy()
+	T.it("keeps selection orthogonal to readiness state", function()
+		local model =
+			ViewModel.fromSnapshot(snapshot({ weapon = "Dodgeball", holdsBall = true, throwCooldown = 0.2 }), "Mouse")
+		T.expect(model.slots[1].selected):toBeTruthy()
+		T.expect(model.slots[1].state.kind):toEqual("Cooldown")
+		T.expect(((model.slots[1].state :: any).progress > 0)):toBeTruthy()
 	end)
 
-	T.it("uses touch presentation without keyboard labels", function()
-		local model = ViewModel.fromSnapshot(snapshot({ holdsBall = true }), "Touch")
-		for _, slot in model.slots do
-			T.expect(slot.inputLabel):toBeNil()
+	T.it("distinguishes a tutorial lock from temporary unavailability", function()
+		local model =
+			ViewModel.fromSnapshot(snapshot({ weapon = "Dodgeball", holdsBall = true, weaponLocked = true }), "Mouse")
+		T.expect(model.slots[1].state.kind):toEqual("Ready")
+		T.expect(model.slots[2].state.kind):toEqual("Locked")
+	end)
+
+	T.it("projects selected dodgeball charge without duplicating its owner", function()
+		local model = ViewModel.fromSnapshot(
+			snapshot({ weapon = "Dodgeball", holdsBall = true, throwState = "Charging", chargeAlpha = 0.65 }),
+			"Mouse"
+		)
+		T.expect(model.slots[1].state.kind):toEqual("Charging")
+		T.expect((model.slots[1].state :: any).progress):toBeNear(0.65, 1e-9)
+		T.expect(model.slots[2].state.kind):toEqual("Ready")
+	end)
+
+	T.it("normalizes cooldown progress from empty to ready", function()
+		local cooling = ViewModel.fromSnapshot(snapshot({ hammerCooldown = 0.5 }), "Mouse")
+		T.expect(cooling.slots[2].state.kind):toEqual("Cooldown")
+		local progress = (cooling.slots[2].state :: any).progress
+		T.expect(progress >= 0 and progress < 1):toBeTruthy()
+	end)
+
+	T.it("uses configured keyboard and gamepad prompts", function()
+		local keyboard = ViewModel.fromSnapshot(snapshot({ holdsBall = true }), "Mouse")
+		T.expect(keyboard.slots[1].inputLabel):toEqual("2")
+		T.expect(keyboard.slots[2].inputLabel):toEqual("1")
+
+		local gamepad = ViewModel.fromSnapshot(snapshot({ holdsBall = true }), "Gamepad")
+		T.expect(gamepad.slots[1].inputLabel):toEqual("R1")
+		T.expect(gamepad.slots[2].inputLabel):toEqual("L1")
+		T.expect(gamepad.slots[1].interactive):toBeFalsy()
+	end)
+
+	T.it("keeps touch prompts hidden and only unequipped usable actions interactive", function()
+		local touch = ViewModel.fromSnapshot(snapshot({ holdsBall = true }), "Touch")
+		T.expect(touch.slots[1].inputLabel):toBeNil()
+		T.expect(touch.slots[1].interactive):toBeTruthy()
+		T.expect(touch.slots[2].inputLabel):toBeNil()
+		T.expect(touch.slots[2].interactive):toBeFalsy()
+	end)
+
+	T.it("projects disabled state while the hidden HUD is inactive", function()
+		local model = ViewModel.fromSnapshot(snapshot({ active = false }), "Mouse")
+		T.expect(model.visible):toBeFalsy()
+		T.expect(model.slots[1].state.kind):toEqual("Disabled")
+		T.expect(model.slots[2].state.kind):toEqual("Disabled")
+	end)
+end)
+
+T.describe("CombatToolbar responsive layout", function()
+	T.it("caps desktop and ultrawide growth", function()
+		local desktop = ViewModel.layout(Vector2.new(1920, 1080), "Mouse")
+		local ultrawide = ViewModel.layout(Vector2.new(3440, 1440), "Mouse")
+		T.expect(desktop.width):toEqual(268)
+		T.expect(ultrawide.width):toEqual(268)
+	end)
+
+	T.it("keeps phone and tablet touch targets compact but usable", function()
+		for _, viewport in { Vector2.new(896, 414), Vector2.new(844, 390), Vector2.new(1180, 820) } do
+			local layout = ViewModel.layout(viewport, "Touch")
+			T.expect(layout.width >= 260 and layout.width <= 288):toBeTruthy()
+			T.expect(layout.height >= 110):toBeTruthy()
 		end
 	end)
 
-	T.it("uses gamepad labels and stays passive", function()
-		local model = ViewModel.fromSnapshot(snapshot({ holdsBall = true }), "Gamepad")
-		T.expect(model.slots[1].interactive):toBeFalsy()
-		T.expect(model.slots[2].interactive):toBeFalsy()
-		T.expect(model.slots[1].inputLabel):toEqual("R1")
-		T.expect(model.slots[2].inputLabel):toEqual("L1")
+	T.it("fits a portrait phone without spanning the screen", function()
+		local layout = ViewModel.layout(Vector2.new(390, 844), "Touch")
+		T.expect(layout.width < 390):toBeTruthy()
+		T.expect(layout.bottomGap >= 8):toBeTruthy()
 	end)
 end)
 

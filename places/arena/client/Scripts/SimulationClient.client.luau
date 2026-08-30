@@ -43,6 +43,7 @@ local DamageFeedback
 local DeathEffects
 local HammerVisuals
 local SplatEffects
+local CosmeticEffects
 local GameAudio
 local DebugVisuals
 
@@ -97,6 +98,10 @@ end)
 startOptional("SplatEffects", function()
 	SplatEffects = require(Presentation:WaitForChild("SplatEffects"))
 	SplatEffects.start()
+end)
+startOptional("CosmeticEffects", function()
+	CosmeticEffects = require(Presentation:WaitForChild("CosmeticEffects"))
+	CosmeticEffects.start()
 end)
 startOptional("MatchAudio", function()
 	require(Presentation:WaitForChild("MatchAudio")).start()
@@ -180,6 +185,9 @@ table.insert(
 			end
 			if optionalSystems.SplatEffects then
 				SplatEffects.onEvent(event)
+			end
+			if optionalSystems.CosmeticEffects then
+				CosmeticEffects.onEvent(event)
 			end
 			if optionalSystems.GameAudio then
 				GameAudio.onEvent(event)

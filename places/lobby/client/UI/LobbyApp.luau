@@ -370,6 +370,9 @@ local function LobbyContent(props)
 			if not isBack then
 				return
 			end
+			if onboardingActive then
+				return
+			end
 			if economyMenu.CloseTopLayer() then
 				return
 			elseif joinOpen then
@@ -385,6 +388,7 @@ local function LobbyContent(props)
 		economyMenu.CloseTopLayer,
 		joinOpen,
 		currentPage,
+		onboardingActive,
 	})
 
 	local views = {}

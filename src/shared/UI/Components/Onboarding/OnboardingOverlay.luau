@@ -1,30 +1,36 @@
 -- Name: OnboardingOverlay.luau
 -- Author: Jack C.
--- Description: The first-session training overlay: a prompt that pops in on every new instruction, an animated demonstration of the input it is asking for, how far through the player is, a discreet skip, and the completion celebration. Presentation only -- every value it renders comes from the onboarding snapshot passed in.
+-- Description: Renders the first-session instruction panel, progress, skip action, and completion card.
 -- Created: 2026-08-26
 
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Motion = require(script.Parent.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Parent.Hooks.useReducedMotion)
 local useEntrance = require(script.Parent.Parent.Parent.Hooks.useEntrance)
+local useViewportSize = require(script.Parent.Parent.Parent.Hooks.useViewportSize)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
-local GestureHint = require(script.Parent.GestureHint)
 
 local c = React.createElement
 
+local PANEL_IMAGE = "rbxassetid://124751224634629"
+local PANEL_SLICE = Rect.new(31, 41, 978, 620)
+local BUTTON_IMAGE = "rbxassetid://136021539696619"
+local BUTTON_SLICE = Rect.new(198, 228, 841, 468)
+local INK = Color3.fromRGB(24, 41, 48)
 local ACCENT = Color3.fromRGB(97, 255, 237)
 local SUCCESS = Color3.fromRGB(0, 255, 42)
-local PANEL = Color3.fromRGB(52, 52, 52)
+local HEADLINE_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local BODY_FONT = Font.new("rbxasset://fonts/families/HighwayGothic.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
 
--- Short, verb-first copy. The world is the teacher; this line only names the
--- action so the player knows which one to try.
 local CUE_COPY: { [string]: { title: string, detail: string? } } = {
 	Ready = { title = "READY?" },
 	Throw = { title = "THROW!", detail = "AIM AT THE DUMMY, THEN THROW" },
@@ -35,22 +41,17 @@ local CUE_COPY: { [string]: { title: string, detail: string? } } = {
 	Done = { title = "NICE WORK!" },
 }
 
-local GESTURE_FOR_CUE: { [string]: GestureHint.Gesture } = {
-	Throw = "Tap",
-	Cross = "Move",
-	Bonk = "Tap",
-	Charge = "Hold",
-}
-
-local INPUT_HINT: { [string]: { [string]: string } } = {
-	Throw = { Mouse = "CLICK", Touch = "TAP", Gamepad = "PRESS RT" },
-	Cross = { Mouse = "WASD", Touch = "JOYSTICK", Gamepad = "LEFT STICK" },
-	Bonk = { Mouse = "CLICK", Touch = "TAP", Gamepad = "PRESS RT" },
-	Charge = { Mouse = "HOLD CLICK", Touch = "HOLD", Gamepad = "HOLD RT" },
-}
-
 local SKILLS = { "THROW", "BONK", "POWER" }
 local LESSONS = { "NormalThrow", "Hammer", "ChargedThrow", "Practice" }
+
+-- The one action label a mouse or gamepad player needs to read for each hands-on
+-- cue. Touch players are shown the physical gesture instead, so this is only
+-- consulted off touch.
+local CONTROL_VERB: { [string]: string } = {
+	Throw = "THROW",
+	Bonk = "SWING",
+	Charge = "HOLD",
+}
 
 local function lessonProgress(step: string): number
 	if step == "Celebration" then
@@ -60,7 +61,104 @@ local function lessonProgress(step: string): number
 	return if index then index - 1 else 0
 end
 
-local function ProgressPips(props: { done: number, reducedMotion: boolean })
+local function textStroke(thickness: number)
+	return c("UIStroke", {
+		Color = INK,
+		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+		Thickness = thickness,
+		Transparency = 0.08,
+	})
+end
+
+-- The runtime-built input context may not have replicated yet, so callers fall
+-- back to a plain label when an action is not resolvable.
+local function boundAction(name: string): any
+	local context = Players.LocalPlayer:FindFirstChild(InputConfig.ContextName)
+	local action = context and context:FindFirstChild(name)
+	return if action and action:IsA("InputAction") then action else nil
+end
+
+local function skipAction(): any
+	return boundAction("OnboardingSkip")
+end
+
+-- A compact, device-accurate control prompt shown inline on the panel for mouse
+-- and gamepad players in place of a floating gesture diagram: the bound Throw
+-- glyph beside the verb for the current cue.
+local function ControlHint(props: { verb: string, fallback: string })
+	local action = boundAction("Throw")
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.5, 0.75),
+		Size = UDim2.fromScale(0.9, 0.24),
+		ZIndex = 62,
+	}, {
+		Layout = c("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0.03, 0),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+		Key = if action
+			then c("InputActionLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				FontFace = BODY_FONT,
+				ImageColor3 = Color3.new(1, 1, 1),
+				InputAction = action,
+				LayoutOrder = 1,
+				Size = UDim2.fromScale(0.16, 0.95),
+				TextColor3 = Color3.new(1, 1, 1),
+				TextSize = 20,
+				ZIndex = 63,
+			})
+			else c("Frame", {
+				BackgroundColor3 = Color3.new(1, 1, 1),
+				BorderSizePixel = 0,
+				LayoutOrder = 1,
+				Size = UDim2.fromScale(0.19, 0.86),
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(0.28, 0) }),
+				Stroke = c("UIStroke", {
+					Color = INK,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					Thickness = 0.07,
+				}),
+				Text = c(ResponsiveText, {
+					MeasurementFont = Enum.Font.Highway,
+					MaxTextSize = 20,
+					Native = {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundTransparency = 1,
+						FontFace = BODY_FONT,
+						Position = UDim2.fromScale(0.5, 0.52),
+						Size = UDim2.fromScale(0.78, 0.6),
+						Text = props.fallback,
+						TextColor3 = INK,
+						ZIndex = 63,
+					},
+				}),
+			}),
+		Verb = c(ResponsiveText, {
+			HostName = "Verb",
+			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 26,
+			Native = {
+				BackgroundTransparency = 1,
+				FontFace = HEADLINE_FONT,
+				LayoutOrder = 2,
+				Size = UDim2.fromScale(0.52, 0.86),
+				Text = props.verb,
+				TextColor3 = ACCENT,
+				ZIndex = 62,
+			},
+		}, { Stroke = textStroke(0.06) }),
+	})
+end
+
+local function ProgressPips(props: { done: number })
 	local pips: { [string]: any } = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
@@ -74,25 +172,26 @@ local function ProgressPips(props: { done: number, reducedMotion: boolean })
 		local complete = index <= props.done
 		local active = index == props.done + 1
 		pips[`Pip{index}`] = c("Frame", {
-			BackgroundColor3 = if complete then SUCCESS else PANEL,
-			BackgroundTransparency = if complete then 0 elseif active then 0.15 else 0.55,
+			BackgroundColor3 = if complete then SUCCESS elseif active then ACCENT else INK,
+			BackgroundTransparency = if complete or active then 0 else 0.45,
 			LayoutOrder = index,
 			Size = if active then UDim2.fromOffset(26, 10) else UDim2.fromOffset(14, 10),
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 			Stroke = c("UIStroke", {
-				Color = if active then ACCENT else Color3.fromRGB(30, 30, 30),
-				Thickness = 2,
-				Transparency = if complete or active then 0.1 else 0.6,
+				Color = INK,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = 0.18,
+				Transparency = 0.15,
 			}),
 		})
 	end
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.5, 0.026),
+		Position = UDim2.fromScale(0.5, 1.08),
 		Size = UDim2.fromOffset(160, 12),
-		ZIndex = 61,
+		ZIndex = 63,
 	}, pips)
 end
 
@@ -104,6 +203,7 @@ export type Props = {
 return function(props: Props)
 	local snapshot = props.Snapshot
 	local reducedMotion = useReducedMotion()
+	local viewport = useViewportSize()
 	local active = snapshot ~= nil and snapshot.active == true
 	local cue = if snapshot then snapshot.cue or "Ready" else "Ready"
 	local celebrating = active and cue == "Done"
@@ -121,82 +221,90 @@ return function(props: Props)
 	end
 
 	local copy = CUE_COPY[cue] or CUE_COPY.Ready
-	local hint = if snapshot.succeeded
-		then nil
-		else (INPUT_HINT[cue] and INPUT_HINT[cue][snapshot.deviceClass or "Mouse"])
 	local title = if snapshot.succeeded and not celebrating then "NICE!" else copy.title
 	local detail = if snapshot.hintLevel and snapshot.hintLevel >= 2 then copy.detail else nil
-	local gesture = GESTURE_FOR_CUE[cue]
 	local done = lessonProgress(snapshot.step or "Intro")
+	local touch = snapshot.deviceClass == "Touch"
+	local action = if touch then nil else skipAction()
+	-- Off touch, hands-on cues carry an inline control glyph rather than a
+	-- floating gesture; the escalated tip only shows when there is no glyph, so
+	-- the compact panel never stacks two secondary lines.
+	local controlVerb = if not touch and not celebrating and not snapshot.succeeded then CONTROL_VERB[cue] else nil
+	local showDetail = detail ~= nil and controlVerb == nil
+	local secondaryRow = controlVerb ~= nil or showDetail
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 60,
 	}, {
-		Progress = if celebrating then nil else c(ProgressPips, { done = done, reducedMotion = reducedMotion }),
-
-		Gesture = if gesture and not snapshot.succeeded
-			then c(GestureHint, {
-				Gesture = gesture,
-				DeviceClass = snapshot.deviceClass or "Mouse",
-				Label = hint,
-			})
-			else nil,
-
-		Prompt = c("Frame", {
+		Prompt = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
+			Image = PANEL_IMAGE,
+			ImageColor3 = if snapshot.succeeded then SUCCESS else Color3.new(1, 1, 1),
 			Position = styles.Offset:map(function(offset: number)
-				return UDim2.fromScale(0.5, 0.08 + offset)
+				return UDim2.fromScale(0.5, 0.05 + offset)
 			end),
-			Size = UDim2.fromScale(0.5, 0.2),
+			ScaleType = Enum.ScaleType.Slice,
+			Size = UDim2.fromScale(0.34, 0.13),
+			SliceCenter = PANEL_SLICE,
+			SliceScale = 0.35,
 			ZIndex = 61,
 		}, {
 			Scale = c("UIScale", { Scale = styles.Scale }),
+			Progress = if celebrating then nil else c(ProgressPips, { done = done }),
 			Aspect = c("UIAspectRatioConstraint", {
 				AspectRatio = 3.4,
 				AspectType = Enum.AspectType.FitWithinMaxSize,
 			}),
+			Bounds = c("UISizeConstraint", {
+				MaxSize = Vector2.new(560, 165),
+				MinSize = Vector2.new(260, 76),
+			}),
 			Title = c(ResponsiveText, {
+				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 64,
+				MaxTextSize = 46,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
+					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0),
-					Size = UDim2.fromScale(1, 0.54),
+					FontFace = HEADLINE_FONT,
+					Position = UDim2.fromScale(0.5, if secondaryRow then 0.4 else 0.5),
+					Size = UDim2.fromScale(0.86, 0.42),
 					Text = title,
-					TextColor3 = if snapshot.succeeded then SUCCESS else Color3.new(1, 1, 1),
+					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 62,
 				},
 			}, {
-				Stroke = c("UIStroke", {
-					Color = Color3.fromRGB(63, 63, 63),
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = 0.055,
-				}),
+				Stroke = textStroke(0.045),
 				Pop = c("UIScale", {
 					Scale = entrance.Alpha:map(function(alpha: number)
 						return 0.55 + 0.45 * alpha
 					end),
 				}),
 			}),
-			Detail = if detail
+			Detail = if showDetail
 				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSans,
-					MaxTextSize = 18,
+					HostName = "Detail",
+					MeasurementFont = Enum.Font.Highway,
+					MaxTextSize = 28,
 					Native = {
-						AnchorPoint = Vector2.new(0.5, 0),
+						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json"),
-						Position = UDim2.fromScale(0.5, 0.9),
-						Size = UDim2.fromScale(0.9, 0.16),
+						FontFace = BODY_FONT,
+						Position = UDim2.fromScale(0.5, 0.73),
+						Size = UDim2.fromScale(0.84, 0.2),
 						Text = detail,
-						TextColor3 = Color3.fromRGB(210, 210, 210),
+						TextColor3 = ACCENT,
 						ZIndex = 62,
 					},
+				}, { Stroke = textStroke(0.06) })
+				else nil,
+			Control = if controlVerb
+				then c(ControlHint, {
+					verb = controlVerb,
+					fallback = if snapshot.deviceClass == "Gamepad" then "RT" else "LMB",
 				})
 				else nil,
 		}),
@@ -207,7 +315,7 @@ return function(props: Props)
 				{
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.5, 0.3),
+					Position = UDim2.fromScale(0.5, if viewport.X < 600 then 0.34 else 0.27),
 					Size = UDim2.fromScale(0.44, 0.08),
 					ZIndex = 61,
 				},
@@ -216,31 +324,43 @@ return function(props: Props)
 						Layout = c("UIListLayout", {
 							FillDirection = Enum.FillDirection.Horizontal,
 							HorizontalAlignment = Enum.HorizontalAlignment.Center,
-							Padding = UDim.new(0.04, 0),
+							Padding = UDim.new(0.03, 0),
 							SortOrder = Enum.SortOrder.LayoutOrder,
 							VerticalAlignment = Enum.VerticalAlignment.Center,
 						}),
 					}
 					for index, name in SKILLS do
 						local appearAt = (index - 1) * 0.22
-						cells[name] = c(ResponsiveText, {
-							MeasurementFont = Enum.Font.LuckiestGuy,
-							MaxTextSize = 26,
-							Native = {
-								BackgroundTransparency = 1,
-								FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-								LayoutOrder = index,
-								Size = UDim2.fromScale(0.3, 1),
-								Text = `✓ {name}`,
-								TextColor3 = SUCCESS,
-								ZIndex = 62,
-							},
+						cells[name] = c("ImageLabel", {
+							BackgroundTransparency = 1,
+							Image = BUTTON_IMAGE,
+							ImageColor3 = SUCCESS,
+							LayoutOrder = index,
+							ScaleType = Enum.ScaleType.Slice,
+							Size = UDim2.fromScale(0.31, 1),
+							SliceCenter = BUTTON_SLICE,
+							SliceScale = 0.1,
+							ZIndex = 62,
 						}, {
 							Pop = c("UIScale", {
 								Scale = entrance.Alpha:map(function(alpha: number)
 									return 0.2 + 0.8 * math.clamp((alpha - appearAt) / 0.4, 0, 1)
 								end),
 							}),
+							Label = c(ResponsiveText, {
+								MeasurementFont = Enum.Font.LuckiestGuy,
+								MaxTextSize = 26,
+								Native = {
+									AnchorPoint = Vector2.new(0.5, 0.5),
+									BackgroundTransparency = 1,
+									FontFace = HEADLINE_FONT,
+									Position = UDim2.fromScale(0.5, 0.54),
+									Size = UDim2.fromScale(0.82, 0.5),
+									Text = name,
+									TextColor3 = Color3.new(1, 1, 1),
+									ZIndex = 63,
+								},
+							}, { Stroke = textStroke(0.05) }),
 						})
 					end
 					return cells
@@ -248,40 +368,99 @@ return function(props: Props)
 			)
 			else nil,
 
-		-- Discreet, always reachable, and never the loudest thing on screen.
-		Skip = if not celebrating
+		Skip = if not celebrating and touch
 			then c(AnimatedButton, {
 				Native = {
 					AnchorPoint = Vector2.new(1, 0),
-					BackgroundColor3 = PANEL,
-					BackgroundTransparency = 0.35,
-					Position = UDim2.fromScale(0.98, 0.04),
-					Size = UDim2.fromScale(0.09, 0.05),
+					BackgroundTransparency = 1,
+					Image = BUTTON_IMAGE,
+					ImageTransparency = 0.25,
+					Position = if viewport.X < 600 then UDim2.fromScale(0.98, 0.31) else UDim2.fromScale(0.98, 0.035),
+					ScaleType = Enum.ScaleType.Slice,
+					Size = UDim2.fromScale(0.11, 0.075),
+					SliceCenter = BUTTON_SLICE,
+					SliceScale = 0.12,
 					ZIndex = 63,
 				},
 				OnActivated = props.OnSkip,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0.35, 0) }),
-				Sizer = c("UISizeConstraint", { MinSize = Vector2.new(76, 30), MaxSize = Vector2.new(150, 56) }),
+				Aspect = c("UIAspectRatioConstraint", { AspectRatio = 3.1 }),
+				Sizer = c("UISizeConstraint", { MinSize = Vector2.new(96, 31), MaxSize = Vector2.new(190, 61) }),
 				Label = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
-					MaxTextSize = 18,
+					MeasurementFont = Enum.Font.LuckiestGuy,
+					MaxTextSize = 24,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
-						FontFace = Font.new(
-							"rbxasset://fonts/families/SourceSansPro.json",
-							Enum.FontWeight.Bold,
-							Enum.FontStyle.Normal
-						),
-						Position = UDim2.fromScale(0.5, 0.5),
-						Size = UDim2.fromScale(0.86, 0.7),
+						FontFace = HEADLINE_FONT,
+						Position = UDim2.fromScale(0.5, 0.54),
+						Size = UDim2.fromScale(0.76, 0.54),
 						Text = "SKIP",
-						TextColor3 = Color3.fromRGB(220, 220, 220),
+						TextColor3 = Color3.new(1, 1, 1),
 						ZIndex = 64,
 					},
-				}),
+				}, { Stroke = textStroke(0.05) }),
 			})
-			else nil,
+			else if not celebrating
+				then c("ImageLabel", {
+					AnchorPoint = Vector2.new(1, 0),
+					BackgroundTransparency = 1,
+					Image = BUTTON_IMAGE,
+					ImageTransparency = 0.12,
+					Position = UDim2.fromScale(0.98, 0.035),
+					ScaleType = Enum.ScaleType.Slice,
+					Size = UDim2.fromScale(0.125, 0.075),
+					SliceCenter = BUTTON_SLICE,
+					SliceScale = 0.12,
+					ZIndex = 63,
+				}, {
+					Aspect = c("UIAspectRatioConstraint", { AspectRatio = 3.35 }),
+					Sizer = c("UISizeConstraint", {
+						MinSize = Vector2.new(116, 35),
+						MaxSize = Vector2.new(210, 63),
+					}),
+					Glyph = if action
+						then c("InputActionLabel", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundTransparency = 1,
+							FontFace = BODY_FONT,
+							ImageColor3 = Color3.new(1, 1, 1),
+							InputAction = action,
+							Position = UDim2.fromScale(0.24, 0.5),
+							Size = UDim2.fromScale(0.28, 0.62),
+							TextColor3 = Color3.new(1, 1, 1),
+							TextSize = 20,
+							ZIndex = 64,
+						})
+						else c(ResponsiveText, {
+							MeasurementFont = Enum.Font.Highway,
+							MaxTextSize = 21,
+							Native = {
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								BackgroundTransparency = 1,
+								FontFace = BODY_FONT,
+								Position = UDim2.fromScale(0.24, 0.52),
+								Size = UDim2.fromScale(0.24, 0.5),
+								Text = if snapshot.deviceClass == "Gamepad" then "B" else "X",
+								TextColor3 = Color3.new(1, 1, 1),
+								ZIndex = 64,
+							},
+						}, { Stroke = textStroke(0.06) }),
+					Label = c(ResponsiveText, {
+						MeasurementFont = Enum.Font.LuckiestGuy,
+						MaxTextSize = 23,
+						Native = {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundTransparency = 1,
+							FontFace = HEADLINE_FONT,
+							Position = UDim2.fromScale(0.64, 0.54),
+							Size = UDim2.fromScale(0.54, 0.54),
+							Text = "SKIP",
+							TextColor3 = Color3.new(1, 1, 1),
+							ZIndex = 64,
+						},
+					}, { Stroke = textStroke(0.05) }),
+				})
+				else nil,
 	})
 end

@@ -120,25 +120,6 @@ return {
 		MarkerBobFrequency = 3.2,
 	},
 
-	Impact = {
-		RingColor = Color3.fromRGB(255, 238, 0),
-		RingThickness = 0.6,
-		RingStartStuds = 3,
-		RingEndStuds = 26,
-		RingSeconds = 0.45,
-		ConfettiCount = 14,
-		ConfettiColors = {
-			Color3.fromRGB(255, 0, 64),
-			Color3.fromRGB(255, 238, 0),
-			Color3.fromRGB(97, 255, 237),
-			Color3.fromRGB(142, 31, 232),
-		},
-		ConfettiSize = Vector3.new(0.9, 0.9, 0.9),
-		ConfettiSeconds = 0.9,
-		ConfettiSpeed = 9,
-		ConfettiRise = 7,
-	},
-
 	Waypoint = {
 		-- The arrow floats in front of the player and turns to point the way. It
 		-- is presentation only and never gates progress.
@@ -151,6 +132,17 @@ return {
 		BobAmplitudeStuds = 0.6,
 		BobFrequency = 2.2,
 		TurnResponsiveness = 12,
+	},
+
+	Gesture = {
+		-- Kept small and secondary to the reticle: the aim point is the primary
+		-- anchor, and the gesture is a lightweight affordance beside it, so it must
+		-- never grow large enough to crowd or cover the target.
+		SizeScale = 0.048,
+		MinPixels = 30,
+		MaxPixels = 46,
+		ClearancePixels = 14,
+		LabelScale = 0.5,
 	},
 
 	Effects = {

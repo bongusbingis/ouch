@@ -7,6 +7,7 @@ export type BindingDef = {
 	Name: string?,
 	KeyCode: Enum.KeyCode?,
 	Scriptable: boolean?,
+	DisplayName: string?,
 }
 
 export type ActionDef = {
@@ -20,11 +21,15 @@ return {
 	WeaponEquip = {
 		Hammer = {
 			Keyboard = Enum.KeyCode.One,
+			KeyboardLabel = "1",
 			Gamepad = Enum.KeyCode.ButtonL1,
+			GamepadLabel = "L1",
 		},
 		Dodgeball = {
 			Keyboard = Enum.KeyCode.Two,
+			KeyboardLabel = "2",
 			Gamepad = Enum.KeyCode.ButtonR1,
+			GamepadLabel = "R1",
 		},
 	},
 	-- Lateral offset, in studs, applied to the camera while the mouse is
@@ -34,20 +39,28 @@ return {
 			Name = "Throw",
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton },
+				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton, DisplayName = "LMB" },
 				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonR2 },
 				-- Pulsed by InputRouter on non-GUI screen taps (touch devices).
-				{ Name = "TouchFeed", Scriptable = true },
+				{ Name = "TouchFeed", Scriptable = true, DisplayName = "TAP" },
 			},
 		},
 		{
 			Name = "Catch",
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseRightButton },
+				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseRightButton, DisplayName = "RMB" },
 				{ Name = "Keyboard", KeyCode = Enum.KeyCode.F },
 				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonL2 },
-				{ Name = "TouchFeed", Scriptable = true },
+				{ Name = "TouchFeed", Scriptable = true, DisplayName = "TAP" },
+			},
+		},
+		{
+			Name = "OnboardingSkip",
+			Type = Enum.InputActionType.Bool,
+			Bindings = {
+				{ Name = "Keyboard", KeyCode = Enum.KeyCode.X, DisplayName = "X" },
+				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonB },
 			},
 		},
 		{

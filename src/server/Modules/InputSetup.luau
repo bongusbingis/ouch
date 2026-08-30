@@ -46,6 +46,9 @@ local function buildContext(player: Player)
 			elseif bindingDef.KeyCode then
 				binding.KeyCode = bindingDef.KeyCode
 			end
+			if bindingDef.DisplayName then
+				binding.DisplayName = bindingDef.DisplayName
+			end
 			binding.Parent = action
 		end
 	end

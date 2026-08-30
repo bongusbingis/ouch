@@ -95,6 +95,15 @@ local onboardingShows = 0
 local swipeSuccesses = 0
 local learnRequestSent = false
 local onboardingWasVisible = false
+local hintGate: (() -> boolean)? = nil
+
+local function hintAllowed(): boolean
+	if hintGate == nil then
+		return true
+	end
+	local ok, allowed = pcall(hintGate :: () -> boolean)
+	return ok and allowed == true
+end
 
 local function publish(nextSnapshot: Snapshot)
 	if
@@ -170,6 +179,7 @@ local function onboardingVisible(now: number, inputType: string, ready: boolean)
 		not ThrowUX.Onboarding.Enabled
 		or inputType ~= "Touch"
 		or not ready
+		or not hintAllowed()
 		or Players.LocalPlayer:GetAttribute("SwipeThrowLearned") == true
 		or swipeSuccesses >= ThrowUX.Onboarding.SuccessesToDismiss
 		or (onboardingShows >= ThrowUX.Onboarding.MaxShowsPerSession and not onboardingWasVisible)
@@ -182,6 +192,10 @@ local function onboardingVisible(now: number, inputType: string, ready: boolean)
 	end
 	local cycle = ThrowUX.Onboarding.VisibleSeconds + 5
 	return elapsed % cycle < ThrowUX.Onboarding.VisibleSeconds
+end
+
+function ThrowUXClient.setHintGate(gate: (() -> boolean)?)
+	hintGate = gate
 end
 
 local function update(dt: number)
@@ -304,6 +318,7 @@ function ThrowUXClient.destroy()
 	CombatFeedback.destroy()
 	table.clear(listeners)
 	currentGesture = EMPTY_GESTURE
+	hintGate = nil
 	started = false
 end
 

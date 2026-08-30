@@ -10,6 +10,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Onboarding"))
+local OnboardingClient = require(script.Parent:WaitForChild("OnboardingClient"))
 local OnboardingTargets = require(script.Parent:WaitForChild("OnboardingTargets"))
 
 local OnboardingTargetMarkers = {}
@@ -22,6 +23,8 @@ local started = false
 local template: BasePart? = nil
 local markers: { [Model]: BasePart } = {}
 local connection: RBXScriptConnection? = nil
+local unsubscribe: (() -> ())? = nil
+local hintLevel = 0
 
 local function resolvedTemplate(): BasePart
 	if template == nil then
@@ -64,6 +67,7 @@ local function update(_dt: number)
 	end
 	local style = OnboardingConfig.Dummy
 	local bob = math.sin(os.clock() * style.MarkerBobFrequency) * style.MarkerBobStuds
+	local emphasis = if hintLevel >= 2 then 1.18 + math.sin(os.clock() * 5) * 0.1 else 1
 	local eye = camera.CFrame.Position
 	local live: { [Model]: boolean } = {}
 
@@ -78,6 +82,8 @@ local function update(_dt: number)
 			marker = buildMarker()
 			markers[target] = marker
 		end
+		marker.Size = resolvedTemplate().Size * style.MarkerScale * emphasis
+		marker.Color = if hintLevel >= 2 then style.MarkerColor:Lerp(Color3.new(1, 1, 1), 0.25) else style.MarkerColor
 		marker.CFrame = markerCFrame(anchor.Position + Vector3.new(0, style.MarkerHeightStuds + bob, 0), eye)
 	end
 
@@ -94,6 +100,9 @@ function OnboardingTargetMarkers.start()
 		return
 	end
 	started = true
+	unsubscribe = OnboardingClient.subscribe(function(snapshot)
+		hintLevel = snapshot.hintLevel or 0
+	end)
 	connection = RunService.RenderStepped:Connect(update)
 end
 
@@ -102,10 +111,15 @@ function OnboardingTargetMarkers.destroy()
 		connection:Disconnect()
 		connection = nil
 	end
+	if unsubscribe then
+		unsubscribe()
+		unsubscribe = nil
+	end
 	for target, marker in markers do
 		marker:Destroy()
 		markers[target] = nil
 	end
+	hintLevel = 0
 	started = false
 end
 
