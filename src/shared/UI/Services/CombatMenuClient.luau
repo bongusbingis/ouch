@@ -1,7 +1,7 @@
--- Name: ArenaMenuClient.luau
+-- Name: CombatMenuClient.luau
 -- Author: Jack C.
--- Description: Owns arena in-match menu state: which page is open, layered close handling, input-method awareness, and the interception hook other screens use to claim the close action.
--- Created: 2026-08-24
+-- Description: Owns the in-combat overlay menu state shared by both places: which page is open, layered close handling, input-method awareness, and the interception hook other screens use to claim the close action.
+-- Created: 2026-08-31
 
 --!strict
 
@@ -11,7 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
-local ArenaMenuClient = {}
+local CombatMenuClient = {}
 
 export type Page = "Inventory" | "Shop" | "Settings"
 export type InputMethod = "KeyboardMouse" | "Gamepad" | "Touch"
@@ -22,8 +22,8 @@ export type Snapshot = {
 	inputMethod: InputMethod,
 }
 
-local TOGGLE_ACTION = "ToggleArenaMenu"
-local CURSOR_REASON = "ArenaMenu"
+local TOGGLE_ACTION = "ToggleCombatMenu"
+local CURSOR_REASON = "CombatMenu"
 local ACTION_PRIORITY = Enum.ContextActionPriority.High.Value + 1
 
 local started = false
@@ -66,7 +66,7 @@ local function publish(changes: { [string]: any })
 	for _, listener in listeners do
 		local ok, err = pcall(listener, state)
 		if not ok then
-			warn(`[ArenaMenuClient] listener failed: {err}`)
+			warn(`[CombatMenuClient] listener failed: {err}`)
 		end
 	end
 end
@@ -90,7 +90,7 @@ local function closeTopLayer(): boolean
 	end
 	local ok, handled = pcall(closeInterceptor)
 	if not ok then
-		warn(`[ArenaMenuClient] close interceptor failed: {handled}`)
+		warn(`[CombatMenuClient] close interceptor failed: {handled}`)
 		return false
 	end
 	return handled == true
@@ -113,7 +113,7 @@ local function handleToggle(
 	return Enum.ContextActionResult.Sink
 end
 
-function ArenaMenuClient.start()
+function CombatMenuClient.start()
 	if started then
 		return
 	end
@@ -135,12 +135,12 @@ function ArenaMenuClient.start()
 	)
 end
 
-function ArenaMenuClient.getSnapshot(): Snapshot
+function CombatMenuClient.getSnapshot(): Snapshot
 	return state
 end
 
-function ArenaMenuClient.subscribe(listener: (Snapshot) -> ()): () -> ()
-	ArenaMenuClient.start()
+function CombatMenuClient.subscribe(listener: (Snapshot) -> ()): () -> ()
+	CombatMenuClient.start()
 	table.insert(listeners, listener)
 	listener(state)
 	local connected = true
@@ -156,40 +156,40 @@ function ArenaMenuClient.subscribe(listener: (Snapshot) -> ()): () -> ()
 	end
 end
 
-function ArenaMenuClient.setAvailable(available: boolean)
+function CombatMenuClient.setAvailable(available: boolean)
 	if not available then
 		setOpen(false)
 	end
 	publish({ available = available })
 end
 
-function ArenaMenuClient.toggle()
+function CombatMenuClient.toggle()
 	if state.open and closeTopLayer() then
 		return
 	end
 	setOpen(not state.open)
 end
 
-function ArenaMenuClient.open()
+function CombatMenuClient.open()
 	setOpen(true)
 end
 
-function ArenaMenuClient.close()
+function CombatMenuClient.close()
 	setOpen(false)
 end
 
-function ArenaMenuClient.navigate(page: Page)
+function CombatMenuClient.navigate(page: Page)
 	if page ~= "Inventory" and page ~= "Shop" and page ~= "Settings" then
 		return
 	end
 	publish({ page = page })
 end
 
-function ArenaMenuClient.setCloseInterceptor(interceptor: (() -> boolean)?)
+function CombatMenuClient.setCloseInterceptor(interceptor: (() -> boolean)?)
 	closeInterceptor = interceptor
 end
 
-function ArenaMenuClient.destroy()
+function CombatMenuClient.destroy()
 	ContextActionService:UnbindAction(TOGGLE_ACTION)
 	for _, connection in connections do
 		connection:Disconnect()
@@ -207,4 +207,4 @@ function ArenaMenuClient.destroy()
 	started = false
 end
 
-return ArenaMenuClient
+return CombatMenuClient

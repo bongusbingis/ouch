@@ -1,6 +1,6 @@
 -- Name: CosmeticEffects.luau
 -- Author: Jack C.
--- Description: Drives every cosmetic VFX category from the config registry: on each triggering sim event it plays the acting player's equipped effect at the impact point through the shared factory, deduplicating per category against repeated broadcasts.
+-- Description: Drives every cosmetic VFX category from the config registry: on each triggering sim event it plays the acting player's equipped effect at the impact point through the shared factory, deduplicating per category against repeated broadcasts. Shared so both the arena and the lobby test session drive cosmetics through one path.
 -- Created: 2026-08-29
 
 --!strict

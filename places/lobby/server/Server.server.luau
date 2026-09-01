@@ -17,6 +17,7 @@ local EconomyService = require(Modules:WaitForChild("EconomyService"))
 local SettingsService = require(Modules:WaitForChild("SettingsService"))
 local OnboardingService = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingService"))
 local OnboardingCombat = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingCombat"))
+local LobbyCombatTest = require(Modules:WaitForChild("Debug"):WaitForChild("LobbyCombatTest"))
 
 ConfigLiveService.start({
 	modules = {
@@ -35,6 +36,7 @@ EconomyService.start()
 SettingsService.start()
 OnboardingCombat.start()
 OnboardingService.start()
+LobbyCombatTest.start()
 
 Players.PlayerAdded:Connect(function(player)
 	PlayerData.load(player)

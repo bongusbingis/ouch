@@ -9,6 +9,18 @@ local T = require(script.Parent.TestKit)
 local CosmeticEffectFactory = require(script.Parent.Parent.Game.Cosmetics.CosmeticEffectFactory)
 local CosmeticEffects = require(script.Parent.Parent.Parent.Config.CosmeticEffects)
 local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
+local Inventory = require(script.Parent.Parent.Parent.Config.Inventory)
+
+local PRODUCTION_IMPACT_EFFECTS = {
+	"StarPop",
+	"FoamPoof",
+	"JellySplash",
+	"PartyPopper",
+	"ComicBonk",
+	"CandyCrash",
+	"BubbleBurst",
+	"RoyalParty",
+}
 
 local function impactCategory()
 	local category = CosmeticEffects.Categories.Impact
@@ -97,6 +109,32 @@ T.describe("CosmeticEffects", function()
 	T.it("resolves the shipped Confetti Impact against the real catalog", function()
 		T.expect(CosmeticEffectFactory.effectIdForItem(Cosmetics.Items, "ImpactEffectAssets", "ConfettiImpact"))
 			:toEqual("ConfettiImpact")
+	end)
+
+	T.it("registers the production impact collection with unique effect ids", function()
+		local seen = {}
+		for _, itemId in PRODUCTION_IMPACT_EFFECTS do
+			local item = Cosmetics.Items[itemId]
+			T.expect(item ~= nil):toBeTruthy()
+			T.expect(item.Category):toEqual("ImpactEffectAssets")
+			T.expect(Cosmetics.Rarities[item.Rarity] ~= nil):toBeTruthy()
+			T.expect(seen[item.EffectId]):toBeNil()
+			seen[item.EffectId] = true
+		end
+	end)
+
+	T.it("lists impact cosmetics in the inventory effects tab", function()
+		local found = false
+		for _, tab in Inventory.Tabs do
+			if tab.Id == "EFFECTS" then
+				for _, section in tab.Sections do
+					if section.Category == "ImpactEffectAssets" then
+						found = true
+					end
+				end
+			end
+		end
+		T.expect(found):toEqual(true)
 	end)
 end)
 

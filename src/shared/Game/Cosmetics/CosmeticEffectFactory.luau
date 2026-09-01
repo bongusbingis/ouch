@@ -56,7 +56,7 @@ local function collectEmitters(root: Instance): { ParticleEmitter }
 end
 
 local function anchorFor(context: EffectContext): BasePart
-	local Workspace = game:GetService("Workspace")
+	local Runtime = require(script.Parent.Effects.Runtime)
 	local anchor = Instance.new("Part")
 	anchor.Name = ANCHOR_NAME
 	anchor.Anchored = true
@@ -69,7 +69,7 @@ local function anchorFor(context: EffectContext): BasePart
 	anchor.CFrame = if context.direction
 		then CFrame.lookAt(context.position, context.position - context.direction)
 		else CFrame.new(context.position)
-	anchor.Parent = Workspace
+	anchor.Parent = Runtime.container()
 	return anchor
 end
 
@@ -108,7 +108,26 @@ function CosmeticEffectFactory.play(categoryId: string, effectId: string?, conte
 	local ScriptEffects = require(script.Parent.Effects.ScriptEffects)
 	local scriptEffect = ScriptEffects.get(resolvedId)
 	if scriptEffect ~= nil then
-		scriptEffect.play(context)
+		local ok, err = pcall(scriptEffect.play, context)
+		if ok then
+			return
+		end
+		warn(`[CosmeticEffectFactory] script effect {resolvedId} failed: {err}`)
+		if resolvedId ~= category.DefaultEffectId then
+			local defaultScriptEffect = ScriptEffects.get(category.DefaultEffectId)
+			if defaultScriptEffect ~= nil then
+				local fallbackOk, fallbackErr = pcall(defaultScriptEffect.play, context)
+				if not fallbackOk then
+					warn(`[CosmeticEffectFactory] default script effect failed: {fallbackErr}`)
+				end
+			else
+				playInstance(
+					effectFolder(category.FolderName):WaitForChild(category.DefaultEffectId),
+					context,
+					category.DefaultEmitCount
+				)
+			end
+		end
 		return
 	end
 

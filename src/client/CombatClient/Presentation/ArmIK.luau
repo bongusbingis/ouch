@@ -40,6 +40,7 @@ local function v3(value: any): Vector3
 end
 
 local started = false
+local replicate = true
 local chains: { [Player]: Chain } = {}
 local lastReportAt = 0
 local lastReportedCharge = -1
@@ -141,6 +142,9 @@ local function frequencyScale(): number
 end
 
 local function report(charge: number)
+	if not replicate then
+		return
+	end
 	local remote = ThrowPose.Remote
 	if not remote.Enabled then
 		return
@@ -248,11 +252,15 @@ function ArmIK.debugState(): (Vector3?, Vector3?, number)
 	return chain.target.WorldPosition, chain.pole.WorldPosition, chain.control.Weight
 end
 
-function ArmIK.start()
+-- replicate = false skips reporting AimCharge to the server: onboarding is a
+-- solo experience with no one else around to see the pose, and the lobby
+-- server has no listener for ReportAimPose.
+function ArmIK.start(options: { replicate: boolean? }?)
 	if started then
 		return
 	end
 	started = true
+	replicate = options == nil or options.replicate ~= false
 
 	local function observe(player: Player)
 		player.CharacterAdded:Connect(function(character)

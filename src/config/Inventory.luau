@@ -22,7 +22,7 @@ return {
 			Id = "EFFECTS",
 			Sections = {
 				{ Id = "TRAILS", Category = "TrailAssets" },
-				{ Id = "ELIMINATIONS", Category = "ElimEffectAssets" },
+				{ Id = "IMPACTS", Category = "ImpactEffectAssets" },
 			},
 		},
 		{
@@ -62,9 +62,7 @@ return {
 			RotationDegrees = -20,
 			SpinDegreesPerSecond = 12,
 		},
-		-- TrailAssets and ElimEffectAssets have no entry yet, and deliberately so.
-		-- Their framing depended on a preview component built for the prototype
-		-- trails that were removed. Adding an effect cosmetic before deciding how
-		-- it previews asserts in InventoryPreview, which is the signal wanted.
+		-- ImpactEffectAssets uses InventoryPreview's non-world effect badge.
+		-- TrailAssets and ElimEffectAssets stay out of Tabs until they have previews.
 	},
 }

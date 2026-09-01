@@ -1,6 +1,6 @@
 -- Name: InventoryPreview.luau
 -- Author: Jack C.
--- Description: Renders a live rotating 3D preview of a cosmetic or character inside a UI frame, only animating while it is actually on screen.
+-- Description: Renders cosmetic inventory previews, using live 3D models where available and a static badge for script effects.
 -- Created: 2026-08-17
 
 --!strict
@@ -156,7 +156,36 @@ export type Props = {
 	ZIndex: number,
 }
 
-return React.memo(function(props: Props)
+local function impactPreview(props: Props)
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.5, 0.46),
+		Size = UDim2.fromScale(0.72, 0.58),
+		ZIndex = props.ZIndex,
+	}, {
+		Burst = c("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Rotation = -8,
+			Size = UDim2.fromScale(1, 0.72),
+			Text = "HIT!",
+			TextColor3 = Color3.new(1, 1, 1),
+			TextScaled = true,
+			ZIndex = props.ZIndex,
+		}, {
+			UIStroke = c("UIStroke", {
+				Color = Color3.fromRGB(30, 30, 30),
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = 0.08,
+			}),
+		}),
+	})
+end
+
+local ViewportPreview = React.memo(function(props: Props)
 	local viewportRef = React.useRef(nil)
 	local cameraRef = React.useRef(nil)
 	local worldRef = React.useRef(nil)
@@ -216,4 +245,11 @@ return React.memo(function(props: Props)
 		PreviewCamera = c("Camera", { ref = cameraRef }),
 		PreviewWorld = c("WorldModel", { ref = worldRef }),
 	})
+end)
+
+return React.memo(function(props: Props)
+	if props.Category == "ImpactEffectAssets" then
+		return impactPreview(props)
+	end
+	return c(ViewportPreview, props)
 end)

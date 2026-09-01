@@ -276,7 +276,9 @@ local function ActionSlot(props: {
 		PodColor = if muted then SURFACE_MUTED else WHITE,
 		IconTransparency = if kind == "Disabled"
 			then 0.65
-			else if kind == "Locked" then 0.46 else if kind == "Unavailable" then 0.5 else if kind == "Cooldown" then 0.28 else 0,
+			else if kind == "Locked"
+				then 0.46
+				else if kind == "Unavailable" then 0.5 else if kind == "Cooldown" then 0.28 else 0,
 		AccentTransparency = if kind == "Disabled"
 			then 0.72
 			else if kind == "Locked" then 0.5 else if kind == "Unavailable" then 0.38 else 0,

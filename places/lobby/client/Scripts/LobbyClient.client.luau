@@ -60,6 +60,27 @@ local OnboardingGestureLayer = require(
 		:WaitForChild("OnboardingGestureLayer")
 )
 
+local RunService = game:GetService("RunService")
+local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local LobbyCombatTestClient =
+	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Debug"):WaitForChild("LobbyCombatTestClient"))
+local CombatMenu = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Components"):WaitForChild("CombatMenu")
+)
+local CombatMenuClient = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("CombatMenuClient")
+)
+local useExternalStore = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Hooks"):WaitForChild("useExternalStore")
+)
+
+-- Studio-only combat/cosmetics test session. Nothing below mounts or binds in a
+-- normal lobby; the same gate the server uses keeps it out of production.
+local combatTestEnabled = Debug.LobbyCombatTest == true and RunService:IsStudio()
+
 local partyClient = PartyClient.new()
 local teleportPresentation = TeleportPresentationClient.start(function()
 	partyClient:setTeleportPresentationReady()
@@ -89,6 +110,7 @@ OnboardingTargets.start()
 OnboardingWaypoint.start()
 OnboardingTargetMarkers.start()
 OnboardingImpactVFX.start()
+LobbyCombatTestClient.start()
 
 -- The lobby backdrop is pinned in front of the camera, which would sit it
 -- squarely in the player's view once training takes the camera. Onboarding's
@@ -105,6 +127,7 @@ local unsubscribeBackground = OnboardingClient.subscribe(applyBackgroundVisibili
 root:render(React.createElement(LobbyApp, {
 	PartyClient = partyClient,
 	OnboardingClient = OnboardingClient,
+	CombatTestClient = if combatTestEnabled then LobbyCombatTestClient else nil,
 	ShopClient = ShopClient,
 	OnPresented = function()
 		ReplicatedFirst:SetAttribute("ReactLoadingPresented", true)
@@ -116,6 +139,25 @@ combatRoot:render(React.createElement(React.Fragment, nil, {
 		OnboardingClient = OnboardingClient,
 	}),
 }))
+
+-- The arena's overlay menu, mounted only for the Studio test session so a
+-- developer can switch cosmetics mid-session exactly as they would in a match.
+local menuContainer, menuRoot = nil, nil
+if combatTestEnabled then
+	CombatMenuClient.start()
+	local function LobbyCombatMenu()
+		local snapshot = useExternalStore(LobbyCombatTestClient.getSnapshot, LobbyCombatTestClient.subscribe)
+		return React.createElement(CombatMenu, {
+			Available = snapshot.active,
+			ShopClient = ShopClient,
+			Place = "Lobby",
+		})
+	end
+	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.DeviceSafeInsets, 500)
+	menuRoot = ReactRoblox.createRoot(menuContainer)
+	menuRoot:render(React.createElement(LobbyCombatMenu))
+end
+
 Replica.RequestData()
 
 script.Destroying:Connect(function()
@@ -131,6 +173,16 @@ script.Destroying:Connect(function()
 	OnboardingWaypoint.destroy()
 	OnboardingClient.destroy()
 	OnboardingCombatClient.destroy()
+	LobbyCombatTestClient.destroy()
+	if menuRoot then
+		menuRoot:unmount()
+	end
+	if menuContainer then
+		menuContainer:Destroy()
+	end
+	if combatTestEnabled then
+		CombatMenuClient.destroy()
+	end
 	teleportPresentation.destroy()
 	if background then
 		background:destroy()

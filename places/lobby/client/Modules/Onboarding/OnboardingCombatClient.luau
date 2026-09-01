@@ -83,7 +83,7 @@ function OnboardingCombatClient.start()
 	-- most of what separates training from the real thing.
 	startOptional("ArmIK", function()
 		local module = require(presentation:WaitForChild("ArmIK")) :: any
-		module.start()
+		module.start({ replicate = false })
 		return module
 	end)
 	local GameAudio = startOptional("GameAudio", function()

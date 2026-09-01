@@ -182,6 +182,10 @@
               "$path": "places/lobby/client/Modules/Onboarding"
             },
 
+            "Debug": {
+              "$path": "places/lobby/client/Modules/Debug"
+            },
+
             "UI": {
               "$className": "Folder",
               "ThrowUXClient": {

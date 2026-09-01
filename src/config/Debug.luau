@@ -45,6 +45,14 @@ return {
 	-- separate from the drawing flags above.
 	PoseStateReadout = true,
 
+	CosmeticVFXGallery = false,
+
+	-- Studio-only lobby combat/cosmetics test session. Press Q while playtesting
+	-- the lobby to spawn onto the baseplate with stationary respawning dummies,
+	-- both weapons, and the arena overlay menu, so equipped cosmetics can be
+	-- iterated on without entering the arena. Gated to Studio and never runs live.
+	LobbyCombatTest = true,
+
 	-- Tap-corner gesture that lets a dev/tester end the active match solo and
 	-- declare themselves the winner, for exercising the post-match flow
 	-- without a second player. Gated server-side by DevSoloPlay.canUse.

@@ -14,6 +14,13 @@ local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Co
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
 local Audio = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Audio"))
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
+local ScriptEffects = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("Effects")
+		:WaitForChild("ScriptEffects")
+)
 local Client = StarterPlayer:WaitForChild("StarterPlayerScripts"):WaitForChild("Client")
 local HammerGrip = require(Client:WaitForChild("Modules"):WaitForChild("Presentation"):WaitForChild("HammerGrip"))
 
@@ -112,6 +119,27 @@ return function()
 					expect(Cosmetics.Rarities[item.Rarity]).to.be.ok()
 					expect(item.AlwaysAvailable).never.to.equal(true)
 				end
+			end
+		end)
+
+		it("loads every registered script impact cosmetic", function()
+			local expected = {
+				"StarPop",
+				"FoamPoof",
+				"JellySplash",
+				"PartyPopper",
+				"ComicBonk",
+				"CandyCrash",
+				"BubbleBurst",
+				"RoyalParty",
+			}
+			for _, effectId in expected do
+				local item = Cosmetics.Items[effectId]
+				expect(item).to.be.ok()
+				expect(item.EffectId).to.equal(effectId)
+				local effect = ScriptEffects.get(effectId)
+				expect(effect).to.be.ok()
+				expect(typeof(effect.play)).to.equal("function")
 			end
 		end)
 	end)

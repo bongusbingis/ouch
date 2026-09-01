@@ -38,6 +38,7 @@ local definitions = {
 	OnboardingReady = "function",
 	OnboardingAction = "event",
 	OnboardingDebug = "event",
+	LobbyCombatTest = "event",
 	CombatFeed = "event",
 	MatchSummary = "event",
 	PostMatchResult = "event",

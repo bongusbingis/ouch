@@ -226,11 +226,26 @@ local function LobbyContent(props)
 		return onboardingClient.subscribe(setOnboarding)
 	end, { onboardingClient })
 
+	-- Studio-only combat test session (nil in production). While it runs it owns
+	-- the combat camera on the baseplate, so the lobby's scripted world view and
+	-- party UI stand down exactly as they do for onboarding.
+	local combatTestClient = props.CombatTestClient
+	local combatTest, setCombatTest = React.useState(function()
+		return if combatTestClient then combatTestClient.getSnapshot() else nil
+	end)
+	React.useEffect(function()
+		if combatTestClient == nil then
+			return
+		end
+		return combatTestClient.subscribe(setCombatTest)
+	end, { combatTestClient })
+	local testActive = combatTest ~= nil and combatTest.active == true
+
 	-- Training owns the screen until eligibility resolves, so the normal lobby
 	-- never flashes in front of a new player and then gets yanked away.
 	local onboardingActive = onboarding ~= nil and onboarding.active == true
 	local onboardingResolved = onboarding == nil or onboarding.resolved == true
-	local lobbyVisible = onboardingResolved and not onboardingActive
+	local lobbyVisible = onboardingResolved and not onboardingActive and not testActive
 
 	React.useEffect(function()
 		if not presented.current and rootRef.current ~= nil and props.OnPresented and onboardingResolved then
@@ -277,7 +292,7 @@ local function LobbyContent(props)
 	local characterRenderer = React.useRef(nil)
 	-- Training drives its own combat camera, so the lobby's establishing-shot
 	-- transition must stay out of the way until onboarding hands back over.
-	useWorldTransition(currentPage, props.CameraEnabled ~= false and not onboardingActive)
+	useWorldTransition(currentPage, props.CameraEnabled ~= false and not onboardingActive and not testActive)
 
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false or onboardingActive then

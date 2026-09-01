@@ -126,10 +126,7 @@ local Defaults: { [string]: DefaultDef } = {
 			HammerSound = "HammerElimination",
 		},
 	},
-	-- EffectId names the authored particle template under
-	-- Assets.Cosmetics.Effects.Impact; Config.CosmeticEffects binds the slot to
-	-- the events that fire it. Impact effects have no world Visual/preview yet, so
-	-- the slot is intentionally absent from Config.Inventory.Tabs.
+	-- Config.CosmeticEffects binds this EffectId to the events that fire it.
 	ImpactEffectAssets = {
 		DisplayName = "Default Impact",
 		Rarity = "Common",
@@ -192,6 +189,70 @@ local Items: { [string]: ItemDef } = {
 		DisplayName = "Confetti Impact",
 		Thumbnail = "",
 		EffectId = "ConfettiImpact",
+	},
+	StarPop = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Common",
+		DisplayName = "Star Pop",
+		Thumbnail = "",
+		EffectId = "StarPop",
+		SortOrder = 10,
+	},
+	FoamPoof = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Common",
+		DisplayName = "Foam Poof",
+		Thumbnail = "",
+		EffectId = "FoamPoof",
+		SortOrder = 20,
+	},
+	JellySplash = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Jelly Splash",
+		Thumbnail = "",
+		EffectId = "JellySplash",
+		SortOrder = 30,
+	},
+	PartyPopper = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Party Popper",
+		Thumbnail = "",
+		EffectId = "PartyPopper",
+		SortOrder = 40,
+	},
+	ComicBonk = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Comic Bonk",
+		Thumbnail = "",
+		EffectId = "ComicBonk",
+		SortOrder = 50,
+	},
+	CandyCrash = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Candy Crash",
+		Thumbnail = "",
+		EffectId = "CandyCrash",
+		SortOrder = 60,
+	},
+	BubbleBurst = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Bubble Burst",
+		Thumbnail = "",
+		EffectId = "BubbleBurst",
+		SortOrder = 70,
+	},
+	RoyalParty = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Royal Party",
+		Thumbnail = "",
+		EffectId = "RoyalParty",
+		SortOrder = 80,
 	},
 }
 

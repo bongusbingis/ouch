@@ -142,11 +142,13 @@ function TouchRegions.bottomSwipeAnchor(): Vector2
 	local step = math.max(width * 0.03, 6)
 	local offset = 0
 	while offset <= width * 0.6 do
-		local toward = math.clamp(if biasRight then target + offset else target - offset, rect.minX + step, rect.maxX - step)
+		local toward =
+			math.clamp(if biasRight then target + offset else target - offset, rect.minX + step, rect.maxX - step)
 		if TouchRegions.isInBottomSwipeRegion(toward, y) then
 			return Vector2.new(toward, y)
 		end
-		local away = math.clamp(if biasRight then target - offset else target + offset, rect.minX + step, rect.maxX - step)
+		local away =
+			math.clamp(if biasRight then target - offset else target + offset, rect.minX + step, rect.maxX - step)
 		if TouchRegions.isInBottomSwipeRegion(away, y) then
 			return Vector2.new(away, y)
 		end
