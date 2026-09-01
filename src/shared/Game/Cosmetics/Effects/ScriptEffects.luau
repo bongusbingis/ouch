@@ -12,6 +12,8 @@ local JellySplash = require(script.Parent.JellySplash)
 local PartyPopper = require(script.Parent.PartyPopper)
 local RoyalParty = require(script.Parent.RoyalParty)
 local StarPop = require(script.Parent.StarPop)
+local DamageEffects = require(script.Parent.Imported.DamageEffects)
+local EggEffects = require(script.Parent.Imported.EggEffects)
 
 export type ScriptEffect = {
 	play: (context: any) -> (),
@@ -20,16 +22,36 @@ export type ScriptEffect = {
 local productionIds = {
 	"StarPop",
 	"FoamPoof",
+	"ConfettiImpact",
 	"JellySplash",
-	"PartyPopper",
-	"ComicBonk",
 	"CandyCrash",
+	"PartyPopper",
+	"SugarRush",
+	"ComicBonk",
 	"BubbleBurst",
 	"RoyalParty",
+	"Prismatic",
+	"Galaxy",
+	"Starlight",
+}
+
+-- Effects reproduced in code from an external particle pack's dump (ParticleKit +
+-- Effects/Imported). They resolve like any script effect, so a cosmetic bound to
+-- one (e.g. SugarRush) needs no Studio template.
+local importedIds = {
+	"Burn",
+	"Magma",
+	"Poison",
+	"Shock",
+	"Common",
+	"Epic",
+	"Ethereal",
 }
 
 local orderedIds = table.clone(productionIds)
-table.insert(orderedIds, "ConfettiImpact")
+for _, id in importedIds do
+	table.insert(orderedIds, id)
+end
 
 local registry: { [string]: ScriptEffect } = {
 	BubbleBurst = BubbleBurst,
@@ -42,6 +64,12 @@ local registry: { [string]: ScriptEffect } = {
 	RoyalParty = RoyalParty,
 	StarPop = StarPop,
 }
+
+for _, map in { DamageEffects, EggEffects } do
+	for id, effect in map do
+		registry[id] = effect
+	end
+end
 
 local ScriptEffects = {}
 

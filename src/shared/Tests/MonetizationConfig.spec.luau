@@ -6,12 +6,14 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
 local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
 local Products = require(script.Parent.Parent.Parent.Config.Products)
 
 T.describe("MonetizationConfig", function()
 	T.it("maps active products into receipt processing and excludes previews", function()
 		T.expect(Products.ById[Products.Catalog.Bonks500.Id]):toEqual(Products.Catalog.Bonks500)
+		T.expect(Products.ById[Products.Catalog.EffectsCrateOpen.Id]):toEqual(Products.Catalog.EffectsCrateOpen)
 		T.expect(Products.ById[Products.Catalog.HammerCrateOpen.Id]):toBeNil()
 		T.expect(Products.Catalog.Bonks500.BonksAmount):toEqual(500)
 		T.expect(Products.Catalog.Bonks1100.BonksAmount):toEqual(1100)
@@ -28,12 +30,21 @@ T.describe("MonetizationConfig", function()
 		end
 	end)
 
-	T.it("maps active boosters while leaving unauthored cosmetic passes in preview", function()
+	T.it("maps active boosters while leaving cosmetic passes in preview", function()
 		T.expect(GamePasses.ById[GamePasses.Catalog.DoubleXP.Id]):toEqual(GamePasses.Catalog.DoubleXP)
 		T.expect(GamePasses.ById[GamePasses.Catalog.SplatStarter.Id]):toBeNil()
 		T.expect(GamePasses.Catalog.SplatStarter.SuggestedRobux):toEqual(49)
 		T.expect(GamePasses.Catalog.EffectCollection.SuggestedRobux):toEqual(149)
-		T.expect(#GamePasses.Catalog.EffectCollection.EntitlementItemIds):toEqual(0)
+		local impactEntitlements = GamePasses.Catalog.EffectCollection.EntitlementItemIds
+		local expectedImpactEntitlements = { "Prismatic", "Galaxy", "Starlight" }
+		T.expect(#impactEntitlements):toEqual(#expectedImpactEntitlements)
+		for index, itemId in impactEntitlements do
+			T.expect(itemId):toEqual(expectedImpactEntitlements[index])
+			local item = Cosmetics.Items[itemId]
+			T.expect(item ~= nil):toBeTruthy()
+			T.expect(item.Rarity):toEqual("Exclusive")
+			T.expect(item.Category):toEqual("ImpactEffectAssets")
+		end
 		T.expect(#GamePasses.Catalog.HammerCosmetics.EntitlementItemIds):toEqual(0)
 		T.expect(#GamePasses.Catalog.CharacterCostumes.EntitlementItemIds):toEqual(0)
 		T.expect(#GamePasses.Catalog.EliminationEmotes.EntitlementItemIds):toEqual(0)

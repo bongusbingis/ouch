@@ -5,6 +5,7 @@
 
 --!strict
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -38,6 +39,7 @@ local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytic
 local SplashPage = require(Components:WaitForChild("SplashPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
 local GameVersion = require(Components:WaitForChild("GameVersion"))
+local DeviceClass = require(Shared:WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass"))
 
 local PartyCharacterRenderer =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby"):WaitForChild("PartyCharacterRenderer"))
@@ -213,6 +215,15 @@ local function LobbyContent(props)
 	local onboardingClient = props.OnboardingClient
 	local rootRef = React.useRef(nil)
 	local presented = React.useRef(false)
+	local playButtonRef = React.useRef(nil)
+	local previousSelection = React.useRef(nil)
+	local focusRevision = React.useRef(0)
+	local isGamepad, setIsGamepad = React.useState(false)
+	React.useEffect(function()
+		return DeviceClass.observe(function(class)
+			setIsGamepad(class == "Gamepad")
+		end)
+	end, {})
 	local notifications = NotificationContext.useNotification()
 	local currentPage, setCurrentPage = React.useState("SplashScreen")
 
@@ -246,6 +257,46 @@ local function LobbyContent(props)
 	local onboardingActive = onboarding ~= nil and onboarding.active == true
 	local onboardingResolved = onboarding == nil or onboarding.resolved == true
 	local lobbyVisible = onboardingResolved and not onboardingActive and not testActive
+
+	-- Give a controller a starting focus on the lobby's primary action, mirroring
+	-- the in-combat menu; page-to-page navigation is left to TopBar's own
+	-- SelectionGroup once the player is in.
+	React.useEffect(function()
+		focusRevision.current += 1
+		local revision = focusRevision.current
+		local root = rootRef.current
+		if lobbyVisible and isGamepad then
+			if previousSelection.current == nil then
+				previousSelection.current = GuiService.SelectedObject
+			end
+			if currentPage == "SplashScreen" then
+				task.defer(function()
+					if focusRevision.current ~= revision then
+						return
+					end
+					local button = playButtonRef.current
+					if button ~= nil and button:IsA("GuiObject") and button.Parent ~= nil then
+						GuiService.SelectedObject = button
+					end
+				end)
+			end
+		else
+			local previous = previousSelection.current
+			previousSelection.current = nil
+			if previous ~= nil and previous:IsA("GuiObject") and previous.Parent ~= nil then
+				GuiService.SelectedObject = previous
+			elseif
+				root ~= nil
+				and GuiService.SelectedObject ~= nil
+				and GuiService.SelectedObject:IsDescendantOf(root)
+			then
+				GuiService.SelectedObject = nil
+			end
+		end
+		return function()
+			focusRevision.current += 1
+		end
+	end, { lobbyVisible, isGamepad })
 
 	React.useEffect(function()
 		if not presented.current and rootRef.current ~= nil and props.OnPresented and onboardingResolved then
@@ -416,6 +467,7 @@ local function LobbyContent(props)
 				if pageName == "SplashScreen" then
 					return c(SplashPage, {
 						Position = position,
+						PlayButtonRef = playButtonRef,
 						PartyState = presentation.partyState,
 						ShowMatchmakingActivity = presentation.showMatchmakingActivity,
 						PlayText = presentation.playText,

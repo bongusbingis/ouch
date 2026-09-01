@@ -17,11 +17,14 @@ local ArenaMenuClient = require(script.Parent.ArenaMenuClient)
 
 local PostMatchClient = {}
 
+export type Action = "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty"
+
 export type Snapshot = {
 	visible: boolean,
 	result: PostMatchResult.PlayerResult?,
 	status: any?,
 	requesting: boolean,
+	pendingAction: Action?,
 	error: string?,
 }
 
@@ -32,6 +35,7 @@ local state: Snapshot = {
 	result = nil,
 	status = nil,
 	requesting = false,
+	pendingAction = nil,
 	error = nil,
 }
 local listeners: { (Snapshot) -> () } = {}
@@ -89,7 +93,7 @@ local function syncPhase()
 			requestGeneration += 1
 			awaitingResultsPhase = false
 			pendingStatus = nil
-			publish({ result = CLEAR, status = CLEAR, requesting = false, error = CLEAR })
+			publish({ result = CLEAR, status = CLEAR, requesting = false, pendingAction = CLEAR, error = CLEAR })
 		end
 	end
 end
@@ -129,7 +133,7 @@ local function receiveResult(payload: any)
 	awaitingResultsPhase = phase ~= "Results"
 	local status = if pendingStatus and pendingStatus.resultId == result.resultId then pendingStatus else nil
 	pendingStatus = nil
-	publish({ result = result, status = status or CLEAR, requesting = false, error = CLEAR })
+	publish({ result = result, status = status or CLEAR, requesting = false, pendingAction = CLEAR, error = CLEAR })
 	if phase == "Results" then
 		setVisible(true)
 	else
@@ -152,7 +156,7 @@ local function receiveStatus(status: any)
 	if current and typeof(current.revision) == "number" and current.revision > status.revision then
 		return
 	end
-	publish({ status = status, requesting = false, error = status.error or CLEAR })
+	publish({ status = status, requesting = false, pendingAction = CLEAR, error = status.error or CLEAR })
 end
 
 function PostMatchClient.start()
@@ -198,30 +202,30 @@ function PostMatchClient.subscribe(listener: (Snapshot) -> ()): () -> ()
 	end
 end
 
-function PostMatchClient.request(action: "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby")
+function PostMatchClient.request(action: Action)
 	local result = state.result
 	if result == nil or state.requesting then
 		return
 	end
 	requestGeneration += 1
 	local generation = requestGeneration
-	publish({ requesting = true, error = CLEAR })
+	publish({ requesting = true, pendingAction = action, error = CLEAR })
 	task.spawn(function()
 		local ok, response = pcall(Network.call, "PostMatchRequest", action, result.resultId)
 		if generation ~= requestGeneration or not started then
 			return
 		end
 		if not ok or typeof(response) ~= "table" then
-			publish({ requesting = false, error = "request_failed" })
+			publish({ requesting = false, pendingAction = CLEAR, error = "request_failed" })
 			return
 		end
 		if response.status then
 			receiveStatus(response.status)
 		end
 		if response.ok ~= true then
-			publish({ requesting = false, error = response.error or "request_failed" })
+			publish({ requesting = false, pendingAction = CLEAR, error = response.error or "request_failed" })
 		elseif response.status == nil then
-			publish({ requesting = false })
+			publish({ requesting = false, pendingAction = CLEAR })
 		end
 	end)
 end
@@ -233,6 +237,10 @@ end
 
 function PostMatchClient.returnToLobby()
 	PostMatchClient.request("ReturnToLobby")
+end
+
+function PostMatchClient.leaveParty()
+	PostMatchClient.request("LeaveParty")
 end
 
 function PostMatchClient.destroy()
@@ -255,6 +263,7 @@ function PostMatchClient.destroy()
 		result = nil,
 		status = nil,
 		requesting = false,
+		pendingAction = nil,
 		error = nil,
 	}
 	started = false

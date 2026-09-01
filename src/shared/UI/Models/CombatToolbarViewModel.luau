@@ -124,15 +124,15 @@ end
 function CombatToolbarViewModel.layout(viewport: Vector2, deviceClass: string): Layout
 	local touch = deviceClass == "Touch"
 	local portrait = viewport.Y > viewport.X
-	local widthFraction = if portrait then 0.62 else if touch then 0.31 else 0.2
-	local minimum = if touch then 260 else 236
-	local maximum = if touch then 288 else 268
+	local widthFraction = if portrait then (if touch then 0.68 else 0.58) else if touch then 0.34 else 0.27
+	local minimum = 260
+	local maximum = if touch then 350 else 332
 	local width = math.clamp(viewport.X * widthFraction, minimum, maximum)
-	local aspect = if touch then 2.35 else 2.25
+	local aspect = if touch then 3 else 3.15
 	return {
 		width = width,
 		height = width / aspect,
-		bottomGap = math.clamp(viewport.Y * (if touch then 0.018 else 0.014), 12, 18),
+		bottomGap = math.clamp(viewport.Y * (if touch then 0.02 else 0.016), 14, 22),
 	}
 end
 

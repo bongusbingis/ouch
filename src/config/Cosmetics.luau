@@ -166,12 +166,96 @@ local function characterColor(displayName: string, color: Color3, sortOrder: num
 	}
 end
 
+local function eliminationEffect(
+	rarity: string,
+	displayName: string,
+	dodgeballSound: string,
+	hammerSound: string,
+	sortOrder: number
+): ItemDef
+	return {
+		Category = "ElimEffectAssets",
+		Rarity = rarity,
+		DisplayName = displayName,
+		Thumbnail = "",
+		SortOrder = sortOrder,
+		ElimEffect = {
+			DodgeballSound = dodgeballSound,
+			HammerSound = hammerSound,
+		},
+	}
+end
+
 local Items: { [string]: ItemDef } = {
 	CharacterColorRed = characterColor("Red", Color3.fromRGB(255, 0, 0), 1),
 	CharacterColorPink = characterColor("Pink", Color3.fromRGB(255, 0, 128), 2),
 	CharacterColorBlue = characterColor("Blue", Color3.fromRGB(0, 90, 255), 4),
 	CharacterColorGreen = characterColor("Green", Color3.fromRGB(0, 200, 80), 5),
 	CharacterColorPurple = characterColor("Purple", Color3.fromRGB(160, 60, 255), 6),
+
+	ElimSoundRubberPop = eliminationEffect(
+		"Common",
+		"Rubber Pop",
+		"RubberPopDodgeballElimination",
+		"RubberPopHammerElimination",
+		10
+	),
+	ElimSoundToySqueak = eliminationEffect(
+		"Common",
+		"Toy Squeak",
+		"ToySqueakDodgeballElimination",
+		"ToySqueakHammerElimination",
+		20
+	),
+	ElimSoundBalloonPop = eliminationEffect(
+		"Common",
+		"Balloon Pop",
+		"BalloonPopDodgeballElimination",
+		"BalloonPopHammerElimination",
+		30
+	),
+	ElimSoundPartyHorn = eliminationEffect(
+		"Rare",
+		"Party Horn",
+		"PartyHornDodgeballElimination",
+		"PartyHornHammerElimination",
+		40
+	),
+	ElimSoundArcadeKO = eliminationEffect(
+		"Rare",
+		"Arcade K.O.",
+		"ArcadeKODodgeballElimination",
+		"ArcadeKOHammerElimination",
+		50
+	),
+	ElimSoundComedyDrums = eliminationEffect(
+		"Rare",
+		"Comedy Drums",
+		"ComedyDrumsDodgeballElimination",
+		"ComedyDrumsHammerElimination",
+		60
+	),
+	ElimSoundRoyalFanfare = eliminationEffect(
+		"Legendary",
+		"Royal Fanfare",
+		"RoyalFanfareDodgeballElimination",
+		"RoyalFanfareHammerElimination",
+		70
+	),
+	ElimSoundStadiumRoar = eliminationEffect(
+		"Legendary",
+		"Stadium Roar",
+		"StadiumRoarDodgeballElimination",
+		"StadiumRoarHammerElimination",
+		80
+	),
+	ElimSoundCosmicChime = eliminationEffect(
+		"Legendary",
+		"Cosmic Chime",
+		"CosmicChimeDodgeballElimination",
+		"CosmicChimeHammerElimination",
+		90
+	),
 
 	BallRed = ballAsset("Common", "Red Ball", Color3.fromRGB(151, 0, 0), Color3.fromRGB(235, 60, 60)),
 	BallBlue = ballAsset("Common", "Blue Ball", Color3.fromRGB(13, 105, 172), Color3.fromRGB(65, 120, 235)),
@@ -185,10 +269,11 @@ local Items: { [string]: ItemDef } = {
 
 	ConfettiImpact = {
 		Category = "ImpactEffectAssets",
-		Rarity = "Rare",
+		Rarity = "Common",
 		DisplayName = "Confetti Impact",
 		Thumbnail = "",
 		EffectId = "ConfettiImpact",
+		SortOrder = 15,
 	},
 	StarPop = {
 		Category = "ImpactEffectAssets",
@@ -232,7 +317,7 @@ local Items: { [string]: ItemDef } = {
 	},
 	CandyCrash = {
 		Category = "ImpactEffectAssets",
-		Rarity = "Legendary",
+		Rarity = "Rare",
 		DisplayName = "Candy Crash",
 		Thumbnail = "",
 		EffectId = "CandyCrash",
@@ -253,6 +338,43 @@ local Items: { [string]: ItemDef } = {
 		Thumbnail = "",
 		EffectId = "RoyalParty",
 		SortOrder = 80,
+	},
+
+	-- Imported from the external particle pack (the "Common" egg-reveal burst),
+	-- recolored to the candy palette and reproduced in code via ParticleKit (no
+	-- Studio asset); EffectId resolves through the script-effect registry. See
+	-- docs/cosmetic-vfx-import.md.
+	SugarRush = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Sugar Rush",
+		Thumbnail = "",
+		EffectId = "SugarRush",
+		SortOrder = 35,
+	},
+	Prismatic = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Prismatic",
+		Thumbnail = "",
+		EffectId = "Prismatic",
+		SortOrder = 90,
+	},
+	Galaxy = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Galaxy",
+		Thumbnail = "",
+		EffectId = "Galaxy",
+		SortOrder = 100,
+	},
+	Starlight = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Starlight",
+		Thumbnail = "",
+		EffectId = "Starlight",
+		SortOrder = 110,
 	},
 }
 

@@ -27,6 +27,7 @@ local ArenaReturnService = {}
 local started = false
 local staying: { [Player]: boolean } = {}
 local pendingReturn: { [Player]: boolean } = {}
+local separatingReturn: { [Player]: boolean } = {}
 local presentationReady: { [number]: boolean } = {}
 local preparing: { [Player]: number | "Manual" } = {}
 local retainedPartyIds: { [string]: boolean } = {}
@@ -166,24 +167,30 @@ local function returnParties()
 	table.clear(retainedPartyIds)
 end
 
-local function returnOptionsFor(player: Player): TeleportOptions
+local function returnOptionsFor(player: Player, separateFromParty: boolean?): TeleportOptions
 	local options = Instance.new("TeleportOptions")
 	local partyId = ArenaSessionService.partyIdFor(player)
 	local session = ArenaSessionService.getSnapshot()
 	if partyId and session then
 		options:SetTeleportData(
-			ReturnPayload.build(partyId, session.matchId, ArenaSessionService.partyMemberUserIdsFor(player))
+			ReturnPayload.build(
+				partyId,
+				session.matchId,
+				ArenaSessionService.partyMemberUserIdsFor(player),
+				if separateFromParty then "Separate" else "Party"
+			)
 		)
 	end
 	return options
 end
 
-function ArenaReturnService.returnPlayer(player: Player): (boolean, string?)
+local function returnPlayer(player: Player, separateFromParty: boolean): (boolean, string?)
 	if player.Parent ~= Players or coordinator:IsTracked(player) or pendingReturn[player] then
 		return false, "return_unavailable"
 	end
 	ArenaSessionService.setRoundEligible(player, false)
 	pendingReturn[player] = true
+	separatingReturn[player] = if separateFromParty then true else nil
 	task.spawn(function()
 		local deadline = os.clock() + Loading.TeleportPresentationFallbackSeconds
 		while player.Parent == Players and not presentationReady[player.UserId] and os.clock() < deadline do
@@ -194,10 +201,25 @@ function ArenaReturnService.returnPlayer(player: Player): (boolean, string?)
 			return
 		end
 		coordinator:Begin(Env.LobbyPlaceId, { player }, function(_retryPlayers)
-			return returnOptionsFor(player)
+			return returnOptionsFor(player, separateFromParty)
 		end)
 	end)
 	return true, nil
+end
+
+function ArenaReturnService.returnPlayer(player: Player): (boolean, string?)
+	return returnPlayer(player, false)
+end
+
+function ArenaReturnService.leavePartyAndReturn(player: Player): (boolean, string?)
+	if ArenaSessionService.partyIdFor(player) == nil or #ArenaSessionService.partyMemberUserIdsFor(player) <= 1 then
+		return false, "leave_party_unavailable"
+	end
+	return returnPlayer(player, true)
+end
+
+function ArenaReturnService.isSeparatingReturn(player: Player): boolean
+	return separatingReturn[player] == true
 end
 
 function ArenaReturnService.returnParty(player: Player): (boolean, string?)
@@ -270,7 +292,14 @@ local function handleRequest(player: Player, action: string)
 	if action == "Retry" then
 		coordinator:Retry(player)
 	elseif action == "Stay" and coordinator:Stay(player) then
+		local wasSeparating = separatingReturn[player] == true
+		separatingReturn[player] = nil
 		staying[player] = true
+		if wasSeparating then
+			ArenaSessionService.setRoundEligible(player, true)
+			dispatchInterrupted(player, "stayed")
+			return
+		end
 		local partyId = ArenaSessionService.partyIdFor(player)
 		if partyId then
 			retainedPartyIds[partyId] = true
@@ -312,6 +341,7 @@ function ArenaReturnService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		staying[player] = nil
 		pendingReturn[player] = nil
+		separatingReturn[player] = nil
 		preparing[player] = nil
 		presentationReady[player.UserId] = nil
 	end)

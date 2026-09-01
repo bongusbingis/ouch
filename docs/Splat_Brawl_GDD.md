@@ -75,7 +75,7 @@ This triangle is the entire balance foundation and should not be diluted with ad
 - After voting selects a registered mode, a 3-second `Starting` phase begins. Combat inputs are suppressed until it reaches `Active`.
 - TDM keeps each matchmaking party together and chooses the closest balanced partition possible. Late party members inherit their party's existing team.
 - Players joining during `Starting` or `Active` enter immediately. TDM assigns them to the smaller team, with deterministic team-order tie breaking.
-- Results are interactive in the arena. A party leader can retain the party for the next 10-second Intermission vote; otherwise the existing grouped return path sends the matched party back to the lobby. Arena geometry is never cloned or destroyed between rounds. See `docs/post-match.md`.
+- Results are interactive in the arena. A party leader can retain the party for the next 10-second Intermission vote or return it together. A non-leader cannot change the party decision, but can explicitly leave the party and return alone. Arena geometry is never cloned or destroyed between rounds. See `docs/post-match.md`.
 
 ## 5. Arena Design
 

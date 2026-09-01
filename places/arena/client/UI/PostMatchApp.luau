@@ -23,8 +23,10 @@ return function()
 		Result = snapshot.result,
 		Status = snapshot.status,
 		Requesting = snapshot.requesting,
+		PendingAction = snapshot.pendingAction,
 		Error = snapshot.error,
 		OnPlayAgain = PostMatchClient.playAgain,
 		OnReturnToLobby = PostMatchClient.returnToLobby,
+		OnLeaveParty = PostMatchClient.leaveParty,
 	})
 end

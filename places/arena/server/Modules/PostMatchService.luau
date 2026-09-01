@@ -7,10 +7,13 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
-local PostMatchResult = require(Shared:WaitForChild("Game"):WaitForChild("PostMatch"):WaitForChild("PostMatchResult"))
+local PostMatch = Shared:WaitForChild("Game"):WaitForChild("PostMatch")
+local PostMatchActionPolicy = require(PostMatch:WaitForChild("PostMatchActionPolicy"))
+local PostMatchResult = require(PostMatch:WaitForChild("PostMatchResult"))
 
 local ArenaReturnService = require(script.Parent.ArenaReturnService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
@@ -27,6 +30,7 @@ export type Status = {
 	requestedByUserId: number?,
 	error: string?,
 	party: PostMatchResult.Party?,
+	selfReturning: boolean?,
 }
 
 local started = false
@@ -68,6 +72,7 @@ end
 local function statusPacket(player: Player, status: Status): Status
 	local packet = table.clone(status)
 	packet.party = partyFor(player)
+	packet.selfReturning = ArenaReturnService.isSeparatingReturn(player)
 	return packet
 end
 
@@ -143,7 +148,7 @@ local function beginResult()
 end
 
 local function validRequest(_player: Player, action: any, resultId: any)
-	return (action == "PlayAgain" or action == "CancelPlayAgain" or action == "ReturnToLobby")
+	return (action == "PlayAgain" or action == "CancelPlayAgain" or action == "ReturnToLobby" or action == "LeaveParty")
 		and typeof(resultId) == "string"
 		and #resultId > 0
 		and #resultId <= 100,
@@ -162,16 +167,29 @@ local function request(player: Player, action: string, resultId: string)
 	then
 		return { ok = false, error = "results_expired" }
 	end
-
 	if status.state == "Returning" then
 		return { ok = false, error = "return_in_progress", status = statusPacket(player, status) }
 	end
 	local leaderUserId = ArenaSessionService.effectiveLeaderUserIdFor(player)
+	local partySize = #ArenaSessionService.partyMemberUserIdsFor(player)
+	local allowed, policyError = PostMatchActionPolicy.validate(
+		action :: PostMatchActionPolicy.Action,
+		player.UserId,
+		leaderUserId,
+		partySize,
+		Workspace:GetServerTimeNow(),
+		result.interactiveAt
+	)
+	if not allowed then
+		return { ok = false, error = policyError, status = statusPacket(player, status) }
+	end
+
+	if action == "LeaveParty" then
+		local ok, reason = ArenaReturnService.leavePartyAndReturn(player)
+		return { ok = ok, error = reason, status = statusPacket(player, status) }
+	end
 
 	if action == "ReturnToLobby" then
-		if #ArenaSessionService.partyMemberUserIdsFor(player) > 1 and player.UserId ~= leaderUserId then
-			return { ok = false, error = "not_party_leader", status = statusPacket(player, status) }
-		end
 		ArenaReturnService.releaseParty(player)
 		status.revision += 1
 		status.state = "Returning"
@@ -187,10 +205,6 @@ local function request(player: Player, action: string, resultId: string)
 		end
 		return { ok = ok, error = reason, status = statusPacket(player, status) }
 	end
-	if player.UserId ~= leaderUserId then
-		return { ok = false, error = "not_party_leader", status = statusPacket(player, status) }
-	end
-
 	if action == "PlayAgain" then
 		local ok, reason = ArenaReturnService.retainParty(player)
 		if not ok then
@@ -245,7 +259,11 @@ function PostMatchService.start()
 	ArenaReturnService.onReturnInterrupted(function(player, reason)
 		local result = activeResult
 		local status = statusFor(player)
-		if result == nil or status == nil or MatchService.phase() ~= "Results" or status.state ~= "Returning" then
+		if result == nil or status == nil or MatchService.phase() ~= "Results" then
+			return
+		end
+		if status.state ~= "Returning" then
+			fireStatus(player, status)
 			return
 		end
 		status.revision += 1

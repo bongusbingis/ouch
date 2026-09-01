@@ -26,6 +26,7 @@ export type Handlers = {
 
 local THROW_GAMEPAD_BUTTON = Enum.KeyCode.ButtonR2
 local HAMMER_GAMEPAD_BUTTON = Enum.KeyCode.ButtonX
+local CANCEL_GAMEPAD_BUTTON = Enum.KeyCode.ButtonB
 
 local EQUIP_HAMMER_KEY = InputConfig.WeaponEquip.Hammer.Keyboard
 local EQUIP_DODGEBALL_KEY = InputConfig.WeaponEquip.Dodgeball.Keyboard
@@ -41,6 +42,10 @@ end
 local pressedAt: number? = nil
 local charging = false
 local triggerHeld = false
+-- Set when a press is deliberately cancelled while the analog trigger is still
+-- past its press point, so the held trigger cannot immediately re-arm a new
+-- press before it is released back below the threshold.
+local triggerBlocked = false
 
 local function fire(name: string)
 	local resolved = handlers
@@ -88,6 +93,16 @@ local function cancelPress()
 	end
 end
 
+local function requestCancel()
+	if pressedAt == nil then
+		return
+	end
+	if triggerHeld then
+		triggerBlocked = true
+	end
+	cancelPress()
+end
+
 local function step()
 	if pressedAt == nil or charging then
 		return
@@ -100,6 +115,12 @@ end
 
 local function updateTrigger(position: number)
 	local config = CombatConfig.Controller
+	if triggerBlocked then
+		if position <= config.TriggerReleaseThreshold then
+			triggerBlocked = false
+		end
+		return
+	end
 	if not triggerHeld and position >= config.TriggerPressThreshold then
 		triggerHeld = true
 		beginPress()
@@ -144,6 +165,8 @@ function DeviceInput.start()
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			beginPress()
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 or input.KeyCode == CANCEL_GAMEPAD_BUTTON then
+			requestCancel()
 		elseif input.KeyCode == HAMMER_GAMEPAD_BUTTON then
 			fire("onHammer")
 		end

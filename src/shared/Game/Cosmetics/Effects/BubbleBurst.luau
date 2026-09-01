@@ -3,12 +3,15 @@
 -- Oversized toy bubbles drift outward and pop in a staggered sequence.
 
 local Palette = require(script.Parent.Palette)
+local ParticleKit = require(script.Parent.ParticleKit)
+local ParticlePresets = require(script.Parent.ParticlePresets)
 local Primitives = require(script.Parent.Primitives)
 local Runtime = require(script.Parent.Runtime)
 
 local BubbleBurst = {}
 
 local random = Random.new()
+local PRESENCE_SCALE = 1.3
 local BUBBLE_COLORS = {
 	Palette.Cyan,
 	Palette.LightBlue,
@@ -19,12 +22,28 @@ local BUBBLE_COLORS = {
 	Palette.LightBlue,
 }
 
+local particles = ParticleKit.effect({
+	emitters = {
+		ParticlePresets.flash(Palette.Cyan, 10),
+		ParticlePresets.ring(Palette.LightBlue, 24),
+		ParticlePresets.motes(Palette.LightBlue, 14, 0.52),
+		ParticlePresets.stars(Palette.White, 6, 0.82),
+		ParticlePresets.flare(Palette.Cyan, 3.2, 0),
+	},
+})
+
 local function bubbleScale(alpha: number): number
-	if alpha < 0.22 then
-		return 0.12 + Primitives.easeOutQuint(alpha / 0.22) * 0.88
+	if alpha < 0.18 then
+		return 0.12 + Primitives.easeOutQuint(alpha / 0.18) * 1.02
+	end
+	if alpha < 0.34 then
+		return 1.14 - Primitives.smooth((alpha - 0.18) / 0.16) * 0.18
+	end
+	if alpha < 0.48 then
+		return 0.96 + Primitives.smooth((alpha - 0.34) / 0.14) * 0.06
 	end
 	if alpha < 0.82 then
-		return 1 + math.sin((alpha - 0.22) * math.pi * 3) * 0.035
+		return 1 + math.sin((alpha - 0.48) * math.pi * 3) * 0.035
 	end
 	if alpha < 0.91 then
 		return 1 + Primitives.easeOutCubic((alpha - 0.82) / 0.09) * 0.18
@@ -39,7 +58,9 @@ local function popStar(position: Vector3, scale: number, delay: number)
 	glyph.label.TextStrokeTransparency = 1
 	Runtime.add(glyph.root, 0.24, function(alpha)
 		glyph.root.CFrame = CFrame.new(position + Vector3.yAxis * alpha * 0.65 * scale)
-		local size = math.sin(alpha * math.pi) * 0.52 * scale
+		local pop = Primitives.popScale(alpha, 0.08, 1.22, 1)
+		local exit = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.58))
+		local size = pop * exit * 0.52 * scale
 		glyph.gui.Size = UDim2.fromScale(size, size)
 		glyph.label.Rotation = alpha * 90
 		glyph.label.TextTransparency = Primitives.fadeAfter(alpha, 0.68)
@@ -92,19 +113,11 @@ local function spawnBubble(
 end
 
 function BubbleBurst.play(context: Primitives.Context)
-	local scale = Primitives.contextScale(context)
+	particles.play(context)
+	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	-- Bubbles drift and pop, which alone reads as too soft for a kill, so the hit
-	-- lands on an immediate flash and ring before the bubbles take over.
-	Primitives.flash(context.position, Palette.Cyan, { maxDiameter = 8 * scale, lifetime = 0.22 })
-	Primitives.shockwave(context.position, Palette.LightBlue, { maxDiameter = 20 * scale, startDiameter = 3 * scale })
-	Primitives.shockwave(
-		context.position,
-		Palette.Cyan,
-		{ maxDiameter = 13 * scale, startDiameter = 2 * scale, lifetime = 0.4, layer = "Secondary" }
-	)
-	local count = Runtime.scaledCount(10, "Secondary")
-	local accentCount = Runtime.scaledCount(3, "Tertiary")
+	local count = Runtime.scaledCount(12, "Secondary")
+	local accentCount = Runtime.scaledCount(4, "Tertiary")
 	for index = 1, count do
 		spawnBubble(context, frame, scale, index, count, index > 1 and index <= accentCount + 1)
 	end

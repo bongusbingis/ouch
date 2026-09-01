@@ -3,12 +3,15 @@
 -- Weighty candy chunks and small sprinkles with decisive ballistic falloff.
 
 local Palette = require(script.Parent.Palette)
+local ParticleKit = require(script.Parent.ParticleKit)
+local ParticlePresets = require(script.Parent.ParticlePresets)
 local Primitives = require(script.Parent.Primitives)
 local Runtime = require(script.Parent.Runtime)
 
 local CandyCrash = {}
 
 local random = Random.new()
+local PRESENCE_SCALE = 1.25
 local CANDY_COLORS = {
 	Palette.HotPink,
 	Palette.HotPink,
@@ -19,13 +22,23 @@ local CANDY_COLORS = {
 	Palette.Yellow,
 }
 
+local particles = ParticleKit.effect({
+	emitters = {
+		ParticlePresets.flash(Palette.White, 10),
+		ParticlePresets.ring(Palette.Teal, 23),
+		ParticlePresets.debris(Palette.HotPink, 8, 1.8),
+		ParticlePresets.debris(Palette.Gold, 5, 1.35),
+		ParticlePresets.streaks(Palette.Lavender, 10, 19),
+	},
+})
+
 local function core(position: Vector3, frame: CFrame, scale: number)
 	local part = Primitives.part("CandyCrashCore", Palette.White, Vector3.one * 0.1, frame)
 	part.Shape = Enum.PartType.Ball
 	Runtime.add(part, 0.28, function(alpha)
-		local expand = Primitives.easeOutQuint(math.min(alpha / 0.2, 1))
+		local spring = Primitives.popScale(alpha, 0.08, 1.2, 1)
 		local exit = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.38))
-		part.Size = Primitives.size(Vector3.new(4.2, 3.3, 0.8) * scale * expand * exit)
+		part.Size = Primitives.size(Vector3.new(4.2, 3.3, 0.8) * scale * spring * exit)
 		part.Transparency = 0.04 + 0.96 * Primitives.fadeAfter(alpha, 0.42)
 	end, { layer = "Hero" })
 end
@@ -58,9 +71,9 @@ local function chunk(position: Vector3, frame: CFrame, scale: number, index: num
 		part.CFrame = CFrame.new(current)
 			* initial
 			* CFrame.Angles(spin.X * elapsed, spin.Y * elapsed, spin.Z * elapsed)
-		local grow = Primitives.easeOutQuint(math.min(alpha / 0.14, 1))
+		local pop = Primitives.popScale(alpha, 0.24, 1.18, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.7))
-		part.Size = Primitives.size(baseSize * grow * shrink)
+		part.Size = Primitives.size(baseSize * pop * shrink)
 		part.Transparency = Primitives.fadeAfter(alpha, 0.82)
 	end, { layer = if index <= 4 then "Hero" else "Secondary" })
 end
@@ -79,28 +92,23 @@ local function sprinkle(position: Vector3, frame: CFrame, scale: number, index: 
 	Runtime.add(part, 0.62, function(alpha, elapsed)
 		part.CFrame = CFrame.new(Primitives.ballistic(position, velocity, Vector3.new(0, -34, 0), elapsed))
 			* CFrame.Angles(elapsed * 8, elapsed * 11, elapsed * 6)
+		local pop = Primitives.popScale(alpha, 0.3, 1.16, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.7))
-		part.Size = Primitives.size(baseSize * shrink)
+		part.Size = Primitives.size(baseSize * pop * shrink)
 		part.Transparency = Primitives.fadeAfter(alpha, 0.82)
 	end, { layer = "Tertiary" })
 end
 
 function CandyCrash.play(context: Primitives.Context)
-	local scale = Primitives.contextScale(context)
+	particles.play(context)
+	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	Primitives.flash(context.position, Palette.White, { maxDiameter = 8 * scale, lifetime = 0.2 })
-	Primitives.shockwave(context.position, Palette.HotPink, { maxDiameter = 21 * scale, startDiameter = 3 * scale })
-	Primitives.shockwave(
-		context.position,
-		Palette.Teal,
-		{ maxDiameter = 13 * scale, startDiameter = 2 * scale, lifetime = 0.4, layer = "Secondary" }
-	)
 	core(context.position, frame, scale)
-	local chunkCount = Runtime.scaledCount(9, "Secondary")
+	local chunkCount = Runtime.scaledCount(11, "Secondary")
 	for index = 1, chunkCount do
 		chunk(context.position, frame, scale, index, chunkCount)
 	end
-	local sprinkleCount = Runtime.scaledCount(6, "Tertiary")
+	local sprinkleCount = Runtime.scaledCount(8, "Tertiary")
 	for index = 1, sprinkleCount do
 		sprinkle(context.position, frame, scale, index, sprinkleCount)
 	end

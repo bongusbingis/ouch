@@ -3,12 +3,15 @@
 -- Gummy central splat with stretched, wobbling candy droplets.
 
 local Palette = require(script.Parent.Palette)
+local ParticleKit = require(script.Parent.ParticleKit)
+local ParticlePresets = require(script.Parent.ParticlePresets)
 local Primitives = require(script.Parent.Primitives)
 local Runtime = require(script.Parent.Runtime)
 
 local JellySplash = {}
 
 local random = Random.new()
+local PRESENCE_SCALE = 1.25
 local JELLY_COLORS = {
 	Palette.HotPink,
 	Palette.HotPink,
@@ -18,6 +21,16 @@ local JELLY_COLORS = {
 	Palette.HotPink,
 	Palette.Purple,
 }
+
+local particles = ParticleKit.effect({
+	emitters = {
+		ParticlePresets.flash(Palette.HotPink, 10),
+		ParticlePresets.ring(Palette.Purple, 23),
+		ParticlePresets.smoke(Palette.HotPink, 6, 5),
+		ParticlePresets.crescents(Palette.Cyan, 6, 3.2),
+		ParticlePresets.motes(Palette.Lavender, 8, 0.52),
+	},
+})
 
 type SplashBlob = {
 	part: Part,
@@ -50,13 +63,16 @@ local function splash(context: Primitives.Context, frame: CFrame, scale: number)
 		})
 	end
 	Runtime.add(model, 0.48, function(alpha)
-		local expand = Primitives.easeOutQuint(math.min(alpha / 0.27, 1))
+		local spring = Primitives.popScale(alpha, 0.12, 1.18, 1)
+		local wobble = math.sin(alpha * math.pi * 5) * (1 - alpha) * 0.09
 		local collapse = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.62))
 		for _, blob in blobs do
 			local offset = frame.RightVector * math.cos(blob.angle) + frame.UpVector * math.sin(blob.angle)
-			local position = context.position + offset * blob.radius * 1.5 * scale * expand
+			local position = context.position + offset * blob.radius * 1.5 * scale * spring
+			local shape =
+				Vector3.new(blob.size.X * (1 + wobble), blob.size.Y * (1 - wobble), blob.size.Z * (1 + wobble * 0.45))
 			blob.part.CFrame = frame.Rotation + position
-			blob.part.Size = Primitives.size(blob.size * scale * (0.12 + expand * 0.88) * collapse)
+			blob.part.Size = Primitives.size(shape * scale * spring * collapse)
 			blob.part.Transparency = 0.05 + 0.95 * Primitives.fadeAfter(alpha, 0.72)
 		end
 	end, { layer = "Hero" })
@@ -83,26 +99,20 @@ local function droplet(context: Primitives.Context, frame: CFrame, scale: number
 		local currentVelocity = Primitives.velocityAt(velocity, gravity, elapsed)
 		local position = Primitives.ballistic(origin, velocity, gravity, elapsed)
 		local wobble = 1 + math.sin(alpha * math.pi * 4 + index) * 0.1 * (1 - alpha)
-		local grow = Primitives.easeOutQuint(math.min(alpha / 0.16, 1))
+		local pop = Primitives.popScale(alpha, 0.16, 1.2, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.74))
-		part.Size = Primitives.size(Vector3.new(width * wobble, width / wobble, length) * grow * shrink)
+		part.Size = Primitives.size(Vector3.new(width * wobble, width / wobble, length) * pop * shrink)
 		part.CFrame = Primitives.lookAlong(position, currentVelocity, math.sin(alpha * math.pi * 3) * 0.18)
 		part.Transparency = 0.06 + 0.94 * Primitives.fadeAfter(alpha, 0.82)
 	end, { layer = if index <= 4 then "Hero" else "Secondary" })
 end
 
 function JellySplash.play(context: Primitives.Context)
-	local scale = Primitives.contextScale(context)
+	particles.play(context)
+	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	Primitives.flash(context.position, Palette.HotPink, { maxDiameter = 7 * scale, lifetime = 0.22 })
-	Primitives.shockwave(context.position, Palette.HotPink, { maxDiameter = 19 * scale, startDiameter = 3 * scale })
-	Primitives.shockwave(
-		context.position,
-		Palette.Purple,
-		{ maxDiameter = 12 * scale, startDiameter = 2 * scale, lifetime = 0.4, layer = "Secondary" }
-	)
 	splash(context, frame, scale)
-	local count = Runtime.scaledCount(10, "Secondary")
+	local count = Runtime.scaledCount(12, "Secondary")
 	for index = 1, count do
 		droplet(context, frame, scale, index, count)
 	end

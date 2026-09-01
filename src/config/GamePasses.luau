@@ -51,8 +51,8 @@ local Catalog: { [string]: GamePassDef } = {
 		Description = "A permanent collection of exclusive effects.",
 		DisplayOrder = 410,
 		SuggestedRobux = 149,
-		Categories = { "TrailAssets", "ElimEffectAssets" },
-		EntitlementItemIds = {},
+		Categories = { "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" },
+		EntitlementItemIds = { "Prismatic", "Galaxy", "Starlight" },
 	},
 	DoubleXP = {
 		Id = 1952133523,

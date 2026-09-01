@@ -42,8 +42,8 @@ EffectCollection = {
     Description = "Exclusive effects, permanently unlocked.",
     DisplayOrder = 410,
     SuggestedRobux = 149,
-    Categories = { "TrailAssets", "ElimEffectAssets" },
-    EntitlementItemIds = { "TrailAurora", --[[ ... ]] },
+    Categories = { "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" },
+    EntitlementItemIds = { "Prismatic", "Galaxy", "Starlight" },
 },
 ```
 

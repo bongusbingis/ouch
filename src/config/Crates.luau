@@ -49,7 +49,7 @@ local function poolOf(categories: { string }): { string }
 	end
 	local pool = {}
 	for itemId, item in Cosmetics.Items do
-		if wanted[item.Category] then
+		if wanted[item.Category] and item.Rarity ~= "Exclusive" then
 			table.insert(pool, itemId)
 		end
 	end
@@ -85,11 +85,11 @@ local Catalog: { [string]: CrateDef } = {
 		DisplayName = "Effects Crate",
 		DisplayOrder = 300,
 		Thumbnail = "",
-		CatalogStatus = "Preview",
+		CatalogStatus = "Active",
 		BonksPrice = 750,
 		Pity = { Rare = 5, Legendary = 25 },
 		OpenQuantities = OPEN_QUANTITIES,
-		ItemPool = poolOf({ "TrailAssets", "ElimEffectAssets" }),
+		ItemPool = poolOf({ "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" }),
 	},
 }
 

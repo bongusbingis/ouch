@@ -13,11 +13,11 @@ it consumes.
 | Featured bundle | One bundle of cosmetics | Robux | Yes, globally |
 | Passes and products | Boosts, Bonks packs, season pass | Robux | No |
 
-Four equip categories, seven slots: `CharacterColor`, `CostumeAssets`,
-`BallAssets`, `HammerAssets`, `TrailAssets`, `ElimEffectAssets`, `EmoteAssets`.
-Trails and elimination effects are one *category* in the storefront but two
-*slots*, because a ball trail and an elimination effect are unrelated in play and
-one slot would make equipping either silently unequip the other.
+Five equip categories, eight slots: `CharacterColor`, `CostumeAssets`,
+`BallAssets`, `HammerAssets`, `TrailAssets`, `ElimEffectAssets`,
+`ImpactEffectAssets`, `EmoteAssets`. Trails, elimination effects, and impact
+effects share one storefront category but remain independent equip slots, so
+equipping one cannot silently replace another.
 
 ## Rotations
 
@@ -55,6 +55,27 @@ Two published economic guarantees are pinned by `CrateConfig.spec`:
 - direct buy beats the expected cost of chasing the same item in a crate,
 
 checked at the **discounted** price actually charged, not just the baked one.
+
+## Impact effect economy
+
+Impact effects have one acquisition source per rarity. Common, Rare, and
+Legendary impacts are in the active `EffectsCrate`; its pool is derived from the
+effect categories and explicitly excludes `Exclusive` items. Players can open it
+with Bonks or through the `EffectsCrateOpen` developer product.
+
+`Prismatic`, `Galaxy`, and `Starlight` are granted only by the
+`EffectCollection` pass. The pass remains `Preview` with no platform id, so it
+can be tested through Studio entitlement seams without advertising a purchase
+that Roblox cannot fulfill.
+
+Before production purchase QA:
+
+- confirm developer product `3709429563` belongs to this experience and opens
+  `EffectsCrate` through receipt processing;
+- verify Bonks opens never roll an Exclusive and still apply duplicate refunds
+  and pity counters;
+- mint the `EffectCollection` game pass, set its id, and switch it to `Active`
+  only after all three grants reconcile correctly.
 
 ## A/B testing
 

@@ -3,12 +3,25 @@
 -- Short comic-book hit with a chunky angular burst, BONK typography, and spiraling stars.
 
 local Palette = require(script.Parent.Palette)
+local ParticleKit = require(script.Parent.ParticleKit)
+local ParticlePresets = require(script.Parent.ParticlePresets)
 local Primitives = require(script.Parent.Primitives)
 local Runtime = require(script.Parent.Runtime)
 
 local ComicBonk = {}
 
 local random = Random.new()
+local PRESENCE_SCALE = 1.3
+
+local particles = ParticleKit.effect({
+	emitters = {
+		ParticlePresets.flash(Palette.White, 10.5),
+		ParticlePresets.ring(Palette.Yellow, 26),
+		ParticlePresets.rays(Palette.Pink, 8, 7.2),
+		ParticlePresets.streaks(Palette.Yellow, 10, 18),
+		ParticlePresets.flare(Palette.White, 3.5, 0),
+	},
+})
 
 type Spike = {
 	part: WedgePart,
@@ -38,12 +51,12 @@ local function burst(position: Vector3, frame: CFrame, scale: number)
 		})
 	end
 	Runtime.add(model, 0.46, function(alpha)
-		local expand = Primitives.easeOutQuint(math.min(alpha / 0.22, 1))
+		local spring = Primitives.popScale(alpha, 0.06, 1.18, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.58))
 		for _, spike in spikes do
-			local radius = spike.length * 0.42 * scale * expand
+			local radius = spike.length * 0.42 * scale * spring
 			spike.part.CFrame = frame * CFrame.Angles(0, 0, spike.angle) * CFrame.new(0, radius, 0)
-			spike.part.Size = Primitives.size(Vector3.new(spike.width, spike.length, 0.18) * scale * expand * shrink)
+			spike.part.Size = Primitives.size(Vector3.new(spike.width, spike.length, 0.18) * scale * spring * shrink)
 			spike.part.Transparency = Primitives.fadeAfter(alpha, 0.7)
 		end
 	end, { layer = "Hero" })
@@ -88,7 +101,7 @@ local function star(position: Vector3, frame: CFrame, scale: number, index: numb
 			+ frame.UpVector * math.sin(theta) * radius
 			+ Vector3.yAxis * alpha * 0.6 * scale
 		glyph.root.CFrame = CFrame.new(position + offset)
-		local starScale = Primitives.easeOutQuint(math.min(alpha / 0.18, 1))
+		local starScale = Primitives.popScale(alpha, 0.16, 1.2, 1)
 			* (1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.62)))
 		glyph.gui.Size = UDim2.fromScale(0.75 * scale * starScale, 0.75 * scale * starScale)
 		glyph.label.Rotation = alpha * 170 * (if index % 2 == 0 then -1 else 1)
@@ -97,13 +110,12 @@ local function star(position: Vector3, frame: CFrame, scale: number, index: numb
 end
 
 function ComicBonk.play(context: Primitives.Context)
-	local scale = Primitives.contextScale(context)
+	particles.play(context)
+	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	Primitives.flash(context.position, Palette.White, { maxDiameter = 8 * scale, lifetime = 0.2 })
-	Primitives.shockwave(context.position, Palette.Yellow, { maxDiameter = 22 * scale, startDiameter = 3 * scale })
 	burst(context.position, frame, scale)
 	word(context.position, frame, scale)
-	for index = 1, Runtime.scaledCount(5, "Secondary") do
+	for index = 1, Runtime.scaledCount(7, "Secondary") do
 		star(context.position, frame, scale, index)
 	end
 end

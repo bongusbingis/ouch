@@ -140,10 +140,16 @@ end
 -- unique sequence so the consumers' dedup key never collapses two distinct hits
 -- (every dummy shares one model name, and one ball can down several in a row).
 local eventSequence = 0
-local function broadcastImpact(player: Player, event: { [string]: any })
+local function broadcastImpacts(player: Player, events: { { [string]: any } })
 	eventSequence += 1
-	event.tick = eventSequence
-	Network.fire("CombatSimEvent", player, { event })
+	local equippedItemId = player:GetAttribute("Equip_ElimEffectAssets")
+	for _, event in events do
+		event.tick = eventSequence
+		if event.kind == "Elim" and typeof(equippedItemId) == "string" and equippedItemId ~= "" then
+			event.elimEffectItemId = equippedItemId
+		end
+	end
+	Network.fire("CombatSimEvent", player, events)
 end
 
 local function slotFor(session: Session, dummy: Dummy): number?
@@ -196,13 +202,15 @@ local function detectBallHits(session: Session, samples: { BallSample })
 			local at = OnboardingDummies.position(dummy)
 			if OnboardingHit.ballReachedTarget(sample.previous, sample.current, at, targetRadius(dummy)) then
 				knockDummy(session, dummy, sample.current)
-				broadcastImpact(session.player, {
-					kind = "Elim",
-					projectileId = sample.ball.Name,
-					sourceId = playerId,
-					targetId = dummy.model.Name,
-					position = at,
-					direction = direction,
+				broadcastImpacts(session.player, {
+					{
+						kind = "Elim",
+						projectileId = sample.ball.Name,
+						sourceId = playerId,
+						targetId = dummy.model.Name,
+						position = at,
+						direction = direction,
+					},
 				})
 			end
 		end
@@ -232,14 +240,24 @@ local function onSimEvent(event: { [string]: any })
 		if OnboardingHit.withinHammerCone(origin, direction, at, targetRadius(dummy), CombatConfig.Hammer) then
 			knockDummy(session, dummy, if typeof(origin) == "Vector3" then origin else at)
 			local sourceId = PlayerIds.toId(session.player)
-			broadcastImpact(session.player, {
-				kind = "HammerHit",
-				projectileId = nil,
-				playerId = sourceId,
-				sourceId = sourceId,
-				targetId = dummy.model.Name,
-				position = at,
-				direction = dirVector,
+			broadcastImpacts(session.player, {
+				{
+					kind = "HammerHit",
+					projectileId = nil,
+					playerId = sourceId,
+					sourceId = sourceId,
+					targetId = dummy.model.Name,
+					position = at,
+					direction = dirVector,
+				},
+				{
+					kind = "Elim",
+					projectileId = nil,
+					sourceId = sourceId,
+					targetId = dummy.model.Name,
+					position = at,
+					direction = dirVector,
+				},
 			})
 			-- One swing takes one target, matching the sim's own resolution.
 			return

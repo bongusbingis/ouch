@@ -14,6 +14,12 @@ local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
+local EliminationAudio = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("EliminationAudio")
+)
 local ClientAudio = require(script.Parent.ClientAudio)
 local CharacterRig = require(script.Parent.CharacterRig)
 
@@ -24,16 +30,25 @@ local ANCHOR_LIFETIME = 6
 
 local random = Random.new()
 local seenEvents = EventDedup.new()
+local warnedMissingAssets: { [string]: boolean } = {}
 
 local function definition(effectName: string)
 	local effect = (Audio.Gameplay :: any)[effectName]
 	assert(effect ~= nil, `[GameAudio] no Config.Audio.Gameplay entry named "{effectName}"`)
-	assert(#effect.AssetIds > 0, `[GameAudio] "{effectName}" has no AssetIds`)
 	return effect
 end
 
-local function pickAssetId(effect): string
-	return effect.AssetIds[random:NextInteger(1, #effect.AssetIds)]
+local function pickAssetId(effect): string?
+	local available = {}
+	for _, assetId in effect.AssetIds do
+		if typeof(assetId) == "string" and string.find(assetId, "%S") ~= nil then
+			table.insert(available, assetId)
+		end
+	end
+	if #available == 0 then
+		return nil
+	end
+	return available[random:NextInteger(1, #available)]
 end
 
 local function emitterFor(host: Instance): AudioEmitter
@@ -87,13 +102,20 @@ local function playLocal(effect, assetId: string, effectName: string)
 	})
 end
 
-function GameAudio.play(effectName: string, at: (Instance | Vector3)?)
+function GameAudio.play(effectName: string, at: (Instance | Vector3)?): boolean
 	local effect = definition(effectName)
 	local assetId = pickAssetId(effect)
+	if assetId == nil then
+		if not warnedMissingAssets[effectName] then
+			warnedMissingAssets[effectName] = true
+			warn(`[GameAudio] "{effectName}" has no published AssetIds; using caller fallback when available`)
+		end
+		return false
+	end
 
 	if effect.Scope == "Local" then
 		playLocal(effect, assetId, effectName)
-		return
+		return true
 	end
 
 	local host: Instance? = nil
@@ -104,9 +126,10 @@ function GameAudio.play(effectName: string, at: (Instance | Vector3)?)
 	end
 	if host == nil then
 		warn(`[GameAudio] world effect "{effectName}" needs an instance or position`)
-		return
+		return false
 	end
 	playWorld(effect, assetId, host)
+	return true
 end
 
 local function characterPartFor(playerId: string?): BasePart?
@@ -114,27 +137,23 @@ local function characterPartFor(playerId: string?): BasePart?
 	return CharacterRig.rootPart(player and player.Character)
 end
 
-local function elimEffectFor(playerId: string?): Cosmetics.ElimEffectDef
-	local default = Cosmetics.Defaults.ElimEffectAssets.ElimEffect
-	assert(default ~= nil, "[GameAudio] default ElimEffectAssets cosmetic must define ElimEffect")
-	local player = PlayerIds.fromId(playerId)
-	if player == nil then
-		return default
+local function toVector3(value: any): Vector3?
+	if typeof(value) == "Vector3" then
+		return value
 	end
-	local itemId = (player:GetAttribute("Equip_ElimEffectAssets") :: string?) or ""
-	local item = Cosmetics.Items[itemId]
-	if item == nil or item.Category ~= "ElimEffectAssets" or item.ElimEffect == nil then
-		return default
+	if typeof(value) == "vector" then
+		return Vector3.new(value.x, value.y, value.z)
 	end
-	return item.ElimEffect
+	return nil
 end
 
-local function eliminationEffect(event: { [string]: any }): string
-	if event.sourceId == nil and event.projectileId == nil then
-		return "ElimZoneFall"
+local function elimEffectItemId(event: { [string]: any }): string?
+	if typeof(event.elimEffectItemId) == "string" then
+		return event.elimEffectItemId
 	end
-	local effect = elimEffectFor(event.sourceId)
-	return if event.projectileId ~= nil then effect.DodgeballSound else effect.HammerSound
+	local player = PlayerIds.fromId(event.sourceId)
+	local itemId = if player then player:GetAttribute("Equip_ElimEffectAssets") else nil
+	return if typeof(itemId) == "string" then itemId else nil
 end
 
 function GameAudio.onEvent(event: { [string]: any })
@@ -147,9 +166,14 @@ function GameAudio.onEvent(event: { [string]: any })
 	end
 
 	if kind == "Elim" then
-		local host = characterPartFor(event.targetId)
-		if host then
-			GameAudio.play(eliminationEffect(event), host)
+		local position = toVector3(event.position)
+		if position == nil then
+			warn("[GameAudio] elimination event is missing its authoritative world position")
+			return
+		end
+		local effectName, fallbackName = EliminationAudio.soundFor(Cosmetics, elimEffectItemId(event), event)
+		if not GameAudio.play(effectName, position) and fallbackName ~= nil and fallbackName ~= effectName then
+			GameAudio.play(fallbackName, position)
 		end
 		return
 	end

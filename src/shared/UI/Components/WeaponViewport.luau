@@ -27,6 +27,7 @@ end
 export type Props = {
 	Weapon: string,
 	ItemId: string?,
+	Zoom: number?,
 	ZIndex: number?,
 }
 
@@ -43,17 +44,18 @@ return function(props: Props)
 			return
 		end
 		viewport.CurrentCamera = camera
+		local zoom = math.max(props.Zoom or 1, 0.1)
 		local category = if props.Weapon == "Dodgeball" then "BallAssets" else "HammerAssets"
 		local object = CosmeticVisualFactory.create(category, props.ItemId)
 		prepare(object)
 		if props.Weapon == "Dodgeball" then
 			object.Size *= 1.42
 			object.CFrame = CFrame.Angles(math.rad(-12), math.rad(24), 0)
-			camera.CFrame = CFrame.lookAt(Vector3.new(0, 0.08, 3.75), Vector3.zero)
+			camera.CFrame = CFrame.lookAt(Vector3.new(0, 0.08, 3.75 / zoom), Vector3.zero)
 		else
 			object.Size *= 1.1
 			object.CFrame = CFrame.Angles(math.rad(-8), math.rad(-24), math.rad(-28))
-			camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, 6.8), Vector3.zero)
+			camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, 6.8 / zoom), Vector3.zero)
 		end
 		object.Parent = world
 		return function()
@@ -62,7 +64,7 @@ return function(props: Props)
 			end
 			object:Destroy()
 		end
-	end, { props.Weapon, props.ItemId })
+	end, { props.Weapon, props.ItemId, props.Zoom })
 
 	return c("ViewportFrame", {
 		ref = viewportRef,

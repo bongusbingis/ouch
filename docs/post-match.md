@@ -17,11 +17,12 @@ The arena post-match experience is an event-driven presentation over existing ma
 ```text
 Active
   -> Results / authoritative result packet
-  -> 0.8 second reveal
+  -> 0.8 second reveal within a 12-second Results phase
   -> interactive results
        -> Play Again: retain the whole party for this reset
        -> Cancel Play Again: release that retention
-       -> Return to Lobby: begin the existing retry/loading teleport path
+       -> Return Party to Lobby: leader returns every present party member
+       -> Leave Party & Return: non-leader separates and returns only themselves
   -> MatchReset
        -> retained parties stay for the next arena vote
        -> all other matched parties return to the lobby together
@@ -29,6 +30,8 @@ Active
 ```
 
 Detailed reward animation never gates the action buttons. The results UI is removed as soon as the authoritative phase leaves `Results`; combat input becomes active only when the existing simulation client observes `Active` again.
+
+The server enforces `interactiveAt`; Reduced Motion snaps visual motion but does not create an earlier action window. The screen renders the authoritative expiry as a countdown and progress bar.
 
 The initial result packet contains the in-memory statistics immediately and truthfully marks its real reward calculation as pending. This reserves the progression card without inventing values or changing the page width later. Entitlement checks and per-player reward commits run concurrently, never inside the serial match-event dispatch. When an exact committed summary becomes available during `Results`, the server republishes the same result ID with its real reward fields; this update neither restarts the reveal nor cancels an action already in flight.
 
@@ -65,9 +68,9 @@ Future systems should add their result values to the server-side personal summar
 
 - `PostMatchResult` event: one authoritative result packet per eligible player.
 - `PostMatchStatus` event: party action state, effective leader, revision, and current party projection.
-- `PostMatchRequest` function: `PlayAgain`, `CancelPlayAgain`, or `ReturnToLobby`, always paired with the current result ID.
+- `PostMatchRequest` function: `PlayAgain`, `CancelPlayAgain`, `ReturnToLobby`, or `LeaveParty`, always paired with the current result ID.
 
-The server rejects stale result IDs, requests outside `Results`, and non-leader replay requests. Status revisions prevent an older response from replacing a newer party decision. Return to Lobby is a grouped operation for every present party member; it uses the same retry/loading coordinator and full party return payload as automatic match return.
+The server rejects stale result IDs, requests before the reveal gate, requests outside `Results`, and every party-wide request from a non-leader. Status revisions prevent an older response from replacing a newer party decision. `ReturnToLobby` is a leader-only grouped operation for every present party member. `LeaveParty` is available only to a non-leader in a multi-member party; its authenticated return payload removes that player from the surviving party record before the lobby creates their solo party. Both paths use the existing retry/loading coordinator.
 
 ## Debug preview
 
@@ -80,10 +83,13 @@ Open `Shared/UI/Stories/PostMatchScreen.story` in the React story tooling. Its t
 - Survivors win;
 - Infected win;
 - no rewards;
+- rewards pending and boosted rewards with a tier transition;
+- tied/no-winner result;
+- missing optional party projection;
 - example future challenge progress;
 - example future unlock presentation;
 - party of one;
-- non-leader party-member controls.
+- non-leader party-member controls, self-return in flight, and request failure.
 
 The story reads only `DebugPostMatchData`. Its actions change local React story state and never call Network, PlayerData, or any reward service.
 
@@ -91,9 +97,10 @@ The story reads only `DebugPostMatchData`. Its actions change local React story 
 
 - PC: the centralized combat module releases mouse lock for the `PostMatch` cursor reason.
 - Touch: combat gestures are already disabled outside `Active`; the action row uses large touch targets and the compact landscape layout.
-- Controller: the result root is a selection group. Play Again receives default focus for leaders, while Return to Lobby receives it for members whose leader owns replay.
+- Controller: the result root is a selection group. Play Again receives default focus for leaders, while Leave Party & Return receives it for non-leaders.
 - Reduced Motion: result springs snap to their resting state.
 - All text uses `ResponsiveText`; no result label uses `TextScaled`.
+- The backdrop is full-bleed; interactive content is constrained to the device safe area and a 1920x1080 maximum canvas. Portrait canvases are height-bounded from their width instead of stretching the landscape composition.
 
 ## Manual acceptance
 
@@ -104,7 +111,7 @@ The story reads only `DebugPostMatchData`. Its actions change local React story 
 5. Test solo, party leader, party member, four-member party, leader disconnect, and member disconnect.
 6. Have the leader choose Play Again, cancel it, and choose again. Verify every member receives the status change.
 7. Verify a retained party stays for the next game-mode vote and a non-retained party returns through the existing loading/retry UX.
-8. Trigger Return to Lobby from a leader and member, including a failed teleport followed by Retry and Stay.
+8. Trigger Return Party to Lobby as leader. As a member, trigger Leave Party & Return and verify only that player receives the separating payload, the remaining party stays together, and the returning player arrives in a solo party. Exercise Retry and Stay for both paths.
 9. Verify combat buttons, touch gestures, and camera attacks cannot fire during Results and return during Active.
 10. Verify mouse, touch, controller focus, Reduced Motion, phone landscape, tablet, desktop, and TV-like aspect ratios.
 11. Repeat several rounds and confirm one result root, no duplicate handlers, no stale result, and no retained decision leaking into another reset.

@@ -6,10 +6,14 @@
 --!strict
 
 local ContextActionService = game:GetService("ContextActionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
+local DeviceClass = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass")
+)
 
 local CombatMenuClient = {}
 
@@ -29,7 +33,7 @@ local ACTION_PRIORITY = Enum.ContextActionPriority.High.Value + 1
 local started = false
 local closeInterceptor: (() -> boolean)? = nil
 local listeners: { (Snapshot) -> () } = {}
-local connections: { RBXScriptConnection } = {}
+local deviceDisconnect: (() -> ())? = nil
 local state: Snapshot = {
 	open = false,
 	page = "Shop",
@@ -37,15 +41,11 @@ local state: Snapshot = {
 	inputMethod = "KeyboardMouse",
 }
 
-local function inputMethod(inputType: Enum.UserInputType): InputMethod
-	if inputType == Enum.UserInputType.Touch then
+local function methodFor(class: DeviceClass.Class): InputMethod
+	if class == "Touch" then
 		return "Touch"
-	end
-	if string.find(inputType.Name, "Gamepad", 1, true) == 1 then
+	elseif class == "Gamepad" then
 		return "Gamepad"
-	end
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return "Touch"
 	end
 	return "KeyboardMouse"
 end
@@ -118,13 +118,9 @@ function CombatMenuClient.start()
 		return
 	end
 	started = true
-	publish({ inputMethod = inputMethod(UserInputService:GetLastInputType()) })
-	table.insert(
-		connections,
-		UserInputService.LastInputTypeChanged:Connect(function(lastInputType)
-			publish({ inputMethod = inputMethod(lastInputType) })
-		end)
-	)
+	deviceDisconnect = DeviceClass.observe(function(class)
+		publish({ inputMethod = methodFor(class) })
+	end)
 	ContextActionService:BindActionAtPriority(
 		TOGGLE_ACTION,
 		handleToggle,
@@ -191,10 +187,10 @@ end
 
 function CombatMenuClient.destroy()
 	ContextActionService:UnbindAction(TOGGLE_ACTION)
-	for _, connection in connections do
-		connection:Disconnect()
+	if deviceDisconnect then
+		deviceDisconnect()
+		deviceDisconnect = nil
 	end
-	table.clear(connections)
 	Combat.releaseCursor(CURSOR_REASON)
 	closeInterceptor = nil
 	state = {

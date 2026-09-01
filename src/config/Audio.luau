@@ -2,6 +2,14 @@
 
 -- Client audio asset ids, mix defaults, and transition timing.
 
+local function eliminationSound(volume: number)
+	return {
+		Scope = "World",
+		Volume = volume,
+		AssetIds = { "" },
+	}
+end
+
 return {
 	Mix = {
 		MasterVolume = 1,
@@ -91,6 +99,24 @@ return {
 				"rbxassetid://8254243751",
 			},
 		},
+		RubberPopDodgeballElimination = eliminationSound(1.45),
+		RubberPopHammerElimination = eliminationSound(1.45),
+		ToySqueakDodgeballElimination = eliminationSound(1.45),
+		ToySqueakHammerElimination = eliminationSound(1.45),
+		BalloonPopDodgeballElimination = eliminationSound(1.45),
+		BalloonPopHammerElimination = eliminationSound(1.45),
+		PartyHornDodgeballElimination = eliminationSound(1.4),
+		PartyHornHammerElimination = eliminationSound(1.4),
+		ArcadeKODodgeballElimination = eliminationSound(1.4),
+		ArcadeKOHammerElimination = eliminationSound(1.4),
+		ComedyDrumsDodgeballElimination = eliminationSound(1.4),
+		ComedyDrumsHammerElimination = eliminationSound(1.4),
+		RoyalFanfareDodgeballElimination = eliminationSound(1.35),
+		RoyalFanfareHammerElimination = eliminationSound(1.35),
+		StadiumRoarDodgeballElimination = eliminationSound(1.35),
+		StadiumRoarHammerElimination = eliminationSound(1.35),
+		CosmicChimeDodgeballElimination = eliminationSound(1.35),
+		CosmicChimeHammerElimination = eliminationSound(1.35),
 		ElimZoneFall = {
 			Scope = "World",
 			Volume = 1.6,

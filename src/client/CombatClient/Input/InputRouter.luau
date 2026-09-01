@@ -1,18 +1,18 @@
 -- Name: InputRouter.luau
 -- Author: Jack C.
--- Description: Feeds the aim vector into the Aim input action every frame, pulses the Throw action on touch taps, reports the player's device class to the server, and owns whether the mouse cursor is released for menus.
+-- Description: Drives per-frame aim and soft-lock target selection while combat is active, reports the player's device class to the server, and owns whether the mouse cursor is released for the mode-vote menu.
 -- Created: 2026-07-12
 
 --!strict
 
-local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
-local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local DeviceClass = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass")
+)
 local AimDirector = require(script.Parent.AimDirector)
 -- The mode ballot is arena-only, and this module is shared by both places, so a
 -- missing ModeVoteClient in the lobby is expected rather than a missing asset.
@@ -36,30 +36,19 @@ local function updateCursorOwnership()
 	end
 end
 
-local function reportDeviceClass()
-	local reported: string? = nil
-	local function report()
-		local deviceClass = AimDirector.deviceClass()
-		if deviceClass ~= reported then
-			reported = deviceClass
-			Network.fireServer("ReportDeviceClass", deviceClass)
-		end
-	end
-	table.insert(connections, UserInputService.LastInputTypeChanged:Connect(report))
-	report()
-end
-
 function InputRouter.start()
 	if started then
 		return
 	end
 	started = true
-	local player = Players.LocalPlayer
-	local context = player:WaitForChild(InputConfig.ContextName)
-	local aimAction = context:WaitForChild("Aim")
-	local aimBinding = aimAction:WaitForChild("AimFeed") :: InputBinding
 
-	reportDeviceClass()
+	table.insert(
+		connections,
+		DeviceClass.observe(function(deviceClass)
+			Network.fireServer("ReportDeviceClass", deviceClass)
+		end)
+	)
+
 	if ModeVoteClient then
 		table.insert(
 			connections,
@@ -78,7 +67,6 @@ function InputRouter.start()
 			local combatActive = Combat.isActive()
 			if combatActive then
 				AimDirector.update()
-				aimBinding:Fire(AimDirector.currentAim())
 			elseif combatWasActive then
 				AimDirector.reset()
 			end

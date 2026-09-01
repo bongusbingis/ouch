@@ -1,6 +1,6 @@
 -- Name: InventoryPreview.luau
 -- Author: Jack C.
--- Description: Renders cosmetic inventory previews, using live 3D models where available and a static badge for script effects.
+-- Description: Renders cosmetic inventory previews, using live 3D models where available and static badges for script effects and sounds.
 -- Created: 2026-08-17
 
 --!strict
@@ -185,6 +185,42 @@ local function impactPreview(props: Props)
 	})
 end
 
+local function eliminationSoundPreview(props: Props)
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(35, 47, 62),
+		BorderSizePixel = 0,
+		Position = UDim2.fromScale(0.5, 0.45),
+		Rotation = -6,
+		Size = UDim2.fromScale(0.58, 0.58),
+		ZIndex = props.ZIndex,
+	}, {
+		UICorner = c("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		UIStroke = c("UIStroke", {
+			Color = Color3.new(1, 1, 1),
+			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			Thickness = 0.075,
+		}),
+		Label = c("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+			Position = UDim2.fromScale(0.5, 0.54),
+			Size = UDim2.fromScale(0.8, 0.5),
+			Text = "SFX!",
+			TextColor3 = Color3.new(1, 1, 1),
+			TextScaled = true,
+			ZIndex = props.ZIndex + 1,
+		}, {
+			UIStroke = c("UIStroke", {
+				Color = Color3.fromRGB(20, 24, 34),
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = 0.08,
+			}),
+		}),
+	})
+end
+
 local ViewportPreview = React.memo(function(props: Props)
 	local viewportRef = React.useRef(nil)
 	local cameraRef = React.useRef(nil)
@@ -250,6 +286,9 @@ end)
 return React.memo(function(props: Props)
 	if props.Category == "ImpactEffectAssets" then
 		return impactPreview(props)
+	end
+	if props.Category == "ElimEffectAssets" then
+		return eliminationSoundPreview(props)
 	end
 	return c(ViewportPreview, props)
 end)

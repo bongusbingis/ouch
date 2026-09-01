@@ -70,9 +70,20 @@ local function directionOf(value: Vector3): Vector3?
 	return if value.Magnitude > 1e-5 then value.Unit else nil
 end
 
+-- A resolvable effect id is either a registered script effect or a
+-- Studio-authored template under the Impact folder; existence is a legitimate
+-- unknown here (typed by hand), so FindFirstChild is the right check.
+local function impactTemplateExists(effectId: string): boolean
+	local node: Instance? = ReplicatedStorage:FindFirstChild("Assets")
+	for _, name in { "Cosmetics", "Effects", "Impact" } do
+		node = if node then node:FindFirstChild(name) else nil
+	end
+	return node ~= nil and node:FindFirstChild(effectId) ~= nil
+end
+
 local function play(effectId: string, position: Vector3, direction: Vector3, scale: number)
-	if ScriptEffects.get(effectId) == nil then
-		warn(`[CosmeticVFXGallery] unknown script effect {effectId}`)
+	if ScriptEffects.get(effectId) == nil and not impactTemplateExists(effectId) then
+		warn(`[CosmeticVFXGallery] unknown effect {effectId} — not a script effect or an Impact template`)
 		return
 	end
 	CosmeticEffectFactory.play("Impact", effectId, {
@@ -172,15 +183,17 @@ function CosmeticVFXGallery.start()
 			end
 			sideBySideTrigger.Value = false
 			local ids = ScriptEffects.productionIds()
-			local columns = 3
+			local columns = 4
+			local rows = math.ceil(#ids / columns)
 			local camera = Workspace.CurrentCamera
 			local right = if camera then camera.CFrame.RightVector else Vector3.xAxis
 			local up = Vector3.yAxis
-			local spacing = 6.5 * math.clamp(scale.Value, 0.5, 1.5)
+			local spacing = 28 * math.clamp(scale.Value, 0.5, 1.5)
 			for index, id in ids do
 				local column = (index - 1) % columns
 				local row = math.floor((index - 1) / columns)
-				local offset = right * (column - 1) * spacing + up * (1 - row) * spacing
+				local rowCount = math.min(columns, #ids - row * columns)
+				local offset = right * (column - (rowCount - 1) / 2) * spacing + up * ((rows - 1) / 2 - row) * spacing
 				play(id, position.Value + offset, direction.Value, scale.Value)
 			end
 		end)

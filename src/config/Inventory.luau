@@ -23,6 +23,7 @@ return {
 			Sections = {
 				{ Id = "TRAILS", Category = "TrailAssets" },
 				{ Id = "IMPACTS", Category = "ImpactEffectAssets" },
+				{ Id = "ELIMINATION SOUNDS", Category = "ElimEffectAssets" },
 			},
 		},
 		{
@@ -62,7 +63,7 @@ return {
 			RotationDegrees = -20,
 			SpinDegreesPerSecond = 12,
 		},
-		-- ImpactEffectAssets uses InventoryPreview's non-world effect badge.
-		-- TrailAssets and ElimEffectAssets stay out of Tabs until they have previews.
+		-- Script effects and elimination sounds use InventoryPreview's static badges.
+		-- TrailAssets stays out of Tabs until it has a preview.
 	},
 }

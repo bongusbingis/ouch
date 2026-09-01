@@ -304,8 +304,14 @@ local function step(dt: number)
 	MovementSpeedService.step(state, characterModels, events)
 	SimStateCodec.encode(state, ballsFolder, characterModels)
 	dispatch(events)
-	if #events > 0 then
-		Network.fire("CombatSimEvent", nil, events)
+	local transientEvents = {}
+	for _, event in events do
+		if event.kind ~= "Elim" then
+			table.insert(transientEvents, event)
+		end
+	end
+	if #transientEvents > 0 then
+		Network.fire("CombatSimEvent", nil, transientEvents)
 	end
 end
 

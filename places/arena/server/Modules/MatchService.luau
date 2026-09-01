@@ -628,24 +628,38 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.sourceId ~= nil and (source == nil or not ArenaSessionService.isRoundEligible(source)) then
 		return false
 	end
+	local acceptedEvent = table.clone(event)
+	if acceptedEvent.position == nil then
+		local character = target.Character
+		if character ~= nil then
+			acceptedEvent.position = character:GetPivot().Position
+		end
+	end
+	local equippedItemId = if source then source:GetAttribute("Equip_ElimEffectAssets") else nil
+	acceptedEvent.elimEffectItemId = if typeof(equippedItemId) == "string" and equippedItemId ~= ""
+		then equippedItemId
+		else nil
 	local activeMode = assert(mode, "[MatchService] active phase without a selected mode")
-	if not eliminateVictim(event.targetId, event) then
+	if not eliminateVictim(acceptedEvent.targetId, acceptedEvent) then
 		return false
 	end
 
 	local events: { MatchSim.MatchEvent } = {}
-	MatchSim.applyElim(state, activeMode.rules, scoreIdForElim(event.sourceId), event.targetId, events)
-	dispatch(table.clone(event))
+	MatchSim.applyElim(state, activeMode.rules, scoreIdForElim(acceptedEvent.sourceId), acceptedEvent.targetId, events)
+	dispatch(table.clone(acceptedEvent))
 	Network.fire("CombatFeed", nil, {
 		kind = "Elim",
-		tick = event.tick,
-		projectileId = event.projectileId,
-		sourceId = event.sourceId,
-		targetId = event.targetId,
+		tick = acceptedEvent.tick,
+		projectileId = acceptedEvent.projectileId,
+		sourceId = acceptedEvent.sourceId,
+		targetId = acceptedEvent.targetId,
+		position = acceptedEvent.position,
+		direction = acceptedEvent.direction,
+		elimEffectItemId = acceptedEvent.elimEffectItemId,
 	})
-	incrementPlayerElim(event.sourceId)
+	incrementPlayerElim(acceptedEvent.sourceId)
 	if state.phase == "Active" then
-		activeMode.onElim(modeContext(), event.sourceId, event.targetId)
+		activeMode.onElim(modeContext(), acceptedEvent.sourceId, acceptedEvent.targetId)
 	end
 	handleMatchEvents(events)
 	return true
@@ -775,11 +789,13 @@ end
 
 local function buildElimEvent(source: Player?, target: Player): { [string]: any }
 	externalEventSequence += 1
+	local character = target.Character
 	return {
 		kind = "Elim",
 		tick = -externalEventSequence,
 		sourceId = if source then PlayerIds.toId(source) else nil,
 		targetId = PlayerIds.toId(target),
+		position = if character then character:GetPivot().Position else nil,
 		direction = Vector3.zero,
 	}
 end

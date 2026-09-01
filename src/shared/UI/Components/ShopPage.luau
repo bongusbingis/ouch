@@ -120,13 +120,13 @@ return function(props)
 	return c("ImageLabel", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Image = "rbxassetid://136021539696619",
+		Image = "rbxassetid://93085297572423",
 		LayoutOrder = 5,
 		Position = props.Position or UDim2.fromScale(0.5, 0.56),
-		ScaleType = Enum.ScaleType.Slice,
-		Size = UDim2.fromScale(0.94, 0.82),
-		SliceCenter = Rect.new(224, 202, 770, 474),
-		SliceScale = 0.06,
+		ScaleType = Enum.ScaleType.Stretch,
+		Size = UDim2.fromScale(0.7, 0.82),
+		--SliceCenter = Rect.new(224, 202, 770, 474),
+		--SliceScale = 0.06,
 	}, {
 		Title = c(ResponsiveText, {
 			MeasurementFont = Enum.Font.LuckiestGuy,
@@ -176,7 +176,7 @@ return function(props)
 				BackgroundTransparency = 1,
 				CanvasSize = UDim2.fromOffset(0, 0),
 				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
-				Position = UDim2.fromScale(0.025, 0),
+				Position = UDim2.fromScale(0.025, 0.05),
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				ScrollBarImageColor3 = Color3.new(1, 1, 1),
 				ScrollBarImageTransparency = 0.1,
@@ -189,7 +189,7 @@ return function(props)
 			}, content),
 		}),
 		UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-			AspectRatio = 1.7,
+			AspectRatio = 1.5,
 			AspectType = Enum.AspectType.FitWithinMaxSize,
 		}),
 	})

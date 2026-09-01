@@ -3,12 +3,15 @@
 -- Chunky star impact with a compressed toy-like pulse and fast graphic arcs.
 
 local Palette = require(script.Parent.Palette)
+local ParticleKit = require(script.Parent.ParticleKit)
+local ParticlePresets = require(script.Parent.ParticlePresets)
 local Primitives = require(script.Parent.Primitives)
 local Runtime = require(script.Parent.Runtime)
 
 local StarPop = {}
 
 local random = Random.new()
+local PRESENCE_SCALE = 1.2
 local STAR_COLORS = {
 	Palette.Yellow,
 	Palette.Yellow,
@@ -17,6 +20,16 @@ local STAR_COLORS = {
 	Palette.Pink,
 	Palette.White,
 }
+
+local particles = ParticleKit.effect({
+	emitters = {
+		ParticlePresets.flash(Palette.White, 10),
+		ParticlePresets.ring(Palette.Gold, 23),
+		ParticlePresets.rays(Palette.Yellow, 8, 6.2),
+		ParticlePresets.motes(Palette.Cyan, 8, 0.52),
+		ParticlePresets.flare(Palette.White, 2.8, 0),
+	},
+})
 
 local function star(
 	context: Primitives.Context,
@@ -47,9 +60,9 @@ local function star(
 		local position = Primitives.ballistic(origin, velocity, Vector3.new(0, -4.5, 0), elapsed)
 		glyph.root.CFrame = CFrame.new(position)
 		glyph.label.Rotation = startRotation + spin * elapsed * (1 - alpha * 0.55)
-		local grow = Primitives.easeOutQuint(math.min(alpha / 0.2, 1))
+		local pop = Primitives.popScale(alpha, 0.22, 1.18, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.66))
-		local visualScale = (0.22 + grow * 0.9) * shrink
+		local visualScale = pop * shrink
 		glyph.gui.Size = UDim2.fromScale(size * visualScale, size * visualScale)
 		glyph.label.TextTransparency = Primitives.fadeAfter(alpha, 0.84)
 		glyph.label.TextStrokeTransparency = Primitives.fadeAfter(alpha, 0.78)
@@ -57,16 +70,10 @@ local function star(
 end
 
 function StarPop.play(context: Primitives.Context)
-	local scale = Primitives.contextScale(context)
+	particles.play(context)
+	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	Primitives.flash(context.position, Palette.Yellow, { maxDiameter = 8 * scale, lifetime = 0.22 })
-	Primitives.shockwave(context.position, Palette.Yellow, { maxDiameter = 22 * scale, startDiameter = 3 * scale })
-	Primitives.shockwave(
-		context.position,
-		Palette.Cyan,
-		{ maxDiameter = 14 * scale, startDiameter = 2 * scale, lifetime = 0.4, layer = "Secondary" }
-	)
-	local count = Runtime.scaledCount(10, "Secondary")
+	local count = Runtime.scaledCount(12, "Secondary")
 	for index = 1, count do
 		star(context, frame, scale, index, count, if index <= 5 then "Hero" else "Secondary")
 	end

@@ -498,6 +498,32 @@ function PartyService:_restoreReturningParty(player, returning)
 	end)
 end
 
+function PartyService:_separateReturningMember(player, returning)
+	local separated = false
+	local updated = self._partyRepository:UpdateParty(returning.partyId, function(current)
+		if ReturnPartyPolicy.resolve(current, returning, player.UserId) ~= "Separate" then
+			return nil
+		end
+
+		local nextParty = PartyModel.clone(current)
+		PartyModel.removeMember(nextParty, player.UserId)
+		separated = true
+		return PartyModel.touch(nextParty, os.time())
+	end)
+	if not updated or not separated then
+		return false
+	end
+
+	self._partyRepository:RemoveUserParty(player.UserId, returning.partyId)
+	if #updated.members == 0 then
+		self._partyRepository:DeleteParty(updated)
+		self._partyBus:PublishDeleted(updated.partyId, updated.revision, player.UserId)
+	else
+		self:NotifyCommitted(updated, "MemberLeft", player.UserId)
+	end
+	return true
+end
+
 function PartyService:_resolveArrivalTarget(player)
 	local function isFriend(userId)
 		local success, result = pcall(player.IsFriendsWith, player, userId)
@@ -510,6 +536,17 @@ function PartyService:_resolveArrivalTarget(player)
 		then ReturnPayload.parse(joinData.TeleportData)
 		else nil
 	if returning then
+		if returning.returnMode == "Separate" then
+			if not self:_separateReturningMember(player, returning) then
+				warn(
+					("[PartyService] Could not separate returning member %d from %s"):format(
+						player.UserId,
+						returning.partyId
+					)
+				)
+			end
+			return nil
+		end
 		local party = self:_restoreReturningParty(player, returning)
 		if party then
 			return party, false

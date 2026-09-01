@@ -37,11 +37,11 @@ local Featured: FeaturedConfig = {
 	-- Cycled in order rather than shuffled: the schedule stays predictable for
 	-- planning, and with a short list a shuffle only obscures it.
 	--
-	-- Only Active crates belong here. The hammer and effects crates are Preview
-	-- until their content exists, and discounting something that cannot be
-	-- opened advertises a price nobody can pay -- add them when they go Active.
+	-- Only Active crates belong here. Discounting a Preview crate would advertise
+	-- a price nobody can pay.
 	Rotation = {
 		{ kind = "Crate", id = "DodgeballCrate" },
+		{ kind = "Crate", id = "EffectsCrate" },
 	},
 }
 

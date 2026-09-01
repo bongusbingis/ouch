@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
 local GameMode = require(script.Parent.GameMode)
 
 local FFA = {}
@@ -16,7 +17,7 @@ FFA.rules = {
 	MinPlayers = 1,
 	ScoreTarget = 15,
 	TimeCapSeconds = 300,
-	ResultsSeconds = 8,
+	ResultsSeconds = PostMatch.ResultsSeconds,
 	IntermissionSeconds = GameModes.VoteDurationSeconds,
 	StartingSeconds = 3,
 	RespawnSeconds = 1,

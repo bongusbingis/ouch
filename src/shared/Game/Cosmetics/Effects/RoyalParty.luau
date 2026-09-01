@@ -3,12 +3,26 @@
 -- Premium gold impact with a composed jewel arc, restrained party burst, and delayed glint.
 
 local Palette = require(script.Parent.Palette)
+local ParticleKit = require(script.Parent.ParticleKit)
+local ParticlePresets = require(script.Parent.ParticlePresets)
 local Primitives = require(script.Parent.Primitives)
 local Runtime = require(script.Parent.Runtime)
 
 local RoyalParty = {}
 
 local random = Random.new()
+local PRESENCE_SCALE = 1.3
+
+local particles = ParticleKit.effect({
+	emitters = {
+		ParticlePresets.flash(Palette.White, 11),
+		ParticlePresets.ring(Palette.Gold, 26),
+		ParticlePresets.rays(Palette.Gold, 12, 7.5),
+		ParticlePresets.stars(Palette.White, 7, 1.2),
+		ParticlePresets.flare(Palette.White, 3.8, 0),
+		ParticlePresets.flare(Palette.Gold, 3.8, 90),
+	},
+})
 
 type Jewel = {
 	part: Part,
@@ -21,9 +35,9 @@ local function core(position: Vector3, frame: CFrame, scale: number)
 	local part = Primitives.part("RoyalPartyCore", Palette.Gold, Vector3.one * 0.1, frame, Enum.Material.Neon)
 	part.Shape = Enum.PartType.Ball
 	Runtime.add(part, 0.34, function(alpha)
-		local expand = Primitives.easeOutQuint(math.min(alpha / 0.24, 1))
+		local spring = Primitives.popScale(alpha, 0.08, 1.2, 1)
 		local exit = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.44))
-		part.Size = Primitives.size(Vector3.new(4.2, 3.3, 0.6) * scale * expand * exit)
+		part.Size = Primitives.size(Vector3.new(4.2, 3.3, 0.6) * scale * spring * exit)
 		part.Transparency = 0.12 + 0.88 * Primitives.fadeAfter(alpha, 0.42)
 	end, { layer = "Hero" })
 end
@@ -62,7 +76,8 @@ local function jewelArc(position: Vector3, scale: number)
 		})
 	end
 	Runtime.add(model, 0.58, function(alpha)
-		local rise = Primitives.easeOutQuint(math.min(alpha / 0.24, 1))
+		local rise = Primitives.popScale(alpha, 0, 1.1, 1)
+		local pop = Primitives.popScale(alpha, 0.12, 1.18, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.64))
 		for _, jewel in jewels do
 			local target = position
@@ -71,7 +86,7 @@ local function jewelArc(position: Vector3, scale: number)
 				+ forward * 0.25 * scale
 			local current = position:Lerp(target, rise)
 			jewel.part.CFrame = CFrame.lookAt(current, current + forward, up) * CFrame.Angles(0, 0, math.rad(45))
-			jewel.part.Size = Primitives.size(Vector3.new(jewel.size, jewel.size, 0.18) * scale * rise * shrink)
+			jewel.part.Size = Primitives.size(Vector3.new(jewel.size, jewel.size, 0.18) * scale * pop * shrink)
 			jewel.part.Transparency = Primitives.fadeAfter(alpha, 0.74)
 		end
 	end, { layer = "Hero" })
@@ -94,7 +109,7 @@ local function burstPiece(position: Vector3, frame: CFrame, scale: number, index
 		local baseSize = random:NextNumber(0.85, 1.25) * scale
 		Runtime.add(glyph.root, 0.72, function(alpha, elapsed)
 			glyph.root.CFrame = CFrame.new(Primitives.ballistic(origin, velocity, Vector3.new(0, -9, 0), elapsed))
-			local visualScale = Primitives.easeOutQuint(math.min(alpha / 0.16, 1))
+			local visualScale = Primitives.popScale(alpha, 0.16, 1.2, 1)
 				* (1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.68)))
 			glyph.gui.Size = UDim2.fromScale(baseSize * visualScale, baseSize * visualScale)
 			glyph.label.Rotation = alpha * 150 * (if index % 2 == 0 then -1 else 1)
@@ -108,8 +123,9 @@ local function burstPiece(position: Vector3, frame: CFrame, scale: number, index
 	Runtime.add(part, 0.68, function(alpha, elapsed)
 		part.CFrame = CFrame.new(Primitives.ballistic(origin, velocity, Vector3.new(0, -17, 0), elapsed))
 			* CFrame.Angles(elapsed * 7, elapsed * 5, elapsed * 9)
+		local pop = Primitives.popScale(alpha, 0.28, 1.17, 1)
 		local shrink = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.7))
-		part.Size = Primitives.size(baseSize * shrink)
+		part.Size = Primitives.size(baseSize * pop * shrink)
 		part.Transparency = Primitives.fadeAfter(alpha, 0.84)
 	end, { layer = "Secondary" })
 end
@@ -120,7 +136,9 @@ local function glint(position: Vector3, scale: number)
 	glyph.label.TextTransparency = 1
 	glyph.label.TextStrokeTransparency = 1
 	Runtime.add(glyph.root, 0.32, function(alpha)
-		local visualScale = math.sin(alpha * math.pi) * 1.5 * scale
+		local pop = Primitives.popScale(alpha, 0.05, 1.22, 1)
+		local exit = 1 - Primitives.easeInCubic(Primitives.fadeAfter(alpha, 0.58))
+		local visualScale = pop * exit * 1.5 * scale
 		glyph.gui.Size = UDim2.fromScale(visualScale, visualScale)
 		glyph.label.Rotation = -18 + alpha * 36
 		glyph.label.TextTransparency = Primitives.fadeAfter(alpha, 0.7)
@@ -129,18 +147,12 @@ local function glint(position: Vector3, scale: number)
 end
 
 function RoyalParty.play(context: Primitives.Context)
-	local scale = Primitives.contextScale(context)
+	particles.play(context)
+	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	Primitives.flash(context.position, Palette.White, { maxDiameter = 8 * scale, lifetime = 0.22 })
-	Primitives.shockwave(context.position, Palette.Gold, { maxDiameter = 24 * scale, startDiameter = 3 * scale })
-	Primitives.shockwave(
-		context.position,
-		Palette.White,
-		{ maxDiameter = 15 * scale, startDiameter = 2 * scale, lifetime = 0.4, layer = "Secondary" }
-	)
 	core(context.position, frame, scale)
 	jewelArc(context.position, scale)
-	local count = Runtime.scaledCount(9, "Secondary")
+	local count = Runtime.scaledCount(7, "Secondary")
 	for index = 1, count do
 		burstPiece(context.position, frame, scale, index, count)
 	end

@@ -12,6 +12,18 @@ local Crates = require(script.Parent.Parent.Parent.Config.Crates)
 local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
 local Audio = require(script.Parent.Parent.Parent.Config.Audio)
 
+local ELIMINATION_SOUND_TIERS = {
+	ElimSoundRubberPop = "Common",
+	ElimSoundToySqueak = "Common",
+	ElimSoundBalloonPop = "Common",
+	ElimSoundPartyHorn = "Rare",
+	ElimSoundArcadeKO = "Rare",
+	ElimSoundComedyDrums = "Rare",
+	ElimSoundRoyalFanfare = "Legendary",
+	ElimSoundStadiumRoar = "Legendary",
+	ElimSoundCosmicChime = "Legendary",
+}
+
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },
 	HammerGold = { Category = "HammerAssets", Rarity = "Rare" },
@@ -92,10 +104,30 @@ T.describe("CosmeticsLogic", function()
 		for _, item in Cosmetics.Items do
 			if item.Category == "ElimEffectAssets" then
 				T.expect(item.ElimEffect ~= nil):toBeTruthy()
-				T.expect(Audio.Gameplay[item.ElimEffect.DodgeballSound] ~= nil):toBeTruthy()
-				T.expect(Audio.Gameplay[item.ElimEffect.HammerSound] ~= nil):toBeTruthy()
+				local dodgeball = Audio.Gameplay[item.ElimEffect.DodgeballSound]
+				local hammer = Audio.Gameplay[item.ElimEffect.HammerSound]
+				T.expect(dodgeball ~= nil):toBeTruthy()
+				T.expect(hammer ~= nil):toBeTruthy()
+				T.expect(dodgeball.Scope):toEqual("World")
+				T.expect(hammer.Scope):toEqual("World")
+				T.expect(#dodgeball.AssetIds > 0):toBeTruthy()
+				T.expect(#hammer.AssetIds > 0):toBeTruthy()
 			end
 		end
+	end)
+
+	T.it("ships three elimination sounds in each openable rarity tier", function()
+		local counts = { Common = 0, Rare = 0, Legendary = 0 }
+		for itemId, rarity in ELIMINATION_SOUND_TIERS do
+			local item = Cosmetics.Items[itemId]
+			T.expect(item ~= nil):toBeTruthy()
+			T.expect(item.Category):toEqual("ElimEffectAssets")
+			T.expect(item.Rarity):toEqual(rarity)
+			counts[rarity] += 1
+		end
+		T.expect(counts.Common):toEqual(3)
+		T.expect(counts.Rare):toEqual(3)
+		T.expect(counts.Legendary):toEqual(3)
 	end)
 
 	T.it("makes every Exclusive cosmetic obtainable from some game pass", function()
@@ -126,14 +158,12 @@ T.describe("CosmeticsLogic", function()
 		end
 	end)
 
-	T.it("keeps every Exclusive trail out of the crate pools", function()
+	T.it("keeps every Exclusive cosmetic out of the crate pools", function()
 		for _, crate in Crates do
 			for _, itemId in crate.ItemPool do
 				local item = Cosmetics.Items[itemId]
 				T.expect(item ~= nil):toBeTruthy()
-				if item.Rarity == "Exclusive" then
-					T.expect(Cosmetics.Rarities.Exclusive.Weight):toEqual(0)
-				end
+				T.expect(item.Rarity ~= "Exclusive"):toBeTruthy()
 			end
 		end
 	end)

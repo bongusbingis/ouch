@@ -14,12 +14,17 @@ local Inventory = require(script.Parent.Parent.Parent.Config.Inventory)
 local PRODUCTION_IMPACT_EFFECTS = {
 	"StarPop",
 	"FoamPoof",
+	"ConfettiImpact",
 	"JellySplash",
+	"SugarRush",
 	"PartyPopper",
-	"ComicBonk",
 	"CandyCrash",
+	"ComicBonk",
 	"BubbleBurst",
 	"RoyalParty",
+	"Prismatic",
+	"Galaxy",
+	"Starlight",
 }
 
 local function impactCategory()
@@ -118,8 +123,10 @@ T.describe("CosmeticEffects", function()
 			T.expect(item ~= nil):toBeTruthy()
 			T.expect(item.Category):toEqual("ImpactEffectAssets")
 			T.expect(Cosmetics.Rarities[item.Rarity] ~= nil):toBeTruthy()
-			T.expect(seen[item.EffectId]):toBeNil()
-			seen[item.EffectId] = true
+			local effectId = item.EffectId
+			assert(effectId ~= nil)
+			T.expect(seen[effectId]):toBeNil()
+			seen[effectId] = true
 		end
 	end)
 
@@ -129,6 +136,20 @@ T.describe("CosmeticEffects", function()
 			if tab.Id == "EFFECTS" then
 				for _, section in tab.Sections do
 					if section.Category == "ImpactEffectAssets" then
+						found = true
+					end
+				end
+			end
+		end
+		T.expect(found):toEqual(true)
+	end)
+
+	T.it("lists elimination sounds in the inventory effects tab", function()
+		local found = false
+		for _, tab in Inventory.Tabs do
+			if tab.Id == "EFFECTS" then
+				for _, section in tab.Sections do
+					if section.Category == "ElimEffectAssets" then
 						found = true
 					end
 				end

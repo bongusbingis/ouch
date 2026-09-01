@@ -8,6 +8,7 @@
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -15,9 +16,11 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local PostMatchConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
+local ActivityDots = require(script.Parent.ActivityDots)
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
+local PostMatchViewModel = require(script.Parent.Parent.Models.PostMatchViewModel)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useViewportSize = require(script.Parent.Parent.Hooks.useViewportSize)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
@@ -52,9 +55,11 @@ export type Props = {
 	Result: any?,
 	Status: any?,
 	Requesting: boolean?,
+	PendingAction: PostMatchViewModel.Action?,
 	Error: string?,
 	OnPlayAgain: () -> (),
 	OnReturnToLobby: () -> (),
+	OnLeaveParty: () -> (),
 }
 
 local function textStroke(thickness: number)
@@ -87,7 +92,15 @@ local function titleLabel(name: string, text: string, position: UDim2, size: UDi
 	})
 end
 
-local function detailLabel(name: string, text: string, position: UDim2, size: UDim2, maxSize: number, zIndex: number)
+local function detailLabel(
+	name: string,
+	text: string,
+	position: UDim2,
+	size: UDim2,
+	maxSize: number,
+	zIndex: number,
+	color: Color3?
+)
 	return c(ResponsiveText, {
 		HostName = name,
 		MeasurementFont = Enum.Font.Highway,
@@ -104,12 +117,29 @@ local function detailLabel(name: string, text: string, position: UDim2, size: UD
 			Position = position,
 			Size = size,
 			Text = text,
-			TextColor3 = WHITE,
+			TextColor3 = color or WHITE,
 			ZIndex = zIndex,
 		},
 	}, {
 		Stroke = textStroke(0.025),
 	})
+end
+
+local function boostedValue(total: number, base: number?, multiplier: number?): string
+	if base == nil or multiplier == nil or math.abs(multiplier - 1) < 0.001 then
+		return `+{total}`
+	end
+	local formatted = string.format("%.2f", multiplier):gsub("0+$", ""):gsub("%.$", "")
+	return `{base} x{formatted} = +{total}`
+end
+
+local function safeArea(viewport: Vector2): (number, number, number, number)
+	local ok, area = pcall(GuiService.GetInsetArea, GuiService, Enum.ScreenInsets.DeviceSafeInsets)
+	if not ok or typeof(area) ~= "Rect" then
+		return 0, 0, viewport.X, viewport.Y
+	end
+	local rect = area :: Rect
+	return rect.Min.X, rect.Min.Y, math.max(rect.Max.X - rect.Min.X, 0), math.max(rect.Max.Y - rect.Min.Y, 0)
 end
 
 local function panel(native: { [any]: any }, children: { [any]: any })
@@ -157,6 +187,9 @@ local function actionButton(
 		},
 	}, {
 		Label = titleLabel("Label", text, UDim2.fromScale(0.5, 0.47), UDim2.fromScale(0.88, 0.55), 42, 26),
+		SizeConstraint = c("UISizeConstraint", {
+			MinSize = Vector2.new(120, 44),
+		}),
 	})
 end
 
@@ -253,35 +286,46 @@ local function progressRows(
 )
 	local values = {}
 	if rewards then
-		table.insert(values, { label = "MATCH XP", value = `+{rewards.matchXp}` })
-		table.insert(values, { label = "BONKS", value = `+{rewards.bonks}` })
+		table.insert(values, {
+			label = "MATCH XP",
+			value = boostedValue(rewards.matchXp, rewards.baseXp, rewards.xpMultiplier),
+		})
+		table.insert(values, {
+			label = "BONKS",
+			value = boostedValue(rewards.bonks, rewards.baseBonks, rewards.bonksMultiplier),
+		})
 	end
 	if rewards and rewards.seasonXp ~= nil then
 		table.insert(values, { label = "SEASON XP", value = `+{rewards.seasonXp}` })
 	end
 	if rewardsPending and rewards == nil then
-		table.insert(values, { label = "MATCH REWARDS", value = "TOTALING UP" })
+		table.insert(values, { label = "MATCH REWARDS", value = "TOTALING UP", loading = true })
 	end
-	if unlocks and unlocks[1] then
-		table.insert(values, { label = "UNLOCKED", value = string.upper(unlocks[1].name) })
+	if season then
+		local tierValue = if season.afterTier > season.beforeTier
+			then `TIER {season.beforeTier} > {season.afterTier}`
+			else `TIER {season.afterTier}`
+		table.insert(values, { label = string.upper(season.displayName), value = tierValue })
 	end
-	if challenges and challenges[1] then
-		local challenge = challenges[1]
-		table.insert(
-			values,
-			{ label = string.upper(challenge.label), value = `{challenge.current} / {challenge.target}` }
-		)
+	for _, unlock in unlocks or {} do
+		table.insert(values, { label = "UNLOCKED", value = string.upper(unlock.name) })
+	end
+	for _, challenge in challenges or {} do
+		table.insert(values, {
+			label = string.upper(challenge.label),
+			value = `{challenge.current} / {challenge.target}`,
+		})
 	end
 	local children = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0.03, 0),
+			Padding = UDim.new(0.015, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
 	}
-	local rowHeight = math.min(if compact then 0.18 else 0.17, (if season then 0.68 else 0.78) / math.max(#values, 1))
+	local rowHeight = math.min(if compact then 0.18 else 0.17, (if season then 0.66 else 0.82) / math.max(#values, 1))
 	for index, value in values do
 		children[`Reward{index}`] = c("Frame", {
 			BackgroundTransparency = 1,
@@ -305,6 +349,17 @@ local function progressRows(
 				if compact then 24 else 32,
 				14
 			),
+			Loading = if value.loading
+				then c(ActivityDots, {
+					Active = true,
+					Native = {
+						Position = UDim2.fromScale(0.93, 0.5),
+						Size = UDim2.fromScale(0.1, 0.46),
+						ZIndex = 15,
+					},
+					DotSize = UDim2.fromScale(0.2, 0.7),
+				})
+				else nil,
 		})
 	end
 	if season then
@@ -342,6 +397,10 @@ local function friendlyError(errorCode: string?): string?
 		return "RETURN TO LOBBY IS ALREADY IN PROGRESS"
 	elseif errorCode == "rewards_pending" then
 		return "FINISHING YOUR REWARDS - PLEASE TRY AGAIN"
+	elseif errorCode == "reveal_in_progress" then
+		return "YOUR RESULTS ARE STILL BEING REVEALED"
+	elseif errorCode == "leave_party_unavailable" then
+		return "YOU CAN ONLY LEAVE A PARTY YOU DO NOT LEAD"
 	end
 	return "THAT DIDN'T WORK - PLEASE TRY AGAIN"
 end
@@ -359,9 +418,11 @@ return function(props: Props)
 	local announcedResult = React.useRef("")
 	local interactive, setInteractive = React.useState(false)
 	local celebrating, setCelebrating = React.useState(false)
+	local remainingSeconds, setRemainingSeconds = React.useState(0)
 	local gamepadActive, setGamepadActive = React.useState(isGamepadInput(UserInputService:GetLastInputType()))
-	local compact = viewport.X < 1000 or viewport.Y < 620
 	local visible = props.Visible and result ~= nil
+	local safeX, safeY, safeWidth, safeHeight = safeArea(viewport)
+	local canvasWidth, canvasHeight, compact = PostMatchViewModel.canvasSize(safeWidth, safeHeight)
 	local styles = ReactSpring.useSpring({
 		Scale = if visible then 1 else 0.92,
 		Offset = if visible then 0 else 32,
@@ -429,7 +490,7 @@ return function(props: Props)
 			UIFeedback.notification()
 		end
 		local delaySeconds = math.max((result.interactiveAt or 0) - Workspace:GetServerTimeNow(), 0)
-		local thread = task.delay(if reducedMotion then 0 else delaySeconds, function()
+		local thread = task.delay(delaySeconds, function()
 			if revision ~= presentationRevision.current then
 				return
 			end
@@ -446,6 +507,26 @@ return function(props: Props)
 			task.cancel(celebrationThread)
 		end
 	end, { visible, if result then result.resultId else "", reducedMotion })
+
+	React.useEffect(function()
+		if not visible then
+			setRemainingSeconds(0)
+			return
+		end
+		local previous = -1
+		local function update()
+			local remaining = PostMatchViewModel.remainingSeconds(result.endsAt, Workspace:GetServerTimeNow())
+			if remaining ~= previous then
+				previous = remaining
+				setRemainingSeconds(remaining)
+			end
+		end
+		update()
+		local connection = RunService.Heartbeat:Connect(update)
+		return function()
+			connection:Disconnect()
+		end
+	end, { visible, if result then result.resultId else "" })
 
 	React.useEffect(function()
 		selectionRevision.current += 1
@@ -477,33 +558,9 @@ return function(props: Props)
 
 	local status = props.Status
 	local party = if props.Status and props.Status.party then props.Status.party else result.party
-	local leaderUserId = if status then status.leaderUserId else if party then party.leaderUserId else 0
 	local localUserId = Players.LocalPlayer.UserId
-	local isLeader = leaderUserId == localUserId
-	local partySize = if party then #party.members else 1
-	local partyNames = {}
-	local leaderName = "YOUR LEADER"
-	if party then
-		for _, member in party.members do
-			local name = if member.isLocal then "YOU" else string.upper(member.displayName)
-			table.insert(partyNames, name)
-			if member.userId == leaderUserId then
-				leaderName = name
-			end
-		end
-	end
-	local replaySelected = status ~= nil and status.state == "PlayAgain"
-	local busy = props.Requesting == true or (status ~= nil and status.state == "Returning")
-	local primaryText = if not isLeader
-		then "WAITING FOR LEADER"
-		else if replaySelected
-			then "CANCEL PLAY AGAIN"
-			else if partySize > 1 then "PLAY AGAIN WITH PARTY" else "PLAY AGAIN"
-	local statusText = if status and status.state == "Returning"
-		then "RETURNING TO LOBBY"
-		else if replaySelected
-			then if isLeader then "YOUR PARTY IS STAYING FOR THE NEXT ROUND" else `{leaderName} CHOSE ANOTHER ROUND`
-			else if not isLeader then `WAITING FOR {leaderName} TO CHOOSE` else "READY FOR ANOTHER ROUND?"
+	local actions =
+		PostMatchViewModel.actions(localUserId, party, status, props.Requesting == true, props.PendingAction)
 	local errorText = friendlyError(props.Error)
 	local accent = ACCENTS[result.presentation.accent] or ACCENTS.Cyan
 	local hasProgress = result.rewardsPending == true
@@ -633,9 +690,12 @@ return function(props: Props)
 		})
 	end
 
-	local rootPosition = styles.Offset:map(function(offset: number)
-		return UDim2.new(0.5, 0, 0.5, offset)
+	local canvasPosition = styles.Offset:map(function(offset: number)
+		return UDim2.fromOffset(safeX + safeWidth * 0.5, safeY + safeHeight * 0.5 + offset)
 	end)
+	local returnCallback = if actions.returnAction == "LeaveParty" then props.OnLeaveParty else props.OnReturnToLobby
+	local resultDuration = math.max(result.endsAt - result.interactiveAt, 1)
+	local expiryProgress = math.clamp(remainingSeconds / resultDuration, 0, 1)
 
 	return c("Frame", {
 		ref = rootRef,
@@ -646,7 +706,7 @@ return function(props: Props)
 			return 0.12 + value * 0.88
 		end),
 		BorderSizePixel = 0,
-		Position = rootPosition,
+		Position = UDim2.fromScale(0.5, 0.5),
 		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
@@ -655,7 +715,6 @@ return function(props: Props)
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 1,
 	}, {
-		Scale = c("UIScale", { Scale = styles.Scale }),
 		Pattern = c("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = PATTERN_IMAGE,
@@ -676,108 +735,155 @@ return function(props: Props)
 				NumberSequenceKeypoint.new(1, 0.42),
 			}),
 		}),
-		ResultBanner = panel({
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromScale(0.5, if compact then 0.025 else 0.035),
-			Size = UDim2.fromScale(if compact then 0.76 else 0.68, if compact then 0.22 else 0.2),
-			ZIndex = 6,
-		}, {
-			Accent = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 1),
-				BackgroundColor3 = accent,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.94),
-				Size = UDim2.fromScale(0.74, 0.035),
-				ZIndex = 8,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			}),
-			Eyebrow = detailLabel(
-				"Eyebrow",
-				result.presentation.eyebrow,
-				UDim2.fromScale(0.5, 0.2),
-				UDim2.fromScale(0.84, 0.2),
-				if compact then 24 else 32,
-				8
-			),
-			Title = titleLabel(
-				"Title",
-				result.presentation.title,
-				UDim2.fromScale(0.5, 0.51),
-				UDim2.fromScale(0.9, 0.36),
-				if compact then 42 else 64,
-				8
-			),
-			Detail = if result.presentation.detail
-				then detailLabel(
-					"Detail",
-					result.presentation.detail,
-					UDim2.fromScale(0.5, 0.8),
-					UDim2.fromScale(0.84, 0.2),
-					if compact then 22 else 30,
-					8
-				)
-				else nil,
-		}),
-		Content = c("Frame", {
+		Canvas = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, if compact then 0.5 else 0.51),
-			Size = UDim2.fromScale(if compact then 0.96 else 0.9, if compact then 0.48 else 0.5),
-			ZIndex = 9,
-		}, contentCards),
-		Party = if #partyNames > 0
-			then detailLabel(
-				"Party",
-				`PARTY  -  {table.concat(partyNames, "  /  ")}`,
-				UDim2.fromScale(0.5, if compact then 0.735 else 0.765),
-				UDim2.fromScale(0.86, 0.05),
-				if compact then 18 else 23,
-				20
-			)
-			else nil,
-		Status = detailLabel(
-			"Status",
-			errorText or statusText,
-			UDim2.fromScale(0.5, if compact then 0.785 else 0.815),
-			UDim2.fromScale(0.86, 0.055),
-			if compact then 20 else 27,
-			20
-		),
-		Actions = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.975),
-			Size = UDim2.fromScale(if compact then 0.92 else 0.72, if compact then 0.16 else 0.14),
-			ZIndex = 22,
+			Position = canvasPosition,
+			Size = UDim2.fromOffset(canvasWidth, canvasHeight),
+			ZIndex = 5,
 		}, {
-			Layout = c("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				Padding = UDim.new(0.035, 0),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
+			Scale = c("UIScale", { Scale = styles.Scale }),
+			ResultBanner = panel({
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, if compact then 0.025 else 0.035),
+				Size = UDim2.fromScale(if compact then 0.76 else 0.68, if compact then 0.22 else 0.2),
+				ZIndex = 6,
+			}, {
+				Accent = c("Frame", {
+					AnchorPoint = Vector2.new(0.5, 1),
+					BackgroundColor3 = accent,
+					BorderSizePixel = 0,
+					Position = UDim2.fromScale(0.5, 0.94),
+					Size = UDim2.fromScale(0.74, 0.035),
+					ZIndex = 8,
+				}, {
+					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				}),
+				Eyebrow = detailLabel(
+					"Eyebrow",
+					result.presentation.eyebrow,
+					UDim2.fromScale(0.5, 0.2),
+					UDim2.fromScale(0.84, 0.2),
+					if compact then 24 else 32,
+					8
+				),
+				Countdown = detailLabel(
+					"Countdown",
+					`CLOSES IN {remainingSeconds}`,
+					UDim2.fromScale(0.86, 0.2),
+					UDim2.fromScale(0.2, 0.18),
+					if compact then 15 else 20,
+					9,
+					accent
+				),
+				Title = titleLabel(
+					"Title",
+					result.presentation.title,
+					UDim2.fromScale(0.5, 0.51),
+					UDim2.fromScale(0.9, 0.36),
+					if compact then 42 else 64,
+					8
+				),
+				Detail = if result.presentation.detail
+					then detailLabel(
+						"Detail",
+						result.presentation.detail,
+						UDim2.fromScale(0.5, 0.8),
+						UDim2.fromScale(0.84, 0.2),
+						if compact then 22 else 30,
+						8
+					)
+					else nil,
 			}),
-			Primary = actionButton(
-				"PlayAgain",
-				primaryText,
-				if replaySelected then BLUE_BUTTON else RED_BUTTON,
-				interactive and isLeader and not busy,
-				props.OnPlayAgain,
-				if isLeader then primaryRef else nil,
-				1,
-				true
+			Content = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(0.5, if compact then 0.5 else 0.51),
+				Size = UDim2.fromScale(if compact then 0.96 else 0.9, if compact then 0.48 else 0.5),
+				ZIndex = 9,
+			}, contentCards),
+			Party = if #actions.partyNames > 0
+				then detailLabel(
+					"Party",
+					`PARTY  -  {table.concat(actions.partyNames, "  /  ")}`,
+					UDim2.fromScale(0.5, if compact then 0.735 else 0.765),
+					UDim2.fromScale(0.86, 0.05),
+					if compact then 18 else 23,
+					20
+				)
+				else nil,
+			Status = detailLabel(
+				"Status",
+				errorText or actions.statusText,
+				UDim2.fromScale(0.5, if compact then 0.785 else 0.815),
+				UDim2.fromScale(0.86, 0.055),
+				if compact then 20 else 27,
+				20,
+				if errorText then ACCENTS.Pink else WHITE
 			),
-			Return = actionButton(
-				"ReturnToLobby",
-				if partySize > 1 then "RETURN PARTY TO LOBBY" else "RETURN TO LOBBY",
-				BLUE_BUTTON,
-				interactive and isLeader and not busy,
-				props.OnReturnToLobby,
-				if isLeader then nil else primaryRef,
-				2,
-				false
-			),
+			StatusActivity = if actions.busy and errorText == nil
+				then c(ActivityDots, {
+					Active = true,
+					Native = {
+						Position = UDim2.fromScale(0.92, if compact then 0.785 else 0.815),
+						Size = UDim2.fromScale(0.055, 0.032),
+						ZIndex = 21,
+					},
+				})
+				else nil,
+			Expiry = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = DARK,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, if compact then 0.835 else 0.855),
+				Size = UDim2.fromScale(if compact then 0.62 else 0.5, 0.012),
+				ZIndex = 20,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Fill = c("Frame", {
+					BackgroundColor3 = accent,
+					BorderSizePixel = 0,
+					Size = UDim2.fromScale(expiryProgress, 1),
+					ZIndex = 21,
+				}, {
+					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				}),
+			}),
+			Actions = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 1),
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(0.5, 0.985),
+				Size = UDim2.fromScale(if compact then 0.92 else 0.72, 0.13),
+				ZIndex = 22,
+			}, {
+				Layout = c("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					Padding = UDim.new(0.035, 0),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+				}),
+				Primary = actionButton(
+					"PlayAgain",
+					actions.primaryText,
+					if actions.replaySelected then BLUE_BUTTON else RED_BUTTON,
+					interactive and actions.isLeader and not actions.busy,
+					props.OnPlayAgain,
+					if actions.isLeader then primaryRef else nil,
+					1,
+					true
+				),
+				Return = actionButton(
+					if actions.returnAction == "LeaveParty" then "LeaveParty" else "ReturnToLobby",
+					actions.returnText,
+					BLUE_BUTTON,
+					interactive and not actions.busy,
+					returnCallback,
+					if actions.isLeader then nil else primaryRef,
+					2,
+					false
+				),
+			}),
 		}),
 	})
 end

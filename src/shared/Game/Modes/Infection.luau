@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
 local GameMode = require(script.Parent.GameMode)
 
 local Infection = {}
@@ -21,7 +22,7 @@ Infection.rules = {
 	MinPlayers = 2,
 	ScoreTarget = math.huge,
 	TimeCapSeconds = 180,
-	ResultsSeconds = 8,
+	ResultsSeconds = PostMatch.ResultsSeconds,
 	IntermissionSeconds = GameModes.VoteDurationSeconds,
 	StartingSeconds = 3,
 	RespawnSeconds = 3,

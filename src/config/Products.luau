@@ -88,7 +88,7 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	EffectsCrateOpen = {
 		Id = 3709429563,
-		CatalogStatus = "Preview",
+		CatalogStatus = "Active",
 		DisplayName = "Effects Crate",
 		Description = "Open one Effects Crate directly.",
 		DisplayOrder = 230,

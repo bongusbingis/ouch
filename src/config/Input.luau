@@ -1,7 +1,11 @@
 --!strict
 
--- Declarative input map, materialized as InputContext/InputAction/InputBinding
--- instances under each Player by InputSetup.
+-- Declarative input map materialized under each Player by InputSetup. Only the
+-- OnboardingSkip action is read as an InputAction. Combat throw, catch, and aim
+-- run through the raw-input Combat layer (PlayerModule/Combat) -- catch is
+-- contextual on the throw button, not a separate binding -- and WeaponEquip is
+-- consumed as raw KeyCode data by DeviceInput and the toolbar view model, not as
+-- bindings here. Do not add throw/catch/aim bindings expecting them to fire.
 
 export type BindingDef = {
 	Name: string?,
@@ -32,44 +36,13 @@ return {
 			GamepadLabel = "R1",
 		},
 	},
-	-- Lateral offset, in studs, applied to the camera while the mouse is
-	-- locked to center. Positive moves the camera to the right, making the
 	Actions = {
-		{
-			Name = "Throw",
-			Type = Enum.InputActionType.Bool,
-			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseLeftButton, DisplayName = "LMB" },
-				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonR2 },
-				-- Pulsed by InputRouter on non-GUI screen taps (touch devices).
-				{ Name = "TouchFeed", Scriptable = true, DisplayName = "TAP" },
-			},
-		},
-		{
-			Name = "Catch",
-			Type = Enum.InputActionType.Bool,
-			Bindings = {
-				{ Name = "Mouse", KeyCode = Enum.KeyCode.MouseRightButton, DisplayName = "RMB" },
-				{ Name = "Keyboard", KeyCode = Enum.KeyCode.F },
-				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonL2 },
-				{ Name = "TouchFeed", Scriptable = true, DisplayName = "TAP" },
-			},
-		},
 		{
 			Name = "OnboardingSkip",
 			Type = Enum.InputActionType.Bool,
 			Bindings = {
 				{ Name = "Keyboard", KeyCode = Enum.KeyCode.X, DisplayName = "X" },
 				{ Name = "Gamepad", KeyCode = Enum.KeyCode.ButtonB },
-			},
-		},
-		{
-			-- Camera look direction, fed every frame by InputRouter through a
-			-- scriptable binding driven by the client aim director.
-			Name = "Aim",
-			Type = Enum.InputActionType.Direction3D,
-			Bindings = {
-				{ Name = "AimFeed", Scriptable = true },
 			},
 		},
 	} :: { ActionDef },

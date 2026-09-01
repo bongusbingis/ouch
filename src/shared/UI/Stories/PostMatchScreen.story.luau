@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local DebugPostMatchData = require(
@@ -25,6 +26,7 @@ local function Story()
 	local index, setIndex = React.useState(1)
 	local replay, setReplay = React.useState(false)
 	local scenario = scenarios[index]
+	scenario.result.endsAt = Workspace:GetServerTimeNow() + 12
 	local localUserId = Players.LocalPlayer.UserId
 	if scenario.result.party then
 		local localMemberIndex = scenario.localMemberIndex or 1
@@ -45,13 +47,17 @@ local function Story()
 			Status = {
 				resultId = scenario.result.resultId,
 				revision = if replay then 2 else 1,
-				state = if replay then "PlayAgain" else "Interactive",
+				state = if replay then "PlayAgain" else scenario.statusState or "Interactive",
 				leaderUserId = leaderUserId,
 			},
+			Requesting = scenario.requesting,
+			PendingAction = scenario.pendingAction,
+			Error = scenario.error,
 			OnPlayAgain = function()
 				setReplay(not replay)
 			end,
 			OnReturnToLobby = function() end,
+			OnLeaveParty = function() end,
 		}),
 		Toolbar = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),

@@ -111,7 +111,7 @@ local combatContainer = ReactRoot.create("ArenaCombatRoot", Enum.ScreenInsets.No
 local combatRoot = ReactRoblox.createRoot(combatContainer)
 local menuContainer = ReactRoot.create("ArenaMenuRoot", Enum.ScreenInsets.DeviceSafeInsets, 500)
 local menuRoot = ReactRoblox.createRoot(menuContainer)
-local postMatchContainer = ReactRoot.create("ArenaPostMatchRoot", Enum.ScreenInsets.DeviceSafeInsets, 700)
+local postMatchContainer = ReactRoot.create("ArenaPostMatchRoot", Enum.ScreenInsets.None, 700)
 local postMatchRoot = ReactRoblox.createRoot(postMatchContainer)
 
 local function destroyBootstrap()

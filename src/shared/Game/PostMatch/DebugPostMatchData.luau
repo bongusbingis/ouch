@@ -8,6 +8,16 @@
 local DebugPostMatchData = {}
 local CLEAR = table.freeze({})
 
+export type Scenario = {
+	name: string,
+	result: any,
+	localMemberIndex: number?,
+	statusState: ("Interactive" | "PlayAgain" | "Returning")?,
+	requesting: boolean?,
+	pendingAction: ("PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty")?,
+	error: string?,
+}
+
 local function members(count: number)
 	local result = {}
 	local names = { "YOU", "ALEX", "SAM", "MILO" }
@@ -76,7 +86,7 @@ local function base(overrides: { [string]: any }?): any
 	return result
 end
 
-function DebugPostMatchData.scenarios(): { { name: string, result: any, localMemberIndex: number? } }
+function DebugPostMatchData.scenarios(): { Scenario }
 	local tdmDefeat = base({
 		resultId = "tdm-defeat",
 		outcome = "Defeat",
@@ -138,6 +148,76 @@ function DebugPostMatchData.scenarios(): { { name: string, result: any, localMem
 		},
 	})
 	local noRewards = base({ resultId = "no-rewards", rewards = CLEAR, seasonProgress = CLEAR })
+	local rewardsPending = base({
+		resultId = "rewards-pending",
+		rewards = CLEAR,
+		seasonProgress = CLEAR,
+		rewardsPending = true,
+	})
+	local boostedRewards = base({
+		resultId = "boosted-rewards",
+		rewards = {
+			matchXp = 1275,
+			seasonXp = 1275,
+			bonks = 240,
+			baseXp = 850,
+			baseBonks = 120,
+			xpMultiplier = 1.5,
+			bonksMultiplier = 2,
+		},
+	})
+	local tie = base({
+		resultId = "tie",
+		outcome = "RoundOver",
+		winnerId = CLEAR,
+		presentation = { eyebrow = "MATCH COMPLETE", title = "WHAT A ROUND!", detail = "20  -  20", accent = "Cyan" },
+		scores = {
+			{ id = "Blue", label = "BLUE", score = 20 },
+			{ id = "Red", label = "RED", score = 20 },
+		},
+	})
+	local noParty = base({ resultId = "no-party", party = CLEAR })
+	local longParty = base({
+		resultId = "long-party",
+		party = {
+			partyId = "debug-long-party",
+			leaderUserId = 1,
+			members = {
+				{
+					userId = 1,
+					username = "MarshmallowCaptain",
+					displayName = "MarshmallowCaptain",
+					isLeader = true,
+					isLocal = true,
+					present = true,
+				},
+				{
+					userId = 2,
+					username = "BouncyCastleHero",
+					displayName = "BouncyCastleHero",
+					isLeader = false,
+					isLocal = false,
+					present = true,
+				},
+				{
+					userId = 3,
+					username = "InflatableChampion",
+					displayName = "InflatableChampion",
+					isLeader = false,
+					isLocal = false,
+					present = true,
+				},
+				{
+					userId = 4,
+					username = "DodgeballSuperstar",
+					displayName = "DodgeballSuperstar",
+					isLeader = false,
+					isLocal = false,
+					present = true,
+				},
+			},
+		},
+	})
 	local solo = base({
 		resultId = "solo-party",
 		party = { partyId = "debug-solo", leaderUserId = 1, members = members(1) },
@@ -151,6 +231,11 @@ function DebugPostMatchData.scenarios(): { { name: string, result: any, localMem
 		{ name = "SURVIVORS WIN", result = survivors },
 		{ name = "INFECTED WIN", result = infected },
 		{ name = "NO REWARDS", result = noRewards },
+		{ name = "REWARDS PENDING", result = rewardsPending },
+		{ name = "BOOSTS / TIER UP", result = boostedRewards },
+		{ name = "TIED ROUND", result = tie },
+		{ name = "NO PARTY PROJECTION", result = noParty },
+		{ name = "LONG PARTY NAMES", result = longParty },
 		{
 			name = "FUTURE CHALLENGE",
 			result = base({
@@ -169,8 +254,42 @@ function DebugPostMatchData.scenarios(): { { name: string, result: any, localMem
 				},
 			}),
 		},
+		{
+			name = "MAX FUTURE PROGRESS",
+			result = base({
+				resultId = "max-future-progress",
+				challenges = {
+					{ id = "hits", label = "DODGEBALL HITS", current = 18, target = 20 },
+					{ id = "catches", label = "CATCH THREE BALLS", current = 2, target = 3 },
+					{ id = "wins", label = "WIN TWO ROUNDS", current = 1, target = 2 },
+				},
+				unlocks = {
+					{ id = "bubble-hammer", name = "BUBBLE HAMMER", kind = "Cosmetic" },
+					{ id = "star-ball", name = "STAR BALL", kind = "Cosmetic" },
+					{ id = "confetti", name = "CONFETTI IMPACT", kind = "Cosmetic" },
+				},
+			}),
+		},
 		{ name = "PARTY OF ONE", result = solo },
 		{ name = "PARTY MEMBER", result = base({ resultId = "party-member" }), localMemberIndex = 2 },
+		{
+			name = "PARTY MEMBER LEAVING",
+			result = base({ resultId = "party-member-leaving" }),
+			localMemberIndex = 2,
+			statusState = "Interactive",
+			requesting = true,
+			pendingAction = "LeaveParty",
+		},
+		{
+			name = "REQUEST ERROR",
+			result = base({ resultId = "request-error" }),
+			error = "request_failed",
+		},
+		{
+			name = "PARTY RETURNING",
+			result = base({ resultId = "party-returning" }),
+			statusState = "Returning",
+		},
 		{ name = "FIRST MATCH", result = base({ resultId = "first-match", firstMatch = true }) },
 	}
 end

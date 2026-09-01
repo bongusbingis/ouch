@@ -181,31 +181,44 @@ table.insert(
 )
 table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
 
+local function presentCombatEvent(event)
+	if optionalSystems.BallVisuals then
+		BallVisuals.onEvent(event)
+	end
+	if optionalSystems.HammerVisuals then
+		HammerVisuals.onEvent(event)
+	end
+	if optionalSystems.SplatEffects then
+		SplatEffects.onEvent(event)
+	end
+	if optionalSystems.CosmeticEffects then
+		CosmeticEffects.onEvent(event)
+	end
+	if optionalSystems.GameAudio then
+		GameAudio.onEvent(event)
+	end
+	if optionalSystems.DebugVisuals then
+		DebugVisuals.onEvent(event)
+	end
+	if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
+		print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
+	end
+end
+
 table.insert(
 	connections,
 	Network.on("CombatSimEvent", function(events)
 		for _, event in events do
-			if optionalSystems.BallVisuals then
-				BallVisuals.onEvent(event)
-			end
-			if optionalSystems.HammerVisuals then
-				HammerVisuals.onEvent(event)
-			end
-			if optionalSystems.SplatEffects then
-				SplatEffects.onEvent(event)
-			end
-			if optionalSystems.CosmeticEffects then
-				CosmeticEffects.onEvent(event)
-			end
-			if optionalSystems.GameAudio then
-				GameAudio.onEvent(event)
-			end
-			if optionalSystems.DebugVisuals then
-				DebugVisuals.onEvent(event)
-			end
-			if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
-				print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
-			end
+			presentCombatEvent(event)
+		end
+	end)
+)
+
+table.insert(
+	connections,
+	Network.on("CombatFeed", function(event)
+		if event.kind == "Elim" then
+			presentCombatEvent(event)
 		end
 	end)
 )

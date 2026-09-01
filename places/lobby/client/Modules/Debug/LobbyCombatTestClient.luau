@@ -20,6 +20,7 @@ local CosmeticEffects = require(
 		:WaitForChild("Cosmetics")
 		:WaitForChild("CosmeticEffects")
 )
+local GameAudio = require(script.Parent.Parent:WaitForChild("Presentation"):WaitForChild("GameAudio"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 export type Snapshot = { active: boolean }
@@ -97,8 +98,6 @@ function LobbyCombatTestClient.start()
 	end
 	started = true
 
-	-- The same driver the arena runs; a broadcast dummy hit plays the acting
-	-- player's equipped effect through the shared factory.
 	CosmeticEffects.start()
 
 	table.insert(connections, Network.on("LobbyCombatTest", onState))
@@ -107,6 +106,7 @@ function LobbyCombatTestClient.start()
 		Network.on("CombatSimEvent", function(events)
 			for _, event in events do
 				CosmeticEffects.onEvent(event)
+				GameAudio.onEvent(event)
 			end
 		end)
 	)

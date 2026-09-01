@@ -21,6 +21,7 @@ local config = UI.VoteCamera
 local started = false
 local active = false
 local angle = 0
+local generation = 0
 local origin: BasePart? = nil
 local blur: BlurEffect? = nil
 local renderConnection: RBXScriptConnection? = nil
@@ -91,27 +92,35 @@ function VoteCamera.start()
 		return
 	end
 	started = true
+	generation += 1
+	local currentGeneration = generation
 
-	local arena = Workspace:WaitForChild("Assets"):WaitForChild("Arena")
-	local part = arena:WaitForChild("MapOrigin")
-	assert(part:IsA("BasePart"), "[VoteCamera] Workspace.Assets.Arena.MapOrigin must be a BasePart")
-	origin = part
+	task.spawn(function()
+		local arena = Workspace:WaitForChild("Assets"):WaitForChild("Arena")
+		local part = arena:WaitForChild("MapOrigin")
+		if generation ~= currentGeneration then
+			return
+		end
+		assert(part:IsA("BasePart"), "[VoteCamera] Workspace.Assets.Arena.MapOrigin must be a BasePart")
+		origin = part
 
-	voteDisconnect = ModeVoteClient.subscribe(function(snapshot)
+		voteDisconnect = ModeVoteClient.subscribe(function(snapshot)
+			if snapshot.admitted and snapshot.open then
+				activate()
+			else
+				deactivate()
+			end
+		end)
+
+		local snapshot = ModeVoteClient.getSnapshot()
 		if snapshot.admitted and snapshot.open then
 			activate()
-		else
-			deactivate()
 		end
 	end)
-
-	local snapshot = ModeVoteClient.getSnapshot()
-	if snapshot.admitted and snapshot.open then
-		activate()
-	end
 end
 
 function VoteCamera.destroy()
+	generation += 1
 	deactivate()
 	if voteDisconnect then
 		voteDisconnect()

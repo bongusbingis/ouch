@@ -218,11 +218,20 @@ function Primitives.smooth(alpha: number): number
 end
 
 function Primitives.popScale(alpha: number, startScale: number, overshoot: number, endScale: number): number
-	if alpha < 0.28 then
-		return startScale + (overshoot - startScale) * Primitives.easeOutQuint(alpha / 0.28)
+	local progress = math.clamp(alpha, 0, 1)
+	local amplitude = overshoot - endScale
+	local compression = endScale - amplitude * 0.32
+	local rebound = endScale + amplitude * 0.12
+	if progress < 0.22 then
+		return startScale + (overshoot - startScale) * Primitives.easeOutQuint(progress / 0.22)
 	end
-	local settle = (alpha - 0.28) / 0.72
-	return overshoot + (endScale - overshoot) * Primitives.smooth(settle)
+	if progress < 0.42 then
+		return overshoot + (compression - overshoot) * Primitives.smooth((progress - 0.22) / 0.2)
+	end
+	if progress < 0.6 then
+		return compression + (rebound - compression) * Primitives.smooth((progress - 0.42) / 0.18)
+	end
+	return rebound + (endScale - rebound) * Primitives.smooth((progress - 0.6) / 0.4)
 end
 
 function Primitives.fadeAfter(alpha: number, startAt: number): number
@@ -240,61 +249,6 @@ end
 function Primitives.cameraRight(): Vector3
 	local camera = Workspace.CurrentCamera
 	return if camera then camera.CFrame.RightVector else Vector3.xAxis
-end
-
-export type FlashOptions = {
-	maxDiameter: number,
-	lifetime: number?,
-	layer: Runtime.Layer?,
-	material: Enum.Material?,
-	holdUntil: number?,
-}
-
--- A punchy bulb that snaps to full size and then blows out. It is a sphere, so it
--- reads as a flash from any camera angle -- the lead "hit" beat that makes an
--- impact land before any debris has moved.
-function Primitives.flash(position: Vector3, color: Color3, options: FlashOptions)
-	local lifetime = options.lifetime or 0.22
-	local holdUntil = options.holdUntil or 0.24
-	local part =
-		Primitives.part("Flash", color, Vector3.one * 0.1, CFrame.new(position), options.material or Enum.Material.Neon)
-	part.Shape = Enum.PartType.Ball
-	Runtime.add(part, lifetime, function(alpha)
-		local pop = Primitives.easeOutQuint(math.min(alpha / 0.24, 1))
-		part.Size = Primitives.size(Vector3.one * options.maxDiameter * pop)
-		part.Transparency = 0.05 + 0.95 * Primitives.fadeAfter(alpha, holdUntil)
-	end, { layer = options.layer or "Hero" })
-end
-
-export type ShockwaveOptions = {
-	maxDiameter: number,
-	startDiameter: number?,
-	thickness: number?,
-	lifetime: number?,
-	layer: Runtime.Layer?,
-}
-
--- The big expanding ring the confetti reference established, factored out so every
--- impact can lead with the same fast ground-plane shockwave. It expands hard on an
--- easeOut so the ring is already wide within a few frames of the hit.
-function Primitives.shockwave(position: Vector3, color: Color3, options: ShockwaveOptions)
-	local startDiameter = options.startDiameter or 3
-	local thickness = options.thickness or 0.6
-	local lifetime = options.lifetime or 0.45
-	local part = Primitives.part(
-		"Shockwave",
-		color,
-		Vector3.new(thickness, 1, 1),
-		CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90)),
-		Enum.Material.Neon
-	)
-	part.Shape = Enum.PartType.Cylinder
-	Runtime.add(part, lifetime, function(alpha)
-		local eased = Primitives.easeOutCubic(alpha)
-		local diameter = startDiameter + (options.maxDiameter - startDiameter) * eased
-		part.Size = Primitives.size(Vector3.new(thickness, diameter, diameter))
-		part.Transparency = alpha
-	end, { layer = options.layer or "Hero" })
 end
 
 return Primitives

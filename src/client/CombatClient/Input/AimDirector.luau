@@ -7,7 +7,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("AimAssist"))
@@ -16,6 +15,7 @@ local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChil
 local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local Intercept = require(SharedGame:WaitForChild("Sim"):WaitForChild("Intercept"))
+local DeviceClass = require(SharedGame:WaitForChild("Input"):WaitForChild("DeviceClass"))
 
 local AimDirector = {}
 
@@ -43,17 +43,7 @@ local function toVec(value: Vector3): Vec
 end
 
 function AimDirector.deviceClass(): string
-	local lastInput = UserInputService:GetLastInputType()
-	if lastInput == Enum.UserInputType.Touch then
-		return "Touch"
-	end
-	if string.find(lastInput.Name, "Gamepad", 1, true) == 1 then
-		return "Gamepad"
-	end
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return "Touch"
-	end
-	return "Mouse"
+	return DeviceClass.current()
 end
 
 local function deviceRow(): AimAssist.DeviceRow

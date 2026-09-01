@@ -94,16 +94,23 @@ T.describe("CombatToolbar responsive layout", function()
 	T.it("caps desktop and ultrawide growth", function()
 		local desktop = ViewModel.layout(Vector2.new(1920, 1080), "Mouse")
 		local ultrawide = ViewModel.layout(Vector2.new(3440, 1440), "Mouse")
-		T.expect(desktop.width):toEqual(268)
-		T.expect(ultrawide.width):toEqual(268)
+		T.expect(desktop.width):toEqual(332)
+		T.expect(ultrawide.width):toEqual(332)
+		T.expect(desktop.height >= 105 and desktop.height <= 106):toBeTruthy()
 	end)
 
 	T.it("keeps phone and tablet touch targets compact but usable", function()
 		for _, viewport in { Vector2.new(896, 414), Vector2.new(844, 390), Vector2.new(1180, 820) } do
 			local layout = ViewModel.layout(viewport, "Touch")
-			T.expect(layout.width >= 260 and layout.width <= 288):toBeTruthy()
-			T.expect(layout.height >= 110):toBeTruthy()
+			T.expect(layout.width >= 260 and layout.width <= 350):toBeTruthy()
+			T.expect(layout.height >= 95 and layout.height <= 117):toBeTruthy()
 		end
+	end)
+
+	T.it("stays compact and legible at the onboarding capture resolution", function()
+		local layout = ViewModel.layout(Vector2.new(1223, 875), "Mouse")
+		T.expect(layout.width):toBeNear(330.21, 0.01)
+		T.expect(layout.height):toBeNear(104.83, 0.01)
 	end)
 
 	T.it("fits a portrait phone without spanning the screen", function()

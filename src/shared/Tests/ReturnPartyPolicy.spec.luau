@@ -11,12 +11,14 @@ local ReturnPartyPolicy = require(script.Parent.Parent.Game.Matchmaking.ReturnPa
 local payload = {
 	matchId = "match-1",
 	memberUserIds = { 10, 20 },
+	returnMode = "Party",
 }
 
 local function party(phase: string, matchId: string?)
 	return {
 		phase = phase,
 		matchId = matchId,
+		leaderUserId = 10,
 		members = {
 			{ userId = 10 },
 			{ userId = 20 },
@@ -32,6 +34,15 @@ T.describe("ReturnPartyPolicy", function()
 
 	T.it("keeps a party already restored by an earlier arrival", function()
 		T.expect(ReturnPartyPolicy.resolve(party("Lobby", nil), payload, 10)):toEqual("Keep")
+	end)
+
+	T.it("separates only the returning member from the matched party", function()
+		local separatePayload = table.clone(payload)
+		separatePayload.returnMode = "Separate"
+		T.expect(ReturnPartyPolicy.resolve(party("Teleporting", "match-1"), separatePayload, 20)):toEqual("Separate")
+		T.expect(ReturnPartyPolicy.resolve(party("Lobby", nil), separatePayload, 20)):toEqual("Separate")
+		T.expect(ReturnPartyPolicy.resolve(party("Teleporting", "match-1"), separatePayload, 10)):toBeNil()
+		T.expect(ReturnPartyPolicy.resolve(party("Teleporting", "match-2"), separatePayload, 20)):toBeNil()
 	end)
 
 	T.it("rejects mismatched matches and players outside either roster", function()

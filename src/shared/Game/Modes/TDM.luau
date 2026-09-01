@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
 local GameMode = require(script.Parent.GameMode)
 
 local TDM = {}
@@ -18,7 +19,7 @@ TDM.rules = {
 	MinPlayers = 1,
 	ScoreTarget = 40,
 	TimeCapSeconds = 360,
-	ResultsSeconds = 8,
+	ResultsSeconds = PostMatch.ResultsSeconds,
 	IntermissionSeconds = GameModes.VoteDurationSeconds,
 	StartingSeconds = 3,
 	RespawnSeconds = 1,

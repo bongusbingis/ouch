@@ -38,6 +38,7 @@ export type Props = {
 	OnInvite: () -> (),
 	OnJoinCode: () -> (),
 	Position: any?,
+	PlayButtonRef: any?,
 }
 
 return function(props: Props)
@@ -94,6 +95,7 @@ return function(props: Props)
 				TextLabel = buttonText("JOIN PARTY"),
 			}),
 			PlayButton = c(AnimatedButton, {
+				ButtonRef = props.PlayButtonRef,
 				Enabled = props.PlayEnabled,
 				Style = "Primary",
 				Native = {

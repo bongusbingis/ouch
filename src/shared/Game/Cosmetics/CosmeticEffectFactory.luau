@@ -75,18 +75,24 @@ end
 
 local function playInstance(template: Instance, context: EffectContext, defaultEmit: number)
 	local Debris = game:GetService("Debris")
-	local count = emitCountFor(template, defaultEmit)
+	local templateCount = emitCountFor(template, defaultEmit)
 	local anchor = anchorFor(context)
 	local clone = template:Clone()
-	clone.Parent = anchor
 
 	local longestLifetime = 0
 	for _, emitter in collectEmitters(clone) do
 		longestLifetime = math.max(longestLifetime, emitter.Lifetime.Max)
-		-- The event is a one-shot burst of `count`; an emitter left Enabled (the
-		-- Studio default) would also free-run for the anchor's whole lifetime.
+		-- Consolidate every emitter onto the anchor so a multi-part authored effect
+		-- bursts from the one impact point; a left-Enabled emitter (the Studio
+		-- default) would otherwise free-run for the anchor's whole lifetime.
 		emitter.Enabled = false
-		emitter:Emit(count)
+		emitter.Parent = anchor
+		-- A per-emitter EmitCount attribute wins so each layer of a composite can
+		-- burst a different amount, then the template's, then the category default.
+		emitter:Emit(emitCountFor(emitter, templateCount))
+	end
+	if not clone:IsA("ParticleEmitter") then
+		clone:Destroy()
 	end
 
 	Debris:AddItem(anchor, math.max(longestLifetime, MIN_ANCHOR_LIFETIME) + 0.25)

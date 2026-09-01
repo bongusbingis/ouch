@@ -7,7 +7,7 @@
 
 local ReturnPartyPolicy = {}
 
-export type Action = "Keep" | "Restore"
+export type Action = "Keep" | "Restore" | "Separate"
 
 function ReturnPartyPolicy.resolve(party: any, payload: any, userId: number): Action?
 	if party == nil or not table.find(payload.memberUserIds, userId) then
@@ -22,6 +22,18 @@ function ReturnPartyPolicy.resolve(party: any, payload: any, userId: number): Ac
 		end
 	end
 	if not isMember then
+		return nil
+	end
+	if payload.returnMode == "Separate" then
+		if party.leaderUserId == userId then
+			return nil
+		end
+		if party.phase == "Lobby" then
+			return "Separate"
+		end
+		if (party.phase == "Assigned" or party.phase == "Teleporting") and party.matchId == payload.matchId then
+			return "Separate"
+		end
 		return nil
 	end
 
