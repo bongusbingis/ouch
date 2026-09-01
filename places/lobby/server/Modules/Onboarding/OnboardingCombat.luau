@@ -19,7 +19,8 @@ local ModeRegistry = require(
 )
 local BallService = require(script.Parent.Parent:WaitForChild("BallService"))
 local InputSetup = require(script.Parent.Parent:WaitForChild("InputSetup"))
-local PlayerAssistService = require(script.Parent.Parent:WaitForChild("PlayerAssistService"))
+local PlayerConfigService = require(script.Parent.Parent:WaitForChild("PlayerConfigService"))
+local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PlayerAssist"))
 
 local OnboardingCombat = {}
 
@@ -106,7 +107,7 @@ function OnboardingCombat.start()
 
 	ensureMatchState()
 	InputSetup.start()
-	PlayerAssistService.start()
+	PlayerConfigService.start({ schemas = { PlayerAssist } })
 	BallService.start()
 	ServerAuthAdapter.start()
 end

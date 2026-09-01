@@ -32,6 +32,12 @@ export type VisualTemplateDef = {
 -- carrying asset ids. The sounds stay owned by the audio config, so a new
 -- effect is an audio entry plus a cosmetic that points at it, and the audio
 -- spec validates every id exactly once.
+--
+-- DodgeballSound and HammerSound are kept as separate fields even though every
+-- shipped item currently points both at the same Config.Audio.Gameplay entry
+-- (one sound for both weapons). This is the seam for giving a future cosmetic
+-- distinct dodgeball/hammer cues without touching this type, EliminationAudio,
+-- or GameAudio -- only the item's two field values would differ.
 export type ElimEffectDef = {
 	DodgeballSound: string,
 	HammerSound: string,
@@ -119,11 +125,11 @@ local Defaults: { [string]: DefaultDef } = {
 		},
 	},
 	ElimEffectAssets = {
-		DisplayName = "Default Splat",
+		DisplayName = "Default Bonk",
 		Rarity = "Common",
 		ElimEffect = {
-			DodgeballSound = "DodgeballElimination",
-			HammerSound = "HammerElimination",
+			DodgeballSound = "DefaultElimination",
+			HammerSound = "DefaultElimination",
 		},
 	},
 	-- Config.CosmeticEffects binds this EffectId to the events that fire it.
@@ -166,13 +172,9 @@ local function characterColor(displayName: string, color: Color3, sortOrder: num
 	}
 end
 
-local function eliminationEffect(
-	rarity: string,
-	displayName: string,
-	dodgeballSound: string,
-	hammerSound: string,
-	sortOrder: number
-): ItemDef
+-- `sound` names one Config.Audio.Gameplay entry, played for both weapons; see
+-- the ElimEffectDef comment for how a future item would diverge from that.
+local function eliminationEffect(rarity: string, displayName: string, sound: string, sortOrder: number): ItemDef
 	return {
 		Category = "ElimEffectAssets",
 		Rarity = rarity,
@@ -180,8 +182,8 @@ local function eliminationEffect(
 		Thumbnail = "",
 		SortOrder = sortOrder,
 		ElimEffect = {
-			DodgeballSound = dodgeballSound,
-			HammerSound = hammerSound,
+			DodgeballSound = sound,
+			HammerSound = sound,
 		},
 	}
 end
@@ -193,69 +195,7 @@ local Items: { [string]: ItemDef } = {
 	CharacterColorGreen = characterColor("Green", Color3.fromRGB(0, 200, 80), 5),
 	CharacterColorPurple = characterColor("Purple", Color3.fromRGB(160, 60, 255), 6),
 
-	ElimSoundRubberPop = eliminationEffect(
-		"Common",
-		"Rubber Pop",
-		"RubberPopDodgeballElimination",
-		"RubberPopHammerElimination",
-		10
-	),
-	ElimSoundToySqueak = eliminationEffect(
-		"Common",
-		"Toy Squeak",
-		"ToySqueakDodgeballElimination",
-		"ToySqueakHammerElimination",
-		20
-	),
-	ElimSoundBalloonPop = eliminationEffect(
-		"Common",
-		"Balloon Pop",
-		"BalloonPopDodgeballElimination",
-		"BalloonPopHammerElimination",
-		30
-	),
-	ElimSoundPartyHorn = eliminationEffect(
-		"Rare",
-		"Party Horn",
-		"PartyHornDodgeballElimination",
-		"PartyHornHammerElimination",
-		40
-	),
-	ElimSoundArcadeKO = eliminationEffect(
-		"Rare",
-		"Arcade K.O.",
-		"ArcadeKODodgeballElimination",
-		"ArcadeKOHammerElimination",
-		50
-	),
-	ElimSoundComedyDrums = eliminationEffect(
-		"Rare",
-		"Comedy Drums",
-		"ComedyDrumsDodgeballElimination",
-		"ComedyDrumsHammerElimination",
-		60
-	),
-	ElimSoundRoyalFanfare = eliminationEffect(
-		"Legendary",
-		"Royal Fanfare",
-		"RoyalFanfareDodgeballElimination",
-		"RoyalFanfareHammerElimination",
-		70
-	),
-	ElimSoundStadiumRoar = eliminationEffect(
-		"Legendary",
-		"Stadium Roar",
-		"StadiumRoarDodgeballElimination",
-		"StadiumRoarHammerElimination",
-		80
-	),
-	ElimSoundCosmicChime = eliminationEffect(
-		"Legendary",
-		"Cosmic Chime",
-		"CosmicChimeDodgeballElimination",
-		"CosmicChimeHammerElimination",
-		90
-	),
+	ElimSoundClang = eliminationEffect("Common", "Clang", "ClangElimination", 10),
 
 	BallRed = ballAsset("Common", "Red Ball", Color3.fromRGB(151, 0, 0), Color3.fromRGB(235, 60, 60)),
 	BallBlue = ballAsset("Common", "Blue Ball", Color3.fromRGB(13, 105, 172), Color3.fromRGB(65, 120, 235)),

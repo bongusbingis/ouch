@@ -7,8 +7,8 @@
 
 local T = require(script.Parent.TestKit)
 local FeaturedRotation = require(script.Parent.Parent.Game.Economy.FeaturedRotation)
-local Shop = require(script.Parent.Parent.Parent.Config.Shop)
-local Crates = require(script.Parent.Parent.Parent.Config.Crates)
+local Shop = require(script.Parent.Parent.Parent.Config.Economy.Shop)
+local Crates = require(script.Parent.Parent.Parent.Config.Economy.Crates)
 
 local WEEK = 7 * 24 * 60 * 60
 local CONFIG = {

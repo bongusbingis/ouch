@@ -67,18 +67,34 @@ local entries: { Entry } = {
 	{ Key = "MapFeatures.JumpPad.FloatFactor", Type = "number", Minimum = 0, Maximum = 1 },
 	{ Key = "MapFeatures.FoamPit.WalkSpeedScale", Type = "number", Minimum = 0.05, Maximum = 1 },
 
-	-- Shop A/B levers. Roblox hands different servers different config snapshots,
-	-- so varying these is the experiment; VariantId is what makes the result
-	-- readable, because it is stamped on every shop analytics row.
-	--
-	-- The bounds are not cosmetic. CrateConfig.spec pins two economic invariants
-	-- -- a crate open must cost less than the cheapest direct buy, and direct buy
-	-- must beat the expected cost of chasing an item in a crate -- and those are
-	-- checked against baked values only. Every combination inside these ranges
-	-- still satisfies both at the price actually charged, discount included.
-	-- Rarity DirectBonks/DupeBonks are deliberately absent: they sit on the other
-	-- side of both invariants, and a live override there could silently make
-	-- crates strictly worse value than buying outright.
+	-- Per-mode match rules. Each mode snapshots these at the match boundary, so an
+	-- override lands on the next match, never mid-match. Infection.ScoreTarget is
+	-- absent on purpose: it is math.huge (survival, not score, ends the mode).
+	{ Key = "Modes.FFA.MinPlayers", Type = "number", Minimum = 1, Maximum = 100 },
+	{ Key = "Modes.FFA.ScoreTarget", Type = "number", Minimum = 1, Maximum = 500 },
+	{ Key = "Modes.FFA.TimeCapSeconds", Type = "number", Minimum = 30, Maximum = 1800 },
+	{ Key = "Modes.FFA.StartingSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.FFA.RespawnSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.FFA.SpawnInvulnSeconds", Type = "number", Minimum = 0, Maximum = 10 },
+	{ Key = "Modes.TDM.MinPlayers", Type = "number", Minimum = 1, Maximum = 100 },
+	{ Key = "Modes.TDM.ScoreTarget", Type = "number", Minimum = 1, Maximum = 500 },
+	{ Key = "Modes.TDM.TimeCapSeconds", Type = "number", Minimum = 30, Maximum = 1800 },
+	{ Key = "Modes.TDM.StartingSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.TDM.RespawnSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.TDM.WaveRespawnSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.TDM.SpawnInvulnSeconds", Type = "number", Minimum = 0, Maximum = 10 },
+	{ Key = "Modes.Infection.MinPlayers", Type = "number", Minimum = 1, Maximum = 100 },
+	{ Key = "Modes.Infection.TimeCapSeconds", Type = "number", Minimum = 30, Maximum = 1800 },
+	{ Key = "Modes.Infection.StartingSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.Infection.RespawnSeconds", Type = "number", Minimum = 0, Maximum = 30 },
+	{ Key = "Modes.Infection.SpawnInvulnSeconds", Type = "number", Minimum = 0, Maximum = 10 },
+
+	-- Shop A/B levers; VariantId labels the result on every analytics row. The
+	-- bounds are not cosmetic: every value in range keeps CrateConfig.spec's
+	-- economic invariants (a crate open cheaper than the cheapest direct buy;
+	-- direct buy beats the expected cost of chasing an item in a crate). Rarity
+	-- DirectBonks/DupeBonks are absent on purpose -- a live override there could
+	-- make crates strictly worse value than buying outright.
 	{ Key = "Shop.VariantId", Type = "string" },
 	{ Key = "Shop.Rotation.OfferCount", Type = "number", Minimum = 1, Maximum = 8 },
 	{ Key = "Shop.Rotation.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },

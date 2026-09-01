@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local CosmeticsLogic = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic"))
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },

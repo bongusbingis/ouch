@@ -12,7 +12,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ModeRegistry = require(SharedGame:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
@@ -37,7 +37,7 @@ local function respawnSeconds(): number
 	end
 	local modeId = if matchState then (matchState:GetAttribute("modeId") :: string?) or "" else ""
 	local mode = ModeRegistry.get(modeId) or ModeRegistry.default()
-	return math.max(mode.rules.RespawnSeconds, 0.05)
+	return math.max(mode.resolveRules().RespawnSeconds, 0.05)
 end
 
 local function ensureColorCorrection(): ColorCorrectionEffect

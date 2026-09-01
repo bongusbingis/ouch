@@ -9,8 +9,8 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GamePasses"))
-local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
+local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
+local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
 export type Snapshot = {

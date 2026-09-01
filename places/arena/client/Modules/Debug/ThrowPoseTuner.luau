@@ -9,8 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
-local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
+local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
+local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("ThrowPose"))
 
 local ThrowPoseTuner = {}
 

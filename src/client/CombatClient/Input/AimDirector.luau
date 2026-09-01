@@ -9,9 +9,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
-local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("AimAssist"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
-local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
+local AimAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("AimAssist"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
+local MobileInput =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("MobileInput"))
 local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local Intercept = require(SharedGame:WaitForChild("Sim"):WaitForChild("Intercept"))

@@ -6,7 +6,7 @@
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
 
 local Config = {
 	ArenaPlaceId = 121997450145716,

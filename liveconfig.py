@@ -12,17 +12,22 @@ Docs: https://create.roblox.com/docs/cloud/guides/configs
   python liveconfig.py --dry-run
   python liveconfig.py --universe-id 1234567
   python liveconfig.py --universe-id 1234567 --publish
+  python liveconfig.py --universe-id 1234567 --wipe --publish   # clear ALL keys
 
 By default the script stages a draft with PATCH, which adds these keys and
-leaves any other config in the repository alone. Publishing is opt-in.
+leaves any other config in the repository alone. Publishing is opt-in. --wipe
+overwrites the draft with an empty set so publishing it removes every key,
+which is the fast way to clear out stale configs before re-seeding.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
+import ssl
 import sys
 import urllib.error
 import urllib.request
@@ -33,18 +38,26 @@ REPO_ROOT = Path(__file__).resolve().parent
 REGISTRY = REPO_ROOT / "src" / "config" / "LiveConfig.luau"
 
 # Module name as it appears in a config key -> the Luau file that defines it.
+# Config modules are grouped into domain folders under src/config; a live key's
+# first segment is the registration name, which need not equal its file name
+# (e.g. Combat lives in Gameplay/Combat.luau).
+_CONFIG = REPO_ROOT / "src" / "config"
 MODULE_SOURCES = {
-    "Combat": REPO_ROOT / "src" / "config" / "Combat.luau",
-    "AimAssist": REPO_ROOT / "src" / "config" / "AimAssist.luau",
-    "GameModes": REPO_ROOT / "src" / "config" / "GameModes.luau",
-    "MapFeatures": REPO_ROOT / "src" / "config" / "MapFeatures.luau",
-    "Matchmaking": REPO_ROOT / "places" / "lobby" / "src" / "shared" / "Matchmaking" / "Config.luau",
+    "Combat": _CONFIG / "Gameplay" / "Combat.luau",
+    "AimAssist": _CONFIG / "Gameplay" / "AimAssist.luau",
+    "GameModes": _CONFIG / "Gameplay" / "GameModes.luau",
+    "MapFeatures": _CONFIG / "Gameplay" / "MapFeatures.luau",
+    "Modes": _CONFIG / "Gameplay" / "Modes.luau",
+    "Shop": _CONFIG / "Economy" / "Shop.luau",
+    "Crates": _CONFIG / "Economy" / "Crates.luau",
+    "Matchmaking": REPO_ROOT / "places" / "lobby" / "shared" / "Matchmaking" / "Config.luau",
 }
 
 BASE_URL = "https://apis.roblox.com/creator-configs-public-api/v1/configs"
 REPOSITORY = "InExperienceConfig"
 MAX_KEYS_PER_REPOSITORY = 100
 MAX_KEY_LENGTH = 256
+DEFAULT_MESSAGE = "Seed live config defaults from src/config"
 
 
 class ConfigError(Exception):
@@ -97,12 +110,6 @@ def strip_noise(source: str) -> str:
     return "".join(out)
 
 
-def assignments(clean: str, name: str, lo: int, hi: int) -> list[int]:
-    """Offsets just past every `name =` assignment inside [lo, hi)."""
-    pattern = re.compile(r"\b" + re.escape(name) + r"\s*=(?!=)")
-    return [lo + match.end() for match in pattern.finditer(clean[lo:hi])]
-
-
 def matching_brace(clean: str, open_index: int) -> int:
     depth = 0
     for index in range(open_index, len(clean)):
@@ -115,31 +122,90 @@ def matching_brace(clean: str, open_index: int) -> int:
     raise ConfigError("unbalanced braces")
 
 
-def read_leaf(clean: str, source: str, path: list[str], key: str) -> str:
-    """Walks `path` through nested Luau tables and returns the leaf's literal.
+def child_ends(clean: str, name: str, lo: int, hi: int) -> list[int]:
+    """Offsets past the `=` of every `name =` that is a *direct* child of the
+    table whose braces span [lo, hi) (lo points at its `{`).
 
-    Requires each name to be unambiguous within its parent so a near-miss fails
-    loudly instead of silently seeding the wrong default.
+    Only brace-depth 1 is considered, so a same-named key inside a nested
+    sub-table does not collide with the one being resolved. A Luau type
+    annotation (`name: Type =`) is tolerated.
     """
-    lo, hi = 0, len(clean)
+    pattern = re.compile(r"\b" + re.escape(name) + r"\s*(?::[^=\n]*?)?=(?!=)")
+    ends = []
+    for match in pattern.finditer(clean, lo, hi):
+        depth = clean.count("{", lo, match.start()) - clean.count("}", lo, match.start())
+        if depth == 1:
+            ends.append(match.end())
+    return ends
+
+
+def local_def_end(clean: str, name: str) -> int:
+    """Offset past the `=` of the top-level `local name =` definition."""
+    pattern = re.compile(r"\blocal\s+" + re.escape(name) + r"\s*(?::[^=\n]*?)?=(?!=)")
+    matches = list(pattern.finditer(clean))
+    if len(matches) != 1:
+        raise ConfigError("expected exactly one 'local " + name + " =', found " + str(len(matches)))
+    return matches[0].end()
+
+
+def resolve_value(clean: str, source: str, after: int) -> tuple[str, int, int]:
+    """Classify the value that begins just past a `=` at `after`, following a
+    bare-identifier re-export alias to the local it names.
+
+    Returns ("table", brace, end) with the braces of a table literal, or
+    ("scalar", start, end) bounding the literal's text in `source`.
+    """
+    index = after
+    while index < len(source) and source[index] in " \t":
+        index += 1
+    if index < len(clean) and clean[index] == "{":
+        return ("table", index, matching_brace(clean, index) + 1)
+    end = index
+    while end < len(source) and source[end] not in ",\n}":
+        end += 1
+    token = source[index:end].strip()
+    if re.fullmatch(r"[A-Za-z_]\w*", token):
+        return resolve_value(clean, source, local_def_end(clean, token))
+    return ("scalar", index, end)
+
+
+def find_root(clean: str, source: str, key: str) -> tuple[int, int]:
+    """Braces of the table the module returns, following `return Ident` back to
+    its `local Ident = {` definition."""
+    # The module's own return sits at column 0; a nested function's return
+    # (e.g. a sort comparator) is indented, so anchor on the line start.
+    matches = list(re.finditer(r"^return\b", clean, re.MULTILINE))
+    if not matches:
+        raise ConfigError(key + ": module has no top-level return")
+    kind, lo, hi = resolve_value(clean, source, matches[-1].end())
+    if kind != "table":
+        raise ConfigError(key + ": module does not return a table")
+    return lo, hi
+
+
+def read_leaf(clean: str, source: str, path: list[str], key: str) -> str:
+    """Walks `path` through the returned table and returns the leaf's literal.
+
+    Each segment must name exactly one direct child of its parent so a near-miss
+    fails loudly instead of silently seeding the wrong default.
+    """
+    lo, hi = find_root(clean, source, key)
     for depth, segment in enumerate(path):
-        found = assignments(clean, segment, lo, hi)
+        found = child_ends(clean, segment, lo, hi)
         if len(found) != 1:
-            where = "the file" if depth == 0 else "'" + ".".join(path[:depth]) + "'"
+            where = "the returned table" if depth == 0 else "'" + ".".join(path[:depth]) + "'"
             raise ConfigError(
                 key + ": expected exactly one '" + segment + " =' in " + where
                 + ", found " + str(len(found))
             )
-        after = found[0]
+        kind, vlo, vhi = resolve_value(clean, source, found[0])
         if depth == len(path) - 1:
-            end = after
-            while end < hi and clean[end] not in ",\n}":
-                end += 1
-            return source[after:end].strip()
-        brace = clean.find("{", after)
-        if brace == -1:
+            if kind != "scalar":
+                raise ConfigError(key + ": '" + segment + "' is a table, not a leaf")
+            return source[vlo:vhi].strip()
+        if kind != "table":
             raise ConfigError(key + ": '" + segment + "' is not a table")
-        lo, hi = brace, matching_brace(clean, brace) + 1
+        lo, hi = vlo, vhi
     raise ConfigError(key + ": empty path")
 
 
@@ -162,12 +228,43 @@ def parse_registry(text: str) -> list[dict[str, Any]]:
     return entries
 
 
+def eval_number(text: str) -> float:
+    """Evaluate a purely arithmetic numeric literal (e.g. `7 * 24 * 60 * 60`).
+
+    Only number literals and +-*/ and parentheses are accepted; any name or call
+    raises, so this cannot execute arbitrary Luau.
+    """
+    try:
+        node = ast.parse(text, mode="eval").body
+    except SyntaxError as error:
+        raise ValueError(text) from error
+
+    def visit(current: ast.AST) -> float:
+        if isinstance(current, ast.Constant) and isinstance(current.value, (int, float)):
+            return current.value
+        if isinstance(current, ast.UnaryOp) and isinstance(current.op, (ast.UAdd, ast.USub)):
+            operand = visit(current.operand)
+            return operand if isinstance(current.op, ast.UAdd) else -operand
+        if isinstance(current, ast.BinOp) and isinstance(current.op, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
+            left, right = visit(current.left), visit(current.right)
+            if isinstance(current.op, ast.Add):
+                return left + right
+            if isinstance(current.op, ast.Sub):
+                return left - right
+            if isinstance(current.op, ast.Mult):
+                return left * right
+            return left / right
+        raise ValueError(text)
+
+    return float(visit(node))
+
+
 def coerce(entry: dict[str, Any], literal: str) -> Any:
     key = entry["key"]
     kind = entry["type"]
     if kind == "number":
         try:
-            value: Any = float(literal)
+            value: Any = eval_number(literal)
         except ValueError as error:
             raise ConfigError(key + ": '" + literal + "' is not a number") from error
         if value.is_integer():
@@ -224,6 +321,17 @@ def collect_entries() -> dict[str, Any]:
 # --- Open Cloud ---------------------------------------------------------------
 
 
+def tls_context() -> ssl.SSLContext:
+    """A verifying TLS context that works on a python.org build whose system CA
+    store is empty: prefer certifi's bundle, else the OpenSSL defaults."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def request(method: str, url: str, api_key: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode("utf-8") if body is not None else None
     headers = {"x-api-key": api_key, "Accept": "application/json"}
@@ -231,7 +339,7 @@ def request(method: str, url: str, api_key: str, body: dict | None = None) -> di
         headers["Content-Type"] = "application/json"
     call = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(call) as response:
+        with urllib.request.urlopen(call, context=tls_context()) as response:
             payload = response.read().decode("utf-8")
             return json.loads(payload) if payload.strip() else {}
     except urllib.error.HTTPError as error:
@@ -244,7 +352,69 @@ def request(method: str, url: str, api_key: str, body: dict | None = None) -> di
             + hint + "\n" + detail
         ) from error
     except urllib.error.URLError as error:
-        raise ConfigError(method + " " + url + " failed: " + str(error.reason)) from error
+        hint = ""
+        if isinstance(error.reason, ssl.SSLCertVerificationError):
+            hint = (
+                "  (TLS verification failed. Install certifi: `python3 -m pip install --upgrade certifi`,"
+                " or run the bundled '/Applications/Python 3.x/Install Certificates.command'.)"
+            )
+        raise ConfigError(method + " " + url + " failed: " + str(error.reason) + hint) from error
+
+
+def publish_draft(base: str, api_key: str, draft_hash: str, message: str, gradual: bool) -> None:
+    strategy = "GradualRollout" if gradual else "Immediate"
+    published = request(
+        "POST",
+        base + "/publish",
+        api_key,
+        {"draftHash": draft_hash, "message": message, "deploymentStrategy": strategy},
+    )
+    print("Published (" + strategy + ") as config version " + str(published.get("configVersion", "?")) + ".")
+    print("Live servers pick this up within about 5 minutes.")
+
+
+def wipe(args: argparse.Namespace) -> int:
+    if not args.universe_id:
+        print("\nerror: --universe-id is required (or set ROBLOX_UNIVERSE_ID)", file=sys.stderr)
+        return 1
+
+    print("WIPE: overwrites the draft with an empty set, dropping EVERY key in")
+    print("  " + REPOSITORY + " for universe " + str(args.universe_id) + ".")
+    if not args.publish:
+        print("This only stages an empty draft; add --publish to remove the live keys.")
+
+    if args.dry_run:
+        print("\nDry run: nothing sent.")
+        return 0
+
+    if not args.api_key:
+        print("\nerror: --api-key is required (or set ROBLOX_API_KEY)", file=sys.stderr)
+        return 1
+
+    if not args.yes:
+        if not sys.stdin.isatty():
+            print("\nerror: refusing to wipe without --yes in a non-interactive shell", file=sys.stderr)
+            return 1
+        if input("\nType the universe id to confirm the wipe: ").strip() != str(args.universe_id):
+            print("Aborted: confirmation did not match.")
+            return 0
+
+    base = BASE_URL + "/universes/" + str(args.universe_id) + "/repositories/" + REPOSITORY
+    message = args.message if args.message != DEFAULT_MESSAGE else "Wipe all live configs"
+    try:
+        result = request("PUT", base + "/draft:overwrite", args.api_key, {"entries": {}})
+        draft_hash = result.get("draftHash")
+        if not draft_hash:
+            raise ConfigError("no draftHash in response: " + json.dumps(result))
+        print("\nEmpty draft staged: " + str(draft_hash))
+        if not args.publish:
+            print("Not published. Review in Creator Hub, or re-run with --publish to remove the keys.")
+            return 0
+        publish_draft(base, args.api_key, draft_hash, message, args.gradual)
+    except ConfigError as error:
+        print("\nerror: " + str(error), file=sys.stderr)
+        return 1
+    return 0
 
 
 def main() -> int:
@@ -268,13 +438,25 @@ def main() -> int:
         "this DROPS any config key not listed in LiveConfig.luau",
     )
     parser.add_argument(
+        "--wipe",
+        action="store_true",
+        help="overwrite the draft with an EMPTY set, dropping every key in the repository "
+        "(clears stale configs). Combine with --publish to remove the live keys",
+    )
+    parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="skip the typed confirmation prompt (required for --wipe in a non-interactive shell)",
+    )
+    parser.add_argument(
         "--publish",
         action="store_true",
         help="publish the draft so the values go live; without this the draft is only staged",
     )
     parser.add_argument(
         "--message",
-        default="Seed live config defaults from src/config",
+        default=DEFAULT_MESSAGE,
         help="publish message recorded in the config history",
     )
     parser.add_argument(
@@ -288,6 +470,12 @@ def main() -> int:
         help="print the entries that would be sent, then exit without calling Roblox",
     )
     args = parser.parse_args()
+
+    if args.wipe:
+        if args.overwrite:
+            print("error: --wipe and --overwrite are mutually exclusive", file=sys.stderr)
+            return 1
+        return wipe(args)
 
     try:
         entries = collect_entries()
@@ -336,15 +524,7 @@ def main() -> int:
             print("\nNot published. Review the draft in Creator Hub, or re-run with --publish.")
             return 0
 
-        strategy = "GradualRollout" if args.gradual else "Immediate"
-        published = request(
-            "POST",
-            base + "/publish",
-            args.api_key,
-            {"draftHash": draft_hash, "message": args.message, "deploymentStrategy": strategy},
-        )
-        print("Published (" + strategy + ") as config version " + str(published.get("configVersion", "?")) + ".")
-        print("Live servers pick this up within about 5 minutes.")
+        publish_draft(base, args.api_key, draft_hash, args.message, args.gradual)
     except ConfigError as error:
         print("\nerror: " + str(error), file=sys.stderr)
         return 1

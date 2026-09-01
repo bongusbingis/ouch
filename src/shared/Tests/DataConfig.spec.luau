@@ -6,8 +6,8 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local DataConfig = require(script.Parent.Parent.Parent.Config.Data)
-local Shop = require(script.Parent.Parent.Parent.Config.Shop)
+local DataConfig = require(script.Parent.Parent.Parent.Config.Progression.Data)
+local Shop = require(script.Parent.Parent.Parent.Config.Economy.Shop)
 
 T.describe("Data config", function()
 	T.it("gives every player a starting balance", function()

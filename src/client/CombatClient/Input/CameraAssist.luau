@@ -10,11 +10,12 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
+local MobileInput =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("MobileInput"))
 local AimDirector = require(script.Parent.AimDirector)
 local AssistConfig = require(script.Parent.AssistConfig)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
-local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
+local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input"))
 local UserInputService = game:GetService("UserInputService")
 
 local CameraAssist = {}

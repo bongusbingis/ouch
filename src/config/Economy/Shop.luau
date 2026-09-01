@@ -24,30 +24,21 @@ export type RotationConfig = {
 	Categories: { string },
 }
 
--- Names the active A/B variant. Empty means the baked configuration. It is
--- overridden live alongside whichever levers an experiment moves, and stamped on
--- every shop analytics row so a result can be attributed to the variant that
--- produced it -- varying prices without labelling them yields numbers nobody can
--- act on.
+-- A/B variant label, stamped on every shop analytics row; empty is the baked config.
 local VariantId = ""
 
 local Featured: FeaturedConfig = {
 	RotationSeconds = 7 * 24 * 60 * 60,
 	DiscountPercent = 15,
-	-- Cycled in order rather than shuffled: the schedule stays predictable for
-	-- planning, and with a short list a shuffle only obscures it.
-	--
-	-- Only Active crates belong here. Discounting a Preview crate would advertise
-	-- a price nobody can pay.
+	-- Cycled in order, not shuffled. Only Active crates: discounting a Preview crate
+	-- would advertise a price nobody can pay.
 	Rotation = {
 		{ kind = "Crate", id = "DodgeballCrate" },
 		{ kind = "Crate", id = "EffectsCrate" },
 	},
 }
 
--- May be empty. An empty rotation means no bundle is featured this period,
--- which is the honest state before any bundle has content -- better than a
--- placeholder entry pointing at something that cannot be bought.
+-- May be empty: no bundle featured this period.
 local Bundle: BundleConfig = {
 	RotationSeconds = 7 * 24 * 60 * 60,
 	Rotation = {
@@ -55,9 +46,7 @@ local Bundle: BundleConfig = {
 	},
 }
 
--- The per-player rotating shop. Offers are temporary, refresh together on this
--- period, and are drawn from these categories only -- crates cover skins and
--- effects, so the rotation is where outfits and emotes are sold individually.
+-- The per-player rotating shop: temporary offers drawn from these categories only.
 local Rotation: RotationConfig = {
 	RotationSeconds = 24 * 60 * 60,
 	OfferCount = 3,

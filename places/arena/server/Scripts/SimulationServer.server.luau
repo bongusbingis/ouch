@@ -11,7 +11,8 @@ local ArenaSessionService = require(Modules:WaitForChild("ArenaSessionService"))
 ArenaSessionService.start()
 
 local InputSetup = require(Modules:WaitForChild("InputSetup"))
-local PlayerAssistService = require(Modules:WaitForChild("PlayerAssistService"))
+local PlayerConfigService = require(Modules:WaitForChild("PlayerConfigService"))
+local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PlayerAssist"))
 local ArenaReturnService = require(Modules:WaitForChild("ArenaReturnService"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local BallService = require(Modules:WaitForChild("BallService"))
@@ -41,7 +42,7 @@ local ServerAuthAdapter = require(Adapters:WaitForChild("ServerAuthAdapter"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
-local Combat = require(ConfigRoot:WaitForChild("Combat"))
+local Combat = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Combat"))
 
 local function forwardDamageFeedback(event)
 	local recipients = {}
@@ -78,11 +79,12 @@ end
 ConfigLiveService.start({
 	modules = {
 		Combat = Combat,
-		AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
-		GameModes = require(ConfigRoot:WaitForChild("GameModes")),
-		MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
-		Shop = require(ConfigRoot:WaitForChild("Shop")),
-		Crates = require(ConfigRoot:WaitForChild("Crates")),
+		AimAssist = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("AimAssist")),
+		GameModes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("GameModes")),
+		MapFeatures = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("MapFeatures")),
+		Modes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Modes")),
+		Shop = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Shop")),
+		Crates = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Crates")),
 	},
 	holdSimOverrides = function()
 		local phase = MatchService.phase()
@@ -96,7 +98,7 @@ MatchService.onEvent(function(event)
 end)
 
 ArenaReturnService.start()
-PlayerAssistService.start()
+PlayerConfigService.start({ schemas = { PlayerAssist } })
 InputSetup.start()
 BallService.start()
 MapFeatureService.start()

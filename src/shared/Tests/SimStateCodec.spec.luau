@@ -12,7 +12,7 @@ local SimStateCodec = require(script.Parent.Parent.Game.Adapters.SimStateCodec)
 local WeaponRegistry = require(script.Parent.Parent.Game.Sim.WeaponRegistry)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local MockWorld = require(script.Parent.MockWorld)
-local Combat = require(script.Parent.Parent.Parent.Config.Combat)
+local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)
 
 type FakeInstance = {
 	Name: string,

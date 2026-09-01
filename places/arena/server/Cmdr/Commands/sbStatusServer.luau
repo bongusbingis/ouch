@@ -13,7 +13,7 @@ local Modules = Server:WaitForChild("Modules")
 local BallService = require(Modules:WaitForChild("BallService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 local function sortedKeys(values: { [string]: any }): { string }
 	local keys = {}

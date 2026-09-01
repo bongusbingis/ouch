@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local Workspace = game:GetService("Workspace")
 
-local Loading = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Loading"))
+local Loading = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Loading"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
 export type Direction = "Arena" | "Lobby"

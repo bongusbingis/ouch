@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local CameraShaker = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("camera-shaker"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))

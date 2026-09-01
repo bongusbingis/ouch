@@ -13,8 +13,8 @@ local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
-local InputConfig = require(Config:WaitForChild("Input"))
-local OnboardingConfig = require(Config:WaitForChild("Onboarding"))
+local InputConfig = require(Config:WaitForChild("Interface"):WaitForChild("Input"))
+local OnboardingConfig = require(Config:WaitForChild("Interface"):WaitForChild("Onboarding"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")

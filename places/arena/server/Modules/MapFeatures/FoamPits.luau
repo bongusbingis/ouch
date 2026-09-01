@@ -7,7 +7,8 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
+local MapFeatures =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Shared = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local Volume = require(Shared:WaitForChild("MapFeatures"):WaitForChild("Volume"))
 local MovementSpeedService = require(Shared:WaitForChild("Adapters"):WaitForChild("MovementSpeedService"))

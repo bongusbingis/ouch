@@ -7,22 +7,10 @@
 
 local T = require(script.Parent.TestKit)
 local CosmeticsLogic = require(script.Parent.Parent.Game.Economy.CosmeticsLogic)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
-local Crates = require(script.Parent.Parent.Parent.Config.Crates)
-local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
-local Audio = require(script.Parent.Parent.Parent.Config.Audio)
-
-local ELIMINATION_SOUND_TIERS = {
-	ElimSoundRubberPop = "Common",
-	ElimSoundToySqueak = "Common",
-	ElimSoundBalloonPop = "Common",
-	ElimSoundPartyHorn = "Rare",
-	ElimSoundArcadeKO = "Rare",
-	ElimSoundComedyDrums = "Rare",
-	ElimSoundRoyalFanfare = "Legendary",
-	ElimSoundStadiumRoar = "Legendary",
-	ElimSoundCosmicChime = "Legendary",
-}
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
+local Crates = require(script.Parent.Parent.Parent.Config.Economy.Crates)
+local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses)
+local Audio = require(script.Parent.Parent.Parent.Config.Infra.Audio)
 
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },
@@ -116,18 +104,14 @@ T.describe("CosmeticsLogic", function()
 		end
 	end)
 
-	T.it("ships three elimination sounds in each openable rarity tier", function()
-		local counts = { Common = 0, Rare = 0, Legendary = 0 }
-		for itemId, rarity in ELIMINATION_SOUND_TIERS do
-			local item = Cosmetics.Items[itemId]
-			T.expect(item ~= nil):toBeTruthy()
-			T.expect(item.Category):toEqual("ElimEffectAssets")
-			T.expect(item.Rarity):toEqual(rarity)
-			counts[rarity] += 1
+	T.it("plays one consolidated sound for both weapons, default included", function()
+		local default = Cosmetics.Defaults.ElimEffectAssets.ElimEffect
+		T.expect(default.DodgeballSound):toEqual(default.HammerSound)
+		for _, item in Cosmetics.Items do
+			if item.Category == "ElimEffectAssets" then
+				T.expect(item.ElimEffect.DodgeballSound):toEqual(item.ElimEffect.HammerSound)
+			end
 		end
-		T.expect(counts.Common):toEqual(3)
-		T.expect(counts.Rare):toEqual(3)
-		T.expect(counts.Legendary):toEqual(3)
 	end)
 
 	T.it("makes every Exclusive cosmetic obtainable from some game pass", function()

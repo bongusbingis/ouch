@@ -8,8 +8,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local InventoryConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Inventory"))
-local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop"))
+local InventoryConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
+local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.ShopPriceButton)
 local ShopPreview = require(script.Parent.ShopPreview)

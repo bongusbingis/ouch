@@ -9,8 +9,8 @@ local SimTypes = require(script.Parent.SimTypes)
 local SimUtil = require(script.Parent.SimUtil)
 local CollisionWorld = require(script.Parent.CollisionWorld)
 local ProjectileTrajectory = require(script.Parent.ProjectileTrajectory)
-local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
-local AimAssist = require(script.Parent.Parent.Parent.Parent.Config.AimAssist)
+local Combat = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.Combat)
+local AimAssist = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.AimAssist)
 
 type Vec = SimTypes.Vec
 type SimState = SimTypes.SimState

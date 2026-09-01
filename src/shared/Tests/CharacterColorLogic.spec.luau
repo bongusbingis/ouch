@@ -7,7 +7,7 @@
 
 local T = require(script.Parent.TestKit)
 local CharacterColorLogic = require(script.Parent.Parent.Game.Economy.CharacterColorLogic)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
 
 T.describe("CharacterColorLogic", function()
 	T.it("resolves an equipped character color from the catalog", function()

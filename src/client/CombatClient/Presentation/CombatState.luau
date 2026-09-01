@@ -10,8 +10,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowPose"))
-local MobileInput = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MobileInput"))
+local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("ThrowPose"))
+local MobileInput =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("MobileInput"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local SimStateCodec = require(Adapters:WaitForChild("SimStateCodec"))

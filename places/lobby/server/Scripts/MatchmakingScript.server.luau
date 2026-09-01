@@ -5,7 +5,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local AnalyticsConfig = require(ReplicatedStorage.Config.Analytics)
+local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)

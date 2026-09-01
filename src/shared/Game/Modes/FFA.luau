@@ -6,24 +6,31 @@
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
-local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
-local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("PostMatch"))
+local Modes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Modes"))
 local GameMode = require(script.Parent.GameMode)
 
 local FFA = {}
 FFA.id = "FFA"
 FFA.displayName = "Free For All"
-FFA.rules = {
-	MinPlayers = 1,
-	ScoreTarget = 15,
-	TimeCapSeconds = 300,
-	ResultsSeconds = PostMatch.ResultsSeconds,
-	IntermissionSeconds = GameModes.VoteDurationSeconds,
-	StartingSeconds = 3,
-	RespawnSeconds = 1,
-	SpawnInvulnSeconds = 1.5,
-	PreserveDodgeballs = true,
-} :: GameMode.MatchRules
+
+function FFA.resolveRules(): GameMode.MatchRules
+	local m = Modes.FFA
+	return {
+		MinPlayers = m.MinPlayers,
+		ScoreTarget = m.ScoreTarget,
+		TimeCapSeconds = m.TimeCapSeconds,
+		ResultsSeconds = PostMatch.ResultsSeconds,
+		IntermissionSeconds = GameModes.VoteDurationSeconds,
+		StartingSeconds = m.StartingSeconds,
+		RespawnSeconds = m.RespawnSeconds,
+		SpawnInvulnSeconds = m.SpawnInvulnSeconds,
+		PreserveDodgeballs = m.PreserveDodgeballs,
+	}
+end
+
+FFA.rules = FFA.resolveRules()
 
 function FFA.onMatchStart(ctx: GameMode.ModeContext)
 	for _, player in ctx.getPlayers() do

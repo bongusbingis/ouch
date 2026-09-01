@@ -6,8 +6,9 @@
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
-local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
-local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("PostMatch"))
+local Modes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Modes"))
 local GameMode = require(script.Parent.GameMode)
 
 local TDM = {}
@@ -15,18 +16,24 @@ TDM.id = "TDM"
 TDM.displayName = "Team Deathmatch"
 TDM.scoreScope = "Team"
 TDM.teams = { "Red", "Blue" }
-TDM.rules = {
-	MinPlayers = 1,
-	ScoreTarget = 40,
-	TimeCapSeconds = 360,
-	ResultsSeconds = PostMatch.ResultsSeconds,
-	IntermissionSeconds = GameModes.VoteDurationSeconds,
-	StartingSeconds = 3,
-	RespawnSeconds = 1,
-	WaveRespawnSeconds = 4.5,
-	SpawnInvulnSeconds = 1.5,
-	PreserveDodgeballs = true,
-} :: GameMode.MatchRules
+
+function TDM.resolveRules(): GameMode.MatchRules
+	local m = Modes.TDM
+	return {
+		MinPlayers = m.MinPlayers,
+		ScoreTarget = m.ScoreTarget,
+		TimeCapSeconds = m.TimeCapSeconds,
+		ResultsSeconds = PostMatch.ResultsSeconds,
+		IntermissionSeconds = GameModes.VoteDurationSeconds,
+		StartingSeconds = m.StartingSeconds,
+		RespawnSeconds = m.RespawnSeconds,
+		WaveRespawnSeconds = m.WaveRespawnSeconds,
+		SpawnInvulnSeconds = m.SpawnInvulnSeconds,
+		PreserveDodgeballs = m.PreserveDodgeballs,
+	}
+end
+
+TDM.rules = TDM.resolveRules()
 
 function TDM.onMatchStart(ctx: GameMode.ModeContext)
 	for _, player in ctx.getPlayers() do

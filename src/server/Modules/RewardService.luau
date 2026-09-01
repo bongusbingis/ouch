@@ -7,7 +7,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 

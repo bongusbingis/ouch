@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("UI"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 
 local c = React.createElement

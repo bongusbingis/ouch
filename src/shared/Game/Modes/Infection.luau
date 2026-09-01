@@ -6,8 +6,9 @@
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
-local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
-local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("PostMatch"))
+local Modes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Modes"))
 local GameMode = require(script.Parent.GameMode)
 
 local Infection = {}
@@ -18,18 +19,24 @@ Infection.scoreScope = "Team"
 Infection.SurvivorTeam = "Survivors"
 Infection.InfectedTeam = "Infected"
 Infection.teams = { Infection.SurvivorTeam, Infection.InfectedTeam }
-Infection.rules = {
-	MinPlayers = 2,
-	ScoreTarget = math.huge,
-	TimeCapSeconds = 180,
-	ResultsSeconds = PostMatch.ResultsSeconds,
-	IntermissionSeconds = GameModes.VoteDurationSeconds,
-	StartingSeconds = 3,
-	RespawnSeconds = 3,
-	SpawnInvulnSeconds = 1.5,
-	TimeCapWinnerId = Infection.SurvivorTeam,
-	PreserveDodgeballs = true,
-} :: GameMode.MatchRules
+
+function Infection.resolveRules(): GameMode.MatchRules
+	local m = Modes.Infection
+	return {
+		MinPlayers = m.MinPlayers,
+		ScoreTarget = m.ScoreTarget,
+		TimeCapSeconds = m.TimeCapSeconds,
+		ResultsSeconds = PostMatch.ResultsSeconds,
+		IntermissionSeconds = GameModes.VoteDurationSeconds,
+		StartingSeconds = m.StartingSeconds,
+		RespawnSeconds = m.RespawnSeconds,
+		SpawnInvulnSeconds = m.SpawnInvulnSeconds,
+		TimeCapWinnerId = Infection.SurvivorTeam,
+		PreserveDodgeballs = m.PreserveDodgeballs,
+	}
+end
+
+Infection.rules = Infection.resolveRules()
 
 function Infection.countSurvivors(teamIds: { string? }): number
 	local survivors = 0
