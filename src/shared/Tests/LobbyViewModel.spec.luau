@@ -1,3 +1,8 @@
+-- Name: LobbyViewModel.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the lobby view model: party code sanitizing and formatting, and the leader, member, queued, and terminal presentation states.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)

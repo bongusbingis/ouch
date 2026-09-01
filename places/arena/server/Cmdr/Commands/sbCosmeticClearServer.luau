@@ -1,3 +1,8 @@
+-- Name: sbCosmeticClearServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-cosmetic-clear, unequipping the named slot through the cosmetics service for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

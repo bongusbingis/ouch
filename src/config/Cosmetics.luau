@@ -2,8 +2,6 @@
 
 -- Cosmetic catalog and the visual definitions shared by every place.
 
-local TrailCosmetics = require(script.Parent.TrailCosmetics)
-
 export type RarityDef = {
 	Weight: number,
 	DupeBonks: number,
@@ -30,6 +28,15 @@ export type VisualTemplateDef = {
 	SurfaceMaps: SurfaceMaps?,
 }
 
+-- An elimination effect names entries in Config.Audio.Gameplay rather than
+-- carrying asset ids. The sounds stay owned by the audio config, so a new
+-- effect is an audio entry plus a cosmetic that points at it, and the audio
+-- spec validates every id exactly once.
+export type ElimEffectDef = {
+	DodgeballSound: string,
+	HammerSound: string,
+}
+
 export type ItemDef = {
 	Category: string,
 	Rarity: string,
@@ -41,15 +48,18 @@ export type ItemDef = {
 	SortOrder: number?,
 	PreviewColor: Color3?,
 	Visual: VisualDef?,
+	ElimEffect: ElimEffectDef?,
 }
 
 export type DefaultDef = {
 	DisplayName: string,
 	Rarity: string,
+	EffectId: string?,
 	SplatColor: Color3?,
 	SortOrder: number?,
 	PreviewColor: Color3?,
 	Visual: VisualDef?,
+	ElimEffect: ElimEffectDef?,
 }
 
 local Rarities: { [string]: RarityDef } = {
@@ -59,10 +69,16 @@ local Rarities: { [string]: RarityDef } = {
 	Exclusive = { Weight = 0, DupeBonks = 0, DirectBonks = 0, DisplayOrder = 1 },
 }
 
+-- TrailAssets and ElimEffectAssets are both "effects" in the storefront but are
+-- separate slots on purpose: a ball trail and an elimination effect are
+-- unrelated in play, and one slot would make equipping one silently unequip the
+-- other.
 local Slots = {
 	BallAssets = true,
 	HammerAssets = true,
 	TrailAssets = true,
+	ElimEffectAssets = true,
+	ImpactEffectAssets = true,
 	EmoteAssets = true,
 	CostumeAssets = true,
 	CharacterColor = true,
@@ -102,6 +118,20 @@ local Defaults: { [string]: DefaultDef } = {
 			Template = "Hammer",
 		},
 	},
+	ElimEffectAssets = {
+		DisplayName = "Default Splat",
+		Rarity = "Common",
+		ElimEffect = {
+			DodgeballSound = "DodgeballElimination",
+			HammerSound = "HammerElimination",
+		},
+	},
+	-- Config.CosmeticEffects binds this EffectId to the events that fire it.
+	ImpactEffectAssets = {
+		DisplayName = "Default Impact",
+		Rarity = "Common",
+		EffectId = "DefaultImpact",
+	},
 	CharacterColor = {
 		DisplayName = "Cyan",
 		Rarity = "Common",
@@ -136,12 +166,96 @@ local function characterColor(displayName: string, color: Color3, sortOrder: num
 	}
 end
 
+local function eliminationEffect(
+	rarity: string,
+	displayName: string,
+	dodgeballSound: string,
+	hammerSound: string,
+	sortOrder: number
+): ItemDef
+	return {
+		Category = "ElimEffectAssets",
+		Rarity = rarity,
+		DisplayName = displayName,
+		Thumbnail = "",
+		SortOrder = sortOrder,
+		ElimEffect = {
+			DodgeballSound = dodgeballSound,
+			HammerSound = hammerSound,
+		},
+	}
+end
+
 local Items: { [string]: ItemDef } = {
 	CharacterColorRed = characterColor("Red", Color3.fromRGB(255, 0, 0), 1),
 	CharacterColorPink = characterColor("Pink", Color3.fromRGB(255, 0, 128), 2),
 	CharacterColorBlue = characterColor("Blue", Color3.fromRGB(0, 90, 255), 4),
 	CharacterColorGreen = characterColor("Green", Color3.fromRGB(0, 200, 80), 5),
 	CharacterColorPurple = characterColor("Purple", Color3.fromRGB(160, 60, 255), 6),
+
+	ElimSoundRubberPop = eliminationEffect(
+		"Common",
+		"Rubber Pop",
+		"RubberPopDodgeballElimination",
+		"RubberPopHammerElimination",
+		10
+	),
+	ElimSoundToySqueak = eliminationEffect(
+		"Common",
+		"Toy Squeak",
+		"ToySqueakDodgeballElimination",
+		"ToySqueakHammerElimination",
+		20
+	),
+	ElimSoundBalloonPop = eliminationEffect(
+		"Common",
+		"Balloon Pop",
+		"BalloonPopDodgeballElimination",
+		"BalloonPopHammerElimination",
+		30
+	),
+	ElimSoundPartyHorn = eliminationEffect(
+		"Rare",
+		"Party Horn",
+		"PartyHornDodgeballElimination",
+		"PartyHornHammerElimination",
+		40
+	),
+	ElimSoundArcadeKO = eliminationEffect(
+		"Rare",
+		"Arcade K.O.",
+		"ArcadeKODodgeballElimination",
+		"ArcadeKOHammerElimination",
+		50
+	),
+	ElimSoundComedyDrums = eliminationEffect(
+		"Rare",
+		"Comedy Drums",
+		"ComedyDrumsDodgeballElimination",
+		"ComedyDrumsHammerElimination",
+		60
+	),
+	ElimSoundRoyalFanfare = eliminationEffect(
+		"Legendary",
+		"Royal Fanfare",
+		"RoyalFanfareDodgeballElimination",
+		"RoyalFanfareHammerElimination",
+		70
+	),
+	ElimSoundStadiumRoar = eliminationEffect(
+		"Legendary",
+		"Stadium Roar",
+		"StadiumRoarDodgeballElimination",
+		"StadiumRoarHammerElimination",
+		80
+	),
+	ElimSoundCosmicChime = eliminationEffect(
+		"Legendary",
+		"Cosmic Chime",
+		"CosmicChimeDodgeballElimination",
+		"CosmicChimeHammerElimination",
+		90
+	),
 
 	BallRed = ballAsset("Common", "Red Ball", Color3.fromRGB(151, 0, 0), Color3.fromRGB(235, 60, 60)),
 	BallBlue = ballAsset("Common", "Blue Ball", Color3.fromRGB(13, 105, 172), Color3.fromRGB(65, 120, 235)),
@@ -152,17 +266,117 @@ local Items: { [string]: ItemDef } = {
 	BallPink = ballAsset("Rare", "Pink Ball", Color3.fromRGB(255, 102, 204), Color3.fromRGB(240, 120, 190)),
 	BallPurple = ballAsset("Legendary", "Purple Ball", Color3.fromRGB(98, 37, 209), Color3.fromRGB(150, 80, 220)),
 	BallYellow = ballAsset("Legendary", "Yellow Ball", Color3.fromRGB(255, 255, 0), Color3.fromRGB(240, 210, 60)),
-}
 
-for itemId, definition in TrailCosmetics do
-	Items[itemId] = {
-		Category = "TrailAssets",
-		Rarity = definition.Rarity,
-		DisplayName = definition.DisplayName,
-		EffectId = itemId,
+	ConfettiImpact = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Common",
+		DisplayName = "Confetti Impact",
 		Thumbnail = "",
-	}
-end
+		EffectId = "ConfettiImpact",
+		SortOrder = 15,
+	},
+	StarPop = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Common",
+		DisplayName = "Star Pop",
+		Thumbnail = "",
+		EffectId = "StarPop",
+		SortOrder = 10,
+	},
+	FoamPoof = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Common",
+		DisplayName = "Foam Poof",
+		Thumbnail = "",
+		EffectId = "FoamPoof",
+		SortOrder = 20,
+	},
+	JellySplash = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Jelly Splash",
+		Thumbnail = "",
+		EffectId = "JellySplash",
+		SortOrder = 30,
+	},
+	PartyPopper = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Party Popper",
+		Thumbnail = "",
+		EffectId = "PartyPopper",
+		SortOrder = 40,
+	},
+	ComicBonk = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Comic Bonk",
+		Thumbnail = "",
+		EffectId = "ComicBonk",
+		SortOrder = 50,
+	},
+	CandyCrash = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Candy Crash",
+		Thumbnail = "",
+		EffectId = "CandyCrash",
+		SortOrder = 60,
+	},
+	BubbleBurst = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Bubble Burst",
+		Thumbnail = "",
+		EffectId = "BubbleBurst",
+		SortOrder = 70,
+	},
+	RoyalParty = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Legendary",
+		DisplayName = "Royal Party",
+		Thumbnail = "",
+		EffectId = "RoyalParty",
+		SortOrder = 80,
+	},
+
+	-- Imported from the external particle pack (the "Common" egg-reveal burst),
+	-- recolored to the candy palette and reproduced in code via ParticleKit (no
+	-- Studio asset); EffectId resolves through the script-effect registry. See
+	-- docs/cosmetic-vfx-import.md.
+	SugarRush = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Rare",
+		DisplayName = "Sugar Rush",
+		Thumbnail = "",
+		EffectId = "SugarRush",
+		SortOrder = 35,
+	},
+	Prismatic = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Prismatic",
+		Thumbnail = "",
+		EffectId = "Prismatic",
+		SortOrder = 90,
+	},
+	Galaxy = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Galaxy",
+		Thumbnail = "",
+		EffectId = "Galaxy",
+		SortOrder = 100,
+	},
+	Starlight = {
+		Category = "ImpactEffectAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Starlight",
+		Thumbnail = "",
+		EffectId = "Starlight",
+		SortOrder = 110,
+	},
+}
 
 return {
 	Rarities = Rarities,

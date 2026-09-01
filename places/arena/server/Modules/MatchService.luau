@@ -1,6 +1,12 @@
+-- Name: MatchService.luau
+-- Author: Jack C.
+-- Description: Drives the match lifecycle from the selected mode's rules: assigns teams, provisions balls, applies elimination consequences and scoring, schedules respawns, publishes the replicated match state, and orchestrates results and reset.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -9,20 +15,20 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Combat = require(Config:WaitForChild("Combat"))
+local PostMatchConfig = require(Config:WaitForChild("PostMatch"))
 local MatchSim = require(Game:WaitForChild("Sim"):WaitForChild("MatchSim"))
 local GameMode = require(Game:WaitForChild("Modes"):WaitForChild("GameMode"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local PartyTeamAllocator = require(Game:WaitForChild("Modes"):WaitForChild("PartyTeamAllocator"))
 local PlayerIds = require(Game:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
+local PostMatchResult = require(Game:WaitForChild("PostMatch"):WaitForChild("PostMatchResult"))
+local DevSoloPlay = require(Game:WaitForChild("Matchmaking"):WaitForChild("DevSoloPlay"))
 local Network = require(Shared:WaitForChild("Network"))
 
 local ArenaService = require(script.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local BallService = require(script.Parent.BallService)
 local EliminationService = require(script.Parent.EliminationService)
-
--- Server orchestration of an explicitly selected game mode in the permanent
--- authored arena. Matchmaking arrival and mode selection are separate owners.
 
 local MatchService = {}
 
@@ -34,20 +40,18 @@ local mode: GameMode.GameMode? = nil
 local listeners: { (event: { [string]: any }) -> () } = {}
 local stateFolder: Folder? = nil
 local spawnedThisMatch: { [string]: boolean } = {}
--- Bumping a player's generation cancels their pending scheduled respawn.
 local respawnGeneration: { [string]: number } = {}
 local spawnProtectionGeneration: { [Model]: number } = {}
 local playerMatchElims: { [string]: number } = {}
 local pendingWaveRespawns: { [string]: Player } = {}
 local partyTeamAssignments: { [string]: string } = {}
 local waveTimer = 0
--- Eliminations raised outside the deterministic sim (world features, dev
--- tooling) take ticks from this counter. They are negative so they can never
--- collide with a real sim tick, and shared so two sources cannot collide with
--- each other.
 local externalEventSequence = 0
 local started = false
 local startingMatch = false
+local watchedPlayers: { [number]: RBXScriptConnection } = {}
+local lastResult: PostMatchResult.GlobalResult? = nil
+local resultRosterByUserId: { [number]: PostMatchResult.Contestant } = {}
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
 	table.insert(listeners, listener)
@@ -110,20 +114,61 @@ end
 
 local function setPlayerTeam(player: Player, teamId: string?)
 	player:SetAttribute("TeamId", teamId)
+	local contestant = resultRosterByUserId[player.UserId]
+	if contestant then
+		contestant.teamId = teamId
+	end
 	local character = player.Character
 	if character then
 		character:SetAttribute("TeamId", teamId)
 	end
 end
 
+local function rememberContestant(player: Player)
+	resultRosterByUserId[player.UserId] = {
+		playerId = PlayerIds.toId(player),
+		userId = player.UserId,
+		username = player.Name,
+		displayName = player.DisplayName,
+		teamId = playerTeam(player),
+	}
+end
+
 local function matchPlayers(): { Player }
 	local result = {}
 	for _, player in Players:GetPlayers() do
-		if ArenaSessionService.isAdmitted(player) then
+		if ArenaSessionService.isRoundEligible(player) then
 			table.insert(result, player)
 		end
 	end
 	return result
+end
+
+local function buildResult(activeMode: GameMode.GameMode, event: { [string]: any })
+	local contestants = {}
+	for _, contestant in resultRosterByUserId do
+		table.insert(contestants, {
+			playerId = contestant.playerId,
+			userId = contestant.userId,
+			username = contestant.username,
+			displayName = contestant.displayName,
+			teamId = contestant.teamId,
+		})
+	end
+	local now = Workspace:GetServerTimeNow()
+	lastResult = PostMatchResult.build({
+		resultId = HttpService:GenerateGUID(false),
+		modeId = activeMode.id,
+		modeName = activeMode.displayName,
+		scoreScope = activeMode.scoreScope or "Player",
+		winnerId = event.winnerId,
+		reason = tostring(event.reason or "Complete"),
+		interactiveAt = now + PostMatchConfig.RevealSeconds,
+		endsAt = now + activeMode.rules.ResultsSeconds,
+		contestants = contestants,
+		scores = table.clone(state.scores),
+		teamIds = activeMode.teams,
+	})
 end
 
 local function clearTeams()
@@ -251,8 +296,6 @@ local function syncPlayers()
 	MatchSim.setPlayers(state, present)
 end
 
--- Forward declared: modeContext's finishMatch lever needs it, and it is defined
--- below alongside the rest of the match event handling.
 local handleMatchEvents: ({ MatchSim.MatchEvent }) -> ()
 
 local function modeContext(): GameMode.ModeContext
@@ -298,16 +341,18 @@ end
 
 local function startMatch(events: { MatchSim.MatchEvent })
 	local activeMode = assert(mode, "[MatchService] startMatch requires a selected mode")
+	table.clear(resultRosterByUserId)
 	table.clear(spawnedThisMatch)
 	table.clear(playerMatchElims)
 	table.clear(pendingWaveRespawns)
 	waveTimer = activeMode.rules.WaveRespawnSeconds or 0
 	assignTeams()
+	for _, player in matchPlayers() do
+		rememberContestant(player)
+	end
 
 	for _, player in matchPlayers() do
 		local character = player.Character
-		-- Absent characters are handled by the CharacterAdded path, which
-		-- also covers their first-spawn mode hook.
 		if character then
 			local key = PlayerIds.toId(player)
 			respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
@@ -355,6 +400,7 @@ function handleMatchEvents(events: { MatchSim.MatchEvent })
 				end
 			end
 		elseif event.kind == "MatchPreparing" then
+			lastResult = nil
 			resetAllScores()
 			setStateAttribute("winnerId", "")
 			for _, teamId in teamIds() do
@@ -366,6 +412,7 @@ function handleMatchEvents(events: { MatchSim.MatchEvent })
 		elseif event.kind == "MatchEnded" then
 			local activeMode = assert(mode, "[MatchService] MatchEnded without a selected mode")
 			activeMode.onMatchEnd(modeContext())
+			buildResult(activeMode, event)
 			setStateAttribute("winnerId", event.winnerId or "")
 			print(`[Match] ended ({event.reason}) — winner: {event.winnerId or "none (tie)"}`)
 		elseif event.kind == "MatchReset" then
@@ -393,6 +440,9 @@ local function syncCharacterTeam(player: Player, character: Model)
 end
 
 local function onCharacterAdded(player: Player, character: Model)
+	if not ArenaSessionService.isRoundEligible(player) then
+		return
+	end
 	syncCharacterTeam(player, character)
 	EliminationService.up(player)
 	local key = PlayerIds.toId(player)
@@ -409,15 +459,18 @@ local function onCharacterAdded(player: Player, character: Model)
 end
 
 local function watchPlayer(player: Player)
-	if not ArenaSessionService.isAdmitted(player) then
+	if not ArenaSessionService.isRoundEligible(player) or watchedPlayers[player.UserId] ~= nil then
 		return
 	end
 	if scoreScope() == "Team" and playerTeam(player) == nil then
 		assignLateJoinTeam(player)
 	end
+	if isArenaJoinPhase() then
+		rememberContestant(player)
+	end
 	setScore(player, 0)
 	syncPlayers()
-	player.CharacterAdded:Connect(function(character)
+	watchedPlayers[player.UserId] = player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
 	end)
 	local character = player.Character
@@ -518,9 +571,6 @@ local function eliminateVictim(targetId: string?, event: { [string]: any }): boo
 	return true
 end
 
--- Waves tick on a fixed cadence from match start so respawns come in
--- synchronized batches; the timer keeps running while anyone is pending so
--- deaths during Results still resolve.
 local function tickWaveRespawns(dt: number)
 	local activeMode = mode
 	if activeMode == nil then
@@ -547,9 +597,12 @@ local function tickWaveRespawns(dt: number)
 	end
 end
 
--- Called with authoritative (server-side) sim events from the adapter.
 function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.kind == "BallCaught" then
+		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
+		if catcher == nil or not ArenaSessionService.isRoundEligible(catcher) then
+			return false
+		end
 		dispatch(table.clone(event))
 		Network.fire("CombatFeed", nil, {
 			kind = "BallCaught",
@@ -567,24 +620,46 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if state.phase ~= "Active" then
 		return false
 	end
+	local target = PlayerIds.fromId(event.targetId)
+	if target == nil or not ArenaSessionService.isRoundEligible(target) then
+		return false
+	end
+	local source = PlayerIds.fromId(event.sourceId)
+	if event.sourceId ~= nil and (source == nil or not ArenaSessionService.isRoundEligible(source)) then
+		return false
+	end
+	local acceptedEvent = table.clone(event)
+	if acceptedEvent.position == nil then
+		local character = target.Character
+		if character ~= nil then
+			acceptedEvent.position = character:GetPivot().Position
+		end
+	end
+	local equippedItemId = if source then source:GetAttribute("Equip_ElimEffectAssets") else nil
+	acceptedEvent.elimEffectItemId = if typeof(equippedItemId) == "string" and equippedItemId ~= ""
+		then equippedItemId
+		else nil
 	local activeMode = assert(mode, "[MatchService] active phase without a selected mode")
-	if not eliminateVictim(event.targetId, event) then
+	if not eliminateVictim(acceptedEvent.targetId, acceptedEvent) then
 		return false
 	end
 
 	local events: { MatchSim.MatchEvent } = {}
-	MatchSim.applyElim(state, activeMode.rules, scoreIdForElim(event.sourceId), event.targetId, events)
-	dispatch(table.clone(event))
+	MatchSim.applyElim(state, activeMode.rules, scoreIdForElim(acceptedEvent.sourceId), acceptedEvent.targetId, events)
+	dispatch(table.clone(acceptedEvent))
 	Network.fire("CombatFeed", nil, {
 		kind = "Elim",
-		tick = event.tick,
-		projectileId = event.projectileId,
-		sourceId = event.sourceId,
-		targetId = event.targetId,
+		tick = acceptedEvent.tick,
+		projectileId = acceptedEvent.projectileId,
+		sourceId = acceptedEvent.sourceId,
+		targetId = acceptedEvent.targetId,
+		position = acceptedEvent.position,
+		direction = acceptedEvent.direction,
+		elimEffectItemId = acceptedEvent.elimEffectItemId,
 	})
-	incrementPlayerElim(event.sourceId)
+	incrementPlayerElim(acceptedEvent.sourceId)
 	if state.phase == "Active" then
-		activeMode.onElim(modeContext(), event.sourceId, event.targetId)
+		activeMode.onElim(modeContext(), acceptedEvent.sourceId, acceptedEvent.targetId)
 	end
 	handleMatchEvents(events)
 	return true
@@ -602,6 +677,10 @@ function MatchService.stateForTesting(): { [string]: any }
 		scoreTarget = if mode then mode.rules.ScoreTarget else 0,
 		scores = table.clone(state.scores),
 	}
+end
+
+function MatchService.resultSnapshot(): PostMatchResult.GlobalResult?
+	return lastResult
 end
 
 function MatchService.beginMode(modeId: string): (boolean, string?)
@@ -674,6 +753,28 @@ function MatchService.endForTesting(): (boolean, string?)
 	return true
 end
 
+function MatchService.devEndMatchForPlayer(player: Player): (boolean, string?)
+	local activeMode = mode
+	if activeMode == nil then
+		return false, "no_selected_mode"
+	end
+	local winnerId: string?
+	if scoreScope() == "Team" then
+		winnerId = playerTeam(player)
+		if winnerId == nil then
+			return false, "no_team"
+		end
+	else
+		winnerId = PlayerIds.toId(player)
+	end
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.finish(state, activeMode.rules, "DevSkip", events, winnerId) then
+		return false, "match_not_active"
+	end
+	handleMatchEvents(events)
+	return true
+end
+
 function MatchService.setTimeForTesting(seconds: number): (boolean, string?)
 	if state.phase ~= "Active" then
 		return false, "match_not_active"
@@ -688,20 +789,17 @@ end
 
 local function buildElimEvent(source: Player?, target: Player): { [string]: any }
 	externalEventSequence += 1
+	local character = target.Character
 	return {
 		kind = "Elim",
 		tick = -externalEventSequence,
 		sourceId = if source then PlayerIds.toId(source) else nil,
 		targetId = PlayerIds.toId(target),
+		position = if character then character:GetPivot().Position else nil,
 		direction = Vector3.zero,
 	}
 end
 
--- Server-only seam for authored world features such as elimination zones.
--- Routing through handleCombatEvent keeps scoring, the combat feed, mode hooks,
--- and respawn in one place rather than giving hazards their own path. Returns
--- false outside an Active match, which is what leaves players alone between
--- matches.
 function MatchService.eliminate(target: Player, source: Player?): boolean
 	return MatchService.handleCombatEvent(buildElimEvent(source, target))
 end
@@ -744,10 +842,30 @@ function MatchService.start()
 	ArenaService.start()
 	ensureStateFolder()
 
+	Network.handleProtected("DevEndMatch", {
+		rateLimit = 2,
+		validate = function(player)
+			return DevSoloPlay.canUse(player), "not_authorized"
+		end,
+	}, function(player)
+		local ok, reason = MatchService.devEndMatchForPlayer(player)
+		if not ok then
+			warn(`[MatchService] DevEndMatch refused for {player.Name}: {reason}`)
+		end
+	end)
+
 	Players.PlayerAdded:Connect(function(player)
 		task.defer(watchPlayer, player)
 	end)
+	ArenaSessionService.onReady(function(player)
+		watchPlayer(player)
+	end)
 	Players.PlayerRemoving:Connect(function(player)
+		local watchedConnection = watchedPlayers[player.UserId]
+		if watchedConnection then
+			watchedConnection:Disconnect()
+			watchedPlayers[player.UserId] = nil
+		end
 		local key = PlayerIds.toId(player)
 		respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 		pendingWaveRespawns[key] = nil

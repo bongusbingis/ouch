@@ -1,6 +1,9 @@
---!strict
+-- Name: AnalyticsLogic.luau
+-- Author: Jack C.
+-- Description: Pure analytics decisions: which onboarding step an event advances, which weapon an elimination came from, and which funnel or custom event a UI interaction routes to.
+-- Created: 2026-07-22
 
--- Pure analytics routing and onboarding progression decisions.
+--!strict
 
 local AnalyticsLogic = {}
 

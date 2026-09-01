@@ -1,3 +1,8 @@
+-- Name: CosmeticVisualFactory.luau
+-- Author: Jack C.
+-- Description: Builds the visual instance for a cosmetic from its catalog definition, the shared path used by both world rendering and inventory previews.
+-- Created: 2026-08-16
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

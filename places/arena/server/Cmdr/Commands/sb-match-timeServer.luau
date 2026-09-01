@@ -1,3 +1,8 @@
+-- Name: sb-match-timeServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-match-time, overwriting the running match's remaining clock.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

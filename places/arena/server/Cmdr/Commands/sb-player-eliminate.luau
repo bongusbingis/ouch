@@ -1,3 +1,8 @@
+-- Name: sb-player-eliminate.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-player-eliminate: applies an authoritative elimination to one or more players.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

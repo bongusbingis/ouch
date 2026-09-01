@@ -1,3 +1,8 @@
+-- Name: ProgressionService.luau
+-- Author: Jack C.
+-- Description: Accumulates per-match progress from deduplicated match and combat events (eliminations, deaths, catches, wins) and commits the resulting XP, Bonks, and stat deltas to each player's profile.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -30,13 +35,46 @@ type MatchProgress = {
 	Bonks: number,
 }
 
+type PendingCommit = {
+	resultId: string,
+	userId: number,
+	progress: MatchProgress,
+	won: boolean,
+	firstMatch: boolean?,
+	committing: boolean,
+	applied: boolean,
+}
+
+export type MatchSummary = {
+	firstMatch: boolean?,
+	rewardsPending: boolean?,
+	won: boolean,
+	elims: number,
+	deaths: number,
+	catches: number,
+	baseXp: number?,
+	baseBonks: number?,
+	xpMultiplier: number?,
+	bonksMultiplier: number?,
+	xp: number?,
+	bonks: number?,
+	seasonXp: number?,
+	seasonBefore: { [string]: any }?,
+	seasonAfter: { [string]: any }?,
+}
+
 local ProgressionService = {}
 
 local progressByPlayerId: { [string]: MatchProgress } = {}
+local summaryByPlayerId: { [string]: MatchSummary } = {}
+local pendingByUserId: { [number]: { [string]: PendingCommit } } = {}
+local summaryListeners: { (Player, MatchSummary, string) -> () } = {}
 local seenEvents = EventDedup.new()
 local started = false
 local activeEntitlementService: any = EntitlementService
 local activeBattlePassService: any = BattlePassService
+local activeMatchService: any = nil
+local currentResultId: string? = nil
 
 local function blank(): MatchProgress
 	return {
@@ -62,10 +100,9 @@ end
 
 local function resetMatch()
 	table.clear(progressByPlayerId)
+	table.clear(summaryByPlayerId)
+	currentResultId = nil
 	seenEvents.clear()
-	for _, player in Players:GetPlayers() do
-		progressFor(PlayerIds.toId(player))
-	end
 end
 
 local function addRewards(progress: MatchProgress, rewardKey: string)
@@ -107,73 +144,242 @@ local function trackCatch(event: MatchEvent)
 	addRewards(progress, "Catch")
 end
 
-local function commitMatch(event: MatchEvent)
-	local winnerId = event.winnerId :: string?
-	for id, progress in progressByPlayerId do
-		local player = PlayerIds.fromId(id)
-		local playerWon = player ~= nil and (id == winnerId or player:GetAttribute("TeamId") == winnerId)
+local function publishSummary(player: Player, summary: MatchSummary, resultId: string)
+	if currentResultId ~= resultId then
+		return
+	end
+	summaryByPlayerId[PlayerIds.toId(player)] = summary
+	if player.Parent ~= Players then
+		return
+	end
+	Network.fire("MatchSummary", player, summary)
+	for _, listener in table.clone(summaryListeners) do
+		local ok, err = pcall(listener, player, summary, resultId)
+		if not ok then
+			warn(`[ProgressionService] summary listener failed: {err}`)
+		end
+	end
+end
 
-		progress.MatchesPlayed += 1
-		addRewards(progress, "MatchComplete")
+local function isPending(pending: PendingCommit): boolean
+	local resultRecords = pendingByUserId[pending.userId]
+	return resultRecords ~= nil and resultRecords[pending.resultId] == pending
+end
+
+local function clearPending(pending: PendingCommit)
+	local resultRecords = pendingByUserId[pending.userId]
+	if resultRecords == nil or resultRecords[pending.resultId] ~= pending then
+		return
+	end
+	resultRecords[pending.resultId] = nil
+	if next(resultRecords) == nil then
+		pendingByUserId[pending.userId] = nil
+	end
+end
+
+local function commitPlayer(player: Player, pending: PendingCommit): boolean
+	activeEntitlementService.awaitReady(player, 2)
+	if not isPending(pending) or PlayerData.get(player) == nil then
+		return false
+	end
+
+	local progress = pending.progress
+	local firstMatch = pending.firstMatch
+	if firstMatch == nil then
+		local data = PlayerData.get(player)
+		firstMatch = data ~= nil and (data.Progression.MatchesPlayed or 0) == 0
+		pending.firstMatch = firstMatch
+	end
+	local multipliers = activeEntitlementService.multipliers(player)
+	local awarded = {
+		Elims = progress.Elims,
+		Deaths = progress.Deaths,
+		Catches = progress.Catches,
+		Wins = progress.Wins,
+		Losses = progress.Losses,
+		MatchesPlayed = progress.MatchesPlayed,
+		XP = Boosts.apply(progress.XP, multipliers.Xp),
+		Bonks = Boosts.apply(progress.Bonks, multipliers.Bonks),
+	}
+
+	local seasonBefore = activeBattlePassService.stateFor(player)
+	if not PlayerData.applyProgression(player, awarded) then
+		return false
+	end
+	pending.applied = true
+	activeBattlePassService.addSeasonXp(player, awarded.XP)
+	local seasonAfter = activeBattlePassService.stateFor(player)
+	PlayerData.completeTutorial(player)
+	if awarded.Bonks > 0 then
+		local data = PlayerData.get(player)
+		local ok, err = pcall(
+			AnalyticsService.logEconomyEvent,
+			player,
+			"Source",
+			"Bonks",
+			awarded.Bonks,
+			if data then data.Bonks else 0,
+			AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+			"MatchRewards"
+		)
+		if not ok then
+			warn(`[ProgressionService] reward analytics failed: {err}`)
+		end
+	end
+	local summary = {
+		firstMatch = firstMatch,
+		rewardsPending = false,
+		won = pending.won,
+		elims = progress.Elims,
+		deaths = progress.Deaths,
+		catches = progress.Catches,
+		baseXp = progress.XP,
+		baseBonks = progress.Bonks,
+		xpMultiplier = multipliers.Xp,
+		bonksMultiplier = multipliers.Bonks,
+		xp = awarded.XP,
+		bonks = awarded.Bonks,
+		seasonXp = if seasonBefore and seasonAfter
+			then math.max((seasonAfter.xp or 0) - (seasonBefore.xp or 0), 0)
+			else nil,
+		seasonBefore = seasonBefore,
+		seasonAfter = seasonAfter,
+	}
+	clearPending(pending)
+	publishSummary(player, summary, pending.resultId)
+	return true
+end
+
+local function startCommit(player: Player, pending: PendingCommit)
+	if pending.committing or not isPending(pending) or not PlayerData.isLoaded(player) then
+		return
+	end
+	local releaseLease = PlayerData.acquireWriteLease(player)
+	if releaseLease == nil then
+		return
+	end
+	pending.committing = true
+	task.spawn(function()
+		local ok, committed = xpcall(function()
+			return commitPlayer(player, pending)
+		end, debug.traceback)
+		releaseLease()
+		if not ok then
+			warn(`[ProgressionService] reward commit failed for user {pending.userId}: {committed}`)
+			if pending.applied then
+				clearPending(pending)
+			end
+		end
+		if isPending(pending) then
+			pending.committing = false
+		end
+	end)
+end
+
+local function commitMatch(_event: MatchEvent)
+	local result = activeMatchService and activeMatchService.resultSnapshot()
+	if result == nil then
+		warn("[ProgressionService] MatchEnded without an authoritative result")
+		return
+	end
+	local resultId = result.resultId
+	if currentResultId == resultId then
+		return
+	end
+	currentResultId = resultId
+	table.clear(summaryByPlayerId)
+	local winnerId = result.winnerId :: string?
+	for _, contestant in result.contestants do
+		local id = contestant.playerId
+		local playerWon = winnerId ~= nil and winnerId ~= "" and (id == winnerId or contestant.teamId == winnerId)
+
+		local committedProgress = table.clone(progressByPlayerId[id] or blank())
+		committedProgress.MatchesPlayed += 1
+		addRewards(committedProgress, "MatchComplete")
 
 		if winnerId ~= nil and winnerId ~= "" then
 			if playerWon then
-				progress.Wins += 1
-				addRewards(progress, "Win")
+				committedProgress.Wins += 1
+				addRewards(committedProgress, "Win")
 			else
-				progress.Losses += 1
+				committedProgress.Losses += 1
 			end
 		end
 
+		local player = Players:GetPlayerByUserId(contestant.userId)
+		local beforeData = if player then PlayerData.get(player) else nil
+		local firstMatch = if beforeData then (beforeData.Progression.MatchesPlayed or 0) == 0 else nil
+		local pending = {
+			resultId = resultId,
+			userId = contestant.userId,
+			progress = committedProgress,
+			won = playerWon,
+			firstMatch = firstMatch,
+			committing = false,
+			applied = false,
+		}
+		local resultRecords = pendingByUserId[contestant.userId]
+		if resultRecords == nil then
+			resultRecords = {}
+			pendingByUserId[contestant.userId] = resultRecords
+		end
+		resultRecords[resultId] = pending
+		summaryByPlayerId[id] = {
+			firstMatch = firstMatch,
+			rewardsPending = true,
+			won = playerWon,
+			elims = committedProgress.Elims,
+			deaths = committedProgress.Deaths,
+			catches = committedProgress.Catches,
+		}
 		if player then
-			-- A cold ownership cache would silently drop a paid boost, so wait
-			-- briefly for it; the yield is invisible at match end.
-			activeEntitlementService.awaitReady(player, 2)
-			local multipliers = activeEntitlementService.multipliers(player)
-			-- Boosted values go into a fresh delta, never back into `progress`:
-			-- resetMatch only clears on MatchStarted, so mutating it in place
-			-- would compound the multiplier if MatchEnded ever fired twice.
-			local awarded = {
-				Elims = progress.Elims,
-				Deaths = progress.Deaths,
-				Catches = progress.Catches,
-				Wins = progress.Wins,
-				Losses = progress.Losses,
-				MatchesPlayed = progress.MatchesPlayed,
-				XP = Boosts.apply(progress.XP, multipliers.Xp),
-				Bonks = Boosts.apply(progress.Bonks, multipliers.Bonks),
-			}
+			startCommit(player, pending)
+		end
+	end
+end
 
-			PlayerData.applyProgression(player, awarded)
-			-- Career XP and season XP are different quantities, so neither can
-			-- be derived from the other. They are kept from drifting by this
-			-- being the only place either is incremented for a match.
-			activeBattlePassService.addSeasonXp(player, awarded.XP)
-			PlayerData.completeTutorial(player)
-			if awarded.Bonks > 0 then
-				local data = PlayerData.get(player)
-				AnalyticsService.logEconomyEvent(
-					player,
-					"Source",
-					"Bonks",
-					awarded.Bonks,
-					if data then data.Bonks else 0,
-					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
-					"MatchRewards"
-				)
+function ProgressionService.awaitCommitted(players: { Player }, resultId: string, timeoutSeconds: number): boolean
+	local deadline = os.clock() + math.max(timeoutSeconds, 0)
+	repeat
+		local waiting = false
+		for _, player in players do
+			if player.Parent == Players then
+				local resultRecords = pendingByUserId[player.UserId]
+				local pending = if resultRecords then resultRecords[resultId] else nil
+				if pending then
+					waiting = true
+					startCommit(player, pending)
+				end
 			end
-			Network.fire("MatchSummary", player, {
-				won = playerWon,
-				elims = progress.Elims,
-				deaths = progress.Deaths,
-				catches = progress.Catches,
-				baseXp = progress.XP,
-				baseBonks = progress.Bonks,
-				xpMultiplier = multipliers.Xp,
-				bonksMultiplier = multipliers.Bonks,
-				xp = awarded.XP,
-				bonks = awarded.Bonks,
-			})
+		end
+		if not waiting then
+			return true
+		end
+		if os.clock() >= deadline then
+			return false
+		end
+		task.wait(0.05)
+	until false
+end
+
+function ProgressionService.summaryFor(player: Player, resultId: string?): MatchSummary?
+	if resultId ~= nil and resultId ~= currentResultId then
+		return nil
+	end
+	return summaryByPlayerId[PlayerIds.toId(player)]
+end
+
+function ProgressionService.onSummary(listener: (Player, MatchSummary, string) -> ()): () -> ()
+	table.insert(summaryListeners, listener)
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(summaryListeners, listener)
+		if index then
+			table.remove(summaryListeners, index)
 		end
 	end
 end
@@ -201,12 +407,15 @@ function ProgressionService.start(matchService: any, options: { entitlementServi
 	activeBattlePassService = if options and options.battlePassService
 		then options.battlePassService
 		else BattlePassService
+	activeMatchService = matchService
 	resetMatch()
 	matchService.onEvent(handleEvent)
-	Players.PlayerAdded:Connect(function(player)
-		local phase = matchService.phase()
-		if phase == "Starting" or phase == "Active" then
-			progressFor(PlayerIds.toId(player))
+	PlayerData.onLoaded(function(player)
+		local resultRecords = pendingByUserId[player.UserId]
+		if resultRecords then
+			for _, pending in resultRecords do
+				startCommit(player, pending)
+			end
 		end
 	end)
 end

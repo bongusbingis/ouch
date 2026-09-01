@@ -1,0 +1,212 @@
+{
+  "auditDate": "2026-08-25",
+  "remediationDate": "2026-08-25",
+  "scope": "c:\\Users\\jackc\\Desktop\\ouch",
+  "excludedPaths": [
+    "C:\\Users\\jackc\\Desktop\\boba-cafe",
+    "c:\\Users\\jackc\\Desktop\\ouch-prototype-lobby"
+  ],
+  "baseline": {
+    "tests": { "framework": "TestKit via Lune", "passing": 447, "failing": 0 },
+    "lint": { "tool": "selene", "targets": ["src", "places/arena", "places/lobby"], "errors": 0, "warnings": 0 },
+    "format": { "tool": "stylua --check", "targets": ["src", "places/arena", "places/lobby"], "clean": true }
+  },
+  "postRemediationVerification": {
+    "tests": { "framework": "TestKit via Lune", "passing": 447, "failing": 0 },
+    "lint": { "tool": "selene", "targets": ["src", "places/arena", "places/lobby"], "errors": 0, "warnings": 0 },
+    "format": { "tool": "stylua --check", "targets": ["src", "places/arena", "places/lobby"], "clean": true },
+    "build": { "tool": "rojo build", "targets": ["arena.project.json", "lobby.project.json"], "clean": true }
+  },
+  "findings": [
+    {
+      "id": "AUDIT-001",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "category": "Input/UI",
+      "title": "Combat camera locks/hides the cursor before the mode vote ever requests it, stranding mouse/keyboard players on a loading-screen retry",
+      "files": [
+        "places/arena/client/Scripts/SimulationClient.client.luau:67",
+        "src/client/PlayerModule/Combat/CombatCamera.luau:34-36,71-81",
+        "places/arena/client/Modules/Input/InputRouter.luau:29,31,96",
+        "src/shared/UI/Components/LoadingScreen.luau:57-70,221"
+      ],
+      "summary": "CombatCamera is enabled unconditionally at client boot; the only cursor-request holder is InputRouter's ModeVote reason, so nothing holds the cursor open during loading/streaming/admission.",
+      "impact": "A mouse/keyboard player whose load fails cannot click LoadingScreen's real retry/continue button because the cursor is hidden and mouse-locked.",
+      "recommendation": "Have the loading screen's mount point hold Combat.requestCursor(\"Loading\") for as long as it is visible, using the existing reason-keyed API.",
+      "scope": "Small",
+      "outcome": "fixed",
+      "remediation": "places/arena/client/UI/ArenaApp.luau now derives actionable = primaryAction ~= nil or secondaryAction ~= nil and holds Combat.requestCursor(\"LoadingAction\") via a React.useEffect keyed on it, releasing on cleanup/unmount. Scoped tighter than the original recommendation: only while a real button is rendered, not the entire loading screen."
+    },
+    {
+      "id": "AUDIT-002",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "category": "UI/Responsive",
+      "title": "Shop UI uses fixed-pixel row heights with no viewport/UIScale scaling",
+      "files": [
+        "src/shared/UI/Components/Shop/ShopSection.luau:37,48,76,84,100,110,117,122",
+        "src/shared/UI/Components/ShopPage.luau:41,67,74",
+        "src/shared/UI/Components/ShopDetailsModal.luau:81"
+      ],
+      "summary": "These components mix scale-based widths with fixed offset heights and never consult useViewportSize or a UIScale, unlike PostMatchScreen/CombatHUD/ResponsiveText which do.",
+      "impact": "Disproportionate sizing on small phones (clipping/scroll) and undersized appearance on tablets/ultrawide relative to the rest of the scaled UI.",
+      "recommendation": "Wrap the shop tree in the same UIScale pattern CombatHUD/ArenaMenu use, or route fixed heights through the existing ResponsiveText/useViewportSize helpers.",
+      "scope": "Medium",
+      "outcome": "retracted",
+      "remediation": "Full read of ShopPage.luau during the fix pass found a real container-width breakpoint system (compact mode below 820px width, driven by React.Change.AbsoluteSize, also consumed by ShopSection for column count and card height) that the original grep-based finding missed. The cited fixed-pixel values are the two breakpoint regimes' concrete sizes, not evidence of no responsive handling. Content sits in an AutomaticCanvasSize ScrollingFrame, so nothing clips even on very short screens. No code change made."
+    },
+    {
+      "id": "AUDIT-003",
+      "severity": "MEDIUM",
+      "confidence": "MEDIUM",
+      "category": "Party/Security",
+      "title": "Party join-by-code has no code-specific brute-force lockout beyond a flat per-action rate limit",
+      "files": [
+        "places/lobby/server/Modules/Matchmaking/PartyRepository.luau:52-73",
+        "places/lobby/server/Scripts/MatchmakingScript.server.luau:65-84"
+      ],
+      "summary": "6-digit numeric codes; JoinByCode is throttled to 2 attempts per 5 seconds per player but has no escalating lockout or cross-account correlation.",
+      "impact": "A determined attacker can still slowly enumerate live codes (~1,440/hr/account); success only allows joining a stranger's party (harassment/privacy nuisance), not an economy/combat exploit, since stale/expired parties are independently rejected on lookup.",
+      "recommendation": "Add an escalating lockout after N consecutive wrong-code attempts, and/or lengthen the code space if abuse is observed.",
+      "scope": "Small",
+      "outcome": "fixed",
+      "remediation": "PartyService tracks consecutive JoinByCode failures per user in-memory (cleared on success and on PlayerRemoving); after Config.JoinCodeMaxFailures (5) wrong codes within Config.JoinCodeLockoutSeconds (30s), further attempts are rejected immediately with a new Protocol.Errors.TooManyCodeAttempts, without touching the repository, for a 30s cooldown. Client shows a friendly message via the existing PartyClient error-message maps. No existing PartyService test harness to extend (none exists today for this class)."
+    },
+    {
+      "id": "AUDIT-004",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "category": "Security/DefenseInDepth",
+      "title": "DevSoloPlay's group id and minimum rank are hardcoded in a client-shipped Shared module",
+      "files": ["src/shared/Game/Matchmaking/DevSoloPlay.luau:10-11"],
+      "summary": "The authorization check itself runs server-side and is unforgeable, but the GROUP_ID/MIN_RANK constants ship to every client in plaintext.",
+      "impact": "Information disclosure only (which group/rank gates dev tooling); no bypass of the check itself.",
+      "recommendation": "Move the constants into a server-only module if this is a concern.",
+      "scope": "Small",
+      "outcome": "skipped",
+      "remediation": "Deliberately not applied. The module is spec-tested via the pure-Luau Lune harness, which has no path to ServerScriptService (confirmed: loader.luau defines no game/GetService global); relocating would strand that test and require new $path entries in both project.json files. Disproportionate cost for a LOW, already-optional finding where the actual authorization decision was already confirmed unforgeable regardless of constant location."
+    },
+    {
+      "id": "AUDIT-005",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "category": "IncompleteIntegration",
+      "title": "Scramble game mode is fully implemented but registered nowhere",
+      "files": [
+        "src/shared/Game/Modes/Scramble.luau",
+        "src/shared/Game/Modes/ModeRegistry.luau:9-13",
+        "src/config/GameModes.luau"
+      ],
+      "summary": "Scramble implements the full GameMode interface but is absent from both ModeRegistry and the GameModes config (not even as a disabled stub, unlike Infection).",
+      "impact": "None today (mode is unreachable); flagged so it is not later rediscovered as a mystery.",
+      "recommendation": "Product decision: register it, or delete the file. See Section 19 of CODEBASE_AUDIT.md.",
+      "scope": "Small",
+      "outcome": "fixed",
+      "remediation": "Asked the user directly (leave / register enabled / register disabled / delete). Answer: delete. src/shared/Game/Modes/Scramble.luau removed."
+    },
+    {
+      "id": "AUDIT-006",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "category": "DeadCode",
+      "title": "CombatDebug.luau has zero call sites anywhere in the repo",
+      "files": ["src/client/PlayerModule/Combat/CombatDebug.luau"],
+      "summary": "Not required by anything, including its own directory's public init.luau surface.",
+      "impact": "None (never loaded); maintenance clutter only.",
+      "recommendation": "Safe to delete in a future pass once confirmed no dynamic require-by-string references it.",
+      "scope": "Small",
+      "outcome": "fixed",
+      "remediation": "Asked the user directly (delete / leave). Answer: delete. Re-confirmed zero references (including ruling out one adjacent grep false-positive, an unrelated \"CombatDebugVisuals\" folder-name string in DebugVisuals.luau) before removing src/client/PlayerModule/Combat/CombatDebug.luau."
+    },
+    {
+      "id": "AUDIT-007",
+      "severity": "LOW",
+      "confidence": "MEDIUM",
+      "category": "Data/Economy",
+      "title": "Receipt/crate-grant idempotency has a bounded profile-persistence-window risk, not a same-process race",
+      "files": [
+        "src/server/Modules/MonetizationService.luau:107-143",
+        "src/server/Modules/CrateService.luau:44-99,215-223"
+      ],
+      "summary": "Traced the full grant call chain and confirmed nothing yields (no task.wait/DataStore call/Promise in the hot path), so two ProcessReceipt calls for the same purchase cannot interleave on one server. The real residual risk is that the receipt ledger is only durable at ProfileStore's next autosave; a crash in that window before a cross-server reconnect could allow a redelivered receipt to be granted twice on a different server. This is inherent to the standard ProfileStore idempotency pattern, not a coding defect here.",
+      "impact": "Low-probability, bounded double-grant risk tied to server-crash timing, not an on-demand exploit.",
+      "recommendation": "No urgent action; if double-grant reports surface in production, check server-crash timing before assuming a code bug.",
+      "scope": "None required now",
+      "outcome": "no_change_needed",
+      "remediation": "No action taken, per the original finding's own recommendation."
+    },
+    {
+      "id": "AUDIT-008",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "category": "Lifecycle/Cleanup",
+      "title": "startOptional debug/optional client modules don't disconnect on script.Destroying",
+      "files": [
+        "places/arena/client/Modules/Debug/DevMatchSkip.luau:69",
+        "places/arena/client/Scripts/SimulationClient.client.luau:209-225"
+      ],
+      "summary": "Several optional modules started via startOptional (including the newly-added DevMatchSkip) are never explicitly torn down.",
+      "impact": "None today since the client script only tears down at place shutdown, ending the whole VM regardless.",
+      "recommendation": "No action needed unless hot-reload or repeated start/stop of the simulation script is ever introduced.",
+      "scope": "None required now",
+      "outcome": "no_change_needed",
+      "remediation": "No action taken, per the original finding's own recommendation."
+    },
+    {
+      "id": "AUDIT-009",
+      "severity": "INFO",
+      "confidence": "MEDIUM",
+      "category": "Architecture/Scale",
+      "title": "Matchmaking has no single leader; every lobby server ticks its own MatchmakerService",
+      "files": ["places/lobby/server/Scripts/MatchmakingScript.server.luau:100-108"],
+      "summary": "Deliberate scale-out design coordinated via MemoryStore atomic claims rather than leader election; claim logic was traced and handles concurrent claims safely.",
+      "impact": "MemoryStore call volume scales with server count, not just CCU; no evidence of a problem at any scale exercised by the test suite (which doesn't simulate CCU load).",
+      "recommendation": "Track MemoryStore call volume as a production metric once real traffic exists.",
+      "scope": "None required now",
+      "outcome": "no_change_needed",
+      "remediation": "No action taken; standing observability note for production telemetry, not a code defect."
+    },
+    {
+      "id": "AUDIT-010",
+      "severity": "INFO",
+      "confidence": "HIGH",
+      "category": "IncompleteSystems",
+      "title": "Infection is deliberately soft-disabled via config; Scramble has no equivalent stub",
+      "files": ["src/config/GameModes.luau"],
+      "summary": "Infection.Enabled = false with a matching spec asserting the disabled stub is retained; Scramble has no config presence at all, supporting the 'possibly forgotten' framing in AUDIT-005 over 'deliberately shelved'.",
+      "impact": "None; documentation/context finding only.",
+      "recommendation": "See AUDIT-005 and Section 19 product question.",
+      "scope": "None",
+      "outcome": "no_change_needed",
+      "remediation": "Superseded by AUDIT-005's resolution (Scramble deleted); the contrast this finding drew no longer applies."
+    },
+    {
+      "id": "AUDIT-011",
+      "severity": "LOW",
+      "confidence": "MEDIUM",
+      "category": "Security/Analytics",
+      "title": "ReportAnalyticsEvent accepts any string kind with no further payload validation",
+      "files": ["src/server/Modules/AnalyticsService.luau:384"],
+      "summary": "Validation checks only that the payload is a table with a string kind field.",
+      "impact": "A modified client can spam spoofed analytics rows, polluting dashboards; no effect on economy, combat, or profile state.",
+      "recommendation": "Constrain kind to a known enum if analytics integrity becomes operationally important.",
+      "scope": "Small",
+      "outcome": "fixed",
+      "remediation": "The remote's validate function now calls the existing pure AnalyticsLogic.routeUIEvent(payload) and rejects anything it wouldn't route (unknown_kind), reusing the existing whitelist instead of adding a second one. Correction: tracing handleReport showed routeUIEvent was already a full whitelist (only \"MenuOpened\" and a fixed SHOP_EVENTS set route anywhere) and unroutable kinds were already silently dropped before this fix - the original impact statement (\"spam arbitrary/spoofed rows\") overstated the exposure. The real gap closed here is that unroutable payloads now get rejected at validation instead of reaching the handler and being dropped there."
+    },
+    {
+      "id": "AUDIT-012",
+      "severity": "INFO",
+      "confidence": "MEDIUM",
+      "category": "Input/Architecture",
+      "title": "Gamepad aim and aim-assist tuning live on different code paths, coupled only through the shared camera",
+      "files": ["places/arena/client/Modules/Input/AimDirector.luau:44-56,206-217"],
+      "summary": "AimDirector always reads camera.CFrame.LookVector; there is no dedicated gamepad aim branch. Gamepad aim works only because the stock CameraModule's right-stick rotation feeds the same camera AimDirector reads.",
+      "impact": "Works correctly today; a future change to stock gamepad camera rotation could silently change aim feel without touching anything that looks like aim code.",
+      "recommendation": "Add a comment at the read site documenting the coupling; no structural change needed.",
+      "scope": "None required now",
+      "outcome": "skipped",
+      "remediation": "Deliberately not applied. The recommended fix was an inline comment, but this session established (and the user approved) a strict no-inline-comments convention for this codebase (4-line header only); adding one back would contradict it."
+    }
+  ]
+}

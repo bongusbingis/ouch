@@ -1,3 +1,8 @@
+-- Name: QuestCompleteServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-quest-complete, forcing an active daily quest to its completion threshold for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

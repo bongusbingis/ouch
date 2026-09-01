@@ -1,3 +1,8 @@
+-- Name: PageTransition.luau
+-- Author: Jack C.
+-- Description: Wrapper that animates a page in and out as the UI routes between screens, honouring the reduced-motion preference.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

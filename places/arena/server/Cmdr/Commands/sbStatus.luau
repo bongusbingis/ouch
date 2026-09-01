@@ -1,3 +1,8 @@
+-- Name: sbStatus.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-status: shows match, combat, position, profile, and equipped-cosmetic state for a player.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

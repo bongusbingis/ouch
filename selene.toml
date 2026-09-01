@@ -1,5 +1,17 @@
 std = "roblox"
-exclude = ["**/*.spec.luau"]
+# Vendored Roblox PlayerModule is excluded for the same reason it is not
+# formatted: it is upstream source, and its warnings are not ours to fix.
+exclude = [
+  "**/*.spec.luau",
+  # Upstream PlayerModule files only. Our additions under Combat/ are linted.
+  "src/client/PlayerModule/CameraModule/**",
+  "src/client/PlayerModule/ControlModule/**",
+  "src/client/PlayerModule/CommonUtils/**",
+  "src/client/PlayerModule/ServerAuthority/**",
+  "src/client/PlayerModule/init.luau",
+  "src/client/PlayerModule/InputSetup.server.luau",
+  "src/client/PlayerModule/PlayerScriptsLoader.server.luau",
+]
 
 [lints]
 unused_variable = "allow"

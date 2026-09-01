@@ -1,3 +1,8 @@
+-- Name: Types.luau
+-- Author: Jack C.
+-- Description: Shared type declarations for the lobby matchmaking system: parties, members, snapshots, queue tickets, match records, and request payloads.
+-- Created: 2026-08-15
+
 export type GameMode = "FFA" | "TDM" | "Infection"
 export type PartyPhase = "Lobby" | "Queued" | "Claimed" | "Assigned" | "Teleporting"
 
@@ -40,6 +45,7 @@ export type PartySnapshot = PartyRecord
 
 export type MatchParty = {
 	partyId: string,
+	leaderUserId: number,
 	memberUserIds: { number },
 }
 
@@ -68,6 +74,10 @@ export type TeleportData = {
 		strategy: "Vote",
 		options: { GameMode },
 	},
+	party: {
+		leaderUserId: number,
+		memberUserIds: { number },
+	}?,
 }
 
 return {}

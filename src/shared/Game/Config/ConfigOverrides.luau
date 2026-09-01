@@ -1,12 +1,9 @@
---!strict
+-- Name: ConfigOverrides.luau
+-- Author: Jack C.
+-- Description: Pure rules for turning raw experience config values into applicable overrides, validating each against its declared type and range and partitioning the simulation-critical ones.
+-- Created: 2026-08-18
 
--- Pure rules for turning raw Roblox experience config values into overrides the
--- game may apply. Every value crossing into gameplay passes through resolve, on
--- the server when it is read from ConfigService and again on the client when it
--- is decoded from replication, so neither a config authoring mistake nor a
--- malformed payload can install a value outside its declared type and range.
---
--- Keys not present in the registry are ignored rather than applied.
+--!strict
 
 local ConfigOverrides = {}
 
@@ -77,7 +74,6 @@ function ConfigOverrides.resolve(entries: { Entry }, rawValues: { [string]: any 
 	return accepted, rejected
 end
 
--- Splits accepted overrides by whether the deterministic sim reads their module.
 function ConfigOverrides.partition(
 	accepted: { [string]: any },
 	simCritical: { [string]: boolean }
@@ -95,9 +91,6 @@ function ConfigOverrides.partition(
 	return immediate, staged
 end
 
--- A key is projected onto an instance name under underscores, keeping dots out of
--- name-based lookups. Neither side reverses this: both walk the registry and
--- derive the name from the key, so no key round trips through its projection.
 function ConfigOverrides.projectedName(key: string): string
 	return (string.gsub(key, "%.", "_"))
 end
@@ -113,8 +106,6 @@ function ConfigOverrides.readPath(root: any, path: { string }): any
 	return cursor
 end
 
--- Writes only where the leaf already exists, so a key that no longer matches
--- the config module cannot introduce a new field.
 function ConfigOverrides.writePath(root: any, path: { string }, value: any): boolean
 	local cursor = root
 	for index = 1, #path - 1 do

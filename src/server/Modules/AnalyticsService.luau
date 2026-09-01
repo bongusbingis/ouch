@@ -1,3 +1,8 @@
+-- Name: AnalyticsService.luau
+-- Author: Jack C.
+-- Description: Central analytics reporting: funnel steps, onboarding progression, economy and custom events, match and combat tallies, and periodic performance gauges, all deduplicated and dimensioned before being sent.
+-- Created: 2026-07-22
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -27,14 +32,6 @@ local AssistResolver = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Config"):WaitForChild("AssistResolver")
 )
 
--- Sole caller of Roblox's AnalyticsService. Every other service reports
--- through the public log* functions here rather than touching the engine
--- API directly, so naming/session-id/Studio-gating stays in one place.
---
--- In Studio, calls are never sent (the dashboard drops Studio sessions
--- anyway) — instead they're printed when Config.Debug.AnalyticsVerbose is
--- on. On a real server they're sent for real, and optionally also printed.
-
 local AnalyticsService = {}
 
 type OnboardingProgress = {
@@ -50,14 +47,9 @@ local combatDedup = EventDedup.new()
 local matchStartedAt = 0
 local started = false
 
--- Per-player, per-match combat tallies. Aggregated rather than logged per throw:
--- a single event per player per match answers "hit rate by device" without
--- putting one analytics call on every input.
 type CombatTally = { throws: number, hits: number, catches: number, deaths: number }
 
 local combatTallies: { [number]: CombatTally } = {}
--- Server-wide values sampled at match end, registered by whoever owns them so
--- this service does not have to reach into the simulation to read them.
 local gauges: { [string]: () -> number } = {}
 
 local function tallyFor(userId: number): CombatTally
@@ -69,9 +61,6 @@ local function tallyFor(userId: number): CombatTally
 	return tally
 end
 
--- Dimensions stamped onto every event. Device class is the axis every
--- mobile-competitiveness question is sliced by, and the assist bucket separates
--- A/B cohorts; stamping centrally means no call site can omit either.
 local function withDimensions(player: Player, customFields: { [string]: any }?): { [string]: any }
 	local fields: { [string]: any } = table.clone(customFields or {})
 	local dimensions = AnalyticsConfig.Dimensions
@@ -100,10 +89,6 @@ local function progressFor(userId: number): OnboardingProgress
 	return progress
 end
 
--- A funnel session identifies one journey through a funnel, not the player's
--- whole visit: step 1 starts a new one so a second shop trip or a re-queue is a
--- separate row rather than merging into the first and making the drop-off
--- between steps unreadable.
 local function funnelSessionId(userId: number, funnelName: string, step: number): string
 	local byFunnel = funnelSessionIds[userId]
 	if byFunnel == nil then
@@ -334,8 +319,6 @@ local function handleMatchEvent(event: { [string]: any })
 		local playerCount = #Players:GetPlayers()
 		for _, player in Players:GetPlayers() do
 			advanceOnboarding(player, "MatchEnded")
-			-- Value is the duration so match length is aggregatable without
-			-- unpacking custom fields; the rest describes what was played.
 			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchCompleted, durationSeconds, {
 				winnerId = event.winnerId,
 				modeId = modeId,
@@ -344,10 +327,6 @@ local function handleMatchEvent(event: { [string]: any })
 				won = event.winnerId ~= nil and tostring(event.winnerId) == PlayerIds.toId(player),
 			})
 
-			-- One row per player per match carrying the whole combat tally, so
-			-- hit rate is a division on the dashboard rather than a join across
-			-- per-throw events. Gauge values describe the server everyone in
-			-- this match shared, so they ride along on every row.
 			local tally = tallyFor(player.UserId)
 			local fields: { [string]: any } = {
 				modeId = modeId,
@@ -381,32 +360,21 @@ local function handleReport(player: Player, payload: { [string]: any })
 	end
 end
 
--- Lets whoever owns a server-wide counter report it without this service having
--- to reach into the simulation to read it. Values are sampled once at match end
--- and attached to every player's CombatSummary row.
 function AnalyticsService.registerGauge(name: string, read: () -> number)
 	gauges[name] = read
 end
 
--- Round-trip time is the input to the largest known fairness gap (see
--- docs/hitreg-audit.md F1), and it cannot be inferred from anything else we log,
--- so it is sampled directly. Per player, because the whole point is comparing
--- one connection against another.
 local function sampleLatency()
 	for _, player in Players:GetPlayers() do
 		local ok, ping = pcall(function()
 			return player:GetNetworkPing()
 		end)
 		if ok and typeof(ping) == "number" then
-			-- GetNetworkPing reports one way, in seconds; milliseconds round trip
-			-- is what everyone actually reasons about.
 			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.InputLatency, ping * 2000)
 		end
 	end
 end
 
--- matchService is optional: the lobby runs the same service for session,
--- onboarding, economy, and funnel reporting but has no match loop to observe.
 function AnalyticsService.start(matchService: any?)
 	if started then
 		return
@@ -416,7 +384,10 @@ function AnalyticsService.start(matchService: any?)
 	Network.handleProtected("ReportAnalyticsEvent", {
 		rateLimit = 10,
 		validate = function(_player, payload)
-			return typeof(payload) == "table" and typeof(payload.kind) == "string", "invalid_payload"
+			if typeof(payload) ~= "table" or typeof(payload.kind) ~= "string" then
+				return false, "invalid_payload"
+			end
+			return AnalyticsLogic.routeUIEvent(payload :: AnalyticsLogic.UIEventPayload) ~= nil, "unknown_kind"
 		end,
 	}, handleReport)
 

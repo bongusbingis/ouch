@@ -1,3 +1,8 @@
+-- Name: ReturnPayload.spec.luau
+-- Author: Jack C.
+-- Description: Spec for grouped and self-separating arena return payloads, including legacy grouped payload compatibility.
+-- Created: 2026-08-31
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -17,6 +22,37 @@ T.describe("ReturnPayload", function()
 		local built = ReturnPayload.build("party-1", "match-1", members)
 		table.insert(members, 30)
 		T.expect(#built.memberUserIds):toEqual(2)
+	end)
+
+	T.it("round-trips an explicit self-separating return", function()
+		local parsed = ReturnPayload.parse(ReturnPayload.build("party", "match", { 10, 20 }, "Separate"))
+		T.expect((parsed :: any).returnMode):toEqual("Separate")
+		T.expect((parsed :: any).memberUserIds[1]):toEqual(10)
+		T.expect((parsed :: any).memberUserIds[2]):toEqual(20)
+	end)
+
+	T.it("defaults legacy and newly built grouped returns to Party", function()
+		local built = ReturnPayload.build("party", "match", { 10 })
+		T.expect(built.returnMode):toEqual("Party")
+		local parsed = ReturnPayload.parse({
+			schemaVersion = ReturnPayload.SchemaVersion,
+			partyId = "party",
+			matchId = "match",
+			memberUserIds = { 10 },
+		})
+		T.expect((parsed :: any).returnMode):toEqual("Party")
+	end)
+
+	T.it("rejects an unknown return mode", function()
+		local parsed, reason = ReturnPayload.parse({
+			schemaVersion = ReturnPayload.SchemaVersion,
+			partyId = "party",
+			matchId = "match",
+			memberUserIds = { 10 },
+			returnMode = "EveryoneElse",
+		})
+		T.expect(parsed):toBeNil()
+		T.expect(reason):toEqual("invalid_return_mode")
 	end)
 
 	T.it("rejects a payload from a different schema", function()

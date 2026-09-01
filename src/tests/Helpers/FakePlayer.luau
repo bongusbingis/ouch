@@ -1,8 +1,9 @@
+-- Name: FakePlayer.luau
+-- Author: Jack C.
+-- Description: Player-shaped test doubles for service seams that only read the player surface, since real players cannot exist in the cloud execution environment.
+-- Created: 2026-07-16
+
 --!strict
--- Player-shaped test doubles for service seams that only read the player
--- surface (UserId, Name, attributes, Character). Real Players cannot exist in
--- the cloud execution environment; anything that needs engine Player behavior
--- (replication, PlayerGui, PlayerAdded) is out of scope for these doubles.
 
 export type FakePlayer = {
 	UserId: number,

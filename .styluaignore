@@ -1,0 +1,13 @@
+# Vendored Roblox PlayerModule. Kept byte-identical to what Roblox ships so it
+# can be re-extracted and diffed; formatting it would create noise in every
+# future upstream comparison.
+#
+# Only the upstream files are listed. Our own additions under Combat/ are
+# formatted and linted like the rest of the project.
+src/client/PlayerModule/CameraModule/
+src/client/PlayerModule/ControlModule/
+src/client/PlayerModule/CommonUtils/
+src/client/PlayerModule/ServerAuthority/
+src/client/PlayerModule/init.luau
+src/client/PlayerModule/InputSetup.server.luau
+src/client/PlayerModule/PlayerScriptsLoader.server.luau

@@ -1,7 +1,9 @@
+-- Name: Projectiles.spec.luau
+-- Author: Jack C.
+-- Description: In-place port of the projectile spec: swept kinematics, homing clamps, bounce and roll transitions, release sockets, and hit rules.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud port of the Projectiles spec: swept kinematics, homing clamps, bounce
--- and roll phase transitions, windup/release sockets, and hit rules. Config
--- overrides are save/restored per case via withConfig.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -105,7 +107,6 @@ return function()
 		it("breaks lock past the break angle", function()
 			withConfig({ Gravity = 0 }, function()
 				local state = SimTypes.newState()
-				-- Target at 90 degrees off the flight path, beyond HomingBreakAngleDeg.
 				local target = MockWorld.character(vector.create(0, 3, 30))
 				local world = MockWorld.snapshot({ dummy = target })
 				local ball = makeBall(state, {

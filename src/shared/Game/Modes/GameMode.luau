@@ -1,8 +1,9 @@
---!strict
+-- Name: GameMode.luau
+-- Author: Jack C.
+-- Description: The interface every game mode implements, pairing the pure match rules readable by the sim, tests, and UI with the server-only lifecycle hooks.
+-- Created: 2026-07-13
 
--- The interface every game mode implements. Modes are shared modules so the
--- pure rules are readable by MatchSim, tests, and client UI; the hooks are
--- invoked only on the server with a ModeContext of levers.
+--!strict
 
 export type MatchRules = {
 	MinPlayers: number,
@@ -10,15 +11,12 @@ export type MatchRules = {
 	TimeCapSeconds: number,
 	ResultsSeconds: number,
 	IntermissionSeconds: number,
-	StartingSeconds: number, -- arena countdown before combat inputs become active
+	StartingSeconds: number,
 	RespawnSeconds: number,
-	-- When set, deaths respawn in synchronized waves on this cadence instead
-	-- of individually after RespawnSeconds (GDD §4.2 TDM push/retreat rhythm).
 	WaveRespawnSeconds: number?,
 	SpawnInvulnSeconds: number,
-	-- Who wins when the clock runs out, for modes where surviving to the cap is
-	-- itself the win. Unset means the leading score takes it.
 	TimeCapWinnerId: string?,
+	PreserveDodgeballs: boolean,
 }
 
 export type ScoreScope = "Player" | "Team"
@@ -31,11 +29,7 @@ export type ModeContext = {
 	getPlayers: () -> { Player },
 	getPlayerTeam: (player: Player) -> string?,
 	getPlayerById: (id: string) -> Player?,
-	-- Modes that move players between sides mid-match (infection) rather than
-	-- being assigned once at the start.
 	setPlayerTeam: (player: Player, teamId: string?) -> (),
-	-- Ends the match now, naming the winner outright for outcomes that are not
-	-- a score race.
 	finishMatch: (winnerId: string?, reason: string) -> (),
 }
 
@@ -47,8 +41,6 @@ export type GameMode = {
 	teams: { string }?,
 
 	onMatchStart: (ctx: ModeContext) -> (),
-	-- isFirstSpawn is true the first time a player spawns in the current
-	-- match (including late joiners), false on respawns after deaths.
 	onPlayerSpawned: (ctx: ModeContext, player: Player, isFirstSpawn: boolean) -> (),
 	onElim: (ctx: ModeContext, sourceId: string?, targetId: string?) -> (),
 	onMatchEnd: (ctx: ModeContext) -> (),

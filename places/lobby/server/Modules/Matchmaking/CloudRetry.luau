@@ -1,3 +1,8 @@
+-- Name: CloudRetry.luau
+-- Author: Jack C.
+-- Description: Wraps a cloud store call with the configured retry and backoff policy so transient failures do not surface as matchmaking errors.
+-- Created: 2026-08-15
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)

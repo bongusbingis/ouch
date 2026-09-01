@@ -1,8 +1,14 @@
+-- Name: Projectiles.luau
+-- Author: Jack C.
+-- Description: The generic swept-projectile subsystem: fixed-tick kinematics, homing, swept collision against characters and static geometry with substepping to prevent tunneling, and the held, windup, flight, bounce, and roll phase machine.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
 local SimUtil = require(script.Parent.SimUtil)
 local CollisionWorld = require(script.Parent.CollisionWorld)
+local ProjectileTrajectory = require(script.Parent.ProjectileTrajectory)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local AimAssist = require(script.Parent.Parent.Parent.Parent.Config.AimAssist)
 
@@ -12,14 +18,8 @@ type WorldSnapshot = SimTypes.WorldSnapshot
 type ProjectileState = SimTypes.ProjectileState
 type SimEvent = SimTypes.SimEvent
 
--- Generic swept-projectile subsystem: fixed-tick kinematics, homing steering,
--- swept-sphere collision vs. capsules and statics, substepped to prevent
--- tunneling. Archetype params come from Config.Combat; the dodgeball is the
--- only archetype for now.
-
 local Projectiles = {}
 
-local MAX_SUBSTEPS = 8
 local DEFAULT_MAX_CONTACTS_PER_STEP = 4
 local DEFAULT_MIN_BOUNCE_NORMAL_SPEED = 1.5
 local SETTLE_DROP = 50
@@ -33,32 +33,53 @@ local function settle(world: WorldSnapshot, position: Vec, radius: number): Vec
 	return position
 end
 
-local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, position: Vec)
-	local radius = Combat[projectile.archetype].Radius
-	projectile.phase = "Free"
-	projectile.position = settle(world, position, radius)
+local function clearFlightState(projectile: ProjectileState)
 	projectile.velocity = vector.zero
 	projectile.targetId = nil
-	projectile.heldBy = nil
 	projectile.flightTime = 0
 	projectile.windupRemaining = 0
 	projectile.releaseAim = nil
 	projectile.releaseTargetId = nil
 	projectile.releaseCharge = nil
-	projectile.releaseLob = nil
 end
 
--- Rotates a direction toward world up by the given angle. The axis is
--- perpendicular to both, so the yaw the player aimed is preserved exactly and
--- only the pitch changes. An already-vertical aim has no such axis and is left
--- alone rather than snapping to an arbitrary heading.
-local function pitchUp(aim: Vec, radians: number): Vec
-	local axis = vector.cross(aim, vector.create(0, 1, 0))
-	if vector.magnitude(axis) <= 1e-4 then
-		return aim
+local function becomeFree(projectile: ProjectileState, world: WorldSnapshot, position: Vec)
+	local radius = Combat[projectile.archetype].Radius
+	projectile.phase = "Free"
+	projectile.position = settle(world, position, radius)
+	projectile.heldBy = nil
+	clearFlightState(projectile)
+end
+
+local function comeToRest(
+	projectile: ProjectileState,
+	state: SimState,
+	world: WorldSnapshot,
+	position: Vec,
+	events: { SimEvent }
+)
+	local rules = world.rules
+	local ownerId = projectile.ownerId
+	if rules ~= nil and rules.preserveDodgeballs and ownerId ~= nil then
+		local owner = world.characters[ownerId]
+		if owner ~= nil and owner.alive and not SimUtil.hasHandBall(state, ownerId) then
+			projectile.phase = "Held"
+			projectile.heldBy = ownerId
+			projectile.position = owner.handPosition
+			clearFlightState(projectile)
+			projectile.bounceCount = 0
+			SimUtil.pushEvent(events, state, {
+				kind = "BallReturned",
+				tick = 0,
+				projectileId = projectile.id,
+				playerId = ownerId,
+				targetId = ownerId,
+				position = projectile.position,
+			})
+			return
+		end
 	end
-	axis = vector.normalize(axis)
-	return vector.normalize(aim * math.cos(radians) + vector.cross(axis, aim) * math.sin(radians))
+	becomeFree(projectile, world, position)
 end
 
 local function horizontalOf(v: Vec): Vec
@@ -84,31 +105,6 @@ local function releasePosition(world: WorldSnapshot, from: Vec, aim: Vec, config
 		return hit.position + hit.normal * config.ContactSeparation
 	end
 	return from + displacement
-end
-
-local function steer(
-	velocity: Vec,
-	from: Vec,
-	targetPos: Vec,
-	turnRateRad: number,
-	breakAngleRad: number,
-	dt: number
-): Vec
-	local speed = vector.magnitude(velocity)
-	if speed <= 1e-6 then
-		return velocity
-	end
-	local currentDir = velocity / speed
-	local toTarget = targetPos - from
-	if vector.magnitude(toTarget) <= 1e-6 then
-		return velocity
-	end
-	local desiredDir = vector.normalize(toTarget)
-
-	local angleError = math.acos(math.clamp(vector.dot(currentDir, desiredDir), -1, 1))
-	local decay = if breakAngleRad > 0 then math.clamp(1 - angleError / breakAngleRad, 0, 1) else 1
-	local maxTurn = turnRateRad * decay * dt
-	return CollisionWorld.rotateToward(currentDir, desiredDir, maxTurn) * speed
 end
 
 type CharacterHit = {
@@ -176,20 +172,10 @@ local function stepWindup(
 
 	local row = AimAssist[projectile.releaseDeviceClass or "Mouse"] or AimAssist.Mouse
 	local aim = vector.normalize(projectile.releaseAim)
-	local speed = config.ThrowSpeed
-	if projectile.releaseLob then
-		aim = pitchUp(aim, math.rad(config.Lob.PitchDeg))
-		speed *= config.Lob.SpeedScale
-	else
-		-- Charge only changes speed. A faster ball is already flatter, longer
-		-- and harder to react to, so there is no separate arc to tune.
-		local charge = math.clamp(projectile.releaseCharge or 0, 0, 1)
-		speed *= 1 + (config.Charge.MaxSpeedScale - 1) * charge
-	end
 	projectile.phase = "InFlight"
 	projectile.heldBy = nil
 	projectile.position = releasePosition(world, holder.throwPosition, aim, config)
-	projectile.velocity = aim * speed + holder.velocity * config.MomentumInheritance
+	projectile.velocity = ProjectileTrajectory.launchVelocity(config, aim, holder.velocity, projectile.releaseCharge)
 	projectile.targetId = projectile.releaseTargetId
 	projectile.effectiveRadius = config.Radius + config.HitForgiveness + row.MagnetismRadius
 	projectile.flightTime = 0
@@ -235,7 +221,7 @@ local function maybeSettleAfterBounce(
 		or speed <= config.SettleSpeed
 		or (hit.normal.y > 0.6 and math.abs(projectile.velocity.y) <= config.SettleVerticalSpeed)
 	then
-		becomeFree(projectile, world, projectile.position)
+		comeToRest(projectile, state, world, projectile.position, events)
 		SimUtil.pushEvent(
 			events,
 			state,
@@ -296,7 +282,7 @@ local function settleRolling(
 	config: typeof(Combat.Dodgeball),
 	events: { SimEvent }
 )
-	becomeFree(projectile, world, projectile.position)
+	comeToRest(projectile, state, world, projectile.position, events)
 	SimUtil.pushEvent(
 		events,
 		state,
@@ -318,7 +304,7 @@ local function advanceBouncing(
 	end
 
 	local speed = vector.magnitude(projectile.velocity)
-	local substeps = math.clamp(math.ceil(speed * dt / math.max(config.Radius, 0.5)), 1, MAX_SUBSTEPS)
+	local substeps = ProjectileTrajectory.substepCount(speed, dt, config.Radius)
 	local subDt = dt / substeps
 	local maxContacts = config.MaxBounceContactsPerStep or DEFAULT_MAX_CONTACTS_PER_STEP
 	local gravity = vector.create(0, -config.Gravity, 0)
@@ -409,7 +395,7 @@ local function stepInFlight(
 )
 	projectile.flightTime += dt
 	if projectile.flightTime > config.MaxFlightTime then
-		becomeFree(projectile, world, projectile.position)
+		comeToRest(projectile, state, world, projectile.position, events)
 		SimUtil.pushEvent(events, state, { kind = "BallLanded", tick = 0, projectileId = projectile.id })
 		return
 	end
@@ -430,7 +416,7 @@ local function stepInFlight(
 	end
 
 	local speed = vector.magnitude(projectile.velocity)
-	local substeps = math.clamp(math.ceil(speed * dt / math.max(config.Radius, 0.5)), 1, MAX_SUBSTEPS)
+	local substeps = ProjectileTrajectory.substepCount(speed, dt, config.Radius)
 	local subDt = dt / substeps
 	local gravity = vector.create(0, -config.Gravity, 0)
 	local characterIds = SimUtil.sortedKeys(world.characters)
@@ -438,7 +424,7 @@ local function stepInFlight(
 	for substepIndex = 1, substeps do
 		projectile.velocity += gravity * subDt
 		if target then
-			projectile.velocity = steer(
+			projectile.velocity = ProjectileTrajectory.steer(
 				projectile.velocity,
 				projectile.position,
 				chestPosition(target),
@@ -473,7 +459,7 @@ local function stepInFlight(
 					then vector.normalize(projectile.velocity)
 					else nil,
 			})
-			becomeFree(projectile, world, characterHit.position)
+			comeToRest(projectile, state, world, characterHit.position, events)
 			return
 		end
 

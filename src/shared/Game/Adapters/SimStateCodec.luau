@@ -1,20 +1,20 @@
+-- Name: SimStateCodec.luau
+-- Author: Jack C.
+-- Description: Encodes and decodes simulation state to and from the attributes on ball and character instances, the between-tick source of truth that replicates to clients for presentation.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
+local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 
 type SimState = SimTypes.SimState
 type ProjectileState = SimTypes.ProjectileState
 
--- Attributes on the ball instances are the between-tick source of truth and
--- replicate to clients for presentation. The adapter decodes a fresh
--- SimState every simulation step and encodes the result back. Names are kept
--- short for the replication limits (first 64 attributes, <=50-char names).
---
--- Ball position is NOT an attribute — it lives in the part's CFrame, which
--- is set by the server each tick and replicates natively.
-
 local SimStateCodec = {}
+
+SimStateCodec.EquippedAttribute = "wpn"
 
 local PHASE_TO_NUMBER: { [SimTypes.ProjectilePhase]: number } = {
 	Held = 0,
@@ -69,13 +69,14 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 			releaseTargetId = ball:GetAttribute("rt") :: string?,
 			releaseDeviceClass = ball:GetAttribute("rd") :: string?,
 			releaseCharge = ball:GetAttribute("rc") :: number?,
-			releaseLob = ball:GetAttribute("rl") :: boolean?,
 		}
 	end
 
 	for playerId, model in characterModels do
 		state.players[playerId] = {
 			id = playerId,
+			equipped = (model:GetAttribute(SimStateCodec.EquippedAttribute) :: string?) or WeaponRegistry.defaultKind(),
+			heldBallLastTick = model:GetAttribute("hadB") == true,
 			weapons = {
 				Dodgeball = {
 					throwCooldown = (model:GetAttribute("dbTc") :: number?) or 0,
@@ -127,7 +128,6 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(ball, "rt", projectile.releaseTargetId)
 		setAttributeIfChanged(ball, "rd", projectile.releaseDeviceClass)
 		setAttributeIfChanged(ball, "rc", projectile.releaseCharge)
-		setAttributeIfChanged(ball, "rl", projectile.releaseLob)
 		local velocity = projectile.velocity
 		if projectile.phase ~= "InFlight" and projectile.phase ~= "Bouncing" and projectile.phase ~= "Rolling" then
 			velocity = vector.zero
@@ -140,6 +140,8 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		if player == nil then
 			continue
 		end
+		setAttributeIfChanged(model, SimStateCodec.EquippedAttribute, player.equipped)
+		setAttributeIfChanged(model, "hadB", player.heldBallLastTick)
 		local kitState = player.weapons.Dodgeball
 		setAttributeIfChanged(model, "dbTc", kitState.throwCooldown)
 		setAttributeIfChanged(model, "dbCc", kitState.catchCooldown)

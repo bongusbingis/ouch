@@ -1,3 +1,8 @@
+-- Name: PopulationPolicy.spec.luau
+-- Author: Jack C.
+-- Description: Spec that the required match population relaxes as the oldest ticket waits and stays clamped to a viable target range.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)

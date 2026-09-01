@@ -1,3 +1,8 @@
+-- Name: TargetSelect.luau
+-- Author: Jack C.
+-- Description: Pure soft-lock target selection and steering: picks the enemy nearest the centre of aim within the cone, scores confidence by angle, and rotates a direction toward a point within a clamp.
+-- Created: 2026-08-19
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
@@ -6,33 +11,12 @@ local SimUtil = require(script.Parent.SimUtil)
 type Vec = SimTypes.Vec
 type WorldSnapshot = SimTypes.WorldSnapshot
 
--- Scored target selection, shared by every weapon that needs to answer "who is
--- the player pointing at". Extracted so the dodgeball's soft lock and the
--- hammer's melee assists cannot drift apart in what counts as a valid target --
--- a difference there would show up as the ball and the swing disagreeing about
--- who you were aiming at, which is exactly the kind of bug nobody can describe.
---
--- Scoring is angle first, distance as a small tiebreak, so the enemy nearest the
--- centre of aim wins and two at the same angle resolve by proximity. Iteration
--- is over sorted keys, so the result is identical for identical inputs.
---
--- Confidence is a normalized 0-1 measure of how well centred the pick is: full
--- through the middle of the cone, tapering to zero at its edge. Assists scale by
--- it so they fade out at the boundary instead of switching off, which is what
--- makes an assist feel like part of the aim rather than a mechanism.
-
 local TargetSelect = {}
 
 export type Options = {
-	-- Furthest a candidate may be, in studs.
 	rangeStuds: number,
-	-- Half-angle around the aim direction that admits a candidate, in degrees.
 	coneDeg: number,
-	-- Fraction of the cone that still scores full confidence.
 	fadeStartFraction: number,
-	-- Sphere radius for the line-of-sight check, or nil to skip the check --
-	-- melee at contact range does not need one and would fail it against the
-	-- target's own capsule.
 	lineOfSightRadius: number?,
 }
 
@@ -48,9 +32,6 @@ local function confidenceFor(angleRadians: number, coneRadians: number, fadeStar
 	return 1 - (fraction - fadeStart) / (1 - fadeStart)
 end
 
--- Best enemy in the cone, plus how confident the pick is. Returns nil and zero
--- when nothing qualifies; callers treat that as "no assist" rather than as an
--- error, because pointing at empty space is a normal thing to do.
 function TargetSelect.pick(
 	world: WorldSnapshot,
 	selfId: string,
@@ -101,9 +82,6 @@ function TargetSelect.pick(
 	return best, confidenceFor(bestAngle, coneRadians, options.fadeStartFraction)
 end
 
--- Rotates a direction toward a point by at most maxAngleRadians, scaled by
--- strength. Used wherever an assist nudges aim rather than replacing it: the
--- clamp is what keeps the result recognisable as the player's own input.
 function TargetSelect.steer(direction: Vec, origin: Vec, point: Vec, strength: number, maxAngleRadians: number): Vec
 	local toPoint = point - origin
 	local distance = vector.magnitude(toPoint)

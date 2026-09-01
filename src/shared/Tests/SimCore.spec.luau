@@ -1,3 +1,8 @@
+-- Name: SimCore.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the end-to-end simulation: a deterministic throw at a strafing dummy producing an elimination, bit-identical replays, and cleanup when a player leaves holding a ball.
+-- Created: 2026-07-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -11,9 +16,6 @@ type InputCommand = SimTypes.InputCommand
 
 local DT = 1 / 60
 
--- Full scenario: player picks up a spawned ball, throws at a strafing dummy
--- with soft-lock, ball curves and eliminates it. Replayed twice to pin
--- end-to-end determinism (same events at the same ticks).
 local function runScenario(): { string }
 	local state = SimCore.newState()
 	state.projectiles.ball_0001 = {
@@ -36,7 +38,6 @@ local function runScenario(): { string }
 	local log: { string } = {}
 
 	for tick = 1, 240 do
-		-- Dummy strafes on Z; scripted from the tick so both runs agree.
 		local dummyZ = 4 * math.sin(tick / 30)
 		local world = MockWorld.snapshot({
 			p1 = MockWorld.character(vector.create(0, 2.5, 0)),

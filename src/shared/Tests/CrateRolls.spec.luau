@@ -1,3 +1,8 @@
+-- Name: CrateRolls.spec.luau
+-- Author: Jack C.
+-- Description: Spec for crate rolling against a scripted random source: weighted rarity distribution, zero-weight exclusion, duplicate refunds, and the pity guarantee bounding the worst-case streak.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -20,8 +25,6 @@ local ITEMS = {
 
 local CRATE = { ItemPool = { "CommonA", "CommonB", "RareA", "LegendaryA", "ExclusiveA" } }
 
--- Deterministic Random stand-in: NextNumber returns queued fractions [0,1),
--- NextInteger returns queued picks (clamped to range).
 local function scriptedRandom(numbers: { number }, integers: { number })
 	local numberIndex = 0
 	local integerIndex = 0
@@ -39,7 +42,6 @@ end
 
 T.describe("CrateRolls", function()
 	T.it("rolls rarities according to weights", function()
-		-- Sorted rarity order: Common(70), Legendary(6), Rare(24); total 100.
 		local common = CrateRolls.roll(CRATE, ITEMS, RARITIES, {}, scriptedRandom({ 0.5 }, { 1 }))
 		T.expect(common.rarity):toEqual("Common")
 
@@ -81,7 +83,6 @@ T.describe("CrateRolls", function()
 
 	T.it("forces the guaranteed rarity once its threshold comes due", function()
 		local pityCrate = { ItemPool = CRATE.ItemPool, Pity = { Rare = 5, Legendary = 25 } }
-		-- 0.5 would roll Common; the fifth open without a Rare must override it.
 		local result = CrateRolls.roll(pityCrate, ITEMS, RARITIES, {}, scriptedRandom({ 0.5 }, { 1 }), { Rare = 4 })
 		T.expect(result.rarity):toEqual("Rare")
 		T.expect(result.pityTriggered):toEqual("Rare")
@@ -99,8 +100,6 @@ T.describe("CrateRolls", function()
 			counters = result.pity
 		end
 
-		-- Still short of the guarantee, so this Rare is rolled, not forced. It
-		-- clears its own counter and leaves the rarer guarantee counting up.
 		local natural = CrateRolls.roll(pityCrate, ITEMS, RARITIES, {}, scriptedRandom({ 0.99 }, { 1 }), counters)
 		T.expect(natural.rarity):toEqual("Rare")
 		T.expect(natural.pityTriggered):toBeNil()
@@ -137,7 +136,6 @@ T.describe("CrateRolls", function()
 		local sinceLegendary = 0
 
 		for _ = 1, 200 do
-			-- 0.5 always rolls Common on its own, so only pity can break the streak.
 			local result = CrateRolls.roll(pityCrate, ITEMS, RARITIES, {}, scriptedRandom({ 0.5 }, { 1 }), counters)
 			counters = result.pity
 			sinceRare = if RARITIES[result.rarity].Weight <= RARITIES.Rare.Weight then 0 else sinceRare + 1

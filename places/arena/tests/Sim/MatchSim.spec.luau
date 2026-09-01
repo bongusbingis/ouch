@@ -1,6 +1,9 @@
+-- Name: MatchSim.spec.luau
+-- Author: Jack C.
+-- Description: In-place port of the match phase machine spec, covering phase transitions, scoring, win conditions, and the mode registry surface.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud port of the MatchSim spec: pure match phase machine (Idle → Starting → Active →
--- Results → Intermission), scoring rules, and the ModeRegistry surface.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

@@ -35,6 +35,6 @@ Under `ScreenGui > BaseClip > Views > Inventory`:
 - `Main > CategoriesHolder > Spacer` must be a transparent `GuiObject` template with `Visible = false`.
 - `ItemCard` must contain `ViewportFrame` (`ViewportFrame`). Its preview camera and world are created and cleaned up by the client renderer.
 
-Trail cards render their dodgeball in the viewport and simulate unsupported Roblox trail/particle effects with a procedural UI ribbon overlay. The ribbon reads the existing `TrailCosmetics` colors and is created and cleaned up by the client renderer.
+Effect cosmetics (`TrailAssets`, `ElimEffectAssets`) have no viewport entry in `Config.Inventory` and no items yet. Adding one before deciding how it previews asserts in `InventoryPreview` -- that is deliberate, not an oversight: a card with nothing to render is worse than a loud failure at setup time.
 
 Keep `TabTemplate`, `CategoryHeader`, `CategoryContent`, `Spacer`, and `ItemCard` hidden. Their clones are made visible by the inventory controller.

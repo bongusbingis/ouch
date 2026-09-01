@@ -5,40 +5,33 @@
 
 return {
 	Dodgeball = {
-		ThrowSpeed = 500,
-		Gravity = 50,
+		ThrowSpeed = 140,
+		Gravity = 70,
 
-		-- Held throw. A charged ball is simply faster, which is what makes it
-		-- flatter, longer and harder to dodge -- the arc is not special-cased.
-		-- It cannot hit harder than a normal throw, because a dodgeball hit
-		-- already eliminates outright.
 		Charge = {
-			-- Speed multiplier at full charge; the uncharged throw is 1.
-			-- Sane: 1.15-1.6. The catch test samples closest approach over a
-			-- tick, so speed does not break it geometrically -- what shrinks is
-			-- the defender's reaction time, and past 1.6 that is short enough
-			-- that a full charge is effectively uncatchable.
+			-- Speed multiplier at full charge.
 			MaxSpeedScale = 1.3,
 		},
 
-		-- Swipe-up throw: slower and pitched up, so it clears cover and drops
-		-- onto someone rather than travelling flat at them.
-		Lob = {
-			-- Speed multiplier. Sane: 0.65-0.9; below 0.65 it barely travels.
-			SpeedScale = 0.82,
-			-- Upward pitch added to the player's aim, in degrees. This is what
-			-- makes the swipe read as a lob rather than a weak throw.
-			-- Sane: 10-30; above 30 it goes nearly straight up.
-			PitchDeg = 20,
+		-- Presentation-only throw preview.
+		Preview = {
+			FollowFrequency = 20,
+			FollowDamping = 1,
+			ImpactSamples = 12,
+			Segments = 32,
+			FovAtFullCharge = -12,
+			FovFrequency = 9,
 		},
+
 		Radius = 1,
 		HitForgiveness = 0.35, -- added to Radius for hit tests (device magnetism adds more)
 		ThrowCooldown = 0.6,
 		ThrowOriginMaxOffset = 6, -- max distance of throw origin from character center
 		MaxFlightTime = 2,
-		-- This should line up with the authored throw/release moment in
-		-- Assets.Animations.Throw. The current clip is about 0.75s, so 0.38s
-		-- leaves enough follow-through after the projectile releases.
+		-- Delay between the throw input and the ball leaving the hand. Zero on
+		-- purpose: the ball is gone the instant the press ends, and the wind-up
+		-- pose held during charge is what telegraphs a throw to opponents.
+		-- Anything above zero is latency the thrower feels on their own input.
 		WindupDuration = 0,
 		ThrowAnimationName = "Throw",
 		MomentumInheritance = 0.3,
@@ -58,20 +51,34 @@ return {
 
 		PickupRadius = 4,
 		BounceRestitution = 0.52,
-		BounceFriction = 0.22,
+		BounceFriction = 0.8,
 		MaxBounces = 5,
 		SettleSpeed = 10,
 		SettleVerticalSpeed = 5,
 		ContactSeparation = 0.08,
 		MinBounceNormalSpeed = 1.5,
 		MaxBounceContactsPerStep = 4,
-		RollFriction = 18,
+		RollFriction = 28,
 		RollSettleSpeed = 1.5,
 		RollGroundSnap = 3,
 		RemoteSmoothing = 18,
+		-- Client-side presentation prediction; hit resolution remains server-side.
+		Prediction = {
+			MaxSeconds = 0.4,
+		},
+		-- Ceiling on how far ahead an in-flight ball's visual is extrapolated,
+		-- in seconds. The lead applied is network latency plus the smoothing
+		-- time constant, so the drawn ball sits where the authoritative one
+		-- already is instead of trailing it; this is what a latency spike may
+		-- not exceed.
+		MaxLatencyExtrapolation = 0.2,
 		BallFeel = {
-			FlightStretchPerSpeed = 0.001,
+			FlightStretchPerSpeed = 0.01,
 			MaxFlightStretch = 0.16,
+			ChargeSquash = 0.08,
+			-- The held ball sits between the camera and whatever is being aimed at,
+			-- so it fades while charging rather than blocking the shot.
+			ChargeAimTransparency = 0.55,
 			ImpactImpulseScale = 0.018,
 			MaxImpactSquash = 0.42,
 			SpringFrequencyHz = 9,
@@ -160,6 +167,6 @@ return {
 	-- Simplified hit capsule applied to every character (never per-limb).
 	CharacterCapsule = {
 		Height = 5,
-		Radius = 1.5,
+		Radius = 1.2,
 	},
 }

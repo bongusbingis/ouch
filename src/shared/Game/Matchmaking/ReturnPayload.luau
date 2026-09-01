@@ -1,3 +1,8 @@
+-- Name: ReturnPayload.luau
+-- Author: Jack C.
+-- Description: Builds and parses the teleport payload the arena sends back to the lobby, validating the party identity, match id, and member list against the schema.
+-- Created: 2026-08-18
+
 --!strict
 
 local ReturnPayload = {}
@@ -11,12 +16,8 @@ export type Payload = {
 	partyId: string,
 	matchId: string,
 	memberUserIds: { number },
+	returnMode: "Party" | "Separate",
 }
-
--- Carried on the arena to lobby teleport so a party can be put back together on
--- arrival. It names the party and everyone who was still in it at the end of the
--- match, because the party record may have expired while the match ran and the
--- lobby then has nothing else to rebuild from.
 
 local function validId(value: any): boolean
 	return typeof(value) == "string" and #value > 0 and #value <= 100
@@ -51,12 +52,18 @@ local function copyMembers(value: any): ({ number }?, string?)
 	return members, nil
 end
 
-function ReturnPayload.build(partyId: string, matchId: string, memberUserIds: { number }): Payload
+function ReturnPayload.build(
+	partyId: string,
+	matchId: string,
+	memberUserIds: { number },
+	returnMode: ("Party" | "Separate")?
+): Payload
 	return {
 		schemaVersion = ReturnPayload.SchemaVersion,
 		partyId = partyId,
 		matchId = matchId,
 		memberUserIds = table.clone(memberUserIds),
+		returnMode = returnMode or "Party",
 	}
 end
 
@@ -70,6 +77,10 @@ function ReturnPayload.parse(value: any): (Payload?, string?)
 	if not validId(value.partyId) or not validId(value.matchId) then
 		return nil, "invalid_identity"
 	end
+	local returnMode = value.returnMode or "Party"
+	if returnMode ~= "Party" and returnMode ~= "Separate" then
+		return nil, "invalid_return_mode"
+	end
 
 	local members, membersError = copyMembers(value.memberUserIds)
 	if not members then
@@ -81,6 +92,7 @@ function ReturnPayload.parse(value: any): (Payload?, string?)
 		partyId = value.partyId,
 		matchId = value.matchId,
 		memberUserIds = members,
+		returnMode = returnMode,
 	},
 		nil
 end

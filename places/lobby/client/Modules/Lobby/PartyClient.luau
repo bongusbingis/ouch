@@ -1,3 +1,8 @@
+-- Name: PartyClient.luau
+-- Author: Jack C.
+-- Description: Client adapter for the lobby party system: holds the party snapshot, sends join, kick, matchmaking-toggle and invite requests, tracks busy and teleport status, and surfaces errors to the UI.
+-- Created: 2026-08-17
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -13,6 +18,7 @@ PartyClient.__index = PartyClient
 
 PartyClient.ErrorMessages = {
 	arena_not_configured = "MATCH PLACE IS NOT CONFIGURED",
+	banned = "YOU ARE BANNED FROM MATCHMAKING",
 	busy = "PLEASE WAIT...",
 	internal_error = "PARTY SERVICE UNAVAILABLE",
 	invalid_args = "INVALID PARTY REQUEST",
@@ -25,14 +31,17 @@ PartyClient.ErrorMessages = {
 	party_full = "THAT PARTY IS FULL",
 	party_not_found = "PARTY NOT FOUND",
 	party_not_ready = "PARTY IS STILL LOADING",
+	party_initialization_failed = "PARTY SERVICE COULD NOT LOAD",
 	rate_limited = "TOO MANY REQUESTS",
 	teleport_failed = "TELEPORT FAILED - TRY AGAIN",
+	too_many_code_attempts = "TOO MANY ATTEMPTS - TRY AGAIN LATER",
 }
 
 PartyClient.JoinCodeErrorMessages = {
 	invalid_code = "PARTY CODE NOT FOUND",
 	party_full = "THAT PARTY IS FULL",
 	party_not_found = "PARTY CODE NOT FOUND",
+	too_many_code_attempts = "TOO MANY ATTEMPTS - TRY AGAIN LATER",
 }
 
 function PartyClient.new()
@@ -41,8 +50,11 @@ function PartyClient.new()
 		_store = PartyStore.new(),
 		_busy = false,
 		_started = false,
+		_initializing = false,
 		_destroyed = false,
 		_generation = 0,
+		_teleportPresentationReady = false,
+		_teleportStatus = nil,
 		_listeners = {},
 		_errorListeners = {},
 		_nextListenerId = 0,
@@ -57,6 +69,10 @@ end
 
 function PartyClient:isBusy(): boolean
 	return self._busy
+end
+
+function PartyClient:getTeleportStatus()
+	return self._teleportStatus
 end
 
 function PartyClient:_emit(snapshot, previous, reason)
@@ -94,6 +110,21 @@ function PartyClient:subscribeErrors(callback)
 	return function()
 		self._errorListeners[id] = nil
 	end
+end
+
+function PartyClient:_acknowledgeTeleportPresentation()
+	if self._destroyed or not self._teleportPresentationReady then
+		return
+	end
+	Network.fireServer("TeleportPresentationReady")
+end
+
+function PartyClient:setTeleportPresentationReady()
+	if self._destroyed then
+		return
+	end
+	self._teleportPresentationReady = true
+	self:_acknowledgeTeleportPresentation()
 end
 
 function PartyClient:_setBusy(busy: boolean)
@@ -154,6 +185,10 @@ function PartyClient:toggleMatchmaking()
 	return nil, "match_forming"
 end
 
+function PartyClient:devSoloPlay()
+	return self:request(Protocol.Actions.DevSoloPlay, nil, false)
+end
+
 function PartyClient:promptInvite()
 	local snapshot = self:getSnapshot()
 	if snapshot == nil then
@@ -177,6 +212,40 @@ function PartyClient:promptInvite()
 	return true
 end
 
+function PartyClient:_beginInitialization(): boolean
+	if self._destroyed or self._initializing or self:getSnapshot() ~= nil then
+		return false
+	end
+	self._initializing = true
+	self._generation += 1
+	local generation = self._generation
+	task.spawn(function()
+		for _ = 1, 10 do
+			if self._destroyed or generation ~= self._generation or self:getSnapshot() ~= nil then
+				if generation == self._generation then
+					self._initializing = false
+				end
+				return
+			end
+			local response = self:request(Protocol.Actions.GetSnapshot, nil, false)
+			if response and response.ok and self:getSnapshot() ~= nil then
+				self._initializing = false
+				return
+			end
+			task.wait(1)
+		end
+		if not self._destroyed and generation == self._generation and self:getSnapshot() == nil then
+			self._initializing = false
+			self:_emitError("party_initialization_failed")
+		end
+	end)
+	return true
+end
+
+function PartyClient:retryInitialization(): boolean
+	return self:_beginInitialization()
+end
+
 function PartyClient:start()
 	if self._started then
 		return
@@ -195,32 +264,37 @@ function PartyClient:start()
 				return
 			end
 			if packet.kind == "Snapshot" then
+				local phase = if typeof(packet.snapshot) == "table" then packet.snapshot.phase else nil
+				if phase ~= "Assigned" and phase ~= "Teleporting" then
+					self._teleportStatus = nil
+				end
 				self._store:ApplySnapshot(packet.snapshot, packet.reason)
+				if phase == "Assigned" or phase == "Teleporting" then
+					self:_acknowledgeTeleportPresentation()
+				end
 			elseif packet.kind == "Error" then
 				self:_emitError(packet.error)
 			end
 		end)
 	)
+	table.insert(
+		self._connections,
+		Network.on("TeleportStatus", function(packet)
+			if
+				self._destroyed
+				or typeof(packet) ~= "table"
+				or packet.direction ~= "Arena"
+				or typeof(packet.state) ~= "string"
+			then
+				return
+			end
+			self._teleportStatus = packet
+			local snapshot = self:getSnapshot()
+			self:_emit(snapshot, snapshot, "TeleportStatus")
+		end)
+	)
 
-	self._generation += 1
-	local generation = self._generation
-	task.spawn(function()
-		local lastError = "internal_error"
-		for _ = 1, 10 do
-			if self._destroyed or generation ~= self._generation or self:getSnapshot() ~= nil then
-				return
-			end
-			local response, errorCode = self:request(Protocol.Actions.GetSnapshot, nil, false)
-			if response and response.ok then
-				return
-			end
-			lastError = errorCode or lastError
-			task.wait(1)
-		end
-		if not self._destroyed and generation == self._generation and self:getSnapshot() == nil then
-			self:_emitError(if lastError == "party_not_ready" then "internal_error" else lastError)
-		end
-	end)
+	self:_beginInitialization()
 end
 
 function PartyClient:destroy()
@@ -228,6 +302,7 @@ function PartyClient:destroy()
 		return
 	end
 	self._destroyed = true
+	self._initializing = false
 	self._generation += 1
 	for _, disconnect in self._connections do
 		if typeof(disconnect) == "RBXScriptConnection" then

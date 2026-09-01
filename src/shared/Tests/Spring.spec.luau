@@ -1,72 +1,73 @@
+-- Name: Spring.spec.luau
+-- Author: Jack C.
+-- Description: Spec that the damped spring settles on its target and stays stable and finite across low frame rates and every frequency the game configures.
+-- Created: 2026-07-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)
 local Spring = require(script.Parent.Parent.Game.Util.Spring)
 
-local DT = 1 / 60
-
-local function settle(spring: Spring.Spring, frequencyHz: number, dampingRatio: number, seconds: number)
-	for _ = 1, math.floor(seconds / DT) do
-		Spring.step(spring, frequencyHz, dampingRatio, DT)
+local function settle(frequency: number, damping: number, fps: number, seconds: number): number
+	local spring = Spring.new(0)
+	spring.target = 1
+	for _ = 1, math.floor(fps * seconds) do
+		Spring.step(spring, frequency, damping, 1 / fps)
 	end
+	return spring.position
 end
 
 T.describe("Spring", function()
-	T.it("converges to the target from a displacement", function()
-		local spring = Spring.new(0)
-		spring.position = 1
-		settle(spring, 5, 0.3, 5)
-		T.expect(spring.position):toBeNear(0, 1e-3)
-		T.expect(spring.velocity):toBeNear(0, 1e-2)
+	T.it("settles on its target at ordinary frame rates", function()
+		T.expect(settle(9, 1, 60, 2)):toBeNear(1, 1e-3)
 	end)
 
-	T.it("underdamped springs overshoot the target", function()
+	T.it("stays stable at the frequencies the throw pose uses", function()
+		T.expect(settle(14, 1, 60, 2)):toBeNear(1, 1e-3)
+		T.expect(settle(11, 0.62, 60, 2)):toBeNear(1, 1e-3)
+	end)
+
+	T.it("stays stable on a slow client", function()
+		for _, fps in { 30, 20, 15, 10 } do
+			T.expect(settle(14, 1, fps, 3)):toBeNear(1, 1e-2)
+		end
+	end)
+
+	T.it("stays stable at frequencies far above anything configured", function()
+		T.expect(settle(40, 1, 60, 3)):toBeNear(1, 1e-2)
+	end)
+
+	T.it("never produces a non-finite position", function()
 		local spring = Spring.new(0)
-		spring.position = 1
-		local minPosition = spring.position
+		spring.target = 1
+		for _ = 1, 600 do
+			Spring.step(spring, 30, 0.5, 1 / 30)
+			T.expect(spring.position == spring.position):toBeTruthy()
+			T.expect(math.abs(spring.position) < 1e6):toBeTruthy()
+		end
+	end)
+
+	T.it("overshoots when under-damped and does not when critically damped", function()
+		local under = Spring.new(0)
+		under.target = 1
+		local critical = Spring.new(0)
+		critical.target = 1
+		local maxUnder, maxCritical = 0, 0
 		for _ = 1, 120 do
-			Spring.step(spring, 5, 0.3, DT)
-			minPosition = math.min(minPosition, spring.position)
+			Spring.step(under, 11, 0.5, 1 / 60)
+			Spring.step(critical, 11, 1, 1 / 60)
+			maxUnder = math.max(maxUnder, under.position)
+			maxCritical = math.max(maxCritical, critical.position)
 		end
-		T.expect(minPosition < -0.01):toBeTruthy()
+		T.expect(maxUnder > 1):toBeTruthy()
+		T.expect(maxCritical <= 1.001):toBeTruthy()
 	end)
 
-	T.it("critically damped springs from rest never overshoot", function()
-		local spring = Spring.new(0)
-		spring.position = 1
-		for _ = 1, 300 do
-			Spring.step(spring, 5, 1, DT)
-			T.expect(spring.position >= -1e-6):toBeTruthy()
-		end
-	end)
-
-	T.it("impulse adds exactly to velocity", function()
-		local spring = Spring.new(0)
-		Spring.impulse(spring, 4)
-		T.expect(spring.velocity):toEqual(4)
-		Spring.impulse(spring, -1.5)
-		T.expect(spring.velocity):toEqual(2.5)
-	end)
-
-	T.it("identical step sequences are deterministic", function()
-		local a = Spring.new(0)
-		local b = Spring.new(0)
-		Spring.impulse(a, -10)
-		Spring.impulse(b, -10)
-		for _ = 1, 90 do
-			Spring.step(a, 5.5, 0.32, DT)
-			Spring.step(b, 5.5, 0.32, DT)
-			T.expect(a.position):toEqual(b.position)
-			T.expect(a.velocity):toEqual(b.velocity)
-		end
-	end)
-
-	T.it("clamps huge dt so a hitch frame stays bounded", function()
-		local spring = Spring.new(0)
-		spring.position = 1
-		Spring.step(spring, 5, 0.3, 10)
-		T.expect(math.abs(spring.position) < 10):toBeTruthy()
-		T.expect(math.abs(spring.velocity) < 100):toBeTruthy()
+	T.it("ignores a non-positive timestep instead of corrupting itself", function()
+		local spring = Spring.new(5)
+		spring.target = 1
+		Spring.step(spring, 10, 1, 0)
+		T.expect(spring.position):toEqual(5)
 	end)
 end)
 

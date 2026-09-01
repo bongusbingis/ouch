@@ -1,3 +1,8 @@
+-- Name: sbCosmeticGrantServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-cosmetic-grant, writing ownership of a named cosmetic into each targeted player's profile.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

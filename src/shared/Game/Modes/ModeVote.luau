@@ -1,3 +1,8 @@
+-- Name: ModeVote.luau
+-- Author: Jack C.
+-- Description: Pure ballot state: one vote per player, tallying, finalist selection, random resolution of ties and empty ballots, and the capped extension for late-ready players.
+-- Created: 2026-08-17
+
 --!strict
 
 local ModeVote = {}
@@ -38,8 +43,6 @@ function ModeVote.remove(state: State, userId: number): boolean
 	return true
 end
 
--- True when every given voter has a ballot. An empty roster is never "all
--- voted": it would otherwise close a ballot nobody could have cast.
 function ModeVote.allVoted(state: State, userIds: { number }): boolean
 	if #userIds == 0 then
 		return false
@@ -84,6 +87,18 @@ function ModeVote.choose(state: State, chooseIndex: (number) -> number): string
 	local index = chooseIndex(#finalists)
 	assert(index % 1 == 0 and index >= 1 and index <= #finalists, "[ModeVote] chooser returned an invalid index")
 	return finalists[index]
+end
+
+function ModeVote.extendForLateReady(
+	currentEndsAt: number,
+	maximumEndsAt: number,
+	now: number,
+	minimumVisibleSeconds: number
+): number
+	if now >= currentEndsAt or currentEndsAt - now >= minimumVisibleSeconds then
+		return currentEndsAt
+	end
+	return math.max(currentEndsAt, math.min(now + minimumVisibleSeconds, maximumEndsAt))
 end
 
 return table.freeze(ModeVote)

@@ -4,8 +4,12 @@
 -- prompt a purchase; only Active definitions enter the receipt map.
 
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
-export type ProductType = "Crate" | "Bonks" | "SeasonPass"
+export type ProductType = "Crate" | "Bonks" | "SeasonPass" | "Bundle" | "Cosmetic"
 
+-- Cosmetic products are how a rotating-shop offer is priced in Robux. One
+-- product per cosmetic rather than shared price tiers: a receipt then names
+-- exactly what was bought with no second lookup to get wrong, which matters
+-- because a receipt is the only record that survives a failed grant.
 export type ProductDef = {
 	Id: number?,
 	CatalogStatus: CatalogStatus,
@@ -17,12 +21,14 @@ export type ProductDef = {
 	CrateId: string?,
 	BonksAmount: number?,
 	SeasonId: string?,
+	BundleId: string?,
+	ItemId: string?,
 }
 
 local Catalog: { [string]: ProductDef } = {
 	Bonks500 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429022,
+		CatalogStatus = "Active",
 		DisplayName = "Pocket Stash",
 		Description = "A handy boost for your next crate.",
 		DisplayOrder = 310,
@@ -31,8 +37,8 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 500,
 	},
 	Bonks1100 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429164,
+		CatalogStatus = "Active",
 		DisplayName = "Bonks Stack",
 		Description = "A solid stack with a little extra value.",
 		DisplayOrder = 320,
@@ -41,9 +47,9 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 1100,
 	},
 	Bonks2500 = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Big Haul",
+		Id = 3709429259,
+		CatalogStatus = "Active",
+		DisplayName = "Bonks Haul",
 		Description = "A bigger haul for several crate opens.",
 		DisplayOrder = 330,
 		Type = "Bonks",
@@ -51,8 +57,8 @@ local Catalog: { [string]: ProductDef } = {
 		BonksAmount = 2500,
 	},
 	Bonks5500 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3709429349,
+		CatalogStatus = "Active",
 		DisplayName = "Mega Vault",
 		Description = "The biggest Bonks bundle and strongest value.",
 		DisplayOrder = 340,
@@ -60,25 +66,47 @@ local Catalog: { [string]: ProductDef } = {
 		SuggestedRobux = 399,
 		BonksAmount = 5500,
 	},
-	BallCrateOpen = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Ball Crate",
-		Description = "Open one Ball Crate directly.",
+	DodgeballCrateOpen = {
+		Id = 3709429401,
+		CatalogStatus = "Active",
+		DisplayName = "Dodgeball Crate",
+		Description = "Open one Dodgeball Crate directly.",
 		DisplayOrder = 210,
 		Type = "Crate",
 		SuggestedRobux = 39,
-		CrateId = "BallCrate",
+		CrateId = "DodgeballCrate",
 	},
-	TrailCrateOpen = {
-		Id = nil,
+	HammerCrateOpen = {
+		Id = 3709429455,
 		CatalogStatus = "Preview",
-		DisplayName = "Trail Crate",
-		Description = "Open one Trail Crate directly.",
+		DisplayName = "Hammer Crate",
+		Description = "Open one Hammer Crate directly.",
 		DisplayOrder = 220,
 		Type = "Crate",
-		SuggestedRobux = 79,
-		CrateId = "TrailCrate",
+		SuggestedRobux = 39,
+		CrateId = "HammerCrate",
+	},
+	EffectsCrateOpen = {
+		Id = 3709429563,
+		CatalogStatus = "Active",
+		DisplayName = "Effects Crate",
+		Description = "Open one Effects Crate directly.",
+		DisplayOrder = 230,
+		Type = "Crate",
+		SuggestedRobux = 59,
+		CrateId = "EffectsCrate",
+	},
+	-- One product per bundle. The bundle itself owns its contents in
+	-- Config.Bundles; this side owns only the Robux id and price.
+	StarterOutfitBundleBuy = {
+		Id = nil,
+		CatalogStatus = "Preview",
+		DisplayName = "Starter Outfit Bundle",
+		Description = "A complete look, cheaper than buying the pieces.",
+		DisplayOrder = 100,
+		Type = "Bundle",
+		SuggestedRobux = 199,
+		BundleId = "StarterOutfitBundle",
 	},
 	-- One product per season rather than editing SeasonId in place, so receipt
 	-- history stays unambiguous about which season was actually bought.
@@ -121,6 +149,16 @@ for key, definition in Catalog do
 			assert(
 				type(definition.SeasonId) == "string" and definition.SeasonId ~= "",
 				`season product "{key}" must define SeasonId`
+			)
+		elseif definition.Type == "Bundle" then
+			assert(
+				type(definition.BundleId) == "string" and definition.BundleId ~= "",
+				`bundle product "{key}" must define BundleId`
+			)
+		elseif definition.Type == "Cosmetic" then
+			assert(
+				type(definition.ItemId) == "string" and definition.ItemId ~= "",
+				`cosmetic product "{key}" must define ItemId`
 			)
 		end
 		assert(ById[definition.Id] == nil, `duplicate developer product id {definition.Id}`)

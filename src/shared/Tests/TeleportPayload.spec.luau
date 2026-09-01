@@ -1,3 +1,8 @@
+-- Name: TeleportPayload.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the lobby-to-arena teleport payload: leaving mode selection to the arena ballot, correct parsing and copying, and rejection of malformed and obsolete payloads.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -8,6 +13,9 @@ T.describe("TeleportPayload", function()
 		local payload = TeleportPayload.build({
 			matchId = "match-1",
 			expectedUserIds = { 1, 2, 3 },
+			parties = {
+				{ partyId = "party-1", leaderUserId = 1, memberUserIds = { 1, 2 } },
+			},
 			modeSelection = {
 				strategy = "Vote",
 				options = { "FFA", "TDM" },
@@ -20,6 +28,8 @@ T.describe("TeleportPayload", function()
 		T.expect(payload.expectedPlayerCount):toEqual(3)
 		T.expect(payload.modeSelection.strategy):toEqual("Vote")
 		T.expect(table.concat(payload.modeSelection.options, ",")):toEqual("FFA,TDM")
+		T.expect((payload.party :: any).leaderUserId):toEqual(1)
+		T.expect(table.concat((payload.party :: any).memberUserIds, ",")):toEqual("1,2")
 		T.expect((payload :: any).mode):toBeNil()
 		T.expect((payload :: any).mapKey):toBeNil()
 	end)
@@ -35,6 +45,10 @@ T.describe("TeleportPayload", function()
 				strategy = "Vote",
 				options = options,
 			},
+			party = {
+				leaderUserId = 1,
+				memberUserIds = { 1, 2 },
+			},
 		})
 
 		T.expect(reason):toBeNil()
@@ -42,6 +56,7 @@ T.describe("TeleportPayload", function()
 		T.expect(table.concat((payload :: any).modeSelection.options, ",")):toEqual("FFA,TDM")
 		options[1] = "changed"
 		T.expect((payload :: any).modeSelection.options[1]):toEqual("FFA")
+		T.expect((payload :: any).party.leaderUserId):toEqual(1)
 	end)
 
 	T.it("rejects malformed and obsolete payloads", function()
@@ -66,6 +81,9 @@ T.describe("TeleportPayload", function()
 		local duplicateOptions = table.clone(base)
 		duplicateOptions.modeSelection = { strategy = "Vote", options = { "FFA", "FFA" } }
 		T.expect(TeleportPayload.parse(duplicateOptions)):toBeNil()
+		local invalidParty = table.clone(base)
+		invalidParty.party = { leaderUserId = 9, memberUserIds = { 1, 2 } }
+		T.expect(TeleportPayload.parse(invalidParty)):toBeNil()
 	end)
 end)
 

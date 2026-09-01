@@ -1,16 +1,19 @@
+-- Name: ModeRegistry.luau
+-- Author: Jack C.
+-- Description: Lists every registered game mode and resolves them by id, the single place a new mode is registered.
+-- Created: 2026-07-13
+
 --!strict
 
 local GameMode = require(script.Parent.GameMode)
 local FFA = require(script.Parent.FFA)
 local Infection = require(script.Parent.Infection)
 local TDM = require(script.Parent.TDM)
---local Scramble = require(script.Parent.Scramble)
 
 local modes: { GameMode.GameMode } = {
 	FFA,
 	TDM,
 	Infection,
-	--Scramble,
 }
 
 local DEFAULT_ID = "FFA"

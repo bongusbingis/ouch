@@ -1,3 +1,8 @@
+-- Name: PartyBus.luau
+-- Author: Jack C.
+-- Description: Cross-server party messaging: subscribes to each party's topic, publishes snapshot and deletion messages, and manages subscription lifetimes as members join and leave a server.
+-- Created: 2026-08-15
+
 local MessagingService = game:GetService("MessagingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

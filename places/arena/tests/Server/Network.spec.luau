@@ -1,8 +1,9 @@
+-- Name: Network.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec that every declared remote is materialized with the right class and that the rate-limiting and validation middleware wrappers behave and compose correctly.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Network on the real server DataModel: remote materialization from the
--- definitions table with correct classes, and the rate-limit / validation
--- middleware wrappers (invoked directly with player-shaped doubles — real
--- client invocations cannot be emulated).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -25,13 +26,19 @@ local EXPECTED_REMOTES = {
 	DamageFeedback = "RemoteEvent",
 	SubmitModeVote = "RemoteEvent",
 	ArenaClientReady = "RemoteEvent",
+	TeleportPresentationReady = "RemoteEvent",
+	TeleportStatus = "RemoteEvent",
+	RequestLobbyReturn = "RemoteEvent",
 	SubmitCombatInput = "RemoteEvent",
+	SetClientSetting = "RemoteEvent",
+	OnboardingState = "RemoteEvent",
+	OnboardingReady = "RemoteFunction",
+	OnboardingAction = "RemoteEvent",
+	OnboardingDebug = "RemoteEvent",
 	CombatSimEvent = "UnreliableRemoteEvent",
 	JumpPadImpulse = "UnreliableRemoteEvent",
 }
 
--- Each case uses fresh UserIds: rate-limit counters are per-user with a
--- 1-second os.clock window, so reused ids would couple cases together.
 local nextUserId = 400000
 local function freshPlayer(): any
 	nextUserId += 1
@@ -90,7 +97,6 @@ return function()
 
 			expect(chatty(player)).to.equal("chatty")
 			expect((chatty(player))).never.to.be.ok()
-			-- Exhausting one remote must leave every other remote's budget intact.
 			expect(guarded(player)).to.equal("guarded")
 		end)
 
@@ -145,7 +151,6 @@ return function()
 				return typeof(value) == "string", "string_required"
 			end, rateLimited)
 
-			-- Invalid calls must not consume rate-limit budget.
 			local result, reason = composed(player, 42)
 			expect(result).never.to.be.ok()
 			expect(reason).to.equal("invalid_args")

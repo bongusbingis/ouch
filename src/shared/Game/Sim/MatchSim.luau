@@ -1,12 +1,12 @@
+-- Name: MatchSim.luau
+-- Author: Jack C.
+-- Description: Pure match phase machine parameterized by the active mode's rules, deciding phase transitions, scores, and the winner, and nothing about how those outcomes are applied.
+-- Created: 2026-07-13
+
 --!strict
 
 local SimUtil = require(script.Parent.SimUtil)
 local GameMode = require(script.Parent.Parent.Modes.GameMode)
-
--- Pure match rules: scoring, win conditions, and the phase machine. The
--- active mode's MatchRules are passed in by the caller, so the same machine
--- serves every mode. Deaths, respawns, and arena teleports are applied by
--- MatchService; this module only decides scores and match flow.
 
 local MatchSim = {}
 
@@ -25,11 +25,11 @@ export type MatchState = {
 }
 
 export type MatchEvent = {
-	kind: string, -- MatchPreparing | MatchStarted | ScoreChanged | MatchEnded | MatchReset | IntermissionEnded
+	kind: string,
 	playerId: string?,
 	score: number?,
 	winnerId: string?,
-	reason: string?, -- MatchEnded: "ScoreTarget" | "TimeCap"
+	reason: string?,
 }
 
 function MatchSim.newState(): MatchState
@@ -44,8 +44,6 @@ function MatchSim.newState(): MatchState
 	}
 end
 
--- Reconciles the score table with the currently present players. Joiners
--- enter at 0 mid-match; leavers forfeit their score.
 function MatchSim.setPlayers(state: MatchState, playerIds: { [string]: boolean })
 	for _, playerId in SimUtil.sortedKeys(playerIds) do
 		if state.scores[playerId] == nil then
@@ -71,7 +69,6 @@ function MatchSim.start(state: MatchState, rules: MatchRules, events: { MatchEve
 	table.insert(events, { kind = "MatchPreparing" })
 end
 
--- Highest score wins; a tie yields no winner.
 local function leader(state: MatchState): string?
 	local bestId: string? = nil
 	local bestScore = -1
@@ -89,8 +86,6 @@ local function leader(state: MatchState): string?
 	return if tied then nil else bestId
 end
 
--- winnerId is for modes whose outcome is not a score race (infection ending when
--- the last survivor falls); without one the leading score still decides.
 local function endMatch(state: MatchState, rules: MatchRules, reason: string, events: { MatchEvent }, winnerId: string?)
 	state.phase = "Results"
 	state.resultsRemaining = rules.ResultsSeconds
@@ -112,8 +107,6 @@ function MatchSim.finish(
 	return true
 end
 
--- One point per elimination. Environmental deaths (no source, or self) and
--- eliminations outside an active match score nothing.
 function MatchSim.applyElim(
 	state: MatchState,
 	rules: MatchRules,

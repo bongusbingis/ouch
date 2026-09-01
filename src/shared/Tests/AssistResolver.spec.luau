@@ -1,3 +1,8 @@
+-- Name: AssistResolver.spec.luau
+-- Author: Jack C.
+-- Description: Spec for aim-assist resolution: rejection of malformed overrides, device scaling, features gated off per device, and the cohort labelling used for analytics.
+-- Created: 2026-08-19
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -85,8 +90,6 @@ T.describe("AssistResolver", function()
 		local entries = {
 			{ Key = "AStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 		}
-		-- Out of range, so it falls back to the default and the player is not
-		-- actually in an experiment.
 		local resolved = AssistResolver.resolve(entries, { AStrength = 99 })
 		T.expect(AssistResolver.bucket(entries, resolved)):toEqual("Default")
 	end)

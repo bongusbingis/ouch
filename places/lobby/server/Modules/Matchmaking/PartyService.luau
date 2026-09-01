@@ -1,11 +1,19 @@
+-- Name: PartyService.luau
+-- Author: Jack C.
+-- Description: Owns lobby party behavior end to end: request handling and validation, cross-server party state, member colors, queue toggling, analytics funnels, teleport hand-off, and restoring parties returning from the arena.
+-- Created: 2026-08-15
+
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local Loading = require(ReplicatedStorage.Config.Loading)
+local DevSoloPlay = require(ReplicatedStorage.Shared.Game.Matchmaking.DevSoloPlay)
 local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
+local ReturnPartyPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPartyPolicy)
 local AnalyticsConfig = require(ReplicatedStorage.Config.Analytics)
 local AnalyticsService = require(script.Parent.Parent.AnalyticsService)
 local PartyModel = require(script.Parent.PartyModel)
@@ -36,8 +44,10 @@ function PartyService.new(
 		_busy = {},
 		_initializing = {},
 		_teleportDispatching = {},
+		_teleportPresentationReady = {},
 		_colorConnections = {},
 		_colorRevisions = {},
+		_joinCodeFailures = {},
 		_queueChangedHandler = nil,
 		_destroyed = false,
 	}, PartyService)
@@ -86,8 +96,6 @@ function PartyService:_getLocalPlayers(partyId)
 	return players
 end
 
--- Matchmaking telemetry is reported per local member: the funnel is a per-player
--- journey, and a party's members may be spread across lobby servers.
 function PartyService:_reportFunnel(partyId, stepKey, fields)
 	local step = AnalyticsConfig.MatchmakingFunnelSteps[stepKey]
 	for _, player in self:_getLocalPlayers(partyId) do
@@ -137,10 +145,43 @@ function PartyService:_maybeTeleport(party)
 
 	self._teleportDispatching[party.partyId] = true
 	task.spawn(function()
+		local presentationDeadline = os.clock() + Loading.TeleportPresentationFallbackSeconds
+		while not self._destroyed and os.clock() < presentationDeadline do
+			local allPresented = true
+			for _, player in self:_getLocalPlayers(party.partyId) do
+				if not self._teleportPresentationReady[player.UserId] then
+					allPresented = false
+					break
+				end
+			end
+			if allPresented then
+				break
+			end
+			task.wait(0.1)
+		end
+
+		local current = self._cache[party.partyId]
+		if self._destroyed or current == nil or current.phase ~= "Teleporting" or current.matchId ~= party.matchId then
+			self._teleportDispatching[party.partyId] = nil
+			return
+		end
+
+		local currentPlayers = self:_getLocalPlayers(party.partyId)
+		if #currentPlayers == 0 then
+			self._teleportDispatching[party.partyId] = nil
+			return
+		end
 		self:_reportFunnel(party.partyId, "Teleporting", { matchId = party.matchId })
-		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, partyPlayers)
+		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, currentPlayers)
 		self._teleportDispatching[party.partyId] = nil
 	end)
+end
+
+function PartyService:HandleTeleportPresentationReady(player)
+	if player.Parent == Players then
+		self._teleportPresentationReady[player.UserId] = true
+		player:SetAttribute("TeleportPresentationReady", true)
+	end
 end
 
 function PartyService:_applyParty(party, reason)
@@ -441,9 +482,48 @@ function PartyService:_joinTarget(player, target, requireFriendAccess)
 	return updated
 end
 
--- Returns the party to place the arriving player in, and whether joining it
--- requires friendship. A player coming back from a match rejoins their own party
--- and is not friend-gated; an invite still is.
+function PartyService:_restoreReturningParty(player, returning)
+	return self._partyRepository:UpdateParty(returning.partyId, function(current)
+		local action = ReturnPartyPolicy.resolve(current, returning, player.UserId)
+		if action == nil then
+			return nil
+		end
+		if action == "Keep" then
+			return current
+		end
+
+		local nextParty = PartyModel.clone(current)
+		PartyModel.returnToLobby(nextParty)
+		return PartyModel.touch(nextParty, os.time())
+	end)
+end
+
+function PartyService:_separateReturningMember(player, returning)
+	local separated = false
+	local updated = self._partyRepository:UpdateParty(returning.partyId, function(current)
+		if ReturnPartyPolicy.resolve(current, returning, player.UserId) ~= "Separate" then
+			return nil
+		end
+
+		local nextParty = PartyModel.clone(current)
+		PartyModel.removeMember(nextParty, player.UserId)
+		separated = true
+		return PartyModel.touch(nextParty, os.time())
+	end)
+	if not updated or not separated then
+		return false
+	end
+
+	self._partyRepository:RemoveUserParty(player.UserId, returning.partyId)
+	if #updated.members == 0 then
+		self._partyRepository:DeleteParty(updated)
+		self._partyBus:PublishDeleted(updated.partyId, updated.revision, player.UserId)
+	else
+		self:NotifyCommitted(updated, "MemberLeft", player.UserId)
+	end
+	return true
+end
+
 function PartyService:_resolveArrivalTarget(player)
 	local function isFriend(userId)
 		local success, result = pcall(player.IsFriendsWith, player, userId)
@@ -452,14 +532,25 @@ function PartyService:_resolveArrivalTarget(player)
 
 	local joinData = player:GetJoinData()
 
-	local returning = ReturnPayload.parse(joinData.TeleportData)
+	local returning = if joinData.SourcePlaceId == Config.ArenaPlaceId and joinData.SourceGameId == game.GameId
+		then ReturnPayload.parse(joinData.TeleportData)
+		else nil
 	if returning then
-		local party = self._partyRepository:GetParty(returning.partyId)
+		if returning.returnMode == "Separate" then
+			if not self:_separateReturningMember(player, returning) then
+				warn(
+					("[PartyService] Could not separate returning member %d from %s"):format(
+						player.UserId,
+						returning.partyId
+					)
+				)
+			end
+			return nil
+		end
+		local party = self:_restoreReturningParty(player, returning)
 		if party then
 			return party, false
 		end
-		-- The record expired while the match ran. Regroup on whichever member
-		-- got here first and made one, rather than everyone landing solo.
 		for _, userId in returning.memberUserIds do
 			if userId ~= player.UserId then
 				local partyId = self._partyRepository:GetUserPartyId(userId)
@@ -564,10 +655,44 @@ function PartyService:_partyForPlayer(player)
 	return party
 end
 
+function PartyService:_checkJoinCodeLockout(userId)
+	local entry = self._joinCodeFailures[userId]
+	if entry == nil then
+		return true
+	end
+	if os.clock() < entry.lockedUntil then
+		return false
+	end
+	if os.clock() >= entry.windowExpiresAt then
+		self._joinCodeFailures[userId] = nil
+	end
+	return true
+end
+
+function PartyService:_recordJoinCodeFailure(userId)
+	local entry = self._joinCodeFailures[userId]
+	local now = os.clock()
+	if entry == nil or now >= entry.windowExpiresAt then
+		entry = { count = 0, windowExpiresAt = now + Config.JoinCodeLockoutSeconds, lockedUntil = 0 }
+		self._joinCodeFailures[userId] = entry
+	end
+	entry.count += 1
+	if entry.count >= Config.JoinCodeMaxFailures then
+		entry.lockedUntil = now + Config.JoinCodeLockoutSeconds
+		entry.windowExpiresAt = entry.lockedUntil
+		entry.count = 0
+	end
+end
+
 function PartyService:_joinByCode(player, payload)
+	if not self:_checkJoinCodeLockout(player.UserId) then
+		return Protocol.failure(Protocol.Errors.TooManyCodeAttempts)
+	end
+
 	local code = Protocol.normalizeCode(payload.code)
 	local target = self._partyRepository:GetPartyByCode(code)
 	if not target then
+		self:_recordJoinCodeFailure(player.UserId)
 		return Protocol.failure(Protocol.Errors.InvalidCode)
 	end
 
@@ -576,6 +701,7 @@ function PartyService:_joinByCode(player, payload)
 		return Protocol.failure(joinError or Protocol.Errors.NotFound)
 	end
 
+	self._joinCodeFailures[player.UserId] = nil
 	return Protocol.success(PartyModel.toSnapshot(party))
 end
 
@@ -697,7 +823,9 @@ function PartyService:_startMatchmaking(player)
 	end
 
 	local hasBannedMember = self._banRepository:HasBannedMember(checkedMemberIds, os.time())
-	if hasBannedMember ~= false then
+	if hasBannedMember == true then
+		return Protocol.failure(Protocol.Errors.Banned)
+	elseif hasBannedMember ~= false then
 		return Protocol.failure(Protocol.Errors.MatchmakingUnavailable)
 	end
 
@@ -771,6 +899,107 @@ function PartyService:_startMatchmaking(player)
 	return Protocol.success(PartyModel.toSnapshot(updated))
 end
 
+function PartyService:_startDevSoloPlay(player)
+	if Config.ArenaPlaceId <= 0 then
+		return Protocol.failure(Protocol.Errors.ArenaNotConfigured)
+	end
+	if not DevSoloPlay.canUse(player) then
+		return Protocol.failure(Protocol.Errors.NotDeveloper)
+	end
+
+	local party = self:_partyForPlayer(player)
+	if not party then
+		return Protocol.failure(Protocol.Errors.NotReady)
+	end
+	if not PartyModel.hasMember(party, player.UserId) then
+		return Protocol.failure(Protocol.Errors.NotFound)
+	end
+	if party.leaderUserId ~= player.UserId then
+		return Protocol.failure(Protocol.Errors.NotLeader)
+	end
+	if party.phase ~= "Lobby" or #party.members ~= 1 then
+		return Protocol.failure(Protocol.Errors.MatchForming)
+	end
+
+	local checkedParty = self._partyRepository:GetParty(party.partyId)
+	if not checkedParty then
+		return Protocol.failure(Protocol.Errors.MatchmakingUnavailable)
+	end
+	if not DevSoloPlay.canUse(player) then
+		return Protocol.failure(Protocol.Errors.NotDeveloper)
+	end
+	if not PartyModel.hasMember(checkedParty, player.UserId) then
+		return Protocol.failure(Protocol.Errors.NotFound)
+	end
+	if checkedParty.leaderUserId ~= player.UserId then
+		return Protocol.failure(Protocol.Errors.NotLeader)
+	end
+	if checkedParty.phase ~= "Lobby" or #checkedParty.members ~= 1 then
+		return Protocol.failure(Protocol.Errors.MatchForming)
+	end
+
+	local accessCode, reserveError = self._teleportCoordinator:ReserveServer()
+	if not accessCode then
+		return Protocol.failure(reserveError or Protocol.Errors.Internal)
+	end
+
+	local matchId = HttpService:GenerateGUID(false)
+	local matchRecord = {
+		schemaVersion = Config.ProtocolVersion,
+		matchId = matchId,
+		modeSelection = {
+			strategy = "Vote",
+			options = table.clone(Config.ModeVoteOptions),
+		},
+		arenaPlaceId = Config.ArenaPlaceId,
+		targetPlayers = 1,
+		parties = {
+			{
+				partyId = party.partyId,
+				leaderUserId = player.UserId,
+				memberUserIds = { player.UserId },
+			},
+		},
+		expectedUserIds = { player.UserId },
+		reservedServerAccessCode = accessCode,
+		status = "Ready",
+		createdAt = os.time(),
+	}
+
+	local stored = self._matchRepository:SetMatch(matchRecord)
+	if not stored then
+		return Protocol.failure(Protocol.Errors.Internal)
+	end
+
+	local denial
+	local updated = self._partyRepository:UpdateParty(party.partyId, function(current)
+		if not current or not PartyModel.hasMember(current, player.UserId) then
+			denial = Protocol.Errors.NotFound
+			return nil
+		end
+		if current.leaderUserId ~= player.UserId then
+			denial = Protocol.Errors.NotLeader
+			return nil
+		end
+		if current.phase ~= "Lobby" or #current.members ~= 1 then
+			denial = Protocol.Errors.MatchForming
+			return nil
+		end
+
+		local nextParty = PartyModel.clone(current)
+		nextParty.phase = "Assigned"
+		nextParty.matchId = matchId
+		return PartyModel.touch(nextParty, os.time())
+	end)
+	if not updated then
+		self._matchRepository:RemoveMatch(matchId)
+		return Protocol.failure(denial or Protocol.Errors.Internal)
+	end
+
+	self:NotifyCommitted(updated, "DevSoloPlayStarted", player.UserId)
+	return Protocol.success(PartyModel.toSnapshot(updated))
+end
+
 function PartyService:_cancelMatchmaking(player)
 	local party = self:_partyForPlayer(player)
 	if not party then
@@ -818,6 +1047,8 @@ function PartyService:_dispatchRequest(player, action, payload)
 		return party and Protocol.success(PartyModel.toSnapshot(party)) or Protocol.failure(Protocol.Errors.NotReady)
 	elseif action == Protocol.Actions.JoinByCode then
 		return self:_joinByCode(player, payload)
+	elseif action == Protocol.Actions.DevSoloPlay then
+		return self:_startDevSoloPlay(player)
 	elseif action == Protocol.Actions.KickMember then
 		return self:_kickMember(player, payload)
 	elseif action == Protocol.Actions.LeaveParty then
@@ -956,6 +1187,8 @@ function PartyService:Start()
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
+		self._teleportPresentationReady[player.UserId] = nil
+		self._joinCodeFailures[player.UserId] = nil
 		self._colorRevisions[player.UserId] = (self._colorRevisions[player.UserId] or 0) + 1
 		local colorConnection = self._colorConnections[player]
 		if colorConnection then
@@ -1009,6 +1242,7 @@ function PartyService:Shutdown()
 		end
 	end
 	self._partyBus:Destroy()
+	self._teleportCoordinator:Destroy()
 end
 
 return PartyService

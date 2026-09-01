@@ -1,7 +1,9 @@
+-- Name: BallFixture.luau
+-- Author: Jack C.
+-- Description: Pure projectile state builders for simulation specs, with sensible defaults so a scenario only states what it cares about.
+-- Created: 2026-07-16
+
 --!strict
--- Pure ProjectileState builders for sim specs: full field set with sensible
--- defaults so specs only state what a scenario cares about. Mirrors the
--- archetype defaults in Config.Combat.Dodgeball.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

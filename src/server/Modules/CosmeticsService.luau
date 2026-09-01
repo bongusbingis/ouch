@@ -1,3 +1,8 @@
+-- Name: CosmeticsService.luau
+-- Author: Jack C.
+-- Description: The only writer of profile cosmetics: grants and equips items after validating ownership and slot, and projects each equip onto a player attribute so every client can render other players' looks.
+-- Created: 2026-07-13
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -14,11 +19,6 @@ local CosmeticsLogic = require(
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 
--- The only writer of profile Cosmetics.*. The profile is the source of truth
--- (replicated to the owning client via Replica); Equip_<Slot> player
--- attributes are a read-only projection so every client can render other
--- players' equips.
-
 local CosmeticsService = {}
 
 local function applyEquipAttributes(player: Player)
@@ -31,9 +31,6 @@ local function applyEquipAttributes(player: Player)
 	end
 end
 
--- Returns false with a reason so callers can tell "already owned" (nothing to
--- do, and safe to treat as success) from "no profile" (retry later). Existing
--- callers read only the first value and are unaffected.
 function CosmeticsService.grant(player: Player, itemId: string): (boolean, string?)
 	local data = PlayerData.get(player)
 	if data == nil then

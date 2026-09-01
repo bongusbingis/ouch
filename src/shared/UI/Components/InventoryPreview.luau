@@ -1,3 +1,8 @@
+-- Name: InventoryPreview.luau
+-- Author: Jack C.
+-- Description: Renders cosmetic inventory previews, using live 3D models where available and static badges for script effects and sounds.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")
@@ -9,7 +14,6 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local InventoryConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Inventory"))
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
-local InventoryTrailPreview = require(script.Parent.InventoryTrailPreview)
 
 local c = React.createElement
 local UPDATE_INTERVAL = 1 / 30
@@ -56,26 +60,12 @@ end
 
 local function update(state, dt: number)
 	if GuiService.ReducedMotionEnabled then
-		if state.category == "TrailAssets" then
-			local phase = 0.35 * math.pi * 2 / state.config.TravelSeconds
-			local x = math.sin(phase) * state.config.TravelDistance * 0.5
-			setPivot(state.object, CFrame.new(x, 0, 0) * CFrame.Angles(0, state.baseRotation, 0))
-		else
-			setPivot(state.object, CFrame.Angles(0, state.baseRotation, 0) * state.basePivot)
-		end
-		state.setElapsed(0.35)
+		setPivot(state.object, CFrame.Angles(0, state.baseRotation, 0) * state.basePivot)
 		return
 	end
 	state.elapsed += dt
-	if state.category == "TrailAssets" then
-		local phase = state.elapsed * math.pi * 2 / state.config.TravelSeconds
-		local x = math.sin(phase) * state.config.TravelDistance * 0.5
-		setPivot(state.object, CFrame.new(x, 0, 0) * CFrame.Angles(0, state.baseRotation, 0))
-		state.setElapsed(state.elapsed)
-	else
-		local spin = math.rad(state.config.SpinDegreesPerSecond) * state.elapsed
-		setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
-	end
+	local spin = math.rad(state.config.SpinDegreesPerSecond) * state.elapsed
+	setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
 end
 
 local function stopIfIdle()
@@ -166,11 +156,75 @@ export type Props = {
 	ZIndex: number,
 }
 
-return React.memo(function(props: Props)
+local function impactPreview(props: Props)
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.5, 0.46),
+		Size = UDim2.fromScale(0.72, 0.58),
+		ZIndex = props.ZIndex,
+	}, {
+		Burst = c("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Rotation = -8,
+			Size = UDim2.fromScale(1, 0.72),
+			Text = "HIT!",
+			TextColor3 = Color3.new(1, 1, 1),
+			TextScaled = true,
+			ZIndex = props.ZIndex,
+		}, {
+			UIStroke = c("UIStroke", {
+				Color = Color3.fromRGB(30, 30, 30),
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = 0.08,
+			}),
+		}),
+	})
+end
+
+local function eliminationSoundPreview(props: Props)
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(35, 47, 62),
+		BorderSizePixel = 0,
+		Position = UDim2.fromScale(0.5, 0.45),
+		Rotation = -6,
+		Size = UDim2.fromScale(0.58, 0.58),
+		ZIndex = props.ZIndex,
+	}, {
+		UICorner = c("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		UIStroke = c("UIStroke", {
+			Color = Color3.new(1, 1, 1),
+			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			Thickness = 0.075,
+		}),
+		Label = c("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+			Position = UDim2.fromScale(0.5, 0.54),
+			Size = UDim2.fromScale(0.8, 0.5),
+			Text = "SFX!",
+			TextColor3 = Color3.new(1, 1, 1),
+			TextScaled = true,
+			ZIndex = props.ZIndex + 1,
+		}, {
+			UIStroke = c("UIStroke", {
+				Color = Color3.fromRGB(20, 24, 34),
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = 0.08,
+			}),
+		}),
+	})
+end
+
+local ViewportPreview = React.memo(function(props: Props)
 	local viewportRef = React.useRef(nil)
 	local cameraRef = React.useRef(nil)
 	local worldRef = React.useRef(nil)
-	local elapsed, setElapsed = React.useBinding(0)
 	local config = InventoryConfig.Viewport[props.Category]
 	assert(config ~= nil, `[InventoryPreview] no preview config for {props.Category}`)
 
@@ -187,8 +241,6 @@ return React.memo(function(props: Props)
 			local color = props.Definition.PreviewColor
 			assert(color ~= nil, "[InventoryPreview] character colors require PreviewColor")
 			object = characterPreview(color)
-		elseif props.Category == "TrailAssets" then
-			object = CosmeticVisualFactory.create("BallAssets", nil)
 		else
 			object = CosmeticVisualFactory.create(props.Category, props.ItemId)
 		end
@@ -205,7 +257,6 @@ return React.memo(function(props: Props)
 			basePivot = centerObject(object),
 			baseRotation = math.rad(config.RotationDegrees),
 			elapsed = 0,
-			setElapsed = setElapsed,
 			updateAccumulator = 0,
 		}
 		local unregister = register(state)
@@ -218,7 +269,6 @@ return React.memo(function(props: Props)
 		end
 	end, { props.Category, props.ItemId, props.Definition })
 
-	local effectId = props.Definition.EffectId
 	return c("ViewportFrame", {
 		ref = viewportRef,
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -230,13 +280,15 @@ return React.memo(function(props: Props)
 		UIScale = c("UIScale", { Scale = 2 }),
 		PreviewCamera = c("Camera", { ref = cameraRef }),
 		PreviewWorld = c("WorldModel", { ref = worldRef }),
-		TrailPreview = if props.Category == "TrailAssets" and effectId
-			then c(InventoryTrailPreview, {
-				EffectId = effectId,
-				Config = config,
-				Elapsed = elapsed,
-				ZIndex = props.ZIndex,
-			})
-			else nil,
 	})
+end)
+
+return React.memo(function(props: Props)
+	if props.Category == "ImpactEffectAssets" then
+		return impactPreview(props)
+	end
+	if props.Category == "ElimEffectAssets" then
+		return eliminationSoundPreview(props)
+	end
+	return c(ViewportPreview, props)
 end)

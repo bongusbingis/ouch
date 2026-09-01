@@ -1,3 +1,8 @@
+-- Name: PlayerData.luau
+-- Author: Jack C.
+-- Description: Loads, saves, and replicates player profiles, exposing a write-through proxy so mutations replicate automatically, plus the balance, XP, and progression mutators every other service goes through.
+-- Created: 2026-07-12
+
 local PlayersService = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -7,13 +12,34 @@ local Promise = require(ReplicatedStorage.Packages.promise)
 
 local Env = require(script.Parent.Parent.Env)
 local DataConfig = require(game.ReplicatedStorage.Config.Data)
-local ProfileMigrations = require(ReplicatedStorage.Shared.Game.Data.ProfileMigrations)
+local WriteThroughProxy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
+)
 
 local Data = {}
 Data._profiles = {}
+Data._loaded = {}
+Data._loadGeneration = {}
+Data._writeLeaseCounts = {}
+Data._pendingSaves = {}
+
+local loadedListeners = {}
 
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
+
+_dataStore = _dataStore.Mock
+
+local WRITE_LEASE_TIMEOUT_SECONDS = 10
+
+local function _notifyLoaded(player)
+	for _, listener in table.clone(loadedListeners) do
+		local ok, err = pcall(listener, player)
+		if not ok then
+			warn(`[Data] Loaded listener failed for {player.Name}: {err}`)
+		end
+	end
+end
 
 export type ProgressionDelta = {
 	Elims: number?,
@@ -34,47 +60,6 @@ local EDITABLE_PROGRESSION_FIELDS = {
 	Losses = true,
 	MatchesPlayed = true,
 }
-
-local function _wrapProxy(data, profileReplica, path)
-	local proxy = {}
-	setmetatable(proxy, {
-		__index = function(_, key)
-			local value = data[key]
-			if type(value) == "table" then
-				local newPath = table.clone(path or {})
-				table.insert(newPath, key)
-				return _wrapProxy(value, profileReplica, newPath)
-			end
-			return value
-		end,
-		__newindex = function(_, key, value)
-			local fullPath = table.clone(path or {})
-			table.insert(fullPath, key)
-			local rawValue = value
-			if type(value) == "table" then
-				value = _wrapProxy(value, profileReplica, fullPath)
-			end
-			data[key] = value
-			profileReplica:Set(fullPath, rawValue)
-		end,
-		__len = function(_)
-			return #data
-		end,
-		-- __iter = function(_)
-		-- 	return next, data, nil
-		-- end,
-		__pairs = function(_)
-			return pairs(data)
-		end,
-		__ipairs = function(_)
-			return ipairs(data)
-		end,
-		__iter = function(_)
-			return pairs, data, nil
-		end,
-	})
-	return proxy
-end
 
 local function _subscribeWhenReady(player, entry)
 	local function subscribe()
@@ -119,24 +104,8 @@ local function _loadPlayerData(player)
 
 		profile:AddUserId(player.UserId)
 
-		-- Ordering is load-bearing on all three counts:
-		-- before Reconcile, so a migration can still tell "field absent" from
-		-- "field at the template default"; before Replica.New, because after
-		-- that every write emits a Set and partial migration state becomes
-		-- visible to the client; and never downward, since a rolling deploy
-		-- puts old servers in front of newer profiles.
-		local migrated, reached, migrationError = ProfileMigrations.apply(profile.Data, DataConfig.SchemaVersion)
-		if not migrated then
-			warn(
-				`[Data] Migration to v{DataConfig.SchemaVersion} failed for {player.Name} at v{reached}: {migrationError}`
-			)
-			profile:EndSession()
-			player:Kick("Data load failed.\nPlease rejoin!")
-			return
-		end
 		profile:Reconcile()
 
-		-- Self-cleaning: disconnects after one fire so it doesn't accumulate.
 		local sessionConn
 		sessionConn = profile.OnSessionEnd:Connect(function()
 			if sessionConn then
@@ -152,6 +121,10 @@ local function _loadPlayerData(player)
 			end
 			Data._profiles[player.UserId].Replica:Destroy()
 			Data._profiles[player.UserId] = nil
+			Data._loaded[player.UserId] = nil
+			Data._writeLeaseCounts[player.UserId] = nil
+			Data._pendingSaves[player.UserId] = nil
+			Data._loadGeneration[player.UserId] = (Data._loadGeneration[player.UserId] or 0) + 1
 			if player:IsDescendantOf(PlayersService) then
 				player:Kick("Your data has been released.\nPlease rejoin!")
 			end
@@ -169,7 +142,7 @@ local function _loadPlayerData(player)
 
 		local entry = {
 			Profile = profile,
-			Data = _wrapProxy(profile.Data, profileReplica),
+			Data = WriteThroughProxy.wrap(profile.Data, profileReplica),
 			Replica = profileReplica,
 		}
 		Data._profiles[player.UserId] = entry
@@ -220,6 +193,7 @@ local function _setProgressionAttributes(player, data)
 	player:SetAttribute("MatchesPlayed", progression.MatchesPlayed)
 	player:SetAttribute("KDR", progression.KDR)
 	player:SetAttribute("TutorialVersion", data.Tutorial.Version)
+	player:SetAttribute("SwipeThrowLearned", data.Onboarding.SwipeThrowLearned == true)
 end
 
 local function _syncLeaderStats(player)
@@ -245,6 +219,25 @@ end
 function Data.get(player)
 	local entry = Data._profiles[player.UserId]
 	return entry and entry.Data
+end
+
+function Data.isLoaded(player)
+	return Data._loaded[player.UserId] == true
+end
+
+function Data.onLoaded(listener)
+	table.insert(loadedListeners, listener)
+	local connected = true
+	return function()
+		if not connected then
+			return
+		end
+		connected = false
+		local index = table.find(loadedListeners, listener)
+		if index then
+			table.remove(loadedListeners, index)
+		end
+	end
 end
 
 function Data.addBonks(player, amount)
@@ -292,14 +285,22 @@ function Data.completeTutorial(player): boolean
 	return true
 end
 
--- Stamped once, on the first session that ever loads this profile. The starter
--- offer window is measured from it, so it must never be rewritten on later joins.
 function Data.markFirstJoin(player, now)
 	local d = Data.get(player)
 	if not d or d.Onboarding.FirstJoinAt > 0 then
 		return false
 	end
 	d.Onboarding.FirstJoinAt = now or os.time()
+	return true
+end
+
+function Data.markSwipeThrowLearned(player): boolean
+	local d = Data.get(player)
+	if not d or d.Onboarding.SwipeThrowLearned == true then
+		return false
+	end
+	d.Onboarding.SwipeThrowLearned = true
+	player:SetAttribute("SwipeThrowLearned", true)
 	return true
 end
 
@@ -346,6 +347,9 @@ function Data.addFieldForTesting(player, field, amount)
 end
 
 function Data.load(player)
+	local generation = (Data._loadGeneration[player.UserId] or 0) + 1
+	Data._loadGeneration[player.UserId] = generation
+	Data._loaded[player.UserId] = nil
 	return _loadPlayerData(player)
 		:andThen(function()
 			_buildLeaderStats(player):await()
@@ -356,6 +360,15 @@ function Data.load(player)
 			end
 		end)
 		:andThen(function()
+			if
+				Data._loadGeneration[player.UserId] ~= generation
+				or Data._profiles[player.UserId] == nil
+				or not player:IsDescendantOf(PlayersService)
+			then
+				return
+			end
+			Data._loaded[player.UserId] = true
+			_notifyLoaded(player)
 			print(`[Data] Loaded profile for {player.Name} ({player.UserId})`)
 		end)
 		:catch(function(err)
@@ -363,18 +376,77 @@ function Data.load(player)
 		end)
 end
 
-function Data.save(player)
-	local entry = Data._profiles[player.UserId]
-	if not entry then
+local function _finishSave(userId, entry)
+	if Data._profiles[userId] ~= entry then
 		return
 	end
-	Data._profiles[player.UserId] = nil
+	Data._profiles[userId] = nil
+	Data._pendingSaves[userId] = nil
+	Data._writeLeaseCounts[userId] = nil
 	if entry.ReadyConnection then
 		entry.ReadyConnection:Disconnect()
 		entry.ReadyConnection = nil
 	end
 	entry.Replica:Destroy()
 	entry.Profile:EndSession()
+end
+
+function Data.acquireWriteLease(player)
+	local userId = player.UserId
+	local entry = Data._profiles[userId]
+	if entry == nil or Data._pendingSaves[userId] ~= nil then
+		return nil
+	end
+
+	Data._writeLeaseCounts[userId] = (Data._writeLeaseCounts[userId] or 0) + 1
+	local released = false
+	return function()
+		if released then
+			return
+		end
+		released = true
+		local count = Data._writeLeaseCounts[userId]
+		if count == nil then
+			return
+		end
+		if count > 1 then
+			Data._writeLeaseCounts[userId] = count - 1
+			return
+		end
+		Data._writeLeaseCounts[userId] = nil
+		local pending = Data._pendingSaves[userId]
+		if pending and pending.Entry == entry then
+			_finishSave(userId, entry)
+		end
+	end
+end
+
+function Data.save(player)
+	local userId = player.UserId
+	local entry = Data._profiles[userId]
+	if not entry or Data._pendingSaves[userId] ~= nil then
+		return
+	end
+	Data._loaded[userId] = nil
+	Data._loadGeneration[userId] = (Data._loadGeneration[userId] or 0) + 1
+	if entry.ReadyConnection then
+		entry.ReadyConnection:Disconnect()
+		entry.ReadyConnection = nil
+	end
+	if (Data._writeLeaseCounts[userId] or 0) == 0 then
+		_finishSave(userId, entry)
+		return
+	end
+
+	local pending = { Entry = entry }
+	Data._pendingSaves[userId] = pending
+	task.delay(WRITE_LEASE_TIMEOUT_SECONDS, function()
+		if Data._pendingSaves[userId] ~= pending then
+			return
+		end
+		warn(`[Data] Timed out waiting for profile writes for user {userId}; closing the profile session`)
+		_finishSave(userId, entry)
+	end)
 end
 
 return Data

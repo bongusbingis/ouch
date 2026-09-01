@@ -1,13 +1,14 @@
+-- Name: PlayerHighlights.luau
+-- Author: Jack C.
+-- Description: Applies and clears the team and teammate outline highlights on other players' characters as they spawn, change team, and leave.
+-- Created: 2026-08-18
+
 --!strict
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("UI"))
-
--- Keeps a Highlight over every other player's character so they stay readable
--- against the arena. Presentation only: it reacts to character lifecycle and
--- holds no gameplay state, and the local player is never highlighted.
 
 local PlayerHighlights = {}
 

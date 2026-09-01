@@ -1,9 +1,16 @@
+-- Name: SimulationServer.server.luau
+-- Author: Jack C.
+-- Description: Arena server entry point: starts every gameplay, economy, and analytics service in order and wires sim events through to animations, feedback, and progression consumers.
+-- Created: 2026-07-12
+
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = ServerScriptService:WaitForChild("Server"):WaitForChild("Modules")
-local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local ArenaSessionService = require(Modules:WaitForChild("ArenaSessionService"))
+ArenaSessionService.start()
+
+local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local PlayerAssistService = require(Modules:WaitForChild("PlayerAssistService"))
 local ArenaReturnService = require(Modules:WaitForChild("ArenaReturnService"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
@@ -12,18 +19,16 @@ local MatchService = require(Modules:WaitForChild("MatchService"))
 local ModeVoteService = require(Modules:WaitForChild("ModeVoteService"))
 local MapFeatureService = require(Modules:WaitForChild("MapFeatureService"))
 local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
+local CombatPoseService = require(Modules:WaitForChild("CombatPoseService"))
 local ProgressionService = require(Modules:WaitForChild("ProgressionService"))
 local QuestService = require(Modules:WaitForChild("QuestService"))
+local PostMatchService = require(Modules:WaitForChild("PostMatchService"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
-local CrateService = require(Modules:WaitForChild("CrateService"))
-local EntitlementService = require(Modules:WaitForChild("EntitlementService"))
-local BattlePassService = require(Modules:WaitForChild("BattlePassService"))
-local DirectPurchaseService = require(Modules:WaitForChild("DirectPurchaseService"))
-local MonetizationService = require(Modules:WaitForChild("MonetizationService"))
-local GamePassService = require(Modules:WaitForChild("GamePassService"))
-local PaidRandomPolicyService = require(Modules:WaitForChild("PaidRandomPolicyService"))
+local EconomyService = require(Modules:WaitForChild("EconomyService"))
+local SettingsService = require(Modules:WaitForChild("SettingsService"))
 local CmdrService = require(Modules:WaitForChild("CmdrService"))
+local ThrowUXService = require(Modules:WaitForChild("ThrowUXService"))
 
 local RotatingPlatforms = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -76,6 +81,8 @@ ConfigLiveService.start({
 		AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
 		GameModes = require(ConfigRoot:WaitForChild("GameModes")),
 		MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
+		Shop = require(ConfigRoot:WaitForChild("Shop")),
+		Crates = require(ConfigRoot:WaitForChild("Crates")),
 	},
 	holdSimOverrides = function()
 		local phase = MatchService.phase()
@@ -88,33 +95,27 @@ MatchService.onEvent(function(event)
 	end
 end)
 
+ArenaReturnService.start()
 PlayerAssistService.start()
 InputSetup.start()
-ArenaSessionService.start()
 BallService.start()
 MapFeatureService.start()
 RotatingPlatforms.startMover()
 MatchService.start()
 ModeVoteService.start()
-ArenaReturnService.start()
 AnalyticsService.start(MatchService)
--- Reported per match rather than read by AnalyticsService directly, so shared
--- simulation code keeps no dependency on a server-only reporting service.
+CombatPoseService.start()
 AnalyticsService.registerGauge("droppedSimMs", ServerAuthAdapter.takeDroppedMilliseconds)
-EntitlementService.start()
-BattlePassService.start({ monetizationService = MonetizationService })
-ProgressionService.start(MatchService)
-QuestService.start(MatchService)
 CosmeticsService.start()
 CharacterColorService.start()
-PaidRandomPolicyService.start()
-CrateService.start()
-DirectPurchaseService.start()
-MonetizationService.start()
-GamePassService.start()
+EconomyService.start()
+SettingsService.start()
+ProgressionService.start(MatchService)
+QuestService.start(MatchService)
+PostMatchService.start()
 CmdrService.start()
+ThrowUXService.start()
 
--- Server-side events are authoritative.
 ServerAuthAdapter.onEvent(function(event)
 	local acceptedElim = MatchService.handleCombatEvent(event)
 	if acceptedElim or event.kind ~= "Elim" then

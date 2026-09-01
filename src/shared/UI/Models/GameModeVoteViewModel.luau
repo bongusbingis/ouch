@@ -1,3 +1,8 @@
+-- Name: GameModeVoteViewModel.luau
+-- Author: Jack C.
+-- Description: Pure formatting for the mode ballot: vote count text and the clamped countdown fraction derived from server time.
+-- Created: 2026-08-17
+
 --!strict
 
 local GameModeVoteViewModel = {}

@@ -1,3 +1,8 @@
+-- Name: BattlePassService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec for the battle pass service: season adoption, XP accrual and tier derivation, premium gating and idempotent grants, claim rules, and season rollover settlement.
+-- Created: 2026-08-12
+
 --!nonstrict
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -180,11 +185,9 @@ return function()
 			BattlePassService.addSeasonXp(f.player, 500)
 			expect(#f.granted).to.equal(0)
 
-			-- Cross into season two without ever opening the pass.
 			f.clock.value = 3500
 			local state = BattlePassService.stateFor(f.player)
 
-			-- Both free tiers were owed and are paid out, not lost.
 			expect(#f.granted).to.equal(2)
 			expect(state.seasonId).to.equal("S2")
 			expect(state.xp).to.equal(0)
@@ -207,7 +210,6 @@ return function()
 			local state = BattlePassService.stateFor(f.player)
 			expect(state.active).to.equal(false)
 
-			-- XP earned with no season live must not silently vanish into S1.
 			BattlePassService.addSeasonXp(f.player, 100)
 			expect(BattlePassService.stateFor(f.player).active).to.equal(false)
 		end)
@@ -237,7 +239,6 @@ return function()
 			local _, reason = BattlePassService.claim(f.player, 1, "Free")
 			expect(reason).to.equal("grant_failed")
 
-			-- Still claimable once the underlying grant works again.
 			f.options.rewardService.grant = function()
 				return true, nil
 			end

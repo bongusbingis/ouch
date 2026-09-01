@@ -1,3 +1,8 @@
+-- Name: CosmeticsLogic.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the shipped cosmetic catalog and equip rules: slot and ownership validation, category defaults, crate pool spread, and that every exclusive item is obtainable and backed by real audio.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -5,6 +10,19 @@ local CosmeticsLogic = require(script.Parent.Parent.Game.Economy.CosmeticsLogic)
 local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
 local Crates = require(script.Parent.Parent.Parent.Config.Crates)
 local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
+local Audio = require(script.Parent.Parent.Parent.Config.Audio)
+
+local ELIMINATION_SOUND_TIERS = {
+	ElimSoundRubberPop = "Common",
+	ElimSoundToySqueak = "Common",
+	ElimSoundBalloonPop = "Common",
+	ElimSoundPartyHorn = "Rare",
+	ElimSoundArcadeKO = "Rare",
+	ElimSoundComedyDrums = "Rare",
+	ElimSoundRoyalFanfare = "Legendary",
+	ElimSoundStadiumRoar = "Legendary",
+	ElimSoundCosmicChime = "Legendary",
+}
 
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },
@@ -43,22 +61,76 @@ T.describe("CosmeticsLogic", function()
 		T.expect(entries[6].name):toEqual("Purple")
 	end)
 
-	T.it("registers renderable trail cosmetics in every rarity", function()
-		local counts = { Common = 0, Rare = 0, Legendary = 0, Exclusive = 0 }
-		for _, item in Cosmetics.Items do
-			if item.Category == "TrailAssets" then
-				counts[item.Rarity] += 1
-				T.expect(item.EffectId ~= nil):toBeTruthy()
+	T.it("spreads every openable crate's pool across more than one rarity", function()
+		for _, crate in Crates do
+			if crate.CatalogStatus == "Active" then
+				local rarities = {}
+				for _, itemId in crate.ItemPool do
+					local item = Cosmetics.Items[itemId]
+					T.expect(item ~= nil):toBeTruthy()
+					rarities[item.Rarity] = true
+				end
+				local distinct = 0
+				for _ in rarities do
+					distinct += 1
+				end
+				T.expect(distinct > 1):toBeTruthy()
 			end
-		end
-		for _, count in counts do
-			T.expect(count > 0):toBeTruthy()
 		end
 	end)
 
+	T.it("gives every equip slot that has items a default or an always-available entry", function()
+		local populated = {}
+		for _, item in Cosmetics.Items do
+			if item.AlwaysAvailable ~= true then
+				populated[item.Category] = true
+			end
+		end
+		for slot in populated do
+			T.expect(Cosmetics.Defaults[slot] ~= nil):toBeTruthy()
+		end
+	end)
+
+	T.it("gives the default elimination effect sounds that Config.Audio actually defines", function()
+		local default = Cosmetics.Defaults.ElimEffectAssets
+		T.expect(default ~= nil):toBeTruthy()
+		local effect = default.ElimEffect
+		T.expect(effect ~= nil):toBeTruthy()
+		T.expect(Audio.Gameplay[effect.DodgeballSound] ~= nil):toBeTruthy()
+		T.expect(Audio.Gameplay[effect.HammerSound] ~= nil):toBeTruthy()
+	end)
+
+	T.it("points every elimination effect cosmetic at real audio entries", function()
+		for _, item in Cosmetics.Items do
+			if item.Category == "ElimEffectAssets" then
+				T.expect(item.ElimEffect ~= nil):toBeTruthy()
+				local dodgeball = Audio.Gameplay[item.ElimEffect.DodgeballSound]
+				local hammer = Audio.Gameplay[item.ElimEffect.HammerSound]
+				T.expect(dodgeball ~= nil):toBeTruthy()
+				T.expect(hammer ~= nil):toBeTruthy()
+				T.expect(dodgeball.Scope):toEqual("World")
+				T.expect(hammer.Scope):toEqual("World")
+				T.expect(#dodgeball.AssetIds > 0):toBeTruthy()
+				T.expect(#hammer.AssetIds > 0):toBeTruthy()
+			end
+		end
+	end)
+
+	T.it("ships three elimination sounds in each openable rarity tier", function()
+		local counts = { Common = 0, Rare = 0, Legendary = 0 }
+		for itemId, rarity in ELIMINATION_SOUND_TIERS do
+			local item = Cosmetics.Items[itemId]
+			T.expect(item ~= nil):toBeTruthy()
+			T.expect(item.Category):toEqual("ElimEffectAssets")
+			T.expect(item.Rarity):toEqual(rarity)
+			counts[rarity] += 1
+		end
+		T.expect(counts.Common):toEqual(3)
+		T.expect(counts.Rare):toEqual(3)
+		T.expect(counts.Legendary):toEqual(3)
+	end)
+
 	T.it("makes every Exclusive cosmetic obtainable from some game pass", function()
-		-- Exclusives never drop from crates and are not directly purchasable, so
-		-- one that no pass grants is unobtainable dead content.
 		local granted = {}
 		for _, definition in GamePasses.Catalog do
 			for _, itemId in definition.EntitlementItemIds do
@@ -86,14 +158,12 @@ T.describe("CosmeticsLogic", function()
 		end
 	end)
 
-	T.it("keeps every Exclusive trail out of the crate pools", function()
+	T.it("keeps every Exclusive cosmetic out of the crate pools", function()
 		for _, crate in Crates do
 			for _, itemId in crate.ItemPool do
 				local item = Cosmetics.Items[itemId]
 				T.expect(item ~= nil):toBeTruthy()
-				if item.Rarity == "Exclusive" then
-					T.expect(Cosmetics.Rarities.Exclusive.Weight):toEqual(0)
-				end
+				T.expect(item.Rarity ~= "Exclusive"):toBeTruthy()
 			end
 		end
 	end)

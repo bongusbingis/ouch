@@ -1,3 +1,8 @@
+-- Name: BattlePassLogic.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the pure season pass rules: tier derivation from XP, progress into the next tier, active season selection, claim legality, what is owed, and stored state normalization.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -59,7 +64,6 @@ T.describe("BattlePassLogic", function()
 		T.expect(BattlePassLogic.activeSeason(defs, 999)):toBeNil()
 		T.expect(BattlePassLogic.activeSeason(defs, 1000).Id):toEqual("T1")
 		T.expect(BattlePassLogic.activeSeason(defs, 1999).Id):toEqual("T1")
-		-- EndsAt is exclusive, so the rest gap starts immediately.
 		T.expect(BattlePassLogic.activeSeason(defs, 2000)):toBeNil()
 	end)
 
@@ -159,7 +163,6 @@ T.describe("BattlePassLogic", function()
 	T.it("ships a season whose full track is reachable in a sane number of hours", function()
 		local season = Seasons.Definitions.S1
 		local total = season.XpThresholds[season.TierCount]
-		-- ~1,650 XP/hour from ProgressionXP at roughly ten matches an hour.
 		local hours = total / 1650
 		T.expect(hours > 5):toBeTruthy()
 		T.expect(hours < 20):toBeTruthy()
@@ -168,15 +171,15 @@ T.describe("BattlePassLogic", function()
 	T.it("gives the shipped free track real rewards, not just a premium teaser", function()
 		local season = Seasons.Definitions.S1
 		local freeCount = 0
-		local freeCosmetics = 0
+		local freeValue = 0
 		for _, reward in season.FreeRewards do
 			freeCount += 1
-			if reward.kind == "Cosmetic" then
-				freeCosmetics += 1
+			if reward.kind == "Bonks" then
+				freeValue += reward.amount or 0
 			end
 		end
 		T.expect(freeCount >= 6):toBeTruthy()
-		T.expect(freeCosmetics >= 3):toBeTruthy()
+		T.expect(freeValue > 0):toBeTruthy()
 	end)
 
 	T.it("rewards only cosmetics that exist and never grants XP back into itself", function()

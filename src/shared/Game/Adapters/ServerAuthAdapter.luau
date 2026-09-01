@@ -1,3 +1,8 @@
+-- Name: ServerAuthAdapter.luau
+-- Author: Jack C.
+-- Description: The server-only bridge between the engine and the pure simulation: runs the fixed-rate accumulator, builds the world snapshot, turns queued client intents into commands, steps the sim, encodes state back onto instances, and broadcasts events.
+-- Created: 2026-07-12
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -9,12 +14,14 @@ local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Sim.SimCore)
 local SimStateCodec = require(script.Parent.SimStateCodec)
 local PlayerIds = require(script.Parent.PlayerIds)
+local DodgeballRelease = require(script.Parent.DodgeballRelease)
 local AssistProjection = require(script.Parent.Parent.Config.AssistProjection)
 local PlayerAssist = require(script.Parent.Parent.Parent.Parent.Config.PlayerAssist)
 local MobileInput = require(script.Parent.Parent.Parent.Parent.Config.MobileInput)
 local Intercept = require(script.Parent.Parent.Sim.Intercept)
 local MovementSpeedService = require(script.Parent.MovementSpeedService)
 local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
+local ModeRegistry = require(script.Parent.Parent.Modes.ModeRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Debug)
@@ -22,15 +29,6 @@ local Network = require(script.Parent.Parent.Parent.Network)
 
 type SimEvent = SimTypes.SimEvent
 type InputCommand = SimTypes.InputCommand
-
--- The single bridge between the pure sim and the engine. The server is the only
--- simulator: it consumes throw/catch intents, runs SimCore on a fixed tick, and
--- encodes the result onto the ball instances that replicate to clients.
---
--- Clients send intent only. Every raycast, hit test, catch, and elimination is
--- resolved here from server-known character positions, and the aim origin is
--- taken from the player's own root rather than anything the client supplied, so
--- a client can never report having hit or been hit by anything.
 
 local ServerAuthAdapter = {}
 
@@ -79,7 +77,8 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 		if model == nil then
 			continue
 		end
-		if player:GetAttribute("ArenaAdmission") == "Rejected" then
+		local admission = player:GetAttribute("ArenaAdmission")
+		if (admission ~= "Direct" and admission ~= "Matched") or player:GetAttribute("ArenaReady") ~= true then
 			table.insert(excluded, model)
 			continue
 		end
@@ -93,10 +92,6 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 	return entries, excluded
 end
 
-local function socketPosition(entry: CharacterEntry, offset: vector): Vector3
-	return (entry.root.CFrame * CFrame.new(offset.x, offset.y, offset.z)).Position
-end
-
 local function heldBallPosition(entry: CharacterEntry): Vector3
 	local hand = entry.model:FindFirstChild("RightHand") or entry.model:FindFirstChild("Right Arm")
 	if hand and hand:IsA("BasePart") then
@@ -106,19 +101,11 @@ local function heldBallPosition(entry: CharacterEntry): Vector3
 end
 
 local function throwPosition(entry: CharacterEntry): Vector3
-	local release = entry.model:FindFirstChild("DodgeballReleaseSocket", true)
-	if release and release:IsA("Attachment") then
-		return release.WorldPosition
-	end
-	return socketPosition(entry, Combat.Dodgeball.OverhandReleaseRootOffset)
+	return DodgeballRelease.position(entry.model, entry.root, Combat.Dodgeball.OverhandReleaseRootOffset)
 end
 
--- Allocated once and reused every tick. At 60Hz a fresh RaycastParams, closure,
--- and snapshot table per step is pure GC churn; only their contents change.
 local raycastParams = RaycastParams.new()
 raycastParams.FilterType = Enum.RaycastFilterType.Exclude
--- Gameplay traces ignore non-collidable geometry (invisible markers, decorative
--- no-clip parts); raycasts hit them by default otherwise.
 raycastParams.RespectCanCollide = true
 
 local collisionWorld: SimTypes.CollisionWorld = {
@@ -134,8 +121,6 @@ local collisionWorld: SimTypes.CollisionWorld = {
 		if Debug.CollisionTrace then
 			trace(`sweep hit {result.Instance:GetFullName()} at d={result.Distance}`)
 		end
-		-- SweepHit.position is the sphere center at contact, matching the
-		-- mock-world semantics the sim is tested against.
 		return {
 			distance = result.Distance,
 			position = origin + (displacement / distance) * result.Distance,
@@ -144,15 +129,21 @@ local collisionWorld: SimTypes.CollisionWorld = {
 	end,
 }
 
+local simRules: SimTypes.SimRules = { preserveDodgeballs = false }
+
 local worldSnapshot: SimTypes.WorldSnapshot = {
 	characters = {},
 	collision = collisionWorld,
 	ballSpawns = {},
+	rules = simRules,
 }
 
--- Rolling window of each character's velocity, kept here rather than in SimState
--- because it is a measurement of the engine world, not a sim decision, and the
--- sim must stay a pure function of the snapshot it is handed.
+local function refreshRules()
+	local modeId = if matchState then matchState:GetAttribute("modeId") :: string? else nil
+	local mode = if modeId then ModeRegistry.get(modeId) else nil
+	simRules.preserveDodgeballs = mode ~= nil and mode.rules.PreserveDodgeballs == true
+end
+
 local velocityHistory: { [string]: { SimTypes.Vec } } = {}
 
 local function sampleConsistency(id: string, velocity: SimTypes.Vec): number
@@ -180,11 +171,8 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 			velocity = entry.root.AssemblyLinearVelocity,
 			height = capsule.Height,
 			radius = capsule.Radius,
-			-- CombatAlive is the single source of truth for aliveness (custom
-			-- elimination flow; native Humanoid health is not used).
 			alive = entry.model:GetAttribute("CombatAlive") ~= false,
 			teamId = entry.model:GetAttribute("TeamId") :: string?,
-			-- Spawn protection flag, set by MatchService on the character model.
 			invulnerable = entry.model:GetAttribute("minv") == true,
 			velocityConsistency = sampleConsistency(id, entry.root.AssemblyLinearVelocity),
 		}
@@ -195,9 +183,8 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 		end
 	end
 
-	-- World ball spawning happens outside the sim (BallSpawner); the sim never
-	-- sees spawn points under this backend.
 	worldSnapshot.characters = characters
+	refreshRules()
 	return worldSnapshot
 end
 
@@ -213,19 +200,28 @@ type Intent = {
 	aimDir: Vector3,
 	targetId: string?,
 	charge: number?,
-	lob: boolean?,
 }
 
 local pendingIntents: { Intent } = {}
+local pendingEquips: { [string]: string } = {}
+
+local function queueEquip(player: Player, weapon: string)
+	if player:GetAttribute("ArenaReady") ~= true then
+		return
+	end
+	pendingEquips[PlayerIds.toId(player)] = weapon
+end
 
 local function queueIntent(
 	player: Player,
 	kind: SimTypes.CommandKind,
 	aimDir: Vector3,
 	targetId: string?,
-	charge: number?,
-	lob: boolean?
+	charge: number?
 )
+	if player:GetAttribute("ArenaReady") ~= true then
+		return
+	end
 	if #pendingIntents >= MAX_QUEUED_INTENTS then
 		return
 	end
@@ -235,18 +231,22 @@ local function queueIntent(
 		aimDir = aimDir,
 		targetId = targetId,
 		charge = charge,
-		lob = lob,
 	})
 end
 
--- Intents become commands only against a live character the server can see, and
--- the origin is derived from that character rather than sent by the client.
 local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
-	if matchState == nil or matchState:GetAttribute("phase") ~= "Active" then
+	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
+	if not active then
 		table.clear(pendingIntents)
-		return commands
 	end
+
+	for playerId, weapon in pendingEquips do
+		if entries[playerId] ~= nil then
+			table.insert(commands, { playerId = playerId, kind = "Equip", weapon = weapon })
+		end
+	end
+	table.clear(pendingEquips)
 
 	for _, intent in pendingIntents do
 		local entry = entries[intent.playerId]
@@ -262,14 +262,9 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 			kind = intent.kind,
 			aimOrigin = entry.root.CFrame.Position + aimDir * 2,
 			aimDir = aimDir,
-			-- Only a proposal: validateTarget re-checks it server-side against the
-			-- wider validation cone and falls back to an unguided throw.
 			targetId = intent.targetId,
 			charge = intent.charge,
-			lob = intent.lob,
 			deviceClass = deviceClass,
-			-- Read from the same projection the client reads, so an assist can
-			-- never be stronger on one side than the other.
 			assist = AssistProjection.strengths(assistFolder, deviceClass),
 		})
 	end
@@ -280,7 +275,6 @@ end
 local function step(dt: number)
 	local ballsFolder = Workspace:FindFirstChild(BALLS_FOLDER_NAME)
 	if ballsFolder == nil then
-		-- Client before first replication, or server before BallSpawner ran.
 		return
 	end
 
@@ -310,8 +304,14 @@ local function step(dt: number)
 	MovementSpeedService.step(state, characterModels, events)
 	SimStateCodec.encode(state, ballsFolder, characterModels)
 	dispatch(events)
-	if #events > 0 then
-		Network.fire("CombatSimEvent", nil, events)
+	local transientEvents = {}
+	for _, event in events do
+		if event.kind ~= "Elim" then
+			table.insert(transientEvents, event)
+		end
+	end
+	if #transientEvents > 0 then
+		Network.fire("CombatSimEvent", nil, transientEvents)
 	end
 end
 
@@ -346,6 +346,18 @@ function ServerAuthAdapter.start()
 		end
 	end)
 
+	Network.handleProtected("SubmitWeaponEquip", {
+		rateLimit = 10,
+		validate = function(_player, weapon)
+			if typeof(weapon) ~= "string" or not WeaponRegistry.isKind(weapon) then
+				return false, "invalid_weapon"
+			end
+			return true
+		end,
+	}, function(player, weapon)
+		queueEquip(player, weapon)
+	end)
+
 	Network.handleProtected("SubmitCombatInput", {
 		rateLimit = 20,
 		validate = function(_player, kind, aimDir, targetId, charge, lob)
@@ -362,12 +374,10 @@ function ServerAuthAdapter.start()
 			if targetId ~= nil and (typeof(targetId) ~= "string" or #targetId == 0 or #targetId > 32) then
 				return false, "invalid_target"
 			end
-			-- Charge is clamped again in the kit; rejecting garbage here keeps a
-			-- NaN from ever reaching the sim.
 			if charge ~= nil and (typeof(charge) ~= "number" or charge ~= charge or charge < 0 or charge > 1) then
 				return false, "invalid_charge"
 			end
-			if lob ~= nil and typeof(lob) ~= "boolean" then
+			if lob ~= nil then
 				return false, "invalid_lob"
 			end
 			return true
@@ -378,10 +388,6 @@ function ServerAuthAdapter.start()
 	RunService.Heartbeat:Connect(function(deltaTime: number)
 		local wanted = accumulator + deltaTime
 		accumulator = math.min(wanted, STEP_SECONDS * MAX_CATCHUP_STEPS)
-		-- Time past the clamp is discarded, not deferred, so the simulation ends
-		-- up permanently behind wall clock and every cooldown stretches. The
-		-- clamp is correct -- without it a long hitch spirals into catch-up --
-		-- but it used to fail silently. Counting it makes the regression visible.
 		droppedSeconds += math.max(wanted - accumulator, 0)
 		while accumulator >= STEP_SECONDS do
 			accumulator -= STEP_SECONDS
@@ -390,9 +396,6 @@ function ServerAuthAdapter.start()
 	end)
 end
 
--- Simulation time discarded by the catch-up clamp since the last read, in
--- milliseconds. Reading resets it, so each report covers one interval and two
--- consumers cannot double-count the same hitch.
 function ServerAuthAdapter.takeDroppedMilliseconds(): number
 	local value = droppedSeconds * 1000
 	droppedSeconds = 0

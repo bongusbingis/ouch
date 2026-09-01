@@ -1,3 +1,8 @@
+-- Name: JumpPads.luau
+-- Author: Jack C.
+-- Description: Map feature kit for trampolines: launches players who jump from or fall fast onto an authored pad, cancelling part of gravity for the floaty arc and broadcasting the impulse that drives the client squash effect.
+-- Created: 2026-08-19
+
 --!strict
 
 local Debris = game:GetService("Debris")
@@ -7,16 +12,6 @@ local Workspace = game:GetService("Workspace")
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
-
--- Trampolines. Each child of Scriptables.JumpPads is an authored Model whose
--- parts are both the launch surface and the thing that squashes; the trigger
--- volume is derived from that model rather than authored separately.
---
--- Two ways to launch, matching the prototype: jumping while on the pad, or
--- falling onto it fast enough. The launch preserves horizontal velocity and
--- replaces vertical, then cancels part of gravity with a VectorForce so the arc
--- floats instead of reading as a plain high jump. That force is removed on
--- landing, which is the only per-player state this kit keeps.
 
 local JumpPads = {}
 
@@ -63,8 +58,6 @@ end
 local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: Model)
 	local settings = config()
 
-	-- A fresh bounce replaces any float still running, so repeated pad hits do
-	-- not stack forces on the same character.
 	clearBounce(player)
 
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
@@ -89,9 +82,6 @@ local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: M
 	Network.fire("JumpPadImpulse", nil, pad)
 end
 
--- True while the character is on or just above the pad, which is what lets a
--- jump taken from the surface count rather than only a landing. The window is
--- asymmetric on purpose: a little slack below, a standing player's worth above.
 local function overPad(pad: Model, position: Vector3): boolean
 	local settings = config()
 	local boundsCFrame, boundsSize = pad:GetBoundingBox()
@@ -103,8 +93,6 @@ local function overPad(pad: Model, position: Vector3): boolean
 		and offset.Y <= top + settings.ZoneHeight
 end
 
--- Falling fast and about to reach the pad. Cast only against this pad's own
--- parts so neighbouring geometry cannot trigger it.
 local function fallingOnto(pad: Model, root: BasePart, humanoid: Humanoid, params: RaycastParams): boolean
 	local settings = config()
 	if root.AssemblyLinearVelocity.Y > -settings.FallSpeed then

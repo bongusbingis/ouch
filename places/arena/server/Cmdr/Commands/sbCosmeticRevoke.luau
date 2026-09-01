@@ -1,3 +1,8 @@
+-- Name: sbCosmeticRevoke.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-cosmetic-revoke: revokes a cosmetic and clears it if equipped.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

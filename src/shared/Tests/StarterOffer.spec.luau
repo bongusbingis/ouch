@@ -1,3 +1,8 @@
+-- Name: StarterOffer.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the starter offer window: active only before it elapses and before conversion, formatted countdowns, and that it points at a real purchasable pass.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -53,7 +58,6 @@ T.describe("StarterOffer", function()
 		local pass = GamePasses.Catalog[offer.PassKey]
 		T.expect(pass ~= nil):toBeTruthy()
 		T.expect(offer.WindowSeconds > 0):toBeTruthy()
-		-- The hook must be the cheapest way in, or it is not a starter offer.
 		for _, definition in GamePasses.Catalog do
 			T.expect(pass.SuggestedRobux <= definition.SuggestedRobux):toBeTruthy()
 		end

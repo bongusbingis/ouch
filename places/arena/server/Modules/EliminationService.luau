@@ -1,10 +1,10 @@
+-- Name: EliminationService.luau
+-- Author: Jack C.
+-- Description: Owns eliminated character body state without touching Humanoid health or reloading the character: flips the CombatAlive attribute, builds and removes the ragdoll constraints, and restores the saved joint and physics state.
+-- Created: 2026-07-13
+
 --!strict
 
--- Owns the character body state for eliminations without touching native
--- Humanoid health or LoadCharacter: the "CombatAlive" character attribute is
--- the single source of truth (nil/true = alive, false = eliminated), read by
--- the sim adapter, MatchService, and client death effects.
---
 local EliminationService = {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -1,14 +1,9 @@
---!strict
+-- Name: SplatEffects.luau
+-- Author: Jack C.
+-- Description: Spawns the world-space paint splat at the impact point of a dodgeball elimination, colored from the thrower's equipped ball cosmetic and deduplicated against repeated broadcasts.
+-- Created: 2026-07-18
 
--- World-space paint splat for dodgeball eliminations (Elim events carrying a
--- projectileId; hammer elims have none). The effect clone is anchored at the
--- event's impact position instead of the ball, which the sim frees at impact.
--- Splat color derives from the thrower's Equip_BallAssets projection; sim
--- broadcast events can arrive more than once, so effects gate on EventDedup.
--- A Studio-authored Assets.Effects.Splat overrides the code-built prototype
--- template when present (user-directed Instance.new exception while Studio
--- asset access is unavailable); the Splat AudioPlayer is optional and
--- WorldAudio skips it silently until authored.
+--!strict
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,7 +24,6 @@ assert(defaultSplatColor ~= nil, "[SplatEffects] Cosmetics.Defaults.BallAssets.S
 local seen = EventDedup.new(4096)
 local started = false
 
--- Flash stays authored-white; only the paint emitters take the skin color.
 local tintedEmitters = {
 	Droplets = true,
 	Sheet = true,
@@ -140,8 +134,6 @@ local function buildPrototypeTemplate(): BasePart
 	return part
 end
 
--- FindFirstChild is deliberate here: the Studio asset is optional, and the
--- code-built prototype covers its absence until it can be authored.
 local function resolveTemplate(): BasePart
 	local effects = ReplicatedStorage:WaitForChild("Assets"):FindFirstChild("Effects")
 	local authored = if effects then effects:FindFirstChild("Splat") else nil
@@ -192,8 +184,6 @@ function SplatEffects.onEvent(event: any)
 		end
 	end
 
-	-- The elimination sound comes from GameAudio's config ids; this clone is the
-	-- splat visual only.
 	Debris:AddItem(clone, Combat.Splat.Lifetime)
 end
 

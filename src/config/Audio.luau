@@ -2,6 +2,14 @@
 
 -- Client audio asset ids, mix defaults, and transition timing.
 
+local function eliminationSound(volume: number)
+	return {
+		Scope = "World",
+		Volume = volume,
+		AssetIds = { "" },
+	}
+end
+
 return {
 	Mix = {
 		MasterVolume = 1,
@@ -18,7 +26,7 @@ return {
 				"rbxassetid://1847683526",
 				"rbxassetid://131711369956795",
 			},
-			Volume = 0.18,
+			Volume = 0, --0.18,
 			FadeInSeconds = 0.8,
 		},
 		Lobby = {
@@ -38,7 +46,7 @@ return {
 	Gameplay = {
 		HammerElimination = {
 			Scope = "World",
-			Volume = 0.6,
+			Volume = 1.6,
 			AssetIds = {
 				"rbxassetid://122682383632262",
 				"rbxassetid://87679579947858",
@@ -48,7 +56,7 @@ return {
 		},
 		HammerSwing = {
 			Scope = "World",
-			Volume = 0.45,
+			Volume = 1.45,
 			AssetIds = {
 				"rbxassetid://137298186656357",
 				"rbxassetid://93854325647161",
@@ -57,7 +65,7 @@ return {
 		},
 		JumpPadBounce = {
 			Scope = "World",
-			Volume = 0.5,
+			Volume = 1.5,
 			AssetIds = {
 				"rbxassetid://123922570136163",
 				"rbxassetid://135468135163946",
@@ -66,7 +74,7 @@ return {
 		},
 		DodgeballElimination = {
 			Scope = "World",
-			Volume = 0.6,
+			Volume = 1.6,
 			AssetIds = {
 				"rbxassetid://173818824",
 				"rbxassetid://6509749580",
@@ -75,7 +83,7 @@ return {
 		},
 		DodgeballThrow = {
 			Scope = "World",
-			Volume = 0.45,
+			Volume = 1.45,
 			AssetIds = {
 				"rbxassetid://94573137804285",
 				"rbxassetid://129467477219437",
@@ -84,20 +92,75 @@ return {
 		},
 		DodgeballBounce = {
 			Scope = "World",
-			Volume = 0.4,
+			Volume = 1.4,
 			AssetIds = {
-				"rbxassetid://115370210004477",
 				"rbxassetid://8254244321",
 				"rbxassetid://8254243230",
 				"rbxassetid://8254243751",
 			},
 		},
+		RubberPopDodgeballElimination = eliminationSound(1.45),
+		RubberPopHammerElimination = eliminationSound(1.45),
+		ToySqueakDodgeballElimination = eliminationSound(1.45),
+		ToySqueakHammerElimination = eliminationSound(1.45),
+		BalloonPopDodgeballElimination = eliminationSound(1.45),
+		BalloonPopHammerElimination = eliminationSound(1.45),
+		PartyHornDodgeballElimination = eliminationSound(1.4),
+		PartyHornHammerElimination = eliminationSound(1.4),
+		ArcadeKODodgeballElimination = eliminationSound(1.4),
+		ArcadeKOHammerElimination = eliminationSound(1.4),
+		ComedyDrumsDodgeballElimination = eliminationSound(1.4),
+		ComedyDrumsHammerElimination = eliminationSound(1.4),
+		RoyalFanfareDodgeballElimination = eliminationSound(1.35),
+		RoyalFanfareHammerElimination = eliminationSound(1.35),
+		StadiumRoarDodgeballElimination = eliminationSound(1.35),
+		StadiumRoarHammerElimination = eliminationSound(1.35),
+		CosmicChimeDodgeballElimination = eliminationSound(1.35),
+		CosmicChimeHammerElimination = eliminationSound(1.35),
 		ElimZoneFall = {
 			Scope = "World",
-			Volume = 0.6,
+			Volume = 1.6,
 			AssetIds = {
 				"rbxassetid://93903966058481",
 			},
+		},
+		OnboardingStepStart = {
+			Scope = "Local",
+			Volume = 0.5,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
+		OnboardingStepSuccess = {
+			Scope = "Local",
+			Volume = 0.8,
+			AssetIds = { "rbxassetid://122835655736085" },
+		},
+		OnboardingDummyLaunch = {
+			Scope = "World",
+			Volume = 1.5,
+			AssetIds = {
+				"rbxassetid://123922570136163",
+				"rbxassetid://135468135163946",
+			},
+		},
+		OnboardingHint = {
+			Scope = "Local",
+			Volume = 0.45,
+			AssetIds = { "rbxassetid://117503154823137" },
+		},
+		OnboardingCoreComplete = {
+			Scope = "Local",
+			Volume = 0.9,
+			AssetIds = { "rbxassetid://124993589864467" },
+		},
+		OnboardingCelebration = {
+			Scope = "Local",
+			Volume = 0.85,
+			AssetIds = { "rbxassetid://9120681039" },
+		},
+		OnboardingReveal = {
+			Scope = "Local",
+			Volume = 0.6,
+			AssetIds = { "rbxassetid://117503154823137" },
 		},
 	},
 

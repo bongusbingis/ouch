@@ -1,3 +1,8 @@
+-- Name: PartyCharacterRenderer.luau
+-- Author: Jack C.
+-- Description: Renders the lobby party members as posed character models, applying each member's equipped cosmetics and character color, and drives the inventory skin preview.
+-- Created: 2026-08-15
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")

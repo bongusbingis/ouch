@@ -1,3 +1,8 @@
+-- Name: PartyStore.luau
+-- Author: Jack C.
+-- Description: Small observable store holding the latest replicated party snapshot and notifying subscribers when it changes.
+-- Created: 2026-08-15
+
 local PartyStore = {}
 PartyStore.__index = PartyStore
 

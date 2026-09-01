@@ -1,18 +1,17 @@
+-- Name: WeaponKit.luau
+-- Author: Jack C.
+-- Description: The interface every weapon implements, declaring the commands it claims and the initialization, input, and tick hooks the simulation calls.
+-- Created: 2026-07-12
+
 --!strict
 
 local SimTypes = require(script.Parent.SimTypes)
 
--- The interface every combat tool implements as pure functions. Adding a new
--- weapon (e.g. the hammer) means one module satisfying this type plus a
--- WeaponRegistry entry — no sim-core, adapter, or netcode changes.
-
 export type WeaponKit = {
 	kind: string,
-	-- Command kinds this kit consumes; SimCore routes on these.
 	commands: { [SimTypes.CommandKind]: boolean },
-	-- Fresh per-player kit state (cooldowns, phase machines).
+	equipOnHandBall: boolean?,
 	init: () -> any,
-	-- Consume one routed command. Mutates kit state / sim state, appends events.
 	handleInput: (
 		kitState: any,
 		state: SimTypes.SimState,
@@ -20,7 +19,6 @@ export type WeaponKit = {
 		world: SimTypes.WorldSnapshot,
 		events: { SimTypes.SimEvent }
 	) -> boolean,
-	-- Per-tick per-player update (cooldowns etc.).
 	tickPlayer: (
 		kitState: any,
 		playerId: string,
@@ -29,7 +27,6 @@ export type WeaponKit = {
 		dt: number,
 		events: { SimTypes.SimEvent }
 	) -> (),
-	-- Per-tick kit-global update (world spawns, pickups). Optional.
 	tickWorld: ((
 		state: SimTypes.SimState,
 		world: SimTypes.WorldSnapshot,

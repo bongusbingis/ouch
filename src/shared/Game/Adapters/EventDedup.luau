@@ -1,11 +1,9 @@
---!strict
+-- Name: EventDedup.luau
+-- Author: Jack C.
+-- Description: Shared dedup guard for simulation and match event consumers, so a broadcast event observed more than once cannot apply a side effect twice.
+-- Created: 2026-07-16
 
--- Dedup guard for sim/match event consumers: the same event can be observed
--- more than once (multiple feeds into one handler, replayed broadcasts), so
--- consumers gate side effects behind markSeen. Sim ticks only grow, so a
--- capped instance may clear its history without re-admitting a live event;
--- an uncapped instance is for per-match lifetimes — call clear() at match
--- boundaries.
+--!strict
 
 local EventDedup = {}
 

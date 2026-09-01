@@ -1,8 +1,9 @@
+-- Name: MatchServiceSmoke.spec.luau
+-- Author: Jack C.
+-- Description: In-place smoke spec that the match service publishes its replicated match state surface, stays idle with no players, and rejects combat events from outside the playable roster.
+-- Created: 2026-07-16
+
 --!nonstrict
--- MatchService smoke coverage: with zero players the match must stay Idle,
--- and the replicated MatchState surface must exist with its documented
--- attributes. Full match flow needs real players; the pure phase machine is
--- covered by the MatchSim spec.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -23,12 +24,11 @@ return function()
 
 			expect(MatchService.phase()).to.equal("Idle")
 
-			-- Guarded start: calling again must be a no-op.
 			MatchService.start()
 			expect(MatchService.phase()).to.equal("Idle")
 		end)
 
-		it("dispatches combat events to onEvent listeners", function()
+		it("rejects combat events for players outside the playable roster", function()
 			local seen = {}
 			MatchService.onEvent(function(event)
 				table.insert(seen, event)
@@ -36,15 +36,12 @@ return function()
 
 			local caught = { kind = "BallCaught", tick = 5, playerId = "1" }
 			expect(MatchService.handleCombatEvent(caught)).to.equal(false)
-			expect(#seen).to.equal(1)
-			expect(seen[1].kind).to.equal("BallCaught")
-			expect(seen[1] == caught).to.equal(false)
+			expect(#seen).to.equal(0)
 
-			-- Elims for unknown victims are rejected before any scoring.
 			expect(MatchService.handleCombatEvent({ kind = "Elim", tick = 6, sourceId = "1", targetId = "2" })).to.equal(
 				false
 			)
-			expect(#seen).to.equal(1)
+			expect(#seen).to.equal(0)
 		end)
 	end)
 end

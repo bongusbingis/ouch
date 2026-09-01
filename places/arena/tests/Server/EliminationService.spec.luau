@@ -1,6 +1,9 @@
+-- Name: EliminationService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec for elimination state, ragdoll construction, and full restoration on a real humanoid rig fixture.
+-- Created: 2026-07-16
+
 --!nonstrict
--- EliminationService state, ragdoll construction, and restoration on a
--- humanoid fixture with a deterministic non-root joint.
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")

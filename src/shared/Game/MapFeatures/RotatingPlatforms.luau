@@ -1,3 +1,8 @@
+-- Name: RotatingPlatforms.luau
+-- Author: Jack C.
+-- Description: Spins the authored rotating platform assemblies from a pure function of the synchronized clock, with a server-only mover and a client-side load so both sides agree without fighting over the same anchored parts.
+-- Created: 2026-08-18
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,19 +11,6 @@ local Workspace = game:GetService("Workspace")
 
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
 local Rotation = require(script.Parent.Rotation)
-
--- Spins each assembly authored under Workspace.Assets.Arena.Scriptables.Rotating.
--- Every child folder there is one assembly: an "Origin" BasePart whose up axis is
--- the axis of rotation, and an "Assembly" Model that turns about it. The
--- Assembly keeps the pose it was authored in relative to Origin.
---
--- Only the server drives the motion; clients receive the pose through ordinary
--- replication. Both sides moving the same anchored assembly would fight, with
--- each write undone by the other's, so `load` builds the registry everywhere but
--- `startMover` is server-only.
---
--- Speed is Config.MapFeatures.Rotating.DegreesPerSecond, overridable per
--- assembly with a numeric "RotationSpeed" attribute on that assembly's Origin.
 
 local RotatingPlatforms = {}
 
@@ -36,8 +28,11 @@ export type Platform = {
 }
 
 local platforms: { Platform } = {}
-local connection: RBXScriptConnection? = nil
+local byFolder: { [Folder]: Platform } = {}
+local watchConnections: { RBXScriptConnection } = {}
+local moverConnection: RBXScriptConnection? = nil
 local started = false
+local generation = 0
 
 function RotatingPlatforms.poseAt(platform: Platform, now: number): CFrame
 	local angle = Rotation.angleAt(now, platform.degreesPerSecond)
@@ -48,15 +43,10 @@ function RotatingPlatforms.all(): { Platform }
 	return platforms
 end
 
--- Bounds of the assembly where it actually is, not where the clock says it
--- should be: on a client that is the replicated pose, which is what the player
--- is standing on.
 function RotatingPlatforms.currentBounds(platform: Platform): CFrame
 	return platform.assembly:GetPivot() * platform.pivotToBounds
 end
 
--- Re-posing an assembly that has not turned is wasted work on every descendant,
--- and re-seats the ground contact of anyone standing on it.
 local MINIMUM_TURN_RADIANS = 1e-5
 
 local function step()
@@ -70,12 +60,7 @@ local function step()
 	end
 end
 
-local function build(folder: Folder): Platform
-	local origin = folder:WaitForChild("Origin")
-	assert(origin:IsA("BasePart"), `[RotatingPlatforms] {folder.Name}.Origin must be a BasePart`)
-	local assembly = folder:WaitForChild("Assembly")
-	assert(assembly:IsA("Model"), `[RotatingPlatforms] {folder.Name}.Assembly must be a Model`)
-
+local function build(origin: BasePart, assembly: Model): Platform
 	local pivot = assembly:GetPivot()
 	local boundsCFrame, boundsSize = assembly:GetBoundingBox()
 
@@ -86,10 +71,47 @@ local function build(folder: Folder): Platform
 		degreesPerSecond = (origin:GetAttribute("RotationSpeed") :: number?) or MapFeatures.Rotating.DegreesPerSecond,
 		boundsSize = boundsSize,
 		pivotToBounds = pivot:Inverse() * boundsCFrame,
-		-- Farthest the assembly can ever be from its axis. Constant because it
-		-- only rotates about that axis, so it makes a cheap rejection test.
 		reach = (boundsCFrame.Position - origin.Position).Magnitude + boundsSize.Magnitude / 2,
 	}
+end
+
+local function forget(child: Instance)
+	if not child:IsA("Folder") then
+		return
+	end
+	local platform = byFolder[child]
+	if platform == nil then
+		return
+	end
+	byFolder[child] = nil
+	local index = table.find(platforms, platform)
+	if index then
+		table.remove(platforms, index)
+	end
+end
+
+-- Origin and Assembly stream in independently of their parent Folder, so each platform builds off the main thread and only joins the live list once both have arrived; a build resolving after a stop() is dropped by the generation guard.
+local function track(child: Instance)
+	if not child:IsA("Folder") then
+		return
+	end
+	if byFolder[child] then
+		return
+	end
+	local folder = child
+	local currentGeneration = generation
+	task.spawn(function()
+		local origin = folder:WaitForChild("Origin")
+		local assembly = folder:WaitForChild("Assembly")
+		if not started or generation ~= currentGeneration or folder.Parent == nil or byFolder[folder] then
+			return
+		end
+		assert(origin:IsA("BasePart"), `[RotatingPlatforms] {folder.Name}.Origin must be a BasePart`)
+		assert(assembly:IsA("Model"), `[RotatingPlatforms] {folder.Name}.Assembly must be a Model`)
+		local platform = build(origin, assembly)
+		byFolder[folder] = platform
+		table.insert(platforms, platform)
+	end)
 end
 
 function RotatingPlatforms.load()
@@ -106,25 +128,31 @@ function RotatingPlatforms.load()
 	end
 
 	for _, child in folder:GetChildren() do
-		if child:IsA("Folder") then
-			table.insert(platforms, build(child))
-		end
+		track(child)
 	end
+	table.insert(watchConnections, folder.ChildAdded:Connect(track))
+	table.insert(watchConnections, folder.ChildRemoved:Connect(forget))
 end
 
 function RotatingPlatforms.startMover()
 	RotatingPlatforms.load()
-	if connection == nil and #platforms > 0 then
-		connection = RunService.Heartbeat:Connect(step)
+	if moverConnection == nil then
+		moverConnection = RunService.Heartbeat:Connect(step)
 	end
 end
 
 function RotatingPlatforms.stop()
-	if connection then
-		connection:Disconnect()
-		connection = nil
+	generation += 1
+	if moverConnection then
+		moverConnection:Disconnect()
+		moverConnection = nil
 	end
+	for _, connection in watchConnections do
+		connection:Disconnect()
+	end
+	table.clear(watchConnections)
 	table.clear(platforms)
+	table.clear(byFolder)
 	started = false
 end
 

@@ -1,3 +1,8 @@
+-- Name: DirectPurchase.spec.luau
+-- Author: Jack C.
+-- Description: Spec for direct cosmetic purchases: pricing from rarity, refusal of grant-only and always-available items, ownership checked before affordability, and a deterministic catalog.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -76,8 +81,6 @@ T.describe("DirectPurchase", function()
 	end)
 
 	T.it("prices every direct buy above the expected crate cost for that rarity", function()
-		-- Expected Bonks per specific item = crate price / (rarity odds / bucket size).
-		-- Guarantees the gamble stays the value play at every rarity.
 		local cratePrice = 1000
 		for rarityName, rarity in RARITIES do
 			if rarity.DirectBonks > 0 then

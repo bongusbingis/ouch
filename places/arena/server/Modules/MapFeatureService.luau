@@ -1,3 +1,8 @@
+-- Name: MapFeatureService.luau
+-- Author: Jack C.
+-- Description: Drives every authored arena map feature from one heartbeat, discovering each kit's folder under the arena scriptables, keeping its parts current as they change, and dispatching the per-player and per-world hooks.
+-- Created: 2026-07-14
+
 --!strict
 
 local Players = game:GetService("Players")
@@ -6,15 +11,6 @@ local RunService = game:GetService("RunService")
 local ArenaService = require(script.Parent.ArenaService)
 local MapFeatureKit = require(script.Parent.MapFeatures.MapFeatureKit)
 local MapFeatureRegistry = require(script.Parent.MapFeatures.MapFeatureRegistry)
-
--- Drives the authored features under Workspace.Assets.Arena.Scriptables. Each
--- registered kit owns one folder there; this service discovers that folder's
--- BasePart children, keeps the list current as parts are added or removed, and
--- runs every kit from one Heartbeat.
---
--- A kit with no authored folder is simply inactive, so features can be
--- registered before the arena has them and the arena can carry folders no kit
--- claims yet.
 
 local MapFeatureService = {}
 
@@ -43,9 +39,6 @@ local function refresh(kit: MapFeatureKit.MapFeatureKit, folder: Folder)
 	partsByKit[kit.folderName] = collected
 end
 
--- Alive roots are resolved once per frame and shared by every kit: resolving them
--- per kit repeated the same FindFirstChild for each feature, and GetPlayers
--- allocates a fresh table on every call.
 local riders: { Player } = {}
 local riderRoots: { BasePart } = {}
 local context: MapFeatureKit.Context = { instances = {}, now = 0, deltaTime = 0 }
@@ -89,9 +82,6 @@ function MapFeatureService.start()
 
 	local scriptables = ArenaService.get().scriptables
 	for _, kit in MapFeatureRegistry.all() do
-		-- FindFirstChild rather than WaitForChild: a registered kit whose folder is
-		-- not authored yet stays inactive instead of stalling the arena. The warning
-		-- keeps a missing folder from passing silently.
 		local folder = scriptables:FindFirstChild(kit.folderName)
 		if folder == nil or not folder:IsA("Folder") then
 			warn(`[MapFeatureService] No Scriptables.{kit.folderName} Folder authored; feature inactive`)

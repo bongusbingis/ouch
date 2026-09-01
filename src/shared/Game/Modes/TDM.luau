@@ -1,7 +1,13 @@
+-- Name: TDM.luau
+-- Author: Jack C.
+-- Description: Team deathmatch game mode: its match rules and the server hooks that assign teams, provision balls, and score eliminations to the scorer's team.
+-- Created: 2026-07-13
+
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
 local GameMode = require(script.Parent.GameMode)
 
 local TDM = {}
@@ -13,17 +19,15 @@ TDM.rules = {
 	MinPlayers = 1,
 	ScoreTarget = 40,
 	TimeCapSeconds = 360,
-	ResultsSeconds = 8,
+	ResultsSeconds = PostMatch.ResultsSeconds,
 	IntermissionSeconds = GameModes.VoteDurationSeconds,
 	StartingSeconds = 3,
 	RespawnSeconds = 1,
 	WaveRespawnSeconds = 4.5,
 	SpawnInvulnSeconds = 1.5,
+	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
--- Every player starts holding a ball (and late joiners get one on their
--- first spawn), so per-team ball counts always match team sizes — no ground
--- spawns to contest.
 function TDM.onMatchStart(ctx: GameMode.ModeContext)
 	for _, player in ctx.getPlayers() do
 		ctx.balls.grantHeldBall(player)

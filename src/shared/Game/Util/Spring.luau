@@ -1,9 +1,9 @@
---!strict
+-- Name: Spring.luau
+-- Author: Jack C.
+-- Description: Damped spring for presentation feel, pure number maths with deterministic steps and a clamped timestep so frame hitches cannot destabilize it.
+-- Created: 2026-07-18
 
--- Damped spring for presentation feel (squash/stretch, wobble). Pure number
--- math with deterministic semi-implicit Euler steps so it runs headlessly
--- under Lune. dt is clamped so frame hitches cannot destabilize the
--- integration.
+--!strict
 
 local Spring = {}
 
@@ -14,6 +14,8 @@ export type Spring = {
 }
 
 local MAX_STEP = 1 / 30
+local SAFE_OMEGA_STEP = 0.35
+local MAX_SUBSTEPS = 12
 
 function Spring.new(position: number?): Spring
 	local p = position or 0
@@ -26,10 +28,17 @@ end
 
 function Spring.step(spring: Spring, frequencyHz: number, dampingRatio: number, dt: number)
 	local h = math.min(dt, MAX_STEP)
-	local omega = 2 * math.pi * frequencyHz
-	local accel = -omega * omega * (spring.position - spring.target) - 2 * dampingRatio * omega * spring.velocity
-	spring.velocity += accel * h
-	spring.position += spring.velocity * h
+	if h <= 0 then
+		return
+	end
+	local omega = 2 * math.pi * math.max(frequencyHz, 0)
+	local substeps = math.clamp(math.ceil(omega * h / SAFE_OMEGA_STEP), 1, MAX_SUBSTEPS)
+	local subDt = h / substeps
+	for _ = 1, substeps do
+		local accel = -omega * omega * (spring.position - spring.target) - 2 * dampingRatio * omega * spring.velocity
+		spring.velocity += accel * subDt
+		spring.position += spring.velocity * subDt
+	end
 end
 
 return Spring

@@ -1,3 +1,8 @@
+-- Name: sbCosmeticsGrantAllServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-cosmetics-grant-all, granting the entire configured cosmetic catalog to each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

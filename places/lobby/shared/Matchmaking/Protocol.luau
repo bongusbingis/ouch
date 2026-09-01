@@ -1,3 +1,8 @@
+-- Name: Protocol.luau
+-- Author: Jack C.
+-- Description: Shared wire protocol for lobby party traffic: join-code normalization, request validation, success and failure envelopes, cross-server message shapes, and invite data encoding.
+-- Created: 2026-08-15
+
 local HttpService = game:GetService("HttpService")
 
 local Config = require(script.Parent.Config)
@@ -7,6 +12,7 @@ local Protocol = {}
 Protocol.Actions = table.freeze({
 	GetSnapshot = "GetSnapshot",
 	JoinByCode = "JoinByCode",
+	DevSoloPlay = "DevSoloPlay",
 	KickMember = "KickMember",
 	LeaveParty = "LeaveParty",
 	StartMatchmaking = "StartMatchmaking",
@@ -15,6 +21,7 @@ Protocol.Actions = table.freeze({
 
 Protocol.Errors = table.freeze({
 	ArenaNotConfigured = "arena_not_configured",
+	Banned = "banned",
 	Busy = "busy",
 	Internal = "internal_error",
 	InvalidCode = "invalid_code",
@@ -23,9 +30,11 @@ Protocol.Errors = table.freeze({
 	MatchmakingUnavailable = "matchmaking_unavailable",
 	NotFound = "party_not_found",
 	NotLeader = "not_party_leader",
+	NotDeveloper = "not_developer",
 	NotReady = "party_not_ready",
 	PartyFull = "party_full",
 	RateLimited = "rate_limited",
+	TooManyCodeAttempts = "too_many_code_attempts",
 	TeleportFailed = "teleport_failed",
 })
 
@@ -52,6 +61,7 @@ function Protocol.validateRequest(_player, action, payload)
 		or action == Protocol.Actions.LeaveParty
 		or action == Protocol.Actions.StartMatchmaking
 		or action == Protocol.Actions.CancelMatchmaking
+		or action == Protocol.Actions.DevSoloPlay
 	then
 		return payload == nil, Protocol.Errors.InvalidRequest
 	end

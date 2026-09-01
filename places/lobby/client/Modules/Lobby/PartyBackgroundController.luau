@@ -1,10 +1,15 @@
+-- Name: PartyBackgroundController.luau
+-- Author: Jack C.
+-- Description: Controls the lobby background scene camera and its transitions while the party and matchmaking UI is shown. Sole owner of the backdrop's placement and visibility, so anything that needs the lobby view out of the way -- onboarding, for one -- switches it off here rather than moving the part itself.
+-- Created: 2026-08-15
+
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local PartyBackgroundController = {}
 PartyBackgroundController.__index = PartyBackgroundController
 
-local CAMERA_DISTANCE = 50
+local CAMERA_DISTANCE = 150
 local LOOP_DURATION = 25
 local MAX_ROLL = math.rad(4)
 local U_TRAVEL_IN_TILES = 0.3
@@ -23,6 +28,7 @@ function PartyBackgroundController.start()
 		if descendant:IsA("Texture") then
 			table.insert(textures, {
 				instance = descendant,
+				transparency = descendant.Transparency,
 				offsetU = descendant.OffsetStudsU,
 				offsetV = descendant.OffsetStudsV,
 				travelU = descendant.StudsPerTileU * U_TRAVEL_IN_TILES,
@@ -33,8 +39,17 @@ function PartyBackgroundController.start()
 
 	local elapsed = 0
 
-	local self = setmetatable({ _connection = nil }, PartyBackgroundController)
+	local self = setmetatable({
+		_connection = nil,
+		_enabled = true,
+		_background = background,
+		_baseTransparency = background.Transparency,
+		_textures = textures,
+	}, PartyBackgroundController)
 	self._connection = RunService.RenderStepped:Connect(function(deltaTime)
+		if not self._enabled then
+			return
+		end
 		elapsed = (elapsed + deltaTime) % LOOP_DURATION
 		local phase = elapsed / LOOP_DURATION * TAU
 		local camera = Workspace.CurrentCamera
@@ -55,6 +70,23 @@ function PartyBackgroundController.start()
 		end
 	end)
 	return self
+end
+
+-- The backdrop is pinned a fixed distance ahead of the camera every frame, so
+-- leaving it running anywhere other than the lobby parks a wall in front of the
+-- player. Disabling stops driving it and hides it outright, textures included,
+-- because a Texture's transparency is independent of the part it sits on.
+function PartyBackgroundController:setEnabled(value)
+	if self._enabled == value then
+		return
+	end
+	self._enabled = value
+	self._background.Transparency = if value then self._baseTransparency else 1
+	for _, texture in self._textures do
+		if texture.instance.Parent then
+			texture.instance.Transparency = if value then texture.transparency else 1
+		end
+	end
 end
 
 function PartyBackgroundController:destroy()

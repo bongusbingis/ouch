@@ -1,3 +1,8 @@
+-- Name: PartyCode.luau
+-- Author: Jack C.
+-- Description: Displays the local party's join code with a copy action.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -1,7 +1,9 @@
+-- Name: BallService.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec exercising the ball service against the real authored ball template: held grants, cloning into the world folder, attribute seeding, naming, and clearing.
+-- Created: 2026-07-16
+
 --!nonstrict
--- BallService against the real Studio-authored default ball template: direct
--- held grants, template cloning into Workspace.Balls, codec attribute seeding,
--- recovery, and cadence ground spawning.
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -186,7 +188,6 @@ return function()
 			local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
 			expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
 
-			-- The occupancy check must not stack a second free ball on the point.
 			local before = #ballsIn(folder)
 			for _ = 1, 10 do
 				task.wait()

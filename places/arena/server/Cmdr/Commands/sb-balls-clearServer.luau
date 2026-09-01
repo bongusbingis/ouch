@@ -1,3 +1,8 @@
+-- Name: sb-balls-clearServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-balls-clear, emptying the world balls folder through the ball service.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

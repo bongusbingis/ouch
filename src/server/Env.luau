@@ -1,7 +1,10 @@
+-- Name: Env.luau
+-- Author: Jack C.
+-- Description: Per-environment server constants: the data store key, the lobby place players return to, and who may open the developer console.
+-- Created: 2026-07-12
+
 return {
-	PrimaryDataKey = "STAGING_004",
-	-- Where lobby-originated players are sent when a match ends. Direct joins
-	-- never teleport, so this is unused on a server nobody was matched into.
+	PrimaryDataKey = "STAGING_007",
 	LobbyPlaceId = 130584867985467,
 	Cmdr = {
 		Enabled = true,

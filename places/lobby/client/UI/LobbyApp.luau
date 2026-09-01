@@ -1,5 +1,11 @@
+-- Name: LobbyApp.luau
+-- Author: Jack C.
+-- Description: Root React component for the lobby: the splash and party pages, join-code modal, shop and inventory menus, loading screen, and world transitions.
+-- Created: 2026-08-17
+
 --!strict
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -12,25 +18,28 @@ local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UI = Shared:WaitForChild("UI")
 local Components = UI:WaitForChild("Components")
-local Network = require(Shared:WaitForChild("Network"))
-local EconomyStore = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("EconomyStore"))
-local InventoryModel = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("InventoryModel"))
+local Config = ReplicatedStorage:WaitForChild("Config")
+local Loading = require(Config:WaitForChild("Loading"))
 local LobbyViewModel = require(UI:WaitForChild("Models"):WaitForChild("LobbyViewModel"))
 local Motion = require(UI:WaitForChild("Motion"))
-local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
+local EconomyMenuController = require(UI:WaitForChild("Hooks"):WaitForChild("EconomyMenuController"))
 local useReducedMotion = require(UI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
 local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("NotificationContext"))
+local EconomyMenuModals = require(Components:WaitForChild("EconomyMenuModals"))
 local InventoryPage = require(Components:WaitForChild("InventoryPage"))
 local JoinCodeModal = require(Components:WaitForChild("JoinCodeModal"))
+local LoadingScreen = require(Components:WaitForChild("LoadingScreen"))
 local NotificationModal = require(Components:WaitForChild("NotificationModal"))
 local PageTransition = require(Components:WaitForChild("PageTransition"))
 local PartyCode = require(Components:WaitForChild("PartyCode"))
+local OnboardingOverlay = require(Components:WaitForChild("Onboarding"):WaitForChild("OnboardingOverlay"))
+local SettingsPage = require(Components:WaitForChild("SettingsPage"))
 local ShopPage = require(Components:WaitForChild("ShopPage"))
-local AnalyticsReporter =
-	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby"):WaitForChild("AnalyticsReporter"))
+local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytics"))
 local SplashPage = require(Components:WaitForChild("SplashPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
 local GameVersion = require(Components:WaitForChild("GameVersion"))
+local DeviceClass = require(Shared:WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass"))
 
 local PartyCharacterRenderer =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby"):WaitForChild("PartyCharacterRenderer"))
@@ -47,8 +56,12 @@ local PAGE_POSITIONS = {
 		offscreen = UDim2.fromScale(-1.5, 0.14282),
 	},
 	Shop = {
-		onscreen = UDim2.fromScale(-0.005, 0.127),
-		offscreen = UDim2.fromScale(-1.5, 0.127),
+		onscreen = UDim2.fromScale(0.5, 0.56),
+		offscreen = UDim2.fromScale(-1, 0.56),
+	},
+	Settings = {
+		onscreen = UDim2.fromScale(0.0211629, 0.14282),
+		offscreen = UDim2.fromScale(-1.5, 0.14282),
 	},
 }
 
@@ -58,14 +71,10 @@ local PAGE_BACKGROUND_COLORS = {
 	Shop = Color3.fromRGB(142, 31, 232),
 }
 
-local EQUIP_ERRORS = {
-	rate_limited = "Please wait before changing another item.",
-	no_profile = "Your inventory is still loading.",
-	not_owned = "That item is not owned.",
-	wrong_slot = "That item cannot be equipped in this slot.",
-	invalid_slot = "That inventory slot is invalid.",
-	network_error = "The inventory service is unavailable.",
-}
+-- Settings has no establishing shot of its own authored in Studio yet, so it
+-- borrows Inventory's camera and background color rather than requiring a new
+-- Views.Party.SettingsCamera part before the page is navigable.
+local WORLD_CAMERA_PAGE = { Settings = "Inventory" }
 
 local function useParty(client, notifications)
 	local _, forceUpdate = React.useReducer(function(revision: number, _action: any)
@@ -84,6 +93,29 @@ local function useParty(client, notifications)
 		end)
 	end, { client, notifications.notify })
 	return client:getSnapshot(), client:isBusy()
+end
+
+local function useLoadingTip(visible: boolean): string?
+	local tip, setTip = React.useState(nil)
+	React.useEffect(function()
+		if not visible then
+			setTip(nil)
+			return
+		end
+		local thread = task.spawn(function()
+			task.wait(Loading.TipDelaySeconds)
+			local index = 1
+			while true do
+				setTip(Loading.Tips[index])
+				index = index % #Loading.Tips + 1
+				task.wait(Loading.TipIntervalSeconds)
+			end
+		end)
+		return function()
+			task.cancel(thread)
+		end
+	end, { visible })
+	return tip
 end
 
 local function useWorldTransition(currentPage: string, enabled: boolean)
@@ -108,12 +140,13 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 		local camera = Workspace.CurrentCamera
 		assert(camera ~= nil, "[LobbyApp] Workspace.CurrentCamera is required")
 		local party = Workspace:WaitForChild("Views"):WaitForChild("Party")
-		local target = party:WaitForChild(`{currentPage}Camera`)
-		assert(target:IsA("BasePart"), `[LobbyApp] Views.Party.{currentPage}Camera must be a BasePart`)
+		local cameraPage = WORLD_CAMERA_PAGE[currentPage] or currentPage
+		local target = party:WaitForChild(`{cameraPage}Camera`)
+		assert(target:IsA("BasePart"), `[LobbyApp] Views.Party.{cameraPage}Camera must be a BasePart`)
 		local partyBackground = party:WaitForChild("Background")
 		assert(partyBackground:IsA("BasePart"), "[LobbyApp] Views.Party.Background must be a BasePart")
-		local pageColor = PAGE_BACKGROUND_COLORS[currentPage]
-		assert(pageColor ~= nil, `[LobbyApp] No background color configured for {currentPage}`)
+		local pageColor = PAGE_BACKGROUND_COLORS[cameraPage]
+		assert(pageColor ~= nil, `[LobbyApp] No background color configured for {cameraPage}`)
 		background.current = partyBackground
 		camera.CameraType = Enum.CameraType.Scriptable
 		if not initialized.current or reducedMotion then
@@ -166,29 +199,140 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 		return function()
 			connection:Disconnect()
 			api.stop()
+			-- The loop pins CameraType to Scriptable every frame; without handing
+			-- it back the camera stays frozen on the last lobby framing and the
+			-- player can neither look around nor use the combat camera.
+			local camera = Workspace.CurrentCamera
+			if camera then
+				camera.CameraType = Enum.CameraType.Custom
+			end
 		end
 	end, { enabled })
 end
 
 local function LobbyContent(props)
 	local partyClient = props.PartyClient
+	local onboardingClient = props.OnboardingClient
+	local rootRef = React.useRef(nil)
+	local presented = React.useRef(false)
+	local playButtonRef = React.useRef(nil)
+	local previousSelection = React.useRef(nil)
+	local focusRevision = React.useRef(0)
+	local isGamepad, setIsGamepad = React.useState(false)
+	React.useEffect(function()
+		return DeviceClass.observe(function(class)
+			setIsGamepad(class == "Gamepad")
+		end)
+	end, {})
 	local notifications = NotificationContext.useNotification()
 	local currentPage, setCurrentPage = React.useState("SplashScreen")
 
-	-- One report per page the player actually lands on. The server maps a Shop
-	-- open onto the purchase funnel's first step and everything else onto a
-	-- MenuOpened custom event.
+	local onboarding, setOnboarding = React.useState(function()
+		return if onboardingClient then onboardingClient.getSnapshot() else nil
+	end)
 	React.useEffect(function()
-		AnalyticsReporter.menuOpened(currentPage)
+		if onboardingClient == nil then
+			return
+		end
+		return onboardingClient.subscribe(setOnboarding)
+	end, { onboardingClient })
+
+	-- Studio-only combat test session (nil in production). While it runs it owns
+	-- the combat camera on the baseplate, so the lobby's scripted world view and
+	-- party UI stand down exactly as they do for onboarding.
+	local combatTestClient = props.CombatTestClient
+	local combatTest, setCombatTest = React.useState(function()
+		return if combatTestClient then combatTestClient.getSnapshot() else nil
+	end)
+	React.useEffect(function()
+		if combatTestClient == nil then
+			return
+		end
+		return combatTestClient.subscribe(setCombatTest)
+	end, { combatTestClient })
+	local testActive = combatTest ~= nil and combatTest.active == true
+
+	-- Training owns the screen until eligibility resolves, so the normal lobby
+	-- never flashes in front of a new player and then gets yanked away.
+	local onboardingActive = onboarding ~= nil and onboarding.active == true
+	local onboardingResolved = onboarding == nil or onboarding.resolved == true
+	local lobbyVisible = onboardingResolved and not onboardingActive and not testActive
+
+	-- Give a controller a starting focus on the lobby's primary action, mirroring
+	-- the in-combat menu; page-to-page navigation is left to TopBar's own
+	-- SelectionGroup once the player is in.
+	React.useEffect(function()
+		focusRevision.current += 1
+		local revision = focusRevision.current
+		local root = rootRef.current
+		if lobbyVisible and isGamepad then
+			if previousSelection.current == nil then
+				previousSelection.current = GuiService.SelectedObject
+			end
+			if currentPage == "SplashScreen" then
+				task.defer(function()
+					if focusRevision.current ~= revision then
+						return
+					end
+					local button = playButtonRef.current
+					if button ~= nil and button:IsA("GuiObject") and button.Parent ~= nil then
+						GuiService.SelectedObject = button
+					end
+				end)
+			end
+		else
+			local previous = previousSelection.current
+			previousSelection.current = nil
+			if previous ~= nil and previous:IsA("GuiObject") and previous.Parent ~= nil then
+				GuiService.SelectedObject = previous
+			elseif
+				root ~= nil
+				and GuiService.SelectedObject ~= nil
+				and GuiService.SelectedObject:IsDescendantOf(root)
+			then
+				GuiService.SelectedObject = nil
+			end
+		end
+		return function()
+			focusRevision.current += 1
+		end
+	end, { lobbyVisible, isGamepad })
+
+	React.useEffect(function()
+		if not presented.current and rootRef.current ~= nil and props.OnPresented and onboardingResolved then
+			presented.current = true
+			props.OnPresented()
+		end
+	end, { props.OnPresented, onboardingResolved })
+
+	React.useEffect(function()
+		UIAnalytics.menuOpened(currentPage)
 	end, { currentPage })
-	local inventoryTab, setInventoryTab = React.useState("OUTFITS")
 	local joinOpen, setJoinOpen = React.useState(false)
 	local codeVisible, setCodeVisible = React.useState(false)
-	local busySlots = React.useRef({})
-	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.onChanged)
-	local economyData = props.EconomyData or storeData
+	local devTapState = React.useRef({ lastTapAt = 0, tapCount = 0 })
+	local economyMenu = EconomyMenuController.use({
+		ShopClient = props.ShopClient,
+		EconomyData = props.EconomyData,
+		ShopRefreshEnabled = props.ShopRefreshEnabled,
+	})
+	local economyData = economyMenu.economyData
+	local inventoryTab = economyMenu.inventoryTab
 	local snapshot, requestBusy = useParty(partyClient, notifications)
+	local teleportStatus = partyClient:getTeleportStatus()
 	local presentation = LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy)
+	local teleportPhase = if snapshot then snapshot.phase else nil
+	local loadingVisible = (teleportPhase == "Assigned" or teleportPhase == "Teleporting")
+		and not (teleportStatus and teleportStatus.state == "Failed")
+	local loadingTitle = if teleportPhase == "Assigned" then "MATCH FOUND" else "TRAVELING TO ARENA"
+	local loadingDetail = if teleportPhase == "Assigned" then "PREPARING YOUR SERVER" else nil
+	if teleportStatus and teleportStatus.state == "Retrying" then
+		loadingTitle = "RECONNECTING"
+		loadingDetail = `ATTEMPT {teleportStatus.attempt} OF {teleportStatus.maxAttempts}`
+	elseif teleportPhase == "Teleporting" then
+		loadingDetail = "THE MATCH IS READY"
+	end
+	local loadingTip = useLoadingTip(loadingVisible)
 	local equipped = if economyData then economyData.Cosmetics.Equipped else {}
 	local skinPreviewState = React.useRef({})
 	skinPreviewState.current = {
@@ -197,23 +341,38 @@ local function LobbyContent(props)
 		hammerItemId = equipped.HammerAssets,
 	}
 	local characterRenderer = React.useRef(nil)
-	useWorldTransition(currentPage, props.CameraEnabled ~= false)
+	-- Training drives its own combat camera, so the lobby's establishing-shot
+	-- transition must stay out of the way until onboarding hands back over.
+	useWorldTransition(currentPage, props.CameraEnabled ~= false and not onboardingActive and not testActive)
 
 	React.useEffect(function()
-		if props.WorldPresentationEnabled == false then
+		if props.WorldPresentationEnabled == false or onboardingActive then
 			return
 		end
 		return partyClient:subscribeErrors(function(errorCode)
+			if errorCode == "party_initialization_failed" then
+				notifications.confirm({
+					title = "PARTY COULD NOT LOAD",
+					description = "CHECK YOUR CONNECTION AND TRY AGAIN.",
+					confirmText = "RETRY",
+					cancelText = "CANCEL",
+				}, function(retry)
+					if retry then
+						partyClient:retryInitialization()
+					end
+				end)
+				return
+			end
 			notifications.notify({
 				title = "PARTY NOTICE",
 				description = partyClient.ErrorMessages[errorCode] or "PARTY REQUEST FAILED",
 				buttonText = "CONFIRM",
 			})
 		end)
-	end, { partyClient, notifications.notify })
+	end, { partyClient, notifications.notify, notifications.confirm })
 
 	React.useEffect(function()
-		if props.WorldPresentationEnabled == false then
+		if props.WorldPresentationEnabled == false or onboardingActive then
 			return
 		end
 		local renderer = PartyCharacterRenderer.new(Players.LocalPlayer.UserId, function(targetUserId, username)
@@ -241,7 +400,7 @@ local function LobbyContent(props)
 			disconnect()
 			renderer:destroy()
 		end
-	end, { partyClient, notifications.confirm, props.WorldPresentationEnabled })
+	end, { partyClient, notifications.confirm, props.WorldPresentationEnabled, onboardingActive })
 
 	React.useEffect(function()
 		local renderer = characterRenderer.current
@@ -257,11 +416,31 @@ local function LobbyContent(props)
 	React.useEffect(function()
 		local connection = UserInputService.InputBegan:Connect(function(input, processed)
 			local isBack = input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB
+			if
+				input.UserInputType == Enum.UserInputType.Touch
+				or input.UserInputType == Enum.UserInputType.MouseButton2
+			then
+				local now = os.clock()
+				local tapState = devTapState.current
+				if now - tapState.lastTapAt > 1.25 then
+					tapState.tapCount = 0
+				end
+				tapState.lastTapAt = now
+				tapState.tapCount += 1
+				if tapState.tapCount >= 10 then
+					tapState.tapCount = 0
+					print("spawning dev server for solo play")
+					task.spawn(partyClient.devSoloPlay, partyClient)
+				end
+			end
 			if not isBack then
 				return
 			end
-			if notifications.request then
-				notifications.close(false)
+			if onboardingActive then
+				return
+			end
+			if economyMenu.CloseTopLayer() then
+				return
 			elseif joinOpen then
 				setJoinOpen(false)
 			elseif not processed and currentPage ~= "SplashScreen" then
@@ -271,31 +450,12 @@ local function LobbyContent(props)
 		return function()
 			connection:Disconnect()
 		end
-	end, { notifications.request, notifications.close, joinOpen, currentPage })
-
-	local function equip(entry)
-		if economyData == nil or busySlots.current[entry.category] then
-			return
-		end
-		if entry.isDefault and InventoryModel.isEquipped(entry, economyData.Cosmetics.Equipped) then
-			return
-		end
-		busySlots.current[entry.category] = true
-		local nextItemId = InventoryModel.nextEquip(entry, economyData.Cosmetics.Equipped)
-		task.spawn(function()
-			local callOk, accepted, reason = pcall(Network.call, "EquipCosmetic", entry.category, nextItemId)
-			busySlots.current[entry.category] = nil
-			if not callOk or not accepted then
-				local errorCode = if callOk then reason else "network_error"
-				notifications.notify({
-					title = "INVENTORY",
-					description = EQUIP_ERRORS[errorCode]
-						or `Unable to equip that item: {tostring(errorCode or "unknown error")}`,
-					buttonText = "OK",
-				})
-			end
-		end)
-	end
+	end, {
+		economyMenu.CloseTopLayer,
+		joinOpen,
+		currentPage,
+		onboardingActive,
+	})
 
 	local views = {}
 	for pageName, positions in PAGE_POSITIONS do
@@ -307,6 +467,7 @@ local function LobbyContent(props)
 				if pageName == "SplashScreen" then
 					return c(SplashPage, {
 						Position = position,
+						PlayButtonRef = playButtonRef,
 						PartyState = presentation.partyState,
 						ShowMatchmakingActivity = presentation.showMatchmakingActivity,
 						PlayText = presentation.playText,
@@ -326,23 +487,39 @@ local function LobbyContent(props)
 						Data = economyData,
 						Position = position,
 						SelectedTab = inventoryTab,
-						OnTabChanged = setInventoryTab,
-						OnEquip = equip,
+						OnTabChanged = economyMenu.setInventoryTab,
+						OnEquip = economyMenu.equip,
+					})
+				elseif pageName == "Settings" then
+					return c(SettingsPage, { Position = position, Place = "Lobby" })
+				elseif pageName == "Shop" then
+					return c(ShopPage, {
+						Model = economyMenu.shopModel,
+						Position = position,
+						OnCardActivated = economyMenu.activateShopCard,
+						OnRefresh = economyMenu.refreshShop,
 					})
 				end
-				return c(ShopPage, { Position = position })
+				return nil
 			end,
 		})
 	end
 
-	return c("ScreenGui", {
-		ResetOnSpawn = false,
-		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	return c("Frame", {
+		ref = rootRef,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
 	}, {
+		Onboarding = if onboardingClient
+			then c(OnboardingOverlay, {
+				Snapshot = onboarding,
+				OnSkip = onboardingClient.skip,
+			})
+			else nil,
 		BaseClip = c("Frame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
+			Visible = lobbyVisible,
 		}, {
 			Views = c("Frame", {
 				BackgroundTransparency = 1,
@@ -406,8 +583,17 @@ local function LobbyContent(props)
 					Request = notifications.request,
 					OnChoose = notifications.close,
 				}),
+				Economy = c(EconomyMenuModals, {
+					Controller = economyMenu,
+				}),
 			}),
 			GameVersion = c(GameVersion),
+		}),
+		Loading = c(LoadingScreen, {
+			Visible = loadingVisible,
+			Title = loadingTitle,
+			Detail = loadingDetail,
+			Tip = loadingTip,
 		}),
 	})
 end

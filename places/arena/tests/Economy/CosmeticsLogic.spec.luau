@@ -1,6 +1,9 @@
+-- Name: CosmeticsLogic.spec.luau
+-- Author: Jack C.
+-- Description: In-place port of the cosmetics equip-validation spec, covering slot and ownership rules and the configured category defaults.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud port of the CosmeticsLogic spec: canEquip slot/ownership rules and the
--- configured category-folder defaults.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

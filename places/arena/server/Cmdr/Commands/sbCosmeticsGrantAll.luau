@@ -1,3 +1,8 @@
+-- Name: sbCosmeticsGrantAll.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-cosmetics-grant-all: grants every configured cosmetic to one or more players.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

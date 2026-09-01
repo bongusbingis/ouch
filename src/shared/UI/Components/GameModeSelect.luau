@@ -1,7 +1,13 @@
+-- Name: GameModeSelect.luau
+-- Author: Jack C.
+-- Description: The game mode ballot screen: lays out the mode cards, the countdown bar, and the local player's selection, purely from the snapshot passed in.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -21,14 +27,17 @@ local VOTE_TEXT_STROKE = TextMetrics.scaledTextStroke(3.8, "Vote for a game mode
 
 export type Props = {
 	Active: boolean,
+	Prepared: boolean?,
 	Modes: { GameModeCard.Mode },
 	EndsAt: number,
 	DurationSeconds: number,
 	OnVote: (string) -> (),
+	OnPrepared: (() -> ())?,
+	OnPresented: (() -> ())?,
 }
 
 return function(props: Props)
-	local present, setPresent = React.useState(props.Active)
+	local present, setPresent = React.useState(props.Active or props.Prepared == true)
 	local revision = React.useRef(0)
 	local focusRevision = React.useRef(0)
 	local firstButtonRef = React.useRef(nil)
@@ -43,13 +52,19 @@ return function(props: Props)
 	React.useEffect(function()
 		revision.current += 1
 		local currentRevision = revision.current
-		if props.Active then
+		local shouldPresent = props.Active or props.Prepared == true
+		if shouldPresent then
 			setPresent(true)
-			api.start({
-				Position = UDim2.fromScale(0, 0),
-				config = Motion.Modal,
-				immediate = reducedMotion,
-			})
+			api.start(if props.Active
+				then {
+					Position = UDim2.fromScale(0, 0),
+					config = Motion.Modal,
+					immediate = reducedMotion,
+				}
+				else {
+					Position = UDim2.fromScale(0, 0.06),
+					immediate = true,
+				})
 		else
 			api.start({
 				Position = UDim2.fromScale(0, 0.06),
@@ -64,7 +79,33 @@ return function(props: Props)
 		return function()
 			revision.current += 1
 		end
-	end, { props.Active, reducedMotion })
+	end, { props.Active, props.Prepared, reducedMotion })
+
+	React.useEffect(function()
+		if not present or #props.Modes == 0 then
+			return
+		end
+		local currentRevision = revision.current
+		task.defer(function()
+			if revision.current ~= currentRevision then
+				return
+			end
+			local button = firstButtonRef.current
+			if button and button.Parent then
+				if props.OnPrepared then
+					props.OnPrepared()
+				end
+				if props.Active and props.OnPresented then
+					task.spawn(function()
+						RunService.RenderStepped:Wait()
+						if revision.current == currentRevision and button.Parent and button.Visible then
+							props.OnPresented()
+						end
+					end)
+				end
+			end
+		end)
+	end, { present, props.Active, props.Modes, props.OnPrepared, props.OnPresented })
 
 	React.useEffect(function()
 		focusRevision.current += 1
@@ -131,6 +172,7 @@ return function(props: Props)
 		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 		Size = UDim2.fromScale(1, 1),
+		Visible = props.Active,
 	}, {
 		Logo = c("ImageLabel", {
 			BackgroundTransparency = 1,

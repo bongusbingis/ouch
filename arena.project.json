@@ -21,6 +21,12 @@
       }
     },
 
+    "ReplicatedFirst": {
+      "LoadingBootstrap": {
+        "$path": "src/client/LoadingBootstrap.client.luau"
+      }
+    },
+
     "ServerScriptService": {
       "Server": {
         "$path": "places/arena/server/Server.server.luau",
@@ -44,12 +50,28 @@
             "$path": "src/server/Modules/PlayerData.luau"
           },
 
+          "CombatPoseService": {
+            "$path": "src/server/Modules/CombatPoseService.luau"
+          },
+
           "ConfigLiveService": {
             "$path": "src/server/Modules/ConfigLiveService.luau"
           },
 
           "CosmeticsService": {
             "$path": "src/server/Modules/CosmeticsService.luau"
+          },
+          "SettingsService": {
+            "$path": "src/server/Modules/SettingsService.luau"
+          },
+          "InputSetup": {
+            "$path": "src/server/Modules/InputSetup.luau"
+          },
+          "BallService": {
+            "$path": "src/server/Modules/BallService.luau"
+          },
+          "PlayerAssistService": {
+            "$path": "src/server/Modules/PlayerAssistService.luau"
           },
 
           "CharacterColorService": {
@@ -58,6 +80,46 @@
 
           "AnalyticsService": {
             "$path": "src/server/Modules/AnalyticsService.luau"
+          },
+
+          "BattlePassService": {
+            "$path": "src/server/Modules/BattlePassService.luau"
+          },
+
+          "CrateService": {
+            "$path": "src/server/Modules/CrateService.luau"
+          },
+
+          "DirectPurchaseService": {
+            "$path": "src/server/Modules/DirectPurchaseService.luau"
+          },
+
+          "EconomyService": {
+            "$path": "src/server/Modules/EconomyService.luau"
+          },
+
+          "EntitlementService": {
+            "$path": "src/server/Modules/EntitlementService.luau"
+          },
+
+          "GamePassService": {
+            "$path": "src/server/Modules/GamePassService.luau"
+          },
+
+          "MonetizationService": {
+            "$path": "src/server/Modules/MonetizationService.luau"
+          },
+
+          "PaidRandomPolicyService": {
+            "$path": "src/server/Modules/PaidRandomPolicyService.luau"
+          },
+
+          "RewardService": {
+            "$path": "src/server/Modules/RewardService.luau"
+          },
+
+          "ShopService": {
+            "$path": "src/server/Modules/ShopService.luau"
           }
         }
       }
@@ -78,9 +140,90 @@
     },
 
     "StarterPlayer": {
+      "PlayerModule": {
+        "$path": "src/client/PlayerModule"
+      },
+
       "StarterPlayerScripts": {
         "Client": {
-          "$path": "places/arena/client"
+          "$className": "Folder",
+
+          "Scripts": {
+            "$path": "places/arena/client/Scripts"
+          },
+
+          "UI": {
+            "$path": "places/arena/client/UI",
+            "CombatHUD": {
+              "$path": "src/client/CombatClient/UI/CombatHUD.luau"
+            }
+          },
+
+          "Modules": {
+            "$className": "Folder",
+
+            "Debug": {
+              "$path": "places/arena/client/Modules/Debug"
+            },
+
+            "Movement": {
+              "$path": "places/arena/client/Modules/Movement"
+            },
+
+            "UI": {
+              "$path": "places/arena/client/Modules/UI",
+              "ThrowUXClient": {
+                "$path": "src/client/CombatClient/UI/ThrowUXClient.luau"
+              }
+            },
+
+            "Input": {
+              "$path": "src/client/CombatClient/Input"
+            },
+
+            "Presentation": {
+              "$path": "places/arena/client/Modules/Presentation",
+              "BallVisuals": {
+                "$path": "src/client/CombatClient/Presentation/BallVisuals.luau"
+              },
+              "ArmIK": {
+                "$path": "src/client/CombatClient/Presentation/ArmIK.luau"
+              },
+              "GameAudio": {
+                "$path": "src/client/CombatClient/Presentation/GameAudio.luau"
+              },
+              "CombatFeedback": {
+                "$path": "src/client/CombatClient/Presentation/CombatFeedback.luau"
+              },
+              "CharacterRig": {
+                "$path": "src/client/CombatClient/Presentation/CharacterRig.luau"
+              },
+              "ChargeAim": {
+                "$path": "src/client/CombatClient/Presentation/ChargeAim.luau"
+              },
+              "ClientAudio": {
+                "$path": "src/client/CombatClient/Presentation/ClientAudio.luau"
+              },
+              "CombatState": {
+                "$path": "src/client/CombatClient/Presentation/CombatState.luau"
+              },
+              "EquippedWeapon": {
+                "$path": "src/client/CombatClient/Presentation/EquippedWeapon.luau"
+              },
+              "HammerGrip": {
+                "$path": "src/client/CombatClient/Presentation/HammerGrip.luau"
+              },
+              "HammerVisuals": {
+                "$path": "src/client/CombatClient/Presentation/HammerVisuals.luau"
+              },
+              "WeaponAnimations": {
+                "$path": "src/client/CombatClient/Presentation/WeaponAnimations.luau"
+              },
+              "WorldAudio": {
+                "$path": "src/client/CombatClient/Presentation/WorldAudio.luau"
+              }
+            }
+          }
         }
       }
     }

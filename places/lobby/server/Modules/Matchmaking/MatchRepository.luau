@@ -1,3 +1,8 @@
+-- Name: MatchRepository.luau
+-- Author: Jack C.
+-- Description: Persistence for match records in the shared memory store, including creation, lookup, removal, party membership checks, and the lease that keeps one server responsible for a match.
+-- Created: 2026-08-15
+
 local MemoryStoreService = game:GetService("MemoryStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

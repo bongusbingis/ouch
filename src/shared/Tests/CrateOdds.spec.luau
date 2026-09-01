@@ -1,3 +1,8 @@
+-- Name: CrateOdds.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the crate probability model: every rollable outcome reported, percentages allocated to sum to exactly one hundred, and deterministic repeated builds.
+-- Created: 2026-08-11
+
 --!strict
 
 local T = require(script.Parent.TestKit)

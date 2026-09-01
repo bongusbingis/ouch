@@ -1,3 +1,8 @@
+-- Name: JoinCodeModal.luau
+-- Author: Jack C.
+-- Description: Modal for entering a six-digit party join code, with per-digit boxes, focus handling, validation, and error feedback.
+-- Created: 2026-08-17
+
 --!strict
 
 local GuiService = game:GetService("GuiService")

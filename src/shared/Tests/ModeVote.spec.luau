@@ -1,3 +1,8 @@
+-- Name: ModeVote.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the pure ballot: one vote per player, removal of departed voters, random selection when nobody votes or leaders tie, and the capped late-ready extension.
+-- Created: 2026-08-17
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -26,9 +31,7 @@ T.describe("ModeVote", function()
 		T.expect(not ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
 		ModeVote.cast(state, 2, "TDM")
 		T.expect(ModeVote.allVoted(state, { 1, 2 })):toBeTruthy()
-		-- A voter who is not listed cannot satisfy the roster on someone's behalf.
 		T.expect(not ModeVote.allVoted(state, { 1, 2, 3 })):toBeTruthy()
-		-- An empty roster never counts as everyone having voted.
 		T.expect(not ModeVote.allVoted(state, {})):toBeTruthy()
 	end)
 
@@ -51,6 +54,13 @@ T.describe("ModeVote", function()
 				return index
 			end) ~= "Infection"):toBeTruthy()
 		end
+	end)
+
+	T.it("gives late-ready players a minimum visible window within the extension cap", function()
+		T.expect(ModeVote.extendForLateReady(110, 120, 108, 5)):toEqual(113)
+		T.expect(ModeVote.extendForLateReady(119, 120, 118, 5)):toEqual(120)
+		T.expect(ModeVote.extendForLateReady(110, 120, 104, 5)):toEqual(110)
+		T.expect(ModeVote.extendForLateReady(110, 120, 110, 5)):toEqual(110)
 	end)
 end)
 

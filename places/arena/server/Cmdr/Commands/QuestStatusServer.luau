@@ -1,3 +1,8 @@
+-- Name: QuestStatusServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-quest-status, listing a player's active daily quests with their progress, targets, and claim state.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

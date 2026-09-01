@@ -1,3 +1,8 @@
+-- Name: ConfigRuntime.spec.luau
+-- Author: Jack C.
+-- Description: Spec that overrides are written into the config tables consumers read, that the shipped value is captured once and restored exactly, and that listeners fire only on real changes.
+-- Created: 2026-08-18
+
 --!strict
 
 local T = require(script.Parent.TestKit)

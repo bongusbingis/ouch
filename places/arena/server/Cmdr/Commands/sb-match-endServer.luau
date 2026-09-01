@@ -1,3 +1,8 @@
+-- Name: sb-match-endServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-match-end, driving the match service to finish the running match immediately.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

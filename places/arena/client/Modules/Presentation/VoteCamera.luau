@@ -1,3 +1,8 @@
+-- Name: VoteCamera.luau
+-- Author: Jack C.
+-- Description: Moves the camera to the authored vote framing while the game-mode ballot is open and returns it to the player on close.
+-- Created: 2026-08-18
+
 --!strict
 
 local Lighting = game:GetService("Lighting")
@@ -9,11 +14,6 @@ local Workspace = game:GetService("Workspace")
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("UI"))
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 
--- Orbits the camera around the arena's authored MapOrigin while the mode vote is
--- open, and blurs the world behind the ballot. Presentation only: it derives
--- entirely from the replicated vote snapshot and owns nothing but the camera
--- mode and the blur it creates.
-
 local VoteCamera = {}
 
 local config = UI.VoteCamera
@@ -21,9 +21,11 @@ local config = UI.VoteCamera
 local started = false
 local active = false
 local angle = 0
+local generation = 0
 local origin: BasePart? = nil
 local blur: BlurEffect? = nil
 local renderConnection: RBXScriptConnection? = nil
+local voteDisconnect: (() -> ())? = nil
 
 local function frame(deltaTime: number)
 	local part = origin
@@ -90,28 +92,42 @@ function VoteCamera.start()
 		return
 	end
 	started = true
+	generation += 1
+	local currentGeneration = generation
 
-	local arena = Workspace:WaitForChild("Assets"):WaitForChild("Arena")
-	local part = arena:WaitForChild("MapOrigin")
-	assert(part:IsA("BasePart"), "[VoteCamera] Workspace.Assets.Arena.MapOrigin must be a BasePart")
-	origin = part
+	task.spawn(function()
+		local arena = Workspace:WaitForChild("Assets"):WaitForChild("Arena")
+		local part = arena:WaitForChild("MapOrigin")
+		if generation ~= currentGeneration then
+			return
+		end
+		assert(part:IsA("BasePart"), "[VoteCamera] Workspace.Assets.Arena.MapOrigin must be a BasePart")
+		origin = part
 
-	ModeVoteClient.subscribe(function(snapshot)
+		voteDisconnect = ModeVoteClient.subscribe(function(snapshot)
+			if snapshot.admitted and snapshot.open then
+				activate()
+			else
+				deactivate()
+			end
+		end)
+
+		local snapshot = ModeVoteClient.getSnapshot()
 		if snapshot.admitted and snapshot.open then
 			activate()
-		else
-			deactivate()
 		end
 	end)
-
-	local snapshot = ModeVoteClient.getSnapshot()
-	if snapshot.admitted and snapshot.open then
-		activate()
-	end
 end
 
 function VoteCamera.destroy()
+	generation += 1
 	deactivate()
+	if voteDisconnect then
+		voteDisconnect()
+		voteDisconnect = nil
+	end
+	origin = nil
+	started = false
 end
 
 return VoteCamera

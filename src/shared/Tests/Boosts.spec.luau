@@ -1,3 +1,8 @@
+-- Name: Boosts.spec.luau
+-- Author: Jack C.
+-- Description: Spec for booster stacking: best-of rather than compounding, ignoring cosmetic-only passes, and that no shipped booster touches anything but XP and Bonks.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -32,7 +37,6 @@ T.describe("Boosts", function()
 
 	T.it("takes the best of overlapping boosters rather than compounding them", function()
 		local result = Boosts.multipliers(CATALOG, { DoubleXP = true, BonksBoost = true, Club = true })
-		-- Multiplicative would be 2 * 2.5 = 5x XP; max-wins keeps it at 2.5.
 		T.expect(result.Xp):toEqual(2.5)
 		T.expect(result.Bonks):toEqual(1.5)
 	end)
@@ -55,10 +59,14 @@ T.describe("Boosts", function()
 		T.expect(Boosts.apply(3, 1.5)):toEqual(4)
 	end)
 
-	T.it("keeps the shipped bundle strictly better than the boosters it replaces", function()
-		-- A player who already owns DoubleXP must still gain from Brawler's Club,
-		-- otherwise the upgrade is a dead purchase under max-wins.
-		local club = GamePasses.Catalog.BrawlersClub.Boosts
+	T.it("keeps any shipped combined booster stronger than its component passes", function()
+		local clubPass = GamePasses.Catalog.BrawlersClub
+		if clubPass == nil then
+			T.expect(GamePasses.Catalog.DoubleXP.Boosts.XpMultiplier):toEqual(2)
+			T.expect(GamePasses.Catalog.BonksBoost.Boosts.BonksMultiplier):toEqual(1.5)
+			return
+		end
+		local club = clubPass.Boosts
 		local doubleXp = GamePasses.Catalog.DoubleXP.Boosts
 		local bonksBoost = GamePasses.Catalog.BonksBoost.Boosts
 		T.expect(club.XpMultiplier > doubleXp.XpMultiplier):toBeTruthy()

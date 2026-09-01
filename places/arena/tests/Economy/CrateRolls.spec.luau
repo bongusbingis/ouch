@@ -1,7 +1,9 @@
+-- Name: CrateRolls.spec.luau
+-- Author: Jack C.
+-- Description: In-place port of the crate roll spec, pinning the weighted rarity distribution, zero-weight exclusion, dupe refunds, and empty-pool rejection with a scripted random source.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud port of the CrateRolls spec: weighted rarity distribution, zero-weight
--- exclusion, the dupe-refund rule, and empty-pool rejection — pinned with the
--- injected ScriptedRandom.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -32,7 +34,6 @@ local CRATE = { ItemPool = { "CommonA", "CommonB", "RareA", "LegendaryA", "Exclu
 return function()
 	describe("CrateRolls", function()
 		it("rolls rarities according to weights", function()
-			-- Sorted rarity order: Common(70), Legendary(6), Rare(24); total 100.
 			local common = CrateRolls.roll(CRATE, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0.5 }, { 1 }))
 			expect(common.rarity).to.equal("Common")
 
@@ -44,7 +45,6 @@ return function()
 		end)
 
 		it("resolves the exact rarity boundaries deterministically", function()
-			-- Cumulative fractions: Common ends at 0.70, Legendary at 0.76, Rare at 1.
 			local atCommonEdge = CrateRolls.roll(CRATE, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0.699 }, { 1 }))
 			expect(atCommonEdge.rarity).to.equal("Common")
 

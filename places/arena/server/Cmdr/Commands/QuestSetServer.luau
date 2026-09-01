@@ -1,3 +1,8 @@
+-- Name: QuestSetServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-quest-set, writing an explicit progress value onto an active daily quest for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

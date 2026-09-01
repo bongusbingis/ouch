@@ -1,3 +1,8 @@
+-- Name: sbCrateOpenCash.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-crate-open-bonks: opens a crate through the normal Bonks purchase path.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

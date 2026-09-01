@@ -1,3 +1,8 @@
+-- Name: InventoryModel.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the inventory projection: defaults, free and owned items, locked items excluded, stable category and rarity ordering, and selection restoration.
+-- Created: 2026-08-16
+
 --!strict
 
 local T = require(script.Parent.TestKit)

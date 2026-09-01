@@ -1,5 +1,9 @@
+-- Name: Environment.spec.luau
+-- Author: Jack C.
+-- Description: In-place spec pinning the assumptions the rest of the cloud suite relies on: a server context, no players, a sane world, and no running place simulation.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Pins the cloud execution context assumptions used by the rest of the suite.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -26,8 +30,6 @@ return function()
 		end)
 
 		it("records whether place scripts auto-ran (diagnostic)", function()
-			-- SimulationServer creates these when it starts; the suite also
-			-- creates them via requires, so this is informative, not asserted.
 			local matchState = ReplicatedStorage:FindFirstChild("MatchState")
 			local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 			print(

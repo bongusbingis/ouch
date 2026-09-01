@@ -1,3 +1,8 @@
+-- Name: CharacterColorService.luau
+-- Author: Jack C.
+-- Description: Applies each player's equipped character color to their character's parts on spawn and whenever the equip changes.
+-- Created: 2026-08-17
+
 --!strict
 
 local Players = game:GetService("Players")

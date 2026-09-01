@@ -1,9 +1,17 @@
+-- Name: SimStateCodec.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the simulation state codec: velocity, equipped weapon, and hammer state surviving encode and decode, and the equipped weapon surviving the full decode-step-encode loop.
+-- Created: 2026-07-13
+
 --!strict
 
 local T = require(script.Parent.TestKit)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 
 local SimStateCodec = require(script.Parent.Parent.Game.Adapters.SimStateCodec)
+local WeaponRegistry = require(script.Parent.Parent.Game.Sim.WeaponRegistry)
+local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
+local MockWorld = require(script.Parent.MockWorld)
 local Combat = require(script.Parent.Parent.Parent.Config.Combat)
 
 type FakeInstance = {
@@ -80,12 +88,71 @@ T.describe("SimStateCodec", function()
 		T.expect(decodedBall.bounceCount):toEqual(1)
 	end)
 
+	T.it("preserves the equipped weapon across encode/decode", function()
+		local ballsFolder = fakeInstance("Balls", "Folder")
+		local character = fakeInstance("Character", "Model")
+		local state = SimTypes.newState()
+		state.players.p1 = {
+			id = "p1",
+			equipped = "Dodgeball",
+			heldBallLastTick = true,
+			weapons = {
+				Dodgeball = { throwCooldown = 0, catchCooldown = 0, catchRemaining = 0, catchDirection = nil },
+				Hammer = {
+					cooldown = 0,
+					activeRemaining = 0,
+					recoveryRemaining = 0,
+					stunRemaining = 0,
+					direction = nil,
+					hitTargetId = nil,
+				},
+			},
+		}
+
+		SimStateCodec.encode(state, ballsFolder :: any, { p1 = character :: any })
+		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
+
+		T.expect(decoded.players.p1.equipped):toEqual("Dodgeball")
+		T.expect(decoded.players.p1.heldBallLastTick):toEqual(true)
+	end)
+
+	T.it("defaults an unstepped character to the registry default weapon", function()
+		local ballsFolder = fakeInstance("Balls", "Folder")
+		local character = fakeInstance("Character", "Model")
+		local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
+		T.expect(decoded.players.p1.equipped):toEqual(WeaponRegistry.defaultKind())
+		T.expect(decoded.players.p1.heldBallLastTick):toEqual(false)
+	end)
+
+	T.it("keeps an equipped weapon across the decode-step-encode loop the adapter runs", function()
+		local ballsFolder = fakeInstance("Balls", "Folder")
+		local character = fakeInstance("Character", "Model")
+		local models = { p1 = character :: any }
+		local world = MockWorld.snapshot({ p1 = MockWorld.character(vector.create(0, 2.5, 0)) })
+
+		local function tick(commands)
+			local state = SimStateCodec.decode(ballsFolder :: any, models)
+			SimCore.step(state, commands, world, 1 / 60)
+			SimStateCodec.encode(state, ballsFolder :: any, models)
+			return state
+		end
+
+		tick({})
+		tick({ { playerId = "p1", kind = "Equip", weapon = "Dodgeball" } })
+		for _ = 1, 5 do
+			local state = tick({})
+			T.expect(state.players.p1.equipped):toEqual("Dodgeball")
+		end
+	end)
+
 	T.it("preserves hammer kit state across encode/decode", function()
 		local ballsFolder = fakeInstance("Balls", "Folder")
 		local character = fakeInstance("Character", "Model")
 		local state = SimTypes.newState()
 		state.players.p1 = {
 			id = "p1",
+			equipped = "Hammer",
+			heldBallLastTick = false,
 			weapons = {
 				Dodgeball = {
 					throwCooldown = 0.2,

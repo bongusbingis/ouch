@@ -1,7 +1,9 @@
---!strict
+-- Name: CosmeticsLogic.luau
+-- Author: Jack C.
+-- Description: Pure equip validation shared by the server's enforcement and the client's storefront, so both agree on which items may go in which slots.
+-- Created: 2026-07-13
 
--- Equip validation shared by the server (enforcement) and the future locker
--- UI (pre-validation): same function, same answers.
+--!strict
 
 local CosmeticsLogic = {}
 

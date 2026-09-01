@@ -1,3 +1,8 @@
+-- Name: Network.luau
+-- Author: Jack C.
+-- Description: The single declaration point for every remote in the game, materializing them from one definitions table and providing the rate-limiting, validation, and logging middleware every client-invokable handler wraps in.
+-- Created: 2026-07-12
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local IS_SERVER = RunService:IsServer()
@@ -26,8 +31,21 @@ local definitions = {
 	CrateOpened = "event",
 	StorePurchaseGranted = "event",
 	ReportDeviceClass = "event",
+	ReportAimPose = "unreliable",
+	MarkSwipeThrowLearned = "event",
+	SetClientSetting = "event",
+	OnboardingState = "event",
+	OnboardingReady = "function",
+	OnboardingAction = "event",
+	OnboardingDebug = "event",
+	LobbyCombatTest = "event",
 	CombatFeed = "event",
 	MatchSummary = "event",
+	PostMatchResult = "event",
+	PostMatchStatus = "event",
+	PostMatchRequest = "function",
+	GetShopState = "function",
+	ShopStateChanged = "event",
 	GetQuestState = "function",
 	ClaimQuest = "function",
 	QuestStateChanged = "event",
@@ -35,7 +53,13 @@ local definitions = {
 	DamageFeedback = "event",
 	SubmitModeVote = "event",
 	ArenaClientReady = "event",
+	TeleportPresentationReady = "event",
+	TeleportStatus = "event",
+	RequestLobbyReturn = "event",
+	ReportArenaLoadingEvent = "event",
+	DevEndMatch = "event",
 	SubmitCombatInput = "event",
+	SubmitWeaponEquip = "event",
 	CombatSimEvent = "unreliable",
 	JumpPadImpulse = "unreliable",
 	ReportAnalyticsEvent = "event",
@@ -83,12 +107,6 @@ end
 
 local Network = {}
 
--- Composable middleware: wrap handlers rather than threading a middleware
--- config object.
-
--- Each wrapper owns an independent per-player budget. Callers pass the remote
--- name so warnings name it; without one the budget is still private to this
--- wrapper, because a shared key would let a chatty remote throttle every other.
 local anonymousBuckets = 0
 
 function Network.withRateLimit(limit, handler, bucket)
@@ -124,7 +142,6 @@ function Network.withLogging(handler)
 	end
 end
 
--- Sugar over Network.handle for callers that pass a middleware table.
 function Network.handleProtected(name, middleware, callback)
 	assert(IS_SERVER, "[Network] handleProtected can only be called on the server")
 	local handler = callback
@@ -157,7 +174,6 @@ function Network.call(name, ...)
 	return remote:InvokeServer(...)
 end
 
--- nil target = fire to all clients (without passing nil as a payload arg)
 function Network.fire(name, target, ...)
 	assert(IS_SERVER, "[Network] fire can only be called on the server")
 	local remote = folder:WaitForChild(name)
@@ -168,7 +184,6 @@ function Network.fire(name, target, ...)
 	end
 end
 
--- Client-side fire-and-forget for event remotes (call() is for RemoteFunctions)
 function Network.fireServer(name, ...)
 	assert(not IS_SERVER, "[Network] fireServer can only be called on the client")
 	local remote = folder:WaitForChild(name)

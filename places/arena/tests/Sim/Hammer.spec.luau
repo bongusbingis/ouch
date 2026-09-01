@@ -1,7 +1,9 @@
+-- Name: Hammer.spec.luau
+-- Author: Jack C.
+-- Description: In-place port of the hammer weapon spec: input routing against held balls, closest-target-in-front hits, team rules, and the cooldown, active, and recovery phases.
+-- Created: 2026-07-16
+
 --!nonstrict
--- Cloud port of the Hammer kit spec: input routing priority vs. held balls,
--- closest-target-in-front hits, team rules, and the cooldown/active/recovery
--- phase machine (the recovery window is the GDD's whiff-punish mechanic).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")

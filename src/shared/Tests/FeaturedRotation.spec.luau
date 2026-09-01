@@ -1,3 +1,8 @@
+-- Name: FeaturedRotation.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the featured rotation schedule: one entry per period, agreement across servers from absolute time, countdowns, and discounts that round in the player's favour.
+-- Created: 2026-08-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -31,7 +36,6 @@ T.describe("FeaturedRotation", function()
 	end)
 
 	T.it("selects from absolute time only, so every server agrees", function()
-		-- No player, seed, or session input exists in the signature at all.
 		local now = 123456789
 		local first = FeaturedRotation.select(CONFIG, now)
 		local second = FeaturedRotation.select(CONFIG, now)
@@ -40,9 +44,9 @@ T.describe("FeaturedRotation", function()
 
 	T.it("counts down to the next rotation", function()
 		local start = 4 * WEEK
-		T.expect(FeaturedRotation.nextRotationAt(CONFIG, start)):toEqual(5 * WEEK)
-		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG, start)):toEqual(WEEK)
-		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG, start + WEEK - 30)):toEqual(30)
+		T.expect(FeaturedRotation.nextRotationAt(CONFIG.RotationSeconds, start)):toEqual(5 * WEEK)
+		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG.RotationSeconds, start)):toEqual(WEEK)
+		T.expect(FeaturedRotation.secondsUntilRotation(CONFIG.RotationSeconds, start + WEEK - 30)):toEqual(30)
 	end)
 
 	T.it("discounts only the currently featured crate", function()

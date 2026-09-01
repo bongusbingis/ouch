@@ -1,3 +1,8 @@
+-- Name: sb-speed-clear.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-speed-clear: clears the Cmdr movement-speed multiplier from players.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

@@ -1,13 +1,14 @@
+-- Name: MovementSpeedService.luau
+-- Author: Jack C.
+-- Description: The only writer of walk speed: composes named multiplicative modifiers over each character's captured base speed and applies them during the synchronized simulation step.
+-- Created: 2026-07-15
+
 --!strict
 
 local RunService = game:GetService("RunService")
 
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
 local PlayerIds = require(script.Parent.PlayerIds)
-
--- Owns character WalkSpeed and hammer physics inside the synchronized
--- simulation callback. Server-owned terrain modifiers are queued and written
--- to the character attributes only when the simulation steps.
 
 local MovementSpeedService = {}
 
@@ -53,8 +54,6 @@ local function applyHammerMotion(events: { any })
 			if root then
 				local velocity = root.AssemblyLinearVelocity
 				local forwardSpeed = Vector3.new(velocity.X, 0, velocity.Z):Dot(direction)
-				-- The swing carries its own dash speed so a lunge can close more
-				-- ground; older events without one fall back to the baseline.
 				local dashSpeed = (event.magnitude :: number?) or Combat.Hammer.DashSpeed
 				local deltaSpeed = math.max(dashSpeed - forwardSpeed, 0)
 				root:ApplyImpulse(direction * root.AssemblyMass * deltaSpeed)

@@ -1,3 +1,8 @@
+-- Name: DataAddServer.luau
+-- Author: Jack C.
+-- Description: Server implementation of sb-data-add, applying a signed delta to the named profile field through PlayerData for each targeted player.
+-- Created: 2026-07-15
+
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")

@@ -1,3 +1,8 @@
+-- Name: Projectiles.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the projectile subsystem: straight flight and flight-time limits, determinism, homing clamps and lock breaking, no tunneling through thin walls, bounce and roll settling, and charged release speeds.
+-- Created: 2026-07-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -42,7 +47,6 @@ local function makeBall(state: SimTypes.SimState, fields: { [string]: any }): Pr
 		bounceCount = fields.bounceCount or 0,
 		releaseAim = fields.releaseAim,
 		releaseCharge = fields.releaseCharge,
-		releaseLob = fields.releaseLob,
 		releaseTargetId = fields.releaseTargetId,
 		releaseDeviceClass = fields.releaseDeviceClass,
 	}
@@ -119,7 +123,6 @@ T.describe("Projectiles", function()
 	T.it("breaks lock past the break angle", function()
 		withConfig({ Gravity = 0 }, function()
 			local state = SimTypes.newState()
-			-- Target at 90 degrees off the flight path, beyond HomingBreakAngleDeg.
 			local target = MockWorld.character(vector.create(0, 3, 30))
 			local world = MockWorld.snapshot({ dummy = target })
 			local ball = makeBall(state, {
@@ -374,7 +377,6 @@ T.describe("Projectiles", function()
 			releaseAim = vector.create(0, 0, 1),
 			windupRemaining = 0,
 			releaseCharge = fields.releaseCharge,
-			releaseLob = fields.releaseLob,
 		})
 		local events: { SimTypes.SimEvent } = {}
 		Projectiles.step(state, world, DT, events)
@@ -404,26 +406,10 @@ T.describe("Projectiles", function()
 		T.expect(vector.magnitude(release({ releaseCharge = 5 }).velocity)):toBeNear(full, 1e-3)
 	end)
 
-	T.it("lobs slower than a normal throw", function()
-		local lob = vector.magnitude(release({ releaseLob = true }).velocity)
-		T.expect(lob):toBeNear(Combat.Dodgeball.ThrowSpeed * Combat.Dodgeball.Lob.SpeedScale, 1e-3)
-	end)
-
-	T.it("pitches a lob upward by the configured angle without changing its heading", function()
+	T.it("releases flat along the aim the player gave", function()
 		local flat = release({})
-		local lob = release({ releaseLob = true })
-		local direction = vector.normalize(lob.velocity)
-		local pitch = math.deg(math.asin(math.clamp(direction.y, -1, 1)))
-		T.expect(pitch):toBeNear(Combat.Dodgeball.Lob.PitchDeg, 0.5)
-		-- The player's yaw is untouched: still travelling down +Z, not sideways.
-		T.expect(direction.x):toBeNear(0, 1e-4)
 		T.expect(flat.velocity.y):toBeNear(0, 1e-4)
-	end)
-
-	T.it("ignores charge on a lob so the two cannot stack", function()
-		local plain = vector.magnitude(release({ releaseLob = true }).velocity)
-		local charged = vector.magnitude(release({ releaseLob = true, releaseCharge = 1 }).velocity)
-		T.expect(charged):toBeNear(plain, 1e-3)
+		T.expect(vector.normalize(flat.velocity).x):toBeNear(0, 1e-4)
 	end)
 
 	T.it("holds at the fake held socket during windup", function()

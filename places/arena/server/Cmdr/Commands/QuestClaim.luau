@@ -1,3 +1,8 @@
+-- Name: QuestClaim.luau
+-- Author: Jack C.
+-- Description: Cmdr definition for sb-quest-claim: claims the reward for a completed active quest.
+-- Created: 2026-07-15
+
 --!strict
 
 return {

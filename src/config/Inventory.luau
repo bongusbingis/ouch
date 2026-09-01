@@ -22,6 +22,8 @@ return {
 			Id = "EFFECTS",
 			Sections = {
 				{ Id = "TRAILS", Category = "TrailAssets" },
+				{ Id = "IMPACTS", Category = "ImpactEffectAssets" },
+				{ Id = "ELIMINATION SOUNDS", Category = "ElimEffectAssets" },
 			},
 		},
 		{
@@ -61,26 +63,7 @@ return {
 			RotationDegrees = -20,
 			SpinDegreesPerSecond = 12,
 		},
-		TrailAssets = {
-			CameraOffset = Vector3.new(0, 0.5, 7),
-			TargetOffset = Vector3.zero,
-			Scale = 0.8,
-			RotationDegrees = 0,
-			SpinDegreesPerSecond = 0,
-			UpdateHz = 15,
-			TravelDistance = 2.75,
-			TravelSeconds = 3.2,
-			ScreenCenter = Vector2.new(0.5, 0.52),
-			ScreenTravelScale = 0.14,
-			ScreenBobScale = 0.01,
-			HeadInsetScale = 0.025,
-			RibbonLengthScale = 0.24,
-			RibbonHeightScale = 0.052,
-			ParticleDriftScale = 0.025,
-			ParticleCyclesPerSecond = 0.42,
-			MaxRibbonLayers = 2,
-			MaxEmitterLayers = 1,
-			ParticlesPerEmitter = 2,
-		},
+		-- Script effects and elimination sounds use InventoryPreview's static badges.
+		-- TrailAssets stays out of Tabs until it has a preview.
 	},
 }

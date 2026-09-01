@@ -1,3 +1,8 @@
+-- Name: StoryRoot.luau
+-- Author: Jack C.
+-- Description: Mounts a story element into a target instance and returns the unmount function every story uses.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

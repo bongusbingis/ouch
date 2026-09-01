@@ -1,9 +1,9 @@
+-- Name: Runner.luau
+-- Author: Jack C.
+-- Description: Bootstraps the in-place test suite, running every spec module under the tests folder and returning a plain summary table for the cloud task and the Studio command bar.
+-- Created: 2026-07-16
+
 --!strict
--- Cloud TestEZ suite bootstrap. Runs every *.spec ModuleScript under this folder
--- (ServerStorage.Tests) with TestEZ's TextReporter and returns a plain summary
--- table. Invoked by the Open Cloud Luau Execution payload
--- (src/scripts/cloud/RunTests.luau); also runnable from the Studio command bar:
---   print(require(game.ServerStorage.Tests.Runner)().failed)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

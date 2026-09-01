@@ -1,10 +1,14 @@
+-- Name: FFA.luau
+-- Author: Jack C.
+-- Description: Free-for-all game mode: its match rules and the server hooks that provision a ball per entrant and score every elimination individually.
+-- Created: 2026-07-13
+
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local PostMatch = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
 local GameMode = require(script.Parent.GameMode)
-
--- Classic FFA: each entrant receives one persistent contested ball.
 
 local FFA = {}
 FFA.id = "FFA"
@@ -13,11 +17,12 @@ FFA.rules = {
 	MinPlayers = 1,
 	ScoreTarget = 15,
 	TimeCapSeconds = 300,
-	ResultsSeconds = 8,
+	ResultsSeconds = PostMatch.ResultsSeconds,
 	IntermissionSeconds = GameModes.VoteDurationSeconds,
 	StartingSeconds = 3,
 	RespawnSeconds = 1,
 	SpawnInvulnSeconds = 1.5,
+	PreserveDodgeballs = true,
 } :: GameMode.MatchRules
 
 function FFA.onMatchStart(ctx: GameMode.ModeContext)

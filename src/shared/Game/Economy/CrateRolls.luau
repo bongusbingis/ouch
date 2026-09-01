@@ -1,13 +1,9 @@
---!strict
+-- Name: CrateRolls.luau
+-- Author: Jack C.
+-- Description: Pure crate roll driven by the shared probability model and an injected random source, including the pity guarantees and the duplicate refund rule.
+-- Created: 2026-07-13
 
--- Pure crate roll driven by the shared probability model. Deterministic given
--- the injected Random.
---
--- Pity bounds the worst-case streak: a crate's configured thresholds force the
--- guaranteed rarity once that many opens have passed without it. Rarity value
--- is derived from Rarities.Weight (rarer = lower weight) so there is no second
--- rank table to drift from the odds model. Crates without a Pity block roll
--- exactly as they did before and consume the same random stream.
+--!strict
 
 local CrateOdds = require(script.Parent.CrateOdds)
 

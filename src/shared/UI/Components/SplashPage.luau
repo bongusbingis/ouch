@@ -1,3 +1,8 @@
+-- Name: SplashPage.luau
+-- Author: Jack C.
+-- Description: The lobby splash page with the play action and party status, the first screen a player sees in the lobby.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +38,7 @@ export type Props = {
 	OnInvite: () -> (),
 	OnJoinCode: () -> (),
 	Position: any?,
+	PlayButtonRef: any?,
 }
 
 return function(props: Props)
@@ -86,9 +92,10 @@ return function(props: Props)
 				OnActivated = props.OnJoinCode,
 			}, {
 				UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
-				TextLabel = buttonText("JOIN WITH CODE"),
+				TextLabel = buttonText("JOIN PARTY"),
 			}),
 			PlayButton = c(AnimatedButton, {
+				ButtonRef = props.PlayButtonRef,
 				Enabled = props.PlayEnabled,
 				Style = "Primary",
 				Native = {

@@ -1,3 +1,8 @@
+-- Name: TeleportPayload.luau
+-- Author: Jack C.
+-- Description: Builds and parses the teleport payload the lobby sends to the arena, carrying session, party, and mode option data and rejecting malformed or obsolete versions.
+-- Created: 2026-08-17
+
 --!strict
 
 local TeleportPayload = {}
@@ -9,12 +14,18 @@ export type ModeSelection = {
 	options: { string },
 }
 
+export type PartyContext = {
+	leaderUserId: number,
+	memberUserIds: { number },
+}
+
 export type Payload = {
 	schemaVersion: number,
 	matchId: string,
 	partyId: string,
 	expectedPlayerCount: number,
 	modeSelection: ModeSelection,
+	party: PartyContext?,
 }
 
 local function validId(value: any): boolean
@@ -50,6 +61,46 @@ local function copyOptions(value: any): ({ string }?, string?)
 	return options, nil
 end
 
+local function copyMembers(value: any): ({ number }?, string?)
+	if typeof(value) ~= "table" or #value == 0 or #value > 16 then
+		return nil, "invalid_party_members"
+	end
+	local result = {}
+	local seen = {}
+	for index, userId in value do
+		if
+			typeof(index) ~= "number"
+			or index % 1 ~= 0
+			or index < 1
+			or index > #value
+			or typeof(userId) ~= "number"
+			or userId % 1 ~= 0
+			or userId <= 0
+			or seen[userId]
+		then
+			return nil, "invalid_party_members"
+		end
+		seen[userId] = true
+		result[index] = userId
+	end
+	if #result ~= #value then
+		return nil, "invalid_party_members"
+	end
+	return result, nil
+end
+
+local function partyFor(matchRecord: any, partyId: string): PartyContext?
+	for _, party in matchRecord.parties or {} do
+		if party.partyId == partyId and typeof(party.leaderUserId) == "number" then
+			return {
+				leaderUserId = party.leaderUserId,
+				memberUserIds = table.clone(party.memberUserIds),
+			}
+		end
+	end
+	return nil
+end
+
 function TeleportPayload.build(matchRecord: any, partyId: string): Payload
 	return {
 		schemaVersion = TeleportPayload.SchemaVersion,
@@ -60,6 +111,7 @@ function TeleportPayload.build(matchRecord: any, partyId: string): Payload
 			strategy = matchRecord.modeSelection.strategy,
 			options = table.clone(matchRecord.modeSelection.options),
 		},
+		party = partyFor(matchRecord, partyId),
 	}
 end
 
@@ -90,6 +142,26 @@ function TeleportPayload.parse(value: any): (Payload?, string?)
 		return nil, optionsError
 	end
 
+	local party = nil
+	if value.party ~= nil then
+		if
+			typeof(value.party) ~= "table"
+			or typeof(value.party.leaderUserId) ~= "number"
+			or value.party.leaderUserId % 1 ~= 0
+			or value.party.leaderUserId <= 0
+		then
+			return nil, "invalid_party"
+		end
+		local members, membersError = copyMembers(value.party.memberUserIds)
+		if not members or not table.find(members, value.party.leaderUserId) then
+			return nil, membersError or "invalid_party_leader"
+		end
+		party = {
+			leaderUserId = value.party.leaderUserId,
+			memberUserIds = members,
+		}
+	end
+
 	return {
 		schemaVersion = TeleportPayload.SchemaVersion,
 		matchId = value.matchId,
@@ -99,6 +171,7 @@ function TeleportPayload.parse(value: any): (Payload?, string?)
 			strategy = "Vote",
 			options = options,
 		},
+		party = party,
 	},
 		nil
 end

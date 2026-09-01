@@ -1,10 +1,9 @@
+-- Name: CharacterFixture.luau
+-- Author: Jack C.
+-- Description: Builds real anchored humanoid rigs for in-place specs through the engine's own rig creation, since the cloud execution environment has no players.
+-- Created: 2026-07-16
+
 --!strict
--- Test-only character rigs for humanoid-dependent specs. The cloud execution
--- environment has no players, so rigs are built through the engine's
--- CreateHumanoidModelFromDescription (a real, standard R15 rig) rather than
--- hand-assembling gameplay assets in code. Physics does not step in this
--- environment, so the HumanoidRootPart is anchored to keep rigs stationary.
--- Callers own cleanup: destroy() every fixture in afterEach.
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")

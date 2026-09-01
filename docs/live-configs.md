@@ -13,9 +13,22 @@ Hub. Each entry declares the key, its type, and its accepted range.
 Currently in scope: `Combat`, `AimAssist`, `GameModes.VoteDurationSeconds`,
 `MapFeatures`, and the lobby's `Matchmaking` scalars.
 
+The shop's A/B levers are also in scope: `Shop.VariantId`, the three rotation
+periods, `Shop.Featured.DiscountPercent`, and each crate's `BonksPrice`. Varying
+these per cohort is how a pricing experiment runs; `VariantId` labels the cohort
+and is stamped on every shop analytics row, so a result can be attributed to the
+configuration that produced it.
+
+Their ranges are load-bearing rather than decorative. `CrateConfig.spec` proves
+that every combination the allowlist permits still satisfies both published
+economic guarantees *at the discounted price actually charged* -- narrow a bound
+and that spec keeps you honest; widen one and it fails.
+
 Deliberately out of scope: monetization (`Products`, `GamePasses`), asset IDs
-(`Cosmetics`, `TrailCosmetics`, `Audio`), the input map, and the economy tables
-(`Data`, `Crates`, `Quests`, `Seasons`, `Shop`, `Inventory`).
+(`Cosmetics`, `Audio`), the input map, and the rest of the economy tables
+(`Data`, `Quests`, `Seasons`, `Inventory`). Rarity `DirectBonks`/`DupeBonks` are
+excluded on purpose: they sit on the far side of both guarantees, so a live
+override there could make crates strictly worse value than buying outright.
 
 `GameModes.Modes[].Enabled` is **not** live-updatable: `VoteOptions` is derived from it
 at module load and copied by the lobby, so changing it live would leave the two out of

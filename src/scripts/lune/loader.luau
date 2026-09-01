@@ -1,8 +1,9 @@
---!strict
+-- Name: loader.luau
+-- Author: Jack C.
+-- Description: Builds a fake instance tree from Rojo's sourcemap so modules written with Roblox-style requires can be loaded and run headlessly under Lune.
+-- Created: 2026-07-12
 
--- Sourcemap-based module loader: builds a fake Instance tree from Rojo's
--- sourcemap.json so ModuleScripts written with Roblox-style requires
--- (`require(script.Parent.X)`) run headlessly under Lune.
+--!strict
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -34,8 +35,6 @@ local FakeCFrame = {
 	identity = setmetatable({ Position = vector.zero }, fakeCFrameMeta),
 }
 
--- Real Color3 exposes both R/G/B and legacy r/g/b accessors; keep both so
--- headless modules can read either.
 local function fakeColor3(r: number, g: number, b: number)
 	return { R = r, G = g, B = b, r = r, g = g, b = b }
 end
@@ -66,6 +65,24 @@ local FakeNumberRange = {
 		return { Min = min, Max = max or min }
 	end,
 }
+
+-- Enum members are only ever compared and passed through by the pure modules
+-- under test, so each one resolves to a single stable table carrying its name.
+-- Two references to the same member are the same value, which is all an
+-- equality check or a lookup key needs.
+local FakeEnum = setmetatable({}, {
+	__index = function(enums, enumName: string)
+		local members = setmetatable({}, {
+			__index = function(self, memberName: string)
+				local member = { Name = memberName, EnumType = enumName }
+				rawset(self, memberName, member)
+				return member
+			end,
+		})
+		rawset(enums, enumName, members)
+		return members
+	end,
+})
 
 function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 	local map: SourcemapEntry = serde.decode("json", fs.readFile(sourcemapPath))
@@ -164,6 +181,7 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 				Vector3 = FakeVector3,
 				Vector2 = FakeVector2,
 				NumberRange = FakeNumberRange,
+				Enum = FakeEnum,
 			},
 			injectGlobals = true,
 		})

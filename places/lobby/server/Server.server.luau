@@ -1,18 +1,23 @@
--- Lobby profile lifecycle and cosmetic equip authority. The shared services
--- are mapped from the canonical source tree by lobby.project.json.
+-- Name: Server.server.luau
+-- Author: Jack C.
+-- Description: Lobby server entry point for player lifecycle: loads and saves profiles and starts the shared analytics, config, cosmetics, character color, and economy services.
+-- Created: 2026-07-12
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Modules = script:WaitForChild("Modules")
--- Ensure the shared Network module runs on server startup so remotes are
--- materialized for tests and runtime consumers.
 local _ = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
 local CharacterColorService = require(Modules:WaitForChild("CharacterColorService"))
+local EconomyService = require(Modules:WaitForChild("EconomyService"))
+local SettingsService = require(Modules:WaitForChild("SettingsService"))
+local OnboardingService = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingService"))
+local OnboardingCombat = require(Modules:WaitForChild("Onboarding"):WaitForChild("OnboardingCombat"))
+local LobbyCombatTest = require(Modules:WaitForChild("Debug"):WaitForChild("LobbyCombatTest"))
 
 ConfigLiveService.start({
 	modules = {
@@ -20,13 +25,18 @@ ConfigLiveService.start({
 		Matchmaking = require(
 			ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")
 		),
+		Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop")),
+		Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates")),
 	},
 })
--- No match loop in the lobby; session, onboarding, economy and funnel
--- reporting still run.
 AnalyticsService.start()
 CosmeticsService.start()
 CharacterColorService.start()
+EconomyService.start()
+SettingsService.start()
+OnboardingCombat.start()
+OnboardingService.start()
+LobbyCombatTest.start()
 
 Players.PlayerAdded:Connect(function(player)
 	PlayerData.load(player)

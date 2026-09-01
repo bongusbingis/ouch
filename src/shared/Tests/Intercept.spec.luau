@@ -1,3 +1,8 @@
+-- Name: Intercept.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the interception maths: leading a crossing target, slower projectiles leading further, receding targets converging, motion consistency scoring, and clamped aim bias.
+-- Created: 2026-08-19
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -15,8 +20,6 @@ T.describe("Intercept", function()
 	end)
 
 	T.it("leads a crossing target ahead of where it is now", function()
-		-- 100 studs away, moving sideways at 20, ball at 200: roughly 0.5s of
-		-- flight, so about 10 studs of lead.
 		local point = Intercept.solve(v(0, 0, 0), v(0, 0, 100), v(20, 0, 0), 200)
 		T.expect(point.x > 9 and point.x < 11):toBeTruthy()
 	end)
@@ -29,8 +32,6 @@ T.describe("Intercept", function()
 
 	T.it("converges rather than running away on a receding target", function()
 		local point = Intercept.solve(v(0, 0, 0), v(0, 0, 100), v(0, 0, 40), 200)
-		-- Target flees at 40 while the ball closes at 200; the meeting point is
-		-- ahead of it but bounded, not diverging.
 		T.expect(point.z > 100 and point.z < 140):toBeTruthy()
 	end)
 
@@ -70,7 +71,6 @@ T.describe("Intercept", function()
 	end)
 
 	T.it("never rotates further than the clamp allows", function()
-		-- Intercept is 90 degrees off; the clamp permits 10.
 		local biased = Intercept.biasAim(v(0, 0, 1), v(0, 0, 0), v(100, 0, 0), 1, math.rad(10))
 		local angle = math.deg(math.acos(math.clamp(vector.dot(biased, v(0, 0, 1)), -1, 1)))
 		T.expect(angle <= 10.5):toBeTruthy()

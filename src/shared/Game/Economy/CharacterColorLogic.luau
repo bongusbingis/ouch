@@ -1,3 +1,8 @@
+-- Name: CharacterColorLogic.luau
+-- Author: Jack C.
+-- Description: Pure resolution of a player's character color from their equipped cosmetic, falling back to the default for anything missing or invalid.
+-- Created: 2026-08-17
+
 --!strict
 
 local CharacterColorLogic = {}

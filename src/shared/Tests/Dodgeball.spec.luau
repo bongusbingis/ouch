@@ -1,3 +1,8 @@
+-- Name: Dodgeball.spec.luau
+-- Author: Jack C.
+-- Description: Spec for the dodgeball weapon kit: throw gating and cooldowns, origin validation, soft-lock cones, target leading, charge clamping, and the catch window.
+-- Created: 2026-07-12
+
 --!strict
 
 local T = require(script.Parent.TestKit)
@@ -44,7 +49,6 @@ local function throwCommand(overrides: { [string]: any }?): InputCommand
 		aimDir = vector.create(1, 0, 0),
 		targetId = nil,
 		deviceClass = "Mouse",
-		-- What a mouse player resolves to: cone snap on, lead inert.
 		assist = { ConeSnap = 1, Lead = 0 },
 	}
 	for key, value in overrides or {} do
@@ -112,7 +116,6 @@ T.describe("Dodgeball kit", function()
 		local first = SimCore.step(state, { throwCommand() }, world, DT)
 		T.expect(countEvents(first, "BallWindup")):toEqual(1)
 
-		-- Immediately give the player another ball; cooldown must still block.
 		for _, projectile in state.projectiles do
 			projectile.phase = "Held"
 			projectile.heldBy = "p1"
@@ -204,16 +207,6 @@ T.describe("Dodgeball kit", function()
 		SimCore.step(state, { throwCommand({ charge = 0.75 }) }, world, DT)
 		local ball = state.projectiles.ball_0001
 		T.expect(ball.releaseCharge):toBeNear(0.75, 1e-6)
-		T.expect(ball.releaseLob):toEqual(false)
-	end)
-
-	T.it("resolves a client claiming both a lob and a charge in favour of the lob", function()
-		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
-		local state = stateWithHeldBall(world)
-		SimCore.step(state, { throwCommand({ charge = 1, lob = true }) }, world, DT)
-		local ball = state.projectiles.ball_0001
-		T.expect(ball.releaseLob):toEqual(true)
-		T.expect(ball.releaseCharge):toEqual(0)
 	end)
 
 	T.it("clamps a charge the client sent out of range", function()
@@ -272,7 +265,6 @@ T.describe("Dodgeball kit", function()
 	end)
 
 	T.it("applies the wider Touch validation cone per device class", function()
-		-- ~20 degrees off the aim ray: outside Mouse validation (16), inside Touch (24).
 		local dummyPosition = vector.create(30, 2.5, 10.9)
 
 		local function windupTarget(deviceClass: string): string?

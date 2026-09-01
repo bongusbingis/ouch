@@ -1,3 +1,8 @@
+-- Name: ElimZones.luau
+-- Author: Jack C.
+-- Description: Map feature kit for out-of-bounds volumes: eliminates any player whose root enters an authored elimination zone, routing through the match service so scoring and respawn stay in one place.
+-- Created: 2026-08-18
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,13 +13,6 @@ local Volume = require(
 )
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local MatchService = require(script.Parent.Parent.MatchService)
-
--- Authored kill volumes: entering one eliminates the player immediately. The
--- elimination is routed through MatchService so scoring, the combat feed, mode
--- hooks, and respawn all run exactly as they do for a dodgeball elimination.
---
--- MatchService ignores eliminations outside an Active match, so a player who
--- wanders into a zone between matches is left alone.
 
 local ElimZones = {}
 

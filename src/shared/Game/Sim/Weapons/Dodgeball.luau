@@ -1,3 +1,8 @@
+-- Name: Dodgeball.luau
+-- Author: Jack C.
+-- Description: The dodgeball weapon kit: throw gating and cooldowns, soft-lock target selection and validation per device class, charged release, and the catch window, with ball possession read from projectile state rather than duplicated.
+-- Created: 2026-07-12
+
 --!strict
 
 local Sim = script.Parent.Parent
@@ -24,13 +29,10 @@ type KitState = {
 	catchDirection: Vec?,
 }
 
--- Ball possession has exactly one source of truth: ProjectileState
--- (phase == "Held" and heldBy). Kit state owns cooldowns plus the transient
--- directional catch window.
-
 local Dodgeball = {}
 Dodgeball.kind = "Dodgeball"
 Dodgeball.commands = { Throw = true, Catch = true } :: { [SimTypes.CommandKind]: boolean }
+Dodgeball.equipOnHandBall = true
 
 local function config()
 	return Combat.Dodgeball
@@ -52,10 +54,6 @@ end
 
 local AIM_LINE_OF_SIGHT_RADIUS = 0.2
 
--- Deterministic in-sim soft-lock: best candidate in the device's selection
--- cone with line of sight, scored by angular offset with a small distance
--- tiebreak. Resolved only on the server, so there is no
--- client proposal to trust.
 local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrigin: Vec, aimDir: Vec): string?
 	local targetId = TargetSelect.pick(world, command.playerId, aimOrigin, aimDir, {
 		rangeStuds = config().TargetSelectRange,
@@ -66,9 +64,6 @@ local function selectTarget(command: InputCommand, world: WorldSnapshot, aimOrig
 	return targetId
 end
 
--- Re-check of an explicitly proposed target (traditional-backend path): alive,
--- not self, inside the widened validation cone, unobstructed. Fails open to an
--- unguided throw rather than rejecting the input.
 local function validateTarget(command: InputCommand, world: WorldSnapshot, aimOrigin: Vec, aimDir: Vec): string?
 	local targetId = command.targetId
 	if targetId == nil or targetId == command.playerId or SimUtil.sameTeam(world, command.playerId, targetId) then
@@ -133,10 +128,6 @@ local function handleThrow(
 	ball.position = character.handPosition
 	ball.velocity = vector.zero
 	ball.releaseAim = aimDir
-	-- Cone snap is an assist like any other: at zero strength a throw goes
-	-- exactly where it was aimed and homes at nothing. A target the player
-	-- tapped is still honoured, since that is an input they gave rather than a
-	-- decision made for them.
 	if command.targetId ~= nil then
 		ball.releaseTargetId = validateTarget(command, world, aimOrigin, aimDir)
 	elseif SimUtil.assistStrength(command, "ConeSnap") > 0 then
@@ -145,14 +136,8 @@ local function handleThrow(
 		ball.releaseTargetId = nil
 	end
 	ball.releaseDeviceClass = command.deviceClass or "Mouse"
-	-- A lob and a charge are different gestures and cannot both be true; the
-	-- sim decides that here rather than trusting whatever the client sent.
-	ball.releaseLob = command.lob == true
-	ball.releaseCharge = if ball.releaseLob then 0 else math.clamp(command.charge or 0, 0, 1)
+	ball.releaseCharge = math.clamp(command.charge or 0, 0, 1)
 
-	-- Lead prediction rides on top of the aim the player actually gave, never
-	-- replacing it: the throw is rotated toward where the target will be, capped
-	-- by MaxLeadAngleDeg and faded by how steadily that target has been moving.
 	local leadStrength = SimUtil.assistStrength(command, "Lead")
 	if leadStrength > 0 and ball.releaseTargetId ~= nil then
 		local target = world.characters[ball.releaseTargetId]
@@ -281,7 +266,6 @@ local function tryCatch(
 	ball.releaseAim = nil
 	ball.releaseTargetId = nil
 	ball.releaseCharge = nil
-	ball.releaseLob = nil
 	kitState.catchRemaining = 0
 	kitState.catchDirection = nil
 

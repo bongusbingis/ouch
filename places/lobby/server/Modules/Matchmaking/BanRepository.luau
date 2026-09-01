@@ -1,3 +1,8 @@
+-- Name: BanRepository.luau
+-- Author: Jack C.
+-- Description: Looks up matchmaking bans for party members through the cloud store with retry, applying the shared ban policy to decide whether a party may queue.
+-- Created: 2026-08-17
+
 --!strict
 
 local DataStoreService = game:GetService("DataStoreService")

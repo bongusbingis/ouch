@@ -1,13 +1,9 @@
---!strict
+-- Name: merge-places.luau
+-- Author: Jack C.
+-- Description: Merges the Studio-authored place with the Rojo-built one into a deployable artifact, replacing every Rojo-mapped tree in a copy of the base place while never writing the base file itself.
+-- Created: 2026-07-16
 
--- Merges the Studio-authored asset place with a rojo-built place into a
--- deployable artifact. Rojo is the single source of truth for every tree
--- mapped by a `$path` in the project file (scripts); the base place is the
--- single source of truth for everything else (maps, assets, nonscriptables).
--- Each mapped tree is deleted from the base copy (clearing stale leftovers)
--- and replaced by the rojo-built one. The base place file is never written.
--- Usage (from repo root):
---   lune run src/scripts/lune/merge-places.luau <project.json> <base.rbxl> <build.rbxl> <out.rbxl>
+--!strict
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -37,9 +33,6 @@ for _, path in { projectPath, basePath, buildPath } do
 	end
 end
 
--- Collect every $path-mapped DataModel path from the project tree. Container
--- nodes without $path only contribute their name; mapped nodes terminate the
--- walk (rojo owns everything below them).
 local function collectMappings(node: { [string]: any }, prefix: Mapping, into: { Mapping })
 	for key, child in node do
 		if string.sub(key, 1, 1) == "$" or typeof(child) ~= "table" then
@@ -83,9 +76,6 @@ for _, path in mappings do
 	local source = resolve(buildPlace, path, #path)
 	assert(source ~= nil, `[merge-places] rojo build is missing {pathString(path)}`)
 
-	-- Walk the base tree toward the mapped node. A missing intermediate
-	-- container is adopted wholesale from the build (it carries the subtree),
-	-- which ends the walk for this mapping.
 	local baseParent: any = basePlace:GetService(path[1])
 	local adopted = false
 	for index = 2, #path - 1 do

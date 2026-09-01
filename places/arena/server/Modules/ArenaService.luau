@@ -1,3 +1,8 @@
+-- Name: ArenaService.luau
+-- Author: Jack C.
+-- Description: Validates the permanent Studio-authored arena and its spawn folders at startup and teleports players onto general or per-team spawn parts without cloning or modifying arena content.
+-- Created: 2026-08-17
+
 --!strict
 
 local Workspace = game:GetService("Workspace")

@@ -1,3 +1,8 @@
+-- Name: JumpPadVisuals.luau
+-- Author: Jack C.
+-- Description: Renders the arena jump pads, tracking their authored parts and playing the squash animation and launch sound when the server broadcasts a pad impulse.
+-- Created: 2026-08-19
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,13 +14,6 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local Spring =
 	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util"):WaitForChild("Spring"))
 local GameAudio = require(script.Parent.GameAudio)
-
--- Squash and stretch for the authored jump pads. Presentation only: the server
--- decides that a bounce happened and broadcasts which pad, and this renders it.
---
--- Each pad's parts are driven by one of two springs. The inner part is far
--- slower and less damped than the outer, which is what gives the surface its
--- delayed second bounce rather than both shells moving as one.
 
 local JumpPadVisuals = {}
 
@@ -97,12 +95,8 @@ local function step(deltaTime: number)
 			end
 			local baseSize = partState.baseSize
 			local height = math.max(baseSize.Y + partState.spring.position, baseSize.Y * settings.MinimumSquash)
-			-- Bulge outward as it flattens so the pad reads as squashing rather
-			-- than shrinking; 1/sqrt keeps the volume roughly constant.
 			local spread = 1 / math.sqrt(height / baseSize.Y)
 			part.Size = Vector3.new(baseSize.X * spread, height, baseSize.Z * spread)
-			-- Size grows about the centre, so shift by half the delta to keep the
-			-- bottom face where it was authored.
 			part.CFrame = partState.baseCFrame + Vector3.new(0, (height - baseSize.Y) / 2, 0)
 		end
 	end

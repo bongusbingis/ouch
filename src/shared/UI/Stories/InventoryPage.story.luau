@@ -1,3 +1,8 @@
+-- Name: InventoryPage.story.luau
+-- Author: Jack C.
+-- Description: Studio story previewing the locker page with fixture inventory data.
+-- Created: 2026-08-17
+
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
