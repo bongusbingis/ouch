@@ -1,7 +1,7 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local Input = require(script.Parent.Parent.Parent.Config.Input)
+local Input = require(script.Parent.Parent.Parent.Config.Interface.Input)
 
 local function actionNamed(name: string): any
 	for _, action in Input.Actions do

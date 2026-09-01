@@ -3,11 +3,11 @@
 -- Production acquisition contract for impact-effect cosmetics.
 
 local T = require(script.Parent.TestKit)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
-local Crates = require(script.Parent.Parent.Parent.Config.Crates)
-local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
-local Products = require(script.Parent.Parent.Parent.Config.Products)
-local Shop = require(script.Parent.Parent.Parent.Config.Shop)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
+local Crates = require(script.Parent.Parent.Parent.Config.Economy.Crates)
+local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses)
+local Products = require(script.Parent.Parent.Parent.Config.Economy.Products)
+local Shop = require(script.Parent.Parent.Parent.Config.Economy.Shop)
 
 local IMPACT_CATEGORY = "ImpactEffectAssets"
 local EXCLUSIVE_IDS = { "Prismatic", "Galaxy", "Starlight" }

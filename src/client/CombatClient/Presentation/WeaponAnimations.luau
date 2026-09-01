@@ -8,8 +8,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Animations = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Animations"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Animations = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Animations"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local CombatState = require(script.Parent.CombatState)
 
 local WeaponAnimations = {}

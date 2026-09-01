@@ -1,15 +1,10 @@
 --!strict
 
--- Terrain feature tuning (GDD §5: bounce pads and foam pits as
--- terrain-based mobility/dodge tools). Per-pad overrides via a
--- "LaunchSpeed" attribute on the pad part.
-
--- VerticalPadding widens a volume upward so a root hovering just above the part
--- still counts as inside it.
+-- Terrain feature tuning. Per-pad override via a "LaunchSpeed" attribute on the pad.
+-- VerticalPadding widens a volume upward so a root just above the part counts as inside.
 return {
-	-- Jump pads. Bounce feel is the prototype's, converted from its mass/damping/
-	-- spring constants to the equivalent frequency and damping ratio: outer
-	-- (m=1, c=3, k=125) and inner (m=50, c=5, k=200) describe the same motion.
+	-- Squash frequencies/ratios are converted from the prototype's spring constants
+	-- (outer m=1, c=3, k=125; inner m=50, c=5, k=200).
 	JumpPad = {
 		BouncePower = 85, -- vertical speed set on launch, horizontal is preserved
 		-- Fraction of gravity cancelled while airborne, which is what makes the

@@ -6,9 +6,9 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
-local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
-local Products = require(script.Parent.Parent.Parent.Config.Products)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
+local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses)
+local Products = require(script.Parent.Parent.Parent.Config.Economy.Products)
 
 T.describe("MonetizationConfig", function()
 	T.it("maps active products into receipt processing and excludes previews", function()
@@ -89,7 +89,7 @@ T.describe("MonetizationConfig", function()
 	end)
 
 	T.it("ships one season pass product per season, each naming a real season", function()
-		local Seasons = require(script.Parent.Parent.Parent.Config.Seasons)
+		local Seasons = require(script.Parent.Parent.Parent.Config.Progression.Seasons)
 		local seen = {}
 		for key, definition in Products.Catalog do
 			if definition.Type == "SeasonPass" then

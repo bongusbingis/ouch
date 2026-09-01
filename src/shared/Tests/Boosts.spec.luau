@@ -7,7 +7,7 @@
 
 local T = require(script.Parent.TestKit)
 local Boosts = require(script.Parent.Parent.Game.Economy.Boosts)
-local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
+local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses)
 
 local CATALOG = {
 	Cosmetic = { EntitlementItemIds = { "TrailX" } },

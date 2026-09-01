@@ -8,8 +8,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
-local AudioConfig = require(Config:WaitForChild("Audio"))
-local Debug = require(Config:WaitForChild("Debug"))
+local AudioConfig = require(Config:WaitForChild("Infra"):WaitForChild("Audio"))
+local Debug = require(Config:WaitForChild("Infra"):WaitForChild("Debug"))
 
 local SettingsRegistry = {}
 

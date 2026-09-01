@@ -7,9 +7,9 @@
 
 local T = require(script.Parent.TestKit)
 local ShopRotation = require(script.Parent.Parent.Game.Economy.ShopRotation)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
-local Shop = require(script.Parent.Parent.Parent.Config.Shop)
-local Bundles = require(script.Parent.Parent.Parent.Config.Bundles)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
+local Shop = require(script.Parent.Parent.Parent.Config.Economy.Shop)
+local Bundles = require(script.Parent.Parent.Parent.Config.Economy.Bundles)
 
 local POOL = { "ItemA", "ItemB", "ItemC", "ItemD", "ItemE", "ItemF" }
 

@@ -37,6 +37,7 @@ export type GameMode = {
 	id: string,
 	displayName: string,
 	rules: MatchRules,
+	resolveRules: () -> MatchRules,
 	scoreScope: ScoreScope?,
 	teams: { string }?,
 

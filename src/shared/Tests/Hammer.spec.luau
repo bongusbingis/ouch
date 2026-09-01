@@ -9,8 +9,8 @@ local T = require(script.Parent.TestKit)
 local MockWorld = require(script.Parent.MockWorld)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
-local Combat = require(script.Parent.Parent.Parent.Config.Combat)
-local MobileInput = require(script.Parent.Parent.Parent.Config.MobileInput)
+local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)
+local MobileInput = require(script.Parent.Parent.Parent.Config.Interface.MobileInput)
 
 type InputCommand = SimTypes.InputCommand
 type SimEvent = SimTypes.SimEvent

@@ -70,8 +70,8 @@
           "BallService": {
             "$path": "src/server/Modules/BallService.luau"
           },
-          "PlayerAssistService": {
-            "$path": "src/server/Modules/PlayerAssistService.luau"
+          "PlayerConfigService": {
+            "$path": "src/server/Modules/PlayerConfigService.luau"
           },
 
           "CharacterColorService": {

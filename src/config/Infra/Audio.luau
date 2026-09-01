@@ -2,14 +2,6 @@
 
 -- Client audio asset ids, mix defaults, and transition timing.
 
-local function eliminationSound(volume: number)
-	return {
-		Scope = "World",
-		Volume = volume,
-		AssetIds = { "" },
-	}
-end
-
 return {
 	Mix = {
 		MasterVolume = 1,
@@ -44,14 +36,18 @@ return {
 	-- for anything that should read as personal feedback rather than a world
 	-- sound. Adding a local cue later is a Scope change here, not new code.
 	Gameplay = {
-		HammerElimination = {
+		DefaultElimination = {
 			Scope = "World",
 			Volume = 1.6,
 			AssetIds = {
-				"rbxassetid://122682383632262",
-				"rbxassetid://87679579947858",
-				"rbxassetid://134712572791297",
-				"rbxassetid://92196646571002",
+				"rbxassetid://173818824",
+			},
+		},
+		ClangElimination = {
+			Scope = "World",
+			Volume = 1.6,
+			AssetIds = {
+				"rbxassetid://139535360137391",
 			},
 		},
 		HammerSwing = {
@@ -72,15 +68,6 @@ return {
 				"rbxassetid://6746569988",
 			},
 		},
-		DodgeballElimination = {
-			Scope = "World",
-			Volume = 1.6,
-			AssetIds = {
-				"rbxassetid://173818824",
-				"rbxassetid://6509749580",
-				"rbxassetid://139905654761878",
-			},
-		},
 		DodgeballThrow = {
 			Scope = "World",
 			Volume = 1.45,
@@ -99,24 +86,6 @@ return {
 				"rbxassetid://8254243751",
 			},
 		},
-		RubberPopDodgeballElimination = eliminationSound(1.45),
-		RubberPopHammerElimination = eliminationSound(1.45),
-		ToySqueakDodgeballElimination = eliminationSound(1.45),
-		ToySqueakHammerElimination = eliminationSound(1.45),
-		BalloonPopDodgeballElimination = eliminationSound(1.45),
-		BalloonPopHammerElimination = eliminationSound(1.45),
-		PartyHornDodgeballElimination = eliminationSound(1.4),
-		PartyHornHammerElimination = eliminationSound(1.4),
-		ArcadeKODodgeballElimination = eliminationSound(1.4),
-		ArcadeKOHammerElimination = eliminationSound(1.4),
-		ComedyDrumsDodgeballElimination = eliminationSound(1.4),
-		ComedyDrumsHammerElimination = eliminationSound(1.4),
-		RoyalFanfareDodgeballElimination = eliminationSound(1.35),
-		RoyalFanfareHammerElimination = eliminationSound(1.35),
-		StadiumRoarDodgeballElimination = eliminationSound(1.35),
-		StadiumRoarHammerElimination = eliminationSound(1.35),
-		CosmicChimeDodgeballElimination = eliminationSound(1.35),
-		CosmicChimeHammerElimination = eliminationSound(1.35),
 		ElimZoneFall = {
 			Scope = "World",
 			Volume = 1.6,

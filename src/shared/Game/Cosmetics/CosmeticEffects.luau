@@ -7,8 +7,9 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
-local CosmeticEffectsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("CosmeticEffects"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local CosmeticEffectsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("CosmeticEffects"))
 local SharedCosmetics = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticEffectFactory = require(SharedCosmetics:WaitForChild("CosmeticEffectFactory"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")

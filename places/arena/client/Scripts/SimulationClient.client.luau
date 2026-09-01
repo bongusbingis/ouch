@@ -13,7 +13,7 @@ end
 local StarterPlayer = game:GetService("StarterPlayer")
 
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
-local Debug = require(ConfigRoot:WaitForChild("Debug"))
+local Debug = require(ConfigRoot:WaitForChild("Infra"):WaitForChild("Debug"))
 local ConfigReplication = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
@@ -57,12 +57,13 @@ local function startOptional(name, callback)
 end
 
 ConfigReplication.startClient({
-	Combat = require(ConfigRoot:WaitForChild("Combat")),
-	AimAssist = require(ConfigRoot:WaitForChild("AimAssist")),
-	GameModes = require(ConfigRoot:WaitForChild("GameModes")),
-	MapFeatures = require(ConfigRoot:WaitForChild("MapFeatures")),
-	Shop = require(ConfigRoot:WaitForChild("Shop")),
-	Crates = require(ConfigRoot:WaitForChild("Crates")),
+	Combat = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Combat")),
+	AimAssist = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("AimAssist")),
+	GameModes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("GameModes")),
+	MapFeatures = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("MapFeatures")),
+	Modes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Modes")),
+	Shop = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Shop")),
+	Crates = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Crates")),
 })
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 Combat.setCameraEnabled(true)

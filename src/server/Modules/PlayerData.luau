@@ -11,7 +11,7 @@ local ProfileStore = require(ReplicatedStorage.Packages.profilestore)
 local Promise = require(ReplicatedStorage.Packages.promise)
 
 local Env = require(script.Parent.Parent.Env)
-local DataConfig = require(game.ReplicatedStorage.Config.Data)
+local DataConfig = require(game.ReplicatedStorage.Config.Progression.Data)
 local WriteThroughProxy = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
 )

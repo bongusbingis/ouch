@@ -6,5 +6,6 @@
         "**/__Source__.lua": "${dirname}"
     },
     "luau-lsp.sourcemap.useVSCodeWatcher": false,
-    "luau-lsp.sourcemap.rojoPath": "/home/jackc714/.cargo/bin/rojo"
+    "luau-lsp.sourcemap.rojoPath": "/home/jackc714/.cargo/bin/rojo",
+    "luau-lsp.sourcemap.rojoProjectFile": "lobby.project.json"
 }

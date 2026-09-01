@@ -7,7 +7,7 @@
 
 local SimTypes = require(script.Parent.Parent.Sim.SimTypes)
 local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
-local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
+local Combat = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.Combat)
 
 type SimState = SimTypes.SimState
 type ProjectileState = SimTypes.ProjectileState

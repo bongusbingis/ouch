@@ -13,7 +13,7 @@ local Game = Shared:WaitForChild("Game")
 
 local SimTypes = require(Game:WaitForChild("Sim"):WaitForChild("SimTypes"))
 local SimStateCodec = require(Game:WaitForChild("Adapters"):WaitForChild("SimStateCodec"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))
 
 local function makeBallsFolder(ballNames: { string }): (Folder, { [string]: BasePart })

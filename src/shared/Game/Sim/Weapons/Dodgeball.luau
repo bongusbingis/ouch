@@ -9,9 +9,9 @@ local Sim = script.Parent.Parent
 local SimTypes = require(Sim.SimTypes)
 local SimUtil = require(Sim.SimUtil)
 local WeaponKit = require(Sim.WeaponKit)
-local Combat = require(Sim.Parent.Parent.Parent.Config.Combat)
-local AimAssist = require(Sim.Parent.Parent.Parent.Config.AimAssist)
-local MobileInput = require(Sim.Parent.Parent.Parent.Config.MobileInput)
+local Combat = require(Sim.Parent.Parent.Parent.Config.Gameplay.Combat)
+local AimAssist = require(Sim.Parent.Parent.Parent.Config.Gameplay.AimAssist)
+local MobileInput = require(Sim.Parent.Parent.Parent.Config.Interface.MobileInput)
 local Intercept = require(Sim.Intercept)
 local TargetSelect = require(Sim.TargetSelect)
 

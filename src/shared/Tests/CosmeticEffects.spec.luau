@@ -7,9 +7,9 @@
 
 local T = require(script.Parent.TestKit)
 local CosmeticEffectFactory = require(script.Parent.Parent.Game.Cosmetics.CosmeticEffectFactory)
-local CosmeticEffects = require(script.Parent.Parent.Parent.Config.CosmeticEffects)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
-local Inventory = require(script.Parent.Parent.Parent.Config.Inventory)
+local CosmeticEffects = require(script.Parent.Parent.Parent.Config.Cosmetics.CosmeticEffects)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
+local Inventory = require(script.Parent.Parent.Parent.Config.Cosmetics.Inventory)
 
 local PRODUCTION_IMPACT_EFFECTS = {
 	"StarPop",

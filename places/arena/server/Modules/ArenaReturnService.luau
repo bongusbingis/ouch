@@ -10,9 +10,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
-local Loading = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Loading"))
-local PostMatchConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PostMatch"))
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local Loading = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Loading"))
+local PostMatchConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("PostMatch"))
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local Matchmaking = Shared:WaitForChild("Game"):WaitForChild("Matchmaking")
 local ReturnPayload = require(Matchmaking:WaitForChild("ReturnPayload"))
 local TeleportRetryCoordinator = require(Matchmaking:WaitForChild("TeleportRetryCoordinator"))

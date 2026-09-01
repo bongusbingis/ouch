@@ -7,13 +7,12 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Audio = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Audio"))
+local Audio = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Audio"))
 
 local REQUIRED_EFFECTS = {
-	"HammerElimination",
+	"DefaultElimination",
 	"HammerSwing",
 	"JumpPadBounce",
-	"DodgeballElimination",
 	"DodgeballThrow",
 	"DodgeballBounce",
 	"ElimZoneFall",

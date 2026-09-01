@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local CombatConfig = require(script.Parent:WaitForChild("CombatConfig"))
-local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Input"))
+local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input"))
 
 local DeviceInput = {}
 

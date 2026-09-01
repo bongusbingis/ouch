@@ -12,8 +12,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RobloxAnalytics = game:GetService("AnalyticsService")
 
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
-local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
+local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))

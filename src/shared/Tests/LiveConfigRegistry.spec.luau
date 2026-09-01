@@ -36,7 +36,7 @@ T.describe("LiveConfig registry", function()
 		local configRoot = script.Parent.Parent.Parent.Config
 		for _, entry in LiveConfig.Entries do
 			local moduleName, path = ConfigOverrides.parseKey(entry.Key)
-			local moduleScript = configRoot:FindFirstChild(moduleName :: string)
+			local moduleScript = configRoot:FindFirstChild(moduleName :: string, true)
 			if moduleScript == nil then
 				continue
 			end

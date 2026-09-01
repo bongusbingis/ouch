@@ -13,7 +13,7 @@ local Workspace = game:GetService("Workspace")
 
 local BallService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("BallService"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
 local FakePlayer = require(Helpers:WaitForChild("FakePlayer"))

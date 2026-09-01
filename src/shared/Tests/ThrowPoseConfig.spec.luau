@@ -6,8 +6,8 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local Animations = require(script.Parent.Parent.Parent.Config.Animations)
-local ThrowPose = require(script.Parent.Parent.Parent.Config.ThrowPose)
+local Animations = require(script.Parent.Parent.Parent.Config.Infra.Animations)
+local ThrowPose = require(script.Parent.Parent.Parent.Config.Infra.ThrowPose)
 
 local STATES = { "Idle", "BallEquipped", "Aiming", "Charging", "Throwing", "FollowThrough", "Recovering" }
 

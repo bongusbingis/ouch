@@ -11,8 +11,8 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Players = game:GetService("Players")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
-local CombatConfig = require(Config:WaitForChild("Combat"))
-local ThrowUX = require(Config:WaitForChild("ThrowUX"))
+local CombatConfig = require(Config:WaitForChild("Gameplay"):WaitForChild("Combat"))
+local ThrowUX = require(Config:WaitForChild("Interface"):WaitForChild("ThrowUX"))
 local ThrowUXViewModel = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("ThrowUXViewModel")
 )

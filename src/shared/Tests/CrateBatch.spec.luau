@@ -7,8 +7,8 @@
 
 local T = require(script.Parent.TestKit)
 local CrateBatch = require(script.Parent.Parent.Game.Economy.CrateBatch)
-local Crates = require(script.Parent.Parent.Parent.Config.Crates)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
+local Crates = require(script.Parent.Parent.Parent.Config.Economy.Crates)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
 
 local BULK = { OpenQuantities = { 1, 5, 10 } }
 

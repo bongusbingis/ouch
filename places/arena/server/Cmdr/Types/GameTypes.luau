@@ -8,9 +8,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
-local Cosmetics = require(Config:WaitForChild("Cosmetics"))
-local Crates = require(Config:WaitForChild("Crates"))
-local Quests = require(Config:WaitForChild("Quests"))
+local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Crates = require(Config:WaitForChild("Economy"):WaitForChild("Crates"))
+local Quests = require(Config:WaitForChild("Progression"):WaitForChild("Quests"))
 local ModeRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
 )

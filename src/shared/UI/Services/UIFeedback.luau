@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
 
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("UI"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local UIFeedback = {}
 

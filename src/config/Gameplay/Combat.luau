@@ -1,7 +1,6 @@
 --!strict
 
--- Every combat feel constant lives here and is cmdr-tunable at runtime (M3).
--- Units: studs, seconds, degrees.
+-- Every combat feel constant. Units: studs, seconds, degrees.
 
 return {
 	Dodgeball = {
@@ -28,10 +27,7 @@ return {
 		ThrowCooldown = 0.6,
 		ThrowOriginMaxOffset = 6, -- max distance of throw origin from character center
 		MaxFlightTime = 2,
-		-- Delay between the throw input and the ball leaving the hand. Zero on
-		-- purpose: the ball is gone the instant the press ends, and the wind-up
-		-- pose held during charge is what telegraphs a throw to opponents.
-		-- Anything above zero is latency the thrower feels on their own input.
+		-- Zero on purpose: anything above zero is latency the thrower feels on their own input.
 		WindupDuration = 0,
 		ThrowAnimationName = "Throw",
 		MomentumInheritance = 0.3,
@@ -66,11 +62,7 @@ return {
 		Prediction = {
 			MaxSeconds = 0.4,
 		},
-		-- Ceiling on how far ahead an in-flight ball's visual is extrapolated,
-		-- in seconds. The lead applied is network latency plus the smoothing
-		-- time constant, so the drawn ball sits where the authoritative one
-		-- already is instead of trailing it; this is what a latency spike may
-		-- not exceed.
+		-- Ceiling (seconds) on how far ahead an in-flight ball's visual is led.
 		MaxLatencyExtrapolation = 0.2,
 		BallFeel = {
 			FlightStretchPerSpeed = 0.01,

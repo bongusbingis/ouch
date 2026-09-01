@@ -9,7 +9,7 @@ local Players = game:GetService("Players")
 local PolicyService = game:GetService("PolicyService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
+local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 
 type StartOptions = {
 	players: any?,

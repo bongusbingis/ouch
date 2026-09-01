@@ -9,7 +9,7 @@ local T = require(script.Parent.TestKit)
 local MockWorld = require(script.Parent.MockWorld)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local Projectiles = require(script.Parent.Parent.Game.Sim.Projectiles)
-local Combat = require(script.Parent.Parent.Parent.Config.Combat)
+local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)
 
 type ProjectileState = SimTypes.ProjectileState
 

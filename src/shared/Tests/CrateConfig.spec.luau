@@ -6,9 +6,9 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local Crates = require(script.Parent.Parent.Parent.Config.Crates)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
-local Shop = require(script.Parent.Parent.Parent.Config.Shop)
+local Crates = require(script.Parent.Parent.Parent.Config.Economy.Crates)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
+local Shop = require(script.Parent.Parent.Parent.Config.Economy.Shop)
 local LiveConfig = require(script.Parent.Parent.Parent.Config.LiveConfig)
 local CrateOdds = require(script.Parent.Parent.Game.Economy.CrateOdds)
 local FeaturedRotation = require(script.Parent.Parent.Game.Economy.FeaturedRotation)

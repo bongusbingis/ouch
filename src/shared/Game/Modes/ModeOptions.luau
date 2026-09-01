@@ -6,7 +6,7 @@
 --!strict
 
 local ReplicatedStorage = script.Parent.Parent.Parent.Parent
-local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes"))
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local ModeRegistry = require(script.Parent.ModeRegistry)
 
 local ModeOptions = {}

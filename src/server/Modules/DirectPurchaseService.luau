@@ -7,13 +7,14 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop"))
+local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 local DirectPurchase = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("DirectPurchase")
 )
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)

@@ -13,7 +13,7 @@ local Modules = Server:WaitForChild("Modules")
 local Cmdr = Server:WaitForChild("Cmdr")
 local CommandUtil = require(Cmdr:WaitForChild("CommandUtil"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 return function(_context, players: { Player }, itemId: string): string
 	local item = Cosmetics.Items[itemId]
