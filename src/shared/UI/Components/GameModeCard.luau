@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local GameModeVoteViewModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
@@ -50,15 +51,19 @@ export type Props = {
 	Enabled: boolean,
 	OnVote: (string) -> (),
 	ButtonRef: any?,
+	Portrait: boolean?,
 }
 
 return function(props: Props)
 	local mode = props.Mode
+	local portrait = props.Portrait == true
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		LayoutOrder = mode.SortOrder,
 		Position = UDim2.fromScale(0.347443, 0.0847785),
-		Size = UDim2.fromScale(0.345678, 0.931169),
+		Size = if portrait
+			then UDim2.new(0.96, 0, 0, UIConfig.Layout.GameMode.CardHeightPx)
+			else UDim2.fromScale(0.345678, 0.931169),
 	}, {
 		Background = c("ImageLabel", {
 			BackgroundTransparency = 1,
@@ -68,12 +73,11 @@ return function(props: Props)
 			SliceCenter = Rect.new(224, 202, 770, 474),
 			SliceScale = 0.2,
 		}),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-			AspectRatio = 0.87,
-		}),
+		UIAspectRatioConstraint = if portrait then nil else c("UIAspectRatioConstraint", { AspectRatio = 0.87 }),
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 46,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
@@ -82,8 +86,8 @@ return function(props: Props)
 					Enum.FontWeight.Bold,
 					Enum.FontStyle.Normal
 				),
-				Position = UDim2.fromScale(0.499634, 0.0521707),
-				Size = UDim2.fromScale(0.967519, 0.104411),
+				Position = UDim2.fromScale(0.499634, if portrait then 0.035 else 0.0521707),
+				Size = UDim2.fromScale(if portrait then 0.9 else 0.967519, if portrait then 0.18 else 0.104411),
 				Text = mode.Title,
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = 2,
@@ -100,16 +104,16 @@ return function(props: Props)
 			BackgroundColor3 = Color3.new(1, 1, 1),
 			BorderColor3 = Color3.new(),
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.147617),
-			Size = UDim2.fromScale(0.817, 0.008),
+			Position = UDim2.fromScale(0.5, if portrait then 0.22 else 0.147617),
+			Size = if portrait then UDim2.new(0.88, 0, 0, 2) else UDim2.fromScale(0.817, 0.008),
 			ZIndex = 2,
 		}),
 		Thumbnail = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = Color3.new(1, 1, 1),
 			Image = mode.ThumbnailId,
-			Position = UDim2.fromScale(0.496345, 0.548243),
-			Size = UDim2.fromScale(0.822196, 0.661131),
+			Position = UDim2.fromScale(if portrait then 0.23 else 0.496345, if portrait then 0.58 else 0.548243),
+			Size = UDim2.fromScale(if portrait then 0.38 else 0.822196, if portrait then 0.58 else 0.661131),
 			ZIndex = 2,
 		}, {
 			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
@@ -124,6 +128,7 @@ return function(props: Props)
 			VoteCount = c(ResponsiveText, {
 				HostName = "VoteCount",
 				MeasurementFont = Enum.Font.Highway,
+				MaxTextSize = 42,
 				Native = {
 					AnchorPoint = Vector2.new(1, 1),
 					BackgroundTransparency = 1,
@@ -152,9 +157,9 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://94748581468730",
 				LayoutOrder = 2,
-				Position = UDim2.fromScale(0.5, 0.95),
+				Position = UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.92 else 0.95),
 				ScaleType = Enum.ScaleType.Slice,
-				Size = UDim2.fromScale(0.651625, 0.156114),
+				Size = if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.fromScale(0.651625, 0.156114),
 				SliceCenter = Rect.new(198, 228, 841, 468),
 				SliceScale = 0.2,
 				ZIndex = 2,
@@ -165,6 +170,7 @@ return function(props: Props)
 		}, {
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 32,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
@@ -184,8 +190,8 @@ return function(props: Props)
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundColor3 = Color3.new(),
 			BackgroundTransparency = 0.8,
-			Position = UDim2.fromScale(0.496873, 0.181),
-			Size = UDim2.fromScale(0.850373, 0.125969),
+			Position = UDim2.fromScale(if portrait then 0.72 else 0.496873, if portrait then 0.31 else 0.181),
+			Size = UDim2.fromScale(if portrait then 0.5 else 0.850373, if portrait then 0.28 else 0.125969),
 			ZIndex = 2,
 		}, {
 			UICorner = c("UICorner", {
@@ -196,6 +202,7 @@ return function(props: Props)
 			}),
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.Highway,
+				Wrapped = portrait,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
@@ -208,6 +215,7 @@ return function(props: Props)
 					Size = UDim2.fromScale(0.927564, 0.8),
 					Text = mode.Description,
 					TextColor3 = Color3.new(1, 1, 1),
+					TextWrapped = portrait,
 					ZIndex = 3,
 				},
 			}),
@@ -215,8 +223,8 @@ return function(props: Props)
 		Checkmark = c("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://72382658",
-			Position = UDim2.fromScale(0.863158, -0.0652306),
-			Size = UDim2.fromScale(CHECKMARK_SCALE.X, CHECKMARK_SCALE.Y),
+			Position = UDim2.fromScale(if portrait then 0.85 else 0.863158, if portrait then -0.06 else -0.0652306),
+			Size = if portrait then UDim2.fromOffset(52, 52) else UDim2.fromScale(CHECKMARK_SCALE.X, CHECKMARK_SCALE.Y),
 			Visible = mode.Selected,
 			ZIndex = 6,
 		}, {

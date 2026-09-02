@@ -12,12 +12,15 @@ local RunService = game:GetService("RunService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local GameModeCard = require(script.Parent.GameModeCard)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local VoteLoadingBar = require(script.Parent.VoteLoadingBar)
 local Motion = require(script.Parent.Parent.Motion)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 local REFERENCE_VIEWPORT = Vector2.new(1890, 1200)
@@ -37,6 +40,8 @@ export type Props = {
 }
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.None)
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local present, setPresent = React.useState(props.Active or props.Prepared == true)
 	local revision = React.useRef(0)
 	local focusRevision = React.useRef(0)
@@ -147,9 +152,10 @@ return function(props: Props)
 
 	local cards = {
 		UIListLayout = c("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
+			FillDirection = if portrait then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			HorizontalFlex = Enum.UIFlexAlignment.SpaceEvenly,
+			HorizontalFlex = if portrait then Enum.UIFlexAlignment.None else Enum.UIFlexAlignment.SpaceEvenly,
+			Padding = if portrait then UDim.new(0, UIConfig.Layout.GameMode.CardGapPx) else UDim.new(0, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -160,8 +166,14 @@ return function(props: Props)
 			Enabled = props.Active,
 			OnVote = props.OnVote,
 			ButtonRef = if index == 1 then firstButtonRef else nil,
+			Portrait = portrait,
 		})
 	end
+	local holderHeight = math.min(
+		#props.Modes * UIConfig.Layout.GameMode.CardHeightPx
+			+ math.max(#props.Modes - 1, 0) * UIConfig.Layout.GameMode.CardGapPx,
+		safeArea.size.Y * 0.66
+	)
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
@@ -174,49 +186,64 @@ return function(props: Props)
 		Size = UDim2.fromScale(1, 1),
 		Visible = props.Active,
 	}, {
-		Logo = c("ImageLabel", {
+		SafeArea = c("Frame", {
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://78333957912633",
-			Position = UDim2.fromScale(0, -0.000749383),
-			Size = UDim2.fromScale(0.321542, 0.301659),
+			Position = UDim2.fromOffset(safeArea.position.X, safeArea.position.Y),
+			Size = UDim2.fromOffset(safeArea.size.X, safeArea.size.Y),
 		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 1.55,
-			}),
-		}),
-		VoteText = c(ResponsiveText, {
-			HostName = "VoteText",
-			MeasurementFont = Enum.Font.Highway,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 1),
+			Logo = c("ImageLabel", {
 				BackgroundTransparency = 1,
-				FontFace = Font.new(
-					"rbxasset://fonts/families/HighwayGothic.json",
-					Enum.FontWeight.Bold,
-					Enum.FontStyle.Normal
-				),
-				Position = UDim2.fromScale(0.522751, 0.300167),
-				Size = UDim2.fromScale(0.967519, 0.0574598),
-				Text = "Vote for a game mode!",
-				TextColor3 = Color3.new(1, 1, 1),
-			},
-		}, {
-			UIStroke = c("UIStroke", {
-				Color = Color3.fromRGB(77, 77, 77),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = VOTE_TEXT_STROKE,
+				Image = "rbxassetid://78333957912633",
+				Position = if portrait then UDim2.fromScale(0.04, 0.015) else UDim2.fromScale(0, -0.000749383),
+				Size = if portrait then UDim2.fromScale(0.5, 0.2) else UDim2.fromScale(0.321542, 0.301659),
+			}, {
+				UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
+					AspectRatio = 1.55,
+				}),
 			}),
-		}),
-		ModesHolder = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.573),
-			Size = UDim2.fromScale(0.944456, 0.562031),
-		}, cards),
-		LoadingBar = c(VoteLoadingBar, {
-			Active = props.Active,
-			EndsAt = props.EndsAt,
-			DurationSeconds = props.DurationSeconds,
+			VoteText = c(ResponsiveText, {
+				HostName = "VoteText",
+				MeasurementFont = Enum.Font.Highway,
+				MaxTextSize = 54,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 1),
+					BackgroundTransparency = 1,
+					FontFace = Font.new(
+						"rbxasset://fonts/families/HighwayGothic.json",
+						Enum.FontWeight.Bold,
+						Enum.FontStyle.Normal
+					),
+					Position = UDim2.fromScale(0.522751, if portrait then 0.225 else 0.300167),
+					Size = UDim2.fromScale(0.94, if portrait then 0.065 else 0.0574598),
+					Text = "Vote for a game mode!",
+					TextColor3 = Color3.new(1, 1, 1),
+				},
+			}, {
+				UIStroke = c("UIStroke", {
+					Color = Color3.fromRGB(77, 77, 77),
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					Thickness = VOTE_TEXT_STROKE,
+				}),
+			}),
+			ModesHolder = c(if portrait then "ScrollingFrame" else "Frame", {
+				Active = if portrait then true else nil,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				AutomaticCanvasSize = if portrait then Enum.AutomaticSize.Y else nil,
+				BackgroundTransparency = 1,
+				CanvasSize = if portrait then UDim2.fromOffset(0, 0) else nil,
+				Position = UDim2.fromScale(0.5, if portrait then 0.57 else 0.573),
+				ScrollBarImageColor3 = if portrait then Color3.new(1, 1, 1) else nil,
+				ScrollBarThickness = if portrait then 5 else nil,
+				Size = if portrait then UDim2.new(0.94, 0, 0, holderHeight) else UDim2.fromScale(0.944456, 0.562031),
+				VerticalScrollBarInset = if portrait then Enum.ScrollBarInset.ScrollBar else nil,
+			}, cards),
+			LoadingBar = c(VoteLoadingBar, {
+				Active = props.Active,
+				EndsAt = props.EndsAt,
+				DurationSeconds = props.DurationSeconds,
+				Position = if portrait then UDim2.fromScale(0.5, 0.96) else nil,
+				Size = if portrait then UDim2.new(0.84, 0, 0, 20) else nil,
+			}),
 		}),
 	})
 end

@@ -8,7 +8,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
+local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 
 local c = React.createElement
 
@@ -38,14 +40,18 @@ export type Props = {
 	MinTextSize: number?,
 	MaxTextSize: number?,
 	Wrapped: boolean?,
+	Truncate: boolean?,
 	children: { [any]: any }?,
 }
 
 return function(props: Props)
 	local labelRef = React.useRef(nil)
 	local revision = React.useRef(0)
-	local maximum = props.MaxTextSize or 100
-	local minimum = math.min(props.MinTextSize or 1, maximum)
+	local preferredTextSize = usePreferredTextSize()
+	local preferredScale = UIConfig.Text.PreferredScale[preferredTextSize.Name] or 1
+	local maximum = math.max(math.round((props.MaxTextSize or UIConfig.Text.DefaultMaxSize) * preferredScale), 1)
+	local minimum =
+		math.min(math.max(math.round((props.MinTextSize or UIConfig.Text.DefaultMinSize) * preferredScale), 1), maximum)
 	local textSize, setTextSize = React.useState(maximum)
 	local text = tostring(props.Native.Text or "")
 
@@ -117,6 +123,9 @@ return function(props: Props)
 	native.ref = labelRef
 	native.TextScaled = false
 	native.TextSize = textSize
+	if props.Truncate ~= false and props.Wrapped ~= true then
+		native.TextTruncate = Enum.TextTruncate.AtEnd
+	end
 	return c(React.Fragment, nil, {
 		[props.HostName or "TextLabel"] = c("TextLabel", native, props.children),
 	})

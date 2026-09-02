@@ -20,6 +20,8 @@ export type Props = {
 	Active: boolean,
 	EndsAt: number,
 	DurationSeconds: number,
+	Position: UDim2?,
+	Size: UDim2?,
 }
 
 return function(props: Props)
@@ -44,8 +46,8 @@ return function(props: Props)
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		Position = UDim2.fromScale(0.5, 0.895087),
-		Size = UDim2.fromScale(0.6, 0.027),
+		Position = props.Position or UDim2.fromScale(0.5, 0.895087),
+		Size = props.Size or UDim2.fromScale(0.6, 0.027),
 	}, {
 		UICorner = c("UICorner", {
 			BottomLeftRadius = UDim.new(1, 0),

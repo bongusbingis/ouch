@@ -4,7 +4,9 @@
 Every key the game allows to be overridden is declared in LiveConfig.luau, and
 its default is the value baked into the matching module in src/config. This
 script reads both, so the configs it creates start out identical to what the
-game ships with and the two cannot drift.
+game ships with and the two cannot drift. It also uploads the per-player AB
+schema keys (PlayerAssist.luau), read at runtime via GetConfigForPlayerAsync,
+which live in the same repository and would otherwise be dropped by --overwrite.
 
 Docs: https://create.roblox.com/docs/cloud/guides/configs
 
@@ -52,6 +54,15 @@ MODULE_SOURCES = {
     "Crates": _CONFIG / "Economy" / "Crates.luau",
     "Matchmaking": REPO_ROOT / "places" / "lobby" / "shared" / "Matchmaking" / "Config.luau",
 }
+
+# Per-player AB schemas (PlayerConfigService). Unlike the module.leaf keys above,
+# each of these declares its own flat keys and inline Default, and the game reads
+# them per player through ConfigService:GetConfigForPlayerAsync. They live in the
+# same repository, so they must be uploaded here too -- otherwise an --overwrite
+# drops them and the game logs "Config value not found" for every key.
+PLAYER_CONFIG_SOURCES = [
+    _CONFIG / "PlayerAssist.luau",
+]
 
 BASE_URL = "https://apis.roblox.com/creator-configs-public-api/v1/configs"
 REPOSITORY = "InExperienceConfig"
@@ -289,6 +300,52 @@ def coerce(entry: dict[str, Any], literal: str) -> Any:
     raise ConfigError(key + ": unsupported type '" + kind + "'")
 
 
+def parse_schema_entries(text: str) -> list[dict[str, str]]:
+    """Parse a per-player schema's `{ Key = .., Type = .., Default = .. }` rows."""
+    pattern = re.compile(
+        r"\{\s*Key\s*=\s*\"(?P<key>[^\"]+)\"\s*,\s*Type\s*=\s*\"(?P<type>[^\"]+)\""
+        r"\s*,\s*Default\s*=\s*(?P<default>[^,}\n]+)"
+    )
+    rows = []
+    for match in pattern.finditer(text):
+        rows.append(
+            {"key": match.group("key"), "type": match.group("type").strip(), "default": match.group("default").strip()}
+        )
+    return rows
+
+
+def coerce_default(key: str, kind: str, literal: str) -> Any:
+    if kind == "boolean":
+        if literal not in ("true", "false"):
+            raise ConfigError(key + ": '" + literal + "' is not a boolean")
+        return literal == "true"
+    if kind == "number":
+        try:
+            value = eval_number(literal)
+        except ValueError as error:
+            raise ConfigError(key + ": '" + literal + "' is not a number") from error
+        return int(value) if value.is_integer() else value
+    raise ConfigError(key + ": unsupported per-player type '" + kind + "'")
+
+
+def collect_player_config_entries() -> dict[str, Any]:
+    values: dict[str, Any] = {}
+    for path in PLAYER_CONFIG_SOURCES:
+        if not path.exists():
+            raise ConfigError("missing per-player config source " + str(path))
+        rows = parse_schema_entries(path.read_text(encoding="utf-8"))
+        if not rows:
+            raise ConfigError("no entries parsed from " + str(path))
+        for row in rows:
+            key = row["key"]
+            if len(key) > MAX_KEY_LENGTH:
+                raise ConfigError(key + ": key exceeds " + str(MAX_KEY_LENGTH) + " characters")
+            if key in values:
+                raise ConfigError("duplicate per-player key " + key)
+            values[key] = coerce_default(key, row["type"], row["default"])
+    return values
+
+
 def collect_entries() -> dict[str, Any]:
     if not REGISTRY.exists():
         raise ConfigError("registry not found: " + str(REGISTRY))
@@ -315,6 +372,11 @@ def collect_entries() -> dict[str, Any]:
             cache[module_name] = (strip_noise(source), source)
         clean, source = cache[module_name]
         values[key] = coerce(entry, read_leaf(clean, source, remainder.split("."), key))
+
+    for key, value in collect_player_config_entries().items():
+        if key in values:
+            raise ConfigError("key collision between LiveConfig and a per-player schema: " + key)
+        values[key] = value
     return values
 
 
@@ -483,7 +545,10 @@ def main() -> int:
         print("error: " + str(error), file=sys.stderr)
         return 1
 
-    print("Resolved " + str(len(entries)) + " config entries from LiveConfig.luau and src/config:\n")
+    print(
+        "Resolved " + str(len(entries)) + " config entries from LiveConfig.luau, the per-player"
+        " schemas, and src/config:\n"
+    )
     for key in sorted(entries):
         print("  " + key.ljust(44) + " " + json.dumps(entries[key]))
 

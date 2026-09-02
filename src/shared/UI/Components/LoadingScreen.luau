@@ -11,12 +11,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ActivityDots = require(script.Parent.ActivityDots)
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local LoadingBackdrop = require(script.Parent.LoadingBackdrop)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
@@ -43,6 +46,7 @@ export type Props = {
 	SecondaryAction: LoadingAction?,
 	OnPresented: (() -> ())?,
 	Static: boolean?,
+	ParentScreenInsets: Enum.ScreenInsets?,
 }
 
 local function textStroke(thickness: number)
@@ -92,6 +96,14 @@ local function actionButton(action: LoadingAction, layoutOrder: number, actionCo
 end
 
 return function(props: Props)
+	local safeArea = useSafeArea(props.ParentScreenInsets or Enum.ScreenInsets.DeviceSafeInsets)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.Loading,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local reducedMotion = useReducedMotion()
 	local present, setPresent = React.useState(props.Visible)
 	local rootRef = React.useRef(nil)
@@ -232,62 +244,136 @@ return function(props: Props)
 		RootRef = rootRef,
 		Transparency = styles.Transparency,
 	}, {
-		Logo = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
+		SafeArea = c("Frame", {
 			BackgroundTransparency = 1,
-			Image = LOGO_IMAGE,
-			Position = UDim2.fromScale(0.5, 0.19),
-			Size = UDim2.fromScale(0.23, 0.23),
+			Position = UDim2.fromOffset(safeArea.position.X, safeArea.position.Y),
+			Size = UDim2.fromOffset(safeArea.size.X, safeArea.size.Y),
 			ZIndex = 101,
 		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 1.55,
-			}),
-			UISizeConstraint = c("UISizeConstraint", {
-				MaxSize = Vector2.new(500, 323),
-				MinSize = Vector2.new(170, 110),
-			}),
-		}),
-		StatusPanel = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = PANEL_IMAGE,
-			Position = UDim2.fromScale(0.5, 0.56),
-			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromScale(0.58, 0.32),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.35,
-			ZIndex = 102,
-		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 3,
-			}),
-			UISizeConstraint = c("UISizeConstraint", {
-				MaxSize = Vector2.new(1000, 334),
-				MinSize = Vector2.new(430, 144),
-			}),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 62,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, if props.Detail then 0.3 else 0.43),
-					Size = UDim2.fromScale(0.82, 0.25),
-					Text = props.Title,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 103,
-				},
+			Logo = c("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Image = LOGO_IMAGE,
+				Position = UDim2.fromScale(0.5, 0.19),
+				Size = UDim2.fromScale(0.23, 0.23),
+				ZIndex = 101,
 			}, {
-				UIStroke = textStroke(0.045),
+				UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
+					AspectRatio = 1.55,
+				}),
+				UISizeConstraint = c("UISizeConstraint", {
+					MaxSize = Vector2.new(500, 323),
+					MinSize = Vector2.new(math.min(170, safeArea.size.X * 0.7), math.min(110, safeArea.size.Y * 0.2)),
+				}),
 			}),
-			Detail = if props.Detail
+			StatusPanel = c("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Image = PANEL_IMAGE,
+				Position = UDim2.fromScale(0.5, 0.56),
+				ScaleType = Enum.ScaleType.Slice,
+				Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+				SliceCenter = Rect.new(31, 41, 978, 620),
+				SliceScale = 0.35,
+				ZIndex = 102,
+			}, {
+				Title = c(ResponsiveText, {
+					HostName = "Title",
+					MeasurementFont = Enum.Font.LuckiestGuy,
+					MaxTextSize = 62,
+					Native = {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundTransparency = 1,
+						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+						Position = UDim2.fromScale(0.5, if props.Detail then 0.3 else 0.43),
+						Size = UDim2.fromScale(0.82, 0.25),
+						Text = props.Title,
+						TextColor3 = Color3.new(1, 1, 1),
+						ZIndex = 103,
+					},
+				}, {
+					UIStroke = textStroke(0.045),
+				}),
+				Detail = if props.Detail
+					then c(ResponsiveText, {
+						HostName = "Detail",
+						MeasurementFont = Enum.Font.Highway,
+						MaxTextSize = 38,
+						Native = {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundTransparency = 1,
+							FontFace = Font.new(
+								"rbxasset://fonts/families/HighwayGothic.json",
+								Enum.FontWeight.Bold,
+								Enum.FontStyle.Normal
+							),
+							Position = UDim2.fromScale(0.5, if props.Static then 0.61 else 0.51),
+							Size = UDim2.fromScale(0.84, 0.18),
+							Text = props.Detail,
+							TextColor3 = Color3.new(1, 1, 1),
+							ZIndex = 103,
+						},
+					}, {
+						UIStroke = textStroke(0.025),
+					})
+					else nil,
+				ActivityDots = if showActivity
+					then c(ActivityDots, {
+						Active = props.Visible,
+						Native = {
+							Position = UDim2.fromScale(0.5, 0.72),
+							Size = UDim2.fromScale(0.12, 0.13),
+							ZIndex = 103,
+						},
+					})
+					else nil,
+				Progress = if showProgress
+					then c("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundColor3 = DARK,
+						BorderSizePixel = 0,
+						Position = UDim2.fromScale(0.5, 0.72),
+						Size = UDim2.fromScale(0.66, 0.075),
+						ZIndex = 103,
+					}, {
+						UICorner = c("UICorner", {
+							CornerRadius = UDim.new(1, 0),
+						}),
+						UIPadding = c("UIPadding", {
+							PaddingBottom = UDim.new(0.17, 0),
+							PaddingLeft = UDim.new(0.012, 0),
+							PaddingRight = UDim.new(0.012, 0),
+							PaddingTop = UDim.new(0.17, 0),
+						}),
+						InnerBar = c("Frame", {
+							BackgroundColor3 = COMPLETION,
+							BorderSizePixel = 0,
+							Size = progressStyles.Progress:map(function(value: number)
+								return UDim2.fromScale(value, 1)
+							end),
+							ZIndex = 104,
+						}, {
+							UICorner = c("UICorner", {
+								CornerRadius = UDim.new(1, 0),
+							}),
+						}),
+					})
+					else nil,
+				Actions = if hasActions
+					then c("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundTransparency = 1,
+						Position = UDim2.fromScale(0.5, 0.76),
+						Size = UDim2.fromScale(0.82, 0.22),
+						ZIndex = 104,
+					}, actionChildren)
+					else nil,
+			}),
+			Tip = if props.Tip and not props.Static
 				then c(ResponsiveText, {
-					HostName = "Detail",
+					HostName = "Tip",
 					MeasurementFont = Enum.Font.Highway,
-					MaxTextSize = 38,
+					MaxTextSize = 30,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
@@ -296,90 +382,16 @@ return function(props: Props)
 							Enum.FontWeight.Bold,
 							Enum.FontStyle.Normal
 						),
-						Position = UDim2.fromScale(0.5, if props.Static then 0.61 else 0.51),
-						Size = UDim2.fromScale(0.84, 0.18),
-						Text = props.Detail,
+						Position = UDim2.fromScale(0.5, 0.84),
+						Size = UDim2.fromScale(0.78, 0.07),
+						Text = props.Tip,
 						TextColor3 = Color3.new(1, 1, 1),
-						ZIndex = 103,
+						ZIndex = 101,
 					},
 				}, {
-					UIStroke = textStroke(0.025),
+					UIStroke = textStroke(0.022),
 				})
-				else nil,
-			ActivityDots = if showActivity
-				then c(ActivityDots, {
-					Active = props.Visible,
-					Native = {
-						Position = UDim2.fromScale(0.5, 0.72),
-						Size = UDim2.fromScale(0.12, 0.13),
-						ZIndex = 103,
-					},
-				})
-				else nil,
-			Progress = if showProgress
-				then c("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundColor3 = DARK,
-					BorderSizePixel = 0,
-					Position = UDim2.fromScale(0.5, 0.72),
-					Size = UDim2.fromScale(0.66, 0.075),
-					ZIndex = 103,
-				}, {
-					UICorner = c("UICorner", {
-						CornerRadius = UDim.new(1, 0),
-					}),
-					UIPadding = c("UIPadding", {
-						PaddingBottom = UDim.new(0.17, 0),
-						PaddingLeft = UDim.new(0.012, 0),
-						PaddingRight = UDim.new(0.012, 0),
-						PaddingTop = UDim.new(0.17, 0),
-					}),
-					InnerBar = c("Frame", {
-						BackgroundColor3 = COMPLETION,
-						BorderSizePixel = 0,
-						Size = progressStyles.Progress:map(function(value: number)
-							return UDim2.fromScale(value, 1)
-						end),
-						ZIndex = 104,
-					}, {
-						UICorner = c("UICorner", {
-							CornerRadius = UDim.new(1, 0),
-						}),
-					}),
-				})
-				else nil,
-			Actions = if hasActions
-				then c("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.5, 0.76),
-					Size = UDim2.fromScale(0.82, 0.22),
-					ZIndex = 104,
-				}, actionChildren)
 				else nil,
 		}),
-		Tip = if props.Tip and not props.Static
-			then c(ResponsiveText, {
-				HostName = "Tip",
-				MeasurementFont = Enum.Font.Highway,
-				MaxTextSize = 30,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/HighwayGothic.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
-					Position = UDim2.fromScale(0.5, 0.84),
-					Size = UDim2.fromScale(0.78, 0.07),
-					Text = props.Tip,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 101,
-				},
-			}, {
-				UIStroke = textStroke(0.022),
-			})
-			else nil,
 	})
 end

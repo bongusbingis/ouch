@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
@@ -18,6 +19,8 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local ActivityDots = require(script.Parent.ActivityDots)
 local InventoryPreview = require(script.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
@@ -82,7 +85,7 @@ local function Card(props)
 			Image = "rbxassetid://123285423801571",
 			LayoutOrder = props.LayoutOrder,
 			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromOffset(150, 150),
+			Size = UDim2.fromOffset(props.CardSize, props.CardSize),
 			SliceCenter = Rect.new(107, 27, 126, 128),
 			TileSize = UDim2.fromScale(0.4, 0.35),
 		},
@@ -119,6 +122,8 @@ local function Card(props)
 		ItemName = c(ResponsiveText, {
 			HostName = "ItemName",
 			MeasurementFont = Enum.Font.SourceSansBold,
+			MaxTextSize = 30,
+			Truncate = true,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.649999976),
 				BackgroundTransparency = 1,
@@ -161,6 +166,7 @@ local function Section(props)
 	for index, entry in props.Entries do
 		cardChildren[entry.id] = c(Card, {
 			Entry = entry,
+			CardSize = props.CardSize,
 			LayoutOrder = index,
 			Equipped = InventoryModel.isEquipped(entry, props.Equipped),
 			OnActivated = function()
@@ -174,23 +180,25 @@ local function Section(props)
 		Header = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = props.LayoutOrder,
-			Size = UDim2.fromScale(1, 0.0493596),
+			Size = UDim2.new(1, 0, 0, UIConfig.Layout.Inventory.HeaderHeightPx),
 		}, {
 			Frame = c("Frame", {
 				BackgroundColor3 = Color3.new(1, 1, 1),
 				BorderColor3 = Color3.new(),
 				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0, 0.7),
-				Size = UDim2.fromScale(1, 0.06),
+				Position = UDim2.new(0, 0, 1, -4),
+				Size = UDim2.new(1, 0, 0, 3),
 				ZIndex = 4,
 			}),
 			Title = c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 32,
+				Truncate = true,
 				Native = {
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Size = UDim2.fromScale(1, 0.8),
+					Size = UDim2.new(1, 0, 1, -8),
 					Text = props.Title,
 					TextColor3 = Color3.new(1, 1, 1),
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -207,12 +215,29 @@ local function Section(props)
 		Spacer = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = props.LayoutOrder + 2,
-			Size = UDim2.fromScale(1, 0.023),
+			Size = UDim2.new(1, 0, 0, UIConfig.Layout.Inventory.SpacerHeightPx),
 		}),
 	}
 end
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.Inventory,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
+	local inventoryLayout = UIConfig.Layout.Inventory
+	local cardWidth = panelSize.X * 0.930013 * 0.94076 * 0.94
+	local _, cardSize = ResponsiveLayout.gridCellSize(
+		cardWidth,
+		inventoryLayout.CardMinPx,
+		inventoryLayout.CardMaxPx,
+		inventoryLayout.CardGapPx,
+		inventoryLayout.MaxColumns
+	)
 	local selectedTab = props.SelectedTab
 	local scrollerRef = React.useRef(nil)
 	local ownedKey = ownershipKey(props.Data)
@@ -249,6 +274,7 @@ return function(props: Props)
 			Title = section.Title,
 			Entries = section.Entries,
 			Equipped = equipped,
+			CardSize = cardSize,
 			LayoutOrder = (index - 1) * 3,
 			OnEquip = props.OnEquip,
 			OnSelectionGained = function(card)
@@ -292,6 +318,8 @@ return function(props: Props)
 		}, {
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 28,
+				Truncate = true,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
@@ -310,12 +338,14 @@ return function(props: Props)
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://101245842230886",
 		Position = props.Position or UDim2.fromScale(0.0211629, 0.14282),
-		Size = UDim2.fromScale(0.602436, 0.74763),
+		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		SliceCenter = Rect.new(0, 278, 885, 655),
 	}, {
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 62,
+			Truncate = true,
 			Native = {
 				BackgroundColor3 = Color3.fromRGB(63, 63, 63),
 				BorderColor3 = Color3.new(),
@@ -388,8 +418,7 @@ return function(props: Props)
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
 			Position = UDim2.fromScale(0.499792, 0.198),
-			Size = UDim2.fromScale(0.866389, 0.0660874),
+			Size = UDim2.new(0.866389, 0, 0, UIConfig.Interaction.MinTargetPx),
 		}, tabs),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1.08 }),
 	})
 end

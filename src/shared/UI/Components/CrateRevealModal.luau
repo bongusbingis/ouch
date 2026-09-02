@@ -11,6 +11,7 @@ local GuiService = game:GetService("GuiService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local Motion = require(script.Parent.Parent.Motion)
@@ -19,6 +20,8 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
@@ -144,6 +147,15 @@ local function gridCell(entry: any, index: number, revealedCount: number, zIndex
 end
 
 return function(props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.CrateReveal,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local reveal = props.Reveal
 	local buttonRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)
@@ -320,15 +332,17 @@ return function(props)
 				return UDim2.fromScale(0.5 + offset, 0.53 + offset * 0.6)
 			end),
 			ScaleType = Enum.ScaleType.Slice,
-			Size = if isBulk then UDim2.fromScale(0.56, 0.6) else UDim2.fromScale(0.4, 0.54),
+			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 			SliceCenter = Rect.new(31, 41, 978, 620),
 			SliceScale = 0.5,
 			ZIndex = 112,
 		}, {
-			Aspect = c("UIAspectRatioConstraint", {
-				AspectRatio = if isBulk then 1.45 else 1.15,
-				AspectType = Enum.AspectType.FitWithinMaxSize,
-			}),
+			Aspect = if not portrait
+				then c("UIAspectRatioConstraint", {
+					AspectRatio = if isBulk then 1.45 else 1.15,
+					AspectType = Enum.AspectType.FitWithinMaxSize,
+				})
+				else nil,
 			Burst = if phase == "Burst" or phase == "Item"
 				then c("Frame", {
 					BackgroundTransparency = 1,
@@ -415,8 +429,10 @@ return function(props)
 					(function()
 						local cells: { [string]: any } = {
 							Layout = c("UIGridLayout", {
-								CellPadding = UDim2.fromScale(0.02, 0.04),
-								CellSize = UDim2.fromScale(0.18, 0.44),
+								CellPadding = if portrait then UDim2.fromOffset(8, 8) else UDim2.fromScale(0.02, 0.04),
+								CellSize = if portrait
+									then UDim2.new(1 / 3, -6, 0, 112)
+									else UDim2.fromScale(0.18, 0.44),
 								SortOrder = Enum.SortOrder.LayoutOrder,
 							}),
 						}

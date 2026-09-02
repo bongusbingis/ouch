@@ -7,11 +7,14 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local DailyRewardsPanel = require(script.Parent.DailyRewardsPanel)
 local PartyStatus = require(script.Parent.PartyStatus)
 local QuestsPanel = require(script.Parent.QuestsPanel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local SeasonStatusCard = require(script.Parent.SeasonStatusCard)
 
 local c = React.createElement
@@ -19,6 +22,7 @@ local c = React.createElement
 local function buttonText(text: string)
 	return c(ResponsiveText, {
 		MeasurementFont = Enum.Font.LuckiestGuy,
+		MaxTextSize = 40,
 		Native = {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
@@ -50,26 +54,32 @@ export type Props = {
 }
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Position = props.Position or UDim2.fromScale(0, 0),
 		Size = UDim2.fromScale(1, 1),
 	}, {
 		BottomRight = c("Frame", {
-			AnchorPoint = Vector2.new(1, 1),
+			AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(1, 1),
-			Size = UDim2.fromScale(0.424534, 0.564113),
+			Position = if portrait then UDim2.fromScale(0.5, 0.98) else UDim2.fromScale(1, 1),
+			Size = if portrait
+				then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
+				else UDim2.fromScale(0.424534, 0.564113),
 		}, {
 			UIListLayout = c("UIListLayout", {
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
-				Padding = UDim.new(0.01, 0),
+				HorizontalAlignment = if portrait
+					then Enum.HorizontalAlignment.Center
+					else Enum.HorizontalAlignment.Right,
+				Padding = if portrait then UDim.new(0, 8) else UDim.new(0.01, 0),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				VerticalAlignment = Enum.VerticalAlignment.Bottom,
 			}),
 			UIPadding = c("UIPadding", {
 				PaddingBottom = UDim.new(0.05, 0),
-				PaddingRight = UDim.new(0.05, 0),
+				PaddingRight = if portrait then UDim.new(0, 0) else UDim.new(0.05, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
 				Native = {
@@ -78,13 +88,17 @@ return function(props: Props)
 					LayoutOrder = 1,
 					Position = UDim2.fromScale(0.343431, 0.675873),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = UDim2.fromScale(0.6, 0.6),
+					Size = if portrait
+						then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
+						else UDim2.fromScale(0.6, 0.6),
 					SliceCenter = Rect.new(59, 31, 370, 78),
 					SliceScale = 0.9,
 				},
 				OnActivated = props.OnInvite,
 			}, {
-				UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
+				UIAspectRatioConstraint = if portrait
+					then nil
+					else c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
 				TextLabel = buttonText("INVITE FRIENDS"),
 			}),
 			JoinWithCode = c(AnimatedButton, {
@@ -93,13 +107,17 @@ return function(props: Props)
 					Image = "rbxassetid://112649977890456",
 					Position = UDim2.fromScale(0.343431, 0.533477),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = UDim2.fromScale(0.6, 0.6),
+					Size = if portrait
+						then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
+						else UDim2.fromScale(0.6, 0.6),
 					SliceCenter = Rect.new(59, 31, 370, 78),
 					SliceScale = 0.9,
 				},
 				OnActivated = props.OnJoinCode,
 			}, {
-				UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
+				UIAspectRatioConstraint = if portrait
+					then nil
+					else c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
 				TextLabel = buttonText("JOIN PARTY"),
 			}),
 			PlayButton = c(AnimatedButton, {
@@ -114,7 +132,9 @@ return function(props: Props)
 					LayoutOrder = 2,
 					Position = UDim2.fromScale(-0.0570855, 0.787143),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = UDim2.fromScale(0.8, 0.8),
+					Size = if portrait
+						then UDim2.new(0.96, 0, 0, UIConfig.Layout.Splash.PrimaryActionHeightPx)
+						else UDim2.fromScale(0.8, 0.8),
 					SliceCenter = Rect.new(198, 228, 841, 468),
 					SliceScale = 0.2,
 				},
@@ -122,6 +142,7 @@ return function(props: Props)
 			}, {
 				TextLabel = c(ResponsiveText, {
 					MeasurementFont = Enum.Font.LuckiestGuy,
+					MaxTextSize = 50,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
@@ -133,7 +154,9 @@ return function(props: Props)
 						ZIndex = 2,
 					},
 				}),
-				UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 4.35 }),
+				UIAspectRatioConstraint = if portrait
+					then nil
+					else c("UIAspectRatioConstraint", { AspectRatio = 4.35 }),
 				ImageLabel = c("ImageLabel", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
@@ -149,8 +172,8 @@ return function(props: Props)
 		BottomMiddle = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 1),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.445346, 1),
-			Size = UDim2.fromScale(0.409947, 0.564113),
+			Position = if portrait then UDim2.fromScale(0.5, 0.68) else UDim2.fromScale(0.445346, 1),
+			Size = if portrait then UDim2.fromScale(0.9, 0.18) else UDim2.fromScale(0.409947, 0.564113),
 		}, {
 			PartyStatus = c(PartyStatus, {
 				Text = props.PartyState,
@@ -160,8 +183,8 @@ return function(props: Props)
 		Logo = c("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://78333957912633",
-			Position = UDim2.fromScale(0, 0.1),
-			Size = UDim2.fromScale(0.321542, 0.301659),
+			Position = if portrait then UDim2.fromScale(0.05, 0.12) else UDim2.fromScale(0, 0.1),
+			Size = if portrait then UDim2.fromScale(0.7, 0.24) else UDim2.fromScale(0.321542, 0.301659),
 		}, {
 			uIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1.55,

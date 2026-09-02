@@ -7,8 +7,11 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 local SELECTED = "rbxassetid://94748581468730"
@@ -88,17 +91,22 @@ export type Props = {
 }
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local definitions = props.Tabs or DEFINITIONS
+	local gap = if portrait then UIConfig.Layout.TopBar.PortraitGapScale else UIConfig.Layout.TopBar.LandscapeGapScale
+	local buttonWidth = math.max((1 - gap * math.max(#definitions - 1, 0)) / math.max(#definitions, 1), 0)
 	local buttons = {
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0.08, 0),
+			Padding = UDim.new(gap, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
 	}
 
-	for _, definition in props.Tabs or DEFINITIONS do
+	for _, definition in definitions do
 		local selected = definition.Id == props.CurrentPage
 		local enabled = definition.Enabled ~= false
 		buttons[definition.Id] = c(AnimatedButton, {
@@ -111,7 +119,10 @@ return function(props: Props)
 				LayoutOrder = definition.LayoutOrder,
 				Position = definition.ButtonPosition or UDim2.fromScale(0.418851, 0.25),
 				ScaleType = Enum.ScaleType.Slice,
-				Size = definition.ButtonSize or UDim2.fromScale(0.242, 0.75),
+				Size = UDim2.fromScale(
+					buttonWidth,
+					if definition.ButtonSize then definition.ButtonSize.Y.Scale else 0.75
+				),
 				SliceCenter = Rect.new(224, 202, 770, 474),
 				SliceScale = 0.2,
 				ZIndex = definition.ZIndex,
@@ -159,14 +170,19 @@ return function(props: Props)
 		BackgroundColor3 = Color3.fromRGB(63, 63, 63),
 		BorderColor3 = Color3.new(),
 		BorderSizePixel = 0,
-		Size = UDim2.new(1, 36, 0.113754, 0),
+		Size = UDim2.fromScale(1, 0.113754),
 	}, {
 		PageTabs = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Position = UDim2.fromScale(0.5, 0.62),
 			SelectionGroup = true,
-			Size = UDim2.fromScale(0.4, 0.877073),
+			Size = UDim2.fromScale(
+				if portrait
+					then UIConfig.Layout.TopBar.PortraitWidthScale
+					else UIConfig.Layout.TopBar.LandscapeWidthScale,
+				0.877073
+			),
 		}, buttons),
 	})
 end

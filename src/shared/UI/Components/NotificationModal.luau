@@ -10,10 +10,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
@@ -67,10 +70,20 @@ local function notificationButton(definition: ButtonDefinition, order: number, o
 			},
 		}),
 		UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 2.9 }),
+		UISizeConstraint = c("UISizeConstraint", {
+			MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+		}),
 	})
 end
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.Notification,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local firstButtonRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)
 	local reducedMotion = useReducedMotion()
@@ -130,7 +143,7 @@ return function(props: Props)
 		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-		Size = UDim2.fromScale(0.361782, 0.196247),
+		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		SliceCenter = Rect.new(31, 41, 978, 620),
 		SliceScale = 0.5,
 		Visible = true,
@@ -139,6 +152,7 @@ return function(props: Props)
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 54,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -180,7 +194,7 @@ return function(props: Props)
 			AnchorPoint = Vector2.new(0.5, 1),
 			BackgroundTransparency = 1,
 			Position = UDim2.fromScale(0.5, 0.944206),
-			Size = UDim2.fromScale(0.8, 0.2465),
+			Size = UDim2.new(0.86, 0, 0, 54),
 		}, buttons),
 	})
 end
