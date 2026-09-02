@@ -35,6 +35,7 @@ return function(props: Props)
 		PartyState = c(ResponsiveText, {
 			HostName = "PartyState",
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 42,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,

@@ -215,6 +215,7 @@ return function(props: Props)
 		GameVersion = c(GameVersion),
 		LoadingScreen = c(LoadingScreen, {
 			Visible = loadingVisible,
+			ParentScreenInsets = Enum.ScreenInsets.None,
 			Title = title,
 			Detail = detail,
 			Tip = tip,

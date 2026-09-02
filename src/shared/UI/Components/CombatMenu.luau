@@ -14,6 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UI = Shared:WaitForChild("UI")
 local Components = UI:WaitForChild("Components")
@@ -118,6 +119,7 @@ local function useHudExclusion(buttonRef, enabled: boolean)
 end
 
 local function MenuToggle(props)
+	local toggleLayout = UIConfig.Layout.MenuToggle
 	local buttonRef = React.useRef(nil)
 	local reducedMotion = useReducedMotion()
 	local styles = ReactSpring.useSpring({
@@ -159,8 +161,13 @@ local function MenuToggle(props)
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundTransparency = 1,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.09, 0.54),
-				Size = UDim2.fromScale(0.6, 0.58),
+				Position = UDim2.new(0, toggleLayout.HorizontalPaddingPx, 0.54, 0),
+				Size = UDim2.new(
+					1 - toggleLayout.KeycapWidthScale,
+					-(toggleLayout.HorizontalPaddingPx * 2 + toggleLayout.LabelKeycapGapPx),
+					0.58,
+					0
+				),
 				Text = if props.Open then "CLOSE" else "MENU",
 				TextColor3 = Color3.new(1, 1, 1),
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -171,8 +178,8 @@ local function MenuToggle(props)
 			AnchorPoint = Vector2.new(1, 0.5),
 			BackgroundColor3 = Color3.fromRGB(52, 52, 52),
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.91, 0.51),
-			Size = UDim2.fromScale(0.27, 0.54),
+			Position = UDim2.new(1, -toggleLayout.HorizontalPaddingPx, 0.51, 0),
+			Size = UDim2.fromScale(toggleLayout.KeycapWidthScale, 0.54),
 			ZIndex = 82,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0.22, 0) }),

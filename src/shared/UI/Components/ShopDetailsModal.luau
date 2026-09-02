@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ReactSpring = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Motion = require(script.Parent.Parent.Motion)
 local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
@@ -18,6 +19,8 @@ local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
@@ -97,6 +100,15 @@ local function quantityButtons(card, quantities: { number }, firstButtonRef, pro
 end
 
 return function(props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.ShopDetails,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local card = props.Card
 	local reducedMotion = useReducedMotion()
 	local firstButtonRef = React.useRef(nil)
@@ -206,7 +218,7 @@ return function(props)
 			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-			Size = UDim2.fromScale(0.62, 0.68),
+			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 			SliceCenter = Rect.new(31, 41, 978, 620),
 			SliceScale = 0.5,
 			ZIndex = 102,
@@ -219,8 +231,8 @@ return function(props)
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.045),
-					Size = UDim2.fromScale(0.82, 0.1),
+					Position = UDim2.fromScale(0.5, if portrait then 0.025 else 0.045),
+					Size = UDim2.fromScale(if portrait then 0.72 else 0.82, if portrait then 0.07 else 0.1),
 					Text = string.upper(card.displayName),
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 104,
@@ -228,8 +240,8 @@ return function(props)
 			}),
 			Preview = c("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.055, 0.17),
-				Size = UDim2.fromScale(0.38, 0.5),
+				Position = if portrait then UDim2.fromScale(0.08, 0.12) else UDim2.fromScale(0.055, 0.17),
+				Size = if portrait then UDim2.fromScale(0.84, 0.26) else UDim2.fromScale(0.38, 0.5),
 				ZIndex = 103,
 			}, {
 				Content = c(ShopPreview, {
@@ -249,8 +261,8 @@ return function(props)
 						Enum.FontWeight.Bold,
 						Enum.FontStyle.Normal
 					),
-					Position = UDim2.fromScale(0.46, 0.17),
-					Size = UDim2.fromScale(0.48, 0.14),
+					Position = if portrait then UDim2.fromScale(0.08, 0.39) else UDim2.fromScale(0.46, 0.17),
+					Size = if portrait then UDim2.fromScale(0.84, 0.1) else UDim2.fromScale(0.48, 0.14),
 					Text = string.upper(card.description),
 					TextColor3 = Color3.new(1, 1, 1),
 					TextWrapped = true,
@@ -264,9 +276,9 @@ return function(props)
 					AutomaticCanvasSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
 					CanvasSize = UDim2.fromOffset(0, 0),
-					Position = UDim2.fromScale(0.46, 0.33),
+					Position = if portrait then UDim2.fromScale(0.08, 0.5) else UDim2.fromScale(0.46, 0.33),
 					ScrollBarImageColor3 = Color3.new(1, 1, 1),
-					Size = UDim2.fromScale(0.48, 0.32),
+					Size = if portrait then UDim2.fromScale(0.84, 0.2) else UDim2.fromScale(0.48, 0.32),
 					ZIndex = 103,
 				}, oddsChildren)
 				else nil,
@@ -282,8 +294,8 @@ return function(props)
 							Enum.FontWeight.Bold,
 							Enum.FontStyle.Normal
 						),
-						Position = UDim2.fromScale(0.46, 0.66),
-						Size = UDim2.fromScale(0.48, 0.08),
+						Position = if portrait then UDim2.fromScale(0.08, 0.71) else UDim2.fromScale(0.46, 0.66),
+						Size = if portrait then UDim2.fromScale(0.84, 0.06) else UDim2.fromScale(0.48, 0.08),
 						Text = pityText(card.pity),
 						TextColor3 = Color3.fromRGB(255, 235, 130),
 						TextWrapped = true,
@@ -293,8 +305,8 @@ return function(props)
 				else nil,
 			Close = c(ShopPriceButton, {
 				Enabled = true,
-				Position = UDim2.fromScale(0.9, 0.16),
-				Size = UDim2.fromScale(0.16, 0.08),
+				Position = if portrait then UDim2.fromScale(0.86, 0.085) else UDim2.fromScale(0.9, 0.16),
+				Size = if portrait then UDim2.fromScale(0.24, 0.075) else UDim2.fromScale(0.16, 0.08),
 				Text = "BACK",
 				OnActivated = props.OnClose,
 				ZIndex = 105,
@@ -302,14 +314,14 @@ return function(props)
 			Buttons = if isBulk
 				then c("Frame", {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.06, 0.735),
-					Size = UDim2.fromScale(0.88, 0.205),
+					Position = UDim2.fromScale(0.06, if portrait then 0.78 else 0.735),
+					Size = UDim2.fromScale(0.88, if portrait then 0.18 else 0.205),
 					ZIndex = 103,
 				}, quantityButtons(card, quantities :: { number }, firstButtonRef, props, hasRobux))
 				else c("Frame", {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.08, 0.77),
-					Size = UDim2.fromScale(0.84, 0.17),
+					Position = UDim2.fromScale(0.08, if portrait then 0.8 else 0.77),
+					Size = UDim2.fromScale(0.84, if portrait then 0.16 else 0.17),
 					ZIndex = 103,
 				}, {
 					Bonks = if hasBonks

@@ -11,10 +11,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 local CODE_LENGTH = 6
@@ -27,6 +30,7 @@ end
 local function actionText(text: string, position: UDim2, size: UDim2)
 	return c(ResponsiveText, {
 		MeasurementFont = Enum.Font.LuckiestGuy,
+		MaxTextSize = 32,
 		Native = {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
@@ -84,6 +88,7 @@ local function DigitBox(props)
 		Char = c(ResponsiveText, {
 			HostName = "Char",
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 50,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -106,6 +111,14 @@ export type Props = {
 }
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.JoinCode,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local inputRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)
 	local focusRevision = React.useRef(0)
@@ -258,6 +271,7 @@ return function(props: Props)
 		Dash = c(ResponsiveText, {
 			HostName = "Dash",
 			MeasurementFont = Enum.Font.SourceSans,
+			MaxTextSize = 42,
 			Native = {
 				BackgroundTransparency = 1,
 				LayoutOrder = 4,
@@ -297,7 +311,7 @@ return function(props: Props)
 		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-		Size = UDim2.fromScale(0.361782, 0.292673),
+		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		SliceCenter = Rect.new(31, 41, 978, 620),
 		SliceScale = 0.5,
 		Visible = true,
@@ -306,6 +320,7 @@ return function(props: Props)
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 46,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -328,6 +343,7 @@ return function(props: Props)
 		Title2 = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.Highway,
+			MaxTextSize = 32,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -416,6 +432,9 @@ return function(props: Props)
 				OnActivated = submit,
 			}, {
 				TextLabel = actionText("CONFIRM", UDim2.fromScale(0.48792, 0.57964), UDim2.fromScale(0.685479, 0.6712)),
+				UISizeConstraint = c("UISizeConstraint", {
+					MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+				}),
 			}),
 			Cancel = c(AnimatedButton, {
 				Enabled = not submitting,
@@ -433,6 +452,9 @@ return function(props: Props)
 				OnActivated = close,
 			}, {
 				TextLabel = actionText("CANCEL", UDim2.fromScale(0.463449, 0.57964), UDim2.fromScale(0.680654, 0.6712)),
+				UISizeConstraint = c("UISizeConstraint", {
+					MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+				}),
 			}),
 		}),
 		ErrorText = c(ResponsiveText, {

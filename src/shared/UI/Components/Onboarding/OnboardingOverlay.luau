@@ -12,10 +12,12 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local InputConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Motion = require(script.Parent.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Parent.Hooks.useReducedMotion)
 local useEntrance = require(script.Parent.Parent.Parent.Hooks.useEntrance)
 local useViewportSize = require(script.Parent.Parent.Parent.Hooks.useViewportSize)
+local usePreferredTextSize = require(script.Parent.Parent.Parent.Hooks.usePreferredTextSize)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 
@@ -86,6 +88,9 @@ end
 -- and gamepad players in place of a floating gesture diagram: the bound Throw
 -- glyph beside the verb for the current cue.
 local function ControlHint(props: { verb: string, fallback: string })
+	local preferredTextSize = usePreferredTextSize()
+	local glyphTextSize =
+		math.round(UIConfig.Text.InputGlyphSize * (UIConfig.Text.PreferredScale[preferredTextSize.Name] or 1))
 	local action = boundAction("Throw")
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -111,7 +116,7 @@ local function ControlHint(props: { verb: string, fallback: string })
 				LayoutOrder = 1,
 				Size = UDim2.fromScale(0.16, 0.95),
 				TextColor3 = Color3.new(1, 1, 1),
-				TextSize = 20,
+				TextSize = glyphTextSize,
 				ZIndex = 63,
 			})
 			else c("Frame", {
@@ -202,6 +207,9 @@ export type Props = {
 
 return function(props: Props)
 	local snapshot = props.Snapshot
+	local preferredTextSize = usePreferredTextSize()
+	local glyphTextSize =
+		math.round(UIConfig.Text.InputGlyphSize * (UIConfig.Text.PreferredScale[preferredTextSize.Name] or 1))
 	local reducedMotion = useReducedMotion()
 	local viewport = useViewportSize()
 	local active = snapshot ~= nil and snapshot.active == true
@@ -429,7 +437,7 @@ return function(props: Props)
 							Position = UDim2.fromScale(0.24, 0.5),
 							Size = UDim2.fromScale(0.28, 0.62),
 							TextColor3 = Color3.new(1, 1, 1),
-							TextSize = 20,
+							TextSize = glyphTextSize,
 							ZIndex = 64,
 						})
 						else c(ResponsiveText, {

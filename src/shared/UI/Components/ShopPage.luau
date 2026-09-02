@@ -7,16 +7,27 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ActivityDots = require(script.Parent.ActivityDots)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopCard = require(script.Parent.Shop.ShopCard)
 local ShopCountdown = require(script.Parent.Shop.ShopCountdown)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopSection = require(script.Parent.Shop.ShopSection)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
 return function(props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.Shop,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local compact, setCompact = React.useState(false)
 	local model = props.Model
 	local heroHeight = if compact then 470 else 255
@@ -124,7 +135,7 @@ return function(props)
 		LayoutOrder = 5,
 		Position = props.Position or UDim2.fromScale(0.5, 0.56),
 		ScaleType = Enum.ScaleType.Stretch,
-		Size = UDim2.fromScale(0.7, 0.82),
+		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		--SliceCenter = Rect.new(224, 202, 770, 474),
 		--SliceScale = 0.06,
 	}, {
@@ -187,10 +198,6 @@ return function(props)
 					setCompact(instance.AbsoluteSize.X < 820)
 				end,
 			}, content),
-		}),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-			AspectRatio = 1.5,
-			AspectType = Enum.AspectType.FitWithinMaxSize,
 		}),
 	})
 end

@@ -15,6 +15,7 @@ local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
+local ResponsiveText = require(script.Parent.ResponsiveText)
 
 local c = React.createElement
 local UPDATE_INTERVAL = 1 / 30
@@ -165,17 +166,20 @@ local function impactPreview(props: Props)
 		Size = UDim2.fromScale(0.72, 0.58),
 		ZIndex = props.ZIndex,
 	}, {
-		Burst = c("TextLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Rotation = -8,
-			Size = UDim2.fromScale(1, 0.72),
-			Text = "HIT!",
-			TextColor3 = Color3.new(1, 1, 1),
-			TextScaled = true,
-			ZIndex = props.ZIndex,
+		Burst = c(ResponsiveText, {
+			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 40,
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Rotation = -8,
+				Size = UDim2.fromScale(1, 0.72),
+				Text = "HIT!",
+				TextColor3 = Color3.new(1, 1, 1),
+				ZIndex = props.ZIndex,
+			},
 		}, {
 			UIStroke = c("UIStroke", {
 				Color = Color3.fromRGB(30, 30, 30),
@@ -202,16 +206,19 @@ local function eliminationSoundPreview(props: Props)
 			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			Thickness = 0.075,
 		}),
-		Label = c("TextLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-			Position = UDim2.fromScale(0.5, 0.54),
-			Size = UDim2.fromScale(0.8, 0.5),
-			Text = "SFX!",
-			TextColor3 = Color3.new(1, 1, 1),
-			TextScaled = true,
-			ZIndex = props.ZIndex + 1,
+		Label = c(ResponsiveText, {
+			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = 36,
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+				Position = UDim2.fromScale(0.5, 0.54),
+				Size = UDim2.fromScale(0.8, 0.5),
+				Text = "SFX!",
+				TextColor3 = Color3.new(1, 1, 1),
+				ZIndex = props.ZIndex + 1,
+			},
 		}, {
 			UIStroke = c("UIStroke", {
 				Color = Color3.fromRGB(20, 24, 34),

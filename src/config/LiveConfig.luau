@@ -89,8 +89,11 @@ local entries: { Entry } = {
 	{ Key = "Modes.Infection.RespawnSeconds", Type = "number", Minimum = 0, Maximum = 30 },
 	{ Key = "Modes.Infection.SpawnInvulnSeconds", Type = "number", Minimum = 0, Maximum = 10 },
 
-	-- Shop A/B levers; VariantId labels the result on every analytics row. The
-	-- bounds are not cosmetic: every value in range keeps CrateConfig.spec's
+	-- Shop A/B levers, tested at server granularity: Roblox hands different servers
+	-- different snapshots (GetConfigAsync), so a whole server runs one variant and
+	-- VariantId labels the result on every analytics row. (Per-player splits use the
+	-- separate GetConfigForPlayerAsync path in PlayerAssist, not this.) The bounds
+	-- are not cosmetic: every value in range keeps CrateConfig.spec's
 	-- economic invariants (a crate open cheaper than the cheapest direct buy;
 	-- direct buy beats the expected cost of chasing an item in a crate). Rarity
 	-- DirectBonks/DupeBonks are absent on purpose -- a live override there could

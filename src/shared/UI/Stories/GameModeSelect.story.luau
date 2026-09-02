@@ -18,7 +18,7 @@ local function Story()
 	local selected, setSelected = React.useState("FFA")
 	return c("ScreenGui", {
 		ResetOnSpawn = false,
-		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
+		ScreenInsets = Enum.ScreenInsets.None,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, {
 		GameModeSelect = c(GameModeSelect, {
@@ -43,6 +43,15 @@ local function Story()
 					SortOrder = 2,
 					VoteCount = 2,
 					Selected = selected == "TDM",
+				},
+				{
+					Id = "Infection",
+					Title = "INFECTION",
+					Description = "Survivors dodge the infected until the round timer expires.",
+					ThumbnailId = "",
+					SortOrder = 3,
+					VoteCount = 3,
+					Selected = selected == "Infection",
 				},
 			},
 			OnVote = setSelected,

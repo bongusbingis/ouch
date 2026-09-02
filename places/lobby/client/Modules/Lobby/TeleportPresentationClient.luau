@@ -26,6 +26,7 @@ function TeleportPresentationClient.start(onReady: () -> ())
 
 	root:render(React.createElement(LoadingScreen, {
 		Visible = true,
+		ParentScreenInsets = Enum.ScreenInsets.None,
 		Static = true,
 		Title = "TRAVELING TO ARENA",
 		Detail = "THE MATCH IS READY",

@@ -8,16 +8,18 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
 local SettingsRegistry = require(Game:WaitForChild("Settings"):WaitForChild("SettingsRegistry"))
 local SettingsStore = require(Game:WaitForChild("Settings"):WaitForChild("SettingsStore"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local SettingRow = require(script.Parent.Settings.SettingRow)
+local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
-local COMPACT_WIDTH_PIXELS = 820
 local ROW_HEIGHT = { Compact = { Plain = 108, Description = 148 }, Wide = { Plain = 64, Description = 88 } }
 
 export type Props = {
@@ -26,6 +28,14 @@ export type Props = {
 }
 
 return function(props: Props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local panelSize =
+		ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.Settings,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local compact, setCompact = React.useState(false)
 	local revision, setRevision = React.useState(0)
 
@@ -119,7 +129,7 @@ return function(props: Props)
 		LayoutOrder = 5,
 		Position = props.Position or UDim2.fromScale(0.0211629, 0.14282),
 		ScaleType = Enum.ScaleType.Slice,
-		Size = UDim2.fromScale(0.602, 0.748),
+		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		SliceCenter = Rect.new(224, 202, 770, 474),
 		SliceScale = 0.06,
 	}, {
@@ -157,7 +167,7 @@ return function(props: Props)
 				Size = UDim2.fromScale(0.95, 0.93),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 				[React.Change.AbsoluteSize] = function(instance)
-					setCompact(instance.AbsoluteSize.X < COMPACT_WIDTH_PIXELS)
+					setCompact(instance.AbsoluteSize.X < UIConfig.Layout.CompactMaxWidthPx)
 				end,
 			}, content),
 		}),

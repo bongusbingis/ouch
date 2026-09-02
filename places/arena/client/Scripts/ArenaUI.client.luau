@@ -43,6 +43,7 @@ end
 
 bootstrapRoot:render(c(LoadingScreen, {
 	Visible = true,
+	ParentScreenInsets = Enum.ScreenInsets.None,
 	Title = "LOADING ARENA",
 	Detail = "PREPARING THE ARENA",
 	OnPresented = markBootstrapPresented,
@@ -76,6 +77,7 @@ if not arenaAppOk then
 	ArenaApp = function(props)
 		return c(LoadingScreen, {
 			Visible = true,
+			ParentScreenInsets = Enum.ScreenInsets.None,
 			Title = "ARENA COULD NOT LOAD",
 			Detail = "RETURN TO THE LOBBY AND TRY AGAIN",
 			PrimaryAction = {
@@ -147,6 +149,7 @@ local teleportPresentationReady = false
 local uiDestroyed = false
 teleportRoot:render(c(LoadingScreen, {
 	Visible = true,
+	ParentScreenInsets = Enum.ScreenInsets.None,
 	Static = true,
 	Title = "RETURNING TO LOBBY",
 	Detail = "TRAVELING FROM THE ARENA",
