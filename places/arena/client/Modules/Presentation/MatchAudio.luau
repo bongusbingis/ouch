@@ -7,7 +7,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local AudioConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Audio"))
+local AudioConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Audio"))
 local ClientAudio = require(script.Parent.ClientAudio)
 local MatchAudioLogic = require(script.Parent.MatchAudioLogic)
 

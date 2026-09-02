@@ -14,8 +14,8 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
 local Config = ReplicatedStorage:WaitForChild("Config")
-local Combat = require(Config:WaitForChild("Combat"))
-local PostMatchConfig = require(Config:WaitForChild("PostMatch"))
+local Combat = require(Config:WaitForChild("Gameplay"):WaitForChild("Combat"))
+local PostMatchConfig = require(Config:WaitForChild("Interface"):WaitForChild("PostMatch"))
 local MatchSim = require(Game:WaitForChild("Sim"):WaitForChild("MatchSim"))
 local GameMode = require(Game:WaitForChild("Modes"):WaitForChild("GameMode"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
@@ -691,6 +691,9 @@ function MatchService.beginMode(modeId: string): (boolean, string?)
 	if selectedMode == nil then
 		return false, "unknown_mode"
 	end
+	-- Snapshot the mode's rules from live config at the boundary so an override
+	-- staged during the previous match lands here and holds for the whole match.
+	selectedMode.rules = selectedMode.resolveRules()
 	if #matchPlayers() < selectedMode.rules.MinPlayers then
 		return false, "not_enough_players"
 	end
@@ -733,6 +736,7 @@ function MatchService.restartForTesting(modeId: string?): (boolean, string?)
 	end
 
 	mode = nextMode
+	nextMode.rules = nextMode.resolveRules()
 	state = MatchSim.newState()
 	local events: { MatchSim.MatchEvent } = {}
 	startMatch(events)

@@ -7,7 +7,7 @@
 
 local RunService = game:GetService("RunService")
 
-local Combat = require(script.Parent.Parent.Parent.Parent.Config.Combat)
+local Combat = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.Combat)
 local PlayerIds = require(script.Parent.PlayerIds)
 
 local MovementSpeedService = {}

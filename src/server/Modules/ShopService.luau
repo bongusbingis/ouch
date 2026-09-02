@@ -8,9 +8,9 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"))
-local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop"))
-local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Bundles"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
+local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Bundles"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Economy = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy")
 local ShopRotation = require(Economy:WaitForChild("ShopRotation"))

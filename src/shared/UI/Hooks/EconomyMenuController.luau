@@ -23,12 +23,12 @@ local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("No
 local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytics"))
 local Config = ReplicatedStorage:WaitForChild("Config")
-local Bundles = require(Config:WaitForChild("Bundles"))
-local Cosmetics = require(Config:WaitForChild("Cosmetics"))
-local Crates = require(Config:WaitForChild("Crates"))
-local GamePasses = require(Config:WaitForChild("GamePasses"))
-local Products = require(Config:WaitForChild("Products"))
-local Shop = require(Config:WaitForChild("Shop"))
+local Bundles = require(Config:WaitForChild("Economy"):WaitForChild("Bundles"))
+local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Crates = require(Config:WaitForChild("Economy"):WaitForChild("Crates"))
+local GamePasses = require(Config:WaitForChild("Economy"):WaitForChild("GamePasses"))
+local Products = require(Config:WaitForChild("Economy"):WaitForChild("Products"))
+local Shop = require(Config:WaitForChild("Economy"):WaitForChild("Shop"))
 
 local EconomyMenuController = {}
 

@@ -8,12 +8,13 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Data"))
+local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local EventDedup = require(Adapters:WaitForChild("EventDedup"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local Boosts = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
 )

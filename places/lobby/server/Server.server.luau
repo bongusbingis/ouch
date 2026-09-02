@@ -22,12 +22,14 @@ local LobbyCombatTest = require(Modules:WaitForChild("Debug"):WaitForChild("Lobb
 
 ConfigLiveService.start({
 	modules = {
-		GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes")),
+		GameModes = require(
+			ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes")
+		),
 		Matchmaking = require(
 			ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")
 		),
-		Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop")),
-		Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates")),
+		Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop")),
+		Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates")),
 	},
 })
 AnalyticsService.start()

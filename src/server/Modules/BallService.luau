@@ -9,7 +9,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local CosmeticVisualFactory = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")

@@ -10,7 +10,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local OnboardingConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Onboarding"))
+local OnboardingConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Onboarding"))
 local OnboardingClient = require(script.Parent:WaitForChild("OnboardingClient"))
 local OnboardingTargets = require(script.Parent:WaitForChild("OnboardingTargets"))
 

@@ -6,7 +6,7 @@
 --!strict
 
 local Config = script.Parent.Parent.Parent.Parent.Config
-local CosmeticEffectsConfig = require(Config:WaitForChild("CosmeticEffects"))
+local CosmeticEffectsConfig = require(Config:WaitForChild("Cosmetics"):WaitForChild("CosmeticEffects"))
 
 local CosmeticEffectFactory = {}
 

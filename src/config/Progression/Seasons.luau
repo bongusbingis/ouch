@@ -12,7 +12,7 @@
 -- 1,650 XP/hour that is ~12 hours of play across a 6-week season, completable
 -- by a casual player with headroom rather than only by grinders.
 
-local Cosmetics = require(script.Parent.Cosmetics)
+local Cosmetics = require(script.Parent.Parent.Cosmetics.Cosmetics)
 
 export type TierReward = {
 	kind: string,

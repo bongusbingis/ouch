@@ -8,9 +8,10 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Seasons"))
-local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Products"))
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
+local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local BattlePassLogic = require(
 	ReplicatedStorage:WaitForChild("Shared")

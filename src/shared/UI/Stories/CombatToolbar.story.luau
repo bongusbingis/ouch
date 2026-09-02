@@ -8,7 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local CombatToolbar = require(script.Parent.Parent.Components.CombatToolbar)
 local CombatToolbarViewModel = require(script.Parent.Parent.Models.CombatToolbarViewModel)
 local StoryRoot = require(script.Parent.StoryRoot)

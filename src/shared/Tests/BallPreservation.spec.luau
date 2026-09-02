@@ -10,7 +10,7 @@ local MockWorld = require(script.Parent.MockWorld)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local ModeRegistry = require(script.Parent.Parent.Game.Modes.ModeRegistry)
-local Combat = require(script.Parent.Parent.Parent.Config.Combat)
+local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)
 
 local DT = 1 / 60
 

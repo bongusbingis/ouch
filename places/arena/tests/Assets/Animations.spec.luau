@@ -8,7 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
-local Animations = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Animations"))
+local Animations = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Animations"))
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 
 return function()

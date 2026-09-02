@@ -13,7 +13,7 @@
 -- its cosmetics are authored. An Active bundle must contain something -- the GDD
 -- is explicit that a bundle is never sold empty.
 
-local Cosmetics = require(script.Parent.Cosmetics)
+local Cosmetics = require(script.Parent.Parent.Cosmetics.Cosmetics)
 
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
 

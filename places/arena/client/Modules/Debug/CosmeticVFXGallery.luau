@@ -7,7 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
 local Cosmetics = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticEffectFactory = require(Cosmetics:WaitForChild("CosmeticEffectFactory"))
 local Effects = Cosmetics:WaitForChild("Effects")

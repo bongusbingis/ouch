@@ -9,7 +9,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local MapFeatures = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("MapFeatures"))
+local MapFeatures =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local RotatingPlatforms = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")

@@ -7,7 +7,7 @@
 
 local T = require(script.Parent.TestKit)
 local StarterOffer = require(script.Parent.Parent.Game.Economy.StarterOffer)
-local GamePasses = require(script.Parent.Parent.Parent.Config.GamePasses)
+local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses)
 
 local CONFIG = { PassKey = "SplatStarter", WindowSeconds = 72 * 60 * 60 }
 local JOINED = 1000000

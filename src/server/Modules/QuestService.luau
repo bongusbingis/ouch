@@ -8,8 +8,10 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local QuestsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Quests"))
-local AnalyticsConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Analytics"))
+local QuestsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Quests"))
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local QuestLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Quests"):WaitForChild("QuestLogic")
 )

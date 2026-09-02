@@ -2,8 +2,8 @@
 
 local Config = script.Parent.Parent.Parent.Parent.Config
 
-local Combat = require(Config.Combat)
-local Input = require(Config.Input)
+local Combat = require(Config.Gameplay.Combat)
+local Input = require(Config.Interface.Input)
 
 local CombatToolbarViewModel = {}
 

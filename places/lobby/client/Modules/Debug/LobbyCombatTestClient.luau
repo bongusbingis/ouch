@@ -12,7 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
-local Debug = require(Config:WaitForChild("Debug"))
+local Debug = require(Config:WaitForChild("Infra"):WaitForChild("Debug"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CosmeticEffects = require(
 	ReplicatedStorage:WaitForChild("Shared")

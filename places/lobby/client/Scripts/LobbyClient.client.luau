@@ -76,7 +76,7 @@ local OnboardingGestureLayer = require(
 )
 
 local RunService = game:GetService("RunService")
-local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Debug"))
+local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
 local LobbyCombatTestClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Debug"):WaitForChild("LobbyCombatTestClient"))
 local CombatMenu = require(
@@ -109,10 +109,10 @@ local combatContainer = ReactRoot.create("LobbyCombatRoot", Enum.ScreenInsets.No
 local combatRoot = ReactRoblox.createRoot(combatContainer)
 
 ConfigReplication.startClient({
-	GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("GameModes")),
+	GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes")),
 	Matchmaking = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")),
-	Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Shop")),
-	Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates")),
+	Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop")),
+	Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates")),
 })
 EconomyStore.start()
 SettingsStore.start()

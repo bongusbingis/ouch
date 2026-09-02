@@ -12,7 +12,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 local Modules = Server:WaitForChild("Modules")
 local CrateService = require(Modules:WaitForChild("CrateService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
-local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Crates"))
+local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates"))
 
 local function describeEntry(entry): string
 	if entry.isDupe then

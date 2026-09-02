@@ -1,23 +1,15 @@
 --!strict
 
--- Crate definitions. A crate rolls a rarity by weight (Config.Cosmetics
--- Rarities), then uniformly among the pool's items of that rarity.
--- BonksPrice = openable with earned Bonks; Robux crates map through
--- Config.Products.ById developer products.
-
--- Pity: opens without the named rarity that force it on the next open. Values
--- are disclosed in the storefront alongside the odds, so changing them changes
--- a published guarantee.
-
--- CatalogStatus mirrors Config.Products and Config.GamePasses:
---   Active  -- rollable and purchasable
---   Preview -- merchandised as coming soon; cannot be opened
---   Hidden  -- omitted from the storefront entirely
+-- Crate definitions. A crate rolls a rarity by weight (Cosmetics Rarities), then
+-- uniformly among that rarity's items in the pool. BonksPrice opens with earned
+-- Bonks; Robux crates map through Products.ById.
 --
--- A crate whose content has not been authored yet must be Preview. The odds
--- model asserts on an empty pool by design -- shipping a crate that can never
--- drop anything is a bug, not a state to tolerate -- so Preview is how a crate
--- exists in config before it has items.
+-- Pity: opens without the named rarity force it on the next open; the values are
+-- disclosed in-store, so changing them changes a published guarantee.
+--
+-- CatalogStatus: Active (rollable/purchasable), Preview (coming soon, cannot open),
+-- Hidden (off the storefront). Unauthored content must be Preview, since the odds
+-- model asserts on an empty pool.
 export type CrateStatus = "Active" | "Preview" | "Hidden"
 
 export type CrateDef = {
@@ -31,17 +23,12 @@ export type CrateDef = {
 	ItemPool: { string },
 }
 
--- Bulk opens are charged at a straight multiple of BonksPrice: no volume
--- discount, so the per-open price guarantees asserted in CrateConfig.spec hold
--- for every quantity. The first entry must be 1 -- a crate must always be
--- openable one at a time.
+-- Straight multiple of BonksPrice per open (no volume discount). First entry must be 1.
 local OPEN_QUANTITIES = { 1, 5, 10 }
 
-local Cosmetics = require(script.Parent.Cosmetics)
+local Cosmetics = require(script.Parent.Parent.Cosmetics.Cosmetics)
 
--- Pools are derived so a new cosmetic cannot be added to the catalog and then
--- silently miss its crate. Sorted for deterministic odds ordering. A crate that
--- needs a curated subset can still declare ItemPool literally.
+-- Derived so a new cosmetic cannot miss its crate; sorted for deterministic odds.
 local function poolOf(categories: { string }): { string }
 	local wanted = {}
 	for _, category in categories do

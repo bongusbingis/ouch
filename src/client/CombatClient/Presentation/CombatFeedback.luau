@@ -9,7 +9,7 @@ local HapticService = game:GetService("HapticService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local ThrowUX = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("ThrowUX"))
+local ThrowUX = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ThrowUX"))
 local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )

@@ -7,8 +7,8 @@
 
 local T = require(script.Parent.TestKit)
 local BattlePassLogic = require(script.Parent.Parent.Game.Progression.BattlePassLogic)
-local Seasons = require(script.Parent.Parent.Parent.Config.Seasons)
-local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics)
+local Seasons = require(script.Parent.Parent.Parent.Config.Progression.Seasons)
+local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
 
 local SEASON = {
 	Id = "T1",

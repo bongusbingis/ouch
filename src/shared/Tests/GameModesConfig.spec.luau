@@ -6,7 +6,7 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local GameModes = require(script.Parent.Parent.Parent.Config.GameModes)
+local GameModes = require(script.Parent.Parent.Parent.Config.Gameplay.GameModes)
 
 T.describe("GameModes config", function()
 	T.it("offers launch modes while retaining the disabled Infection stub", function()

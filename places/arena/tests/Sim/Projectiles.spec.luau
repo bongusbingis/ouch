@@ -14,7 +14,7 @@ local Sim = Shared:WaitForChild("Game"):WaitForChild("Sim")
 local MockWorld = require(Shared:WaitForChild("Tests"):WaitForChild("MockWorld"))
 local SimTypes = require(Sim:WaitForChild("SimTypes"))
 local Projectiles = require(Sim:WaitForChild("Projectiles"))
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))
 
 local DT = 1 / 60

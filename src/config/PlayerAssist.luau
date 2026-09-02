@@ -1,18 +1,13 @@
 --!strict
 
--- Per-player assist tuning. Separate from LiveConfig on purpose: LiveConfig
--- installs one global snapshot into the shared config tables, which cannot
--- express "this player is in the B bucket". These leaves are resolved per
--- player through ConfigService:GetConfigForPlayerAsync, so a Roblox experience
--- config condition can hold half the population at a different strength.
+-- Aim-assist schema for the per-player AB engine (PlayerConfigService): unlike
+-- LiveConfig's one global snapshot, these leaves resolve per player through
+-- ConfigService:GetConfigForPlayerAsync, so an experience-config condition can
+-- hold half the population at a different strength. Defaults apply when no
+-- override does, the service is unavailable, or a value fails validation.
 --
--- Every entry is a plain scalar with a declared type and range, validated by the
--- same pure rules LiveConfig uses. Defaults here are what a player gets when no
--- override applies, when the config service is unavailable, or when a value
--- fails validation.
---
--- Convention: <Feature>Enabled is a kill switch, <Feature>Strength is a 0-1
--- scalar, and Strength 0 must behave exactly like Enabled = false.
+-- Convention: <Feature>Enabled is a kill switch, <Feature>Strength a 0-1 scalar,
+-- and Strength 0 behaves exactly like Enabled = false.
 
 export type Entry = {
 	Key: string,
@@ -23,8 +18,7 @@ export type Entry = {
 }
 
 local entries: { Entry } = {
-	-- Existing cone snap: the sim picking the best target inside the selection
-	-- cone. Off for mouse, which never needed it.
+	-- Cone snap: the sim picks the best target inside the selection cone.
 	{ Key = "ConeSnapEnabled", Type = "boolean", Default = true },
 	{ Key = "ConeSnapStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 
@@ -32,27 +26,23 @@ local entries: { Entry } = {
 	{ Key = "LeadEnabled", Type = "boolean", Default = true },
 	{ Key = "LeadStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 
-	-- Camera pull that follows a target's angular movement, and drag damping
-	-- while over one. Separate scalars: they are different sensations and want
-	-- to be tuned apart.
+	-- Adhesion is camera pull toward a target's movement; friction damps drag while
+	-- over one. Separate scalars: different sensations, tuned apart.
 	{ Key = "AdhesionEnabled", Type = "boolean", Default = true },
 	{ Key = "AdhesionStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 	{ Key = "FrictionEnabled", Type = "boolean", Default = true },
 	{ Key = "FrictionStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 
-	-- Melee, Phase 3.
+	-- Melee assists.
 	{ Key = "AutoFaceEnabled", Type = "boolean", Default = true },
 	{ Key = "AutoFaceStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 	{ Key = "LungeEnabled", Type = "boolean", Default = true },
 	{ Key = "LungeStrength", Type = "number", Default = 1, Minimum = 0, Maximum = 1 },
 }
 
--- Per-device multipliers applied on top of the resolved strength. This is the
--- gate that keeps mouse and keyboard untouched: a 0 here means the assist is
--- inert for that device no matter what the player's config says.
---
--- Gamepad gets adhesion and friction at a lower strength than touch: a stick
--- has analogue precision a thumb dragging on glass does not, so it needs less.
+-- Per-device multipliers on the resolved strength: a 0 keeps the assist inert for
+-- that device regardless of config. Gamepad gets less than touch (a stick has
+-- precision a thumb on glass does not).
 local deviceScale = {
 	Mouse = {
 		ConeSnap = 1,

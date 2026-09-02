@@ -9,7 +9,7 @@ local EliminationService = {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Combat"))
+local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 
 type HumanoidState = {
 	AutoRotate: boolean,
