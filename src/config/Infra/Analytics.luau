@@ -62,6 +62,7 @@ local Analytics = {
 		-- docs/hitreg-audit.md that reading the code cannot.
 		InputLatency = "InputLatency",
 		CombatSummary = "CombatSummary",
+		DailyRewardClaimed = "DailyRewardClaimed",
 	},
 
 	-- Every custom event and funnel step carries these, stamped centrally so no

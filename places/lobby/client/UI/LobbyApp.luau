@@ -25,6 +25,8 @@ local Motion = require(UI:WaitForChild("Motion"))
 local EconomyMenuController = require(UI:WaitForChild("Hooks"):WaitForChild("EconomyMenuController"))
 local useReducedMotion = require(UI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
 local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("NotificationContext"))
+local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
+local DailyRewardModal = require(Components:WaitForChild("DailyRewardModal"))
 local EconomyMenuModals = require(Components:WaitForChild("EconomyMenuModals"))
 local InventoryPage = require(Components:WaitForChild("InventoryPage"))
 local JoinCodeModal = require(Components:WaitForChild("JoinCodeModal"))
@@ -345,6 +347,26 @@ local function LobbyContent(props)
 	-- transition must stay out of the way until onboarding hands back over.
 	useWorldTransition(currentPage, props.CameraEnabled ~= false and not onboardingActive and not testActive)
 
+	local dailyRewardState = useExternalStore(props.DailyRewardStore.snapshot, props.DailyRewardStore.subscribe)
+	local seasonState = useExternalStore(props.SeasonStore.snapshot, props.SeasonStore.subscribe)
+	local questState = useExternalStore(props.QuestStore.snapshot, props.QuestStore.subscribe)
+
+	local showDailyRewardModal, setShowDailyRewardModal = React.useState(false)
+	local dailyRewardAutoPopped = React.useRef(false)
+	React.useEffect(function()
+		if
+			lobbyVisible
+			and dailyRewardState ~= nil
+			and dailyRewardState.canClaim
+			and not dailyRewardAutoPopped.current
+		then
+			dailyRewardAutoPopped.current = true
+			task.delay(0.5, function()
+				setShowDailyRewardModal(true)
+			end)
+		end
+	end, { lobbyVisible, dailyRewardState })
+
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false or onboardingActive then
 			return
@@ -481,6 +503,15 @@ local function LobbyContent(props)
 						OnJoinCode = function()
 							setJoinOpen(true)
 						end,
+						DailyReward = dailyRewardState,
+						OnViewDailyReward = function()
+							setShowDailyRewardModal(true)
+						end,
+						SeasonState = seasonState,
+						QuestState = questState,
+						OnClaimQuest = function(questId)
+							task.spawn(props.QuestStore.claim, questId)
+						end,
 					})
 				elseif pageName == "Inventory" then
 					return c(InventoryPage, {
@@ -585,6 +616,16 @@ local function LobbyContent(props)
 				}),
 				Economy = c(EconomyMenuModals, {
 					Controller = economyMenu,
+				}),
+				DailyReward = c(DailyRewardModal, {
+					Visible = showDailyRewardModal,
+					State = dailyRewardState,
+					OnClaim = function()
+						task.spawn(props.DailyRewardStore.claim)
+					end,
+					OnClose = function()
+						setShowDailyRewardModal(false)
+					end,
 				}),
 			}),
 			GameVersion = c(GameVersion),

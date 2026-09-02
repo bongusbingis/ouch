@@ -319,7 +319,7 @@ local function waitForProfile(player: Player)
 	end
 end
 
-function QuestService.start(matchService: any)
+function QuestService.start(matchService: any?)
 	if started then
 		return
 	end
@@ -339,7 +339,9 @@ function QuestService.start(matchService: any)
 		return QuestService.claim(player, questId)
 	end)
 
-	matchService.onEvent(QuestService.handleMatchEvent)
+	if matchService then
+		matchService.onEvent(QuestService.handleMatchEvent)
+	end
 	Players.PlayerAdded:Connect(function(player)
 		task.spawn(waitForProfile, player)
 	end)

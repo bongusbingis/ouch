@@ -46,6 +46,12 @@ return {
 			Version = 0,
 			SkippedAtStep = "",
 		},
+		DailyReward = {
+			Day = 0, -- last claimed day in cycle (1-7); 0 = never claimed
+			LastClaimAt = 0, -- unix timestamp; 0 = never
+			TotalClaimed = 0,
+		},
+
 		Settings = {}, -- { [settingId]: value }; keys are lazily written by SettingsService
 
 		Season = {

@@ -9,10 +9,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local DailyRewardsPanel = require(script.Parent.DailyRewardsPanel)
 local PartyStatus = require(script.Parent.PartyStatus)
+local QuestsPanel = require(script.Parent.QuestsPanel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local SeasonStatusCard = require(script.Parent.SeasonStatusCard)
 
 local c = React.createElement
 
@@ -43,6 +46,11 @@ export type Props = {
 	OnJoinCode: () -> (),
 	Position: any?,
 	PlayButtonRef: any?,
+	DailyReward: any?,
+	OnViewDailyReward: (() -> ())?,
+	SeasonState: any?,
+	QuestState: any?,
+	OnClaimQuest: ((questId: string) -> ())?,
 }
 
 return function(props: Props)
@@ -181,6 +189,17 @@ return function(props: Props)
 			uIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1.55,
 			}),
+		}),
+		DailyRewards = c(DailyRewardsPanel, {
+			State = props.DailyReward,
+			OnClaim = props.OnViewDailyReward,
+		}),
+		SeasonStatus = c(SeasonStatusCard, {
+			State = props.SeasonState,
+		}),
+		Quests = c(QuestsPanel, {
+			State = props.QuestState,
+			OnClaim = props.OnClaimQuest,
 		}),
 	})
 end
