@@ -7,6 +7,7 @@
 
 local BattlePassService = require(script.Parent.BattlePassService)
 local CrateService = require(script.Parent.CrateService)
+local DailyRewardService = require(script.Parent.DailyRewardService)
 local DirectPurchaseService = require(script.Parent.DirectPurchaseService)
 local EntitlementService = require(script.Parent.EntitlementService)
 local GamePassService = require(script.Parent.GamePassService)
@@ -32,6 +33,7 @@ function EconomyService.start()
 	DirectPurchaseService.start()
 	MonetizationService.start()
 	GamePassService.start()
+	DailyRewardService.start()
 end
 
 return EconomyService

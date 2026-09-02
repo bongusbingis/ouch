@@ -16,6 +16,21 @@ local EconomyStore = require(
 local SettingsStore = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Settings"):WaitForChild("SettingsStore")
 )
+local DailyRewardStore = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("DailyReward")
+		:WaitForChild("DailyRewardStore")
+)
+local SeasonStore = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("SeasonStore")
+)
+local QuestStore = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Quests"):WaitForChild("QuestStore")
+)
 local ShopClient = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("ShopClient")
 )
@@ -102,6 +117,9 @@ ConfigReplication.startClient({
 EconomyStore.start()
 SettingsStore.start()
 ShopClient.start()
+DailyRewardStore.start()
+SeasonStore.start()
+QuestStore.start()
 UIFeedback.start()
 partyClient:start()
 OnboardingCombatClient.start()
@@ -129,6 +147,9 @@ root:render(React.createElement(LobbyApp, {
 	OnboardingClient = OnboardingClient,
 	CombatTestClient = if combatTestEnabled then LobbyCombatTestClient else nil,
 	ShopClient = ShopClient,
+	DailyRewardStore = DailyRewardStore,
+	SeasonStore = SeasonStore,
+	QuestStore = QuestStore,
 	OnPresented = function()
 		ReplicatedFirst:SetAttribute("ReactLoadingPresented", true)
 	end,
@@ -190,5 +211,8 @@ script.Destroying:Connect(function()
 	EconomyStore.stop()
 	SettingsStore.stop()
 	ShopClient.stop()
+	DailyRewardStore.stop()
+	SeasonStore.stop()
+	QuestStore.stop()
 	UIFeedback.destroy()
 end)

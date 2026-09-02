@@ -120,6 +120,14 @@
 
           "ShopService": {
             "$path": "src/server/Modules/ShopService.luau"
+          },
+
+          "QuestService": {
+            "$path": "src/server/Modules/QuestService.luau"
+          },
+
+          "DailyRewardService": {
+            "$path": "src/server/Modules/DailyRewardService.luau"
           }
         }
       }
