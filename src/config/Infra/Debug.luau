@@ -9,7 +9,7 @@ return {
 	CombatTrace = false,
 	CollisionTrace = false,
 
-	AutoGrantAllItemsInStudio = true,
+	AutoGrantAllItemsInStudio = false,
 	AnalyticsVerbose = false,
 
 	AimAssistCones = true,

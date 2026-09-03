@@ -112,13 +112,12 @@ export type Props = {
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
-	local panelSize =
-		ResponsiveLayout.panelSize(
-			safeArea.size,
-			UIConfig.Layout.Panels.JoinCode,
-			UIConfig.Layout.PortraitMaxAspect,
-			UIConfig.Layout.ShortLandscapeMaxHeightPx
-		)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.JoinCode,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local inputRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)
 	local focusRevision = React.useRef(0)

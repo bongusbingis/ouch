@@ -29,13 +29,12 @@ export type Props = {
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
-	local panelSize =
-		ResponsiveLayout.panelSize(
-			safeArea.size,
-			UIConfig.Layout.Panels.Settings,
-			UIConfig.Layout.PortraitMaxAspect,
-			UIConfig.Layout.ShortLandscapeMaxHeightPx
-		)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.Settings,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local compact, setCompact = React.useState(false)
 	local revision, setRevision = React.useState(0)
 

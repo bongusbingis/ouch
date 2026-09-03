@@ -115,6 +115,60 @@ T.describe("ShopViewModel", function()
 		T.expect(model.byId["Crate:HammerCrate"].status):toEqual("Preview")
 		T.expect(model.byId["Product:Bonks500"].status):toEqual("Loading")
 	end)
+
+	T.it("uses configured product and game pass icons instead of marketplace icons", function()
+		local products = table.clone(Products.Catalog)
+		products.Bonks500 = table.clone(products.Bonks500)
+		products.Bonks500.Icon = "rbxassetid://101"
+		local pass = table.clone(GamePasses.Catalog.DoubleXP)
+		pass.Icon = "rbxassetid://202"
+		local model = build({
+			products = products,
+			gamePasses = { Catalog = { DoubleXP = pass } },
+			metadata = {
+				[`Product:{products.Bonks500.Id}`] = {
+					name = "Marketplace Product",
+					priceInRobux = 49,
+					iconImageAssetId = 303,
+					isForSale = true,
+				},
+				[`GamePass:{pass.Id}`] = {
+					name = "Marketplace Pass",
+					priceInRobux = 199,
+					iconImageAssetId = 404,
+					isForSale = true,
+				},
+			},
+		})
+		T.expect(model.byId["Product:Bonks500"].thumbnail):toEqual("rbxassetid://101")
+		T.expect(model.byId["GamePass:DoubleXP"].thumbnail):toEqual("rbxassetid://202")
+	end)
+
+	T.it("leaves product and game pass artwork absent when Icon is missing", function()
+		local products = table.clone(Products.Catalog)
+		products.Bonks500 = table.clone(products.Bonks500)
+		products.Bonks500.Icon = nil
+		local pass = table.clone(GamePasses.Catalog.DoubleXP)
+		pass.Icon = nil
+		local model = build({
+			products = products,
+			gamePasses = { Catalog = { DoubleXP = pass } },
+			metadata = {
+				[`Product:{products.Bonks500.Id}`] = {
+					priceInRobux = 49,
+					iconImageAssetId = 303,
+					isForSale = true,
+				},
+				[`GamePass:{pass.Id}`] = {
+					priceInRobux = 199,
+					iconImageAssetId = 404,
+					isForSale = true,
+				},
+			},
+		})
+		T.expect(model.byId["Product:Bonks500"].thumbnail):toBeNil()
+		T.expect(model.byId["GamePass:DoubleXP"].thumbnail):toBeNil()
+	end)
 end)
 
 return true

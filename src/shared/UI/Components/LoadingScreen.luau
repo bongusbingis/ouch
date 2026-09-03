@@ -97,13 +97,12 @@ end
 
 return function(props: Props)
 	local safeArea = useSafeArea(props.ParentScreenInsets or Enum.ScreenInsets.DeviceSafeInsets)
-	local panelSize =
-		ResponsiveLayout.panelSize(
-			safeArea.size,
-			UIConfig.Layout.Panels.Loading,
-			UIConfig.Layout.PortraitMaxAspect,
-			UIConfig.Layout.ShortLandscapeMaxHeightPx
-		)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.Loading,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local reducedMotion = useReducedMotion()
 	local present, setPresent = React.useState(props.Visible)
 	local rootRef = React.useRef(nil)

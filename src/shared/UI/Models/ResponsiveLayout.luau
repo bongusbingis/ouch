@@ -27,6 +27,40 @@ export type MenuToggleLayout = {
 	keycapSize: Vector2,
 }
 
+export type SplashPanelConfig = {
+	EdgePaddingPx: number,
+	GapPx: number,
+	Landscape: {
+		DailyBottomScale: number,
+		SeasonTopScale: number,
+		QuestsTopScale: number,
+	},
+	Portrait: {
+		WidthScale: number,
+		TopScale: number,
+		BottomScale: number,
+		GapPx: number,
+		SeasonWeight: number,
+		DailyWeight: number,
+		QuestsWeight: number,
+	},
+	Daily: PanelVariant,
+	Season: PanelVariant,
+	Quests: PanelVariant,
+}
+
+export type SplashPanelRect = {
+	position: Vector2,
+	size: Vector2,
+}
+
+export type SplashPanelLayout = {
+	portrait: boolean,
+	daily: SplashPanelRect,
+	season: SplashPanelRect,
+	quests: SplashPanelRect,
+}
+
 function ResponsiveLayout.isPortrait(size: Vector2, maxAspect: number): boolean
 	return size.Y > 0 and size.X / size.Y <= maxAspect
 end
@@ -54,12 +88,8 @@ function ResponsiveLayout.panelSize(
 ): Vector2
 	local portrait = ResponsiveLayout.isPortrait(available, portraitMaxAspect)
 	local variant = if portrait then spec.Portrait else spec.Landscape
-	local heightScale = if not portrait
-			and shortLandscapeMaxHeight
-			and available.Y <= shortLandscapeMaxHeight
-			and variant.ShortHeightScale
-		then variant.ShortHeightScale
-		else variant.HeightScale
+	local short = not portrait and shortLandscapeMaxHeight ~= nil and available.Y <= shortLandscapeMaxHeight
+	local heightScale = if short and variant.ShortHeightScale then variant.ShortHeightScale else variant.HeightScale
 	local width = math.min(available.X * variant.WidthScale, variant.MaxSize.X)
 	local height = math.min(available.Y * heightScale, variant.MaxSize.Y)
 	if variant.AspectRatio then
@@ -71,6 +101,70 @@ function ResponsiveLayout.panelSize(
 		end
 	end
 	return Vector2.new(math.max(math.floor(width), 1), math.max(math.floor(height), 1))
+end
+
+function ResponsiveLayout.splashPanels(
+	available: Vector2,
+	config: SplashPanelConfig,
+	portraitMaxAspect: number,
+	shortLandscapeMaxHeight: number?
+): SplashPanelLayout
+	local portrait = ResponsiveLayout.isPortrait(available, portraitMaxAspect)
+	if portrait then
+		local portraitConfig = config.Portrait
+		local width = math.max(math.floor(available.X * portraitConfig.WidthScale), 1)
+		local left = math.floor((available.X - width) * 0.5)
+		local top = math.floor(available.Y * portraitConfig.TopScale)
+		local bottom = math.floor(available.Y * portraitConfig.BottomScale)
+		local gap = portraitConfig.GapPx
+		local contentHeight = math.max(bottom - top - gap * 2, 3)
+		local totalWeight = portraitConfig.SeasonWeight + portraitConfig.DailyWeight + portraitConfig.QuestsWeight
+		local seasonHeight = math.max(math.floor(contentHeight * portraitConfig.SeasonWeight / totalWeight), 1)
+		local dailyHeight = math.max(math.floor(contentHeight * portraitConfig.DailyWeight / totalWeight), 1)
+		local questsHeight = math.max(contentHeight - seasonHeight - dailyHeight, 1)
+		return {
+			portrait = true,
+			season = {
+				position = Vector2.new(left, top),
+				size = Vector2.new(width, seasonHeight),
+			},
+			daily = {
+				position = Vector2.new(left, top + seasonHeight + gap),
+				size = Vector2.new(width, dailyHeight),
+			},
+			quests = {
+				position = Vector2.new(left, top + seasonHeight + gap + dailyHeight + gap),
+				size = Vector2.new(width, questsHeight),
+			},
+		}
+	end
+
+	local function landscapeSize(variant: PanelVariant): Vector2
+		local spec = { Portrait = variant, Landscape = variant }
+		return ResponsiveLayout.panelSize(available, spec, portraitMaxAspect, shortLandscapeMaxHeight)
+	end
+	local dailySize = landscapeSize(config.Daily)
+	local seasonSize = landscapeSize(config.Season)
+	local questsSize = landscapeSize(config.Quests)
+	local edge = math.min(config.EdgePaddingPx, math.floor(available.X * 0.03))
+	local seasonTop = math.floor(available.Y * config.Landscape.SeasonTopScale)
+	local questsTop =
+		math.max(math.floor(available.Y * config.Landscape.QuestsTopScale), seasonTop + seasonSize.Y + config.GapPx)
+	return {
+		portrait = false,
+		daily = {
+			position = Vector2.new(edge, math.floor(available.Y * config.Landscape.DailyBottomScale) - dailySize.Y),
+			size = dailySize,
+		},
+		season = {
+			position = Vector2.new(available.X - edge - seasonSize.X, seasonTop),
+			size = seasonSize,
+		},
+		quests = {
+			position = Vector2.new(available.X - edge - questsSize.X, questsTop),
+			size = questsSize,
+		},
+	}
 end
 
 function ResponsiveLayout.gridCellSize(

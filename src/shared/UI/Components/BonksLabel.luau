@@ -15,13 +15,29 @@ local c = React.createElement
 local BONKS_ICON_ASSET = "rbxassetid://106703644238993"
 local BONKS_COLOR = Color3.fromRGB(255, 211, 51)
 
+-- Grouped in thousands wherever it is shown, so a balance and a price of the
+-- same magnitude are read the same way.
+local function formatAmount(value: number): string
+	local out = tostring(math.floor(value))
+	while true do
+		local replaced, count = string.gsub(out, "^(%-?%d+)(%d%d%d)", "%1,%2")
+		out = replaced
+		if count == 0 then
+			return out
+		end
+	end
+end
+
 export type Props = {
 	Amount: number,
 	Native: { [any]: any }?,
 	TextColor: Color3?,
 	IconSize: UDim2?,
+	MaxTextSize: number?,
+	TextStroke: number?,
 	StackThreshold: number?,
 	StackIconAsset: string?,
+	children: { [any]: any }?,
 }
 
 return function(props: Props)
@@ -40,7 +56,7 @@ return function(props: Props)
 		end
 	end
 
-	return c("Frame", container, {
+	local children = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -58,15 +74,34 @@ return function(props: Props)
 		}),
 		Amount = c(ResponsiveText, {
 			MeasurementFont = Enum.Font.LuckiestGuy,
+			MaxTextSize = props.MaxTextSize,
 			Native = {
 				BackgroundTransparency = 1,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				LayoutOrder = 2,
 				Size = UDim2.fromScale(0.7, 0.8),
-				Text = tostring(props.Amount),
+				Text = formatAmount(props.Amount),
 				TextColor3 = props.TextColor or BONKS_COLOR,
 				TextXAlignment = Enum.TextXAlignment.Left,
 			},
+		}, {
+			-- Callers that sit the amount on a button match that button's own
+			-- outlined type rather than reading as a plain number beside it.
+			UIStroke = if props.TextStroke
+				then c("UIStroke", {
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					Thickness = props.TextStroke,
+				})
+				else nil,
 		}),
-	})
+	}
+	-- Callers decorate the container itself (a corner, a stroke), so their own
+	-- children sit alongside the icon and the amount rather than replacing them.
+	if props.children then
+		for key, value in props.children do
+			children[key] = value
+		end
+	end
+
+	return c("Frame", container, children)
 end

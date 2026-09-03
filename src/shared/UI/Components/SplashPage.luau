@@ -56,6 +56,14 @@ export type Props = {
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local progressPanels = ResponsiveLayout.splashPanels(
+		safeArea.size,
+		UIConfig.Layout.Splash.ProgressPanels,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
+	local compactProgressPanels = progressPanels.portrait
+		or safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Position = props.Position or UDim2.fromScale(0, 0),
@@ -184,20 +192,35 @@ return function(props: Props)
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://78333957912633",
 			Position = if portrait then UDim2.fromScale(0.05, 0.12) else UDim2.fromScale(0, 0.1),
-			Size = if portrait then UDim2.fromScale(0.7, 0.24) else UDim2.fromScale(0.321542, 0.301659),
+			Size = if portrait then UDim2.fromScale(0.52, 0.18) else UDim2.fromScale(0.321542, 0.301659),
 		}, {
 			uIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1.55,
 			}),
 		}),
 		DailyRewards = c(DailyRewardsPanel, {
+			Compact = compactProgressPanels,
+			Native = {
+				Position = UDim2.fromOffset(progressPanels.daily.position.X, progressPanels.daily.position.Y),
+				Size = UDim2.fromOffset(progressPanels.daily.size.X, progressPanels.daily.size.Y),
+			},
 			State = props.DailyReward,
 			OnClaim = props.OnViewDailyReward,
 		}),
 		SeasonStatus = c(SeasonStatusCard, {
+			Compact = compactProgressPanels,
+			Native = {
+				Position = UDim2.fromOffset(progressPanels.season.position.X, progressPanels.season.position.Y),
+				Size = UDim2.fromOffset(progressPanels.season.size.X, progressPanels.season.size.Y),
+			},
 			State = props.SeasonState,
 		}),
 		Quests = c(QuestsPanel, {
+			Compact = compactProgressPanels,
+			Native = {
+				Position = UDim2.fromOffset(progressPanels.quests.position.X, progressPanels.quests.position.Y),
+				Size = UDim2.fromOffset(progressPanels.quests.size.X, progressPanels.quests.size.Y),
+			},
 			State = props.QuestState,
 			OnClaim = props.OnClaimQuest,
 		}),

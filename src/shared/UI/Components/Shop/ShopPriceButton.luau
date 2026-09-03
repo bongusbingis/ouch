@@ -9,11 +9,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
+local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 
 local c = React.createElement
 
 return function(props)
+	local stacked = props.SubText ~= nil or props.SubBonks ~= nil
 	return c(AnimatedButton, {
 		ButtonRef = props.ButtonRef,
 		EntranceDelay = props.EntranceDelay,
@@ -34,26 +36,61 @@ return function(props)
 		},
 		OnActivated = props.OnActivated,
 	}, {
-		TextLabel = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = if props.SubText then 26 else 28,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = if props.SubText then UDim2.fromScale(0.5, 0.4) else UDim2.fromScale(0.5, 0.56),
-				Size = if props.SubText then UDim2.fromScale(0.84, 0.38) else UDim2.fromScale(0.82, 0.6),
-				Text = props.Text,
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = (props.ZIndex or 8) + 1,
-			},
-		}, {
-			UIStroke = c("UIStroke", {
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.06,
+		-- A Bonks amount is shown as the coin plus the number, never as the word:
+		-- the currency reads at a glance and the button keeps the same footprint
+		-- whichever currency it is priced in.
+		BonksLabel = if props.BonksAmount
+			then c(BonksLabel, {
+				Amount = props.BonksAmount,
+				MaxTextSize = if stacked then 26 else 28,
+				TextColor = props.BonksColor or Color3.new(1, 1, 1),
+				TextStroke = 0.06,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					Position = if stacked then UDim2.fromScale(0.5, 0.4) else UDim2.fromScale(0.5, 0.56),
+					Size = if stacked then UDim2.fromScale(0.88, 0.38) else UDim2.fromScale(0.88, 0.6),
+					ZIndex = (props.ZIndex or 8) + 1,
+				},
+			})
+			else nil,
+		TextLabel = if props.BonksAmount
+			then nil
+			else c(ResponsiveText, {
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = if stacked then 26 else 28,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					Position = if stacked then UDim2.fromScale(0.5, 0.4) else UDim2.fromScale(0.5, 0.56),
+					Size = if stacked then UDim2.fromScale(0.88, 0.38) else UDim2.fromScale(0.88, 0.6),
+					Text = props.Text,
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = (props.ZIndex or 8) + 1,
+				},
+			}, {
+				UIStroke = c("UIStroke", {
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					Thickness = 0.06,
+				}),
 			}),
-		}),
-		SubLabel = if props.SubText
+		SubBonksLabel = if props.SubBonks
+			then c(BonksLabel, {
+				Amount = props.SubBonks,
+				MaxTextSize = props.SubTextSize or 20,
+				TextColor = props.SubTextColor or Color3.fromRGB(255, 240, 190),
+				TextStroke = 0.08,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					Position = UDim2.fromScale(0.5, 0.72),
+					Size = UDim2.fromScale(0.88, 0.3),
+					ZIndex = (props.ZIndex or 8) + 1,
+				},
+			})
+			else nil,
+		SubLabel = if props.SubText and not props.SubBonks
 			then c(ResponsiveText, {
 				MeasurementFont = Enum.Font.SourceSansBold,
 				MaxTextSize = props.SubTextSize or 20,

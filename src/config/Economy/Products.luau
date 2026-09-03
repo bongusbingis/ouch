@@ -12,6 +12,7 @@ export type ProductType = "Crate" | "Bonks" | "SeasonPass" | "Bundle" | "Cosmeti
 -- because a receipt is the only record that survives a failed grant.
 export type ProductDef = {
 	Id: number?,
+	Icon: string?,
 	CatalogStatus: CatalogStatus,
 	DisplayName: string,
 	Description: string,
@@ -28,6 +29,7 @@ export type ProductDef = {
 local Catalog: { [string]: ProductDef } = {
 	Bonks500 = {
 		Id = 3709429022,
+		Icon = "rbxassetid://93880146029014",
 		CatalogStatus = "Active",
 		DisplayName = "Pocket Stash",
 		Description = "A handy boost for your next crate.",
@@ -38,6 +40,7 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	Bonks1100 = {
 		Id = 3709429164,
+		Icon = "rbxassetid://128078334031314",
 		CatalogStatus = "Active",
 		DisplayName = "Bonks Stack",
 		Description = "A solid stack with a little extra value.",
@@ -48,6 +51,7 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	Bonks2500 = {
 		Id = 3709429259,
+		Icon = "rbxassetid://120940829762396",
 		CatalogStatus = "Active",
 		DisplayName = "Bonks Haul",
 		Description = "A bigger haul for several crate opens.",
@@ -58,6 +62,7 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	Bonks5500 = {
 		Id = 3709429349,
+		Icon = "rbxassetid://111667665844951",
 		CatalogStatus = "Active",
 		DisplayName = "Mega Vault",
 		Description = "The biggest Bonks bundle and strongest value.",
@@ -68,8 +73,9 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	DodgeballCrateOpen = {
 		Id = 3709429401,
+		Icon = "rbxassetid://119117881625478",
 		CatalogStatus = "Active",
-		DisplayName = "Dodgeball Crate",
+		DisplayName = "Dodgeballs",
 		Description = "Open one Dodgeball Crate directly.",
 		DisplayOrder = 210,
 		Type = "Crate",
@@ -78,8 +84,9 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	HammerCrateOpen = {
 		Id = 3709429455,
+		Icon = "rbxassetid://134713149561894",
 		CatalogStatus = "Preview",
-		DisplayName = "Hammer Crate",
+		DisplayName = "Hammers",
 		Description = "Open one Hammer Crate directly.",
 		DisplayOrder = 220,
 		Type = "Crate",
@@ -88,8 +95,9 @@ local Catalog: { [string]: ProductDef } = {
 	},
 	EffectsCrateOpen = {
 		Id = 3709429563,
-		CatalogStatus = "Active",
-		DisplayName = "Effects Crate",
+		Icon = "rbxassetid://126538865895544",
+		CatalogStatus = "Preview",
+		DisplayName = "Effects",
 		Description = "Open one Effects Crate directly.",
 		DisplayOrder = 230,
 		Type = "Crate",
@@ -100,6 +108,7 @@ local Catalog: { [string]: ProductDef } = {
 	-- Config.Bundles; this side owns only the Robux id and price.
 	StarterOutfitBundleBuy = {
 		Id = nil,
+		Icon = "",
 		CatalogStatus = "Preview",
 		DisplayName = "Starter Outfit Bundle",
 		Description = "A complete look, cheaper than buying the pieces.",
@@ -111,8 +120,9 @@ local Catalog: { [string]: ProductDef } = {
 	-- One product per season rather than editing SeasonId in place, so receipt
 	-- history stays unambiguous about which season was actually bought.
 	SeasonPassS1 = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 3711055761,
+		Icon = "rbxassetid://121533534625743",
+		CatalogStatus = "Active",
 		DisplayName = "Season 1 Premium Pass",
 		Description = "Unlock the premium reward track for Season 1.",
 		DisplayOrder = 500,
@@ -129,6 +139,11 @@ local ById: { [number]: ProductDef } = {}
 for key, definition in Catalog do
 	assert(definition.DisplayOrder % 1 == 0, `developer product "{key}" must define an integer DisplayOrder`)
 	assert(definition.SuggestedRobux > 0, `developer product "{key}" must define a positive SuggestedRobux`)
+	local icon = definition.Icon
+	assert(
+		icon == nil or icon == "" or string.match(icon, "^rbxassetid://%d+$") ~= nil,
+		`developer product "{key}" Icon must be a Roblox asset id string`
+	)
 	if definition.CatalogStatus == "Active" then
 		assert(definition.Id ~= nil, `active developer product "{key}" must define Id`)
 		assert(

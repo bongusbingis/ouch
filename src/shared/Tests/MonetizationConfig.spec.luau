@@ -11,6 +11,19 @@ local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses
 local Products = require(script.Parent.Parent.Parent.Config.Economy.Products)
 
 T.describe("MonetizationConfig", function()
+	T.it("accepts only optional Roblox asset id strings for storefront icons", function()
+		for _, catalog in { Products.Catalog, GamePasses.Catalog } do
+			for _, definition in catalog do
+				local icon = definition.Icon
+				T.expect(
+					icon == nil
+						or icon == ""
+						or (type(icon) == "string" and string.match(icon, "^rbxassetid://%d+$") ~= nil)
+				):toBeTruthy()
+			end
+		end
+	end)
+
 	T.it("maps active products into receipt processing and excludes previews", function()
 		T.expect(Products.ById[Products.Catalog.Bonks500.Id]):toEqual(Products.Catalog.Bonks500)
 		T.expect(Products.ById[Products.Catalog.EffectsCrateOpen.Id]):toEqual(Products.Catalog.EffectsCrateOpen)
@@ -30,28 +43,24 @@ T.describe("MonetizationConfig", function()
 		end
 	end)
 
-	T.it("maps active boosters while leaving cosmetic passes in preview", function()
+	T.it("maps active passes and validates their grants", function()
 		T.expect(GamePasses.ById[GamePasses.Catalog.DoubleXP.Id]):toEqual(GamePasses.Catalog.DoubleXP)
-		T.expect(GamePasses.ById[GamePasses.Catalog.SplatStarter.Id]):toBeNil()
+		T.expect(GamePasses.Catalog.SplatStarter.Id):toEqual(1968922292)
+		T.expect(GamePasses.ById[GamePasses.Catalog.SplatStarter.Id]):toEqual(GamePasses.Catalog.SplatStarter)
 		T.expect(GamePasses.Catalog.SplatStarter.SuggestedRobux):toEqual(49)
-		T.expect(GamePasses.Catalog.EffectCollection.SuggestedRobux):toEqual(149)
-		local impactEntitlements = GamePasses.Catalog.EffectCollection.EntitlementItemIds
-		local expectedImpactEntitlements = { "Prismatic", "Galaxy", "Starlight" }
-		T.expect(#impactEntitlements):toEqual(#expectedImpactEntitlements)
-		for index, itemId in impactEntitlements do
-			T.expect(itemId):toEqual(expectedImpactEntitlements[index])
+		local starterEntitlements = GamePasses.Catalog.SplatStarter.EntitlementItemIds
+		T.expect(#starterEntitlements):toEqual(1)
+		for _, itemId in starterEntitlements do
+			T.expect(itemId):toEqual("Starlight")
 			local item = Cosmetics.Items[itemId]
 			T.expect(item ~= nil):toBeTruthy()
 			T.expect(item.Rarity):toEqual("Exclusive")
 			T.expect(item.Category):toEqual("ImpactEffectAssets")
 		end
-		T.expect(#GamePasses.Catalog.HammerCosmetics.EntitlementItemIds):toEqual(0)
-		T.expect(#GamePasses.Catalog.CharacterCostumes.EntitlementItemIds):toEqual(0)
-		T.expect(#GamePasses.Catalog.EliminationEmotes.EntitlementItemIds):toEqual(0)
 		for _, definition in GamePasses.Catalog do
 			if definition.CatalogStatus == "Active" then
 				T.expect(definition.Id ~= nil):toBeTruthy()
-				T.expect(definition.Boosts ~= nil):toBeTruthy()
+				T.expect(#definition.EntitlementItemIds > 0 or definition.Boosts ~= nil):toBeTruthy()
 			else
 				T.expect(definition.Id):toBeNil()
 			end

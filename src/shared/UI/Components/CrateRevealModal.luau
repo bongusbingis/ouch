@@ -149,13 +149,12 @@ end
 return function(props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
-	local panelSize =
-		ResponsiveLayout.panelSize(
-			safeArea.size,
-			UIConfig.Layout.Panels.CrateReveal,
-			UIConfig.Layout.PortraitMaxAspect,
-			UIConfig.Layout.ShortLandscapeMaxHeightPx
-		)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.CrateReveal,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local reveal = props.Reveal
 	local buttonRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)

@@ -48,6 +48,7 @@ return function(props)
 		MeasurementFont = Enum.Font.SourceSansBold,
 		MaxTextSize = props.MaxTextSize or 28,
 		Native = {
+			AnchorPoint = props.AnchorPoint,
 			BackgroundTransparency = 1,
 			FontFace = Font.new(
 				"rbxasset://fonts/families/SourceSansPro.json",

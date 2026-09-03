@@ -23,6 +23,7 @@ export type Boosts = {
 
 export type GamePassDef = {
 	Id: number?,
+	Icon: string?,
 	CatalogStatus: CatalogStatus,
 	DisplayName: string,
 	Description: string,
@@ -35,27 +36,30 @@ export type GamePassDef = {
 
 local Catalog: { [string]: GamePassDef } = {
 	SplatStarter = {
-		Id = nil,
-		CatalogStatus = "Preview",
+		Id = 1968922292,
+		Icon = "rbxassetid://132823050014980",
+		CatalogStatus = "Active",
 		DisplayName = "Splat Starter Kit",
 		Description = "An exclusive effect you cannot get any other way.",
 		DisplayOrder = 400,
 		SuggestedRobux = 49,
-		Categories = { "TrailAssets" },
-		EntitlementItemIds = {},
+		Categories = { "ImpactEffectAssets" },
+		EntitlementItemIds = { "Starlight" },
 	},
-	EffectCollection = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Effect Collection",
-		Description = "A permanent collection of exclusive effects.",
-		DisplayOrder = 410,
-		SuggestedRobux = 149,
-		Categories = { "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" },
-		EntitlementItemIds = { "Prismatic", "Galaxy", "Starlight" },
-	},
+	-- EffectCollection = {
+	-- 	Id = nil,
+	-- 	Icon = "rbxassetid://133826079905432",
+	-- 	CatalogStatus = "Active",
+	-- 	DisplayName = "Effect Collection",
+	-- 	Description = "A permanent collection of exclusive effects.",
+	-- 	DisplayOrder = 410,
+	-- 	SuggestedRobux = 149,
+	-- 	Categories = { "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" },
+	-- 	EntitlementItemIds = { "Prismatic", "Galaxy", "Starlight" },
+	-- },
 	DoubleXP = {
 		Id = 1952133523,
+		Icon = "rbxassetid://94347881059588",
 		CatalogStatus = "Active",
 		DisplayName = "Double XP",
 		Description = "Earn 2x XP from every match, forever.",
@@ -67,6 +71,7 @@ local Catalog: { [string]: GamePassDef } = {
 	},
 	BonksBoost = {
 		Id = 1955640877,
+		Icon = "rbxassetid://136145300490466",
 		CatalogStatus = "Active",
 		DisplayName = "Bonks Boost",
 		Description = "Earn 1.5x Bonks from every match, forever.",
@@ -87,36 +92,39 @@ local Catalog: { [string]: GamePassDef } = {
 	-- 	EntitlementItemIds = {},
 	-- 	Boosts = { XpMultiplier = 2.5, BonksMultiplier = 1.5 },
 	-- },
-	HammerCosmetics = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Hammer Cosmetics",
-		Description = "A permanent collection of exclusive hammer looks.",
-		DisplayOrder = 460,
-		SuggestedRobux = 249,
-		Categories = { "HammerAssets" },
-		EntitlementItemIds = {},
-	},
-	CharacterCostumes = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Character Costumes",
-		Description = "A permanent collection of character costumes.",
-		DisplayOrder = 470,
-		SuggestedRobux = 399,
-		Categories = { "CostumeAssets" },
-		EntitlementItemIds = {},
-	},
-	EliminationEmotes = {
-		Id = nil,
-		CatalogStatus = "Preview",
-		DisplayName = "Elimination Emotes",
-		Description = "A permanent collection of elimination emotes.",
-		DisplayOrder = 480,
-		SuggestedRobux = 99,
-		Categories = { "EmoteAssets" },
-		EntitlementItemIds = {},
-	},
+	-- HammerCosmetics = {
+	-- 	Id = nil,
+	-- 	Icon = "rbxassetid://119325969421846",
+	-- 	CatalogStatus = "Active",
+	-- 	DisplayName = "Hammer Cosmetics",
+	-- 	Description = "A permanent collection of exclusive hammer looks.",
+	-- 	DisplayOrder = 460,
+	-- 	SuggestedRobux = 249,
+	-- 	Categories = { "HammerAssets" },
+	-- 	EntitlementItemIds = {},
+	-- },
+	-- CharacterCostumes = {
+	-- 	Id = nil,
+	-- 	Icon = "rbxassetid://137546092827690",
+	-- 	CatalogStatus = "Active",
+	-- 	DisplayName = "Character Costumes",
+	-- 	Description = "A permanent collection of character costumes.",
+	-- 	DisplayOrder = 470,
+	-- 	SuggestedRobux = 399,
+	-- 	Categories = { "CostumeAssets" },
+	-- 	EntitlementItemIds = {},
+	-- },
+	-- EliminationEmotes = {
+	-- 	Id = nil,
+	-- 	Icon = "rbxassetid://75171943932635",
+	-- 	CatalogStatus = "Active",
+	-- 	DisplayName = "Elimination Emotes",
+	-- 	Description = "A permanent collection of elimination emotes.",
+	-- 	DisplayOrder = 480,
+	-- 	SuggestedRobux = 99,
+	-- 	Categories = { "EmoteAssets" },
+	-- 	EntitlementItemIds = {},
+	-- },
 }
 
 local ById: { [number]: GamePassDef } = {}
@@ -125,6 +133,11 @@ local KeyById: { [number]: string } = {}
 for key, definition in Catalog do
 	assert(definition.DisplayOrder % 1 == 0, `game pass "{key}" must define an integer DisplayOrder`)
 	assert(definition.SuggestedRobux > 0, `game pass "{key}" must define a positive SuggestedRobux`)
+	local icon = definition.Icon
+	assert(
+		icon == nil or icon == "" or string.match(icon, "^rbxassetid://%d+$") ~= nil,
+		`game pass "{key}" Icon must be a Roblox asset id string`
+	)
 	if definition.Boosts ~= nil then
 		local xp = definition.Boosts.XpMultiplier
 		local bonks = definition.Boosts.BonksMultiplier

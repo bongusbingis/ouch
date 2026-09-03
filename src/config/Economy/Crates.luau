@@ -46,7 +46,7 @@ end
 
 local Catalog: { [string]: CrateDef } = {
 	DodgeballCrate = {
-		DisplayName = "Dodgeball Crate",
+		DisplayName = "Dodgeballs",
 		DisplayOrder = 100,
 		Thumbnail = "",
 		CatalogStatus = "Active",
@@ -56,7 +56,7 @@ local Catalog: { [string]: CrateDef } = {
 		ItemPool = poolOf({ "BallAssets" }),
 	},
 	HammerCrate = {
-		DisplayName = "Hammer Crate",
+		DisplayName = "Hammers",
 		DisplayOrder = 200,
 		Thumbnail = "",
 		CatalogStatus = "Preview",
@@ -69,7 +69,7 @@ local Catalog: { [string]: CrateDef } = {
 	-- they are the same "effects" purchase to a player, and two near-empty
 	-- crates would read as padding.
 	EffectsCrate = {
-		DisplayName = "Effects Crate",
+		DisplayName = "Effects",
 		DisplayOrder = 300,
 		Thumbnail = "",
 		CatalogStatus = "Active",

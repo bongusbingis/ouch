@@ -222,13 +222,12 @@ end
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
-	local panelSize =
-		ResponsiveLayout.panelSize(
-			safeArea.size,
-			UIConfig.Layout.Panels.Inventory,
-			UIConfig.Layout.PortraitMaxAspect,
-			UIConfig.Layout.ShortLandscapeMaxHeightPx
-		)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.Inventory,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local inventoryLayout = UIConfig.Layout.Inventory
 	local cardWidth = panelSize.X * 0.930013 * 0.94076 * 0.94
 	local _, cardSize = ResponsiveLayout.gridCellSize(

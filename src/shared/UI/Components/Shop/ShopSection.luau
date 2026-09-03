@@ -1,6 +1,6 @@
 -- Name: ShopSection.luau
 -- Author: Jack C.
--- Description: One titled storefront section, laying out its cards and its rotation countdown.
+-- Description: One category block in the storefront dashboard: a compact label, its rotation countdown, and the card grid the resolved layout gives its column.
 -- Created: 2026-08-23
 
 --!strict
@@ -8,24 +8,37 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ShopCard = require(script.Parent.ShopCard)
 local ShopCountdown = require(script.Parent.ShopCountdown)
 
 local c = React.createElement
 
-return function(props)
+local ShopUI = UIConfig.Layout.Shop
+
+export type Props = {
+	Section: any,
+	Class: any,
+	Grid: any,
+	Position: UDim2,
+	Width: number,
+	Height: number,
+	LayoutOrder: number?,
+	OnCardActivated: (any) -> (),
+	OnExpired: (() -> ())?,
+}
+
+return function(props: Props)
 	local section = props.Section
-	local columns = props.Compact and 2 or 3
-	local cardHeight = if props.Compact then 258 else 250
-	local gutter = 12
-	local rows = math.max(1, math.ceil(#section.cards / columns))
-	local contentHeight = if #section.cards == 0 then 62 else rows * cardHeight + math.max(rows - 1, 0) * gutter
+	local grid = props.Grid
+	local countdownAt = section.countdownAt
 	local children = {}
 	if #section.cards == 0 then
 		children.Empty = c(ResponsiveText, {
+			HostName = "Empty",
 			MeasurementFont = Enum.Font.SourceSansBold,
-			MaxTextSize = 22,
+			MaxTextSize = 20,
 			Native = {
 				BackgroundColor3 = Color3.fromRGB(58, 58, 58),
 				BackgroundTransparency = 0.42,
@@ -34,54 +47,53 @@ return function(props)
 					Enum.FontWeight.Bold,
 					Enum.FontStyle.Normal
 				),
-				Size = UDim2.new(1, 0, 0, 62),
+				Size = UDim2.fromScale(1, 1),
 				Text = "NEW ITEMS ARE ON THE WAY!",
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = 5,
 			},
 		}, {
-			UICorner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
+			UICorner = c("UICorner", { CornerRadius = UDim.new(0.16, 0) }),
 		})
 	else
 		children.UIGridLayout = c("UIGridLayout", {
-			CellPadding = UDim2.fromOffset(gutter, gutter),
-			CellSize = UDim2.new(1 / columns, -((columns - 1) * gutter / columns), 0, cardHeight),
-			FillDirectionMaxCells = columns,
+			CellPadding = UDim2.fromOffset(ShopUI.CardGapPx, ShopUI.CardGapPx),
+			CellSize = UDim2.fromOffset(grid.cardWidth, grid.cardHeight),
+			FillDirectionMaxCells = grid.columns,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		})
 		for index, card in section.cards do
-			children[card.id] = c("Frame", {
-				BackgroundTransparency = 1,
+			children[card.id] = c(ShopCard, {
+				Card = card,
+				CardHeight = grid.cardHeight,
+				Class = props.Class,
 				LayoutOrder = index,
-				Size = UDim2.fromScale(1, 1),
-			}, {
-				Card = c(ShopCard, {
-					Card = card,
-					LayoutOrder = index,
-					OnActivated = props.OnCardActivated,
-				}),
+				OnActivated = props.OnCardActivated,
 			})
 		end
 	end
 
 	return c("Frame", {
-		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder,
-		Size = UDim2.fromScale(1, 0),
+		Position = props.Position,
+		Size = UDim2.fromOffset(props.Width, props.Height),
 	}, {
+		-- A section label, not a second page title: it names the block and gets
+		-- out of the way of the cards underneath it.
 		Header = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = 1,
-			Size = UDim2.new(1, 0, 0, 54),
+			Size = UDim2.new(1, 0, 0, ShopUI.HeaderHeightPx),
 		}, {
 			Title = c(ResponsiveText, {
+				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 32,
+				MaxTextSize = ShopUI.HeaderTextSize,
 				Native = {
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Size = UDim2.new(0.68, 0, 0, 38),
+					Size = UDim2.new(if countdownAt then 0.62 else 1, 0, 0, ShopUI.HeaderHeightPx - 6),
 					Text = section.title,
 					TextColor3 = Color3.new(1, 1, 1),
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -90,37 +102,24 @@ return function(props)
 			}, {
 				UIStroke = c("UIStroke", {
 					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = 0.055,
+					Thickness = 0.06,
 				}),
 			}),
-			Countdown = if section.countdownAt
+			Countdown = if countdownAt
 				then c(ShopCountdown, {
-					ExpiresAt = section.countdownAt,
-					Position = UDim2.fromScale(0.7, 0),
-					Size = UDim2.new(0.3, 0, 0, 38),
+					ExpiresAt = countdownAt,
+					MaxTextSize = ShopUI.HeaderTextSize - 4,
+					Position = UDim2.fromScale(0.64, 0),
+					Size = UDim2.new(0.36, 0, 0, ShopUI.HeaderHeightPx - 6),
 					OnExpired = props.OnExpired,
 				})
 				else nil,
-			Divider = c("Frame", {
-				AnchorPoint = Vector2.new(0, 1),
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundTransparency = 0.18,
-				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(0, 42),
-				Size = UDim2.new(1, 0, 0, 3),
-				ZIndex = 6,
-			}),
 		}),
 		Content = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = 2,
-			Size = UDim2.new(1, 0, 0, contentHeight),
+			Size = UDim2.new(1, 0, 1, -ShopUI.HeaderHeightPx),
 		}, children),
-		Spacer = c("Frame", {
-			BackgroundTransparency = 1,
-			LayoutOrder = 3,
-			Size = UDim2.new(1, 0, 0, 22),
-		}),
 		UIListLayout = c("UIListLayout", {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),

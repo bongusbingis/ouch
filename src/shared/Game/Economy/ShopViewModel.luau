@@ -28,7 +28,7 @@ export type Card = {
 	hintText: string?,
 	status: string,
 	badge: string?,
-	thumbnail: string,
+	thumbnail: string?,
 	bonksPrice: number?,
 	originalBonksPrice: number?,
 	robuxPrice: number?,
@@ -103,21 +103,25 @@ local function metadataFor(metadata: { [string]: any }, kind: string, id: number
 	return metadata[`{kind}:{id}`]
 end
 
-local function productPresentation(definition: any, metadata: { [string]: any }): (string, number?, string)
+local function configuredIcon(definition: any): string?
+	if definition ~= nil and type(definition.Icon) == "string" and definition.Icon ~= "" then
+		return definition.Icon
+	end
+	return nil
+end
+
+local function productPresentation(definition: any, metadata: { [string]: any }): (string, number?)
 	if definition == nil or definition.CatalogStatus ~= "Active" or definition.Id == nil then
-		return "Preview", nil, ""
+		return "Preview", nil
 	end
 	local info = metadataFor(metadata, "Product", definition.Id)
 	if info == nil then
-		return "Loading", nil, ""
+		return "Loading", nil
 	end
 	if info.failed == true or info.isForSale == false or type(info.priceInRobux) ~= "number" then
-		return "Unavailable", nil, ""
+		return "Unavailable", nil
 	end
-	local thumbnail = if type(info.iconImageAssetId) == "number" and info.iconImageAssetId > 0
-		then `rbxassetid://{info.iconImageAssetId}`
-		else ""
-	return "Active", info.priceInRobux, thumbnail
+	return "Active", info.priceInRobux
 end
 
 local function previewItem(itemId: string, cosmetics: any): PreviewItem?
@@ -156,7 +160,7 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 	local crate = args.crates[crateId]
 	local cardId = if featured then `FeaturedCrate:{crateId}` else `Crate:{crateId}`
 	local _, product = productFor(args.products, "CrateId", crateId)
-	local productStatus, robuxPrice, productThumbnail = productPresentation(product, args.metadata)
+	local productStatus, robuxPrice = productPresentation(product, args.metadata)
 	local status = crate.CatalogStatus
 	local bonksPrice = crate.BonksPrice
 	local originalBonksPrice = nil
@@ -199,7 +203,7 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 		hintText = hintText,
 		status = status,
 		badge = if featured then "FEATURED" else nil,
-		thumbnail = if crate.Thumbnail ~= "" then crate.Thumbnail else productThumbnail,
+		thumbnail = if crate.Thumbnail ~= "" then crate.Thumbnail else configuredIcon(product),
 		bonksPrice = bonksPrice,
 		originalBonksPrice = if originalBonksPrice ~= bonksPrice then originalBonksPrice else nil,
 		robuxPrice = if productStatus == "Active" then robuxPrice else nil,
@@ -227,7 +231,7 @@ local function bundleCard(args: any, bundleId: string): Card?
 		return nil
 	end
 	local _, product = productFor(args.products, "BundleId", bundleId)
-	local productStatus, robuxPrice, thumbnail = productPresentation(product, args.metadata)
+	local productStatus, robuxPrice = productPresentation(product, args.metadata)
 	local previews = {}
 	local owned = #bundle.ItemIds > 0
 	for _, itemId in bundle.ItemIds do
@@ -250,7 +254,7 @@ local function bundleCard(args: any, bundleId: string): Card?
 		hintText = "LIMITED WEEKLY COLLECTION",
 		status = status,
 		badge = "WEEKLY BUNDLE",
-		thumbnail = thumbnail,
+		thumbnail = configuredIcon(product),
 		bonksPrice = nil,
 		originalBonksPrice = nil,
 		robuxPrice = robuxPrice,
@@ -275,7 +279,7 @@ local function cosmeticCard(args: any, offer: any): Card?
 		return nil
 	end
 	local _, product = productFor(args.products, "ItemId", offer.itemId)
-	local productStatus, robuxPrice, thumbnail = productPresentation(product, args.metadata)
+	local productStatus, robuxPrice = productPresentation(product, args.metadata)
 	local owned = args.owned[offer.itemId] == true
 	local preview = previewItem(offer.itemId, args.cosmetics)
 	local status = if owned
@@ -291,7 +295,7 @@ local function cosmeticCard(args: any, offer: any): Card?
 		hintText = nil,
 		status = status,
 		badge = definition.Rarity,
-		thumbnail = if definition.Thumbnail ~= "" then definition.Thumbnail else thumbnail,
+		thumbnail = if definition.Thumbnail ~= "" then definition.Thumbnail else nil,
 		bonksPrice = offer.bonksPrice,
 		originalBonksPrice = nil,
 		robuxPrice = if productStatus == "Active" then robuxPrice else nil,
@@ -312,7 +316,7 @@ local function cosmeticCard(args: any, offer: any): Card?
 end
 
 local function productCard(args: any, key: string, definition: any): Card
-	local status, robuxPrice, thumbnail = productPresentation(definition, args.metadata)
+	local status, robuxPrice = productPresentation(definition, args.metadata)
 	local info = metadataFor(args.metadata, "Product", definition.Id)
 	local owned = definition.Type == "SeasonPass"
 		and definition.SeasonId ~= nil
@@ -329,7 +333,7 @@ local function productCard(args: any, key: string, definition: any): Card
 		hintText = if definition.Type == "SeasonPass" then "PREMIUM SEASON REWARDS" else nil,
 		status = if owned then "Owned" else status,
 		badge = if definition.Type == "SeasonPass" then "SEASON PASS" else nil,
-		thumbnail = thumbnail,
+		thumbnail = configuredIcon(definition),
 		bonksPrice = nil,
 		originalBonksPrice = nil,
 		robuxPrice = robuxPrice,
@@ -352,7 +356,6 @@ local function passCard(args: any, key: string, definition: any): Card
 	local info = metadataFor(args.metadata, "GamePass", definition.Id)
 	local status = definition.CatalogStatus
 	local price = nil
-	local thumbnail = ""
 	if status == "Active" then
 		if info == nil then
 			status = "Loading"
@@ -360,9 +363,6 @@ local function passCard(args: any, key: string, definition: any): Card
 			status = "Unavailable"
 		else
 			price = info.priceInRobux
-			if type(info.iconImageAssetId) == "number" and info.iconImageAssetId > 0 then
-				thumbnail = `rbxassetid://{info.iconImageAssetId}`
-			end
 		end
 	end
 	local owned = args.ownedPasses[key] == true
@@ -377,7 +377,7 @@ local function passCard(args: any, key: string, definition: any): Card
 		description = definition.Description,
 		status = if owned then "Owned" else status,
 		badge = "PERMANENT",
-		thumbnail = thumbnail,
+		thumbnail = configuredIcon(definition),
 		bonksPrice = nil,
 		originalBonksPrice = nil,
 		robuxPrice = price,

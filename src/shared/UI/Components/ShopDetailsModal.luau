@@ -40,19 +40,6 @@ local function pityText(pity: { [string]: number }?): string
 	return table.concat(entries, "  •  ")
 end
 
-local function withSeparators(value: number): string
-	local text = tostring(math.floor(value))
-	local out = text
-	while true do
-		local replaced, count = string.gsub(out, "^(%-?%d+)(%d%d%d)", "%1,%2")
-		out = replaced
-		if count == 0 then
-			break
-		end
-	end
-	return out
-end
-
 -- One row, one shape: every option reads as "how many" over "what it costs", so
 -- the quantities compare at a glance instead of each carrying its own format.
 -- Robux is the same shape but the red variant, because it is a different
@@ -73,7 +60,7 @@ local function quantityButtons(card, quantities: { number }, firstButtonRef, pro
 			Position = UDim2.fromScale(gap * index + width * (index - 0.5), 1),
 			Size = UDim2.fromScale(width, 0.88),
 			Text = `{quantity}x`,
-			SubText = withSeparators(total),
+			SubBonks = total,
 			SubTextColor = if affordable then Color3.fromRGB(255, 240, 190) else Color3.fromRGB(255, 176, 176),
 			OnActivated = function()
 				props.OnPurchaseBonks(quantity)
@@ -102,13 +89,12 @@ end
 return function(props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
-	local panelSize =
-		ResponsiveLayout.panelSize(
-			safeArea.size,
-			UIConfig.Layout.Panels.ShopDetails,
-			UIConfig.Layout.PortraitMaxAspect,
-			UIConfig.Layout.ShortLandscapeMaxHeightPx
-		)
+	local panelSize = ResponsiveLayout.panelSize(
+		safeArea.size,
+		UIConfig.Layout.Panels.ShopDetails,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	)
 	local card = props.Card
 	local reducedMotion = useReducedMotion()
 	local firstButtonRef = React.useRef(nil)
@@ -195,7 +181,10 @@ return function(props)
 
 	local hasBonks = card.bonksPrice ~= nil
 	local hasRobux = card.productId ~= nil and card.robuxPrice ~= nil
-	local bonksText = if card.affordable then `{card.bonksPrice} BONKS` else `NEED {card.bonksPrice} BONKS`
+	-- Affordability is carried by the colour of the amount rather than by a word
+	-- in front of it, so the price reads the same shape whether or not it is
+	-- within reach.
+	local bonksColor = if card.affordable then Color3.new(1, 1, 1) else Color3.fromRGB(255, 176, 176)
 	local quantities = if card.kind == "Crate" then card.openQuantities else nil
 	local isBulk = quantities ~= nil and #quantities > 1
 
@@ -330,7 +319,8 @@ return function(props)
 							Enabled = card.affordable and not card.pending,
 							Position = if hasRobux then UDim2.fromScale(0.25, 1) else UDim2.fromScale(0.38, 1),
 							Size = if hasRobux then UDim2.fromScale(0.44, 0.72) else UDim2.fromScale(0.58, 0.72),
-							Text = bonksText,
+							BonksAmount = card.bonksPrice,
+							BonksColor = bonksColor,
 							OnActivated = function()
 								props.OnPurchaseBonks(1)
 							end,

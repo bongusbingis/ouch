@@ -160,7 +160,6 @@ local function requestMetadata(kind: string, id: number, infoType: Enum.InfoType
 			nextMetadata[key] = {
 				name = info.Name,
 				priceInRobux = info.PriceInRobux,
-				iconImageAssetId = info.IconImageAssetId,
 				isForSale = info.IsForSale ~= false,
 			}
 		else

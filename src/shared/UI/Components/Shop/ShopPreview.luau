@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local InventoryPreview = require(script.Parent.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 
@@ -19,10 +20,30 @@ return React.memo(function(props)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Image = props.Thumbnail,
-			Position = UDim2.fromScale(0.5, 0.5),
+			Position = props.ThumbnailPosition or UDim2.fromScale(0.5, 0.5),
 			ScaleType = Enum.ScaleType.Fit,
-			Size = UDim2.fromScale(0.82, 0.82),
+			-- Fitted to the whole artwork band rather than to a square inside it:
+			-- the shop's icons are all wider than they are tall, so a square box
+			-- would leave the band's width unused and shrink them. Artwork is
+			-- authored with its own margin, so only a hairline is held back here.
+			Size = props.ThumbnailSize or UDim2.fromScale(0.94, 0.94),
 			ZIndex = props.ZIndex or 5,
+		})
+	end
+	-- A currency offer with no artwork of its own shows what it grants as the
+	-- coin plus the amount, the same way every price in the shop is written.
+	if props.PlaceholderBonks then
+		return c(BonksLabel, {
+			Amount = props.PlaceholderBonks,
+			MaxTextSize = 34,
+			TextStroke = 0.05,
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromScale(0.9, 0.62),
+				ZIndex = props.ZIndex or 5,
+			},
 		})
 	end
 	if #props.Items == 0 then
