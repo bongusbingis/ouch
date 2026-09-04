@@ -14,17 +14,25 @@ export type SurfaceMaps = {
 	MetalnessMapId: number?,
 	NormalMapId: number?,
 	RoughnessMapId: number?,
+	EmissiveStrength: number?,
 }
 
 export type VisualDef = {
 	Template: string,
+	MeshId: number?,
+	Size: Vector3?,
 	Color: Color3?,
+	Material: Enum.Material?,
 	TextureId: number?,
+	SurfaceMaps: SurfaceMaps?,
 }
 
 export type VisualTemplateDef = {
-	CarrierName: string,
 	MeshId: number,
+	Size: Vector3,
+	Color: Color3,
+	Material: Enum.Material,
+	EffectsCarrier: string?,
 	SurfaceMaps: SurfaceMaps?,
 }
 
@@ -51,6 +59,7 @@ export type ItemDef = {
 	Thumbnail: string,
 	SplatColor: Color3?,
 	AlwaysAvailable: boolean?,
+	ShopEligible: boolean?,
 	SortOrder: number?,
 	PreviewColor: Color3?,
 	Visual: VisualDef?,
@@ -92,12 +101,17 @@ local Slots = {
 
 local VisualTemplates: { [string]: VisualTemplateDef } = {
 	Dodgeball = {
-		CarrierName = "DodgeballBase",
 		MeshId = 126364964183882,
+		Size = Vector3.new(2, 2, 2),
+		Color = Color3.fromRGB(248, 248, 248),
+		Material = Enum.Material.SmoothPlastic,
+		EffectsCarrier = "DodgeballBase",
 	},
 	Hammer = {
-		CarrierName = "HammerBase",
 		MeshId = 95803748037612,
+		Size = Vector3.new(1.28, 6.395, 3.156),
+		Color = Color3.fromRGB(163, 162, 165),
+		Material = Enum.Material.ForceField,
 		SurfaceMaps = {
 			ColorMapId = 91752383385405,
 			MetalnessMapId = 90467888299989,
@@ -146,20 +160,6 @@ local Defaults: { [string]: DefaultDef } = {
 	},
 }
 
-local function ballAsset(rarity: string, displayName: string, color: Color3, splatColor: Color3): ItemDef
-	return {
-		Category = "BallAssets",
-		Rarity = rarity,
-		DisplayName = displayName,
-		Thumbnail = "",
-		SplatColor = splatColor,
-		Visual = {
-			Template = "Dodgeball",
-			Color = color,
-		},
-	}
-end
-
 local function characterColor(displayName: string, color: Color3, sortOrder: number): ItemDef
 	return {
 		Category = "CharacterColor",
@@ -196,16 +196,6 @@ local Items: { [string]: ItemDef } = {
 	CharacterColorPurple = characterColor("Purple", Color3.fromRGB(160, 60, 255), 6),
 
 	ElimSoundClang = eliminationEffect("Common", "Clang", "ClangElimination", 10),
-
-	BallRed = ballAsset("Common", "Red Ball", Color3.fromRGB(151, 0, 0), Color3.fromRGB(235, 60, 60)),
-	BallBlue = ballAsset("Common", "Blue Ball", Color3.fromRGB(13, 105, 172), Color3.fromRGB(65, 120, 235)),
-	BallWhite = ballAsset("Common", "White Ball", Color3.fromRGB(248, 248, 248), Color3.fromRGB(240, 240, 240)),
-	BallBlack = ballAsset("Common", "Black Ball", Color3.fromRGB(17, 17, 17), Color3.fromRGB(45, 45, 45)),
-	BallOrange = ballAsset("Rare", "Orange Ball", Color3.fromRGB(255, 102, 0), Color3.fromRGB(240, 140, 40)),
-	BallGreen = ballAsset("Rare", "Green Ball", Color3.fromRGB(52, 142, 64), Color3.fromRGB(90, 200, 80)),
-	BallPink = ballAsset("Rare", "Pink Ball", Color3.fromRGB(255, 102, 204), Color3.fromRGB(240, 120, 190)),
-	BallPurple = ballAsset("Legendary", "Purple Ball", Color3.fromRGB(98, 37, 209), Color3.fromRGB(150, 80, 220)),
-	BallYellow = ballAsset("Legendary", "Yellow Ball", Color3.fromRGB(255, 255, 0), Color3.fromRGB(240, 210, 60)),
 
 	ConfettiImpact = {
 		Category = "ImpactEffectAssets",
@@ -317,6 +307,18 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 110,
 	},
 }
+
+local DodgeballItems = require(script.Parent.DodgeballItems)
+local HammerItems = require(script.Parent.HammerItems)
+
+for itemId, def in DodgeballItems do
+	assert(Items[itemId] == nil, `[Cosmetics] duplicate item id: {itemId}`)
+	Items[itemId] = def
+end
+for itemId, def in HammerItems do
+	assert(Items[itemId] == nil, `[Cosmetics] duplicate item id: {itemId}`)
+	Items[itemId] = def
+end
 
 return {
 	Rarities = Rarities,

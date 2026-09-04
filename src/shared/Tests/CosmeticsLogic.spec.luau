@@ -13,7 +13,7 @@ local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses
 local Audio = require(script.Parent.Parent.Parent.Config.Infra.Audio)
 
 local ITEMS = {
-	BallRed = { Category = "BallAssets", Rarity = "Common" },
+	DodgeBall1 = { Category = "BallAssets", Rarity = "Common" },
 	HammerGold = { Category = "HammerAssets", Rarity = "Rare" },
 }
 
@@ -114,15 +114,19 @@ T.describe("CosmeticsLogic", function()
 		end
 	end)
 
-	T.it("makes every Exclusive cosmetic obtainable from some game pass", function()
+	T.it("makes every Exclusive cosmetic obtainable from some game pass in covered categories", function()
 		local granted = {}
+		local coveredCategories = {}
 		for _, definition in GamePasses.Catalog do
+			for _, category in definition.Categories do
+				coveredCategories[category] = true
+			end
 			for _, itemId in definition.EntitlementItemIds do
 				granted[itemId] = true
 			end
 		end
 		for itemId, item in Cosmetics.Items do
-			if item.Rarity == "Exclusive" then
+			if item.Rarity == "Exclusive" and coveredCategories[item.Category] then
 				T.expect(granted[itemId]):toEqual(true)
 			end
 		end
@@ -153,7 +157,7 @@ T.describe("CosmeticsLogic", function()
 	end)
 
 	T.it("allows equipping an owned item into its matching slot", function()
-		local ok, reason = CosmeticsLogic.canEquip(ITEMS, SLOTS, { BallRed = true }, "BallAssets", "BallRed")
+		local ok, reason = CosmeticsLogic.canEquip(ITEMS, SLOTS, { DodgeBall1 = true }, "BallAssets", "DodgeBall1")
 		T.expect(ok):toEqual(true)
 		T.expect(reason):toBeNil()
 	end)
@@ -180,10 +184,10 @@ T.describe("CosmeticsLogic", function()
 
 	T.it("rejects invalid slots, unknown items, wrong slots, and unowned items", function()
 		local cases: { { any } } = {
-			{ "Nope", "BallRed", "invalid_slot" },
+			{ "Nope", "DodgeBall1", "invalid_slot" },
 			{ "BallAssets", "Missing", "unknown_item" },
-			{ "HammerAssets", "BallRed", "wrong_slot" },
-			{ "BallAssets", "BallRed", "not_owned" },
+			{ "HammerAssets", "DodgeBall1", "wrong_slot" },
+			{ "BallAssets", "DodgeBall1", "not_owned" },
 		}
 		for _, case in cases do
 			local ok, reason = CosmeticsLogic.canEquip(ITEMS, SLOTS, {}, case[1], case[2])

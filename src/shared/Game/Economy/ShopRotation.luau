@@ -10,7 +10,7 @@ local ShopRotation = {}
 local MODULUS = 2147483647
 local MULTIPLIER = 16807
 
-type ItemDef = { Category: string, AlwaysAvailable: boolean?, [string]: any }
+type ItemDef = { Category: string, Rarity: string, AlwaysAvailable: boolean?, ShopEligible: boolean?, [string]: any }
 
 local function step(state: number): number
 	return (MULTIPLIER * state) % MODULUS
@@ -30,8 +30,12 @@ function ShopRotation.pool(items: { [string]: ItemDef }, categories: { string })
 	end
 	local pool = {}
 	for itemId, item in items do
-		if wanted[item.Category] and item.AlwaysAvailable ~= true then
-			table.insert(pool, itemId)
+		local inCategory = wanted[item.Category]
+		local eligible = item.ShopEligible
+		if (inCategory and eligible ~= false) or (eligible == true) then
+			if item.AlwaysAvailable ~= true and item.Rarity ~= "Exclusive" then
+				table.insert(pool, itemId)
+			end
 		end
 	end
 	table.sort(pool)

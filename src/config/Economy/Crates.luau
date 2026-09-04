@@ -59,7 +59,7 @@ local Catalog: { [string]: CrateDef } = {
 		DisplayName = "Hammers",
 		DisplayOrder = 200,
 		Thumbnail = "",
-		CatalogStatus = "Preview",
+		CatalogStatus = "Active",
 		BonksPrice = 500,
 		Pity = { Rare = 5, Legendary = 25 },
 		OpenQuantities = OPEN_QUANTITIES,

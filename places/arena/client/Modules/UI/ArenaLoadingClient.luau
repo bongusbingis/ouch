@@ -338,7 +338,9 @@ local function criticalInstances(): { Instance }
 	end
 	local templates = assets:WaitForChild("Cosmetics"):WaitForChild("Templates")
 	for _, template in Cosmetics.VisualTemplates do
-		add(templates:WaitForChild(template.CarrierName))
+		if template.EffectsCarrier then
+			add(templates:WaitForChild(template.EffectsCarrier))
+		end
 	end
 	return result
 end

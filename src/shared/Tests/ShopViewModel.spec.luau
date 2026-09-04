@@ -26,7 +26,7 @@ local function build(overrides)
 		shopState = {
 			serverNow = now,
 			offers = {
-				{ itemId = "BallRed", rarity = "Common", displayName = "Red Ball", bonksPrice = 1200 },
+				{ itemId = "DodgeBall1", rarity = "Common", displayName = "Red Ball", bonksPrice = 1200 },
 			},
 			offersExpireAt = now + 100,
 			featured = { kind = "Crate", id = "DodgeballCrate" },
@@ -84,21 +84,21 @@ T.describe("ShopViewModel", function()
 	T.it("uses an aspirational crate reward instead of the first alphabetic item", function()
 		local model = build(nil)
 		local card = model.byId["FeaturedCrate:DodgeballCrate"]
-		T.expect(card.previewItems[1].itemId):toEqual("BallPurple")
+		T.expect(card.previewItems[1].itemId):toEqual("DodgeBall19")
 	end)
 
 	T.it("uses Replica ownership instead of the offer snapshot", function()
 		local model = build({
-			economyData = { Bonks = 2500, Cosmetics = { Owned = { BallRed = true }, Equipped = {} } },
+			economyData = { Bonks = 2500, Cosmetics = { Owned = { DodgeBall1 = true }, Equipped = {} } },
 		})
-		local card = model.byId["Cosmetic:BallRed"]
+		local card = model.byId["Cosmetic:DodgeBall1"]
 		T.expect(card.owned):toEqual(true)
 		T.expect(card.status):toEqual("Owned")
 	end)
 
 	T.it("omits redundant card hints while retaining useful crate pricing", function()
 		local model = build(nil)
-		T.expect(model.byId["Cosmetic:BallRed"].hintText):toBeNil()
+		T.expect(model.byId["Cosmetic:DodgeBall1"].hintText):toBeNil()
 		T.expect(model.byId["FeaturedCrate:DodgeballCrate"].hintText):toEqual("425 BONKS  |  WAS 500")
 	end)
 
@@ -112,7 +112,7 @@ T.describe("ShopViewModel", function()
 	T.it("keeps previews disabled and active products pending metadata", function()
 		local model = build(nil)
 		T.expect(model.byId["Bundle:StarterOutfitBundle"].status):toEqual("Preview")
-		T.expect(model.byId["Crate:HammerCrate"].status):toEqual("Preview")
+		T.expect(model.byId["Crate:HammerCrate"].status):toEqual("Active")
 		T.expect(model.byId["Product:Bonks500"].status):toEqual("Loading")
 	end)
 

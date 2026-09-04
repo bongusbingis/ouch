@@ -24,76 +24,25 @@ local ScriptEffects = require(
 local Client = StarterPlayer:WaitForChild("StarterPlayerScripts"):WaitForChild("Client")
 local HammerGrip = require(Client:WaitForChild("Modules"):WaitForChild("Presentation"):WaitForChild("HammerGrip"))
 
-local function numericAssetId(contentId)
-	return tonumber(string.match(contentId, "%d+"))
-end
-
 return function()
 	describe("Cosmetics assets", function()
-		it("has every configured MeshPart carrier with its catalog mesh", function()
+		it("has the effects carrier for templates that declare one", function()
 			for _, definition in Cosmetics.VisualTemplates do
-				local carrier =
-					TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "Templates", definition.CarrierName)
-				expect(carrier:IsA("MeshPart")).to.equal(true)
-				expect(numericAssetId(carrier.MeshId)).to.equal(definition.MeshId)
+				if definition.EffectsCarrier then
+					local carrier =
+						TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "Templates", definition.EffectsCarrier)
+					expect(carrier:IsA("MeshPart")).to.equal(true)
+				end
 			end
 		end)
 
-		it("keeps the authored hammer PBR maps on its carrier", function()
-			local carrier = TestAssets.get(
-				ReplicatedStorage,
-				"Assets",
-				"Cosmetics",
-				"Templates",
-				Cosmetics.VisualTemplates.Hammer.CarrierName
-			)
-			local appearance = TestAssets.get(carrier, "SurfaceAppearance")
-			local maps = Cosmetics.VisualTemplates.Hammer.SurfaceMaps
-			expect(appearance:IsA("SurfaceAppearance")).to.equal(true)
-			local ok, colorId = pcall(function()
-				return numericAssetId(appearance.ColorMap)
-			end)
-			if ok and colorId then
-				expect(colorId).to.equal(maps.ColorMapId)
-			end
-			local ok_metal, metalId = pcall(function()
-				return numericAssetId(appearance.MetalnessMap)
-			end)
-			if ok_metal and metalId then
-				expect(metalId).to.equal(maps.MetalnessMapId)
-			end
-			local ok_normal, normalId = pcall(function()
-				return numericAssetId(appearance.NormalMap)
-			end)
-			if ok_normal and normalId then
-				expect(normalId).to.equal(maps.NormalMapId)
-			end
-			local ok_rough, roughId = pcall(function()
-				return numericAssetId(appearance.RoughnessMap)
-			end)
-			if ok_rough and roughId then
-				expect(roughId).to.equal(maps.RoughnessMapId)
-			end
-		end)
-
-		it("resolves the hammer carrier grip without an ambiguous axis", function()
-			local carrier = TestAssets.get(
-				ReplicatedStorage,
-				"Assets",
-				"Cosmetics",
-				"Templates",
-				Cosmetics.VisualTemplates.Hammer.CarrierName
-			)
-			local attachment = carrier:FindFirstChild("GripAttachment")
-			if attachment then
-				expect(attachment:IsA("Attachment")).to.equal(true)
-			else
-				local size = carrier.Size
-				local config = Combat.Hammer.AutoGrip
-				local solution =
-					HammerGrip.solve(size.X, size.Y, size.Z, config.MinAxisDominanceRatio, config.GripAlongLongAxis)
-				expect(solution).to.be.ok()
-			end
+		it("resolves the hammer grip from config Size without an ambiguous axis", function()
+			local templateDef = Cosmetics.VisualTemplates.Hammer
+			local size = templateDef.Size
+			local config = Combat.Hammer.AutoGrip
+			local solution =
+				HammerGrip.solve(size.X, size.Y, size.Z, config.MinAxisDominanceRatio, config.GripAlongLongAxis)
+			expect(solution).to.be.ok()
 		end)
 
 		it("has real audio behind every elimination effect, default included", function()
