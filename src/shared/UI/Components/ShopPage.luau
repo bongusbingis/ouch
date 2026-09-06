@@ -132,9 +132,14 @@ local function resolveSpans(entries, unit: number): ()
 	end
 end
 
-local function measure(entries, unit: number): ()
+local function measure(entries, unit: number, short: boolean): ()
 	for _, entry in entries do
 		local class = ShopUI.CardClasses[entry.style.Class]
+		if short then
+			class = table.clone(class)
+			class.MinHeightPx = ShopUI.ShortCardHeightPx
+			class.MaxHeightPx = ShopUI.ShortCardHeightPx
+		end
 		entry.class = class
 		entry.width = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
 		entry.grid = ShopLayout.grid(entry.width, #entry.cards, class, ShopUI.CardGapPx, entry.style.MaxColumns)
@@ -142,11 +147,11 @@ local function measure(entries, unit: number): ()
 	end
 end
 
-local function renderBlocks(model, contentWidth: number, handlers): ({ [string]: any }, number)
+local function renderBlocks(model, contentWidth: number, handlers, short: boolean): ({ [string]: any }, number)
 	local unit = ShopLayout.trackUnit(contentWidth, ShopUI.Tracks, ShopUI.GapPx)
 	local entries = orderedEntries(model, unit)
 	resolveSpans(entries, unit)
-	measure(entries, unit)
+	measure(entries, unit, short)
 	local placements, bottom = ShopLayout.place(entries, ShopUI.Tracks, ShopUI.GapPx)
 	local children = {}
 	for order, placement in placements do
@@ -226,7 +231,7 @@ export type Props = {
 }
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.Shop,
@@ -236,7 +241,9 @@ return function(props: Props)
 	local model = props.Model
 	local contentWidth, setContentWidth = React.useState(estimateContentWidth(panelSize.X))
 
-	local content, bottom = renderBlocks(model, contentWidth, props)
+	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local content, bottom = renderBlocks(model, contentWidth, props, short)
 	content.UIPadding = c("UIPadding", {
 		PaddingLeft = UDim.new(0, ShopUI.PaddingXPx),
 		PaddingRight = UDim.new(0, ShopUI.PaddingXPx),
@@ -253,7 +260,7 @@ return function(props: Props)
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://124751224634629",
 		LayoutOrder = 5,
-		Position = props.Position or UDim2.fromScale(0.5, 0.56),
+		Position = props.Position or UIConfig.Layout.PagePosition,
 		ScaleType = Enum.ScaleType.Slice,
 		SliceCenter = Rect.new(31, 41, 978, 620),
 		SliceScale = 0.5,
@@ -263,8 +270,6 @@ return function(props: Props)
 			MeasurementFont = Enum.Font.LuckiestGuy,
 			MaxTextSize = 62,
 			Native = {
-				--BackgroundColor3 = Color3.fromRGB(63, 63, 63),
-				--BorderSizePixel = 0,
 				BackgroundTransparency = 1,
 				Position = UDim2.fromScale(0.291804, 0.0540634),
 				Size = UDim2.fromScale(0.398251, 0.0898091),
@@ -274,6 +279,16 @@ return function(props: Props)
 				ZIndex = 5,
 			},
 		}),
+		Refreshing = if model.status == "Refreshing"
+			then c(ActivityDots, {
+				Active = true,
+				Native = {
+					Position = UDim2.fromScale(0.18, 0.09),
+					Size = UDim2.fromScale(0.08, 0.025),
+					ZIndex = 6,
+				},
+			})
+			else nil,
 		Bonks = c(BonksLabel, {
 			Amount = model.bonks,
 			MaxTextSize = 36,

@@ -47,7 +47,11 @@ local function assignTwoTeams(groups: { Group }, teams: { string }): { [string]:
 		local size = #group.members
 		total += size
 		local additions = {}
-		for sum, selected in reachable do
+		for sum = 0, total - size do
+			local selected = reachable[sum]
+			if selected == nil then
+				continue
+			end
 			local nextSum = sum + size
 			if reachable[nextSum] == nil and additions[nextSum] == nil then
 				local nextSelected = table.clone(selected)

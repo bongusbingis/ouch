@@ -96,6 +96,27 @@ T.describe("CrateOdds", function()
 		end
 	end)
 
+	T.it("discloses exactly the guaranteed roll, including simultaneous pity thresholds", function()
+		local items = {
+			C = { Rarity = "Common" },
+			R = { Rarity = "Rare" },
+			L1 = { Rarity = "Legendary" },
+			L2 = { Rarity = "Legendary" },
+		}
+		local crate = { ItemPool = { "C", "R", "L1", "L2" }, Pity = { Rare = 5, Legendary = 25 } }
+		local rare = CrateOdds.build(crate, items, RARITIES, { Rare = 4 })
+		T.expect(rare.forcedRarity):toEqual("Rare")
+		T.expect(CrateOdds.percentByItem(rare, 2).R):toEqual(100)
+		local legendary = CrateOdds.build(crate, items, RARITIES, { Rare = 4, Legendary = 24 })
+		local percents = CrateOdds.percentByItem(legendary, 2)
+		T.expect(legendary.forcedRarity):toEqual("Legendary")
+		T.expect(percents.C):toEqual(0)
+		T.expect(percents.R):toEqual(0)
+		T.expect(percents.L1):toEqual(50)
+		T.expect(percents.L2):toEqual(50)
+		T.expect(CrateOdds.percentByRarity(legendary, RARITIES, 2).Legendary):toEqual(100)
+	end)
+
 	T.it("formats whole percentages without decimals", function()
 		T.expect(CrateOdds.formatPercent(25, 2)):toEqual("25")
 		T.expect(CrateOdds.formatPercent(11.11, 2)):toEqual("11.11")

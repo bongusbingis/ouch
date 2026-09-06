@@ -122,6 +122,7 @@ return function(target: Instance)
 				},
 			},
 			OnClaimQuest = function() end,
+			OnClaimSeason = function() end,
 		})
 	)
 end

@@ -44,6 +44,16 @@ local definitions = {
 }
 
 T.describe("QuestLogic", function()
+	T.it("does not award a completed-match quest for an abandoned contest", function()
+		T.expect(
+			QuestLogic.progressForEvent(
+				definitions[3],
+				{ kind = "MatchEnded", reason = "NoContest" },
+				{ playerId = "1" }
+			)
+		)
+			:toEqual(0)
+	end)
 	T.it("generates deterministic daily quest ids", function()
 		local first = QuestLogic.selectDailyQuestIds(123, "2026-07-13", definitions, 3)
 		local second = QuestLogic.selectDailyQuestIds(123, "2026-07-13", definitions, 3)

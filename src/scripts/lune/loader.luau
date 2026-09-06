@@ -52,12 +52,16 @@ local FakeVector3 = {
 	new = function(x: number?, y: number?, z: number?)
 		return { X = x or 0, Y = y or 0, Z = z or 0 }
 	end,
+	zero = { X = 0, Y = 0, Z = 0 },
+	one = { X = 1, Y = 1, Z = 1 },
 }
 
 local FakeVector2 = {
 	new = function(x: number?, y: number?)
 		return { X = x or 0, Y = y or 0 }
 	end,
+	zero = { X = 0, Y = 0 },
+	one = { X = 1, Y = 1 },
 }
 
 local FakeNumberRange = {

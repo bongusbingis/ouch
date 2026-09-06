@@ -16,6 +16,8 @@ local MatchAudio = {}
 local started = false
 local matchState: Folder? = nil
 local phaseConnection: RBXScriptConnection? = nil
+local timeConnection: RBXScriptConnection? = nil
+local lastSeconds: any = nil
 local musicEndedConnection: RBXScriptConnection? = nil
 local currentMusic: Sound? = nil
 local currentMode: MatchAudioLogic.MusicMode? = nil
@@ -94,12 +96,45 @@ local function setMusicMode(mode: MatchAudioLogic.MusicMode?)
 	end
 end
 
+local function playCue(name: string)
+	local cue = AudioConfig.Effects[name]
+	ClientAudio.play({
+		name = name,
+		assetId = cue.AssetId,
+		category = "Effects",
+		volume = cue.Volume,
+		maxLifetimeSeconds = cue.MaxLifetimeSeconds,
+	})
+end
+
+local function onTimeChanged()
+	local state = matchState
+	if state == nil then
+		return
+	end
+	local seconds = state:GetAttribute("timeRemaining")
+	if
+		MatchAudioLogic.shouldPlayTick(
+			state:GetAttribute("phase"),
+			lastSeconds,
+			seconds,
+			AudioConfig.Effects.FinalSeconds.Threshold
+		)
+	then
+		playCue("FinalSeconds")
+	end
+	lastSeconds = seconds
+end
+
 local function onPhaseChanged()
 	local state = matchState
 	if state == nil then
 		return
 	end
 	local phase = state:GetAttribute("phase")
+	if MatchAudioLogic.shouldPlayStart(lastPhase, phase) then
+		playCue("MatchStart")
+	end
 	if MatchAudioLogic.shouldPlayWhistle(lastPhase, phase) then
 		local whistle = AudioConfig.Effects.MatchEndWhistle
 		ClientAudio.play({
@@ -112,6 +147,7 @@ local function onPhaseChanged()
 	end
 	setMusicMode(MatchAudioLogic.musicMode(phase))
 	lastPhase = phase
+	lastSeconds = nil
 end
 
 function MatchAudio.start()
@@ -125,9 +161,15 @@ function MatchAudio.start()
 	lastPhase = state:GetAttribute("phase")
 	setMusicMode(MatchAudioLogic.musicMode(lastPhase))
 	phaseConnection = state:GetAttributeChangedSignal("phase"):Connect(onPhaseChanged)
+	timeConnection = state:GetAttributeChangedSignal("timeRemaining"):Connect(onTimeChanged)
 end
 
 function MatchAudio._resetForTest()
+	if timeConnection then
+		timeConnection:Disconnect()
+	end
+	timeConnection = nil
+	lastSeconds = nil
 	if phaseConnection then
 		phaseConnection:Disconnect()
 	end

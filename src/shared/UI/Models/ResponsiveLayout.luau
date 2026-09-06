@@ -8,6 +8,8 @@ export type PanelVariant = {
 	MaxSize: Vector2,
 	AspectRatio: number?,
 	ShortHeightScale: number?,
+	ShortWidthScale: number?,
+	ShortAspectRatio: number?,
 }
 
 export type PanelSpec = {
@@ -28,11 +30,14 @@ export type MenuToggleLayout = {
 }
 
 export type SplashPanelConfig = {
+	DailyMinHeightPx: number?,
 	EdgePaddingPx: number,
 	GapPx: number,
 	Landscape: {
 		DailyBottomScale: number,
 		SeasonTopScale: number,
+		ShortTopPx: number?,
+		ShortBottomPx: number?,
 		QuestsTopScale: number,
 	},
 	Portrait: {
@@ -71,13 +76,33 @@ function ResponsiveLayout.safeRect(
 	insetMax: Vector2,
 	parentIsFullScreen: boolean
 ): SafeRect
-	local maximum =
-		Vector2.new(math.clamp(insetMax.X, insetMin.X, viewport.X), math.clamp(insetMax.Y, insetMin.Y, viewport.Y))
-	local minimum = Vector2.new(math.clamp(insetMin.X, 0, maximum.X), math.clamp(insetMin.Y, 0, maximum.Y))
+	-- The viewport is the harder constraint: it reads (1, 1) until the client has
+	-- rendered a frame, and an inset larger than it would otherwise invert the
+	-- clamp bounds and throw inside a render.
+	local limit = Vector2.new(math.max(viewport.X, 0), math.max(viewport.Y, 0))
+	local low = Vector2.new(math.clamp(insetMin.X, 0, limit.X), math.clamp(insetMin.Y, 0, limit.Y))
+	local maximum = Vector2.new(math.clamp(insetMax.X, low.X, limit.X), math.clamp(insetMax.Y, low.Y, limit.Y))
+	local minimum = Vector2.new(math.min(low.X, maximum.X), math.min(low.Y, maximum.Y))
 	return {
 		position = if parentIsFullScreen then minimum else Vector2.new(0, 0),
 		size = Vector2.new(maximum.X - minimum.X, maximum.Y - minimum.Y),
 	}
+end
+
+function ResponsiveLayout.insetRect(
+	viewport: Vector2,
+	deviceMin: Vector2,
+	deviceMax: Vector2,
+	parentMin: Vector2,
+	parentMax: Vector2
+): SafeRect
+	local parentSize =
+		Vector2.new(math.min(viewport.X, parentMax.X - parentMin.X), math.min(viewport.Y, parentMax.Y - parentMin.Y))
+	local minimum =
+		Vector2.new(math.max(deviceMin.X, parentMin.X) - parentMin.X, math.max(deviceMin.Y, parentMin.Y) - parentMin.Y)
+	local maximum =
+		Vector2.new(math.min(deviceMax.X, parentMax.X) - parentMin.X, math.min(deviceMax.Y, parentMax.Y) - parentMin.Y)
+	return ResponsiveLayout.safeRect(parentSize, minimum, maximum, true)
 end
 
 function ResponsiveLayout.panelSize(
@@ -90,10 +115,11 @@ function ResponsiveLayout.panelSize(
 	local variant = if portrait then spec.Portrait else spec.Landscape
 	local short = not portrait and shortLandscapeMaxHeight ~= nil and available.Y <= shortLandscapeMaxHeight
 	local heightScale = if short and variant.ShortHeightScale then variant.ShortHeightScale else variant.HeightScale
-	local width = math.min(available.X * variant.WidthScale, variant.MaxSize.X)
+	local widthScale = if short and variant.ShortWidthScale then variant.ShortWidthScale else variant.WidthScale
+	local width = math.min(available.X * widthScale, variant.MaxSize.X)
 	local height = math.min(available.Y * heightScale, variant.MaxSize.Y)
-	if variant.AspectRatio then
-		local aspect = variant.AspectRatio
+	local aspect = if short and variant.ShortAspectRatio then variant.ShortAspectRatio else variant.AspectRatio
+	if aspect then
 		if width / math.max(height, 1) > aspect then
 			width = height * aspect
 		else
@@ -120,7 +146,10 @@ function ResponsiveLayout.splashPanels(
 		local contentHeight = math.max(bottom - top - gap * 2, 3)
 		local totalWeight = portraitConfig.SeasonWeight + portraitConfig.DailyWeight + portraitConfig.QuestsWeight
 		local seasonHeight = math.max(math.floor(contentHeight * portraitConfig.SeasonWeight / totalWeight), 1)
-		local dailyHeight = math.max(math.floor(contentHeight * portraitConfig.DailyWeight / totalWeight), 1)
+		local dailyHeight = math.min(
+			math.max(math.floor(contentHeight * portraitConfig.DailyWeight / totalWeight), config.DailyMinHeightPx or 1),
+			contentHeight - seasonHeight - 1
+		)
 		local questsHeight = math.max(contentHeight - seasonHeight - dailyHeight, 1)
 		return {
 			portrait = true,
@@ -144,16 +173,26 @@ function ResponsiveLayout.splashPanels(
 		return ResponsiveLayout.panelSize(available, spec, portraitMaxAspect, shortLandscapeMaxHeight)
 	end
 	local dailySize = landscapeSize(config.Daily)
+	dailySize = Vector2.new(dailySize.X, math.max(dailySize.Y, config.DailyMinHeightPx or 1))
 	local seasonSize = landscapeSize(config.Season)
 	local questsSize = landscapeSize(config.Quests)
 	local edge = math.min(config.EdgePaddingPx, math.floor(available.X * 0.03))
-	local seasonTop = math.floor(available.Y * config.Landscape.SeasonTopScale)
+	local short = shortLandscapeMaxHeight ~= nil and available.Y <= shortLandscapeMaxHeight
+	local seasonTop = math.max(
+		math.floor(available.Y * config.Landscape.SeasonTopScale),
+		if short then config.Landscape.ShortTopPx or 0 else 0
+	)
 	local questsTop =
 		math.max(math.floor(available.Y * config.Landscape.QuestsTopScale), seasonTop + seasonSize.Y + config.GapPx)
+	local bottom = if short then available.Y - (config.Landscape.ShortBottomPx or 0) else available.Y
+	questsSize = Vector2.new(questsSize.X, math.min(questsSize.Y, math.max(44, bottom - questsTop)))
 	return {
 		portrait = false,
 		daily = {
-			position = Vector2.new(edge, math.floor(available.Y * config.Landscape.DailyBottomScale) - dailySize.Y),
+			position = Vector2.new(
+				edge,
+				math.min(bottom, math.floor(available.Y * config.Landscape.DailyBottomScale)) - dailySize.Y
+			),
 			size = dailySize,
 		},
 		season = {

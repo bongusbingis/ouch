@@ -14,6 +14,7 @@ export type CardClass = {
 	MaxPx: number,
 	Aspect: number,
 	MinHeightPx: number,
+	MaxHeightPx: number?,
 	Layout: string,
 	ArtScale: number?,
 	NameScale: number,
@@ -53,6 +54,9 @@ function ShopLayout.grid(available: number, count: number, class: CardClass, gap
 	-- Narrow columns would otherwise squash a landscape card until its name and
 	-- price button had nowhere to go, so a card squares up rather than flattens.
 	local cardHeight = math.max(math.floor(cardWidth * class.Aspect), class.MinHeightPx, 1)
+	if class.MaxHeightPx then
+		cardHeight = math.min(cardHeight, math.max(class.MinHeightPx, class.MaxHeightPx))
+	end
 	local rows = if count <= 0 then 0 else math.ceil(count / columns)
 	return {
 		columns = columns,

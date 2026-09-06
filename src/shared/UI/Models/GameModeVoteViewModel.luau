@@ -7,6 +7,17 @@
 
 local GameModeVoteViewModel = {}
 
+function GameModeVoteViewModel.description(rules: any, teamMode: boolean): string
+	local target = rules.ScoreTarget
+	if target == math.huge then
+		return "Survive until time runs out. Eliminated survivors join the infected."
+	end
+	local goal = if teamMode
+		then `First team to {target} eliminations wins.`
+		else `First to {target} eliminations wins.`
+	return goal .. (if teamMode then " Parties stay together." else " Everyone is a target.")
+end
+
 function GameModeVoteViewModel.formatVoteCount(count: number): string
 	return string.format("%03d", math.max(0, math.floor(count)))
 end

@@ -50,7 +50,15 @@ local Bundle: BundleConfig = {
 local Rotation: RotationConfig = {
 	RotationSeconds = 24 * 60 * 60,
 	OfferCount = 3,
-	Categories = { "CostumeAssets", "EmoteAssets" },
+	Categories = {
+		"BallAssets",
+		"HammerAssets",
+		"TrailAssets",
+		"ElimEffectAssets",
+		"ImpactEffectAssets",
+		"CostumeAssets",
+		"EmoteAssets",
+	},
 }
 
 assert(#Featured.Rotation > 0, "featured rotation must contain at least one entry")
@@ -71,6 +79,7 @@ local RobuxSymbol = "\u{E002}"
 
 return {
 	VariantId = VariantId,
+	MetadataRefreshSeconds = 300,
 	RobuxSymbol = RobuxSymbol,
 	Featured = Featured,
 	Bundle = Bundle,

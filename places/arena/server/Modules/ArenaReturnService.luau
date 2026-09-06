@@ -1,6 +1,6 @@
 -- Name: ArenaReturnService.luau
 -- Author: Jack C.
--- Description: Sends lobby-originated players back to the lobby place when a match resets, grouping one teleport per party, carrying the return payload, and retrying transient teleport failures while leaving direct joins alone.
+-- Description: Owns party continuation and lobby returns, grouping return intent and checking committed rewards through the shared retry coordinator.
 -- Created: 2026-08-18
 
 --!strict
@@ -80,23 +80,31 @@ local function partyGroups(): { [string]: { Player } }
 	return groups
 end
 
-local function sendGroup(partyId: string, matchId: string, players: { Player }, generation: number?)
+local function rewardPreflight(): TeleportRetryCoordinator.Preflight
 	local result = MatchService.resultSnapshot()
-	if
-		result
-		and not ProgressionService.awaitCommitted(players, result.resultId, PostMatchConfig.RewardCommitTimeoutSeconds)
-	then
-		for _, player in players do
-			dispatchInterrupted(player, "rewards_pending")
-		end
-		return
+	return function(players)
+		local committed = result == nil
+			or ProgressionService.awaitCommitted(players, result.resultId, PostMatchConfig.RewardCommitTimeoutSeconds)
+		return committed, if committed then nil else "rewards_pending"
 	end
-	local memberUserIds = ArenaSessionService.partyMemberUserIdsFor(players[1])
+end
+
+local function sendGroup(
+	partyId: string,
+	matchId: string,
+	players: { Player },
+	generation: number?,
+	queueOnArrival: boolean?
+)
+	local memberUserIds = {}
+	for _, member in players do
+		table.insert(memberUserIds, member.UserId)
+	end
 	local prepared = coordinator:Prepare(Env.LobbyPlaceId, players, function(_retryPlayers)
 		local options = Instance.new("TeleportOptions")
-		options:SetTeleportData(ReturnPayload.build(partyId, matchId, memberUserIds))
+		options:SetTeleportData(ReturnPayload.build(partyId, matchId, memberUserIds, "Party", queueOnArrival))
 		return options
-	end)
+	end, rewardPreflight())
 	if #prepared == 0 then
 		return
 	end
@@ -144,8 +152,9 @@ end
 
 local function returnParties()
 	local session = ArenaSessionService.getSnapshot()
-	if session == nil then
-		return
+	local canContinue = #MatchService.availableModes() > 0
+	if not canContinue then
+		table.clear(retainedPartyIds)
 	end
 	returnGeneration += 1
 	local generation = returnGeneration
@@ -158,18 +167,29 @@ local function returnParties()
 	for _, player in Players:GetPlayers() do
 		local partyId = ArenaSessionService.partyIdFor(player)
 		if partyId then
-			ArenaSessionService.setRoundEligible(player, retainedPartyIds[partyId] == true)
+			ArenaSessionService.setRoundEligible(
+				player,
+				canContinue
+					and retainedPartyIds[partyId] == true
+					and not pendingReturn[player]
+					and not coordinator:IsTracked(player)
+			)
+		elseif not ArenaSessionService.isRoundEligible(player) then
+			ArenaReturnService.returnPlayer(player)
+		elseif not canContinue then
+			ArenaSessionService.setRoundEligible(player, false)
+			ArenaReturnService.returnPlayer(player)
 		end
 	end
 	local groups = partyGroups()
 	table.clear(staying)
 	for partyId, players in groups do
-		task.spawn(sendGroup, partyId, session.matchId, players, generation)
+		task.spawn(sendGroup, partyId, assert(session).matchId, players, generation)
 	end
 	table.clear(retainedPartyIds)
 end
 
-local function returnOptionsFor(player: Player, separateFromParty: boolean?): TeleportOptions
+local function returnOptionsFor(player: Player, separateFromParty: boolean?, queueOnArrival: boolean?): TeleportOptions
 	local options = Instance.new("TeleportOptions")
 	local partyId = ArenaSessionService.partyIdFor(player)
 	local session = ArenaSessionService.getSnapshot()
@@ -179,14 +199,21 @@ local function returnOptionsFor(player: Player, separateFromParty: boolean?): Te
 				partyId,
 				session.matchId,
 				ArenaSessionService.partyMemberUserIdsFor(player),
-				if separateFromParty then "Separate" else "Party"
+				if separateFromParty then "Separate" else "Party",
+				queueOnArrival
 			)
+		)
+	elseif queueOnArrival then
+		local result = MatchService.resultSnapshot()
+		assert(result, "[ArenaReturnService] finding players requires a result")
+		options:SetTeleportData(
+			ReturnPayload.build(`solo:{player.UserId}`, result.resultId, { player.UserId }, "Party", true)
 		)
 	end
 	return options
 end
 
-local function returnPlayer(player: Player, separateFromParty: boolean): (boolean, string?)
+local function returnPlayer(player: Player, separateFromParty: boolean, queueOnArrival: boolean?): (boolean, string?)
 	if player.Parent ~= Players or coordinator:IsTracked(player) or pendingReturn[player] then
 		return false, "return_unavailable"
 	end
@@ -194,17 +221,15 @@ local function returnPlayer(player: Player, separateFromParty: boolean): (boolea
 	pendingReturn[player] = true
 	separatingReturn[player] = if separateFromParty then true else nil
 	task.spawn(function()
+		local prepared = coordinator:Prepare(Env.LobbyPlaceId, { player }, function(_retryPlayers)
+			return returnOptionsFor(player, separateFromParty, queueOnArrival)
+		end, rewardPreflight())
 		local deadline = os.clock() + Loading.TeleportPresentationFallbackSeconds
 		while player.Parent == Players and not presentationReady[player.UserId] and os.clock() < deadline do
 			task.wait(0.1)
 		end
 		pendingReturn[player] = nil
-		if player.Parent ~= Players or coordinator:IsTracked(player) then
-			return
-		end
-		coordinator:Begin(Env.LobbyPlaceId, { player }, function(_retryPlayers)
-			return returnOptionsFor(player, separateFromParty)
-		end)
+		coordinator:StartPrepared(prepared)
 	end)
 	return true, nil
 end
@@ -224,13 +249,18 @@ function ArenaReturnService.isSeparatingReturn(player: Player): boolean
 	return separatingReturn[player] == true
 end
 
-function ArenaReturnService.returnParty(player: Player): (boolean, string?)
+function ArenaReturnService.returnParty(player: Player, queueOnArrival: boolean?): (boolean, string?)
 	local partyId = ArenaSessionService.partyIdFor(player)
 	if partyId == nil then
-		return ArenaReturnService.returnPlayer(player)
+		return returnPlayer(player, false, queueOnArrival)
 	end
 	local session = ArenaSessionService.getSnapshot()
-	local players = ArenaSessionService.partyPlayersFor(player)
+	local players = {}
+	for _, member in ArenaSessionService.partyPlayersFor(player) do
+		if not separatingReturn[member] then
+			table.insert(players, member)
+		end
+	end
 	if session == nil or #players == 0 then
 		return false, "return_unavailable"
 	end
@@ -244,7 +274,7 @@ function ArenaReturnService.returnParty(player: Player): (boolean, string?)
 		pendingReturn[member] = true
 	end
 	task.spawn(function()
-		sendGroup(partyId, session.matchId, players, nil)
+		sendGroup(partyId, session.matchId, players, nil, queueOnArrival)
 		for _, member in players do
 			pendingReturn[member] = nil
 		end
@@ -254,11 +284,14 @@ end
 
 function ArenaReturnService.retainParty(player: Player): (boolean, string?)
 	local partyId = ArenaSessionService.partyIdFor(player)
-	if partyId == nil then
-		return true, nil
-	end
-	retainedPartyIds[partyId] = true
 	setPartyEligible(player, true)
+	if #MatchService.availableModes() == 0 then
+		setPartyEligible(player, false)
+		return false, "not_enough_players"
+	end
+	if partyId then
+		retainedPartyIds[partyId] = true
+	end
 	return true, nil
 end
 
@@ -266,13 +299,15 @@ function ArenaReturnService.releaseParty(player: Player)
 	local partyId = ArenaSessionService.partyIdFor(player)
 	if partyId then
 		retainedPartyIds[partyId] = nil
-		setPartyEligible(player, false)
 	end
+	setPartyEligible(player, false)
 end
 
 function ArenaReturnService.isPartyRetained(player: Player): boolean
 	local partyId = ArenaSessionService.partyIdFor(player)
-	return partyId == nil or retainedPartyIds[partyId] == true
+	return ArenaSessionService.isRoundEligible(player)
+		and (partyId == nil or retainedPartyIds[partyId] == true)
+		and #MatchService.availableModes() > 0
 end
 
 function ArenaReturnService.onReturnInterrupted(listener: (Player, string) -> ()): () -> ()
@@ -361,7 +396,15 @@ function ArenaReturnService.start()
 	}, handleRequest)
 
 	MatchService.onEvent(function(event)
-		if event.kind == "MatchReset" then
+		if event.kind == "MatchEnded" then
+			table.clear(retainedPartyIds)
+			for _, player in Players:GetPlayers() do
+				local partyId = ArenaSessionService.partyIdFor(player)
+				if partyId and ArenaSessionService.isRoundEligible(player) then
+					retainedPartyIds[partyId] = true
+				end
+			end
+		elseif event.kind == "MatchReset" then
 			returnParties()
 		end
 	end)

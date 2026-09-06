@@ -91,8 +91,9 @@ export type Props = {
 }
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local definitions = props.Tabs or DEFINITIONS
 	local gap = if portrait then UIConfig.Layout.TopBar.PortraitGapScale else UIConfig.Layout.TopBar.LandscapeGapScale
 	local buttonWidth = math.max((1 - gap * math.max(#definitions - 1, 0)) / math.max(#definitions, 1), 0)
@@ -133,6 +134,10 @@ return function(props: Props)
 			OnSelectionGained = definition.OnSelectionGained,
 		}, {
 			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1.3 }),
+			TargetSize = c(
+				"UISizeConstraint",
+				{ MinSize = Vector2.new(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx) }
+			),
 			ImageLabel = c("ImageLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -170,7 +175,7 @@ return function(props: Props)
 		BackgroundColor3 = Color3.fromRGB(63, 63, 63),
 		BorderColor3 = Color3.new(),
 		BorderSizePixel = 0,
-		Size = UDim2.fromScale(1, 0.113754),
+		Size = if short then UDim2.new(1, 0, 0, UIConfig.Layout.TopBar.ShortHeightPx) else UDim2.fromScale(1, 0.113754),
 	}, {
 		PageTabs = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -178,9 +183,11 @@ return function(props: Props)
 			Position = UDim2.fromScale(0.5, 0.62),
 			SelectionGroup = true,
 			Size = UDim2.fromScale(
-				if portrait
-					then UIConfig.Layout.TopBar.PortraitWidthScale
-					else UIConfig.Layout.TopBar.LandscapeWidthScale,
+				if short
+					then UIConfig.Layout.TopBar.ShortWidthScale
+					else if portrait
+						then UIConfig.Layout.TopBar.PortraitWidthScale
+						else UIConfig.Layout.TopBar.LandscapeWidthScale,
 				0.877073
 			),
 		}, buttons),

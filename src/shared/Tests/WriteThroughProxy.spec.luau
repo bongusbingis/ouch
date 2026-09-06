@@ -30,6 +30,15 @@ local function fixture()
 end
 
 T.describe("WriteThroughProxy", function()
+	T.it("materializes nested payloads for transport without leaking the writable proxy", function()
+		local raw, proxy = fixture()
+		proxy.Shop.Offers = { "BallRed" }
+		local snapshot = WriteThroughProxy.snapshot(proxy)
+		T.expect(snapshot.Shop.Offers[1]):toEqual("BallRed")
+		T.expect(getmetatable(snapshot.Shop)):toBeNil()
+		snapshot.Shop.Offers[1] = "BallBlue"
+		T.expect(raw.Shop.Offers[1]):toEqual("BallRed")
+	end)
 	T.it("stores assigned tables raw while replicating the same value", function()
 		local raw, proxy, writes = fixture()
 		local shop = {

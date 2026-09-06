@@ -77,7 +77,7 @@ export type SimState = {
 	spawnTimers: { number },
 }
 
-export type CommandKind = "Throw" | "Catch" | "Equip"
+export type CommandKind = "Throw" | "Catch" | "Equip" | "BeginCharge" | "CancelCharge"
 
 export type InputCommand = {
 	playerId: string,

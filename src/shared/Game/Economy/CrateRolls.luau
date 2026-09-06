@@ -32,7 +32,7 @@ function CrateRolls.roll(
 	random: Random,
 	pity: PityState?
 ): RollResult
-	local model = CrateOdds.build(crate, items, rarities)
+	local model = CrateOdds.build(crate, items, rarities, pity)
 	local thresholds = crate.Pity
 	local counters: PityState = {}
 	if pity then
@@ -41,17 +41,7 @@ function CrateRolls.roll(
 		end
 	end
 
-	local forced: string? = nil
-	if thresholds then
-		for _, rarityName in model.rarityOrder do
-			local threshold = thresholds[rarityName]
-			if threshold ~= nil and (counters[rarityName] or 0) + 1 >= threshold then
-				if forced == nil or rarities[rarityName].Weight < rarities[forced].Weight then
-					forced = rarityName
-				end
-			end
-		end
-	end
+	local forced = model.forcedRarity
 
 	local chosenRarity = forced
 	if chosenRarity == nil then

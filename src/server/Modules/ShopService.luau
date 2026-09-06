@@ -17,6 +17,7 @@ local ShopRotation = require(Economy:WaitForChild("ShopRotation"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local DirectPurchase = require(Economy:WaitForChild("DirectPurchase"))
 local PlayerData = require(script.Parent.PlayerData)
+local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
 
 local ShopService = {}
 
@@ -29,6 +30,7 @@ local activePlayers: any = Players
 local activePlayerData: any = PlayerData
 local activeNetwork: any = Network
 local activeTime: () -> number = os.time
+local activePaidRandomPolicy: any = PaidRandomPolicyService
 
 local function rotationPool(): { string }
 	return ShopRotation.pool(Cosmetics.Items, Shop.Rotation.Categories)
@@ -40,7 +42,7 @@ function ShopService.ensure(player: Player): any?
 		return nil
 	end
 	local bucket = FeaturedRotation.periodIndex(Shop.Rotation.RotationSeconds, activeTime())
-	if data.Shop ~= nil and data.Shop.Bucket == bucket then
+	if data.Shop ~= nil and data.Shop.Bucket == bucket and #data.Shop.Offers > 0 then
 		return data
 	end
 	data.Shop = {
@@ -83,6 +85,7 @@ function ShopService.isPurchasable(player: Player, itemId: string): boolean
 end
 
 function ShopService.stateFor(player: Player): any
+	local allowed, policyReason = activePaidRandomPolicy.canReceivePaidRandom(player)
 	local now = activeTime()
 	local data = ShopService.ensure(player)
 	local owned = if data then data.Cosmetics.Owned else {}
@@ -114,6 +117,8 @@ function ShopService.stateFor(player: Player): any
 
 	return {
 		serverNow = now,
+		paidRandomAllowed = allowed,
+		paidRandomReason = policyReason,
 		offers = offers,
 		offersExpireAt = FeaturedRotation.nextRotationAt(Shop.Rotation.RotationSeconds, now),
 		featured = if featured then { kind = featured.kind, id = featured.id } else nil,
@@ -149,6 +154,7 @@ end
 export type StartOptions = {
 	players: any?,
 	playerData: any?,
+	paidRandomPolicy: any?,
 	network: any?,
 	time: (() -> number)?,
 	runAsync: ((() -> ()) -> ())?,
@@ -164,6 +170,9 @@ function ShopService.start(options: StartOptions?)
 	activePlayerData = if options and options.playerData then options.playerData else PlayerData
 	activeNetwork = if options and options.network then options.network else Network
 	activeTime = if options and options.time then options.time else os.time
+	activePaidRandomPolicy = if options and options.paidRandomPolicy
+		then options.paidRandomPolicy
+		else PaidRandomPolicyService
 	local runAsync = if options and options.runAsync then options.runAsync else task.spawn
 	local sweepSeconds = if options and options.sweepSeconds then options.sweepSeconds else SWEEP_SECONDS
 
@@ -191,6 +200,7 @@ function ShopService._resetForTest()
 	activePlayerData = PlayerData
 	activeNetwork = Network
 	activeTime = os.time
+	activePaidRandomPolicy = PaidRandomPolicyService
 end
 
 return ShopService

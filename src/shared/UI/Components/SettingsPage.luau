@@ -20,7 +20,7 @@ local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
 
-local ROW_HEIGHT = { Compact = { Plain = 108, Description = 148 }, Wide = { Plain = 64, Description = 88 } }
+local ROW_HEIGHT = UIConfig.Layout.SettingsControls.RowHeight
 
 export type Props = {
 	Position: any?,
@@ -28,14 +28,16 @@ export type Props = {
 }
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.Settings,
 		UIConfig.Layout.PortraitMaxAspect,
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
-	local compact, setCompact = React.useState(false)
+	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local compact = not short and panelSize.X * 0.93 * 0.95 < UIConfig.Layout.CompactMaxWidthPx
 	local revision, setRevision = React.useState(0)
 
 	React.useEffect(function()
@@ -83,13 +85,24 @@ return function(props: Props)
 			PaddingTop = UDim.new(0, 4),
 		}),
 	}
+	local saveStatus = ""
+	for _, definition in definitions do
+		local status = SettingsStore.status(definition.Id)
+		if status == "failed" then
+			saveStatus = "Couldn’t confirm this change. Check the value and try again."
+			break
+		end
+		if status == "pending" then
+			saveStatus = "Saving…"
+		end
+	end
 	local layoutOrder = 0
 	for _, category in categoryOrder do
 		layoutOrder += 1
 		content[`Category{category}`] = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = layoutOrder,
-			Size = UDim2.new(1, 0, 0, 34),
+			Size = UDim2.new(1, 0, 0, if short then 24 else 34),
 		}, {
 			Label = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
@@ -110,7 +123,15 @@ return function(props: Props)
 			layoutOrder += 1
 			local hasDescription = definition.Description ~= nil and definition.Description ~= ""
 			local heightTable = if compact then ROW_HEIGHT.Compact else ROW_HEIGHT.Wide
-			local rowHeight = if hasDescription then heightTable.Description else heightTable.Plain
+			local rowHeight = (if hasDescription then heightTable.Description else heightTable.Plain)
+				+ (
+					if compact and definition.Type == "Slider"
+						then UIConfig.Layout.SettingsControls.SliderLabelHeightPx
+						else 0
+				)
+			if short then
+				rowHeight = UIConfig.Layout.SettingsControls.ShortRowHeightPx
+			end
 			content[definition.Id] = c(SettingRow, {
 				Definition = definition,
 				Value = SettingsStore.get(definition.Id),
@@ -126,7 +147,8 @@ return function(props: Props)
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://136021539696619",
 		LayoutOrder = 5,
-		Position = props.Position or UDim2.fromScale(0.0211629, 0.14282),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = props.Position or UIConfig.Layout.PagePosition,
 		ScaleType = Enum.ScaleType.Slice,
 		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		SliceCenter = Rect.new(224, 202, 770, 474),
@@ -136,7 +158,7 @@ return function(props: Props)
 			MeasurementFont = Enum.Font.LuckiestGuy,
 			MaxTextSize = 62,
 			Native = {
-				BackgroundColor3 = Color3.fromRGB(63, 63, 63),
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				Position = UDim2.fromScale(0.291804, 0.0540634),
@@ -163,12 +185,22 @@ return function(props: Props)
 				ScrollBarImageColor3 = Color3.new(1, 1, 1),
 				ScrollBarImageTransparency = 0.1,
 				ScrollBarThickness = if compact then 5 else 7,
-				Size = UDim2.fromScale(0.95, 0.93),
+				Size = UDim2.new(0.95, 0, 1, -38),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
-				[React.Change.AbsoluteSize] = function(instance)
-					setCompact(instance.AbsoluteSize.X < UIConfig.Layout.CompactMaxWidthPx)
-				end,
 			}, content),
+			SaveStatus = c(ResponsiveText, {
+				MeasurementFont = Enum.Font.FredokaOne,
+				MaxTextSize = 16,
+				Native = {
+					BackgroundTransparency = 1,
+					Font = Enum.Font.FredokaOne,
+					Position = UDim2.new(0.025, 0, 1, -34),
+					Size = UDim2.new(0.95, 0, 0, 30),
+					Text = saveStatus,
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 5,
+				},
+			}),
 		}),
 	})
 end

@@ -21,6 +21,7 @@ function TDM.resolveRules(): GameMode.MatchRules
 	local m = Modes.TDM
 	return {
 		MinPlayers = m.MinPlayers,
+		MinParties = m.MinParties,
 		ScoreTarget = m.ScoreTarget,
 		TimeCapSeconds = m.TimeCapSeconds,
 		ResultsSeconds = PostMatch.ResultsSeconds,

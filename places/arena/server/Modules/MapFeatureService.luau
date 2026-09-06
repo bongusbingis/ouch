@@ -37,6 +37,9 @@ local function refresh(kit: MapFeatureKit.MapFeatureKit, folder: Folder)
 		end
 	end
 	partsByKit[kit.folderName] = collected
+	if #collected == 0 and kit.forget then
+		kit.forget(nil)
+	end
 end
 
 local riders: { Player } = {}
@@ -51,6 +54,12 @@ local function step(deltaTime: number)
 		if root then
 			table.insert(riders, player)
 			table.insert(riderRoots, root)
+		else
+			for _, kit in MapFeatureRegistry.all() do
+				if kit.forget then
+					kit.forget(player)
+				end
+			end
 		end
 	end
 
@@ -69,7 +78,11 @@ local function step(deltaTime: number)
 			continue
 		end
 		for index, player in riders do
-			kit.tickPlayer(context, player, riderRoots[index])
+			if aliveRoot(player) == riderRoots[index] then
+				kit.tickPlayer(context, player, riderRoots[index])
+			elseif kit.forget then
+				kit.forget(player)
+			end
 		end
 	end
 end
@@ -102,13 +115,16 @@ function MapFeatureService.start()
 		)
 	end
 
-	Players.PlayerRemoving:Connect(function(player)
-		for _, kit in MapFeatureRegistry.all() do
-			if kit.forget then
-				kit.forget(player)
+	table.insert(
+		connections,
+		Players.PlayerRemoving:Connect(function(player)
+			for _, kit in MapFeatureRegistry.all() do
+				if kit.forget then
+					kit.forget(player)
+				end
 			end
-		end
-	end)
+		end)
+	)
 
 	heartbeat = RunService.Heartbeat:Connect(step)
 end

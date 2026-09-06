@@ -77,7 +77,7 @@ local function notificationButton(definition: ButtonDefinition, order: number, o
 end
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.Notification,
@@ -85,7 +85,6 @@ return function(props: Props)
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
 	local firstButtonRef = React.useRef(nil)
-	local previousSelection = React.useRef(nil)
 	local reducedMotion = useReducedMotion()
 	local styles = ReactSpring.useSpring({
 		Scale = if props.Request then 1 else 0.82,
@@ -95,21 +94,21 @@ return function(props: Props)
 	})
 	local request = props.Request
 	React.useEffect(function()
-		if request then
-			if previousSelection.current == nil then
-				previousSelection.current = GuiService.SelectedObject
+		if not request then
+			return
+		end
+		local previous = GuiService.SelectedObject
+		local active = true
+		task.defer(function()
+			local button = firstButtonRef.current
+			if active and button and button.Parent and button.Visible and button.Selectable then
+				GuiService.SelectedObject = button
 			end
-			task.defer(function()
-				local button = firstButtonRef.current
-				if button and button.Parent and button.Visible and button.Selectable then
-					GuiService.SelectedObject = button
-				end
-			end)
-		else
-			local selection = previousSelection.current
-			previousSelection.current = nil
-			if selection and selection.Parent and selection.Visible and selection.Selectable then
-				GuiService.SelectedObject = selection
+		end)
+		return function()
+			active = false
+			if previous and previous.Parent and previous.Visible and previous.Selectable then
+				GuiService.SelectedObject = previous
 			end
 		end
 	end, { request })
@@ -131,70 +130,83 @@ return function(props: Props)
 			notificationButton(definition, index + 1, props.OnChoose, if index == 1 then firstButtonRef else nil)
 	end
 
-	return c("ImageLabel", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://124751224634629",
-		Position = UDim2.fromScale(0.5, 0.57),
-		Rotation = styles.Rotation,
-		ScaleType = Enum.ScaleType.Slice,
-		SelectionGroup = true,
-		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
-		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
-		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
-		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-		SliceCenter = Rect.new(31, 41, 978, 620),
-		SliceScale = 0.5,
-		Visible = true,
+	return c("TextButton", {
+		Active = true,
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(),
+		BackgroundTransparency = 0.35,
+		Selectable = false,
+		Text = "",
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 130,
 	}, {
-		ModalScale = c("UIScale", { Scale = styles.Scale }),
-		Title = c(ResponsiveText, {
-			HostName = "Title",
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 54,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.177439),
-				Size = UDim2.fromScale(0.9, 0.204474),
-				Text = request.Title,
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 2,
-			},
-		}),
-		Frame = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
-			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.265),
-			Size = UDim2.fromScale(0.8, 0.015),
-		}),
-		Description = c(ResponsiveText, {
-			HostName = "Description",
-			MaxTextSize = 50,
-			MeasurementFont = Enum.Font.Highway,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
-				Position = UDim2.fromScale(0.498537, 0.506245),
-				Size = UDim2.fromScale(0.9, 0.323246),
-				Text = request.Description,
-				TextColor3 = Color3.new(1, 1, 1),
-				TextYAlignment = Enum.TextYAlignment.Top,
-				ZIndex = 2,
-			},
-		}, {
-			UITextSizeConstraint = c("UITextSizeConstraint", { MaxTextSize = 50 }),
-		}),
-		Buttons = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
+		Panel = c("ImageLabel", {
+			Active = true,
+			ZIndex = 131,
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.944206),
-			Size = UDim2.new(0.86, 0, 0, 54),
-		}, buttons),
+			Image = "rbxassetid://124751224634629",
+			Position = UDim2.fromScale(0.5, 0.57),
+			Rotation = styles.Rotation,
+			ScaleType = Enum.ScaleType.Slice,
+			SelectionGroup = true,
+			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+			SliceCenter = Rect.new(31, 41, 978, 620),
+			SliceScale = 0.5,
+			Visible = true,
+		}, {
+			ModalScale = c("UIScale", { Scale = styles.Scale }),
+			Title = c(ResponsiveText, {
+				HostName = "Title",
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 54,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					Position = UDim2.fromScale(0.5, 0.177439),
+					Size = UDim2.fromScale(0.9, 0.204474),
+					Text = request.Title,
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 2,
+				},
+			}),
+			Frame = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0),
+				BackgroundColor3 = Color3.new(1, 1, 1),
+				BorderColor3 = Color3.new(),
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.265),
+				Size = UDim2.fromScale(0.8, 0.015),
+			}),
+			Description = c(ResponsiveText, {
+				HostName = "Description",
+				MaxTextSize = 50,
+				MeasurementFont = Enum.Font.Highway,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+					Position = UDim2.fromScale(0.498537, 0.506245),
+					Size = UDim2.fromScale(0.9, 0.323246),
+					Text = request.Description,
+					TextColor3 = Color3.new(1, 1, 1),
+					TextYAlignment = Enum.TextYAlignment.Top,
+					ZIndex = 2,
+				},
+			}, {
+				UITextSizeConstraint = c("UITextSizeConstraint", { MaxTextSize = 50 }),
+			}),
+			Buttons = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 1),
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(0.5, 0.944206),
+				Size = UDim2.new(0.86, 0, 0, 54),
+			}, buttons),
+		}),
 	})
 end

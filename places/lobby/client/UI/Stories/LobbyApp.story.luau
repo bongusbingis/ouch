@@ -49,6 +49,23 @@ local shopState = {
 	grant = nil,
 }
 
+local function projection(state)
+	return {
+		snapshot = function()
+			return state
+		end,
+		subscribe = function()
+			return function() end
+		end,
+		claim = function()
+			return nil, "preview"
+		end,
+		claimAll = function()
+			return nil, "preview"
+		end,
+	}
+end
+
 local mockShopClient = {}
 
 function mockShopClient.snapshot()
@@ -117,6 +134,9 @@ return function(target: Instance)
 	root:render(React.createElement(LobbyApp, {
 		PartyClient = mockPartyClient,
 		ShopClient = mockShopClient,
+		DailyRewardStore = projection(nil),
+		SeasonStore = projection({ active = false, tiers = {} }),
+		QuestStore = projection({ dailyKey = "story", resetAt = 0, quests = {} }),
 		EconomyData = { Bonks = 0, Cosmetics = { Owned = {}, Equipped = {} } },
 		CameraEnabled = false,
 		WorldPresentationEnabled = false,

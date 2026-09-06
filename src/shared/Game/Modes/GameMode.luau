@@ -7,6 +7,7 @@
 
 export type MatchRules = {
 	MinPlayers: number,
+	MinParties: number?,
 	ScoreTarget: number,
 	TimeCapSeconds: number,
 	ResultsSeconds: number,

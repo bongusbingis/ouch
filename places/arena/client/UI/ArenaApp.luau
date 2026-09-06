@@ -6,14 +6,17 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
+local GameModeVoteViewModel = require(ReplicatedStorage.Shared.UI.Models.GameModeVoteViewModel)
 local GameModeSelect = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameModeSelect"))
 local GameVersion = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameVersion"))
 local LoadingBackdrop = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("LoadingBackdrop"))
@@ -27,6 +30,11 @@ local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 local PostMatchClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("PostMatchClient"))
+local MatchHUD = require(Shared.UI.Components.MatchHUD)
+local TeammateMarkers = require(Shared.UI.Components.Arena.TeammateMarkers)
+local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+local MatchHUDClient = require(script.Parent.Parent.Modules.UI.MatchHUDClient)
+local CombatMenuClient = require(Shared.UI.Services.CombatMenuClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local c = React.createElement
@@ -71,6 +79,9 @@ end
 local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 	if teleportStatus then
 		if teleportStatus.state == "Failed" then
+			if teleportStatus.reason == "rewards_pending" then
+				return "REWARDS ARE STILL SAVING", "TRY AGAIN TO CHECK YOUR REWARDS AND RETURN"
+			end
 			return "RETURN FAILED", "WE COULD NOT REACH THE LOBBY"
 		elseif teleportStatus.state == "Retrying" then
 			return "RECONNECTING", `ATTEMPT {teleportStatus.attempt} OF {teleportStatus.maxAttempts}`
@@ -104,6 +115,8 @@ local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 end
 
 return function(props: Props)
+	local matchHUD = useExternalStore(MatchHUDClient.getSnapshot, MatchHUDClient.subscribe)
+	local menu = useExternalStore(CombatMenuClient.getSnapshot, CombatMenuClient.subscribe)
 	local loading = useExternalStore(ArenaLoadingClient.getSnapshot, ArenaLoadingClient.subscribe)
 	local vote = useExternalStore(ModeVoteClient.getSnapshot, ModeVoteClient.subscribe)
 	local teleportStatus = useExternalStore(ArenaTeleportClient.getSnapshot, ArenaTeleportClient.subscribe)
@@ -119,7 +132,7 @@ return function(props: Props)
 			table.insert(modes, {
 				Id = modeId,
 				Title = definition.Title,
-				Description = definition.Description,
+				Description = GameModeVoteViewModel.description(mode.resolveRules(), mode.scoreScope == "Team"),
 				ThumbnailId = imageId(definition.ThumbnailId),
 				SortOrder = definition.SortOrder,
 				VoteCount = vote.voteCounts[modeId] or 0,
@@ -134,11 +147,22 @@ return function(props: Props)
 	local matchVisible = clientReady
 		and (
 			loading.matchPhase == "Active"
+			or loading.matchPhase == "Starting"
 			or loading.matchPhase == "Intermission"
 			or (loading.matchPhase == "Results" and postMatch.result ~= nil)
 		)
 	local returning = teleportStatus ~= nil and teleportStatus.state ~= "Complete"
 	local loadingVisible = not hostPresented or returning or (not votePresented and not matchVisible)
+	local hudAvailable = not loadingVisible and loading.matchPhase == "Active" and not menu.open
+	local hudVisible = not loadingVisible
+		and (loading.matchPhase == "Active" or loading.matchPhase == "Starting")
+		and not menu.open
+	React.useEffect(function()
+		MatchHUDClient.setAvailable(hudAvailable)
+		return function()
+			MatchHUDClient.setAvailable(false)
+		end
+	end, { hudAvailable })
 	local tip = useLoadingTip(loadingVisible and not returning)
 	local title, detail = loadingCopy(loading, vote, teleportStatus, postMatch.result ~= nil)
 	local primaryAction = nil
@@ -155,11 +179,13 @@ return function(props: Props)
 			OnActivated = ArenaTeleportClient.stay,
 		}
 	elseif loading.fatalError then
-		primaryAction = {
-			Text = "TRY AGAIN",
-			Color = "Blue",
-			OnActivated = ArenaLoadingClient.retryInitialization,
-		}
+		primaryAction = if loading.simulationReady
+			then {
+				Text = "TRY AGAIN",
+				Color = "Blue",
+				OnActivated = ArenaLoadingClient.retryInitialization,
+			}
+			else nil
 		secondaryAction = {
 			Text = "RETURN",
 			Color = "Red",
@@ -213,6 +239,16 @@ return function(props: Props)
 			end,
 		}),
 		GameVersion = c(GameVersion),
+		Teammates = ReactRoblox.createPortal(
+			c(TeammateMarkers, { Snapshot = matchHUD, Visible = hudAvailable and not matchHUD.scoreboardOpen }),
+			playerGui
+		),
+		MatchHUD = c(MatchHUD, {
+			Snapshot = matchHUD,
+			Visible = hudVisible,
+			OnToggleScores = MatchHUDClient.toggleScoreboard,
+			OnCloseScores = MatchHUDClient.closeScoreboard,
+		}),
 		LoadingScreen = c(LoadingScreen, {
 			Visible = loadingVisible,
 			ParentScreenInsets = Enum.ScreenInsets.None,

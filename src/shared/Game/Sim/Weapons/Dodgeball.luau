@@ -27,11 +27,13 @@ type KitState = {
 	catchCooldown: number,
 	catchRemaining: number,
 	catchDirection: Vec?,
+	chargeSeconds: number?,
 }
 
 local Dodgeball = {}
 Dodgeball.kind = "Dodgeball"
-Dodgeball.commands = { Throw = true, Catch = true } :: { [SimTypes.CommandKind]: boolean }
+Dodgeball.commands =
+	{ Throw = true, Catch = true, BeginCharge = true, CancelCharge = true } :: { [SimTypes.CommandKind]: boolean }
 Dodgeball.equipOnHandBall = true
 
 local function config()
@@ -136,7 +138,11 @@ local function handleThrow(
 		ball.releaseTargetId = nil
 	end
 	ball.releaseDeviceClass = command.deviceClass or "Mouse"
-	ball.releaseCharge = math.clamp(command.charge or 0, 0, 1)
+	ball.releaseCharge = math.min(
+		math.clamp(command.charge or 0, 0, 1),
+		math.clamp((kitState.chargeSeconds or 0) / cfg.Charge.FullSeconds, 0, 1)
+	)
+	kitState.chargeSeconds = nil
 
 	local leadStrength = SimUtil.assistStrength(command, "Lead")
 	if leadStrength > 0 and ball.releaseTargetId ~= nil then
@@ -192,6 +198,9 @@ local function findCatchableBall(
 		end
 
 		local toPlayer = character.position - projectile.position
+		if not SimUtil.hasLineOfSight(world, projectile.position, character, cfg.Radius) then
+			continue
+		end
 		local speed = vector.magnitude(projectile.velocity)
 		if speed <= 1e-6 or vector.dot(projectile.velocity, toPlayer) <= 0 then
 			continue
@@ -321,7 +330,23 @@ function Dodgeball.handleInput(
 	world: WorldSnapshot,
 	events: { SimEvent }
 ): boolean
-	if command.kind == "Throw" then
+	if command.kind == "BeginCharge" then
+		local character = world.characters[command.playerId]
+		if
+			character
+			and character.alive
+			and state.players[command.playerId].equipped == Dodgeball.kind
+			and kitState.throwCooldown <= 0
+			and findHeldBall(state, command.playerId) ~= nil
+			and kitState.chargeSeconds == nil
+		then
+			kitState.chargeSeconds = 0
+		end
+		return false
+	elseif command.kind == "CancelCharge" then
+		kitState.chargeSeconds = nil
+		return false
+	elseif command.kind == "Throw" then
 		return handleThrow(kitState, state, command, world, events)
 	elseif command.kind == "Catch" then
 		return beginCatch(kitState, state, command, world, events)
@@ -337,6 +362,17 @@ function Dodgeball.tickPlayer(
 	dt: number,
 	events: { SimEvent }
 )
+	local character = world.characters[playerId]
+	if
+		character == nil
+		or not character.alive
+		or state.players[playerId].equipped ~= Dodgeball.kind
+		or findHeldBall(state, playerId) == nil
+	then
+		kitState.chargeSeconds = nil
+	elseif kitState.chargeSeconds ~= nil then
+		kitState.chargeSeconds = math.min(kitState.chargeSeconds + dt, config().Charge.FullSeconds)
+	end
 	kitState.throwCooldown = math.max(kitState.throwCooldown - dt, 0)
 	kitState.catchCooldown = math.max(kitState.catchCooldown - dt, 0)
 	if kitState.catchRemaining <= 0 then

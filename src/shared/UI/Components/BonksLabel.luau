@@ -13,20 +13,15 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 local c = React.createElement
 
 local BONKS_ICON_ASSET = "rbxassetid://106703644238993"
+local BONKS_STACK_ICON_ASSET = "rbxassetid://128078334031314"
 local BONKS_COLOR = Color3.fromRGB(255, 211, 51)
 
--- Grouped in thousands wherever it is shown, so a balance and a price of the
--- same magnitude are read the same way.
-local function formatAmount(value: number): string
-	local out = tostring(math.floor(value))
-	while true do
-		local replaced, count = string.gsub(out, "^(%-?%d+)(%d%d%d)", "%1,%2")
-		out = replaced
-		if count == 0 then
-			return out
-		end
-	end
-end
+-- The stack art is the storefront's 1,100-Bonks "Bonks Stack" product icon, so
+-- it takes over at the four-figure amounts it depicts. Every per-grant reward
+-- and every crate price falls below this; every cosmetic price sits above it.
+local BONKS_STACK_THRESHOLD = 1000
+
+local formatAmount = require(script.Parent.Parent.Models.NumberText)
 
 export type Props = {
 	Amount: number,
@@ -41,10 +36,8 @@ export type Props = {
 }
 
 return function(props: Props)
-	local icon = BONKS_ICON_ASSET
-	if props.StackThreshold and props.StackIconAsset and props.Amount >= props.StackThreshold then
-		icon = props.StackIconAsset
-	end
+	local threshold = props.StackThreshold or BONKS_STACK_THRESHOLD
+	local icon = if props.Amount >= threshold then props.StackIconAsset or BONKS_STACK_ICON_ASSET else BONKS_ICON_ASSET
 
 	local container = {
 		BackgroundTransparency = 1,

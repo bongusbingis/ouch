@@ -107,6 +107,17 @@ function MatchSim.finish(
 	return true
 end
 
+function MatchSim.noContest(state: MatchState, rules: MatchRules, events: { MatchEvent }): boolean
+	if state.phase ~= "Active" then
+		return false
+	end
+	state.phase = "Results"
+	state.resultsRemaining = rules.ResultsSeconds
+	state.winnerId = nil
+	table.insert(events, { kind = "MatchEnded", reason = "NoContest" })
+	return true
+end
+
 function MatchSim.applyElim(
 	state: MatchState,
 	rules: MatchRules,

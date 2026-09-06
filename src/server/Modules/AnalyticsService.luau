@@ -321,11 +321,13 @@ local function handleMatchEvent(event: { [string]: any })
 		for _, player in Players:GetPlayers() do
 			advanceOnboarding(player, "MatchEnded")
 			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchCompleted, durationSeconds, {
+				reason = event.reason,
 				winnerId = event.winnerId,
 				modeId = modeId,
 				playerCount = playerCount,
 				score = player:GetAttribute("MatchScore"),
-				won = event.winnerId ~= nil and tostring(event.winnerId) == PlayerIds.toId(player),
+				won = event.winnerId ~= nil
+					and (event.winnerId == PlayerIds.toId(player) or event.winnerId == player:GetAttribute("TeamId")),
 			})
 
 			local tally = tallyFor(player.UserId)

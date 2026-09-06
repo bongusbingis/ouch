@@ -4,6 +4,7 @@
 -- Created: 2026-08-15
 
 local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -101,7 +102,7 @@ local teleportPresentation = TeleportPresentationClient.start(function()
 	partyClient:setTeleportPresentationReady()
 end)
 local background = PartyBackgroundController.start()
-local container = ReactRoot.create("LobbyRoot")
+local container = ReactRoot.create("LobbyRoot", Enum.ScreenInsets.CoreUISafeInsets)
 local root = ReactRoblox.createRoot(container)
 -- Same surface the arena gives the combat HUD: no screen insets so the reticle
 -- sits on the true centre, and its own root so lobby UI never reorders it.
@@ -140,7 +141,15 @@ local function applyBackgroundVisibility(snapshot)
 	end
 end
 
+local previousTouchControlsEnabled = GuiService.TouchControlsEnabled
+local function applyMovementVisibility()
+	GuiService.TouchControlsEnabled = OnboardingClient.getSnapshot().active
+		or LobbyCombatTestClient.getSnapshot().active
+end
 applyBackgroundVisibility(OnboardingClient.getSnapshot())
+applyMovementVisibility()
+local unsubscribeMovement = OnboardingClient.subscribe(applyMovementVisibility)
+local unsubscribeTestMovement = LobbyCombatTestClient.subscribe(applyMovementVisibility)
 local unsubscribeBackground = OnboardingClient.subscribe(applyBackgroundVisibility)
 root:render(React.createElement(LobbyApp, {
 	PartyClient = partyClient,
@@ -174,7 +183,7 @@ if combatTestEnabled then
 			Place = "Lobby",
 		})
 	end
-	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.DeviceSafeInsets, 500)
+	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500)
 	menuRoot = ReactRoblox.createRoot(menuContainer)
 	menuRoot:render(React.createElement(LobbyCombatMenu))
 end
@@ -188,6 +197,9 @@ script.Destroying:Connect(function()
 	combatContainer:Destroy()
 	partyClient:destroy()
 	unsubscribeBackground()
+	unsubscribeMovement()
+	unsubscribeTestMovement()
+	GuiService.TouchControlsEnabled = previousTouchControlsEnabled
 	OnboardingImpactVFX.destroy()
 	OnboardingTargetMarkers.destroy()
 	OnboardingTargets.destroy()

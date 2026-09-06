@@ -1,6 +1,6 @@
 -- Name: CosmeticVisualFactory.luau
 -- Author: Jack C.
--- Description: Builds the visual instance for a cosmetic from its catalog definition, the shared path used by both world rendering and inventory previews.
+-- Description: Builds the visual instance for a cosmetic by cloning its authored MeshPart, the shared path used by both world rendering and inventory previews.
 -- Created: 2026-08-16
 
 --!strict
@@ -26,6 +26,27 @@ function CosmeticVisualFactory.definition(category: string, itemId: string?): an
 	return definitionFor(category, itemId)
 end
 
+-- Neither MeshId nor a SurfaceAppearance's PBR maps can be written from a
+-- runtime script, so every visual is an authored MeshPart cloned as-is: a
+-- category default comes from Assets.Cosmetics.Templates.<Template>, and each
+-- item from its own part under that category's VisualFolders folder. Config
+-- keeps only what is still writable (Size, Color, Material); MeshId and
+-- SurfaceMaps stay in config as the record of what the authored asset must
+-- carry, and the in-place asset spec is what holds the two in agreement.
+local function sourceFor(category: string, itemId: string?, templateName: string): MeshPart
+	local cosmetics = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Cosmetics")
+	local source
+	if itemId == nil or itemId == "" then
+		source = cosmetics:WaitForChild("Templates"):WaitForChild(templateName)
+	else
+		local folder = Cosmetics.VisualFolders[category]
+		assert(folder ~= nil, `[CosmeticVisualFactory] {category} has no VisualFolders entry`)
+		source = cosmetics:WaitForChild(folder):WaitForChild(itemId)
+	end
+	assert(source:IsA("MeshPart"), `[CosmeticVisualFactory] {source:GetFullName()} must be a MeshPart`)
+	return source
+end
+
 function CosmeticVisualFactory.create(category: string, itemId: string?): MeshPart
 	local definition = definitionFor(category, itemId)
 	assert(definition ~= nil, `[CosmeticVisualFactory] unknown {category} cosmetic {tostring(itemId)}`)
@@ -34,9 +55,8 @@ function CosmeticVisualFactory.create(category: string, itemId: string?): MeshPa
 	local templateDef = Cosmetics.VisualTemplates[visual.Template]
 	assert(templateDef ~= nil, `[CosmeticVisualFactory] unknown visual template {visual.Template}`)
 
-	local mesh = Instance.new("MeshPart")
+	local mesh = sourceFor(category, itemId, visual.Template):Clone()
 	mesh.Name = if itemId and itemId ~= "" then itemId else `Default{category}`
-	mesh.MeshId = `rbxassetid://{visual.MeshId or templateDef.MeshId}`
 	mesh.Size = visual.Size or templateDef.Size
 	mesh.Color = visual.Color or templateDef.Color
 	mesh.Material = visual.Material or templateDef.Material
@@ -44,43 +64,6 @@ function CosmeticVisualFactory.create(category: string, itemId: string?): MeshPa
 	mesh.CanCollide = false
 	mesh.CanQuery = false
 	mesh.CanTouch = false
-
-	if visual.TextureId then
-		mesh.TextureID = `rbxassetid://{visual.TextureId}`
-	end
-
-	local maps = visual.SurfaceMaps or templateDef.SurfaceMaps
-	if maps then
-		local sa = Instance.new("SurfaceAppearance")
-		if maps.ColorMapId then
-			sa.ColorMap = `rbxassetid://{maps.ColorMapId}`
-		end
-		if maps.MetalnessMapId then
-			sa.MetalnessMap = `rbxassetid://{maps.MetalnessMapId}`
-		end
-		if maps.NormalMapId then
-			sa.NormalMap = `rbxassetid://{maps.NormalMapId}`
-		end
-		if maps.RoughnessMapId then
-			sa.RoughnessMap = `rbxassetid://{maps.RoughnessMapId}`
-		end
-		if maps.EmissiveStrength then
-			sa.EmissiveStrength = maps.EmissiveStrength
-		end
-		sa.Parent = mesh
-	end
-
-	if templateDef.EffectsCarrier then
-		local carrier = ReplicatedStorage:WaitForChild("Assets")
-			:WaitForChild("Cosmetics")
-			:WaitForChild("Templates")
-			:WaitForChild(templateDef.EffectsCarrier)
-		for _, child in carrier:GetChildren() do
-			if not child:IsA("SurfaceAppearance") then
-				child:Clone().Parent = mesh
-			end
-		end
-	end
 
 	return mesh
 end

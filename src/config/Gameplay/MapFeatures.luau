@@ -3,6 +3,7 @@
 -- Terrain feature tuning. Per-pad override via a "LaunchSpeed" attribute on the pad.
 -- VerticalPadding widens a volume upward so a root just above the part counts as inside.
 return {
+	Spawns = { RootOffsetStuds = 3.5 },
 	-- Squash frequencies/ratios are converted from the prototype's spring constants
 	-- (outer m=1, c=3, k=125; inner m=50, c=5, k=200).
 	JumpPad = {
@@ -12,12 +13,11 @@ return {
 		FloatFactor = 0.65,
 		-- How far above the pad still counts as standing on it, so a jump taken
 		-- from the surface triggers rather than only a landing.
-		ZoneHeight = 8,
-		VerticalPadding = 2,
+		ContactTolerance = 0.75,
 		-- A player descending faster than this gets bounced on contact instead of
 		-- having to jump.
 		FallSpeed = 5,
-		FallCastBuffer = 15,
+		MaxFloatSeconds = 8,
 		RetriggerCooldown = 0.15,
 		ParticleBurst = 50,
 		ParticleLifetime = 2,
@@ -39,10 +39,13 @@ return {
 	},
 	Rotating = {
 		DegreesPerSecond = 1, -- per-assembly override: numeric "RotationSpeed" attribute on Origin
-		-- A rider is carried while their root sits above the assembly's footprint
-		-- and within CarryHeight of its top, which is what keeps them moving with
-		-- it through a jump instead of the platform turning out from under them.
 		CarryHeight = 16,
-		CarryDepthTolerance = 2,
+		ContactTolerance = 0.75,
+		MinSupportNormalY = 0.5,
+		MaxAirborneSeconds = 4,
+		MaxFrameSeconds = 0.2,
+		MaxFrameDisplacement = 16,
+		MaxCarryDelta = 4,
+		MinimumCarryStuds = 1e-3,
 	},
 }

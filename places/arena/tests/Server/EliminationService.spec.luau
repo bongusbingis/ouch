@@ -148,6 +148,22 @@ return function()
 			expect(humanoid.PlatformStand).to.equal(false)
 		end)
 
+		it("restores a previously disabled humanoid state machine", function()
+			local humanoid = rig:FindFirstChildOfClass("Humanoid")
+			humanoid.EvaluateStateMachine = false
+			EliminationService.down(player, nil)
+			EliminationService.up(player)
+			expect(humanoid.EvaluateStateMachine).to.equal(false)
+		end)
+
+		it("releases ragdoll resources when the character is removed", function()
+			expect(EliminationService.down(player, nil)).to.equal(true)
+			player.CharacterRemoving:Fire(rig)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_")).to.equal(0)
+			expect(testMotor.Enabled).to.equal(true)
+			EliminationService.forget(rig)
+		end)
+
 		it("up on a never-downed character still marks it alive", function()
 			expect(EliminationService.up(player)).to.equal(true)
 			expect(rig:GetAttribute("CombatAlive")).to.equal(true)

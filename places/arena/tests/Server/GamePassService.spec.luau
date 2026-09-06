@@ -37,6 +37,7 @@ local function dependencies(owned)
 	local purchaseFinished = signal()
 	local granted = {}
 	local notifications = {}
+	local grantEvents = {}
 	local grantedSet = {}
 	local marketplace = {
 		PromptGamePassPurchaseFinished = purchaseFinished,
@@ -58,7 +59,7 @@ local function dependencies(owned)
 	local cosmeticsService = {
 		grant = function(_player, itemId)
 			if grantedSet[itemId] then
-				return false
+				return false, "already_owned"
 			end
 			grantedSet[itemId] = true
 			table.insert(granted, itemId)
@@ -92,8 +93,14 @@ local function dependencies(owned)
 		purchaseFinished = purchaseFinished,
 		granted = granted,
 		notifications = notifications,
+		grantEvents = grantEvents,
 		ownershipWrites = ownershipWrites,
 		options = {
+			analyticsService = {
+				logCustomEvent = function(_player, name, _value, fields)
+					table.insert(grantEvents, { name = name, fields = fields })
+				end,
+			},
 			entitlementService = entitlementService,
 			marketplace = marketplace,
 			players = players,
@@ -130,6 +137,43 @@ return function()
 			expect(#fixture.granted).to.equal(2)
 			expect(fixture.granted[1]).to.equal("BallRed")
 			expect(fixture.granted[2]).to.equal("BallBlue")
+		end)
+
+		it("fulfills the actual Showtime collection and recovers a partial grant", function()
+			local config = game:GetService("ReplicatedStorage").Config
+			local definition = require(config.Economy.GamePasses).Catalog.Showtime
+			local owned = { [definition.Id] = false }
+			local fixture = dependencies(owned)
+			fixture.options.gamePasses = {
+				Catalog = { Showtime = definition },
+				ById = { [definition.Id] = definition },
+				KeyById = { [definition.Id] = "Showtime" },
+			}
+			fixture.options.cosmetics = require(config.Cosmetics.Cosmetics)
+			local grant = fixture.options.cosmeticsService.grant
+			local failed = false
+			fixture.options.cosmeticsService.grant = function(player, itemId)
+				if itemId == "ShowtimeFlex" and not failed then
+					failed = true
+					return false, "no_profile"
+				end
+				return grant(player, itemId)
+			end
+			GamePassService.start(fixture.options)
+			expect(#fixture.granted).to.equal(0)
+			owned[definition.Id] = true
+			fixture.purchaseFinished:Fire(fixture.player, definition.Id, true)
+			fixture.purchaseFinished:Fire(fixture.player, definition.Id, true)
+			expect(#fixture.granted).to.equal(3)
+			expect(table.find(fixture.granted, "ShowtimeTwirl") ~= nil).to.equal(true)
+			expect(table.find(fixture.granted, "ShowtimeFlex") ~= nil).to.equal(true)
+			expect(table.find(fixture.granted, "ShowtimeBounce") ~= nil).to.equal(true)
+			expect(#fixture.notifications).to.equal(1)
+			expect(#fixture.grantEvents).to.equal(3)
+			for _, event in fixture.grantEvents do
+				expect(event.name).to.equal("CosmeticGranted")
+				expect(event.fields.passId).to.equal(definition.Id)
+			end
 		end)
 
 		it("rechecks a completed purchase and keeps repeated grants idempotent", function()
@@ -173,8 +217,58 @@ return function()
 			fixture.options.marketplace.UserOwnsGamePassAsync = function()
 				error("network down")
 			end
+			fixture.options.wait = function()
+				fixture.player.Parent = nil
+			end
 			GamePassService.start(fixture.options)
 			expect(#fixture.ownershipWrites).to.equal(0)
+		end)
+
+		it("retries unresolved ownership while the player remains connected", function()
+			local fixture = dependencies({ [91] = true })
+			local lookup = fixture.options.marketplace.UserOwnsGamePassAsync
+			local attempts = 0
+			fixture.options.marketplace.UserOwnsGamePassAsync = function(...)
+				attempts += 1
+				if attempts == 1 then
+					error("temporary failure")
+				end
+				return lookup(...)
+			end
+			GamePassService.start(fixture.options)
+			expect(attempts).to.equal(2)
+			expect(#fixture.ownershipWrites).to.equal(1)
+			expect(#fixture.granted).to.equal(2)
+		end)
+
+		it("retries a partial entitlement grant without duplicating completed items", function()
+			local f = dependencies({ [91] = true })
+			local grant = f.options.cosmeticsService.grant
+			local failed = false
+			f.options.cosmeticsService.grant = function(player, itemId)
+				if itemId == "BallBlue" and not failed then
+					failed = true
+					return false, "no_profile"
+				end
+				return grant(player, itemId)
+			end
+			GamePassService.start(f.options)
+			expect(#f.granted).to.equal(2)
+		end)
+
+		it("keeps retrying a purchased pass beyond a short platform outage", function()
+			local owned = { [91] = false }
+			local f = dependencies(owned)
+			GamePassService.start(f.options)
+			local attempts = 0
+			f.options.marketplace.UserOwnsGamePassAsync = function()
+				attempts += 1
+				return attempts > 5
+			end
+			f.purchaseFinished:Fire(f.player, 91, true)
+			expect(attempts).to.equal(6)
+			expect(#f.granted).to.equal(2)
+			expect(#f.notifications).to.equal(1)
 		end)
 
 		it("rejects enabled passes that reference unknown cosmetics", function()

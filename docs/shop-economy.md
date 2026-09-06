@@ -1,13 +1,12 @@
 # Shop and economy
 
-The storefront backend. The shop UI itself is not built yet; this is the surface
-it consumes.
+Shared storefront, pricing, and acquisition contracts. The React shop and economy services run in both places. See [economy-balance.md](economy-balance.md) for the remediation balance and rollout checks.
 
 ## What is sold, and where it comes from
 
 | Surface | Content | Currency | Rotates |
 |---|---|---|---|
-| Rotating shop | Outfits and emotes, per player | Bonks, or a per-item dev product | Yes, per player |
+| Rotating shop | Available weapon skins, effects, outfits and emotes, per player | Bonks, or a per-item dev product | Yes, per player |
 | Crates | Dodgeball / hammer / effect skins | Bonks or Robux | No |
 | Featured crate | One crate, discounted | Bonks | Yes, globally |
 | Featured bundle | One bundle of cosmetics | Robux | Yes, globally |
@@ -58,13 +57,13 @@ checked at the **discounted** price actually charged, not just the baked one.
 
 ## Impact effect economy
 
-Impact effects have one acquisition source per rarity. Common, Rare, and
-Legendary impacts are in the active `EffectsCrate`; its pool is derived from the
-effect categories and explicitly excludes `Exclusive` items. Players can open it
+Common, Rare, and Legendary impacts are in the active `EffectsCrate`; its pool is derived from the
+effect categories and explicitly excludes `Exclusive` items. Players eligible for paid random items can open it
 with Bonks or through the `EffectsCrateOpen` developer product.
 
-`Prismatic`, `Galaxy`, and `Starlight` are granted only by the
-`EffectCollection` pass. The pass remains `Preview` with no platform id, so it
+`Starlight` is granted by the existing Splat Starter Kit. The planned
+`EffectCollection` grants `Prismatic`, `Galaxy`, and `Starlight`; already-owned
+items are retained without paying duplicate refunds for pass reconciliation. The pass remains `Preview` with no platform id, so it
 can be tested through Studio entitlement seams without advertising a purchase
 that Roblox cannot fulfill.
 
@@ -89,7 +88,7 @@ Shop.Rotation.RotationSeconds      1h..30d
 Shop.Featured.RotationSeconds      1h..30d
 Shop.Featured.DiscountPercent      0..20
 Shop.Bundle.RotationSeconds        1h..30d
-Crates.<CrateId>.BonksPrice        500..1000
+Crates.<CrateId>.BonksPrice        500..900
 ```
 
 `VariantId` is the piece that makes the rest measurable: it is stamped on every
@@ -107,11 +106,7 @@ See `docs/live-configs.md` for the override mechanism.
 
 ## Adding content
 
-**A cosmetic reskin** (colour or texture) needs no Studio asset — a `Visual`
-entry in `Config.Cosmetics` is enough. A *shape*-changing skin needs a new
-`MeshPart` under `ReplicatedStorage.Assets.Cosmetics.Templates` plus a matching
-`VisualTemplates` entry; the MeshId must match or `CosmeticVisualFactory.create`
-asserts.
+**A cosmetic reskin** needs a catalog entry and its authored MeshPart under the category's visual folder. The config records mesh/PBR requirements; runtime clones the authored item and applies supported size/color/material overrides. Shape changes also need an authored template and matching VisualTemplates entry. See AGENTS.md and the asset contract specs.
 
 **An elimination effect** is an entry in `Config.Audio.Gameplay` plus a cosmetic
 that names it. Effects reference audio by name rather than carrying asset ids, so
@@ -136,3 +131,13 @@ previews has not been decided yet.
 The economy service cohort lives under `src/server/Modules` and is started by
 `EconomyService` in both places. Lobby and arena therefore use the same rotation,
 purchase, receipt, entitlement, crate, and season-pass authority.
+
+## Player-specific prices and odds
+
+No catalog contains a Robux amount. ShopClient calls GetProductInfoAsync on the client with the correct InfoType; ShopViewModel uses PriceInRobux only when metadata confirms availability. Missing, failed, or off-sale metadata never falls back to a configured price. A short session cache refreshes on subsequent shop refreshes after five minutes. The Roblox purchase prompt remains the final platform price confirmation.
+
+CrateOdds is the single probability model for both rolling and disclosure, including the player's replicated pity counters. The item list totals 100%, identifies repeated rewards and Bonks refunds, and displays base chances alongside changed next-open chances. Batch openings update pity and ownership after each result.
+
+PaidRandomPolicyService remains the policy owner. GetShopState projects its decision; unresolved or restricted accounts cannot enter either crate purchase path. The server independently checks again before a grant. Guaranteed rotating items remain available.
+
+These contracts follow Roblox's [regional pricing documentation](https://create.roblox.com/docs/production/monetization/regional-pricing) and [paid random item requirements](https://create.roblox.com/docs/production/monetization/paid-random-items).

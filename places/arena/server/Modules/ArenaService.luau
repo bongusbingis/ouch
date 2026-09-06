@@ -5,6 +5,9 @@
 
 --!strict
 
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MapFeatures = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
 local Workspace = game:GetService("Workspace")
 
 local ArenaService = {}
@@ -32,6 +35,7 @@ end
 
 local function requireFolder(parent: Instance, name: string, path: string): Folder
 	local folder = parent:WaitForChild(name)
+	assert(folder:IsA("Folder"), `[ArenaService] {path} must be a Folder`)
 	return folder
 end
 
@@ -42,6 +46,13 @@ function ArenaService.start(): Arena
 
 	local assets = requireFolder(Workspace, "Assets", "Workspace.Assets")
 	local root = requireFolder(assets, "Arena", "Workspace.Assets.Arena")
+	local origin = root:WaitForChild("MapOrigin")
+	assert(origin:IsA("BasePart"), "[ArenaService] Workspace.Assets.Arena.MapOrigin must be a BasePart")
+	local function projectOrigin()
+		root:SetAttribute("MapOriginPosition", origin.Position)
+	end
+	projectOrigin()
+	origin:GetPropertyChangedSignal("Position"):Connect(projectOrigin)
 	local playerSpawnsFolder = requireFolder(root, "PlayerSpawns", "Workspace.Assets.Arena.PlayerSpawns")
 	local teamSpawnsFolder = requireFolder(root, "TeamSpawns", "Workspace.Assets.Arena.TeamSpawns")
 	local redSpawns = requireFolder(teamSpawnsFolder, "Red", "Workspace.Assets.Arena.TeamSpawns.Red")
@@ -68,9 +79,35 @@ function ArenaService.teleport(character: Model, teamId: string?)
 	local current = ArenaService.start()
 	local spawns = if teamId == nil then current.playerSpawns else current.teamSpawns[teamId]
 	assert(spawns ~= nil and #spawns > 0, `[ArenaService] no spawn points configured for team "{teamId or "none"}"`)
+	local root = character:WaitForChild("HumanoidRootPart")
+	assert(root:IsA("BasePart"), "[ArenaService] HumanoidRootPart must be a BasePart")
 	local spawnPart = spawns[math.random(#spawns)]
-	character:WaitForChild("HumanoidRootPart")
-	character:PivotTo(CFrame.new(spawnPart.Position + Vector3.new(0, 3.5, 0)) * spawnPart.CFrame.Rotation)
+	local bestClearance = -1
+	for _, candidate in spawns do
+		local clearance = math.huge
+		for _, player in Players:GetPlayers() do
+			local other = player.Character
+			local otherRoot = if other then other:FindFirstChild("HumanoidRootPart") else nil
+			if
+				other
+				and other ~= character
+				and other:GetAttribute("CombatAlive") ~= false
+				and otherRoot
+				and otherRoot:IsA("BasePart")
+			then
+				clearance = math.min(clearance, (otherRoot.Position - candidate.Position).Magnitude)
+			end
+		end
+		if clearance < math.huge and clearance > bestClearance then
+			bestClearance = clearance
+			spawnPart = candidate
+		end
+	end
+	local target = CFrame.new(spawnPart.Position + Vector3.new(0, MapFeatures.Spawns.RootOffsetStuds, 0))
+		* spawnPart.CFrame.Rotation
+	character:PivotTo(target * root.CFrame:Inverse() * character:GetPivot())
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
 end
 
 return ArenaService

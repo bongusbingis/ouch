@@ -22,6 +22,9 @@ local FORCE_NAME = "JumpPadFloatForce"
 type Bounce = {
 	force: VectorForce,
 	attachment: Attachment,
+	root: BasePart,
+	expiresAt: number,
+	hasLeftGround: boolean,
 }
 
 local bounces: { [Player]: Bounce } = {}
@@ -73,39 +76,26 @@ local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: M
 	force.Name = FORCE_NAME
 	force.Attachment0 = attachment
 	force.ApplyAtCenterOfMass = true
+	force.RelativeTo = Enum.ActuatorRelativeTo.World
 	force.Force = Vector3.new(0, root.AssemblyMass * Workspace.Gravity * settings.FloatFactor, 0)
 	force.Parent = root
 
-	bounces[player] = { force = force, attachment = attachment }
+	bounces[player] = {
+		force = force,
+		attachment = attachment,
+		root = root,
+		expiresAt = os.clock() + settings.MaxFloatSeconds,
+		hasLeftGround = false,
+	}
 	cooldowns[player] = os.clock() + settings.RetriggerCooldown
 
 	emitCloud(root)
 	Network.fire("JumpPadImpulse", nil, pad)
 end
 
-local function overPad(pad: Model, position: Vector3): boolean
-	local settings = config()
-	local boundsCFrame, boundsSize = pad:GetBoundingBox()
-	local offset = boundsCFrame:PointToObjectSpace(position)
-	local top = boundsSize.Y / 2
-	return math.abs(offset.X) <= boundsSize.X / 2
-		and math.abs(offset.Z) <= boundsSize.Z / 2
-		and offset.Y >= -top - settings.VerticalPadding
-		and offset.Y <= top + settings.ZoneHeight
-end
-
-local function fallingOnto(pad: Model, root: BasePart, humanoid: Humanoid, params: RaycastParams): boolean
-	local settings = config()
-	if root.AssemblyLinearVelocity.Y > -settings.FallSpeed then
-		return false
-	end
-	params.FilterDescendantsInstances = { pad }
-	local distance = humanoid.HipHeight + root.Size.Y / 2 + settings.FallCastBuffer
-	return Workspace:Raycast(root.Position, Vector3.new(0, -distance, 0), params) ~= nil
-end
-
 local castParams = RaycastParams.new()
-castParams.FilterType = Enum.RaycastFilterType.Include
+castParams.FilterType = Enum.RaycastFilterType.Exclude
+castParams.RespectCanCollide = true
 
 function JumpPads.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)
 	local character = root.Parent
@@ -115,7 +105,17 @@ function JumpPads.tickPlayer(context: MapFeatureKit.Context, player: Player, roo
 	end
 
 	local bounce = bounces[player]
-	if bounce ~= nil and humanoid.FloorMaterial ~= Enum.Material.Air then
+	if bounce and humanoid.FloorMaterial == Enum.Material.Air then
+		bounce.hasLeftGround = true
+	end
+	if
+		bounce ~= nil
+		and (
+			(bounce.hasLeftGround and humanoid.FloorMaterial ~= Enum.Material.Air)
+			or bounce.root ~= root
+			or context.now >= bounce.expiresAt
+		)
+	then
 		clearBounce(player)
 	end
 
@@ -124,13 +124,19 @@ function JumpPads.tickPlayer(context: MapFeatureKit.Context, player: Player, roo
 	end
 
 	local jumping = humanoid:GetState() == Enum.HumanoidStateType.Jumping
+	local falling = root.AssemblyLinearVelocity.Y <= -config().FallSpeed
+	if not jumping and not falling then
+		return
+	end
+	castParams.FilterDescendantsInstances = { character }
+	local distance = humanoid.HipHeight + root.Size.Y / 2 + config().ContactTolerance
+	local support = Workspace:Raycast(root.Position, Vector3.new(0, -distance, 0), castParams)
+	if support == nil then
+		return
+	end
 	for _, instance in context.instances do
 		local pad = instance :: Model
-		if jumping and overPad(pad, root.Position) then
-			launch(player, root, humanoid, pad)
-			return
-		end
-		if fallingOnto(pad, root, humanoid, castParams) then
+		if support.Instance:IsDescendantOf(pad) then
 			launch(player, root, humanoid, pad)
 			return
 		end

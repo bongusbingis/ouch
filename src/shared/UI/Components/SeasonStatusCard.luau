@@ -8,21 +8,25 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
+local AnimatedButton = require(script.Parent.AnimatedButton)
+local SeasonClaims = require(script.Parent.Parent.Models.SeasonClaims)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local Palette = UIConfig.ProgressionStyle
+
 local c = React.createElement
 
-local PANEL_NINE_SLICE = "rbxassetid://124751224634629"
-local PANEL_SLICE_CENTER = Rect.new(31, 41, 978, 620)
-
-local DARK = Color3.fromRGB(24, 41, 48)
-local MUTED = Color3.fromRGB(194, 221, 226)
-local PROGRESS_FILL_COLOR = Color3.fromRGB(154, 233, 91)
-local TIER_BADGE_COLOR = Color3.fromRGB(255, 211, 51)
+local DARK = Palette.Ink
+local MUTED = Palette.Muted
+local PROGRESS_FILL_COLOR = Palette.Pink
+local TIER_BADGE_COLOR = Palette.Pink
 
 export type Props = {
 	State: any?,
+	OnClaim: (() -> ())?,
+	Pending: boolean?,
 	Compact: boolean?,
 	Native: { [any]: any }?,
 }
@@ -42,7 +46,9 @@ return function(props: Props)
 		return nil
 	end
 
+	local claimable = SeasonClaims.count(state)
 	local compact = props.Compact == true
+	local claimWidth = if compact then UIConfig.Layout.SeasonCompactClaimWidthPx else UIConfig.Layout.SeasonClaimWidthPx
 	local tier = state.tier or 0
 	local tierCount = state.tierCount or 0
 	local xpIntoTier = state.xpIntoTier or 0
@@ -53,13 +59,11 @@ return function(props: Props)
 	local nextReward = if state.tiers then findNextFreeReward(state.tiers) else nil
 	local native = {
 		AnchorPoint = Vector2.new(0, 0),
-		BackgroundTransparency = 1,
-		Image = PANEL_NINE_SLICE,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Palette.Surface,
+		BorderSizePixel = 0,
 		Position = UDim2.fromScale(0, 0),
-		ScaleType = Enum.ScaleType.Slice,
 		Size = UDim2.fromScale(1, 1),
-		SliceCenter = PANEL_SLICE_CENTER,
-		SliceScale = if compact then 0.35 else 0.5,
 	}
 	if props.Native then
 		for key, value in props.Native do
@@ -67,20 +71,31 @@ return function(props: Props)
 		end
 	end
 
-	return c("ImageLabel", native, {
+	return c("Frame", native, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+		Outline = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
+		HeaderBand = c("Frame", {
+			BackgroundColor3 = Palette.Pink,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(4, 4),
+			Size = UDim2.new(1, -8, 0, 32),
+			Visible = not compact,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		}),
 		Title = if not compact
 			then c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MinTextSize = 14,
-				MaxTextSize = 30,
+				MaxTextSize = 22,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.06),
-					Size = UDim2.fromScale(0.88, 0.17),
-					Text = "SEASON",
+					Position = UDim2.new(0.5, 0, 0, 4),
+					Size = UDim2.new(1, -24, 0, 32),
+					Text = "SEASON PROGRESS",
 					TextColor3 = Color3.new(1, 1, 1),
 					TextStrokeColor3 = DARK,
 					TextStrokeTransparency = 0.72,
@@ -91,10 +106,10 @@ return function(props: Props)
 		Content = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = DARK,
-			BackgroundTransparency = 0.72,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, if compact then 0.5 else 0.61),
-			Size = UDim2.fromScale(if compact then 0.94 else 0.9, if compact then 0.76 else 0.62),
+			Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
+			Size = UDim2.new(1, -20, 1, if compact then -12 else -48),
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
 			TierBadge = c("Frame", {
@@ -105,7 +120,11 @@ return function(props: Props)
 				Size = UDim2.fromScale(if compact then 0.17 else 0.21, 0.84),
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0.14, 0) }),
-				Aspect = if compact then nil else c("UIAspectRatioConstraint", { AspectRatio = 0.85 }),
+				Stroke = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
+				Gradient = c(
+					"UIGradient",
+					{ Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 150, 220)), Rotation = 90 }
+				),
 				TierWord = c(ResponsiveText, {
 					MeasurementFont = Enum.Font.SourceSansBold,
 					MinTextSize = if compact then 8 else 10,
@@ -117,7 +136,7 @@ return function(props: Props)
 						Position = UDim2.fromScale(0.5, 0.07),
 						Size = UDim2.fromScale(0.82, 0.28),
 						Text = "TIER",
-						TextColor3 = DARK,
+						TextColor3 = Color3.new(1, 1, 1),
 					},
 				}),
 				TierNumber = c(ResponsiveText, {
@@ -131,27 +150,60 @@ return function(props: Props)
 						Position = UDim2.fromScale(0.5, 0.65),
 						Size = UDim2.fromScale(0.82, 0.48),
 						Text = tostring(tier),
-						TextColor3 = DARK,
+						TextColor3 = Color3.new(1, 1, 1),
 					},
 				}),
 			}),
+			Claim = if claimable > 0
+				then c(AnimatedButton, {
+					Style = "Primary",
+					Enabled = props.OnClaim ~= nil and not props.Pending,
+					OnActivated = props.OnClaim,
+					Native = {
+						AnchorPoint = Vector2.new(1, 0.5),
+						Position = UDim2.fromScale(1, 0.5),
+						Size = UDim2.fromOffset(claimWidth, UIConfig.Interaction.MinTargetPx),
+						BackgroundColor3 = Palette.Green,
+					},
+				}, {
+					Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+					Label = c(ResponsiveText, {
+						MinTextSize = 12,
+						MaxTextSize = 18,
+						MeasurementFont = Enum.Font.LuckiestGuy,
+						Native = {
+							BackgroundTransparency = 1,
+							Position = UDim2.fromScale(0.05, 0.1),
+							Size = UDim2.fromScale(0.9, 0.8),
+							Text = if props.Pending
+								then "CLAIMING..."
+								else if compact then "CLAIM" else `CLAIM ({claimable})`,
+							TextColor3 = Color3.new(1, 1, 1),
+							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+						},
+					}),
+				})
+				else nil,
 			Info = c("Frame", {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromScale(if compact then 0.22 else 0.27, 0.08),
-				Size = UDim2.fromScale(if compact then 0.75 else 0.7, 0.84),
+				Size = UDim2.new(
+					if compact then 0.75 else 0.7,
+					if claimable > 0 then -(claimWidth + UIConfig.Layout.InventoryContentGapPx) else 0,
+					0.84,
+					0
+				),
 			}, {
 				SeasonName = c(ResponsiveText, {
-					MeasurementFont = if compact then Enum.Font.SourceSansBold else Enum.Font.Highway,
+					MeasurementFont = Enum.Font.SourceSansBold,
 					MinTextSize = if compact then 9 else 12,
 					MaxTextSize = if compact then 17 else 23,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = if compact
-							then Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold)
-							else Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
 						Position = UDim2.fromScale(0, 0),
 						Size = UDim2.fromScale(1, if compact then 0.42 else 0.24),
-						Text = if compact then `SEASON · {displayName}` else displayName,
+						Text = if compact then "SEASON PROGRESS" else displayName,
 						TextColor3 = Color3.new(1, 1, 1),
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextTruncate = Enum.TextTruncate.AtEnd,

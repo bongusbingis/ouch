@@ -14,6 +14,7 @@ local Network = require(ReplicatedStorage.Shared.Network)
 local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
 local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
 local ReturnPartyPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPartyPolicy)
+local ReturnQueuePolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnQueuePolicy)
 local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
 local AnalyticsService = require(script.Parent.Parent.AnalyticsService)
 local PartyModel = require(script.Parent.PartyModel)
@@ -29,9 +30,11 @@ function PartyService.new(
 	matchRepository,
 	partyBus,
 	teleportCoordinator,
-	banRepository
+	banRepository,
+	runtime
 )
 	local self = setmetatable({
+		_players = if runtime and runtime.players then runtime.players else Players,
 		_partyRepository = partyRepository,
 		_queueRepository = queueRepository,
 		_matchRepository = matchRepository,
@@ -88,7 +91,7 @@ function PartyService:_getLocalPlayers(partyId)
 	end
 
 	for _, player in partyPlayers do
-		if player.Parent == Players then
+		if player.Parent == self._players then
 			table.insert(players, player)
 		end
 	end
@@ -178,7 +181,7 @@ function PartyService:_maybeTeleport(party)
 end
 
 function PartyService:HandleTeleportPresentationReady(player)
-	if player.Parent == Players then
+	if player.Parent == self._players then
 		self._teleportPresentationReady[player.UserId] = true
 		player:SetAttribute("TeleportPresentationReady", true)
 	end
@@ -236,7 +239,7 @@ function PartyService:_characterColorId(player)
 end
 
 function PartyService:_syncMemberColor(player, revision)
-	if self._destroyed or player.Parent ~= Players or self._colorRevisions[player.UserId] ~= revision then
+	if self._destroyed or player.Parent ~= self._players or self._colorRevisions[player.UserId] ~= revision then
 		return
 	end
 
@@ -309,7 +312,11 @@ end
 
 function PartyService:_moveMemberToSoloParty(player, previousPartyId, reason)
 	local userId = player.UserId
-	if player.Parent ~= Players or self._localPartyByUser[userId] ~= previousPartyId or self._initializing[userId] then
+	if
+		player.Parent ~= self._players
+		or self._localPartyByUser[userId] ~= previousPartyId
+		or self._initializing[userId]
+	then
 		return
 	end
 
@@ -323,7 +330,7 @@ function PartyService:_moveMemberToSoloParty(player, previousPartyId, reason)
 			error(("Could not create replacement party for %d: %s"):format(userId, tostring(createError)))
 		end
 
-		if player.Parent ~= Players then
+		if player.Parent ~= self._players then
 			self:_removeMemberFromParty(userId, party.partyId, "MemberLeft", true)
 			return
 		end
@@ -334,7 +341,7 @@ function PartyService:_moveMemberToSoloParty(player, previousPartyId, reason)
 
 	if not success then
 		warn(("[PartyService] %s"):format(message))
-		if player.Parent == Players then
+		if player.Parent == self._players then
 			self:_sendError(player, Protocol.Errors.Internal)
 		end
 	end
@@ -461,7 +468,7 @@ function PartyService:_joinTarget(player, target, requireFriendAccess)
 		end
 		return nil, indexError
 	end
-	if player.Parent ~= Players then
+	if player.Parent ~= self._players then
 		if not alreadyMember then
 			self:_rollbackJoinedMember(updated.partyId, userId)
 		end
@@ -494,6 +501,12 @@ function PartyService:_restoreReturningParty(player, returning)
 
 		local nextParty = PartyModel.clone(current)
 		PartyModel.returnToLobby(nextParty)
+		for _, member in current.members do
+			if not table.find(returning.memberUserIds, member.userId) then
+				PartyModel.removeMember(nextParty, member.userId)
+			end
+		end
+		ReturnQueuePolicy.arm(nextParty, returning, os.time(), Config.ReturnQueueWaitSeconds)
 		return PartyModel.touch(nextParty, os.time())
 	end)
 end
@@ -535,7 +548,7 @@ function PartyService:_resolveArrivalTarget(player)
 	local returning = if joinData.SourcePlaceId == Config.ArenaPlaceId and joinData.SourceGameId == game.GameId
 		then ReturnPayload.parse(joinData.TeleportData)
 		else nil
-	if returning then
+	if returning and table.find(returning.memberUserIds, player.UserId) then
 		if returning.returnMode == "Separate" then
 			if not self:_separateReturningMember(player, returning) then
 				warn(
@@ -555,11 +568,16 @@ function PartyService:_resolveArrivalTarget(player)
 			if userId ~= player.UserId then
 				local partyId = self._partyRepository:GetUserPartyId(userId)
 				local rebuilt = partyId and self._partyRepository:GetParty(partyId)
-				if rebuilt then
+				if
+					rebuilt
+					and rebuilt.lastReturnMatchId == returning.matchId
+					and rebuilt.returnSourcePartyId == returning.partyId
+				then
 					return rebuilt, false
 				end
 			end
 		end
+		return nil, false, returning
 	end
 
 	local invite = Protocol.decodeInviteData(joinData.LaunchData)
@@ -584,11 +602,11 @@ function PartyService:_resolveArrivalTarget(player)
 end
 
 function PartyService:_initializePlayerUnlocked(player)
-	if player.Parent ~= Players then
+	if player.Parent ~= self._players then
 		return
 	end
 
-	local target, requireFriendAccess = self:_resolveArrivalTarget(player)
+	local target, requireFriendAccess, returning = self:_resolveArrivalTarget(player)
 	if target then
 		local joined = self:_joinTarget(player, target, requireFriendAccess)
 		if joined then
@@ -607,11 +625,22 @@ function PartyService:_initializePlayerUnlocked(player)
 		self:_sendError(player, Protocol.Errors.Internal)
 		return
 	end
-	if player.Parent ~= Players then
+	if player.Parent ~= self._players then
 		self:_removeMemberFromParty(player.UserId, party.partyId, "MemberLeft", true)
 		return
 	end
 
+	if returning and table.find(returning.memberUserIds, player.UserId) then
+		local restored = self._partyRepository:UpdateParty(party.partyId, function(current)
+			if not current or current.phase ~= "Lobby" then
+				return nil
+			end
+			local nextParty = PartyModel.clone(current)
+			ReturnQueuePolicy.arm(nextParty, returning, os.time(), Config.ReturnQueueWaitSeconds)
+			return PartyModel.touch(nextParty, os.time())
+		end)
+		party = restored or party
+	end
 	self:_attach(player, party, "PartyCreated")
 end
 
@@ -635,7 +664,7 @@ end
 function PartyService:_partyForPlayer(player)
 	local partyId = self._localPartyByUser[player.UserId]
 	if not partyId then
-		if player.Parent == Players then
+		if player.Parent == self._players then
 			task.spawn(function()
 				self:_initializePlayer(player)
 			end)
@@ -782,7 +811,17 @@ function PartyService:_kickMember(player, payload)
 	return Protocol.success(PartyModel.toSnapshot(updated))
 end
 
-function PartyService:_startMatchmaking(player)
+function PartyService:_localMemberPresence(partyId)
+	local present = {}
+	for _, member in self._localPlayersByParty[partyId] or {} do
+		if member.Parent == self._players then
+			present[member.UserId] = true
+		end
+	end
+	return present
+end
+
+function PartyService:_startMatchmaking(player, returnMatchId)
 	if Config.ArenaPlaceId <= 0 then
 		return Protocol.failure(Protocol.Errors.ArenaNotConfigured)
 	end
@@ -843,6 +882,18 @@ function PartyService:_startMatchmaking(player)
 			denial = Protocol.Errors.MatchForming
 			return nil
 		end
+		if
+			returnMatchId
+			and (
+				not current.returnQueue
+				or current.returnQueue.matchId ~= returnMatchId
+				or ReturnQueuePolicy.evaluate(current, self:_localMemberPresence(current.partyId), os.time())
+					~= "Ready"
+			)
+		then
+			denial = Protocol.Errors.NotReady
+			return nil
+		end
 		if #current.members ~= #checkedMemberIds then
 			denial = Protocol.Errors.MatchmakingUnavailable
 			return nil
@@ -857,6 +908,7 @@ function PartyService:_startMatchmaking(player)
 		local now = os.time()
 		local nextParty = PartyModel.clone(current)
 		nextParty.phase = "Queued"
+		nextParty.returnQueue = nil
 		nextParty.queueTicket = {
 			ticketId = HttpService:GenerateGUID(false),
 			partyId = current.partyId,
@@ -1020,6 +1072,11 @@ function PartyService:_cancelMatchmaking(player)
 			denial = Protocol.Errors.MatchForming
 			return nil
 		end
+		if current.phase == "Lobby" and current.returnQueue then
+			local nextParty = PartyModel.clone(current)
+			nextParty.returnQueue = nil
+			return PartyModel.touch(nextParty, os.time())
+		end
 		if current.phase ~= "Queued" or not current.queueTicket then
 			denial = Protocol.Errors.NotReady
 			return nil
@@ -1176,8 +1233,53 @@ function PartyService:_runLoop(interval, callback)
 	end)
 end
 
+function PartyService:_queueReturningParties()
+	for partyId in self._localPlayersByParty do
+		local party = self._cache[partyId]
+		if not party or not party.returnQueue then
+			continue
+		end
+		local decision = ReturnQueuePolicy.evaluate(party, self:_localMemberPresence(partyId), os.time())
+		local leader = self._players:GetPlayerByUserId(party.leaderUserId)
+		if decision == "Ready" and leader and not self._busy[leader.UserId] then
+			self._busy[leader.UserId] = true
+			local ok, response = xpcall(function()
+				return self:_startMatchmaking(leader, party.returnQueue.matchId)
+			end, debug.traceback)
+			self._busy[leader.UserId] = nil
+			if not ok or not response.ok then
+				self:_sendError(leader, if ok then response.error else Protocol.Errors.Internal)
+				decision = "Expired"
+				if not ok then
+					warn(("[PartyService] Return queue failed: %s"):format(response))
+				end
+			end
+		end
+		if decision == "Expired" then
+			local updated = self._partyRepository:UpdateParty(partyId, function(current)
+				if
+					not current
+					or not current.returnQueue
+					or current.returnQueue.matchId ~= party.returnQueue.matchId
+				then
+					return nil
+				end
+				local nextParty = PartyModel.clone(current)
+				nextParty.returnQueue = nil
+				return PartyModel.touch(nextParty, os.time())
+			end)
+			if updated then
+				self:NotifyCommitted(updated, "ReturnQueueInterrupted")
+				for _, member in self._localPlayersByParty[partyId] or {} do
+					self:_sendError(member, Protocol.Errors.MatchmakingUnavailable)
+				end
+			end
+		end
+	end
+end
+
 function PartyService:Start()
-	Players.PlayerAdded:Connect(function(player)
+	self._players.PlayerAdded:Connect(function(player)
 		self._colorConnections[player] = player:GetAttributeChangedSignal(CHARACTER_COLOR_ATTRIBUTE):Connect(function()
 			self:_scheduleMemberColorSync(player)
 		end)
@@ -1186,7 +1288,7 @@ function PartyService:Start()
 		end)
 	end)
 
-	Players.PlayerRemoving:Connect(function(player)
+	self._players.PlayerRemoving:Connect(function(player)
 		self._teleportPresentationReady[player.UserId] = nil
 		self._joinCodeFailures[player.UserId] = nil
 		self._colorRevisions[player.UserId] = (self._colorRevisions[player.UserId] or 0) + 1
@@ -1205,7 +1307,7 @@ function PartyService:Start()
 		self._teleportCoordinator:Clear(player)
 	end)
 
-	for _, player in Players:GetPlayers() do
+	for _, player in self._players:GetPlayers() do
 		self._colorConnections[player] = player:GetAttributeChangedSignal(CHARACTER_COLOR_ATTRIBUTE):Connect(function()
 			self:_scheduleMemberColorSync(player)
 		end)
@@ -1216,6 +1318,9 @@ function PartyService:Start()
 
 	self:_runLoop(Config.PartyReconcileInterval, function()
 		self:_reconcile()
+	end)
+	self:_runLoop(Config.ReturnQueuePollSeconds, function()
+		self:_queueReturningParties()
 	end)
 	self:_runLoop(Config.PresenceHeartbeatInterval, function()
 		self:_heartbeat()
@@ -1235,7 +1340,7 @@ function PartyService:Shutdown()
 		connection:Disconnect()
 	end
 	table.clear(self._colorConnections)
-	for _, player in Players:GetPlayers() do
+	for _, player in self._players:GetPlayers() do
 		local party = self:_partyForPlayer(player)
 		if party and party.phase ~= "Assigned" and party.phase ~= "Teleporting" then
 			self:_removeMemberFromParty(player.UserId, party.partyId, "ServerClosing", true)

@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local arenaOrigin = require(script.Parent.ArenaOrigin)
 
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
@@ -22,7 +23,7 @@ local started = false
 local active = false
 local angle = 0
 local generation = 0
-local origin: BasePart? = nil
+local origin: Vector3? = nil
 local blur: BlurEffect? = nil
 local renderConnection: RBXScriptConnection? = nil
 local voteDisconnect: (() -> ())? = nil
@@ -34,7 +35,7 @@ local function frame(deltaTime: number)
 		return
 	end
 	angle += math.rad(config.RotationSpeedDeg) * deltaTime
-	local center = part.Position
+	local center = part
 	local offset = Vector3.new(math.cos(angle) * config.Distance, config.Height, math.sin(angle) * config.Distance)
 	camera.CFrame = CFrame.lookAt(center + offset, center)
 end
@@ -96,13 +97,11 @@ function VoteCamera.start()
 	local currentGeneration = generation
 
 	task.spawn(function()
-		local arena = Workspace:WaitForChild("Assets"):WaitForChild("Arena")
-		local part = arena:WaitForChild("MapOrigin")
+		local position = arenaOrigin()
 		if generation ~= currentGeneration then
 			return
 		end
-		assert(part:IsA("BasePart"), "[VoteCamera] Workspace.Assets.Arena.MapOrigin must be a BasePart")
-		origin = part
+		origin = position
 
 		voteDisconnect = ModeVoteClient.subscribe(function(snapshot)
 			if snapshot.admitted and snapshot.open then

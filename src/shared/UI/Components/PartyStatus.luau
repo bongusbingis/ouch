@@ -20,10 +20,10 @@ export type Props = {
 
 return function(props: Props)
 	return c("Frame", {
-		AnchorPoint = Vector2.new(0.5, 1),
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.489696, 0.955724),
-		Size = UDim2.fromScale(0.967519, 0.0940959),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
 	}, {
 		ActivityDots = c(ActivityDots, {
 			Active = props.Active,

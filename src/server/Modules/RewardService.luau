@@ -25,8 +25,11 @@ local handlers: { [string]: Handler } = {}
 
 handlers.Bonks = function(player, reward)
 	local amount = reward.amount
-	if amount == nil or amount <= 0 then
+	if amount == nil or amount <= 0 or amount % 1 ~= 0 or amount == math.huge then
 		return false, "invalid_reward"
+	end
+	if PlayerData.get(player) == nil then
+		return false, "no_profile"
 	end
 	PlayerData.addBonks(player, amount)
 	return true, nil
@@ -34,8 +37,11 @@ end
 
 handlers.XP = function(player, reward)
 	local amount = reward.amount
-	if amount == nil or amount <= 0 then
+	if amount == nil or amount <= 0 or amount % 1 ~= 0 or amount == math.huge then
 		return false, "invalid_reward"
+	end
+	if PlayerData.get(player) == nil then
+		return false, "no_profile"
 	end
 	PlayerData.addXP(player, amount)
 	return true, nil

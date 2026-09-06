@@ -7,7 +7,7 @@
 
 local PostMatchActionPolicy = {}
 
-export type Action = "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty"
+export type Action = "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty" | "FindMatch"
 
 function PostMatchActionPolicy.validate(
 	action: Action,

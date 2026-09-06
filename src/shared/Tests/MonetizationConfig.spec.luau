@@ -32,8 +32,6 @@ T.describe("MonetizationConfig", function()
 		T.expect(Products.Catalog.Bonks1100.BonksAmount):toEqual(1100)
 		T.expect(Products.Catalog.Bonks2500.BonksAmount):toEqual(2500)
 		T.expect(Products.Catalog.Bonks5500.BonksAmount):toEqual(5500)
-		T.expect(Products.Catalog.DodgeballCrateOpen.SuggestedRobux):toEqual(39)
-		T.expect(Products.Catalog.EffectsCrateOpen.SuggestedRobux):toEqual(59)
 		for _, definition in Products.Catalog do
 			if definition.CatalogStatus == "Active" then
 				T.expect(Products.ById[definition.Id]):toEqual(definition)
@@ -47,7 +45,6 @@ T.describe("MonetizationConfig", function()
 		T.expect(GamePasses.ById[GamePasses.Catalog.DoubleXP.Id]):toEqual(GamePasses.Catalog.DoubleXP)
 		T.expect(GamePasses.Catalog.SplatStarter.Id):toEqual(1968922292)
 		T.expect(GamePasses.ById[GamePasses.Catalog.SplatStarter.Id]):toEqual(GamePasses.Catalog.SplatStarter)
-		T.expect(GamePasses.Catalog.SplatStarter.SuggestedRobux):toEqual(49)
 		local starterEntitlements = GamePasses.Catalog.SplatStarter.EntitlementItemIds
 		T.expect(#starterEntitlements):toEqual(1)
 		for _, itemId in starterEntitlements do
@@ -67,18 +64,16 @@ T.describe("MonetizationConfig", function()
 		end
 	end)
 
-	T.it("ladders pass prices so there is an entry point at every wallet size", function()
-		local prices = {}
-		for _, definition in GamePasses.Catalog do
-			table.insert(prices, definition.SuggestedRobux)
+	T.it("keeps Robux pricing out of both catalogs", function()
+		for _, catalog in { GamePasses.Catalog, Products.Catalog } do
+			for _, definition in catalog do
+				T.expect(definition.SuggestedRobux):toBeNil()
+				T.expect(definition.RobuxPrice):toBeNil()
+			end
 		end
-		table.sort(prices)
-		T.expect(prices[1] <= 99):toBeTruthy()
-		T.expect(prices[#prices] >= 399):toBeTruthy()
-		T.expect(#prices >= 4):toBeTruthy()
 	end)
 
-	T.it("keeps at least one purely cosmetic pass at every price point that has boosts", function()
+	T.it("keeps concrete cosmetic grants alongside progression passes", function()
 		local cosmeticOnly = 0
 		for _, definition in GamePasses.Catalog do
 			if definition.Boosts == nil and #definition.Categories > 0 then

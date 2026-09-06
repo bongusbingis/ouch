@@ -9,6 +9,18 @@ local T = require(script.Parent.TestKit)
 local ReturnPayload = require(script.Parent.Parent.Game.Matchmaking.ReturnPayload)
 
 T.describe("ReturnPayload", function()
+	T.it("round-trips opt-in queue intent while older returns stay in the lobby", function()
+		local parsed = assert(ReturnPayload.parse(ReturnPayload.build("party", "match", { 10 }, "Party", true)))
+		T.expect(parsed.queueOnArrival):toEqual(true)
+		local legacy = assert(ReturnPayload.parse(ReturnPayload.build("party", "match", { 10 })))
+		T.expect(legacy.queueOnArrival):toBeNil()
+		local invalid: any = ReturnPayload.build("party", "match", { 10 }, "Separate")
+		invalid.queueOnArrival = true
+		T.expect((ReturnPayload.parse(invalid))):toBeNil()
+		invalid.returnMode = "Party"
+		invalid.queueOnArrival = "yes"
+		T.expect((ReturnPayload.parse(invalid))):toBeNil()
+	end)
 	T.it("round trips the party it was built from", function()
 		local built = ReturnPayload.build("party-1", "match-1", { 10, 20, 30 })
 		local parsed = ReturnPayload.parse(built)

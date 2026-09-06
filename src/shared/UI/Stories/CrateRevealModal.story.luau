@@ -6,14 +6,16 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local CrateRevealModal = require(script.Parent.Parent.Components.CrateRevealModal)
 local mount = require(script.Parent.StoryRoot)
 
+local Fixtures = require(script.Parent.EconomyFixtures)
+local model = Fixtures.build("Ready")
 local RESULTS = {}
-for index = 1, 10 do
-	table.insert(RESULTS, {
-		displayName = if index == 10 then "Legendary Hammer" else `Reward {index}`,
-		rarity = if index == 10 then "Legendary" else if index % 3 == 0 then "Rare" else "Common",
-		isDupe = index % 4 == 0,
-		bonksRefund = if index % 4 == 0 then 100 else 0,
-	})
+local totalRefund = 0
+for index, outcome in model.byId["Crate:EffectsCrate"].odds do
+	local result = table.clone(outcome)
+	result.isDupe = index % 4 == 0
+	result.bonksRefund = if result.isDupe then outcome.bonksRefund else 0
+	totalRefund += result.bonksRefund
+	table.insert(RESULTS, result)
 end
 
 return function(target: Instance)
@@ -22,7 +24,7 @@ return function(target: Instance)
 		React.createElement(CrateRevealModal, {
 			Reveal = {
 				results = RESULTS,
-				totalRefund = 200,
+				totalRefund = totalRefund,
 			},
 			OnClose = function() end,
 		})

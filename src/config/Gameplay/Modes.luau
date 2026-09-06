@@ -8,7 +8,7 @@
 
 return {
 	FFA = {
-		MinPlayers = 1,
+		MinPlayers = 2,
 		ScoreTarget = 15,
 		TimeCapSeconds = 300,
 		StartingSeconds = 3,
@@ -17,7 +17,8 @@ return {
 		PreserveDodgeballs = true,
 	},
 	TDM = {
-		MinPlayers = 1,
+		MinPlayers = 2,
+		MinParties = 2,
 		ScoreTarget = 40,
 		TimeCapSeconds = 360,
 		StartingSeconds = 3,

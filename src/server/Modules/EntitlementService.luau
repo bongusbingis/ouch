@@ -34,7 +34,10 @@ local playerRemovingConnection: any = nil
 local function boostKeys(): { string }
 	local keys = {}
 	for key, definition in activeGamePasses.Catalog do
-		if definition.Boosts ~= nil then
+		if
+			definition.Boosts ~= nil
+			and (definition.CatalogStatus == nil or definition.CatalogStatus == "Active" or definition.Id ~= nil)
+		then
 			table.insert(keys, key)
 		end
 	end
@@ -70,10 +73,7 @@ function EntitlementService.ownsAny(player: Player): boolean
 end
 
 function EntitlementService.isReady(player: Player): boolean
-	local entries = ownedByUserId[player.UserId]
-	if entries == nil then
-		return false
-	end
+	local entries = ownedByUserId[player.UserId] or {}
 	for _, key in boostKeys() do
 		if entries[key] == nil then
 			return false

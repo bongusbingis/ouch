@@ -17,6 +17,7 @@ local SettingsRegistry = require(
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ToggleControl = require(script.Parent.ToggleControl)
 local SliderControl = require(script.Parent.SliderControl)
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local c = React.createElement
 
@@ -41,7 +42,14 @@ return React.memo(function(props: Props)
 	local hasDescription = definition.Description ~= nil and definition.Description ~= ""
 
 	local textWidth = if props.Compact then 1 else 0.56
-	local textHeight = if props.Compact then (if hasDescription then 0.5 else 0.62) else 1
+	local controlHeight = UIConfig.Interaction.MinTargetPx
+		+ (if definition.Type == "Slider" then UIConfig.Layout.SettingsControls.SliderLabelHeightPx else 0)
+	local textHeight = if props.Compact
+		then math.max(
+			(props.Height - controlHeight - UIConfig.Layout.SettingsControls.LabelControlGapPx) / props.Height,
+			0
+		)
+		else 1
 
 	local control
 	if definition.Type == "Toggle" then
@@ -53,11 +61,9 @@ return React.memo(function(props: Props)
 			OnChange = function(value: any)
 				props.OnChange(definition.Id, value, true)
 			end,
-			AnchorPoint = if props.Compact then nil else Vector2.new(1, 0.5),
-			Position = if props.Compact
-				then UDim2.fromScale(0, if hasDescription then 0.56 else 0.68)
-				else UDim2.fromScale(1, 0.5),
-			Size = if props.Compact then UDim2.fromScale(0.62, 0.32) else UDim2.fromScale(0.34, 0.56),
+			AnchorPoint = if props.Compact then Vector2.new(0, 1) else Vector2.new(1, 0.5),
+			Position = if props.Compact then UDim2.fromScale(0, 1) else UDim2.fromScale(1, 0.5),
+			Size = UDim2.new(if props.Compact then 0.62 else 0.34, 0, 0, controlHeight),
 		})
 	else
 		control = c(SliderControl, {
@@ -68,11 +74,9 @@ return React.memo(function(props: Props)
 			OnChange = function(value: number, committed: boolean)
 				props.OnChange(definition.Id, value, committed)
 			end,
-			AnchorPoint = if props.Compact then nil else Vector2.new(1, 0.5),
-			Position = if props.Compact
-				then UDim2.fromScale(0, if hasDescription then 0.56 else 0.68)
-				else UDim2.fromScale(1, 0.5),
-			Size = if props.Compact then UDim2.fromScale(1, 0.32) else UDim2.fromScale(0.4, 0.56),
+			AnchorPoint = if props.Compact then Vector2.new(0, 1) else Vector2.new(1, 0.5),
+			Position = if props.Compact then UDim2.fromScale(0, 1) else UDim2.fromScale(1, 0.5),
+			Size = UDim2.new(if props.Compact then 1 else 0.4, 0, 0, controlHeight),
 		})
 	end
 

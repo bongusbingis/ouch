@@ -18,6 +18,7 @@ export type Model = {
 	rarityOrder: { string },
 	totalWeight: number,
 	outcomes: { Outcome },
+	forcedRarity: string?,
 }
 
 type ItemDef = { Rarity: string, [string]: any }
@@ -26,7 +27,8 @@ type RarityDef = { Weight: number, [string]: any }
 function CrateOdds.build(
 	crate: { ItemPool: { string }, [string]: any },
 	items: { [string]: ItemDef },
-	rarities: { [string]: RarityDef }
+	rarities: { [string]: RarityDef },
+	pity: { [string]: number }?
 ): Model
 	local buckets: { [string]: { string } } = {}
 	local rarityOrder: { string } = {}
@@ -51,11 +53,24 @@ function CrateOdds.build(
 	assert(totalWeight > 0, "[CrateOdds] crate pool has no rollable items")
 	table.sort(rarityOrder)
 
+	local forcedRarity: string? = nil
+	for _, rarityName in rarityOrder do
+		local threshold = if crate.Pity then crate.Pity[rarityName] else nil
+		local count = if pity then pity[rarityName] or 0 else 0
+		if threshold ~= nil and count + 1 >= threshold then
+			if forcedRarity == nil or rarities[rarityName].Weight < rarities[forcedRarity].Weight then
+				forcedRarity = rarityName
+			end
+		end
+	end
+
 	local outcomes: { Outcome } = {}
 	for _, rarityName in rarityOrder do
 		local bucket = buckets[rarityName]
 		table.sort(bucket)
-		local probability = rarities[rarityName].Weight / totalWeight / #bucket
+		local probability = if forcedRarity
+			then (if rarityName == forcedRarity then 1 / #bucket else 0)
+			else rarities[rarityName].Weight / totalWeight / #bucket
 		for _, itemId in bucket do
 			table.insert(outcomes, {
 				itemId = itemId,
@@ -70,6 +85,7 @@ function CrateOdds.build(
 		rarityOrder = rarityOrder,
 		totalWeight = totalWeight,
 		outcomes = outcomes,
+		forcedRarity = forcedRarity,
 	}
 end
 
@@ -123,12 +139,18 @@ end
 
 function CrateOdds.percentByRarity(
 	model: Model,
-	rarities: { [string]: RarityDef },
+	_rarities: { [string]: RarityDef },
 	precision: number
 ): { [string]: number }
 	local values = table.create(#model.rarityOrder)
 	for index, rarityName in model.rarityOrder do
-		values[index] = rarities[rarityName].Weight / model.totalWeight
+		local probability = 0
+		for _, outcome in model.outcomes do
+			if outcome.rarity == rarityName then
+				probability += outcome.probability
+			end
+		end
+		values[index] = probability
 	end
 
 	local percents = allocate(values, precision)

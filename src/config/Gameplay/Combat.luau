@@ -8,6 +8,7 @@ return {
 		Gravity = 70,
 
 		Charge = {
+			FullSeconds = 0.7,
 			-- Speed multiplier at full charge.
 			MaxSpeedScale = 1.3,
 		},

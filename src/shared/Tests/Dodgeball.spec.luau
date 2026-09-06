@@ -102,6 +102,18 @@ T.describe("Dodgeball kit", function()
 		T.expect(next(state.projectiles)):toBeNil()
 	end)
 
+	T.it("cannot catch an incoming ball across a wall", function()
+		local world = MockWorld.snapshot({
+			p1 = MockWorld.character(vector.create(0, 2.5, 0)),
+			p2 = MockWorld.character(vector.create(10, 2.5, 0)),
+		}, { { min = vector.create(2, 0, -4), max = vector.create(2.2, 8, 4) } })
+		local state = SimCore.newState()
+		addIncomingBall(state, vector.create(4, 2.5, 0), vector.create(-20, 0, 0))
+		local events = SimCore.step(state, { catchCommand() }, world, DT)
+		T.expect(countEvents(events, "BallCaught")):toEqual(0)
+		T.expect(state.projectiles.ball_0001.heldBy):toBeNil()
+	end)
+
 	T.it("throw requires a held ball", function()
 		local world = arena()
 		world.ballSpawns = {}
@@ -204,16 +216,64 @@ T.describe("Dodgeball kit", function()
 	T.it("carries the charge the player held through to the release", function()
 		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
 		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ kind = "BeginCharge" }) }, world, DT)
+		for _ = 1, 32 do
+			SimCore.step(state, {}, world, DT)
+		end
 		SimCore.step(state, { throwCommand({ charge = 0.75 }) }, world, DT)
 		local ball = state.projectiles.ball_0001
 		T.expect(ball.releaseCharge):toBeNear(0.75, 1e-6)
 	end)
 
-	T.it("clamps a charge the client sent out of range", function()
+	T.it("does not trust charged releases without a server-observed hold", function()
 		local world = arena({ dummy = MockWorld.character(vector.create(30, 2.5, 1)) })
 		local state = stateWithHeldBall(world)
 		SimCore.step(state, { throwCommand({ charge = 12 }) }, world, DT)
-		T.expect(state.projectiles.ball_0001.releaseCharge):toEqual(1)
+		T.expect(state.projectiles.ball_0001.releaseCharge):toEqual(0)
+	end)
+
+	T.it("caps a forged full charge to elapsed simulation time", function()
+		local world = arena()
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ kind = "BeginCharge" }) }, world, DT)
+		SimCore.step(state, { throwCommand({ charge = 1 }) }, world, DT)
+		T.expect(state.projectiles.ball_0001.releaseCharge):toBeNear(DT / Combat.Dodgeball.Charge.FullSeconds, 1e-6)
+	end)
+
+	T.it("cancels charge on cancellation, death, and weapon switches", function()
+		for _, cancellation in { "CancelCharge", "Death", "Equip" } do
+			local world = arena()
+			local state = stateWithHeldBall(world)
+			SimCore.step(state, { throwCommand({ kind = "BeginCharge" }) }, world, DT)
+			local commands = {}
+			if cancellation == "Death" then
+				world.characters.p1.alive = false
+			else
+				table.insert(commands, throwCommand({ kind = cancellation, weapon = "Hammer" }))
+			end
+			SimCore.step(state, commands, world, DT)
+			T.expect(state.players.p1.weapons.Dodgeball.chargeSeconds):toBeNil()
+		end
+	end)
+
+	T.it("keeps legacy tap throws uncharged and playable", function()
+		local world = arena()
+		local state = stateWithHeldBall(world)
+		local events = SimCore.step(state, { throwCommand() }, world, DT)
+		T.expect(state.projectiles.ball_0001.releaseCharge):toEqual(0)
+		T.expect(countEvents(events, "BallReleased")):toEqual(1)
+	end)
+
+	T.it("an invalid catch does not consume a same-tick hammer attack", function()
+		local world = arena()
+		local state = stateWithHeldBall(world)
+		local events = SimCore.step(state, {
+			throwCommand({ kind = "Equip", weapon = "Hammer" }),
+			catchCommand(),
+			throwCommand(),
+		}, world, DT)
+		T.expect(countEvents(events, "CatchStarted")):toEqual(0)
+		T.expect(state.players.p1.weapons.Hammer.cooldown > 0):toBeTruthy()
 	end)
 
 	T.it("does not auto-select outside the selection cone", function()

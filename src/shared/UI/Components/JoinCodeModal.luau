@@ -111,7 +111,7 @@ export type Props = {
 }
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.JoinCode,
@@ -199,7 +199,11 @@ return function(props: Props)
 		submitRevision.current += 1
 		local revision = submitRevision.current
 		task.spawn(function()
-			local success, message = props.OnSubmit(code)
+			local callOk, success, message = pcall(props.OnSubmit, code)
+			if not callOk then
+				success = false
+				message = "Connection failed. Please try again."
+			end
 			if not aliveRef.current or revision ~= submitRevision.current then
 				return
 			end
@@ -229,6 +233,10 @@ return function(props: Props)
 		scheduleFocus(0)
 		return function()
 			focusRevision.current += 1
+			local previous = previousSelection.current
+			if previous and previous.Parent and previous.Visible and previous.Selectable then
+				GuiService.SelectedObject = previous
+			end
 			local input = inputRef.current
 			if input and input:IsFocused() then
 				input:ReleaseFocus()
@@ -298,177 +306,198 @@ return function(props: Props)
 	end
 
 	local canSubmit = #code == CODE_LENGTH and not submitting
-	return c("ImageLabel", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://124751224634629",
-		Position = UDim2.fromScale(0.5, 0.534555),
-		Rotation = modalStyles.Rotation,
-		ScaleType = Enum.ScaleType.Slice,
-		SelectionGroup = true,
-		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
-		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
-		SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
-		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-		SliceCenter = Rect.new(31, 41, 978, 620),
-		SliceScale = 0.5,
-		Visible = true,
+	return c("TextButton", {
+		Active = true,
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(),
+		BackgroundTransparency = 0.35,
+		Selectable = false,
+		Text = "",
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 100,
 	}, {
-		ModalScale = c("UIScale", { Scale = modalStyles.Scale }),
-		Title = c(ResponsiveText, {
-			HostName = "Title",
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 46,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.147601),
-				Size = UDim2.fromScale(0.9, 0.144798),
-				Text = "ENTER PARTY CODE",
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 2,
-			},
-		}),
-		Frame = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
-			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.202036),
-			Size = UDim2.fromScale(0.8, 0.015),
-		}),
-		Title2 = c(ResponsiveText, {
-			HostName = "Title",
-			MeasurementFont = Enum.Font.Highway,
-			MaxTextSize = 32,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
-				Position = UDim2.fromScale(0.5, 0.275),
-				Size = UDim2.fromScale(0.9, 0.0881433),
-				Text = "Type the 6-digit code to join a party",
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 2,
-			},
-		}),
-		EntryBox = c("ImageLabel", {
+		Panel = c("ImageLabel", {
+			Active = true,
+			ZIndex = 101,
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://130293277730649",
-			Position = UDim2.fromScale(0.05, 0.333456),
+			Image = "rbxassetid://124751224634629",
+			Position = UDim2.fromScale(0.5, 0.534555),
+			Rotation = modalStyles.Rotation,
 			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromScale(0.9, 0.34441),
-			SliceCenter = Rect.new(61, 58, 958, 139),
+			SelectionGroup = true,
+			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+			SliceCenter = Rect.new(31, 41, 978, 620),
 			SliceScale = 0.5,
+			Visible = true,
 		}, {
-			Holder = c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.0137874, -0.0459255),
-				Size = UDim2.fromScale(0.962774, 1.04593),
-			}, digits),
-			InputCapture = c("TextBox", {
-				ref = inputRef,
-				BackgroundTransparency = 1,
-				ClearTextOnFocus = false,
-				FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json"),
-				MultiLine = false,
-				ShowNativeInput = true,
-				Size = UDim2.fromScale(1, 1),
-				Text = code,
-				TextColor3 = Color3.new(),
-				TextEditable = true,
-				TextSize = 14,
-				TextTransparency = 1,
-				[React.Change.Text] = function(input: TextBox)
-					local nextCode = sanitize(input.Text)
-					setCode(nextCode)
-					if input.Text ~= nextCode then
-						input.Text = nextCode
-						input.CursorPosition = #nextCode + 1
-					end
-				end,
-				[React.Event.FocusLost] = function(_input: TextBox, enterPressed: boolean)
-					if enterPressed then
-						submit()
-					end
-					if focusAllowedRef.current and not closingRef.current then
-						scheduleFocus()
-					end
-				end,
-				[React.Event.ReturnPressedFromOnScreenKeyboard] = submit,
-			}),
-		}),
-		Buttons = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.944206),
-			Size = UDim2.fromScale(0.8, 0.158129),
-		}, {
-			UIListLayout = c("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				Padding = UDim.new(0.03, 0),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-			}),
-			Confirm = c(AnimatedButton, {
-				Enabled = canSubmit,
-				EntranceDelay = 0.025,
+			ModalScale = c("UIScale", { Scale = modalStyles.Scale }),
+			Title = c(ResponsiveText, {
+				HostName = "Title",
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 46,
 				Native = {
-					AutoButtonColor = canSubmit,
+					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					Image = "rbxassetid://136021539696619",
-					ImageColor3 = if canSubmit then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
-					LayoutOrder = 3,
-					Position = UDim2.fromScale(0.153547, 0),
-					ScaleType = Enum.ScaleType.Slice,
-					Size = UDim2.fromScale(0.334921, 1),
-					SliceCenter = Rect.new(198, 228, 841, 468),
-					SliceScale = 0.2,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					Position = UDim2.fromScale(0.5, 0.147601),
+					Size = UDim2.fromScale(0.9, 0.144798),
+					Text = "ENTER PARTY CODE",
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 2,
 				},
-				OnActivated = submit,
+			}),
+			Frame = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0),
+				BackgroundColor3 = Color3.new(1, 1, 1),
+				BorderColor3 = Color3.new(),
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.202036),
+				Size = UDim2.fromScale(0.8, 0.015),
+			}),
+			Title2 = c(ResponsiveText, {
+				HostName = "Title",
+				MeasurementFont = Enum.Font.Highway,
+				MaxTextSize = 32,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+					Position = UDim2.fromScale(0.5, 0.275),
+					Size = UDim2.fromScale(0.9, 0.0881433),
+					Text = "Type the 6-digit code to join a party",
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 2,
+				},
+			}),
+			EntryBox = c("ImageLabel", {
+				BackgroundTransparency = 1,
+				Image = "rbxassetid://130293277730649",
+				Position = UDim2.fromScale(0.05, 0.333456),
+				ScaleType = Enum.ScaleType.Slice,
+				Size = UDim2.fromScale(0.9, 0.34441),
+				SliceCenter = Rect.new(61, 58, 958, 139),
+				SliceScale = 0.5,
 			}, {
-				TextLabel = actionText("CONFIRM", UDim2.fromScale(0.48792, 0.57964), UDim2.fromScale(0.685479, 0.6712)),
-				UISizeConstraint = c("UISizeConstraint", {
-					MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+				Holder = c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromScale(0.0137874, -0.0459255),
+					Size = UDim2.fromScale(0.962774, 1.04593),
+				}, digits),
+				InputCapture = c("TextBox", {
+					ref = inputRef,
+					BackgroundTransparency = 1,
+					ClearTextOnFocus = false,
+					FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json"),
+					MultiLine = false,
+					ShowNativeInput = true,
+					Size = UDim2.fromScale(1, 1),
+					Text = code,
+					TextColor3 = Color3.new(),
+					TextEditable = true,
+					TextSize = 14,
+					TextTransparency = 1,
+					[React.Change.Text] = function(input: TextBox)
+						local nextCode = sanitize(input.Text)
+						setCode(nextCode)
+						if input.Text ~= nextCode then
+							input.Text = nextCode
+							input.CursorPosition = #nextCode + 1
+						end
+					end,
+					[React.Event.FocusLost] = function(_input: TextBox, enterPressed: boolean)
+						if enterPressed then
+							submit()
+						end
+						if focusAllowedRef.current and not closingRef.current then
+							scheduleFocus()
+						end
+					end,
+					[React.Event.ReturnPressedFromOnScreenKeyboard] = submit,
 				}),
 			}),
-			Cancel = c(AnimatedButton, {
-				Enabled = not submitting,
-				EntranceDelay = 0,
-				Native = {
-					BackgroundTransparency = 1,
-					Image = "rbxassetid://94748581468730",
-					LayoutOrder = 2,
-					Position = UDim2.fromScale(0.520694, 0),
-					ScaleType = Enum.ScaleType.Slice,
-					Size = UDim2.fromScale(0.277094, 1),
-					SliceCenter = Rect.new(198, 228, 841, 468),
-					SliceScale = 0.2,
-				},
-				OnActivated = close,
+			Buttons = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 1),
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(0.5, 0.944206),
+				Size = UDim2.fromScale(0.8, 0.158129),
 			}, {
-				TextLabel = actionText("CANCEL", UDim2.fromScale(0.463449, 0.57964), UDim2.fromScale(0.680654, 0.6712)),
-				UISizeConstraint = c("UISizeConstraint", {
-					MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+				UIListLayout = c("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					Padding = UDim.new(0.03, 0),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+				}),
+				Confirm = c(AnimatedButton, {
+					Enabled = canSubmit,
+					EntranceDelay = 0.025,
+					Native = {
+						AutoButtonColor = canSubmit,
+						BackgroundTransparency = 1,
+						Image = "rbxassetid://136021539696619",
+						ImageColor3 = if canSubmit then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
+						LayoutOrder = 3,
+						Position = UDim2.fromScale(0.153547, 0),
+						ScaleType = Enum.ScaleType.Slice,
+						Size = UDim2.fromScale(0.334921, 1),
+						SliceCenter = Rect.new(198, 228, 841, 468),
+						SliceScale = 0.2,
+					},
+					OnActivated = submit,
+				}, {
+					TextLabel = actionText(
+						"CONFIRM",
+						UDim2.fromScale(0.48792, 0.57964),
+						UDim2.fromScale(0.685479, 0.6712)
+					),
+					UISizeConstraint = c("UISizeConstraint", {
+						MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+					}),
+				}),
+				Cancel = c(AnimatedButton, {
+					Enabled = not submitting,
+					EntranceDelay = 0,
+					Native = {
+						BackgroundTransparency = 1,
+						Image = "rbxassetid://94748581468730",
+						LayoutOrder = 2,
+						Position = UDim2.fromScale(0.520694, 0),
+						ScaleType = Enum.ScaleType.Slice,
+						Size = UDim2.fromScale(0.277094, 1),
+						SliceCenter = Rect.new(198, 228, 841, 468),
+						SliceScale = 0.2,
+					},
+					OnActivated = close,
+				}, {
+					TextLabel = actionText(
+						"CANCEL",
+						UDim2.fromScale(0.463449, 0.57964),
+						UDim2.fromScale(0.680654, 0.6712)
+					),
+					UISizeConstraint = c("UISizeConstraint", {
+						MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
+					}),
 				}),
 			}),
-		}),
-		ErrorText = c(ResponsiveText, {
-			HostName = "ErrorText",
-			MeasurementFont = Enum.Font.Highway,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
-				Position = UDim2.fromScale(0.495, 0.73),
-				Size = UDim2.fromScale(0.9, 0.0741377),
-				Text = errorText,
-				TextColor3 = errorColor,
-				ZIndex = 2,
-			},
+			ErrorText = c(ResponsiveText, {
+				HostName = "ErrorText",
+				MeasurementFont = Enum.Font.Highway,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+					Position = UDim2.fromScale(0.495, 0.73),
+					Size = UDim2.fromScale(0.9, 0.0741377),
+					Text = errorText,
+					TextColor3 = errorColor,
+					ZIndex = 2,
+				},
+			}),
 		}),
 	})
 end

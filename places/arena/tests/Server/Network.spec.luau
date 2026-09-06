@@ -31,6 +31,7 @@ local EXPECTED_REMOTES = {
 	RequestLobbyReturn = "RemoteEvent",
 	SubmitCombatInput = "RemoteEvent",
 	SetClientSetting = "RemoteEvent",
+	SetClientSettingRequest = "RemoteFunction",
 	OnboardingState = "RemoteEvent",
 	OnboardingReady = "RemoteFunction",
 	OnboardingAction = "RemoteEvent",
@@ -142,20 +143,27 @@ return function()
 			expect(calls).to.equal(1)
 		end)
 
-		it("validation runs before rate limiting when composed like handleProtected", function()
+		it("invalid packets consume the budget before further validation", function()
 			local player = freshPlayer()
-			local rateLimited = Network.withRateLimit(1, function(_player, value)
-				return value
-			end)
-			local composed = Network.withValidation(function(_player, value)
-				return typeof(value) == "string", "string_required"
-			end, rateLimited)
+			local validated = 0
+			local composed = Network.withRateLimit(
+				1,
+				Network.withValidation(function(_player, value)
+					validated += 1
+					return typeof(value) == "string", "string_required"
+				end, function(_player, value)
+					return value
+				end)
+			)
 
 			local result, reason = composed(player, 42)
 			expect(result).never.to.be.ok()
 			expect(reason).to.equal("invalid_args")
 
-			expect(composed(player, "fine")).to.equal("fine")
+			local accepted, deniedReason = composed(player, "fine")
+			expect(accepted).to.equal(nil)
+			expect(deniedReason).to.equal("rate_limited")
+			expect(validated).to.equal(1)
 		end)
 	end)
 end

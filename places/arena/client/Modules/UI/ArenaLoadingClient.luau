@@ -11,6 +11,7 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local arenaOrigin = require(script.Parent.Parent.Presentation.ArenaOrigin)
 
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Animations = require(Config:WaitForChild("Infra"):WaitForChild("Animations"))
@@ -328,6 +329,9 @@ local function criticalInstances(): { Instance }
 		add(instance)
 	end
 	local assets = ReplicatedStorage:WaitForChild("Assets")
+	local rig = assets:WaitForChild("Rigs"):WaitForChild("CharacterRig")
+	assert(rig:IsA("Model"), "[ArenaLoadingClient] Assets.Rigs.CharacterRig must be a Model")
+	add(rig)
 	local animations = assets:WaitForChild(Animations.FolderName)
 	for _, clips in Animations.Clips do
 		for _, clip in clips do
@@ -336,11 +340,13 @@ local function criticalInstances(): { Instance }
 			end
 		end
 	end
-	local templates = assets:WaitForChild("Cosmetics"):WaitForChild("Templates")
-	for _, template in Cosmetics.VisualTemplates do
-		if template.EffectsCarrier then
-			add(templates:WaitForChild(template.EffectsCarrier))
-		end
+	local cosmetics = assets:WaitForChild("Cosmetics")
+	local templates = cosmetics:WaitForChild("Templates")
+	for name in Cosmetics.VisualTemplates do
+		add(templates:WaitForChild(name))
+	end
+	for _, folder in Cosmetics.VisualFolders do
+		add(cosmetics:WaitForChild(folder))
 	end
 	return result
 end
@@ -428,13 +434,7 @@ end
 local function beginStreaming(currentGeneration: number)
 	task.spawn(function()
 		if Workspace.StreamingEnabled then
-			local arena = Workspace:WaitForChild("Assets"):WaitForChild("Arena")
-			local mapOrigin = arena:WaitForChild("MapOrigin")
-			assert(
-				mapOrigin:IsA("BasePart"),
-				"[ArenaLoadingClient] Workspace.Assets.Arena.MapOrigin must be a BasePart"
-			)
-			pcall(player.RequestStreamAroundAsync, player, mapOrigin.Position, Loading.CriticalPreloadTimeoutSeconds)
+			pcall(player.RequestStreamAroundAsync, player, arenaOrigin(), Loading.CriticalPreloadTimeoutSeconds)
 		end
 		if destroyed or generation ~= currentGeneration then
 			return
@@ -494,10 +494,21 @@ function ArenaLoadingClient.markBallotPresented(startsAt: number)
 end
 
 function ArenaLoadingClient.retryInitialization()
-	if destroyed or isLocalReady() then
+	if destroyed or isLocalReady() or not localState.simulationReady then
 		return
 	end
+	generation += 1
+	readyTaskRunning = false
 	localState.fatalError = nil
+	localState.preloadReady = false
+	localState.preloadProgress = 0
+	localState.preloadFailed = false
+	localState.preloadTimedOut = false
+	localState.streamReady = false
+	localState.worldReady = false
+	preloadStartedAt = os.clock()
+	beginPreload(generation)
+	beginStreaming(generation)
 	changed()
 	scheduleInitializationTimeout(generation)
 end

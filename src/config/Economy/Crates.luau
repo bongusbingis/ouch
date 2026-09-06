@@ -14,6 +14,7 @@ export type CrateStatus = "Active" | "Preview" | "Hidden"
 
 export type CrateDef = {
 	DisplayName: string,
+	Description: string,
 	DisplayOrder: number,
 	Thumbnail: string,
 	CatalogStatus: CrateStatus,
@@ -47,6 +48,7 @@ end
 local Catalog: { [string]: CrateDef } = {
 	DodgeballCrate = {
 		DisplayName = "Dodgeballs",
+		Description = "Fresh looks for your next knockout.",
 		DisplayOrder = 100,
 		Thumbnail = "",
 		CatalogStatus = "Active",
@@ -57,6 +59,7 @@ local Catalog: { [string]: CrateDef } = {
 	},
 	HammerCrate = {
 		DisplayName = "Hammers",
+		Description = "Big swings. Bigger style.",
 		DisplayOrder = 200,
 		Thumbnail = "",
 		CatalogStatus = "Active",
@@ -70,10 +73,11 @@ local Catalog: { [string]: CrateDef } = {
 	-- crates would read as padding.
 	EffectsCrate = {
 		DisplayName = "Effects",
+		Description = "Hit effects and knockout sounds. Make your mark.",
 		DisplayOrder = 300,
 		Thumbnail = "",
 		CatalogStatus = "Active",
-		BonksPrice = 750,
+		BonksPrice = 500,
 		Pity = { Rare = 5, Legendary = 25 },
 		OpenQuantities = OPEN_QUANTITIES,
 		ItemPool = poolOf({ "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" }),

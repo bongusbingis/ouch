@@ -69,10 +69,10 @@ local function rollOne(player: Player, crateId: string, source: string): OpenEnt
 		rng,
 		data.Crates.Pity[crateId]
 	)
-	data.Crates.Pity[crateId] = result.pity
 	if result.isDupe then
 		data.Bonks += result.bonksRefund
-		AnalyticsService.logEconomyEvent(
+		pcall(
+			AnalyticsService.logEconomyEvent,
 			player,
 			"Source",
 			"Bonks",
@@ -82,16 +82,20 @@ local function rollOne(player: Player, crateId: string, source: string): OpenEnt
 			crateId
 		)
 	else
-		CosmeticsService.grant(player, result.itemId)
-		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
+		local granted = CosmeticsService.grant(player, result.itemId)
+		if not granted then
+			return nil
+		end
+		pcall(AnalyticsService.logCustomEvent, player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
 			itemId = result.itemId,
 			source = source,
 			variantId = Shop.VariantId,
 		})
 	end
 
+	data.Crates.Pity[crateId] = result.pity
 	local steps = AnalyticsConfig.ShopFunnelSteps.Completed
-	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
+	pcall(AnalyticsService.logFunnelStep, player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
 		crateId = crateId,
 		rarity = result.rarity,
 		source = source,
@@ -131,7 +135,8 @@ local function fireReveal(player: Player, payload: OpenResult)
 end
 
 local function logCrateFailure(player: Player, reason: string)
-	AnalyticsService.logCustomEvent(
+	pcall(
+		AnalyticsService.logCustomEvent,
 		player,
 		AnalyticsConfig.CustomEvents.CratePurchaseFailed,
 		1,
@@ -181,7 +186,7 @@ function CrateService.openWithBonks(player: Player, crateId: string, count: numb
 	end
 
 	local steps = AnalyticsConfig.ShopFunnelSteps.Attempted
-	AnalyticsService.logFunnelStep(player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
+	pcall(AnalyticsService.logFunnelStep, player, AnalyticsConfig.Funnels.ShopPurchase, steps.step, steps.name, {
 		crateId = crateId,
 		source = "Bonks",
 		count = quantity,
@@ -204,7 +209,8 @@ function CrateService.openWithBonks(player: Player, crateId: string, count: numb
 	price = CrateBatch.totalPrice(unitPrice, result.count)
 
 	data.Bonks -= price
-	AnalyticsService.logEconomyEvent(
+	pcall(
+		AnalyticsService.logEconomyEvent,
 		player,
 		"Sink",
 		"Bonks",
@@ -218,7 +224,12 @@ function CrateService.openWithBonks(player: Player, crateId: string, count: numb
 	return result, nil
 end
 
-local function grantRestrictedValue(player: Player, crateId: string, purchaseId: string, reason: string): boolean
+local function grantRestrictedValue(
+	player: Player,
+	crateId: string,
+	purchaseId: string,
+	reason: string
+): (boolean, any?)
 	local crate = Crates[crateId]
 	local data = PlayerData.get(player)
 	if crate == nil or data == nil then
@@ -231,7 +242,8 @@ local function grantRestrictedValue(player: Player, crateId: string, purchaseId:
 	end
 
 	PlayerData.addBonks(player, amount)
-	AnalyticsService.logEconomyEvent(
+	pcall(
+		AnalyticsService.logEconomyEvent,
 		player,
 		"Source",
 		"Bonks",
@@ -241,19 +253,28 @@ local function grantRestrictedValue(player: Player, crateId: string, purchaseId:
 		crateId,
 		{ substitutedFor = reason }
 	)
-	Network.fire("StorePurchaseGranted", player, {
+	return true, {
 		grantId = purchaseId,
 		kind = "Bonks",
 		amount = amount,
-	})
-	return true
+	}
 end
 
-function CrateService.openFromReceipt(player: Player, crateId: string, purchaseId: string): boolean
+function CrateService.openFromReceipt(player: Player, crateId: string, purchaseId: string): (boolean, any?)
 	if not CrateService.isOpenable(crateId) then
 		return grantRestrictedValue(player, crateId, purchaseId, "crate_unavailable")
 	end
+	local profile = PlayerData.get(player)
+	if profile == nil then
+		return false
+	end
 	local allowed, reason = PaidRandomPolicyService.canReceivePaidRandom(player)
+	if PlayerData.get(player) ~= profile then
+		return false
+	end
+	if reason == "policy_unavailable" then
+		return false
+	end
 	if not allowed then
 		return grantRestrictedValue(player, crateId, purchaseId, reason or "paid_random_restricted")
 	end
@@ -261,8 +282,7 @@ function CrateService.openFromReceipt(player: Player, crateId: string, purchaseI
 	if result == nil then
 		return false
 	end
-	fireReveal(player, result)
-	return true
+	return true, { kind = "Crate", reveal = result }
 end
 
 function CrateService.openForTesting(player: Player, crateId: string): (OpenResult?, string?)

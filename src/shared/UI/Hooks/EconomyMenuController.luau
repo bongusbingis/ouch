@@ -5,12 +5,15 @@
 
 --!strict
 
+local formatNumber = require(script.Parent.Parent.Models.NumberText)
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
+local ClientRequest = require(Shared.Game.Data.ClientRequest)
 local Economy = Shared:WaitForChild("Game"):WaitForChild("Economy")
 local CrateBatch = require(Economy:WaitForChild("CrateBatch"))
 local CrateOdds = require(Economy:WaitForChild("CrateOdds"))
@@ -28,6 +31,7 @@ local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmeti
 local Crates = require(Config:WaitForChild("Economy"):WaitForChild("Crates"))
 local GamePasses = require(Config:WaitForChild("Economy"):WaitForChild("GamePasses"))
 local Products = require(Config:WaitForChild("Economy"):WaitForChild("Products"))
+local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
 local Shop = require(Config:WaitForChild("Economy"):WaitForChild("Shop"))
 
 local EconomyMenuController = {}
@@ -43,6 +47,7 @@ local EQUIP_ERRORS = {
 
 local SHOP_ERRORS = {
 	busy = "That purchase is already being processed.",
+	season_ended = "This season has ended. Please refresh the shop.",
 	network_error = "The shop service is unavailable. Please try again.",
 	marketplace_error = "Roblox purchases are unavailable right now.",
 	no_profile = "Your profile is still loading.",
@@ -113,6 +118,7 @@ function EconomyMenuController.use(options: Options): Controller
 			bundles = Bundles,
 			gamePasses = GamePasses,
 			products = Products.Catalog,
+			seasons = Seasons.Definitions,
 			shopConfig = Shop,
 			featuredRotation = FeaturedRotation,
 			crateOdds = CrateOdds,
@@ -145,7 +151,9 @@ function EconomyMenuController.use(options: Options): Controller
 			count = crateReveal.count,
 			total = total,
 			affordable = balance >= total,
-			label = if crateReveal.count > 1 then `AGAIN {crateReveal.count}x  {total}` else `AGAIN  {total}`,
+			label = if crateReveal.count > 1
+				then `AGAIN {crateReveal.count}x  {formatNumber(total)}`
+				else `AGAIN  {formatNumber(total)}`,
 		}
 	end, { crateReveal, economyData })
 
@@ -172,9 +180,13 @@ function EconomyMenuController.use(options: Options): Controller
 		if grant == nil then
 			return
 		end
-		local description = if grant.kind == "Bonks"
-			then `YOU RECEIVED {grant.amount} BONKS.`
-			else "YOUR PURCHASE HAS BEEN ADDED TO YOUR ACCOUNT."
+		local passKey = if grant.passId then GamePasses.KeyById[grant.passId] else nil
+		local pass = if passKey then GamePasses.Catalog[passKey] else nil
+		local description = if pass and pass.PurchaseMessage
+			then pass.PurchaseMessage
+			else if grant.kind == "Bonks"
+				then `YOU RECEIVED {grant.amount} BONKS.`
+				else "YOUR PURCHASE HAS BEEN ADDED TO YOUR ACCOUNT."
 		notifications.notify({
 			title = "PURCHASE COMPLETE",
 			description = description,
@@ -198,7 +210,10 @@ function EconomyMenuController.use(options: Options): Controller
 		end
 		local generation = lifecycleGeneration.current
 		task.spawn(function()
-			local ok, reason = action()
+			local ran, ok, reason = pcall(action)
+			if not ran then
+				ok, reason = false, "network_error"
+			end
 			if not mounted.current or lifecycleGeneration.current ~= generation then
 				return
 			end
@@ -215,7 +230,7 @@ function EconomyMenuController.use(options: Options): Controller
 			return
 		end
 		UIAnalytics.report("OfferSelected", { offerKey = card.id, offerKind = card.kind })
-		if card.kind == "Crate" or (card.kind == "Cosmetic" and card.productId ~= nil) then
+		if card.kind == "Crate" or card.kind == "GamePass" or (card.kind == "Cosmetic" and card.productId ~= nil) then
 			setSelectedShopCardId(card.id)
 		elseif card.kind == "Cosmetic" and card.itemId then
 			local itemId = card.itemId
@@ -261,7 +276,7 @@ function EconomyMenuController.use(options: Options): Controller
 		local nextItemId = InventoryModel.nextEquip(entry, economyData.Cosmetics.Equipped)
 		local generation = lifecycleGeneration.current
 		task.spawn(function()
-			local callOk, accepted, reason = pcall(Network.call, "EquipCosmetic", entry.category, nextItemId)
+			local callOk, accepted, reason = ClientRequest(Network.call, "EquipCosmetic", entry.category, nextItemId)
 			busySlots.current[entry.category] = nil
 			if not mounted.current or lifecycleGeneration.current ~= generation then
 				return
@@ -327,25 +342,28 @@ function EconomyMenuController.use(options: Options): Controller
 
 	local purchaseSelectedRobux = React.useCallback(function()
 		local card = selectedShopCard
-		if card == nil or card.productId == nil then
+		if card == nil or (card.productId == nil and card.passId == nil) then
 			return
 		end
 		setSelectedShopCardId(nil)
 		UIAnalytics.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
 		runShopAction(function()
+			if card.passId then
+				return shopClient.promptGamePass(card.id, card.passId)
+			end
 			return shopClient.promptProduct(card.id, card.productId)
 		end, nil)
 	end, { selectedShopCard, runShopAction, shopClient })
 
 	local closeTopLayer = React.useCallback(function(): boolean
-		if crateReveal ~= nil then
+		if notifications.request ~= nil then
+			notifications.close(false)
+			return true
+		elseif crateReveal ~= nil then
 			shopClient.clearReveal()
 			return true
 		elseif selectedShopCardId ~= nil then
 			setSelectedShopCardId(nil)
-			return true
-		elseif notifications.request ~= nil then
-			notifications.close(false)
 			return true
 		end
 		return false

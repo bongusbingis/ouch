@@ -23,30 +23,34 @@ export type Props = {
 }
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundTransparency = 1,
-		Position = props.Position or UDim2.fromScale(0.5, 0.115),
+		Position = props.Position or UDim2.fromScale(if portrait then 0.74 else 0.5, 0.115),
 		Size = if portrait
-			then UDim2.new(0.84, 0, 0, UIConfig.Layout.PartyCode.PortraitHeightPx)
-			else UDim2.fromScale(0.4, 0.122814),
+			then UDim2.new(0.44, 0, 0, UIConfig.Layout.PartyCode.PortraitHeightPx)
+			else UDim2.fromOffset(
+				UIConfig.Layout.PartyCode.LandscapeWidthPx,
+				UIConfig.Layout.PartyCode.LandscapeCodeHeightPx + UIConfig.Interaction.MinTargetPx + 6
+			),
 	}, {
 		UIListLayout = c("UIListLayout", {
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = if portrait then UDim.new(0, 6) else UDim.new(0.04, 0),
+			Padding = UDim.new(0, 6),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 		Code = c("ImageLabel", {
+			LayoutOrder = 1,
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://123095501298848",
 			Position = UDim2.fromScale(0.365216, 0.0467871),
 			Size = if portrait
-				then UDim2.new(0.72, 0, 0, UIConfig.Layout.PartyCode.CodeHeightPx)
-				else UDim2.fromScale(0.397188, 1.08804),
+				then UDim2.new(1, 0, 0, UIConfig.Layout.PartyCode.CodeHeightPx)
+				else UDim2.new(1, 0, 0, UIConfig.Layout.PartyCode.LandscapeCodeHeightPx),
 		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 4.18 }),
+
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MaxTextSize = 40,
@@ -61,15 +65,16 @@ return function(props: Props)
 				},
 			}),
 		}),
-		UIPadding = c("UIPadding", { PaddingTop = if portrait then UDim.new(0, 0) else UDim.new(0.1, 0) }),
+
 		ShowCode = c(AnimatedButton, {
 			Native = {
+				LayoutOrder = 2,
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://136731323162202",
 				Position = UDim2.fromScale(0.433867, 0.634355),
 				Size = if portrait
 					then UDim2.new(0.42, 0, 0, UIConfig.Interaction.MinTargetPx)
-					else UDim2.fromScale(0.161336, 0.704785),
+					else UDim2.new(0.62, 0, 0, UIConfig.Interaction.MinTargetPx),
 			},
 			OnActivated = props.OnToggle,
 		}, {
@@ -86,7 +91,7 @@ return function(props: Props)
 					TextColor3 = Color3.new(1, 1, 1),
 				},
 			}),
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 2.86 }),
+			UIAspectRatioConstraint = if portrait then c("UIAspectRatioConstraint", { AspectRatio = 2.86 }) else nil,
 			UISizeConstraint = c("UISizeConstraint", {
 				MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
 			}),

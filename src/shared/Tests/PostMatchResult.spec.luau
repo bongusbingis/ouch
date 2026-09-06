@@ -29,6 +29,79 @@ local function global(modeId: string, scope: "Player" | "Team", winnerId: string
 end
 
 T.describe("PostMatchResult", function()
+	T.it("explains opponent loss without claiming that a tied contest was completed", function()
+		local result = global("TDM", "Team", nil)
+		result.reason = "NoContest"
+		local projected = PostMatchResult.forPlayer(result, 10, nil, nil)
+		T.expect(projected.outcome):toEqual("RoundOver")
+		T.expect(projected.presentation.title):toEqual("LET'S FIND MORE PLAYERS")
+		T.expect(#projected.podium):toEqual(0)
+	end)
+	T.it("retains earned standings for a contestant whose live score entry was removed", function()
+		local result = PostMatchResult.build({
+			resultId = "round",
+			modeId = "FFA",
+			modeName = "Free For All",
+			scoreScope = "Player",
+			reason = "TimeCap",
+			interactiveAt = 10,
+			endsAt = 20,
+			contestants = {
+				{ playerId = "10", userId = 10, username = "Left", displayName = "LEFT", contribution = 8 },
+				{ playerId = "20", userId = 20, username = "Here", displayName = "HERE", contribution = 3 },
+			},
+			scores = { ["20"] = 3 },
+		})
+		T.expect(result.scores[1].id):toEqual("10")
+		T.expect(result.scores[1].score):toEqual(8)
+		T.expect(result.winnerId):toBeNil()
+	end)
+	T.it("does not declare a winner when the authoritative round is tied", function()
+		local result = global("FFA", "Player", nil)
+		result.scores[1].score = result.scores[2].score
+		local projected = PostMatchResult.forPlayer(result, 10, nil, nil)
+		T.expect(projected.outcome):toEqual("RoundOver")
+		T.expect(projected.presentation.detail):toEqual("TIED ROUND")
+	end)
+
+	T.it("projects bounded podium ranks without breaking ties or rewarding ownership", function()
+		local result = global("FFA", "Player", "10")
+		result.contestants[2].emoteId = "ShowtimeTwirl"
+		local projected = PostMatchResult.forPlayer(result, 20, nil, nil)
+		T.expect(#projected.podium):toEqual(3)
+		T.expect(projected.podium[1].userId):toEqual(10)
+		T.expect(projected.podium[2].placement):toEqual(2)
+		T.expect(projected.podium[3].placement):toEqual(2)
+		T.expect(projected.personalAppearance.emoteId):toEqual("ShowtimeTwirl")
+		local parsed = PostMatchResult.parse(projected)
+		T.expect(parsed.podium[2].emoteId):toEqual("ShowtimeTwirl")
+		projected.podium[2].emoteId = "Changed"
+		T.expect(parsed.podium[2].emoteId):toEqual("ShowtimeTwirl")
+		projected.podium[3] = projected.podium[2]
+		T.expect(PostMatchResult.parse(projected)):toBeNil()
+	end)
+
+	T.it("keeps team contribution recognition separate from the winning team score", function()
+		local result = global("TDM", "Team", "Blue")
+		result.contestants[1].contribution = 8
+		result.contestants[2].contribution = 15
+		result.contestants[3].contribution = 17
+		local podium = PostMatchResult.podium(result)
+		T.expect(#podium):toEqual(2)
+		T.expect(podium[1].userId):toEqual(30)
+		T.expect(podium[1].score):toEqual(17)
+		T.expect(result.scores[1].score):toEqual(25)
+	end)
+	T.it("accepts default cosmetic attribute projections without inventing equips", function()
+		local result = global("FFA", "Player", "10")
+		result.contestants[1].emoteId = ""
+		result.contestants[1].colorId = ""
+		local projected = PostMatchResult.forPlayer(result, 10, nil, nil)
+		local parsed = PostMatchResult.parse(projected)
+		T.expect(parsed.personalAppearance.emoteId):toBeNil()
+		T.expect(parsed.podium[1].colorId):toBeNil()
+	end)
+
 	T.it("orders FFA scores deterministically and assigns shared placements", function()
 		local result = global("FFA", "Player", "10")
 		T.expect(result.scores[1].id):toEqual("10")

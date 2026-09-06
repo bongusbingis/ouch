@@ -1,50 +1,19 @@
--- Name: ProgressionService.luau
--- Author: Jack C.
--- Description: Accumulates per-match progress from deduplicated match and combat events (eliminations, deaths, catches, wins) and commits the resulting XP, Bonks, and stat deltas to each player's profile.
--- Created: 2026-07-13
-
+-- Records earned match progress in PlayerData's journal and presents committed match summaries.
 --!strict
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
-local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
-local EventDedup = require(Adapters:WaitForChild("EventDedup"))
-local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
-local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-local AnalyticsConfig =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
-local Boosts = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
-)
+local DataConfig = require(ReplicatedStorage.Config.Progression.Data)
+local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
+local PlayerIds = require(ReplicatedStorage.Shared.Game.Adapters.PlayerIds)
+local EventDedup = require(ReplicatedStorage.Shared.Game.Adapters.EventDedup)
+local Network = require(ReplicatedStorage.Shared.Network)
 local PlayerData = require(script.Parent.PlayerData)
-local AnalyticsService = require(script.Parent.AnalyticsService)
-local EntitlementService = require(script.Parent.EntitlementService)
+local MatchAwardService = require(script.Parent.MatchAwardService)
 local BattlePassService = require(script.Parent.BattlePassService)
-
-type MatchEvent = { [string]: any }
-
-type MatchProgress = {
-	Elims: number,
-	Deaths: number,
-	Catches: number,
-	Wins: number,
-	Losses: number,
-	MatchesPlayed: number,
-	XP: number,
-	Bonks: number,
-}
-
-type PendingCommit = {
-	resultId: string,
-	userId: number,
-	progress: MatchProgress,
-	won: boolean,
-	firstMatch: boolean?,
-	committing: boolean,
-	applied: boolean,
-}
+local ArenaSessionService = require(script.Parent.ArenaSessionService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 export type MatchSummary = {
 	firstMatch: boolean?,
@@ -65,88 +34,46 @@ export type MatchSummary = {
 }
 
 local ProgressionService = {}
-
-local progressByPlayerId: { [string]: MatchProgress } = {}
+local started = false
+local awardId: string? = nil
+local currentResultId: string? = nil
 local summaryByPlayerId: { [string]: MatchSummary } = {}
-local pendingByUserId: { [number]: { [string]: PendingCommit } } = {}
 local summaryListeners: { (Player, MatchSummary, string) -> () } = {}
 local seenEvents = EventDedup.new()
-local started = false
-local activeEntitlementService: any = EntitlementService
-local activeBattlePassService: any = BattlePassService
 local activeMatchService: any = nil
-local currentResultId: string? = nil
 
-local function blank(): MatchProgress
-	return {
-		Elims = 0,
-		Deaths = 0,
-		Catches = 0,
-		Wins = 0,
-		Losses = 0,
-		MatchesPlayed = 0,
-		XP = 0,
-		Bonks = 0,
-	}
-end
-
-local function progressFor(id: string): MatchProgress
-	local progress = progressByPlayerId[id]
-	if progress == nil then
-		progress = blank()
-		progressByPlayerId[id] = progress
+local function ensureRecord(player: Player): any
+	if awardId == nil then
+		return nil
 	end
-	return progress
+	local journal = PlayerData.matchAwards(player)
+	if journal and journal.Pending[awardId] then
+		return journal.Pending[awardId]
+	end
+	local season = BattlePassService.stateFor(player)
+	local record = PlayerData.beginMatchAward(player, awardId, if season then season.seasonId else "")
+	if record == nil then
+		player:SetAttribute("RewardsRecoveryPending", true)
+		ArenaSessionService.setRoundEligible(player, false)
+	end
+	return record
 end
 
-local function resetMatch()
-	table.clear(progressByPlayerId)
-	table.clear(summaryByPlayerId)
-	currentResultId = nil
-	seenEvents.clear()
-end
-
-local function addRewards(progress: MatchProgress, rewardKey: string)
-	progress.XP += DataConfig.ProgressionXP[rewardKey] or 0
-	progress.Bonks += DataConfig.ProgressionBonks[rewardKey] or 0
-end
-
-local function trackElim(event: MatchEvent)
-	if not seenEvents.markSeen(event) then
+local function add(player: Player?, delta: any)
+	if player == nil or awardId == nil or not ArenaSessionService.isRoundEligible(player) then
 		return
 	end
-
-	local sourceId = event.sourceId :: string?
-	local targetId = event.targetId :: string?
-	if sourceId == nil or targetId == nil or sourceId == targetId then
-		return
+	if ensureRecord(player) then
+		PlayerData.addMatchProgress(player, awardId, delta)
 	end
-
-	local source = progressFor(sourceId)
-	source.Elims += 1
-	addRewards(source, "Elim")
-
-	local target = progressFor(targetId)
-	target.Deaths += 1
 end
 
-local function trackCatch(event: MatchEvent)
-	if not seenEvents.markSeen(event) then
-		return
-	end
-
-	local catcherId = (event.playerId or event.sourceId) :: string?
-	if catcherId == nil then
-		return
-	end
-
-	local progress = progressFor(catcherId)
-	progress.Catches += 1
-	addRewards(progress, "Catch")
+local function rewards(key: string): any
+	return { XP = DataConfig.ProgressionXP[key] or 0, Bonks = DataConfig.ProgressionBonks[key] or 0 }
 end
 
-local function publishSummary(player: Player, summary: MatchSummary, resultId: string)
-	if currentResultId ~= resultId then
+local function publish(player: Player, summary: MatchSummary, resultId: string)
+	if resultId ~= currentResultId then
 		return
 	end
 	summaryByPlayerId[PlayerIds.toId(player)] = summary
@@ -162,58 +89,11 @@ local function publishSummary(player: Player, summary: MatchSummary, resultId: s
 	end
 end
 
-local function isPending(pending: PendingCommit): boolean
-	local resultRecords = pendingByUserId[pending.userId]
-	return resultRecords ~= nil and resultRecords[pending.resultId] == pending
-end
-
-local function clearPending(pending: PendingCommit)
-	local resultRecords = pendingByUserId[pending.userId]
-	if resultRecords == nil or resultRecords[pending.resultId] ~= pending then
-		return
-	end
-	resultRecords[pending.resultId] = nil
-	if next(resultRecords) == nil then
-		pendingByUserId[pending.userId] = nil
-	end
-end
-
-local function commitPlayer(player: Player, pending: PendingCommit): boolean
-	activeEntitlementService.awaitReady(player, 2)
-	if not isPending(pending) or PlayerData.get(player) == nil then
-		return false
-	end
-
-	local progress = pending.progress
-	local firstMatch = pending.firstMatch
-	if firstMatch == nil then
-		local data = PlayerData.get(player)
-		firstMatch = data ~= nil and (data.Progression.MatchesPlayed or 0) == 0
-		pending.firstMatch = firstMatch
-	end
-	local multipliers = activeEntitlementService.multipliers(player)
-	local awarded = {
-		Elims = progress.Elims,
-		Deaths = progress.Deaths,
-		Catches = progress.Catches,
-		Wins = progress.Wins,
-		Losses = progress.Losses,
-		MatchesPlayed = progress.MatchesPlayed,
-		XP = Boosts.apply(progress.XP, multipliers.Xp),
-		Bonks = Boosts.apply(progress.Bonks, multipliers.Bonks),
-	}
-
-	local seasonBefore = activeBattlePassService.stateFor(player)
-	if not PlayerData.applyProgression(player, awarded) then
-		return false
-	end
-	pending.applied = true
-	activeBattlePassService.addSeasonXp(player, awarded.XP)
-	local seasonAfter = activeBattlePassService.stateFor(player)
-	PlayerData.completeTutorial(player)
+local function committed(player: Player, record: any, before: any, after: any)
+	local progress, awarded, multipliers = record.Progress, record.Awarded, record.Multipliers
 	if awarded.Bonks > 0 then
 		local data = PlayerData.get(player)
-		local ok, err = pcall(
+		pcall(
 			AnalyticsService.logEconomyEvent,
 			player,
 			"Source",
@@ -223,14 +103,14 @@ local function commitPlayer(player: Player, pending: PendingCommit): boolean
 			AnalyticsConfig.EconomyTransactionTypes.Gameplay,
 			"MatchRewards"
 		)
-		if not ok then
-			warn(`[ProgressionService] reward analytics failed: {err}`)
-		end
 	end
-	local summary = {
-		firstMatch = firstMatch,
+	if record.ResultId == nil then
+		return
+	end
+	publish(player, {
+		firstMatch = record.FirstMatch,
 		rewardsPending = false,
-		won = pending.won,
+		won = record.Won == true,
 		elims = progress.Elims,
 		deaths = progress.Deaths,
 		catches = progress.Catches,
@@ -240,102 +120,85 @@ local function commitPlayer(player: Player, pending: PendingCommit): boolean
 		bonksMultiplier = multipliers.Bonks,
 		xp = awarded.XP,
 		bonks = awarded.Bonks,
-		seasonXp = if seasonBefore and seasonAfter
-			then math.max((seasonAfter.xp or 0) - (seasonBefore.xp or 0), 0)
+		seasonXp = if before
+				and after
+				and before.seasonId == after.seasonId
+			then math.max((after.xp or 0) - (before.xp or 0), 0)
 			else nil,
-		seasonBefore = seasonBefore,
-		seasonAfter = seasonAfter,
-	}
-	clearPending(pending)
-	publishSummary(player, summary, pending.resultId)
-	return true
+		seasonBefore = before,
+		seasonAfter = after,
+	}, record.ResultId)
 end
 
-local function startCommit(player: Player, pending: PendingCommit)
-	if pending.committing or not isPending(pending) or not PlayerData.isLoaded(player) then
+local function commitMatch()
+	local result = activeMatchService.resultSnapshot()
+	if result == nil or result.resultId == currentResultId or awardId == nil then
 		return
 	end
-	local releaseLease = PlayerData.acquireWriteLease(player)
-	if releaseLease == nil then
-		return
-	end
-	pending.committing = true
-	task.spawn(function()
-		local ok, committed = xpcall(function()
-			return commitPlayer(player, pending)
-		end, debug.traceback)
-		releaseLease()
-		if not ok then
-			warn(`[ProgressionService] reward commit failed for user {pending.userId}: {committed}`)
-			if pending.applied then
-				clearPending(pending)
-			end
-		end
-		if isPending(pending) then
-			pending.committing = false
-		end
-	end)
-end
-
-local function commitMatch(_event: MatchEvent)
-	local result = activeMatchService and activeMatchService.resultSnapshot()
-	if result == nil then
-		warn("[ProgressionService] MatchEnded without an authoritative result")
-		return
-	end
-	local resultId = result.resultId
-	if currentResultId == resultId then
-		return
-	end
-	currentResultId = resultId
-	table.clear(summaryByPlayerId)
-	local winnerId = result.winnerId :: string?
+	currentResultId = result.resultId
 	for _, contestant in result.contestants do
-		local id = contestant.playerId
-		local playerWon = winnerId ~= nil and winnerId ~= "" and (id == winnerId or contestant.teamId == winnerId)
-
-		local committedProgress = table.clone(progressByPlayerId[id] or blank())
-		committedProgress.MatchesPlayed += 1
-		addRewards(committedProgress, "MatchComplete")
-
-		if winnerId ~= nil and winnerId ~= "" then
-			if playerWon then
-				committedProgress.Wins += 1
-				addRewards(committedProgress, "Win")
+		local player = Players:GetPlayerByUserId(contestant.userId)
+		if player == nil then
+			continue
+		end
+		local record = ensureRecord(player)
+		if record == nil or record.Ready then
+			continue
+		end
+		local winner = result.winnerId
+		local won = winner ~= nil and winner ~= "" and (contestant.playerId == winner or contestant.teamId == winner)
+		local completed = result.reason ~= "NoContest"
+		local delta = if completed then rewards("MatchComplete") else { XP = 0, Bonks = 0 }
+		delta.MatchesPlayed = if completed then 1 else 0
+		if winner ~= nil and winner ~= "" then
+			if won then
+				delta.Wins = 1
+				delta.XP += DataConfig.ProgressionXP.Win
+				delta.Bonks += DataConfig.ProgressionBonks.Win
 			else
-				committedProgress.Losses += 1
+				delta.Losses = 1
 			end
 		end
-
-		local player = Players:GetPlayerByUserId(contestant.userId)
-		local beforeData = if player then PlayerData.get(player) else nil
-		local firstMatch = if beforeData then (beforeData.Progression.MatchesPlayed or 0) == 0 else nil
-		local pending = {
-			resultId = resultId,
-			userId = contestant.userId,
-			progress = committedProgress,
-			won = playerWon,
-			firstMatch = firstMatch,
-			committing = false,
-			applied = false,
-		}
-		local resultRecords = pendingByUserId[contestant.userId]
-		if resultRecords == nil then
-			resultRecords = {}
-			pendingByUserId[contestant.userId] = resultRecords
-		end
-		resultRecords[resultId] = pending
-		summaryByPlayerId[id] = {
-			firstMatch = firstMatch,
+		PlayerData.addMatchProgress(player, awardId, delta)
+		PlayerData.finishMatchAward(player, awardId, result.resultId, won)
+		publish(player, {
 			rewardsPending = true,
-			won = playerWon,
-			elims = committedProgress.Elims,
-			deaths = committedProgress.Deaths,
-			catches = committedProgress.Catches,
-		}
-		if player then
-			startCommit(player, pending)
+			won = won,
+			elims = record.Progress.Elims,
+			deaths = record.Progress.Deaths,
+			catches = record.Progress.Catches,
+		}, result.resultId)
+		MatchAwardService.flush(player)
+	end
+	awardId = nil
+end
+
+local function handleEvent(event: any)
+	if event.kind == "MatchStarted" then
+		awardId = HttpService:GenerateGUID(false)
+		currentResultId = nil
+		table.clear(summaryByPlayerId)
+		seenEvents.clear()
+		for _, player in Players:GetPlayers() do
+			if ArenaSessionService.isRoundEligible(player) then
+				ensureRecord(player)
+			end
 		end
+	elseif event.kind == "Elim" and seenEvents.markSeen(event) then
+		local source = PlayerIds.fromId(event.sourceId)
+		local target = PlayerIds.fromId(event.targetId)
+		if source and source ~= target then
+			local delta = rewards("Elim")
+			delta.Elims = 1
+			add(source, delta)
+		end
+		add(target, { Deaths = 1 })
+	elseif event.kind == "BallCaught" and seenEvents.markSeen(event) then
+		local delta = rewards("Catch")
+		delta.Catches = 1
+		add(PlayerIds.fromEvent(event), delta)
+	elseif event.kind == "MatchEnded" then
+		commitMatch()
 	end
 end
 
@@ -344,12 +207,16 @@ function ProgressionService.awaitCommitted(players: { Player }, resultId: string
 	repeat
 		local waiting = false
 		for _, player in players do
-			if player.Parent == Players then
-				local resultRecords = pendingByUserId[player.UserId]
-				local pending = if resultRecords then resultRecords[resultId] else nil
-				if pending then
-					waiting = true
-					startCommit(player, pending)
+			local journal = PlayerData.matchAwards(player)
+			if journal == nil and player.Parent == Players then
+				waiting = true
+			elseif journal then
+				for _, record in journal.Pending do
+					if record.ResultId == resultId then
+						waiting = true
+						MatchAwardService.flush(player)
+						break
+					end
 				end
 			end
 		end
@@ -359,7 +226,7 @@ function ProgressionService.awaitCommitted(players: { Player }, resultId: string
 		if os.clock() >= deadline then
 			return false
 		end
-		task.wait(0.05)
+		task.wait(DataConfig.Persistence.SavePollSeconds)
 	until false
 end
 
@@ -372,12 +239,7 @@ end
 
 function ProgressionService.onSummary(listener: (Player, MatchSummary, string) -> ()): () -> ()
 	table.insert(summaryListeners, listener)
-	local connected = true
 	return function()
-		if not connected then
-			return
-		end
-		connected = false
 		local index = table.find(summaryListeners, listener)
 		if index then
 			table.remove(summaryListeners, index)
@@ -385,40 +247,14 @@ function ProgressionService.onSummary(listener: (Player, MatchSummary, string) -
 	end
 end
 
-local function handleEvent(event: MatchEvent)
-	if event.kind == "MatchStarted" then
-		resetMatch()
-	elseif event.kind == "Elim" then
-		trackElim(event)
-	elseif event.kind == "BallCaught" then
-		trackCatch(event)
-	elseif event.kind == "MatchEnded" then
-		commitMatch(event)
-	end
-end
-
-function ProgressionService.start(matchService: any, options: { entitlementService: any?, battlePassService: any? }?)
+function ProgressionService.start(matchService: any)
 	if started then
 		return
 	end
 	started = true
-	activeEntitlementService = if options and options.entitlementService
-		then options.entitlementService
-		else EntitlementService
-	activeBattlePassService = if options and options.battlePassService
-		then options.battlePassService
-		else BattlePassService
 	activeMatchService = matchService
-	resetMatch()
 	matchService.onEvent(handleEvent)
-	PlayerData.onLoaded(function(player)
-		local resultRecords = pendingByUserId[player.UserId]
-		if resultRecords then
-			for _, pending in resultRecords do
-				startCommit(player, pending)
-			end
-		end
-	end)
+	MatchAwardService.onCommitted(committed)
 end
 
 return ProgressionService

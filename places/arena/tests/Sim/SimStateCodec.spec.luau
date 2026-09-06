@@ -134,7 +134,7 @@ return function()
 			expect(balls.ball_0001:GetAttribute("vel")).to.equal(vector.zero)
 		end)
 
-		it("preserves hammer kit state across encode/decode", function()
+		it("preserves charge and hammer kit state across encode/decode", function()
 			local folder = track(makeBallsFolder({}))
 			local character = track(Instance.new("Model"))
 			character.Name = "Character"
@@ -145,6 +145,7 @@ return function()
 				weapons = {
 					Dodgeball = {
 						throwCooldown = 0,
+						chargeSeconds = 0.35,
 						catchCooldown = 0,
 						catchRemaining = 0,
 						catchDirection = nil,
@@ -161,6 +162,7 @@ return function()
 
 			SimStateCodec.encode(state, folder, { p1 = character })
 			local decoded = SimStateCodec.decode(folder, { p1 = character })
+			expect(decoded.players.p1.weapons.Dodgeball.chargeSeconds).to.be.near(0.35)
 			local hammer = decoded.players.p1.weapons.Hammer
 
 			expect(hammer.cooldown).to.be.near(0.4)

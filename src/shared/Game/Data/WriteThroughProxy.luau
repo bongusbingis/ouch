@@ -49,4 +49,12 @@ function WriteThroughProxy.wrap(data: { [any]: any }, writer: Writer): { [any]: 
 	return wrap(data, writer, nil)
 end
 
+function WriteThroughProxy.snapshot(data: { [any]: any }): { [any]: any }
+	local result = {}
+	for key, value in data do
+		result[key] = if type(value) == "table" then WriteThroughProxy.snapshot(value) else value
+	end
+	return result
+end
+
 return WriteThroughProxy

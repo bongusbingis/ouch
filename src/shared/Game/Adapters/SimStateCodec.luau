@@ -83,6 +83,7 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 					catchCooldown = (model:GetAttribute("dbCc") :: number?) or 0,
 					catchRemaining = (model:GetAttribute("dbCr") :: number?) or 0,
 					catchDirection = model:GetAttribute("dbCd") :: Vector3?,
+					chargeSeconds = model:GetAttribute("dbCh") :: number?,
 				},
 				Hammer = {
 					cooldown = (model:GetAttribute("hmCd") :: number?) or 0,
@@ -147,6 +148,7 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(model, "dbCc", kitState.catchCooldown)
 		setAttributeIfChanged(model, "dbCr", kitState.catchRemaining)
 		setAttributeIfChanged(model, "dbCd", kitState.catchDirection)
+		setAttributeIfChanged(model, "dbCh", kitState.chargeSeconds)
 		local hammerState = player.weapons.Hammer
 		setAttributeIfChanged(model, "hmCd", hammerState.cooldown)
 		setAttributeIfChanged(model, "hmAc", hammerState.activeRemaining)

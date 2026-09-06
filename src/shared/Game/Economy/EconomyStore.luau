@@ -11,6 +11,7 @@ export type EconomyData = {
 		Owned: { [string]: boolean },
 		Equipped: { [string]: string? },
 	},
+	Crates: { Pity: { [string]: { [string]: number } } }?,
 	Entitlements: {
 		PremiumSeasons: { [string]: boolean },
 	}?,
@@ -59,7 +60,7 @@ local function watchProfile(replica: any)
 	profileReplica = replica
 	profileChangeConnection = replica:OnChange(function(_action: string, path: { any })
 		local root = path[1]
-		if root == "Bonks" or root == "Cosmetics" or root == "Entitlements" then
+		if root == "Bonks" or root == "Cosmetics" or root == "Entitlements" or root == "Crates" then
 			notify()
 		end
 	end)

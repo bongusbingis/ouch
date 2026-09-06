@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SettingsRegistry = require(script.Parent.SettingsRegistry)
 local SettingsValues = require(script.Parent.SettingsValues)
+local ClientRequest = require(script.Parent.Parent.Data.ClientRequest)
 
 type ChangedCallback = (id: string) -> ()
 
@@ -21,6 +22,11 @@ local newReplicaConnection: any = nil
 local profileChangeConnection: any = nil
 local network: any = nil
 local localValues: { [string]: any } = {}
+local revisions: { [string]: number } = {}
+local queued: { [string]: any } = {}
+local workers: { [string]: boolean } = {}
+local statuses: { [string]: string } = {}
+local generation = 0
 local callbacks: { ChangedCallback } = {}
 
 local function disconnect(connection: any?)
@@ -75,18 +81,52 @@ function SettingsStore.set(id: string, value: any)
 		return
 	end
 	localValues[id] = normalized
+	revisions[id] = (revisions[id] or 0) + 1
+	statuses[id] = nil
 	notify(id)
+end
+
+function SettingsStore.status(id: string): string?
+	return statuses[id]
 end
 
 function SettingsStore.commit(id: string)
 	local definition = SettingsRegistry.get(id)
-	if definition == nil or not SettingsRegistry.isPersisted(definition) then
+	if definition == nil or not SettingsRegistry.isPersisted(definition) or network == nil then
 		return
 	end
-	if network == nil then
+	queued[id] = { value = SettingsStore.get(id), revision = revisions[id] or 0 }
+	statuses[id] = "pending"
+	notify(id)
+	if workers[id] then
 		return
 	end
-	network.fireServer("SetClientSetting", id, SettingsStore.get(id))
+	workers[id] = true
+	local currentGeneration = generation
+	local activeNetwork = network
+	task.spawn(function()
+		while queued[id] and currentGeneration == generation do
+			local request = queued[id]
+			queued[id] = nil
+			local callOk, accepted, _reason, value =
+				ClientRequest(activeNetwork.call, "SetClientSettingRequest", id, request.value)
+			if currentGeneration ~= generation then
+				return
+			end
+			if request.revision == (revisions[id] or 0) then
+				if callOk and accepted == true and value ~= nil then
+					local normalized = SettingsValues.normalize(definition, value)
+					localValues[id] = if replicatedValue(id) == normalized then nil else normalized
+					statuses[id] = nil
+				else
+					localValues[id] = nil
+					statuses[id] = "failed"
+				end
+				notify(id)
+			end
+		end
+		workers[id] = nil
+	end)
 end
 
 function SettingsStore.reset(id: string)
@@ -107,6 +147,9 @@ local function watchProfile(replica: any)
 		end
 		local id = path[2]
 		if type(id) == "string" then
+			if localValues[id] == replicatedValue(id) then
+				localValues[id] = nil
+			end
 			notify(id)
 		else
 			for _, definition in SettingsRegistry.all() do
@@ -114,6 +157,9 @@ local function watchProfile(replica: any)
 			end
 		end
 	end)
+	for _, definition in SettingsRegistry.all() do
+		notify(definition.Id)
+	end
 end
 
 function SettingsStore.start(overrides: { replica: any?, network: any? }?)
@@ -148,6 +194,11 @@ function SettingsStore.subscribe(callback: ChangedCallback): () -> ()
 end
 
 function SettingsStore.stop()
+	generation += 1
+	table.clear(revisions)
+	table.clear(queued)
+	table.clear(workers)
+	table.clear(statuses)
 	disconnect(profileChangeConnection)
 	disconnect(newReplicaConnection)
 	started = false

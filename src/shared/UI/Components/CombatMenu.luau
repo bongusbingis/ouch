@@ -35,6 +35,8 @@ local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytic
 local CombatMenuClient = require(UI:WaitForChild("Services"):WaitForChild("CombatMenuClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
+local useSafeArea = require(UI.Hooks.useSafeArea)
+local ResponsiveLayout = require(UI.Models.ResponsiveLayout)
 local c = React.createElement
 
 local BACK_ACTION = "CloseCombatMenuLayer"
@@ -44,16 +46,16 @@ local UNSELECTED_IMAGE = "rbxassetid://136021539696619"
 
 local PAGE_POSITIONS = {
 	Inventory = {
-		onscreen = UDim2.fromScale(0.0211629, 0.14282),
-		offscreen = UDim2.fromScale(-1.5, 0.14282),
+		onscreen = UIConfig.Layout.PagePosition,
+		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 	Shop = {
-		onscreen = UDim2.fromScale(0.5, 0.56),
-		offscreen = UDim2.fromScale(-1, 0.56),
+		onscreen = UIConfig.Layout.PagePosition,
+		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 	Settings = {
-		onscreen = UDim2.fromScale(0.0211629, 0.14282),
-		offscreen = UDim2.fromScale(-1.5, 0.14282),
+		onscreen = UIConfig.Layout.PagePosition,
+		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 }
 
@@ -222,6 +224,9 @@ local function MenuToggle(props)
 end
 
 local function CombatMenuContent(props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local shortPages = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local available = props.Available == true
 	local menu = useExternalStore(CombatMenuClient.getSnapshot, CombatMenuClient.subscribe)
 	local notifications = NotificationContext.useNotification()
@@ -417,8 +422,8 @@ local function CombatMenuContent(props)
 	for pageName, positions in PAGE_POSITIONS do
 		views[pageName] = c(PageTransition, {
 			Active = menu.open and menu.page == pageName,
-			Onscreen = positions.onscreen,
-			Offscreen = positions.offscreen,
+			Onscreen = if shortPages then UIConfig.Layout.ShortPagePosition else positions.onscreen,
+			Offscreen = if shortPages then UIConfig.Layout.ShortPageOffscreen else positions.offscreen,
 			Render = function(position)
 				if pageName == "Inventory" then
 					return c(InventoryPage, {
@@ -486,6 +491,7 @@ local function CombatMenuContent(props)
 						OnChoose = notifications.close,
 					}),
 					Economy = c(EconomyMenuModals, {
+						FocusEnabled = notifications.request == nil,
 						Controller = controller,
 					}),
 				}),

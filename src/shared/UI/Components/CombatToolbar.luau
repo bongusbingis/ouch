@@ -20,14 +20,17 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 local WeaponViewport = require(script.Parent.WeaponViewport)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local Palette = UIConfig.ProgressionStyle
+
 local c = React.createElement
-local INK = Color3.fromRGB(24, 41, 48)
-local SHADOW = Color3.fromRGB(10, 19, 24)
-local BAR_TOP = Color3.fromRGB(48, 77, 84)
-local BAR_BOTTOM = Color3.fromRGB(31, 55, 63)
-local SELECTED_SURFACE = Color3.fromRGB(65, 103, 108)
-local SELECTED_ACCENT = Color3.fromRGB(97, 255, 237)
-local WARNING = Color3.fromRGB(255, 224, 78)
+local INK = Palette.Ink
+local SHADOW = Palette.Ink
+local BAR_TOP = Palette.Surface
+local BAR_BOTTOM = Palette.Ink
+local SELECTED_SURFACE = Palette.Raised
+local SELECTED_ACCENT = Palette.Yellow
+local WARNING = Palette.Yellow
 local WHITE = Color3.new(1, 1, 1)
 local BAR_INSET_X = 8
 local BAR_INSET_Y = 14
@@ -64,8 +67,8 @@ local function InputCue(props: {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		GroupTransparency = props.Transparency,
-		Position = UDim2.fromScale(0.13, 0.17),
-		Size = UDim2.fromScale(0.18, 0.2),
+		Position = UDim2.fromScale(0.15, 0.18),
+		Size = UDim2.fromScale(0.2, 0.24),
 		ZIndex = 59,
 	}, {
 		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1.08 }),
@@ -116,8 +119,8 @@ local function StateLabel(props: { Kind: string, Transparency: any, Scale: any }
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		GroupTransparency = props.Transparency,
-		Position = UDim2.fromScale(0.5, 0.62),
-		Size = UDim2.fromScale(0.68, 0.14),
+		Position = UDim2.fromScale(0.5, 0.6),
+		Size = UDim2.fromScale(0.82, 0.19),
 		ZIndex = 61,
 	}, {
 		Scale = c("UIScale", { Scale = props.Scale }),
@@ -152,8 +155,8 @@ local function ProgressLine(props: {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		GroupTransparency = props.Transparency,
-		Position = UDim2.fromScale(0.5, 0.7),
-		Size = UDim2.fromScale(0.68, 0.035),
+		Position = UDim2.fromScale(0.5, 0.755),
+		Size = UDim2.fromScale(0.78, 0.06),
 		ZIndex = 61,
 	}, {
 		Track = c("Frame", {
@@ -240,7 +243,7 @@ local function ActionSlot(props: {
 	local styles = ReactSpring.useSpring({
 		Scale = scale,
 		Lift = if slot.selected then SELECTED_LIFT else 0,
-		SurfaceTransparency = if slot.selected then 0 else 1,
+		SurfaceTransparency = if slot.selected then 0 else 0.6,
 		WashTransparency = if muted then 0.72 else 1,
 		IconTransparency = if kind == "Disabled"
 			then 0.62
@@ -269,7 +272,7 @@ local function ActionSlot(props: {
 		Image = "",
 		LayoutOrder = props.LayoutOrder,
 		Selectable = false,
-		Size = UDim2.fromScale(0.5, 1),
+		Size = UDim2.new(0.5, -6, 1, -8),
 		ZIndex = 54,
 		[React.Event.Activated] = if slot.interactive
 			then function()
@@ -286,15 +289,22 @@ local function ActionSlot(props: {
 			else nil,
 		[React.Event.InputEnded] = endPress,
 	}, {
+		SlotCorner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+		SlotOutline = c("UIStroke", {
+			Color = WHITE,
+			Thickness = 2,
+			Transparency = styles.SelectionTransparency,
+		}),
 		SelectedSurface = c("Frame", {
-			BackgroundColor3 = SELECTED_SURFACE,
+			BackgroundColor3 = if slot.weapon == "Hammer" then Palette.Pink else Palette.Cyan,
 			BackgroundTransparency = styles.SurfaceTransparency,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 54,
 		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
 			Gradient = c("UIGradient", {
-				Color = ColorSequence.new(SELECTED_SURFACE, BAR_BOTTOM),
+				Color = ColorSequence.new(Color3.new(1, 1, 1), SELECTED_SURFACE),
 				Rotation = 90,
 			}),
 		}),
@@ -304,6 +314,8 @@ local function ActionSlot(props: {
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 55,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
 		}),
 		Content = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -359,8 +371,8 @@ local function ActionSlot(props: {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.83),
-					Size = UDim2.fromScale(0.78, 0.2),
+					Position = UDim2.fromScale(0.5, 0.9),
+					Size = UDim2.fromScale(0.88, 0.18),
 					Text = slot.title,
 					TextColor3 = WHITE,
 					TextTransparency = styles.TitleTransparency,
@@ -371,12 +383,12 @@ local function ActionSlot(props: {
 			}),
 		}),
 		Selection = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
+			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundColor3 = SELECTED_ACCENT,
 			BackgroundTransparency = styles.SelectionTransparency,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.985),
-			Size = UDim2.new(0.42, 0, 0, 4),
+			Position = UDim2.new(0.5, 0, 0, 5),
+			Size = UDim2.new(0.48, 0, 0, 4),
 			ZIndex = 63,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -444,7 +456,7 @@ return function(props: Props)
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 0),
+			Padding = UDim.new(0, 6),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -474,13 +486,13 @@ return function(props: Props)
 		Shadow = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = SHADOW,
-			BackgroundTransparency = 0.34,
+			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, 0, 0.5, SHADOW_OFFSET),
 			Size = UDim2.new(1, -BAR_INSET_X, 1, -BAR_INSET_Y),
 			ZIndex = 50,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0.22, 0) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
 		}),
 		Bar = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -491,8 +503,8 @@ return function(props: Props)
 			Size = UDim2.new(1, -BAR_INSET_X, 1, -BAR_INSET_Y),
 			ZIndex = 51,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0.22, 0) }),
-			Stroke = textStroke(INK, 0.012, 0.08),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
+			Stroke = textStroke(WHITE, 0.018, 0.08),
 			Gradient = c("UIGradient", {
 				Color = ColorSequence.new(BAR_TOP, BAR_BOTTOM),
 				Rotation = 90,
@@ -502,17 +514,6 @@ return function(props: Props)
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 53,
 			}, slots),
-			Divider = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = WHITE,
-				BackgroundTransparency = 0.82,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.new(0, 2, 0.58, 0),
-				ZIndex = 64,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			}),
 		}),
 	})
 end

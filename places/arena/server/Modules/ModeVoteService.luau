@@ -14,7 +14,6 @@ local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
-local ModeOptions = require(Game:WaitForChild("Modes"):WaitForChild("ModeOptions"))
 local ModeVote = require(Game:WaitForChild("Modes"):WaitForChild("ModeVote"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
@@ -81,7 +80,7 @@ local function ensureSnapshotValue(): StringValue
 end
 
 local function configuredOptions(): { string }?
-	local available = ModeOptions.resolve(ArenaSessionService.modeOptions())
+	local available = MatchService.availableModes()
 	return if #available > 0 then available else nil
 end
 
@@ -131,6 +130,11 @@ local function startWinner()
 		pendingWinner = nil
 		return
 	end
+	if reason == "not_enough_players" then
+		cancelVote()
+		task.defer(beginVote)
+		return
+	end
 
 	warn(`[ModeVoteService] Could not start mode "{winner}": {reason or "unknown"}`)
 	if reason ~= "not_enough_players" and reason ~= "match_not_idle" then
@@ -158,7 +162,27 @@ local function finishVote(expectedRevision: number)
 	end
 
 	local activeVote = assert(vote, "finishVote requires an active vote")
-	local winner = ModeVote.choose(activeVote, function(count)
+	local available = configuredOptions()
+	if available == nil then
+		cancelVote()
+		return
+	end
+	local eligibleOptions = {}
+	for _, option in activeVote.options do
+		if table.find(available, option) then
+			table.insert(eligibleOptions, option)
+		end
+	end
+	if #eligibleOptions == 0 then
+		cancelVote()
+		task.defer(beginVote)
+		return
+	end
+	local eligibleVote = ModeVote.new(eligibleOptions)
+	for userId, choice in activeVote.votesByUserId do
+		ModeVote.cast(eligibleVote, userId, choice)
+	end
+	local winner = ModeVote.choose(eligibleVote, function(count)
 		return random:NextInteger(1, count)
 	end)
 	winnerModeId = winner

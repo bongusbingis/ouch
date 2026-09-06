@@ -9,6 +9,8 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local DataConfig = require(ReplicatedStorage.Config.Progression.Data)
+local WriteThroughProxy = require(ReplicatedStorage.Shared.Game.Data.WriteThroughProxy)
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates"))
 local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Bundles"))
@@ -51,10 +53,11 @@ local activePlayerData: any = PlayerData
 local activeAnalyticsService: any = AnalyticsService
 local activeNetwork: any = Network
 local activeTime: () -> number = os.time
+local processing: { [number]: boolean } = {}
 
 local handlers: { [string]: Handler } = {
 	Crate = function(player, def, receiptInfo)
-		return activeCrateService.openFromReceipt(player, def.CrateId, tostring(receiptInfo.PurchaseId)), nil
+		return activeCrateService.openFromReceipt(player, def.CrateId, tostring(receiptInfo.PurchaseId))
 	end,
 	Bonks = function(player, def, receiptInfo)
 		if type(def.BonksAmount) ~= "number" or def.BonksAmount <= 0 or def.BonksAmount % 1 ~= 0 then
@@ -89,10 +92,19 @@ local handlers: { [string]: Handler } = {
 		if bundle == nil or #bundle.ItemIds == 0 then
 			return false, nil
 		end
-		for _, itemId in bundle.ItemIds do
+		local data = activePlayerData.get(player)
+		local work = data.ReceiptWork[tostring(receiptInfo.PurchaseId)]
+		if work.ItemIds == nil then
+			work.ItemIds = table.clone(bundle.ItemIds)
+		end
+		for _, itemId in work.ItemIds do
+			if work.Items[itemId] then
+				continue
+			end
 			if not activeRewardService.grant(player, { kind = "Cosmetic", itemId = itemId }) then
 				return false, nil
 			end
+			work.Items[itemId] = true
 		end
 		return true,
 			{
@@ -100,12 +112,12 @@ local handlers: { [string]: Handler } = {
 				kind = "Bundle",
 				productId = receiptInfo.ProductId,
 				bundleId = def.BundleId,
-				itemIds = bundle.ItemIds,
+				itemIds = work.ItemIds,
 			}
 	end,
 }
 
-local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
+local function grantReceipt(receiptInfo: { [string]: any }, player: Player): Enum.ProductPurchaseDecision
 	local def = activeProducts.ById[receiptInfo.ProductId]
 	if def == nil then
 		warn(`[Monetization] receipt for unmapped product {receiptInfo.ProductId}`)
@@ -117,40 +129,80 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
-	local player = activePlayers:GetPlayerByUserId(receiptInfo.PlayerId)
-	if player == nil then
-		return Enum.ProductPurchaseDecision.NotProcessedYet
-	end
 	local data = activePlayerData.get(player)
 	if data == nil then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
 	local receiptKey = tostring(receiptInfo.PurchaseId)
-	if data.Receipts[receiptKey] ~= nil then
-		return Enum.ProductPurchaseDecision.PurchaseGranted
+	if data.ReceiptWork == nil then
+		data.ReceiptWork = {}
 	end
-
-	local ok, granted, payload = pcall(handler, player, def, receiptInfo)
-	if not ok or not granted then
+	if data.Receipts[receiptKey] == nil then
+		if data.ReceiptWork[receiptKey] == nil then
+			local count = 0
+			for _ in data.ReceiptWork do
+				count += 1
+			end
+			if count >= DataConfig.Persistence.MaxPendingReceipts then
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+			data.ReceiptWork[receiptKey] = { Items = {} }
+		end
+		local ok, granted, payload = pcall(handler, player, def, receiptInfo)
+		if not ok or not granted or activePlayerData.get(player) ~= data then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		data.ReceiptWork[receiptKey].Payload = payload
+		data.Receipts[receiptKey] = activeTime()
+	end
+	if not activePlayerData.confirmReceiptSaved(player, receiptKey) then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-
-	data.Receipts[receiptKey] = activeTime()
-	activeAnalyticsService.logEconomyEvent(
-		player,
-		"Source",
-		"Robux",
-		(receiptInfo.CurrencySpent :: number?) or 0,
-		0,
-		AnalyticsConfig.EconomyTransactionTypes.IAP,
-		tostring(receiptInfo.ProductId),
-		{ productType = def.Type }
-	)
-	if payload then
-		activeNetwork.fire("StorePurchaseGranted", player, payload)
+	local work = data.ReceiptWork[receiptKey]
+	if work then
+		pcall(
+			activeAnalyticsService.logEconomyEvent,
+			player,
+			"Source",
+			"Robux",
+			(receiptInfo.CurrencySpent :: number?) or 0,
+			0,
+			AnalyticsConfig.EconomyTransactionTypes.IAP,
+			tostring(receiptInfo.ProductId),
+			{ productType = def.Type }
+		)
+		local payload = if work.Payload then WriteThroughProxy.snapshot(work.Payload) else nil
+		if payload then
+			if payload.kind == "Crate" then
+				pcall(activeNetwork.fire, "CrateOpened", player, payload.reveal)
+			else
+				pcall(activeNetwork.fire, "StorePurchaseGranted", player, payload)
+			end
+		end
+		data.ReceiptWork[receiptKey] = nil
 	end
 	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
+local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
+	local player = activePlayers:GetPlayerByUserId(receiptInfo.PlayerId)
+	if player == nil or processing[player.UserId] then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	local release = activePlayerData.acquireWriteLease(player)
+	if release == nil then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	processing[player.UserId] = true
+	local ok, result = pcall(grantReceipt, receiptInfo, player)
+	processing[player.UserId] = nil
+	release()
+	if not ok then
+		warn(`[Monetization] receipt {receiptInfo.PurchaseId} failed: {result}`)
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	return result
 end
 
 function MonetizationService.registerHandler(productType: string, handler: Handler)
@@ -199,6 +251,7 @@ function MonetizationService.start(options: StartOptions?)
 end
 
 function MonetizationService._resetForTest()
+	table.clear(processing)
 	started = false
 	activeMarketplace = MarketplaceService
 	activePlayers = Players

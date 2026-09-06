@@ -7,6 +7,7 @@
 
 local SimTypes = require(script.Parent.SimTypes)
 local SimUtil = require(script.Parent.SimUtil)
+local CommandOrder = require(script.Parent.CommandOrder)
 local WeaponRegistry = require(script.Parent.WeaponRegistry)
 local Projectiles = require(script.Parent.Projectiles)
 
@@ -85,12 +86,7 @@ local function applyEquips(state: SimState, commands: { InputCommand })
 end
 
 local function sortCommands(commands: { InputCommand })
-	table.sort(commands, function(a, b)
-		if a.playerId ~= b.playerId then
-			return a.playerId < b.playerId
-		end
-		return a.kind < b.kind
-	end)
+	table.sort(commands, CommandOrder.less)
 end
 
 function SimCore.step(state: SimState, commands: { InputCommand }, world: WorldSnapshot, dt: number): { SimEvent }

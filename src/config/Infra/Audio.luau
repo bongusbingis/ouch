@@ -18,7 +18,7 @@ return {
 				"rbxassetid://1847683526",
 				"rbxassetid://131711369956795",
 			},
-			Volume = 0, --0.18,
+			Volume = 0.12,
 			FadeInSeconds = 0.8,
 		},
 		Lobby = {
@@ -134,6 +134,17 @@ return {
 	},
 
 	Effects = {
+		MatchStart = {
+			AssetId = "rbxassetid://122835655736085",
+			Volume = 0.32,
+			MaxLifetimeSeconds = 4,
+		},
+		FinalSeconds = {
+			AssetId = "rbxassetid://117503154823137",
+			Volume = 0.16,
+			Threshold = 5,
+			MaxLifetimeSeconds = 1,
+		},
 		MatchEndWhistle = {
 			AssetId = "rbxassetid://9120681039",
 			Volume = 0.24,

@@ -177,7 +177,9 @@ function PartyClient:toggleMatchmaking()
 	if snapshot == nil or snapshot.leaderUserId ~= self._player.UserId then
 		return nil, "not_party_leader"
 	end
-	if snapshot.phase == "Lobby" then
+	if snapshot.phase == "Lobby" and snapshot.returnQueuePending then
+		return self:request(Protocol.Actions.CancelMatchmaking, nil)
+	elseif snapshot.phase == "Lobby" then
 		return self:request(Protocol.Actions.StartMatchmaking, nil)
 	elseif snapshot.phase == "Queued" then
 		return self:request(Protocol.Actions.CancelMatchmaking, nil)

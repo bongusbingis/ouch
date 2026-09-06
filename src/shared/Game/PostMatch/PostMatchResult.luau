@@ -18,7 +18,14 @@ export type Contestant = {
 	username: string,
 	displayName: string,
 	teamId: string?,
+	colorId: string?,
+	emoteId: string?,
+	ballId: string?,
+	hammerId: string?,
+	contribution: number?,
 }
+
+export type ShowcaseEntry = Contestant & { placement: number, score: number }
 
 export type ScoreEntry = {
 	id: string,
@@ -139,6 +146,8 @@ export type PlayerResult = {
 	presentation: Presentation,
 	scores: { ScoreEntry },
 	personalStats: { Stat },
+	podium: { ShowcaseEntry }?,
+	personalAppearance: Contestant?,
 	rewards: Rewards?,
 	seasonProgress: SeasonProgress?,
 	challenges: { ChallengeProgress }?,
@@ -169,6 +178,11 @@ local function copyContestants(contestants: { Contestant }): { Contestant }
 			username = contestant.username,
 			displayName = contestant.displayName,
 			teamId = contestant.teamId,
+			colorId = contestant.colorId,
+			emoteId = contestant.emoteId,
+			ballId = contestant.ballId,
+			hammerId = contestant.hammerId,
+			contribution = contestant.contribution,
 		})
 	end
 	table.sort(result, function(a, b)
@@ -188,6 +202,7 @@ end
 
 local function orderedScores(input: BuildInput, contestants: { Contestant }): { ScoreEntry }
 	local ids = {}
+	local scores = table.clone(input.scores)
 	if input.scoreScope == "Team" then
 		for _, teamId in input.teamIds or {} do
 			table.insert(ids, teamId)
@@ -195,12 +210,15 @@ local function orderedScores(input: BuildInput, contestants: { Contestant }): { 
 	else
 		for _, contestant in contestants do
 			table.insert(ids, contestant.playerId)
+			if scores[contestant.playerId] == nil then
+				scores[contestant.playerId] = contestant.contribution or 0
+			end
 		end
 	end
 
 	table.sort(ids, function(a, b)
-		local aScore = input.scores[a] or 0
-		local bScore = input.scores[b] or 0
+		local aScore = scores[a] or 0
+		local bScore = scores[b] or 0
 		if aScore == bScore then
 			return a < b
 		end
@@ -211,7 +229,7 @@ local function orderedScores(input: BuildInput, contestants: { Contestant }): { 
 	local previousScore: number? = nil
 	local placement = 0
 	for index, id in ids do
-		local score = input.scores[id] or 0
+		local score = scores[id] or 0
 		if previousScore == nil or score ~= previousScore then
 			placement = index
 		end
@@ -280,6 +298,14 @@ local function scoreDetail(scores: { ScoreEntry }): string?
 end
 
 local function presentation(result: GlobalResult, outcome: Outcome, placement: number?): Presentation
+	if result.reason == "NoContest" then
+		return {
+			eyebrow = "ROUND ENDED",
+			title = "LET'S FIND MORE PLAYERS",
+			detail = "YOUR EARNED REWARDS ARE KEPT",
+			accent = "Cyan",
+		}
+	end
 	local accent: Accent = if outcome == "Victory" then "Yellow" else "Cyan"
 	local eyebrow = if outcome == "Victory"
 		then "VICTORY"
@@ -289,7 +315,13 @@ local function presentation(result: GlobalResult, outcome: Outcome, placement: n
 		return {
 			eyebrow = eyebrow,
 			title = if placement then `{PostMatchResult.formatPlacement(placement)} PLACE` else "ROUND OVER",
-			detail = if result.scores[1] then `{result.scores[1].label} TAKES THE WIN` else nil,
+			detail = if result.winnerId and result.winnerId ~= ""
+				then `{contestantLabel(result.contestants, result.winnerId)} TAKES THE WIN`
+				else if result.scores[1]
+						and result.scores[2]
+						and result.scores[1].score == result.scores[2].score
+					then "TIED ROUND"
+					else "ROUND COMPLETE",
 			accent = accent,
 		}
 	end
@@ -378,6 +410,40 @@ local function seasonProgress(summary: PersonalSummary?): SeasonProgress?
 	}
 end
 
+function PostMatchResult.podium(result: GlobalResult): { ShowcaseEntry }
+	if result.reason == "NoContest" then
+		return {}
+	end
+	local candidates = {}
+	local scores = {}
+	for _, entry in result.scores do
+		scores[entry.id] = entry.score
+	end
+	for _, contestant in result.contestants do
+		local score = if result.scoreScope == "Player" then scores[contestant.playerId] else contestant.contribution
+		if score ~= nil and (result.scoreScope == "Player" or contestant.teamId == result.winnerId) then
+			local entry: any = table.clone(contestant)
+			entry.score = score
+			table.insert(candidates, entry)
+		end
+	end
+	table.sort(candidates, function(a, b)
+		return if a.score == b.score then a.userId < b.userId else a.score > b.score
+	end)
+	local podium = {}
+	local previous, rank = nil, 0
+	for index = 1, math.min(#candidates, 3) do
+		local entry = candidates[index]
+		if entry.score ~= previous then
+			rank = index
+		end
+		previous = entry.score
+		entry.placement = rank
+		table.insert(podium, entry)
+	end
+	return podium
+end
+
 function PostMatchResult.forPlayer(
 	result: GlobalResult,
 	userId: number,
@@ -412,6 +478,8 @@ function PostMatchResult.forPlayer(
 		presentation = presentation(result, outcome, placement),
 		scores = table.clone(result.scores),
 		personalStats = personalStats(summary, placement),
+		podium = PostMatchResult.podium(result),
+		personalAppearance = table.clone(contestant),
 		rewards = rewards(summary),
 		seasonProgress = seasonProgress(summary),
 		party = party,
@@ -428,6 +496,63 @@ end
 
 local function optionalNumber(value: any): boolean
 	return value == nil or finiteNumber(value)
+end
+
+local function copyAppearance(value: any): Contestant?
+	if
+		typeof(value) ~= "table"
+		or not validText(value.playerId, 100)
+		or not finiteNumber(value.userId)
+		or value.userId % 1 ~= 0
+		or not validText(value.username, 64)
+		or not validText(value.displayName, 64)
+		or (value.contribution ~= nil and (not finiteNumber(value.contribution) or value.contribution < 0))
+	then
+		return nil
+	end
+	local copied = {
+		playerId = value.playerId,
+		userId = value.userId,
+		username = value.username,
+		displayName = value.displayName,
+		contribution = value.contribution,
+	}
+	for _, key in { "teamId", "colorId", "emoteId", "ballId", "hammerId" } do
+		if value[key] ~= nil and value[key] ~= "" then
+			if not validText(value[key], 100) then
+				return nil
+			end
+			copied[key] = value[key]
+		end
+	end
+	return copied
+end
+
+local function copyPodium(value: any): { ShowcaseEntry }?
+	if typeof(value) ~= "table" or #value > 3 then
+		return nil
+	end
+	local copied, seen = {}, {}
+	for _, item in value do
+		local entry: any = copyAppearance(item)
+		if
+			not entry
+			or seen[entry.userId]
+			or not finiteNumber(item.score)
+			or item.score < 0
+			or not finiteNumber(item.placement)
+			or item.placement % 1 ~= 0
+			or item.placement < 1
+			or item.placement > 3
+		then
+			return nil
+		end
+		seen[entry.userId] = true
+		entry.score = item.score
+		entry.placement = item.placement
+		table.insert(copied, entry)
+	end
+	return copied
 end
 
 local function copyPresentation(value: any): Presentation?
@@ -707,6 +832,8 @@ function PostMatchResult.parse(value: any): (PlayerResult?, string?)
 	local copiedChallenges = copyChallenges(value.challenges)
 	local copiedUnlocks = copyUnlocks(value.unlocks)
 	local copiedParty = copyParty(value.party)
+	local copiedPodium = if value.podium ~= nil then copyPodium(value.podium) else nil
+	local copiedAppearance = if value.personalAppearance ~= nil then copyAppearance(value.personalAppearance) else nil
 	if
 		copiedPresentation == nil
 		or copiedScores == nil
@@ -716,6 +843,8 @@ function PostMatchResult.parse(value: any): (PlayerResult?, string?)
 		or (value.challenges ~= nil and copiedChallenges == nil)
 		or (value.unlocks ~= nil and copiedUnlocks == nil)
 		or (value.party ~= nil and copiedParty == nil)
+		or (value.podium ~= nil and copiedPodium == nil)
+		or (value.personalAppearance ~= nil and copiedAppearance == nil)
 	then
 		return nil, "invalid_payload"
 	end
@@ -735,6 +864,8 @@ function PostMatchResult.parse(value: any): (PlayerResult?, string?)
 		presentation = copiedPresentation,
 		scores = copiedScores,
 		personalStats = copiedStats,
+		podium = copiedPodium,
+		personalAppearance = copiedAppearance,
 		rewards = copiedRewards,
 		seasonProgress = copiedSeason,
 		challenges = copiedChallenges,

@@ -29,7 +29,7 @@ return {
 		{
 			Id = "EMOTES",
 			Sections = {
-				{ Id = "EMOTES", Category = "EmoteAssets" },
+				{ Id = "VICTORY EMOTES", Category = "EmoteAssets" },
 			},
 		},
 	},

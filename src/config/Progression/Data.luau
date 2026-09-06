@@ -1,6 +1,16 @@
 return {
+	Persistence = {
+		ReceiptSaveTimeoutSeconds = 8,
+		SavePollSeconds = 0.1,
+		ProgressionRetrySeconds = 5,
+		EntitlementRetrySeconds = 5,
+		MaxPendingMatchAwards = 64,
+		MaxPendingReceipts = 64,
+		CompletedMatchAwardHistory = 128,
+		MaxSeasonArchives = 64,
+	},
 	Template = {
-		Bonks = 2500,
+		Bonks = 1000,
 		Level = {
 			Points = 0,
 		},
@@ -54,6 +64,8 @@ return {
 
 		Settings = {}, -- { [settingId]: value }; keys are lazily written by SettingsService
 
+		MatchAwards = { Version = 1, Pending = {}, Completed = {} },
+		SeasonHistory = {},
 		Season = {
 			-- Reset wholesale at rollover. Tier is derived from XP, never stored.
 			Id = "",
@@ -66,6 +78,7 @@ return {
 			-- the platform does not remember for us, so premium lives here.
 			PremiumSeasons = {}, -- { [seasonId]: true }
 		},
+		ReceiptWork = {},
 		Receipts = {}, -- { [purchaseId]: unix time } for ProcessReceipt idempotency
 	},
 
@@ -79,8 +92,8 @@ return {
 	},
 
 	ProgressionBonks = {
-		MatchComplete = 50,
-		Win = 150,
+		MatchComplete = 75,
+		Win = 100,
 		Elim = 10,
 		Catch = 15,
 	},

@@ -15,10 +15,13 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Combat = require(Config:WaitForChild("Gameplay"):WaitForChild("Combat"))
+local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local PostMatchConfig = require(Config:WaitForChild("Interface"):WaitForChild("PostMatch"))
 local MatchSim = require(Game:WaitForChild("Sim"):WaitForChild("MatchSim"))
 local GameMode = require(Game:WaitForChild("Modes"):WaitForChild("GameMode"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
+local ModeOptions = require(Game:WaitForChild("Modes"):WaitForChild("ModeOptions"))
+local ModeAvailability = require(Game:WaitForChild("Modes"):WaitForChild("ModeAvailability"))
 local PartyTeamAllocator = require(Game:WaitForChild("Modes"):WaitForChild("PartyTeamAllocator"))
 local PlayerIds = require(Game:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local PostMatchResult = require(Game:WaitForChild("PostMatch"):WaitForChild("PostMatchResult"))
@@ -29,6 +32,8 @@ local ArenaService = require(script.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local BallService = require(script.Parent.BallService)
 local EliminationService = require(script.Parent.EliminationService)
+
+local PlayerData = require(script.Parent.PlayerData)
 
 local MatchService = {}
 
@@ -52,6 +57,8 @@ local startingMatch = false
 local watchedPlayers: { [number]: RBXScriptConnection } = {}
 local lastResult: PostMatchResult.GlobalResult? = nil
 local resultRosterByUserId: { [number]: PostMatchResult.Contestant } = {}
+local opponentDeadline: number? = nil
+local refreshPopulation: () -> ()
 
 function MatchService.onEvent(listener: (event: { [string]: any }) -> ())
 	table.insert(listeners, listener)
@@ -131,6 +138,11 @@ local function rememberContestant(player: Player)
 		username = player.Name,
 		displayName = player.DisplayName,
 		teamId = playerTeam(player),
+		colorId = player:GetAttribute("Equip_CharacterColor"),
+		emoteId = player:GetAttribute("Equip_EmoteAssets"),
+		ballId = player:GetAttribute("Equip_BallAssets"),
+		hammerId = player:GetAttribute("Equip_HammerAssets"),
+		contribution = playerMatchElims[PlayerIds.toId(player)] or 0,
 	}
 end
 
@@ -145,15 +157,14 @@ local function matchPlayers(): { Player }
 end
 
 local function buildResult(activeMode: GameMode.GameMode, event: { [string]: any })
+	for _, player in Players:GetPlayers() do
+		if resultRosterByUserId[player.UserId] then
+			rememberContestant(player)
+		end
+	end
 	local contestants = {}
 	for _, contestant in resultRosterByUserId do
-		table.insert(contestants, {
-			playerId = contestant.playerId,
-			userId = contestant.userId,
-			username = contestant.username,
-			displayName = contestant.displayName,
-			teamId = contestant.teamId,
-		})
+		table.insert(contestants, table.clone(contestant))
 	end
 	local now = Workspace:GetServerTimeNow()
 	lastResult = PostMatchResult.build({
@@ -367,6 +378,8 @@ local function startMatch(events: { MatchSim.MatchEvent })
 	activeMode.onMatchStart(modeContext())
 	MatchSim.start(state, activeMode.rules, events)
 	setStateAttribute("modeId", activeMode.id)
+	setStateAttribute("scoreTarget", activeMode.rules.ScoreTarget)
+	setStateAttribute("scoreScope", activeMode.scoreScope or "Player")
 end
 
 local function cleanupMatch()
@@ -400,6 +413,8 @@ function handleMatchEvents(events: { MatchSim.MatchEvent })
 				end
 			end
 		elseif event.kind == "MatchPreparing" then
+			opponentDeadline = nil
+			setStateAttribute("opponentDeadline", nil)
 			lastResult = nil
 			resetAllScores()
 			setStateAttribute("winnerId", "")
@@ -407,9 +422,12 @@ function handleMatchEvents(events: { MatchSim.MatchEvent })
 				setTeamScore(teamId, state.scores[teamId] or 0)
 			end
 		elseif event.kind == "MatchStarted" then
+			refreshPopulation()
 			local activeMode = assert(mode, "[MatchService] MatchStarted without a selected mode")
 			print(`[Match] started — {activeMode.id}`)
 		elseif event.kind == "MatchEnded" then
+			opponentDeadline = nil
+			setStateAttribute("opponentDeadline", nil)
 			local activeMode = assert(mode, "[MatchService] MatchEnded without a selected mode")
 			activeMode.onMatchEnd(modeContext())
 			buildResult(activeMode, event)
@@ -598,6 +616,13 @@ local function tickWaveRespawns(dt: number)
 end
 
 function MatchService.handleCombatEvent(event: { [string]: any }): boolean
+	if event.kind == "BallWindup" or event.kind == "HammerSwing" then
+		local player = PlayerIds.fromEvent(event)
+		local character = if player then player.Character else nil
+		if character then
+			character:SetAttribute("minv", nil)
+		end
+	end
 	if event.kind == "BallCaught" then
 		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
 		if catcher == nil or not ArenaSessionService.isRoundEligible(catcher) then
@@ -683,6 +708,52 @@ function MatchService.resultSnapshot(): PostMatchResult.GlobalResult?
 	return lastResult
 end
 
+local function rosterAllows(rules: GameMode.MatchRules, players: { Player }): boolean
+	local entrants = {}
+	for _, player in players do
+		table.insert(entrants, { id = PlayerIds.toId(player), partyId = ArenaSessionService.partyIdFor(player) })
+	end
+	local practice = #players == 1 and (RunService:IsStudio() or DevSoloPlay.canUse(players[1]))
+	return ModeAvailability.canStart(rules, entrants, practice)
+end
+
+local function captureRules(selectedMode: GameMode.GameMode)
+	selectedMode.rules = selectedMode.resolveRules()
+	local players = matchPlayers()
+	if #players == 1 and (RunService:IsStudio() or DevSoloPlay.canUse(players[1])) then
+		selectedMode.rules.MinPlayers = 1
+		selectedMode.rules.MinParties = 1
+	end
+end
+
+refreshPopulation = function()
+	if state.phase ~= "Active" or mode == nil then
+		return
+	end
+	local entrants = {}
+	for _, player in matchPlayers() do
+		table.insert(entrants, { teamId = playerTeam(player) })
+	end
+	if ModeAvailability.canContinue(mode.rules, entrants) then
+		opponentDeadline = nil
+	elseif opponentDeadline == nil then
+		opponentDeadline = Workspace:GetServerTimeNow() + GameModes.OpponentGraceSeconds
+	end
+	setStateAttribute("opponentDeadline", opponentDeadline)
+end
+
+function MatchService.availableModes(): { string }
+	local players = matchPlayers()
+	local options = {}
+	for _, modeId in ModeOptions.resolve(ArenaSessionService.modeOptions()) do
+		local candidate = ModeRegistry.get(modeId)
+		if candidate and rosterAllows(candidate.resolveRules(), players) then
+			table.insert(options, modeId)
+		end
+	end
+	return options
+end
+
 function MatchService.beginMode(modeId: string): (boolean, string?)
 	if startingMatch or state.phase ~= "Idle" then
 		return false, "match_not_idle"
@@ -693,8 +764,14 @@ function MatchService.beginMode(modeId: string): (boolean, string?)
 	end
 	-- Snapshot the mode's rules from live config at the boundary so an override
 	-- staged during the previous match lands here and holds for the whole match.
-	selectedMode.rules = selectedMode.resolveRules()
-	if #matchPlayers() < selectedMode.rules.MinPlayers then
+	captureRules(selectedMode)
+	for _, player in matchPlayers() do
+		if not PlayerData.canQueueMatchAward(player) then
+			player:SetAttribute("RewardsRecoveryPending", true)
+			ArenaSessionService.setRoundEligible(player, false)
+		end
+	end
+	if not rosterAllows(selectedMode.rules, matchPlayers()) then
 		return false, "not_enough_players"
 	end
 
@@ -736,7 +813,7 @@ function MatchService.restartForTesting(modeId: string?): (boolean, string?)
 	end
 
 	mode = nextMode
-	nextMode.rules = nextMode.resolveRules()
+	captureRules(nextMode)
 	state = MatchSim.newState()
 	local events: { MatchSim.MatchEvent } = {}
 	startMatch(events)
@@ -863,8 +940,15 @@ function MatchService.start()
 	end)
 	ArenaSessionService.onReady(function(player)
 		watchPlayer(player)
+		refreshPopulation()
+	end)
+	ArenaSessionService.onRoundEligibilityChanged(function()
+		task.defer(refreshPopulation)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
+		if resultRosterByUserId[player.UserId] then
+			rememberContestant(player)
+		end
 		local watchedConnection = watchedPlayers[player.UserId]
 		if watchedConnection then
 			watchedConnection:Disconnect()
@@ -874,7 +958,10 @@ function MatchService.start()
 		respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 		pendingWaveRespawns[key] = nil
 		spawnedThisMatch[key] = nil
-		task.defer(syncPlayers)
+		task.defer(function()
+			syncPlayers()
+			refreshPopulation()
+		end)
 	end)
 	for _, player in matchPlayers() do
 		watchPlayer(player)
@@ -884,7 +971,11 @@ function MatchService.start()
 		local events: { MatchSim.MatchEvent } = {}
 		local activeMode = mode
 		if activeMode then
-			MatchSim.tick(state, activeMode.rules, dt, events)
+			if state.phase == "Active" and opponentDeadline and Workspace:GetServerTimeNow() >= opponentDeadline then
+				MatchSim.noContest(state, activeMode.rules, events)
+			else
+				MatchSim.tick(state, activeMode.rules, dt, events)
+			end
 		end
 		handleMatchEvents(events)
 		tickWaveRespawns(dt)

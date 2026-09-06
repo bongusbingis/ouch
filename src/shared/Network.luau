@@ -34,6 +34,7 @@ local definitions = {
 	ReportAimPose = "unreliable",
 	MarkSwipeThrowLearned = "event",
 	SetClientSetting = "event",
+	SetClientSettingRequest = "function",
 	OnboardingState = "event",
 	OnboardingReady = "function",
 	OnboardingAction = "event",
@@ -148,14 +149,14 @@ end
 function Network.handleProtected(name, middleware, callback)
 	assert(IS_SERVER, "[Network] handleProtected can only be called on the server")
 	local handler = callback
-	if middleware.rateLimit then
-		handler = Network.withRateLimit(middleware.rateLimit, handler, name)
-	end
 	if middleware.validate then
 		handler = Network.withValidation(middleware.validate, handler)
 	end
 	if middleware.logging then
 		handler = Network.withLogging(handler)
+	end
+	if middleware.rateLimit then
+		handler = Network.withRateLimit(middleware.rateLimit, handler, name)
 	end
 	Network.handle(name, handler)
 end

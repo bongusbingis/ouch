@@ -7,8 +7,6 @@
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local InventoryConfig =
@@ -16,42 +14,10 @@ local InventoryConfig =
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
+local PreviewScheduler = require(script.Parent.Parent.Services.PreviewScheduler)
 
 local c = React.createElement
-local UPDATE_INTERVAL = 1 / 30
-local active = {}
-local connection: RBXScriptConnection? = nil
-local accumulator = 0
-
-local function overlaps(position: Vector2, size: Vector2, clipPosition: Vector2, clipSize: Vector2): boolean
-	return position.X < clipPosition.X + clipSize.X
-		and position.X + size.X > clipPosition.X
-		and position.Y < clipPosition.Y + clipSize.Y
-		and position.Y + size.Y > clipPosition.Y
-end
-
-local function isVisible(state): boolean
-	local viewport = state.viewport
-	if not viewport.Visible then
-		return false
-	end
-	local camera = Workspace.CurrentCamera
-	if
-		camera == nil
-		or not overlaps(viewport.AbsolutePosition, viewport.AbsoluteSize, Vector2.zero, camera.ViewportSize)
-	then
-		return false
-	end
-	local scroller = state.scroller
-	return scroller == nil
-		or overlaps(
-			viewport.AbsolutePosition,
-			viewport.AbsoluteSize,
-			scroller.AbsolutePosition,
-			scroller.AbsoluteWindowSize
-		)
-end
-
 local function setPivot(object: Model | BasePart, pivot: CFrame)
 	if object:IsA("Model") then
 		object:PivotTo(pivot)
@@ -70,44 +36,11 @@ local function update(state, dt: number)
 	setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
 end
 
-local function stopIfIdle()
-	if next(active) == nil and connection then
-		connection:Disconnect()
-		connection = nil
-		accumulator = 0
-	end
-end
-
 local function register(state)
-	active[state] = true
 	update(state, 0)
-	if not connection then
-		connection = RunService.RenderStepped:Connect(function(dt)
-			accumulator += dt
-			if accumulator < UPDATE_INTERVAL then
-				return
-			end
-			local step = math.min(accumulator, 0.1)
-			accumulator = 0
-			for preview in active do
-				if isVisible(preview) then
-					preview.updateAccumulator += step
-					local interval = 1 / (preview.config.UpdateHz or 30)
-					if preview.updateAccumulator >= interval then
-						local previewStep = preview.updateAccumulator
-						preview.updateAccumulator = 0
-						update(preview, previewStep)
-					end
-				else
-					preview.updateAccumulator = 0
-				end
-			end
-		end)
-	end
-	return function()
-		active[state] = nil
-		stopIfIdle()
-	end
+	return PreviewScheduler.register(state.viewport, function(dt)
+		update(state, dt)
+	end, state.config.UpdateHz)
 end
 
 local function preparePart(part: BasePart)
@@ -156,6 +89,7 @@ export type Props = {
 	Category: string,
 	Definition: any,
 	ZIndex: number,
+	ColorId: string?,
 }
 
 local function impactPreview(props: Props)
@@ -244,33 +178,44 @@ local ViewportPreview = React.memo(function(props: Props)
 			return
 		end
 		viewport.CurrentCamera = camera
-		local object: Model | BasePart
-		if props.Category == "CharacterColor" then
-			local color = props.Definition.PreviewColor
-			assert(color ~= nil, "[InventoryPreview] character colors require PreviewColor")
-			object = characterPreview(color)
-		else
-			object = CosmeticVisualFactory.create(props.Category, props.ItemId)
-		end
-		setScale(object, config.Scale)
-		object.Parent = world
-		local target = config.TargetOffset
-		camera.CFrame = CFrame.lookAt(target + config.CameraOffset, target)
-		local state = {
-			object = object,
-			viewport = viewport,
-			scroller = viewport:FindFirstAncestorWhichIsA("ScrollingFrame"),
-			category = props.Category,
-			config = config,
-			basePivot = centerObject(object),
-			baseRotation = math.rad(config.RotationDegrees),
-			elapsed = 0,
-			updateAccumulator = 0,
-		}
-		local unregister = register(state)
+		local object: (Model | BasePart)? = nil
+		local unregister: (() -> ())? = nil
+		local preparation = task.defer(function()
+			local prepared: Model | BasePart
+			if props.Category == "CharacterColor" then
+				local color = props.Definition.PreviewColor
+				assert(color ~= nil, "[InventoryPreview] character colors require PreviewColor")
+				prepared = characterPreview(color)
+			else
+				prepared = CosmeticVisualFactory.create(props.Category, props.ItemId)
+			end
+			object = prepared
+			setScale(prepared, config.Scale)
+			prepared.Parent = world
+			local target = config.TargetOffset
+			camera.CFrame = CFrame.lookAt(target + config.CameraOffset, target)
+			unregister = register({
+				object = prepared,
+				viewport = viewport,
+				scroller = viewport:FindFirstAncestorWhichIsA("ScrollingFrame"),
+				category = props.Category,
+				config = config,
+				basePivot = centerObject(prepared),
+				baseRotation = math.rad(config.RotationDegrees),
+				elapsed = 0,
+				updateAccumulator = 0,
+			})
+		end)
 		return function()
-			unregister()
-			object:Destroy()
+			if coroutine.status(preparation) ~= "dead" then
+				task.cancel(preparation)
+			end
+			if unregister then
+				unregister()
+			end
+			if object then
+				object:Destroy()
+			end
 			if viewport.CurrentCamera == camera then
 				viewport.CurrentCamera = nil
 			end
@@ -292,6 +237,9 @@ local ViewportPreview = React.memo(function(props: Props)
 end)
 
 return React.memo(function(props: Props)
+	if props.Category == "EmoteAssets" then
+		return c(CelebrationAvatar, { EmoteId = props.ItemId, ColorId = props.ColorId, ZIndex = props.ZIndex })
+	end
 	if props.Category == "ImpactEffectAssets" then
 		return impactPreview(props)
 	end

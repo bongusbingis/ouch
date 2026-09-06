@@ -7,12 +7,12 @@ local useViewportSize = require(script.Parent.useViewportSize)
 
 return function(parentScreenInsets: Enum.ScreenInsets?): ResponsiveLayout.SafeRect
 	local viewport = useViewportSize()
-	local ok, area = pcall(GuiService.GetInsetArea, GuiService, Enum.ScreenInsets.DeviceSafeInsets)
-	local minimum = Vector2.zero
-	local maximum = viewport
-	if ok and typeof(area) == "Rect" then
-		minimum = (area :: Rect).Min
-		maximum = (area :: Rect).Max
+	local ok, area, parent = pcall(function()
+		return GuiService:GetInsetArea(Enum.ScreenInsets.DeviceSafeInsets),
+			GuiService:GetInsetArea(parentScreenInsets or Enum.ScreenInsets.CoreUISafeInsets)
+	end)
+	if ok and typeof(area) == "Rect" and typeof(parent) == "Rect" then
+		return ResponsiveLayout.insetRect(viewport, area.Min, area.Max, parent.Min, parent.Max)
 	end
-	return ResponsiveLayout.safeRect(viewport, minimum, maximum, parentScreenInsets == Enum.ScreenInsets.None)
+	return ResponsiveLayout.safeRect(viewport, Vector2.zero, viewport, true)
 end

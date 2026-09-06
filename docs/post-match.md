@@ -1,117 +1,56 @@
 # Post-match flow
 
-The arena post-match experience is an event-driven presentation over existing match, progression, party, and teleport owners. It does not calculate wins, award currency, mutate profiles, or run a second matchmaker.
+Results is a presentation over authoritative match, reward, party and teleport owners. It never calculates a hit, grants a reward, or runs another matchmaker.
 
-## Runtime ownership
+## Ownership
 
-- `MatchService` owns the authoritative match phase, winner, scores, participant roster, and result lifetime.
-- `ProgressionService` remains the only match reward committer. It exposes the exact summary it already awarded, including XP, Bonks, boosts, and season state before/after the award.
-- `PostMatchService` joins those facts into one player-specific result packet and owns server validation for post-match actions.
-- `ArenaReturnService` owns lobby teleport retries and the one-reset party-retention decision used by Play Again.
-- `ArenaSessionService` owns party identity from the lobby teleport payload and selects an effective leader. The original leader remains leader while present; otherwise the lowest present user ID takes over.
-- `PostMatchClient` owns the local result screen lifecycle and the `PostMatch` combat-cursor request.
-- `PostMatchScreen` is presentation-only and can render production or debug data without requiring networking or profile services.
+| Concern | Owner |
+|---|---|
+| Phase, outcome, score, roster, opponent-loss deadline | MatchService / MatchSim |
+| Pending award journal and durable profile updates | PlayerData / MatchAwardService |
+| Match progress and exact committed result summary | ProgressionService |
+| Result packets, group choices, authorization and revisions | PostMatchService |
+| Retention, grouped returns and recovery | ArenaReturnService / TeleportRetryCoordinator |
+| Session admission, party identity and round eligibility | ArenaSessionService |
+| Return reconciliation and queue transaction | Lobby PartyService / existing repositories |
+| Rendering and bounded requests | PostMatchClient / React components |
 
-## State flow
+## Player flow
 
-```text
-Active
-  -> Results / authoritative result packet
-  -> 0.8 second reveal within a 12-second Results phase
-  -> interactive results
-       -> Play Again: retain the whole party for this reset
-       -> Cancel Play Again: release that retention
-       -> Return Party to Lobby: leader returns every present party member
-       -> Leave Party & Return: non-leader separates and returns only themselves
-  -> MatchReset
-       -> retained parties stay for the next arena vote
-       -> all other matched parties return to the lobby together
-  -> Intermission / next game-mode vote
-```
+After a normal match, the server opens a 12-second Results phase with a 0.8-second reveal gate. The screen shows the actual outcome, earned top-three appearances, personal earnings/progression and a stable next-action row. Ties share placement; a stable display sort never invents a winner. TDM recognizes contributors from the winning team. No-contest results name the interrupted round and do not award podium placement.
 
-Detailed reward animation never gates the action buttons. The results UI is removed as soon as the authoritative phase leaves `Results`; combat input becomes active only when the existing simulation client observes `Active` again.
+Viable groups **continue automatically** into the next mode vote. The footer says where the player will go when the timer expires. The leader can return the party to the lobby; a member can explicitly leave alone. The effective leader changes when the original leader leaves. The next-round indicator is disabled after acceptance; controller focus moves to Scores rather than defaulting to the Lobby exit.
 
-The server enforces `interactiveAt`; Reduced Motion snaps visual motion but does not create an earlier action window. The screen renders the authoritative expiry as a countdown and progress bar.
+If the remaining roster cannot produce a valid match, **Find players** returns the group to the lobby with an explicit queue intent. The lobby reconciles the party, waits for all expected members to arrive locally, then uses its existing ban-checked queue transaction once. Regrouping is visible and cancellable by the leader. The intent expires after 20 seconds, is consumed with the queue transition, and cannot be re-armed by a late/duplicate arrival. Membership changes cancel it. An ordinary Lobby return never autoqueues.
 
-The initial result packet contains the in-memory statistics immediately and truthfully marks its real reward calculation as pending. This reserves the progression card without inventing values or changing the page width later. Entitlement checks and per-player reward commits run concurrently, never inside the serial match-event dispatch. When an exact committed summary becomes available during `Results`, the server republishes the same result ID with its real reward fields; this update neither restarts the reveal nor cancels an action already in flight.
+At reset, groups without viable retention return through the existing coordinator. It performs a reward preflight before each actual transfer, including manual retries. Pending/missing reward data surfaces a recoverable save status; teleport errors surface Try Again/Stay. Stay restores round eligibility. Transient teleport failures retain grouped retry behavior.
 
-The current same-server replay path intentionally reuses the arena's existing Intermission vote. It does not yet send a retained party back through the global lobby queue or backfill that arena from other servers. A future population coordinator can replace the retention implementation behind `ArenaReturnService.retainParty` without changing the result UI or request contract.
+The production matchmaker relaxes its population target to two players after 30 seconds. FFA requires two players; TDM additionally requires two independent parties/entrants before selection. The existing developer-only solo path and Studio practice remain available. An active match losing all opposition gets an eight-second recovery deadline; a restored roster cancels it, otherwise it ends as NoContest. Earned combat progress is kept, with no fabricated win, match-completion bonus or completed-match quest progress.
 
-## Result contract
+## Result and action contracts
 
-`Shared.Game.PostMatch.PostMatchResult` is the boundary between gameplay facts and presentation.
+`Shared.Game.PostMatch.PostMatchResult` schema 1 carries result identity, mode/outcome, server timestamps, scores, personal statistics and optional committed progression/party/showcase fields. Appearance snapshots contain bounded cosmetic IDs and character color. Older packets without optional showcase fields remain valid. Departed contestants retain their captured elimination contribution for final standings.
 
-Production-required player fields:
+The initial result marks unresolved rewards as pending. A committed summary republishes the same result ID; it neither restarts celebration nor cancels an in-flight action. Detailed reward animation never gates input. Every preview uses the shared authored rig/cosmetic factory and visible-only preview scheduler; Reduced Motion presents the same information without continuous celebration motion.
 
-- schema and result IDs;
-- mode ID and display name;
-- outcome;
-- authoritative winner ID when one exists;
-- reveal and expiry server timestamps;
-- presentation copy derived from the real mode result;
-- ordered score entries;
-- tracked personal statistics.
+| Remote | Shape |
+|---|---|
+| PostMatchResult event | Authoritative per-player result |
+| PostMatchStatus event | Result ID, revision, group state, leader, party, self-return flag, next destination, replay viability and optional finding-players intent |
+| PostMatchRequest function | Action plus current result ID |
 
-Optional fields:
+Actions are `PlayAgain`, compatibility `CancelPlayAgain`, `ReturnToLobby`, `LeaveParty`, and `FindMatch`. The server rejects expired results, pre-reveal actions and unauthorized party-wide requests. All group actions remain leader-owned. Client requests are bounded and stale responses cannot replace newer state.
 
-- FFA placement;
-- match XP, season XP, Bonks, bases, and multipliers;
-- season before/after progress;
-- challenge progress and unlock presentation;
-- party members and effective leader.
+Return payload schema 1 adds optional `queueOnArrival`. It is accepted only with the configured arena source place and universe, validated party/match identity and bounded unique members. Separate-member returns cannot request group queueing. Legacy payloads continue to return normally to the lobby. The party record retains one last-return identity and at most one expiring queue intent; no new player-profile persistence is introduced.
 
-The optional layout collapses cleanly. Missing reward, season, score-detail, or party information does not create an empty card. The contract and debug story support challenge and unlock presentation, but production challenge deltas and unlocks are not emitted until their authoritative owners provide them. Dodgeball hits, hammer hits, accuracy, streaks, and podiums are not currently calculated and are therefore not sent to production clients.
+## Presentation and controls
 
-Future systems should add their result values to the server-side personal summary and extend the shared result projection. They should not make the React component require gameplay services or write profile data from UI code.
+The result hero, podium, personal progress and action row share the arena palette and existing interaction primitives. Flexible rounded surfaces replace broken image slicing. Phone landscape puts earnings above the fold and preserves touch targets; scores/details scroll. The new Showtime pass adds three cosmetic victory emotes through the existing EMOTES inventory slot. It changes no placement, combat or reward rules. See [Showtime](showtime-pass.md).
 
-## Networking
+The custom arena scoreboard uses Tab, controller Select and Scores. Chat and pause/report remain available; the replaced native player list, health/backpack HUD and overhead labels stay disabled. Screen lifecycle releases cursor/focus ownership and cancels stale requests. During Studio QA, Tab is attempted after loading; the lobby's native CoreGui binding can reject VirtualInput, so the player list is hidden directly for that playtest.
 
-- `PostMatchResult` event: one authoritative result packet per eligible player.
-- `PostMatchStatus` event: party action state, effective leader, revision, and current party projection.
-- `PostMatchRequest` function: `PlayAgain`, `CancelPlayAgain`, `ReturnToLobby`, or `LeaveParty`, always paired with the current result ID.
+## Verification and release
 
-The server rejects stale result IDs, requests before the reveal gate, requests outside `Results`, and every party-wide request from a non-leader. Status revisions prevent an older response from replacing a newer party decision. `ReturnToLobby` is a leader-only grouped operation for every present party member. `LeaveParty` is available only to a non-leader in a multi-member party; its authenticated return payload removes that player from the surviving party record before the lobby creates their solo party. Both paths use the existing retry/loading coordinator.
+See the [arena implementation record](arena-experience-redesign.md) for exact counts and executed scenarios. Coverage includes pure eligibility/outcome/contract rules, isolated party/teleport services, actual Studio continuation, no-contest rewards, and return failure/Stay. Stories cover standings, podium appearances, pending rewards and party roles without networking or purchases.
 
-## Debug preview
-
-Open `Shared/UI/Stories/PostMatchScreen.story` in the React story tooling. Its top development toolbar cycles through:
-
-- TDM victory with a party of four;
-- TDM defeat;
-- FFA first place;
-- FFA sixth place;
-- Survivors win;
-- Infected win;
-- no rewards;
-- rewards pending and boosted rewards with a tier transition;
-- tied/no-winner result;
-- missing optional party projection;
-- example future challenge progress;
-- example future unlock presentation;
-- party of one;
-- non-leader party-member controls, self-return in flight, and request failure.
-
-The story reads only `DebugPostMatchData`. Its actions change local React story state and never call Network, PlayerData, or any reward service.
-
-## Device behavior
-
-- PC: the centralized combat module releases mouse lock for the `PostMatch` cursor reason.
-- Touch: combat gestures are already disabled outside `Active`; the action row uses large touch targets and the compact landscape layout.
-- Controller: the result root is a selection group. Play Again receives default focus for leaders, while Leave Party & Return receives it for non-leaders.
-- Reduced Motion: result springs snap to their resting state.
-- All text uses `ResponsiveText`; no result label uses `TextScaled`.
-- The backdrop is full-bleed; interactive content is constrained to the device safe area and a 1920x1080 maximum canvas. Portrait canvases are height-bounded from their width instead of stretching the landscape composition.
-
-## Manual acceptance
-
-1. End FFA, TDM, and Infection through the authoritative match tools and verify mode-specific copy, winner, scores, and FFA placement.
-2. Test a win, loss, and tied/no-winner result.
-3. Confirm only existing eliminations, catches, knockouts, XP, Bonks, boosts, and season progress appear.
-4. Verify missing rewards or season data removes the section without an empty panel.
-5. Test solo, party leader, party member, four-member party, leader disconnect, and member disconnect.
-6. Have the leader choose Play Again, cancel it, and choose again. Verify every member receives the status change.
-7. Verify a retained party stays for the next game-mode vote and a non-retained party returns through the existing loading/retry UX.
-8. Trigger Return Party to Lobby as leader. As a member, trigger Leave Party & Return and verify only that player receives the separating payload, the remaining party stays together, and the returning player arrives in a solo party. Exercise Retry and Stay for both paths.
-9. Verify combat buttons, touch gestures, and camera attacks cannot fire during Results and return during Active.
-10. Verify mouse, touch, controller focus, Reduced Motion, phone landscape, tablet, desktop, and TV-like aspect ratios.
-11. Repeat several rounds and confirm one result root, no duplicate handlers, no stale result, and no retained decision leaking into another reset.
+Before publishing, save the authored rig changes in both open Studio documents and the persistent lobby scene, then run the saved-place cloud suites. Real multi-client transfers, actual billing/regional accounts and hardware/audio listening checks remain platform acceptance work. Remove the obsolete live MinPlayers=1 overrides; the allowlist now rejects them. No repository tool has rewritten a place binary.

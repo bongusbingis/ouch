@@ -213,3 +213,9 @@ Targets to judge the economy against. Every one maps to an event that is already
 Two of these are guard rails rather than growth targets. **Faucet vs. sink** catches an economy drifting into either inflation or a grind wall. **Crate/direct split** catches one path dominating: if direct buy falls below 20%, the RNG-averse player has no real option; if crates fall below 20%, the gamble has stopped being the better deal for breadth and its pricing needs revisiting.
 
 Instrumentation gaps worth knowing: economy events record `endingBalance` as `0` on the Robux receipt path, and Studio sessions log to console rather than to Roblox analytics.
+
+## 2026-09-06 arena experience refinement
+
+The user directed refinement of the existing game modes rather than replacement with an external mode document. FFA/TDM retain their current score targets and time caps; Infection remains disabled. Production requires opponents: two players, and two independent parties/entrants for TDM. Team assignment preserves parties. The authorized developer solo path remains separate.
+
+After eight seconds without valid opposition, an active round ends as NoContest, preserving earned combat rewards without a win or completion bonus. Spawn protection ends on an accepted attack. Results includes earned podium appearances, personal progress and explicit destination copy. Viable groups continue automatically; Find Players uses an authenticated, cancellable, once-only handoff to the existing lobby matchmaker. See [the final mode decision table and implementation evidence](arena-experience-redesign.md#final-mode-and-repeat-decisions--2026-09-06) and [post-match ownership and protocol](post-match.md).

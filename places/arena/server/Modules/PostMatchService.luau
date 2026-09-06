@@ -31,6 +31,9 @@ export type Status = {
 	error: string?,
 	party: PostMatchResult.Party?,
 	selfReturning: boolean?,
+	nextDestination: ("Arena" | "Lobby")?,
+	canReplay: boolean?,
+	findingPlayers: boolean?,
 }
 
 local started = false
@@ -73,6 +76,10 @@ local function statusPacket(player: Player, status: Status): Status
 	local packet = table.clone(status)
 	packet.party = partyFor(player)
 	packet.selfReturning = ArenaReturnService.isSeparatingReturn(player)
+	packet.canReplay = #MatchService.availableModes() > 0
+	packet.nextDestination = if packet.selfReturning or status.state == "Returning"
+		then "Lobby"
+		else if ArenaReturnService.isPartyRetained(player) then "Arena" else "Lobby"
 	return packet
 end
 
@@ -95,6 +102,30 @@ local function publishGroup(player: Player)
 	end
 end
 
+local statusPublishScheduled = false
+local function scheduleStatuses()
+	if statusPublishScheduled then
+		return
+	end
+	statusPublishScheduled = true
+	task.defer(function()
+		statusPublishScheduled = false
+		if activeResult == nil or MatchService.phase() ~= "Results" then
+			return
+		end
+		local published = {}
+		for _, player in Players:GetPlayers() do
+			local key = groupKey(player)
+			local status = statusFor(player)
+			if status and not published[key] then
+				published[key] = true
+				status.revision += 1
+				publishGroup(player)
+			end
+		end
+	end)
+end
+
 local function sendResult(player: Player, result: PostMatchResult.GlobalResult)
 	if not ArenaSessionService.isPlayable(player) then
 		return
@@ -106,7 +137,7 @@ local function sendResult(player: Player, result: PostMatchResult.GlobalResult)
 		status = {
 			resultId = result.resultId,
 			revision = 1,
-			state = "Interactive",
+			state = if ArenaReturnService.isPartyRetained(player) then "PlayAgain" else "Interactive",
 			leaderUserId = ArenaSessionService.effectiveLeaderUserIdFor(player),
 		}
 		statusByGroup[key] = status
@@ -148,7 +179,13 @@ local function beginResult()
 end
 
 local function validRequest(_player: Player, action: any, resultId: any)
-	return (action == "PlayAgain" or action == "CancelPlayAgain" or action == "ReturnToLobby" or action == "LeaveParty")
+	return (
+		action == "PlayAgain"
+		or action == "CancelPlayAgain"
+		or action == "ReturnToLobby"
+		or action == "LeaveParty"
+		or action == "FindMatch"
+	)
 		and typeof(resultId) == "string"
 		and #resultId > 0
 		and #resultId <= 100,
@@ -189,19 +226,23 @@ local function request(player: Player, action: string, resultId: string)
 		return { ok = ok, error = reason, status = statusPacket(player, status) }
 	end
 
-	if action == "ReturnToLobby" then
-		ArenaReturnService.releaseParty(player)
+	if action == "ReturnToLobby" or action == "FindMatch" then
+		local previousState = status.state
 		status.revision += 1
 		status.state = "Returning"
 		status.requestedByUserId = player.UserId
 		status.error = nil
+		status.findingPlayers = action == "FindMatch"
 		publishGroup(player)
-		local ok, reason = ArenaReturnService.returnParty(player)
+		local ok, reason = ArenaReturnService.returnParty(player, action == "FindMatch")
 		if not ok then
 			status.revision += 1
-			status.state = "Interactive"
+			status.state = previousState
 			status.requestedByUserId = nil
+			status.findingPlayers = nil
 			publishGroup(player)
+		else
+			ArenaReturnService.releaseParty(player)
 		end
 		return { ok = ok, error = reason, status = statusPacket(player, status) }
 	end
@@ -270,19 +311,11 @@ function PostMatchService.start()
 		status.state = "Interactive"
 		status.requestedByUserId = nil
 		status.error = reason
+		status.findingPlayers = nil
 		publishGroup(player)
 	end)
-
-	Players.PlayerRemoving:Connect(function(player)
-		local key = groupKey(player)
-		task.defer(function()
-			local status = statusByGroup[key]
-			local members = groupPlayers(player)
-			if status and members[1] then
-				publishGroup(members[1])
-			end
-		end)
-	end)
+	ArenaSessionService.onRoundEligibilityChanged(scheduleStatuses)
+	Players.PlayerRemoving:Connect(scheduleStatuses)
 end
 
 return PostMatchService

@@ -96,7 +96,7 @@ local function actionButton(action: LoadingAction, layoutOrder: number, actionCo
 end
 
 return function(props: Props)
-	local safeArea = useSafeArea(props.ParentScreenInsets or Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(props.ParentScreenInsets or Enum.ScreenInsets.CoreUISafeInsets)
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.Loading,

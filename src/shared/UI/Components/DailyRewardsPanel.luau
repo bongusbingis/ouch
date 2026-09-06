@@ -12,17 +12,18 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local Palette = UIConfig.ProgressionStyle
+
 local c = React.createElement
 
-local PANEL_NINE_SLICE = "rbxassetid://124751224634629"
-local PANEL_SLICE_CENTER = Rect.new(31, 41, 978, 620)
-local CLAIM_BUTTON_ASSET = "rbxassetid://94748581468730"
+local CHECK_ICON_ASSET = "rbxassetid://505845268"
 
-local DARK = Color3.fromRGB(24, 41, 48)
-local CLAIM_COLOR = Color3.fromRGB(154, 233, 91)
-local AVAILABLE_COLOR = Color3.fromRGB(255, 211, 51)
-local CLAIMED_SURFACE = Color3.fromRGB(39, 78, 90)
-local LOCKED_SURFACE = Color3.fromRGB(23, 88, 105)
+local DARK = Palette.Ink
+local CLAIM_COLOR = Palette.Green
+local AVAILABLE_COLOR = Palette.Yellow
+local CLAIMED_SURFACE = Palette.Raised
+local LOCKED_SURFACE = Palette.Ink
 
 export type PublicDay = {
 	day: number,
@@ -50,16 +51,19 @@ export type Props = {
 local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boolean })
 	local day = dayProps.Day
 	local compact = dayProps.Compact
-	local available = day.available and not day.claimed
-	local backgroundColor = if day.claimed then CLAIMED_SURFACE elseif available then AVAILABLE_COLOR else LOCKED_SURFACE
+	local available = day.available
+	local claimed = day.claimed and not available
+	local backgroundColor = if claimed then CLAIMED_SURFACE elseif available then AVAILABLE_COLOR else LOCKED_SURFACE
 	local foregroundColor = if available then DARK else Color3.new(1, 1, 1)
-	local rewardColor = if available then DARK elseif day.claimed then Color3.fromRGB(188, 207, 212) else AVAILABLE_COLOR
-	local strokeColor = if day.claimed then CLAIM_COLOR elseif available then AVAILABLE_COLOR else Color3.new(1, 1, 1)
+	local rewardColor = if available then DARK elseif claimed then Palette.Muted else AVAILABLE_COLOR
+	local strokeColor = if claimed then CLAIM_COLOR elseif available then AVAILABLE_COLOR else Color3.new(1, 1, 1)
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		LayoutOrder = dayProps.Order,
-		Size = UDim2.fromScale(1 / 7 - 0.009, 1),
+		Size = if compact
+			then UDim2.new(0, UIConfig.Layout.DailyCell.MinWidthPx, 1, -4)
+			else UDim2.fromScale(1 / 7 - 0.009, 1),
 	}, {
 		Background = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -67,28 +71,38 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 			BackgroundTransparency = if available then 0 else 0.08,
 			BorderSizePixel = 0,
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.94, 0.92),
+			Rotation = if available then -3 else 0,
+			Size = UDim2.fromScale(0.92, if available then 0.96 else 0.88),
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0.14, 0) }),
 			Stroke = c("UIStroke", {
 				Color = strokeColor,
-				Thickness = if available then 2 else 1,
-				Transparency = if day.claimed or available then 0.15 else 0.62,
+				Thickness = if available then 3 else 1,
+				Transparency = if claimed or available then 0 else 0.72,
 			}),
-			DayNumber = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MinTextSize = if compact then 9 else 11,
-				MaxTextSize = if compact then 14 else 20,
-				Native = {
+			DayNumber = if compact and claimed
+				then c("ImageLabel", {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, if compact then 0.05 else 0.08),
-					Size = UDim2.fromScale(0.9, if compact then 0.38 else 0.24),
-					Text = if compact then `D{day.day}` else `DAY {day.day}`,
-					TextColor3 = foregroundColor,
-				},
-			}),
+					Image = CHECK_ICON_ASSET,
+					Position = UDim2.fromScale(0.5, 0.05),
+					ScaleType = Enum.ScaleType.Fit,
+					Size = UDim2.fromScale(0.9, 0.38),
+				})
+				else c(ResponsiveText, {
+					MeasurementFont = Enum.Font.LuckiestGuy,
+					MinTextSize = if compact then 9 else 11,
+					MaxTextSize = if compact then 14 else 20,
+					Native = {
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundTransparency = 1,
+						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+						Position = UDim2.fromScale(0.5, if compact then 0.05 else 0.08),
+						Size = UDim2.fromScale(0.9, if compact then 0.38 else 0.24),
+						Text = if compact and available then "NOW" else `DAY {day.day}`,
+						TextColor3 = foregroundColor,
+					},
+				}),
 			Reward = if day.reward.kind == "Bonks"
 				then c(BonksLabel, {
 					Amount = day.reward.amount or 0,
@@ -97,11 +111,11 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 						Position = UDim2.fromScale(0.5, if compact then 0.7 else 0.57),
 						Size = UDim2.fromScale(0.94, if compact then 0.48 else 0.35),
 					},
-					IconSize = UDim2.fromScale(if compact then 0.3 else 0.27, 0.78),
+					IconSize = UDim2.fromScale(0.2, 0.78),
 					TextColor = rewardColor,
 				})
 				else nil,
-			Status = if not compact and (day.claimed or available)
+			Status = if not compact and (claimed or available)
 				then c(ResponsiveText, {
 					MeasurementFont = Enum.Font.SourceSansBold,
 					MinTextSize = 10,
@@ -112,8 +126,8 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
 						Position = UDim2.fromScale(0.5, 0.94),
 						Size = UDim2.fromScale(0.9, 0.18),
-						Text = if day.claimed then "CLAIMED" else "TODAY",
-						TextColor3 = if day.claimed then CLAIM_COLOR else DARK,
+						Text = if claimed then "CLAIMED" else "TODAY",
+						TextColor3 = if claimed then CLAIM_COLOR else DARK,
 					},
 				})
 				else nil,
@@ -131,8 +145,8 @@ return function(props: Props)
 	local dayCells = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0.006, 0),
+			HorizontalAlignment = if compact then Enum.HorizontalAlignment.Left else Enum.HorizontalAlignment.Center,
+			Padding = if compact then UDim.new(0, 4) else UDim.new(0.006, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -147,13 +161,11 @@ return function(props: Props)
 
 	local native = {
 		AnchorPoint = Vector2.new(0, 0),
-		BackgroundTransparency = 1,
-		Image = PANEL_NINE_SLICE,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Palette.Surface,
+		BorderSizePixel = 0,
 		Position = UDim2.fromScale(0, 0),
-		ScaleType = Enum.ScaleType.Slice,
 		Size = UDim2.fromScale(1, 1),
-		SliceCenter = PANEL_SLICE_CENTER,
-		SliceScale = if compact then 0.35 else 0.5,
 	}
 	if props.Native then
 		for key, value in props.Native do
@@ -161,49 +173,59 @@ return function(props: Props)
 		end
 	end
 
-	return c("ImageLabel", native, {
+	return c("Frame", native, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+		Outline = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
+		HeaderBand = c("Frame", {
+			BackgroundColor3 = Palette.Yellow,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(4, 4),
+			Size = UDim2.new(1, -8, 0, 44),
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		}),
 		Header = c("Frame", {
+			ZIndex = 2,
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, if compact then 0.04 else 0.06),
-			Size = UDim2.fromScale(if compact then 0.94 else 0.9, if compact then 0.28 else 0.22),
+			Position = UDim2.new(0.5, 0, 0, 4),
+			Size = UDim2.new(1, -24, 0, 44),
 		}, {
 			Title = c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MinTextSize = if compact then 10 else 14,
-				MaxTextSize = if compact then 19 else 32,
+				MaxTextSize = if compact then 20 else 26,
 				Native = {
 					AnchorPoint = Vector2.new(0, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 					Position = UDim2.fromScale(0, 0.5),
-					Size = UDim2.fromScale(if state.canClaim then 0.67 else 1, 0.95),
+					Size = UDim2.new(1, if props.OnClaim then -100 else 0, 1, -8),
 					Text = "DAILY REWARDS",
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = DARK,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextStrokeColor3 = DARK,
-					TextStrokeTransparency = 0.72,
+					TextStrokeTransparency = 1,
 					ZIndex = 2,
 				},
 			}),
-			ClaimButton = if state.canClaim
+			ClaimButton = if props.OnClaim ~= nil
 				then c(AnimatedButton, {
 					Style = "Primary",
+					Enabled = props.OnClaim ~= nil,
 					Native = {
 						AnchorPoint = Vector2.new(1, 0.5),
-						BackgroundTransparency = 1,
-						Image = CLAIM_BUTTON_ASSET,
-						ImageColor3 = CLAIM_COLOR,
+						BackgroundTransparency = 0,
+						BackgroundColor3 = CLAIM_COLOR,
+						Image = "",
 						Position = UDim2.fromScale(1, 0.5),
-						ScaleType = Enum.ScaleType.Slice,
-						Size = UDim2.fromScale(0.29, 0.9),
-						SliceCenter = Rect.new(198, 228, 841, 468),
-						SliceScale = 0.2,
+						Size = UDim2.fromOffset(92, 44),
 					},
 					OnActivated = props.OnClaim,
 				}, {
-					Aspect = c("UIAspectRatioConstraint", { AspectRatio = 4.35 }),
+					Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+					Stroke = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
 					TextLabel = c(ResponsiveText, {
 						MeasurementFont = Enum.Font.LuckiestGuy,
 						MinTextSize = if compact then 9 else 12,
@@ -214,7 +236,7 @@ return function(props: Props)
 							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 							Position = UDim2.fromScale(0.5, 0.54),
 							Size = UDim2.fromScale(0.76, 0.58),
-							Text = "CLAIM",
+							Text = "VIEW",
 							TextColor3 = Color3.new(1, 1, 1),
 							ZIndex = 2,
 						},
@@ -222,11 +244,17 @@ return function(props: Props)
 				})
 				else nil,
 		}),
-		DaysGrid = c("Frame", {
+		DaysGrid = c("ScrollingFrame", {
+			AutomaticCanvasSize = Enum.AutomaticSize.X,
+			CanvasSize = UDim2.new(),
+			ScrollingDirection = Enum.ScrollingDirection.X,
+			ScrollBarThickness = if compact then 3 else 0,
+			ScrollBarImageColor3 = Palette.Yellow,
+			BorderSizePixel = 0,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, if compact then 0.67 else 0.66),
-			Size = UDim2.fromScale(if compact then 0.96 else 0.92, if compact then 0.58 else 0.62),
+			Position = UDim2.new(0.5, 0, 0.5, 26),
+			Size = UDim2.new(1, -16, 1, -58),
 		}, dayCells),
 	})
 end

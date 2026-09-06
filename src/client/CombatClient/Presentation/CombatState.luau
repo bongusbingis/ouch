@@ -10,9 +10,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
+local CombatConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local ThrowPose = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("ThrowPose"))
-local MobileInput =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("MobileInput"))
 local Adapters = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters")
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local SimStateCodec = require(Adapters:WaitForChild("SimStateCodec"))
@@ -163,7 +162,7 @@ local function evaluate()
 	local held = pressedAt
 	if held ~= nil then
 		snapshot.state = "Charging"
-		local full = math.max(MobileInput.Gestures.ChargeFullSeconds, 1e-3)
+		local full = math.max(CombatConfig.Dodgeball.Charge.FullSeconds, 1e-3)
 		snapshot.chargeAlpha = math.clamp((now - held) / full, 0, 1)
 	else
 		snapshot.state = if matchIsActive() then "Aiming" else "BallEquipped"
@@ -202,9 +201,9 @@ function CombatState.cancelCharge()
 	evaluate()
 end
 
-function CombatState.onThrow(aim: Vector3?)
+function CombatState.onThrow(aim: Vector3?, releasedCharge: number?)
 	snapshot.releaseAim = if typeof(aim) == "Vector3" and aim.Magnitude > 1e-6 then aim.Unit else nil
-	snapshot.releaseCharge = snapshot.chargeAlpha
+	snapshot.releaseCharge = if releasedCharge ~= nil then math.clamp(releasedCharge, 0, 1) else snapshot.chargeAlpha
 	snapshot.releaseRevision += 1
 	pressedAt = nil
 	enter("Throwing", ThrowPose.Timing.ThrowingSeconds)

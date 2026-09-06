@@ -1,0 +1,57 @@
+--!strict
+
+local T = require(script.Parent.TestKit)
+local Model = require(script.Parent.Parent.UI.Models.MatchHUDModel)
+
+T.describe("MatchHUDModel", function()
+	T.it("explains protection and the server's opponent recovery deadline", function()
+		T.expect(Model.build({ spawnProtected = true }, 100).respawn):toEqual("SPAWN SHIELD • ATTACKING ENDS IT")
+		T.expect(Model.build({ opponentDeadline = 108, spawnProtected = true }, 101).respawn)
+			:toEqual("WAITING FOR OPPONENTS • 7s")
+	end)
+	T.it("identifies only living allies and never the local player or unassigned players", function()
+		T.expect(Model.isTeammate({ teamId = "Blue", alive = true }, "Blue")):toBeTruthy()
+		T.expect(Model.isTeammate({ teamId = "Red", alive = true }, "Blue")):toEqual(false)
+		T.expect(Model.isTeammate({ teamId = "Blue", alive = false }, "Blue")):toEqual(false)
+		T.expect(Model.isTeammate({ teamId = "Blue", alive = true, isLocal = true }, "Blue")):toEqual(false)
+		T.expect(Model.isTeammate({ alive = true }, nil)):toEqual(false)
+	end)
+	T.it("uses the server's starting countdown and mode objective", function()
+		local view = Model.build({ phase = "Starting", timeRemaining = 3, scoreTarget = 40 }, 0)
+		T.expect(view.starting):toBeTruthy()
+		T.expect(view.remaining):toEqual(3)
+		T.expect(view.objective):toEqual("FIRST TO 40 ELIMINATIONS")
+		T.expect(Model.build({ phase = "Active" }, 0).starting):toEqual(false)
+	end)
+	T.it("orders live standings without inventing tie breakers or mutating player facts", function()
+		local players = {
+			{ userId = 30, displayName = "THREE", score = 4, isLocal = true },
+			{ userId = 10, displayName = "ONE", score = 4 },
+			{ userId = 20, displayName = "TWO", score = 8 },
+		}
+		local view = Model.build({ players = players, scoreboardOpen = true }, 0)
+		T.expect(view.entries[1].userId):toEqual(20)
+		T.expect(view.entries[2].userId):toEqual(10)
+		T.expect(view.entries[3].placement):toEqual(2)
+		T.expect(view.placement):toEqual(2)
+		T.expect(view.scoreboardOpen):toEqual(true)
+		T.expect(players[1].placement):toBeNil()
+	end)
+	T.it("formats authoritative scores and the time cap", function()
+		local view = Model.build({ timeRemaining = 125, scoreTarget = 15, score = 4 }, 0)
+		T.expect(view.clock):toEqual("2:05")
+		T.expect(view.objective):toEqual("FIRST TO 15 ELIMINATIONS")
+		T.expect(view.scores):toEqual("YOUR ELIMINATIONS  4")
+	end)
+	T.it("derives wave respawns from the replicated deadline", function()
+		T.expect(Model.build({ alive = false, respawnAt = 103 }, 100).respawn):toEqual("BACK IN 3…")
+		T.expect(Model.build({ alive = false, respawnAt = 103 }, 104).respawn):toEqual("RESPAWNING…")
+	end)
+	T.it("identifies teams in text and explains round exclusion", function()
+		local view = Model.build({ teamMode = true, redScore = 7, blueScore = 5, teamId = "Blue", eligible = false }, 0)
+		T.expect(view.scores):toEqual("RED 7   •   BLUE 5   |   YOU: BLUE")
+		T.expect(view.respawn):toEqual("YOU’LL JOIN THE NEXT ROUND")
+	end)
+end)
+
+return true

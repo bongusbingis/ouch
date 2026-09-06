@@ -23,6 +23,19 @@ function MatchAudioLogic.shouldPlayWhistle(previousPhase: any, phase: any): bool
 	return phase == "Results" and previousPhase ~= nil and previousPhase ~= "Results"
 end
 
+function MatchAudioLogic.shouldPlayStart(previousPhase: any, phase: any): boolean
+	return previousPhase == "Starting" and phase == "Active"
+end
+
+function MatchAudioLogic.shouldPlayTick(phase: any, previous: any, seconds: any, threshold: number): boolean
+	return phase == "Active"
+		and typeof(previous) == "number"
+		and typeof(seconds) == "number"
+		and seconds > 0
+		and seconds <= threshold
+		and seconds < previous
+end
+
 function MatchAudioLogic.selectTrackIndex(trackCount: number, previousIndex: number?, roll: number): number?
 	if trackCount <= 0 then
 		return nil

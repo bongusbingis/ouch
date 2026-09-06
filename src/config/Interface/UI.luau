@@ -1,6 +1,17 @@
 --!strict
 
 return {
+	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1 },
+	ProgressionStyle = {
+		Ink = Color3.fromRGB(27, 24, 47),
+		Surface = Color3.fromRGB(43, 39, 65),
+		Raised = Color3.fromRGB(62, 55, 86),
+		Muted = Color3.fromRGB(211, 210, 229),
+		Cyan = Color3.fromRGB(53, 226, 218),
+		Pink = Color3.fromRGB(242, 40, 160),
+		Yellow = Color3.fromRGB(255, 220, 62),
+		Green = Color3.fromRGB(154, 233, 91),
+	},
 	Text = {
 		DefaultFont = Font.new(
 			"rbxasset://fonts/families/ComicNeueAngular.json",
@@ -20,12 +31,28 @@ return {
 	},
 	Interaction = {
 		MinTargetPx = 44,
+		FocusStrokePx = 3,
+		FocusCornerPx = 8,
 	},
 	Layout = {
+		PagePosition = UDim2.fromScale(0.5, 0.56),
+		PageOffscreen = UDim2.fromScale(-1, 0.56),
+		ShortPagePosition = UDim2.fromScale(0.5, 0.62),
+		ShortPageOffscreen = UDim2.fromScale(-1, 0.62),
+		MatchHUD = { WidthPx = 420, HeightPx = 78, TopPx = 54, EdgePx = 12, RespawnHeightPx = 36 },
 		PortraitMaxAspect = 1,
 		CompactMaxWidthPx = 820,
 		ShortLandscapeMaxHeightPx = 500,
 		Panels = {
+			DailyReward = {
+				Portrait = { WidthScale = 0.9, HeightScale = 0.48, MaxSize = Vector2.new(480, 430) },
+				Landscape = {
+					WidthScale = 0.46,
+					HeightScale = 0.58,
+					MaxSize = Vector2.new(620, 460),
+					ShortHeightScale = 0.88,
+				},
+			},
 			Inventory = {
 				Portrait = { WidthScale = 0.956, HeightScale = 0.75, MaxSize = Vector2.new(480, 720) },
 				Landscape = {
@@ -33,7 +60,9 @@ return {
 					HeightScale = 0.74763,
 					MaxSize = Vector2.new(1000, 820),
 					AspectRatio = 1.08,
-					ShortHeightScale = 0.86,
+					ShortHeightScale = 0.7,
+					ShortWidthScale = 0.9,
+					ShortAspectRatio = 2.4,
 				},
 			},
 			Shop = {
@@ -46,7 +75,9 @@ return {
 					HeightScale = 0.82,
 					MaxSize = Vector2.new(1240, 820),
 					AspectRatio = 1.5,
-					ShortHeightScale = 0.86,
+					ShortHeightScale = 0.7,
+					ShortWidthScale = 0.9,
+					ShortAspectRatio = 2.5,
 				},
 			},
 			Settings = {
@@ -55,7 +86,8 @@ return {
 					WidthScale = 0.602,
 					HeightScale = 0.748,
 					MaxSize = Vector2.new(1100, 820),
-					ShortHeightScale = 0.86,
+					ShortHeightScale = 0.7,
+					ShortWidthScale = 0.9,
 				},
 			},
 			Notification = {
@@ -79,8 +111,8 @@ return {
 			ShopDetails = {
 				Portrait = { WidthScale = 0.94, HeightScale = 0.88, MaxSize = Vector2.new(520, 760) },
 				Landscape = {
-					WidthScale = 0.62,
-					HeightScale = 0.68,
+					WidthScale = 0.86,
+					HeightScale = 0.78,
 					MaxSize = Vector2.new(1100, 760),
 					ShortHeightScale = 0.92,
 				},
@@ -106,6 +138,8 @@ return {
 			},
 		},
 		Inventory = {
+			ShortCardSizePx = 76,
+			ShortHeaderHeightPx = 24,
 			CardGapPx = 7,
 			CardMinPx = 132,
 			CardMaxPx = 150,
@@ -128,6 +162,7 @@ return {
 		-- ragged. Order is the reading order ("Promo" expands to the limited-time
 		-- offers, "Rest" to any block no entry names).
 		Shop = {
+			ShortCardHeightPx = 120,
 			PaddingXPx = 16,
 			PaddingBottomPx = 20,
 			ScrollBarPx = 8,
@@ -154,8 +189,8 @@ return {
 					NameScale = 0.15,
 					NameTextSize = 26,
 					ActionScale = 0.23,
-					ActionMinPx = 28,
-					ActionMaxPx = 40,
+					ActionMinPx = 44,
+					ActionMaxPx = 44,
 				},
 				-- Currency: the densest class, icon over name over price.
 				Tile = {
@@ -168,8 +203,8 @@ return {
 					NameScale = 0.15,
 					NameTextSize = 24,
 					ActionScale = 0.24,
-					ActionMinPx = 28,
-					ActionMaxPx = 38,
+					ActionMinPx = 44,
+					ActionMaxPx = 44,
 				},
 				-- Crates and rotating offers: richer artwork, two to a quarter span.
 				Feature = {
@@ -182,8 +217,8 @@ return {
 					NameScale = 0.16,
 					NameTextSize = 26,
 					ActionScale = 0.25,
-					ActionMinPx = 28,
-					ActionMaxPx = 40,
+					ActionMinPx = 44,
+					ActionMaxPx = 44,
 				},
 				-- Limited-time offers: landscape banners, art beside the copy.
 				Promo = {
@@ -197,7 +232,7 @@ return {
 					NameScale = 0.2,
 					NameTextSize = 34,
 					ActionScale = 0.26,
-					ActionMinPx = 30,
+					ActionMinPx = 44,
 					ActionMaxPx = 44,
 				},
 			},
@@ -222,54 +257,80 @@ return {
 			Order = { "More", "Promo", "Crates", "Bonks", "ForYou", "MorePasses", "Rest" },
 		},
 		TopBar = {
+			ShortHeightPx = 72,
+			ShortWidthScale = 0.7,
 			PortraitWidthScale = 0.92,
 			LandscapeWidthScale = 0.4,
 			PortraitGapScale = 0.025,
 			LandscapeGapScale = 0.05,
 		},
 		Splash = {
-			PortraitActionsHeightPx = 230,
+			ShortActionsHeightPx = 56,
+			ShortActionButtonHeightPx = 48,
+			ShortActionsBottomPx = 8,
+			ShortLogoTopPx = 78,
+			PortraitActionsHeightPx = 146,
 			SecondaryActionHeightPx = 56,
 			PrimaryActionHeightPx = 70,
 			ProgressPanels = {
+				DailyMinHeightPx = 98,
 				EdgePaddingPx = 24,
 				GapPx = 10,
 				Landscape = {
 					DailyBottomScale = 0.9,
 					SeasonTopScale = 0.145,
+					ShortTopPx = 80,
+					ShortBottomPx = 70,
 					QuestsTopScale = 0.31,
 				},
 				Portrait = {
 					WidthScale = 0.94,
-					TopScale = 0.315,
-					BottomScale = 0.64,
+					TopScale = 0.24,
+					BottomScale = 0.67,
 					GapPx = 6,
-					SeasonWeight = 0.19,
-					DailyWeight = 0.29,
-					QuestsWeight = 0.52,
+					SeasonWeight = 0.22,
+					DailyWeight = 0.37,
+					QuestsWeight = 0.41,
 				},
 				Daily = {
-					WidthScale = 0.29,
-					HeightScale = 0.2,
+					WidthScale = 0.34,
+					HeightScale = 0.27,
 					MaxSize = Vector2.new(600, 220),
-					AspectRatio = 2.72,
+					AspectRatio = 2.5,
 				},
 				Season = {
-					WidthScale = 0.23,
+					WidthScale = 0.3,
 					HeightScale = 0.16,
-					MaxSize = Vector2.new(470, 180),
-					AspectRatio = 2.6,
+					ShortHeightScale = 0.19,
+					ShortAspectRatio = 4,
+					MaxSize = Vector2.new(600, 180),
+					AspectRatio = 3.5,
 				},
 				Quests = {
 					WidthScale = 0.3,
-					HeightScale = 0.28,
-					MaxSize = Vector2.new(600, 300),
-					AspectRatio = 2,
+					HeightScale = 0.32,
+					ShortHeightScale = 0.4,
+					MaxSize = Vector2.new(600, 340),
+					AspectRatio = 1.65,
 				},
 			},
 		},
+		SettingsControls = {
+			ShortRowHeightPx = 80,
+			RowHeight = { Compact = { Plain = 104, Description = 132 }, Wide = { Plain = 88, Description = 104 } },
+			SliderLabelHeightPx = 24,
+			LabelControlGapPx = 8,
+		},
+		InventoryContentGapPx = 8,
+		SeasonClaimWidthPx = 88,
+		SeasonCompactClaimWidthPx = 64,
+		SeasonDetailedMinHeightPx = 132,
+		QuestRow = { ShortHeightPx = 80, CompactHeightPx = 138, CompactInfoHeightPx = 82 },
+		DailyCell = { MinWidthPx = 64 },
 		PartyCode = {
 			PortraitHeightPx = 118,
+			LandscapeWidthPx = 210,
+			LandscapeCodeHeightPx = 40,
 			CodeHeightPx = 58,
 		},
 		MenuToggle = {
@@ -279,6 +340,7 @@ return {
 		},
 	},
 	Feedback = {
+		Volume = 0.5,
 		HoverSoundId = "rbxassetid://117503154823137",
 		ClickSoundId = {
 			"rbxassetid://122835655736085",

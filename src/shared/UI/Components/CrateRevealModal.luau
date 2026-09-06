@@ -5,6 +5,8 @@
 
 --!strict
 
+local formatNumber = require(script.Parent.Parent.Models.NumberText)
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
 
@@ -65,19 +67,25 @@ local function bestEntry(results: { any }): any?
 	return best
 end
 
-local function burstRays(tier, color: Color3, alpha: number, zIndex: number)
+local function burstRays(tier, color: Color3, alpha: any, zIndex: number)
 	local rays = {}
 	for index = 1, tier.rays do
 		local angle = (index / tier.rays) * math.pi * 2
-		local reach = 0.16 + alpha * 0.42
 		rays[`Ray{index}`] = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = color,
-			BackgroundTransparency = math.clamp(alpha, 0, 1),
+			BackgroundTransparency = alpha:map(function(value: number)
+				return math.clamp(1 - value, 0, 1)
+			end),
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5 + math.cos(angle) * reach, 0.5 + math.sin(angle) * reach),
+			Position = alpha:map(function(value: number)
+				local reach = 0.16 + (1 - value) * 0.42
+				return UDim2.fromScale(0.5 + math.cos(angle) * reach, 0.5 + math.sin(angle) * reach)
+			end),
 			Rotation = math.deg(angle),
-			Size = UDim2.fromScale(0.06 + (1 - alpha) * 0.05, 0.012),
+			Size = alpha:map(function(value: number)
+				return UDim2.fromScale(0.06 + value * 0.05, 0.012)
+			end),
 			ZIndex = zIndex,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -88,7 +96,7 @@ end
 
 local function subtitleFor(entry: any): string
 	if entry.isDupe then
-		return if entry.bonksRefund > 0 then `DUPLICATE  •  +{entry.bonksRefund} BONKS` else "DUPLICATE"
+		return if entry.bonksRefund > 0 then `DUPLICATE  •  +{formatNumber(entry.bonksRefund)} BONKS` else "DUPLICATE"
 	end
 	return string.upper(entry.rarity)
 end
@@ -137,7 +145,9 @@ local function gridCell(entry: any, index: number, revealedCount: number, zIndex
 					),
 					Position = UDim2.fromScale(0.5, 0.98),
 					Size = UDim2.fromScale(0.92, 0.28),
-					Text = if entry.isDupe then `+{entry.bonksRefund}` else string.upper(entry.displayName),
+					Text = if entry.isDupe
+						then `+{formatNumber(entry.bonksRefund)}`
+						else string.upper(entry.displayName),
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = zIndex + 2,
 				},
@@ -147,7 +157,7 @@ local function gridCell(entry: any, index: number, revealedCount: number, zIndex
 end
 
 return function(props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
@@ -157,7 +167,6 @@ return function(props)
 	)
 	local reveal = props.Reveal
 	local buttonRef = React.useRef(nil)
-	local previousSelection = React.useRef(nil)
 	local reducedMotion = useReducedMotion()
 	local generation = React.useRef(0)
 
@@ -268,24 +277,32 @@ return function(props)
 	end, { reveal, reducedMotion })
 
 	React.useEffect(function()
-		if reveal then
-			if previousSelection.current == nil then
-				previousSelection.current = GuiService.SelectedObject
-			end
-			task.defer(function()
-				local button = buttonRef.current
-				if button and button.Parent and button.Visible and button.Selectable then
-					GuiService.SelectedObject = button
-				end
-			end)
-		else
-			local previous = previousSelection.current
-			previousSelection.current = nil
+		if reveal == nil then
+			return
+		end
+		local previous = GuiService.SelectedObject
+		return function()
 			if previous and previous.Parent and previous.Visible and previous.Selectable then
 				GuiService.SelectedObject = previous
 			end
 		end
-	end, { reveal })
+	end, { reveal ~= nil })
+
+	React.useEffect(function()
+		if reveal == nil or props.FocusEnabled == false then
+			return
+		end
+		local active = true
+		task.defer(function()
+			local button = buttonRef.current
+			if active and button and button.Parent and button.Visible and button.Selectable then
+				GuiService.SelectedObject = button
+			end
+		end)
+		return function()
+			active = false
+		end
+	end, { reveal, props.FocusEnabled })
 
 	React.useEffect(function()
 		return function()
@@ -304,7 +321,7 @@ return function(props)
 	local building = phase == "Shake"
 	local title = if building then "OPENING..." else if isBulk then `YOU GOT {count} ITEMS` else "YOU GOT"
 	local refundLine = if isBulk and reveal.totalRefund > 0
-		then `{reveal.totalRefund} BONKS REFUNDED FROM DUPLICATES`
+		then `{formatNumber(reveal.totalRefund)} BONKS REFUNDED FROM DUPLICATES`
 		else nil
 
 	return c("TextButton", {
@@ -323,6 +340,11 @@ return function(props)
 		end,
 	}, {
 		Panel = c("ImageLabel", {
+			SelectionGroup = true,
+			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://124751224634629",
@@ -347,7 +369,7 @@ return function(props)
 					BackgroundTransparency = 1,
 					Size = UDim2.fromScale(1, 1),
 					ZIndex = 116,
-				}, burstRays(tier, color, 1, 116))
+				}, burstRays(tier, color, burstStyles.Alpha, 116))
 				else nil,
 			Flash = c("Frame", {
 				BackgroundColor3 = Color3.new(1, 1, 1),

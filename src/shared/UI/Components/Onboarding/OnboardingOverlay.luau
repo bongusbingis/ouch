@@ -393,7 +393,10 @@ return function(props: Props)
 				OnActivated = props.OnSkip,
 			}, {
 				Aspect = c("UIAspectRatioConstraint", { AspectRatio = 3.1 }),
-				Sizer = c("UISizeConstraint", { MinSize = Vector2.new(96, 31), MaxSize = Vector2.new(190, 61) }),
+				Sizer = c("UISizeConstraint", {
+					MinSize = Vector2.new(UIConfig.Interaction.MinTargetPx * 3.1, UIConfig.Interaction.MinTargetPx),
+					MaxSize = Vector2.new(190, 61),
+				}),
 				Label = c(ResponsiveText, {
 					MeasurementFont = Enum.Font.LuckiestGuy,
 					MaxTextSize = 24,

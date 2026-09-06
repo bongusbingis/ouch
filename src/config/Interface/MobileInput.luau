@@ -2,6 +2,8 @@
 
 -- Touch input and assist tuning.
 
+local Combat = require(script.Parent.Parent.Gameplay.Combat)
+
 return {
 	-- Reference viewport height for pixel thresholds.
 	ReferenceViewportHeight = 1080,
@@ -22,8 +24,7 @@ return {
 		-- Held past this without moving, a touch becomes a charge. Matches
 		-- TapMaxSeconds so there is no dead band between the two.
 		HoldMinSeconds = 0.25,
-		-- Time to reach full charge after HoldMinSeconds. Seconds.
-		ChargeFullSeconds = 0.7,
+		ChargeFullSeconds = Combat.Dodgeball.Charge.FullSeconds,
 		-- Double-tap interval. Seconds.
 		DoubleTapMaxSeconds = 0.3,
 		-- Minimum swipe travel in reference pixels.

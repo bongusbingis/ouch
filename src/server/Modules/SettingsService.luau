@@ -26,7 +26,7 @@ local SettingsService = {}
 
 local started = false
 
-function SettingsService.set(player: Player, id: string, rawValue: any): (boolean, string?)
+function SettingsService.set(player: Player, id: string, rawValue: any): (boolean, string?, any)
 	local definition = SettingsRegistry.get(id)
 	if definition == nil then
 		return false, "unknown_setting"
@@ -39,7 +39,7 @@ function SettingsService.set(player: Player, id: string, rawValue: any): (boolea
 		return false, "no_profile"
 	end
 	data.Settings[id] = SettingsValues.normalize(definition, rawValue)
-	return true, nil
+	return true, nil, data.Settings[id]
 end
 
 function SettingsService.start()
@@ -47,14 +47,14 @@ function SettingsService.start()
 		return
 	end
 	started = true
-	Network.handleProtected("SetClientSetting", {
+	local middleware = {
 		rateLimit = 5,
 		validate = function(_player, id, _value)
 			return typeof(id) == "string" and #id > 0 and #id <= 64, "invalid_id"
 		end,
-	}, function(player, id, value)
-		SettingsService.set(player, id, value)
-	end)
+	}
+	Network.handleProtected("SetClientSetting", middleware, SettingsService.set)
+	Network.handleProtected("SetClientSettingRequest", middleware, SettingsService.set)
 end
 
 return SettingsService

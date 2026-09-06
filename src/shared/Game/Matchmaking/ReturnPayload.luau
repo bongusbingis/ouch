@@ -17,6 +17,7 @@ export type Payload = {
 	matchId: string,
 	memberUserIds: { number },
 	returnMode: "Party" | "Separate",
+	queueOnArrival: boolean?,
 }
 
 local function validId(value: any): boolean
@@ -56,7 +57,8 @@ function ReturnPayload.build(
 	partyId: string,
 	matchId: string,
 	memberUserIds: { number },
-	returnMode: ("Party" | "Separate")?
+	returnMode: ("Party" | "Separate")?,
+	queueOnArrival: boolean?
 ): Payload
 	return {
 		schemaVersion = ReturnPayload.SchemaVersion,
@@ -64,6 +66,7 @@ function ReturnPayload.build(
 		matchId = matchId,
 		memberUserIds = table.clone(memberUserIds),
 		returnMode = returnMode or "Party",
+		queueOnArrival = if returnMode ~= "Separate" and queueOnArrival == true then true else nil,
 	}
 end
 
@@ -81,6 +84,12 @@ function ReturnPayload.parse(value: any): (Payload?, string?)
 	if returnMode ~= "Party" and returnMode ~= "Separate" then
 		return nil, "invalid_return_mode"
 	end
+	if value.queueOnArrival ~= nil and typeof(value.queueOnArrival) ~= "boolean" then
+		return nil, "invalid_queue_intent"
+	end
+	if returnMode == "Separate" and value.queueOnArrival == true then
+		return nil, "invalid_queue_intent"
+	end
 
 	local members, membersError = copyMembers(value.memberUserIds)
 	if not members then
@@ -93,6 +102,7 @@ function ReturnPayload.parse(value: any): (Payload?, string?)
 		matchId = value.matchId,
 		memberUserIds = members,
 		returnMode = returnMode,
+		queueOnArrival = if value.queueOnArrival == true then true else nil,
 	},
 		nil
 end

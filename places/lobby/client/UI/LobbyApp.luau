@@ -17,6 +17,9 @@ local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UI = Shared:WaitForChild("UI")
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local useSafeArea = require(UI.Hooks.useSafeArea)
+local ResponsiveLayout = require(UI.Models.ResponsiveLayout)
 local Components = UI:WaitForChild("Components")
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
@@ -54,16 +57,16 @@ local PAGE_POSITIONS = {
 		offscreen = UDim2.fromScale(0, 1),
 	},
 	Inventory = {
-		onscreen = UDim2.fromScale(0.0211629, 0.14282),
-		offscreen = UDim2.fromScale(-1.5, 0.14282),
+		onscreen = UIConfig.Layout.PagePosition,
+		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 	Shop = {
-		onscreen = UDim2.fromScale(0.5, 0.56),
-		offscreen = UDim2.fromScale(-1, 0.56),
+		onscreen = UIConfig.Layout.PagePosition,
+		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 	Settings = {
-		onscreen = UDim2.fromScale(0.0211629, 0.14282),
-		offscreen = UDim2.fromScale(-1.5, 0.14282),
+		onscreen = UIConfig.Layout.PagePosition,
+		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 }
 
@@ -213,6 +216,8 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 end
 
 local function LobbyContent(props)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local partyClient = props.PartyClient
 	local onboardingClient = props.OnboardingClient
 	local rootRef = React.useRef(nil)
@@ -352,20 +357,66 @@ local function LobbyContent(props)
 	local questState = useExternalStore(props.QuestStore.snapshot, props.QuestStore.subscribe)
 
 	local showDailyRewardModal, setShowDailyRewardModal = React.useState(false)
+	local pendingClaims, setPendingClaims = React.useState({})
+	local claimRequests = React.useRef({})
+	local dailyClaimError, setDailyClaimError = React.useState(nil)
+	local mounted = React.useRef(true)
+	React.useEffect(function()
+		mounted.current = true
+		return function()
+			mounted.current = false
+		end
+	end, {})
+	local function claimReward(key, action)
+		if claimRequests.current[key] then
+			return
+		end
+		claimRequests.current[key] = true
+		setPendingClaims(table.clone(claimRequests.current))
+		if key == "Daily" then
+			setDailyClaimError(nil)
+		end
+		task.spawn(function()
+			local callOk, result = pcall(action)
+			claimRequests.current[key] = nil
+			if not mounted.current then
+				return
+			end
+			setPendingClaims(table.clone(claimRequests.current))
+			if not callOk or not result then
+				if key == "Daily" then
+					setDailyClaimError("COULDN'T CLAIM. TRY AGAIN.")
+				else
+					notifications.notify({
+						title = "REWARD NOT CLAIMED",
+						description = "WE COULDN'T CONFIRM YOUR REWARD. PLEASE TRY AGAIN.",
+					})
+				end
+			end
+		end)
+	end
 	local dailyRewardAutoPopped = React.useRef(false)
 	React.useEffect(function()
 		if
 			lobbyVisible
+			and snapshot ~= nil
+			and snapshot.phase == "Lobby"
+			and not snapshot.returnQueuePending
 			and dailyRewardState ~= nil
 			and dailyRewardState.canClaim
 			and not dailyRewardAutoPopped.current
 		then
-			dailyRewardAutoPopped.current = true
-			task.delay(0.5, function()
+			local pending = task.delay(0.5, function()
+				dailyRewardAutoPopped.current = true
 				setShowDailyRewardModal(true)
 			end)
+			return function()
+				if coroutine.status(pending) ~= "dead" then
+					task.cancel(pending)
+				end
+			end
 		end
-	end, { lobbyVisible, dailyRewardState })
+	end, { lobbyVisible, dailyRewardState, snapshot })
 
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false or onboardingActive then
@@ -461,7 +512,13 @@ local function LobbyContent(props)
 			if onboardingActive then
 				return
 			end
-			if economyMenu.CloseTopLayer() then
+			if notifications.request ~= nil then
+				notifications.close(false)
+				return
+			elseif showDailyRewardModal then
+				setShowDailyRewardModal(false)
+				return
+			elseif economyMenu.CloseTopLayer() then
 				return
 			elseif joinOpen then
 				setJoinOpen(false)
@@ -474,17 +531,25 @@ local function LobbyContent(props)
 		end
 	end, {
 		economyMenu.CloseTopLayer,
+		notifications.request,
+		notifications.close,
+		showDailyRewardModal,
 		joinOpen,
 		currentPage,
 		onboardingActive,
 	})
 
+	local shortPages = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local views = {}
 	for pageName, positions in PAGE_POSITIONS do
 		views[pageName] = c(PageTransition, {
 			Active = currentPage == pageName,
-			Onscreen = positions.onscreen,
-			Offscreen = positions.offscreen,
+			Onscreen = if shortPages and pageName ~= "SplashScreen"
+				then UIConfig.Layout.ShortPagePosition
+				else positions.onscreen,
+			Offscreen = if shortPages and pageName ~= "SplashScreen"
+				then UIConfig.Layout.ShortPageOffscreen
+				else positions.offscreen,
 			Render = function(position)
 				if pageName == "SplashScreen" then
 					return c(SplashPage, {
@@ -509,8 +574,14 @@ local function LobbyContent(props)
 						end,
 						SeasonState = seasonState,
 						QuestState = questState,
+						PendingClaims = pendingClaims,
+						OnClaimSeason = function()
+							claimReward("Season", props.SeasonStore.claimAll)
+						end,
 						OnClaimQuest = function(questId)
-							task.spawn(props.QuestStore.claim, questId)
+							claimReward(questId, function()
+								return props.QuestStore.claim(questId)
+							end)
 						end,
 					})
 				elseif pageName == "Inventory" then
@@ -564,8 +635,10 @@ local function LobbyContent(props)
 				TopBar = c(TopBar, { CurrentPage = currentPage, OnNavigate = setCurrentPage }),
 				PartyCode = c(PageTransition, {
 					Active = currentPage == "SplashScreen",
-					Onscreen = UDim2.fromScale(0.5, 0.115),
-					Offscreen = UDim2.fromScale(0.5, -1),
+					Onscreen = if shortPages
+						then UDim2.new(0.51, 0, 0, UIConfig.Layout.Splash.ShortLogoTopPx)
+						else UDim2.fromScale(if portrait then 0.74 else 0.5, 0.115),
+					Offscreen = UDim2.fromScale(if portrait then 0.74 else 0.5, -1),
 					Render = function(position)
 						return c(PartyCode, {
 							Position = position,
@@ -590,7 +663,7 @@ local function LobbyContent(props)
 			}, {
 				JoinCode = c(JoinCodeModal, {
 					Open = joinOpen,
-					FocusEnabled = notifications.request == nil,
+					FocusEnabled = notifications.request == nil and not showDailyRewardModal,
 					OnClose = function()
 						setJoinOpen(false)
 					end,
@@ -615,13 +688,17 @@ local function LobbyContent(props)
 					OnChoose = notifications.close,
 				}),
 				Economy = c(EconomyMenuModals, {
+					FocusEnabled = notifications.request == nil,
 					Controller = economyMenu,
 				}),
 				DailyReward = c(DailyRewardModal, {
 					Visible = showDailyRewardModal,
 					State = dailyRewardState,
+					Pending = pendingClaims.Daily,
+					ErrorText = dailyClaimError,
+					FocusEnabled = notifications.request == nil,
 					OnClaim = function()
-						task.spawn(props.DailyRewardStore.claim)
+						claimReward("Daily", props.DailyRewardStore.claim)
 					end,
 					OnClose = function()
 						setShowDailyRewardModal(false)

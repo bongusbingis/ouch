@@ -24,6 +24,10 @@ function PartyModel.clone(party)
 	if party.claim then
 		copy.claim = table.clone(party.claim)
 	end
+	if party.returnQueue then
+		copy.returnQueue = table.clone(party.returnQueue)
+		copy.returnQueue.memberUserIds = table.clone(party.returnQueue.memberUserIds)
+	end
 
 	return copy
 end
@@ -51,6 +55,9 @@ function PartyModel.removeMember(party, userId)
 	end
 
 	party.members = members
+	if removed then
+		party.returnQueue = nil
+	end
 	if removed and party.leaderUserId == userId then
 		party.leaderUserId = members[1] and members[1].userId or 0
 	end
@@ -70,6 +77,7 @@ function PartyModel.returnToLobby(party)
 	party.queueTicket = nil
 	party.claim = nil
 	party.matchId = nil
+	party.returnQueue = nil
 	return party
 end
 
@@ -88,6 +96,7 @@ function PartyModel.toSnapshot(party)
 		members = members,
 		allowFriendJoins = party.allowFriendJoins,
 		phase = party.phase,
+		returnQueuePending = party.returnQueue ~= nil,
 		matchId = party.matchId,
 		createdAt = party.createdAt,
 		updatedAt = party.updatedAt,

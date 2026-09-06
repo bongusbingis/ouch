@@ -37,6 +37,17 @@ local function lastEvent(events: { MatchEvent }, kind: string): MatchEvent?
 end
 
 T.describe("MatchSim", function()
+	T.it("ends an empty contest without inventing a win for the score leader", function()
+		local state = activeMatch({ "p1", "p2" })
+		state.scores.p1 = 10
+		local events: { MatchEvent } = {}
+		T.expect(MatchSim.noContest(state, RULES, events)):toEqual(true)
+		T.expect(state.phase):toEqual("Results")
+		T.expect(state.winnerId):toBeNil()
+		T.expect(events[1].reason):toEqual("NoContest")
+		T.expect(MatchSim.noContest(state, RULES, events)):toEqual(false)
+		T.expect(#events):toEqual(1)
+	end)
 	T.it("counts down Starting before activating with reset scores", function()
 		local state = MatchSim.newState()
 		MatchSim.setPlayers(state, { p1 = true, p2 = true })

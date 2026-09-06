@@ -43,6 +43,10 @@
       "Tests": {
         "$path": "places/lobby/tests",
 
+        "Shared": {
+          "$path": "src/tests/Shared"
+        },
+
         "Runner": {
           "$path": "src/tests/Runner.luau"
         },
@@ -114,6 +118,10 @@
 
           "DirectPurchaseService": {
             "$path": "src/server/Modules/DirectPurchaseService.luau"
+          },
+
+          "MatchAwardService": {
+            "$path": "src/server/Modules/MatchAwardService.luau"
           },
 
           "EconomyService": {

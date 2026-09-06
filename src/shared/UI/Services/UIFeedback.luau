@@ -10,6 +10,9 @@ local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local SettingsStore = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Settings"):WaitForChild("SettingsStore")
+)
 
 local UIFeedback = {}
 
@@ -51,6 +54,7 @@ local function playSound(options: { Sound }?)
 	end
 
 	local sound = options[random:NextInteger(1, #options)]
+	sound.Volume = UIConfig.Feedback.Volume * SettingsStore.get("MasterVolume") * SettingsStore.get("EffectsVolume")
 	SoundService:PlayLocalSound(sound)
 end
 

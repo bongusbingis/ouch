@@ -11,13 +11,14 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
+local ClientRequest = require(Shared:WaitForChild("Game"):WaitForChild("Data"):WaitForChild("ClientRequest"))
 local PostMatchResult = require(Shared:WaitForChild("Game"):WaitForChild("PostMatch"):WaitForChild("PostMatchResult"))
+local CombatMenuClient = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CombatMenuClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
-local ArenaMenuClient = require(script.Parent.ArenaMenuClient)
 
 local PostMatchClient = {}
 
-export type Action = "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty"
+export type Action = "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty" | "FindMatch"
 
 export type Snapshot = {
 	visible: boolean,
@@ -71,7 +72,7 @@ end
 
 local function setVisible(visible: boolean)
 	if visible then
-		ArenaMenuClient.close()
+		CombatMenuClient.close()
 		Combat.requestCursor(CURSOR_REASON)
 	else
 		Combat.releaseCursor(CURSOR_REASON)
@@ -211,12 +212,16 @@ function PostMatchClient.request(action: Action)
 	local generation = requestGeneration
 	publish({ requesting = true, pendingAction = action, error = CLEAR })
 	task.spawn(function()
-		local ok, response = pcall(Network.call, "PostMatchRequest", action, result.resultId)
+		local ok, response = ClientRequest(Network.call, "PostMatchRequest", action, result.resultId)
 		if generation ~= requestGeneration or not started then
 			return
 		end
 		if not ok or typeof(response) ~= "table" then
-			publish({ requesting = false, pendingAction = CLEAR, error = "request_failed" })
+			publish({
+				requesting = false,
+				pendingAction = CLEAR,
+				error = if response == "request_timed_out" then "request_timed_out" else "request_failed",
+			})
 			return
 		end
 		if response.status then
@@ -232,7 +237,7 @@ end
 
 function PostMatchClient.playAgain()
 	local status = state.status
-	PostMatchClient.request(if status and status.state == "PlayAgain" then "CancelPlayAgain" else "PlayAgain")
+	PostMatchClient.request(if status and status.canReplay == false then "FindMatch" else "PlayAgain")
 end
 
 function PostMatchClient.returnToLobby()

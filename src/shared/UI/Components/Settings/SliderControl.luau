@@ -6,6 +6,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -166,9 +167,9 @@ return function(props: Props)
 			ref = trackRef,
 			Active = true,
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0, 0.44),
+			Position = UDim2.new(0, 0, 1, -UIConfig.Interaction.MinTargetPx),
 			Selectable = enabled,
-			Size = UDim2.fromScale(1, 0.56),
+			Size = UDim2.new(1, 0, 0, UIConfig.Interaction.MinTargetPx),
 			ZIndex = 4,
 			[React.Event.InputBegan] = function(_object, input: InputObject)
 				if not enabled then

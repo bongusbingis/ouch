@@ -12,6 +12,7 @@ local Cosmetics = require(Config.Cosmetics.Cosmetics)
 local Crates = require(Config.Economy.Crates)
 local GamePasses = require(Config.Economy.GamePasses)
 local Products = require(Config.Economy.Products)
+local Seasons = require(Config.Progression.Seasons)
 local Shop = require(Config.Economy.Shop)
 local Economy = script.Parent.Parent.Game.Economy
 local CrateBatch = require(Economy.CrateBatch)
@@ -25,6 +26,7 @@ local function build(overrides)
 		status = "Ready",
 		shopState = {
 			serverNow = now,
+			paidRandomAllowed = true,
 			offers = {
 				{ itemId = "DodgeBall1", rarity = "Common", displayName = "Red Ball", bonksPrice = 1200 },
 			},
@@ -44,6 +46,7 @@ local function build(overrides)
 		bundles = Bundles,
 		gamePasses = GamePasses,
 		products = Products.Catalog,
+		seasons = Seasons.Definitions,
 		shopConfig = Shop,
 		featuredRotation = FeaturedRotation,
 		crateOdds = CrateOdds,
@@ -70,6 +73,7 @@ T.describe("ShopViewModel", function()
 		local model = build({
 			shopState = {
 				serverNow = 1_800_000_000,
+				paidRandomAllowed = true,
 				offers = {},
 				offersExpireAt = 1_800_000_100,
 				featured = { kind = "Crate", id = "DodgeballCrate" },
@@ -107,6 +111,7 @@ T.describe("ShopViewModel", function()
 		local card = model.byId["FeaturedCrate:DodgeballCrate"]
 		T.expect(card.originalBonksPrice):toEqual(500)
 		T.expect(card.bonksPrice):toEqual(425)
+		T.expect(model.byId["Crate:DodgeballCrate"].bonksPrice):toEqual(card.bonksPrice)
 	end)
 
 	T.it("keeps previews disabled and active products pending metadata", function()
@@ -114,6 +119,60 @@ T.describe("ShopViewModel", function()
 		T.expect(model.byId["Bundle:StarterOutfitBundle"].status):toEqual("Preview")
 		T.expect(model.byId["Crate:HammerCrate"].status):toEqual("Active")
 		T.expect(model.byId["Product:Bonks500"].status):toEqual("Loading")
+	end)
+
+	T.it("uses each supplied regional price without a catalog fallback", function()
+		for _, price in { 7, 83, 421 } do
+			local metadata = {}
+			for kind, definition in { Product = Products.Catalog.Bonks500, GamePass = GamePasses.Catalog.DoubleXP } do
+				metadata[kind .. ":" .. definition.Id] = { priceInRobux = price, isForSale = true }
+			end
+			local model = build({ metadata = metadata })
+			T.expect(model.byId["Product:Bonks500"].robuxPrice):toEqual(price)
+			T.expect(model.byId["GamePass:DoubleXP"].robuxPrice):toEqual(price)
+		end
+		for _, info in { { loading = true }, { failed = true }, { isForSale = false, priceInRobux = 83 }, {} } do
+			local model = build({ metadata = { ["Product:" .. Products.Catalog.Bonks500.Id] = info } })
+			local card = model.byId["Product:Bonks500"]
+			T.expect(card.robuxPrice):toBeNil()
+			T.expect(card.productId):toBeNil()
+			T.expect(card.status):toEqual(if info.loading then "Loading" else "Unavailable")
+		end
+	end)
+
+	T.it("uses replicated pity and ownership to disclose actual next-open outcomes", function()
+		local model = build({
+			economyData = {
+				Bonks = 1000,
+				Cosmetics = { Owned = { BubbleBurst = true }, Equipped = {} },
+				Crates = { Pity = { EffectsCrate = { Legendary = 24 } } },
+			},
+		})
+		local card = model.byId["Crate:EffectsCrate"]
+		local total = 0
+		for _, outcome in card.odds do
+			total += outcome.percent
+			if outcome.rarity ~= "Legendary" then
+				T.expect(outcome.percent):toEqual(0)
+			end
+			if outcome.itemId == "BubbleBurst" then
+				T.expect(outcome.owned):toEqual(true)
+				T.expect(outcome.bonksRefund):toEqual(400)
+				T.expect(outcome.preview.itemId):toEqual("BubbleBurst")
+			end
+		end
+		T.expect(total):toBeNear(100, 0.0001)
+		T.expect(card.pityRemaining.Legendary):toEqual(1)
+	end)
+
+	T.it("blocks both crate purchase paths until policy explicitly allows them", function()
+		for _, allowed in { false, "unknown" } do
+			local model = build({ shopState = { offers = {}, paidRandomAllowed = allowed } })
+			local card = model.byId["Crate:EffectsCrate"]
+			T.expect(card.status):toEqual("Unavailable")
+			T.expect(card.productId):toBeNil()
+			T.expect(card.robuxPrice):toBeNil()
+		end
 	end)
 
 	T.it("uses configured product and game pass icons instead of marketplace icons", function()
@@ -168,6 +227,25 @@ T.describe("ShopViewModel", function()
 		})
 		T.expect(model.byId["Product:Bonks500"].thumbnail):toBeNil()
 		T.expect(model.byId["GamePass:DoubleXP"].thumbnail):toBeNil()
+	end)
+end)
+
+T.describe("Season storefront expiry", function()
+	T.it("removes the seasonal purchase at its exact deadline", function()
+		local seasons = { Test = { Id = "Test", StartsAt = 100, EndsAt = 200 } }
+		local products = {
+			TestPass = {
+				Type = "SeasonPass",
+				SeasonId = "Test",
+				CatalogStatus = "Preview",
+				DisplayName = "Test",
+				Description = "",
+				DisplayOrder = 1,
+			},
+		}
+		T.expect(build({ now = 199, seasons = seasons, products = products }).byId["Product:TestPass"] ~= nil)
+			:toEqual(true)
+		T.expect(build({ now = 200, seasons = seasons, products = products }).byId["Product:TestPass"]):toBeNil()
 	end)
 end)
 

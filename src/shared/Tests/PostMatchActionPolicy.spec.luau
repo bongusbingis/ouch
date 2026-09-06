@@ -16,7 +16,7 @@ T.describe("PostMatchActionPolicy", function()
 	end)
 
 	T.it("keeps replay and grouped return with the leader", function()
-		for _, action in { "PlayAgain", "CancelPlayAgain", "ReturnToLobby" } do
+		for _, action in { "PlayAgain", "CancelPlayAgain", "ReturnToLobby", "FindMatch" } do
 			T.expect(PostMatchActionPolicy.validate(action :: any, 10, 10, 2, 5, 5)):toBeTruthy()
 			local allowed, reason = PostMatchActionPolicy.validate(action :: any, 20, 10, 2, 5, 5)
 			T.expect(allowed):toEqual(false)

@@ -51,11 +51,14 @@ export type Props = {
 	SeasonState: any?,
 	QuestState: any?,
 	OnClaimQuest: ((questId: string) -> ())?,
+	OnClaimSeason: (() -> ())?,
+	PendingClaims: { [string]: boolean }?,
 }
 
 return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.DeviceSafeInsets)
+	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local progressPanels = ResponsiveLayout.splashPanels(
 		safeArea.size,
 		UIConfig.Layout.Splash.ProgressPanels,
@@ -72,60 +75,86 @@ return function(props: Props)
 		BottomRight = c("Frame", {
 			AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 			BackgroundTransparency = 1,
-			Position = if portrait then UDim2.fromScale(0.5, 0.98) else UDim2.fromScale(1, 1),
-			Size = if portrait
-				then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
-				else UDim2.fromScale(0.424534, 0.564113),
+			Position = if short
+				then UDim2.new(1, -12, 1, -UIConfig.Layout.Splash.ShortActionsBottomPx)
+				else if portrait then UDim2.fromScale(0.5, 0.98) else UDim2.fromScale(1, 1),
+			Size = if short
+				then UDim2.new(1, -24, 0, UIConfig.Layout.Splash.ShortActionsHeightPx)
+				else if portrait
+					then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
+					else UDim2.fromScale(0.424534, 0.564113),
 		}, {
-			UIListLayout = c("UIListLayout", {
-				HorizontalAlignment = if portrait
-					then Enum.HorizontalAlignment.Center
-					else Enum.HorizontalAlignment.Right,
-				Padding = if portrait then UDim.new(0, 8) else UDim.new(0.01, 0),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Bottom,
-			}),
+			Status = if not short and not portrait
+				then c("Frame", {
+					BackgroundTransparency = 1,
+					LayoutOrder = -1,
+					Size = UDim2.new(0.8, 0, 0, 32),
+				}, { Label = c(PartyStatus, { Text = props.PartyState, Active = props.ShowMatchmakingActivity }) })
+				else nil,
+			UIListLayout = if portrait
+				then nil
+				else c("UIListLayout", {
+					FillDirection = if short then Enum.FillDirection.Horizontal else Enum.FillDirection.Vertical,
+					HorizontalAlignment = if portrait
+						then Enum.HorizontalAlignment.Center
+						else Enum.HorizontalAlignment.Right,
+					Padding = if short
+						then UDim.new(0.02, 0)
+						else if portrait then UDim.new(0, 8) else UDim.new(0.01, 0),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					VerticalAlignment = if short then Enum.VerticalAlignment.Center else Enum.VerticalAlignment.Bottom,
+				}),
 			UIPadding = c("UIPadding", {
 				PaddingBottom = UDim.new(0.05, 0),
-				PaddingRight = if portrait then UDim.new(0, 0) else UDim.new(0.05, 0),
+				PaddingRight = if short or portrait then UDim.new(0, 0) else UDim.new(0.05, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
 				Native = {
 					BackgroundTransparency = 1,
 					Image = "rbxassetid://123095501298848",
 					LayoutOrder = 1,
-					Position = UDim2.fromScale(0.343431, 0.675873),
+					Position = if portrait then UDim2.fromScale(0.025, 0) else UDim2.fromScale(0.343431, 0.675873),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = if portrait
-						then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
-						else UDim2.fromScale(0.6, 0.6),
+					Size = if short
+						then UDim2.new(0.26, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
+						else if portrait
+							then UDim2.new(0.45, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
+							else UDim2.new(
+								0.6,
+								0,
+								0,
+								math.max(UIConfig.Interaction.MinTargetPx, safeArea.size.X * 0.424534 * 0.6 / 5.44)
+							),
 					SliceCenter = Rect.new(59, 31, 370, 78),
 					SliceScale = 0.9,
 				},
 				OnActivated = props.OnInvite,
 			}, {
-				UIAspectRatioConstraint = if portrait
-					then nil
-					else c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
+
 				TextLabel = buttonText("INVITE FRIENDS"),
 			}),
 			JoinWithCode = c(AnimatedButton, {
 				Native = {
 					BackgroundTransparency = 1,
 					Image = "rbxassetid://112649977890456",
-					Position = UDim2.fromScale(0.343431, 0.533477),
+					Position = if portrait then UDim2.fromScale(0.525, 0) else UDim2.fromScale(0.343431, 0.533477),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = if portrait
-						then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
-						else UDim2.fromScale(0.6, 0.6),
+					Size = if short
+						then UDim2.new(0.26, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
+						else if portrait
+							then UDim2.new(0.45, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
+							else UDim2.new(
+								0.6,
+								0,
+								0,
+								math.max(UIConfig.Interaction.MinTargetPx, safeArea.size.X * 0.424534 * 0.6 / 5.44)
+							),
 					SliceCenter = Rect.new(59, 31, 370, 78),
 					SliceScale = 0.9,
 				},
 				OnActivated = props.OnJoinCode,
 			}, {
-				UIAspectRatioConstraint = if portrait
-					then nil
-					else c("UIAspectRatioConstraint", { AspectRatio = 5.44 }),
+
 				TextLabel = buttonText("JOIN PARTY"),
 			}),
 			PlayButton = c(AnimatedButton, {
@@ -138,11 +167,14 @@ return function(props: Props)
 					Image = "rbxassetid://94748581468730",
 					ImageColor3 = if props.PlayEnabled then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
 					LayoutOrder = 2,
-					Position = UDim2.fromScale(-0.0570855, 0.787143),
+					AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.zero,
+					Position = if portrait then UDim2.fromScale(0.5, 1) else UDim2.fromScale(-0.0570855, 0.787143),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = if portrait
-						then UDim2.new(0.96, 0, 0, UIConfig.Layout.Splash.PrimaryActionHeightPx)
-						else UDim2.fromScale(0.8, 0.8),
+					Size = if short
+						then UDim2.new(0.44, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
+						else if portrait
+							then UDim2.new(0.96, 0, 0, UIConfig.Layout.Splash.PrimaryActionHeightPx)
+							else UDim2.fromScale(0.8, 0.8),
 					SliceCenter = Rect.new(198, 228, 841, 468),
 					SliceScale = 0.2,
 				},
@@ -162,7 +194,7 @@ return function(props: Props)
 						ZIndex = 2,
 					},
 				}),
-				UIAspectRatioConstraint = if portrait
+				UIAspectRatioConstraint = if short or portrait
 					then nil
 					else c("UIAspectRatioConstraint", { AspectRatio = 4.35 }),
 				ImageLabel = c("ImageLabel", {
@@ -177,29 +209,39 @@ return function(props: Props)
 				}),
 			}),
 		}),
-		BottomMiddle = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundTransparency = 1,
-			Position = if portrait then UDim2.fromScale(0.5, 0.68) else UDim2.fromScale(0.445346, 1),
-			Size = if portrait then UDim2.fromScale(0.9, 0.18) else UDim2.fromScale(0.409947, 0.564113),
-		}, {
-			PartyStatus = c(PartyStatus, {
-				Text = props.PartyState,
-				Active = props.ShowMatchmakingActivity,
-			}),
-		}),
+		BottomMiddle = if short or portrait
+			then c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 1),
+				BackgroundTransparency = 1,
+				Position = if short
+					then UDim2.new(0.5, 0, 1, -72)
+					else if portrait then UDim2.fromScale(0.5, 0.72) else UDim2.fromScale(0.445346, 1),
+				Size = if short
+					then UDim2.new(0.3, 0, 0, 28)
+					else if portrait then UDim2.fromScale(0.9, 0.18) else UDim2.fromScale(0.409947, 0.564113),
+			}, {
+				PartyStatus = c(PartyStatus, {
+					Text = props.PartyState,
+					Active = props.ShowMatchmakingActivity,
+				}),
+			})
+			else nil,
 		Logo = c("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://78333957912633",
-			Position = if portrait then UDim2.fromScale(0.05, 0.12) else UDim2.fromScale(0, 0.1),
-			Size = if portrait then UDim2.fromScale(0.52, 0.18) else UDim2.fromScale(0.321542, 0.301659),
+			Position = if short
+				then UDim2.fromOffset(12, UIConfig.Layout.Splash.ShortLogoTopPx)
+				else if portrait then UDim2.fromScale(0.05, 0.09) else UDim2.fromScale(0, 0.1),
+			Size = if short
+				then UDim2.fromOffset(150, 60)
+				else if portrait then UDim2.fromScale(0.42, 0.14) else UDim2.fromScale(0.321542, 0.301659),
 		}, {
 			uIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1.55,
 			}),
 		}),
 		DailyRewards = c(DailyRewardsPanel, {
-			Compact = compactProgressPanels,
+			Compact = compactProgressPanels or progressPanels.daily.size.X < UIConfig.Layout.DailyCell.MinWidthPx * 7,
 			Native = {
 				Position = UDim2.fromOffset(progressPanels.daily.position.X, progressPanels.daily.position.Y),
 				Size = UDim2.fromOffset(progressPanels.daily.size.X, progressPanels.daily.size.Y),
@@ -208,14 +250,17 @@ return function(props: Props)
 			OnClaim = props.OnViewDailyReward,
 		}),
 		SeasonStatus = c(SeasonStatusCard, {
-			Compact = compactProgressPanels,
+			Compact = compactProgressPanels or progressPanels.season.size.Y < UIConfig.Layout.SeasonDetailedMinHeightPx,
 			Native = {
 				Position = UDim2.fromOffset(progressPanels.season.position.X, progressPanels.season.position.Y),
 				Size = UDim2.fromOffset(progressPanels.season.size.X, progressPanels.season.size.Y),
 			},
 			State = props.SeasonState,
+			OnClaim = props.OnClaimSeason,
+			Pending = props.PendingClaims and props.PendingClaims.Season,
 		}),
 		Quests = c(QuestsPanel, {
+			Short = short,
 			Compact = compactProgressPanels,
 			Native = {
 				Position = UDim2.fromOffset(progressPanels.quests.position.X, progressPanels.quests.position.Y),
@@ -223,6 +268,7 @@ return function(props: Props)
 			},
 			State = props.QuestState,
 			OnClaim = props.OnClaimQuest,
+			PendingClaims = props.PendingClaims,
 		}),
 	})
 end

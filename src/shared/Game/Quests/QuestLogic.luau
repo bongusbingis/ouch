@@ -189,7 +189,7 @@ function QuestLogic.progressForEvent(
 	elseif kind == "Catch" then
 		return if event.kind == "BallCaught" and sourceMatches(event, playerId) then 1 else 0
 	elseif kind == "MatchPlayed" then
-		return if event.kind == "MatchEnded" then 1 else 0
+		return if event.kind == "MatchEnded" and event.reason ~= "NoContest" then 1 else 0
 	elseif kind == "Win" then
 		return if event.kind == "MatchEnded" and context.playerWon == true then 1 else 0
 	elseif kind == "ModeWin" then

@@ -1,7 +1,7 @@
 --!strict
 
--- Developer-product catalog. Preview entries are production-visible but never
--- prompt a purchase; only Active definitions enter the receipt map.
+-- Developer-product identities and grants. Robux prices come only from client
+-- MarketplaceService product information; catalog status controls merchandising.
 
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
 export type ProductType = "Crate" | "Bonks" | "SeasonPass" | "Bundle" | "Cosmetic"
@@ -18,7 +18,6 @@ export type ProductDef = {
 	Description: string,
 	DisplayOrder: number,
 	Type: ProductType,
-	SuggestedRobux: number,
 	CrateId: string?,
 	BonksAmount: number?,
 	SeasonId: string?,
@@ -35,7 +34,6 @@ local Catalog: { [string]: ProductDef } = {
 		Description = "A handy boost for your next crate.",
 		DisplayOrder = 310,
 		Type = "Bonks",
-		SuggestedRobux = 49,
 		BonksAmount = 500,
 	},
 	Bonks1100 = {
@@ -43,10 +41,9 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://128078334031314",
 		CatalogStatus = "Active",
 		DisplayName = "Bonks Stack",
-		Description = "A solid stack with a little extra value.",
+		Description = "1,100 Bonks for your next picks.",
 		DisplayOrder = 320,
 		Type = "Bonks",
-		SuggestedRobux = 99,
 		BonksAmount = 1100,
 	},
 	Bonks2500 = {
@@ -57,7 +54,6 @@ local Catalog: { [string]: ProductDef } = {
 		Description = "A bigger haul for several crate opens.",
 		DisplayOrder = 330,
 		Type = "Bonks",
-		SuggestedRobux = 199,
 		BonksAmount = 2500,
 	},
 	Bonks5500 = {
@@ -65,10 +61,9 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://111667665844951",
 		CatalogStatus = "Active",
 		DisplayName = "Mega Vault",
-		Description = "The biggest Bonks bundle and strongest value.",
+		Description = "5,500 Bonks for your collection.",
 		DisplayOrder = 340,
 		Type = "Bonks",
-		SuggestedRobux = 399,
 		BonksAmount = 5500,
 	},
 	DodgeballCrateOpen = {
@@ -79,7 +74,6 @@ local Catalog: { [string]: ProductDef } = {
 		Description = "Open one Dodgeball Crate directly.",
 		DisplayOrder = 210,
 		Type = "Crate",
-		SuggestedRobux = 39,
 		CrateId = "DodgeballCrate",
 	},
 	HammerCrateOpen = {
@@ -90,18 +84,16 @@ local Catalog: { [string]: ProductDef } = {
 		Description = "Open one Hammer Crate directly.",
 		DisplayOrder = 220,
 		Type = "Crate",
-		SuggestedRobux = 39,
 		CrateId = "HammerCrate",
 	},
 	EffectsCrateOpen = {
 		Id = 3709429563,
 		Icon = "rbxassetid://126538865895544",
-		CatalogStatus = "Preview",
+		CatalogStatus = "Active",
 		DisplayName = "Effects",
 		Description = "Open one Effects Crate directly.",
 		DisplayOrder = 230,
 		Type = "Crate",
-		SuggestedRobux = 59,
 		CrateId = "EffectsCrate",
 	},
 	-- One product per bundle. The bundle itself owns its contents in
@@ -114,7 +106,6 @@ local Catalog: { [string]: ProductDef } = {
 		Description = "A complete look, cheaper than buying the pieces.",
 		DisplayOrder = 100,
 		Type = "Bundle",
-		SuggestedRobux = 199,
 		BundleId = "StarterOutfitBundle",
 	},
 	-- One product per season rather than editing SeasonId in place, so receipt
@@ -127,9 +118,6 @@ local Catalog: { [string]: ProductDef } = {
 		Description = "Unlock the premium reward track for Season 1.",
 		DisplayOrder = 500,
 		Type = "SeasonPass",
-		-- Introductory: the GDD targets 799, held back until the track has a
-		-- season of proven content behind it.
-		SuggestedRobux = 499,
 		SeasonId = "S1",
 	},
 }
@@ -138,7 +126,6 @@ local ById: { [number]: ProductDef } = {}
 
 for key, definition in Catalog do
 	assert(definition.DisplayOrder % 1 == 0, `developer product "{key}" must define an integer DisplayOrder`)
-	assert(definition.SuggestedRobux > 0, `developer product "{key}" must define a positive SuggestedRobux`)
 	local icon = definition.Icon
 	assert(
 		icon == nil or icon == "" or string.match(icon, "^rbxassetid://%d+$") ~= nil,

@@ -228,6 +228,51 @@ return function()
 			expect(again).to.equal(0)
 		end)
 
+		it("settles a delayed premium receipt against archived progress exactly once", function()
+			local f = fixture(1500)
+			BattlePassService.start(f.options)
+			BattlePassService.addSeasonXp(f.player, 500)
+			f.clock.value = 3500
+			BattlePassService.stateFor(f.player)
+			expect(f.profile.SeasonHistory.S1.XP).to.equal(500)
+			expect(#f.granted).to.equal(2)
+			expect(BattlePassService.grantPremium(f.player, "S1")).to.equal(true)
+			expect(#f.granted).to.equal(3)
+			expect(BattlePassService.grantPremium(f.player, "S1")).to.equal(true)
+			expect(#f.granted).to.equal(3)
+			expect(f.profile.Season.XP).to.equal(0)
+		end)
+
+		it("retains failed rollover grants and retries only unpaid tiers", function()
+			local f = fixture(1500)
+			local fail = true
+			f.options.rewardService.grant = function(_player, reward)
+				if reward.amount == 75 and fail then
+					return false, "unavailable"
+				end
+				table.insert(f.granted, reward)
+				return true
+			end
+			BattlePassService.start(f.options)
+			BattlePassService.addSeasonXp(f.player, 500)
+			f.clock.value = 3500
+			BattlePassService.stateFor(f.player)
+			expect(#f.granted).to.equal(1)
+			expect(f.profile.SeasonHistory.S1.ClaimedFree["2"]).to.equal(nil)
+			fail = false
+			BattlePassService.stateFor(f.player)
+			BattlePassService.stateFor(f.player)
+			expect(#f.granted).to.equal(2)
+		end)
+
+		it("credits delayed match XP to its original season", function()
+			local f = fixture(3500)
+			BattlePassService.start(f.options)
+			expect(BattlePassService.addSeasonXp(f.player, 250, "S1")).to.equal(true)
+			expect(f.profile.SeasonHistory.S1.XP).to.equal(250)
+			expect(f.profile.Season.XP).to.equal(0)
+		end)
+
 		it("does not mark a tier claimed when the grant fails", function()
 			local f = fixture(1500)
 			f.options.rewardService.grant = function()

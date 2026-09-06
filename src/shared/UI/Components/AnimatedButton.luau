@@ -14,6 +14,7 @@ local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local c = React.createElement
 
@@ -38,6 +39,7 @@ export type Props = {
 	OnSelectionGained: ((GuiButton) -> ())?,
 	ButtonRef: any?,
 	EntranceDelay: number?,
+	Visual: any?,
 	children: { [any]: any }?,
 }
 
@@ -48,6 +50,7 @@ return function(props: Props)
 	local entered, setEntered = React.useState(props.EntranceDelay == nil)
 	local entranceRevision = React.useRef(0)
 	local hovering, setHovering = React.useState(false)
+	local focused, setFocused = React.useState(false)
 	local pressing, setPressing = React.useState(false)
 	local reducedMotion = useReducedMotion()
 	local preset = Motion.Controls[props.Style or "Standard"]
@@ -70,6 +73,14 @@ return function(props: Props)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
+			ZIndex = (props.Native.ZIndex or 1) + 10,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Interaction.FocusCornerPx) }),
+			Outline = c("UIStroke", {
+				Color = UIConfig.ProgressionStyle.Yellow,
+				Thickness = UIConfig.Interaction.FocusStrokePx,
+				Transparency = if focused and enabled then 0 else 1,
+			}),
 		}),
 		InteractionVisual = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -89,6 +100,7 @@ return function(props: Props)
 			TileSize = props.Native.TileSize,
 			ZIndex = (props.Native.ZIndex or 1) - 1,
 		}, {
+			Visual = props.Visual,
 			InteractionScale = c("UIScale", {
 				Scale = styles.Scale,
 			}),
@@ -191,6 +203,7 @@ return function(props: Props)
 				end
 				else nil,
 			[React.Event.SelectionGained] = function(button)
+				setFocused(true)
 				if GuiService.SelectedObject ~= nil then
 					beginHover()
 				end
@@ -198,7 +211,10 @@ return function(props: Props)
 					props.OnSelectionGained(button)
 				end
 			end,
-			[React.Event.SelectionLost] = endHover,
+			[React.Event.SelectionLost] = function()
+				setFocused(false)
+				endHover()
+			end,
 		}),
 		children
 	)

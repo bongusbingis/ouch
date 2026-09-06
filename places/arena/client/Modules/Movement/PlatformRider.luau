@@ -1,88 +1,138 @@
--- Name: PlatformRider.luau
--- Author: Jack C.
--- Description: Carries the local character along with a rotating arena platform it is standing on or airborne above, measuring the platform's own pose change frame to frame so replication lag cannot desync the ride.
--- Created: 2026-08-18
-
 --!strict
+-- Carries a local rider only after support contact; airborne carry cannot acquire a platform.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-
+local Workspace = game:GetService("Workspace")
 local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
-local RotatingPlatforms = require(
-	ReplicatedStorage:WaitForChild("Shared")
-		:WaitForChild("Game")
-		:WaitForChild("MapFeatures")
-		:WaitForChild("RotatingPlatforms")
-)
+local Features = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures")
+local RotatingPlatforms = require(Features:WaitForChild("RotatingPlatforms"))
+local RiderSupport = require(Features:WaitForChild("RiderSupport"))
 
 local PlatformRider = {}
-
-local MINIMUM_CARRY_STUDS = 1e-3
-
-local started = false
+local connection: RBXScriptConnection? = nil
 local ridingPlatform: RotatingPlatforms.Platform? = nil
 local ridingPivot: CFrame? = nil
+local previousRoot: BasePart? = nil
+local previousPosition: Vector3? = nil
+local airborneSeconds = 0
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+rayParams.RespectCanCollide = true
 
-local function ridden(rootPosition: Vector3): RotatingPlatforms.Platform?
-	local config = MapFeatures.Rotating
+local function clear()
+	ridingPlatform = nil
+	ridingPivot = nil
+	previousRoot = nil
+	previousPosition = nil
+	airborneSeconds = 0
+end
+
+local function platformFor(hit: RaycastResult?): RotatingPlatforms.Platform?
+	if hit == nil or hit.Normal.Y < MapFeatures.Rotating.MinSupportNormalY then
+		return nil
+	end
 	for _, platform in RotatingPlatforms.all() do
-		if (rootPosition - platform.origin.Position).Magnitude > platform.reach + config.CarryHeight then
-			continue
-		end
-		local offset = RotatingPlatforms.currentBounds(platform):PointToObjectSpace(rootPosition)
-		local size = platform.boundsSize
-		local top = size.Y / 2
-		if
-			math.abs(offset.X) <= size.X / 2
-			and math.abs(offset.Z) <= size.Z / 2
-			and offset.Y >= top - config.CarryDepthTolerance
-			and offset.Y <= top + config.CarryHeight
-		then
+		if hit.Instance:IsDescendantOf(platform.assembly) then
 			return platform
 		end
 	end
 	return nil
 end
 
-local function step()
+local function step(dt: number)
 	local character = Players.LocalPlayer.Character
 	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	local alive = character ~= nil and character:GetAttribute("CombatAlive") ~= false
-	if not alive or root == nil or not root:IsA("BasePart") then
-		ridingPlatform = nil
-		ridingPivot = nil
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	local config = MapFeatures.Rotating
+	if
+		character == nil
+		or character:GetAttribute("CombatAlive") == false
+		or root == nil
+		or not root:IsA("BasePart")
+		or humanoid == nil
+		or root.Anchored
+		or dt > config.MaxFrameSeconds
+	then
+		clear()
 		return
 	end
-
-	local platform = ridden(root.Position)
+	if
+		previousRoot ~= root
+		or (previousPosition and (root.Position - previousPosition).Magnitude > config.MaxFrameDisplacement)
+	then
+		clear()
+	end
+	rayParams.FilterDescendantsInstances = { character }
+	local contactDistance = humanoid.HipHeight + root.Size.Y / 2 + config.ContactTolerance
+	local supportHit = Workspace:Raycast(root.Position, Vector3.new(0, -contactDistance, 0), rayParams)
+	local platform = platformFor(supportHit)
+	if platform then
+		airborneSeconds = 0
+	else
+		airborneSeconds += dt
+		local below =
+			Workspace:Raycast(root.Position, Vector3.new(0, -contactDistance - config.CarryHeight, 0), rayParams)
+		if
+			RiderSupport.canRetain({
+				previous = ridingPlatform ~= nil,
+				sameSupport = platformFor(below) == ridingPlatform,
+				airborne = humanoid.FloorMaterial == Enum.Material.Air
+					or humanoid:GetState() == Enum.HumanoidStateType.Jumping
+					or humanoid:GetState() == Enum.HumanoidStateType.Freefall,
+				otherContact = supportHit ~= nil,
+				airborneSeconds = airborneSeconds,
+			}, config.MaxAirborneSeconds)
+		then
+			platform = ridingPlatform
+		end
+	end
 	if platform == nil then
-		ridingPlatform = nil
-		ridingPivot = nil
+		clear()
 		return
 	end
-
 	local pivot = platform.assembly:GetPivot()
 	if ridingPlatform == platform and ridingPivot then
 		local current = root.CFrame
-		local localOffset = ridingPivot:Inverse() * current.Position
-		local carried = pivot * localOffset
-		if (carried - current.Position).Magnitude >= MINIMUM_CARRY_STUDS then
-			root.CFrame = CFrame.new(carried) * current.Rotation
+		local carried = pivot:PointToWorldSpace(ridingPivot:PointToObjectSpace(current.Position))
+		local delta = Vector3.new(carried.X - current.X, 0, carried.Z - current.Z)
+		if delta.Magnitude > config.MaxCarryDelta then
+			clear()
+			return
+		end
+		if delta.Magnitude >= config.MinimumCarryStuds then
+			root.CFrame = current + delta
 		end
 	end
 	ridingPlatform = platform
 	ridingPivot = pivot
+	previousRoot = root
+	previousPosition = root.Position
 end
 
 function PlatformRider.start()
-	if started then
-		return
+	if connection == nil then
+		connection = RunService.Heartbeat:Connect(step)
 	end
-	started = true
-	RunService.Heartbeat:Connect(step)
+end
+
+function PlatformRider.stop()
+	if connection then
+		connection:Disconnect()
+		connection = nil
+	end
+	clear()
+end
+
+function PlatformRider._snapshotForTest()
+	return {
+		started = connection ~= nil,
+		platform = if ridingPlatform then ridingPlatform.assembly:GetFullName() else "",
+		airborneSeconds = airborneSeconds,
+		root = previousRoot,
+	}
 end
 
 return PlatformRider

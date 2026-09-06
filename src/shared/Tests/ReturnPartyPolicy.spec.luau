@@ -27,6 +27,11 @@ local function party(phase: string, matchId: string?)
 end
 
 T.describe("ReturnPartyPolicy", function()
+	T.it("rejects a stale return for a lobby party already restored from another match", function()
+		local current = party("Lobby", nil)
+		current.lastReturnMatchId = "newer"
+		T.expect(ReturnPartyPolicy.resolve(current, payload, 10)):toBeNil()
+	end)
 	T.it("restores the surviving assigned or teleporting party for its match", function()
 		T.expect(ReturnPartyPolicy.resolve(party("Assigned", "match-1"), payload, 10)):toEqual("Restore")
 		T.expect(ReturnPartyPolicy.resolve(party("Teleporting", "match-1"), payload, 20)):toEqual("Restore")

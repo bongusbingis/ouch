@@ -31,9 +31,8 @@ local function ballsIn(folder: Instance): { BasePart }
 end
 
 return function()
-	local simulationIt = if RunService:IsRunning() then it else itSKIP
-
 	describe("BallService", function()
+		local simulationIt = if RunService:IsRunning() then it else itSKIP
 		local rigs = {}
 
 		local function rigFor(player)

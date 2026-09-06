@@ -5,6 +5,8 @@
 
 --!strict
 
+local BattlePassLogic = require(script.Parent.Parent.Progression.BattlePassLogic)
+
 local ShopViewModel = {}
 
 export type PreviewItem = {
@@ -18,6 +20,10 @@ export type OddsEntry = {
 	displayName: string,
 	rarity: string,
 	percent: number,
+	basePercent: number,
+	owned: boolean,
+	bonksRefund: number,
+	preview: PreviewItem?,
 }
 
 export type Card = {
@@ -43,6 +49,7 @@ export type Card = {
 	previewItems: { PreviewItem },
 	odds: { OddsEntry }?,
 	pity: { [string]: number }?,
+	pityRemaining: { [string]: number }?,
 	openQuantities: { number }?,
 	bonksAvailable: number?,
 	definition: any,
@@ -115,7 +122,7 @@ local function productPresentation(definition: any, metadata: { [string]: any })
 		return "Preview", nil
 	end
 	local info = metadataFor(metadata, "Product", definition.Id)
-	if info == nil then
+	if info == nil or info.loading == true then
 		return "Loading", nil
 	end
 	if info.failed == true or info.isForSale == false or type(info.priceInRobux) ~= "number" then
@@ -162,9 +169,12 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 	local _, product = productFor(args.products, "CrateId", crateId)
 	local productStatus, robuxPrice = productPresentation(product, args.metadata)
 	local status = crate.CatalogStatus
+	if status == "Active" and args.paidRandomAllowed ~= true then
+		status = "Unavailable"
+	end
 	local bonksPrice = crate.BonksPrice
 	local originalBonksPrice = nil
-	if featured and bonksPrice ~= nil then
+	if bonksPrice ~= nil then
 		originalBonksPrice = bonksPrice
 		bonksPrice = args.featuredRotation.priceFor(args.shopConfig.Featured, crateId, bonksPrice, args.serverNow)
 	end
@@ -175,7 +185,9 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 	local previews = if representative then { representative } else {}
 	local odds = nil
 	if crate.CatalogStatus == "Active" then
-		local oddsModel = args.crateOdds.build(crate, args.cosmetics.Items, args.cosmetics.Rarities)
+		local oddsModel = args.crateOdds.build(crate, args.cosmetics.Items, args.cosmetics.Rarities, args.pity[crateId])
+		local baseModel = args.crateOdds.build(crate, args.cosmetics.Items, args.cosmetics.Rarities)
+		local basePercents = args.crateOdds.percentByItem(baseModel, 2)
 		local percents = args.crateOdds.percentByItem(oddsModel, 2)
 		odds = {}
 		for _, outcome in oddsModel.outcomes do
@@ -185,8 +197,27 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 				displayName = definition.DisplayName,
 				rarity = outcome.rarity,
 				percent = percents[outcome.itemId],
+				basePercent = basePercents[outcome.itemId],
+				owned = args.owned[outcome.itemId] == true,
+				bonksRefund = args.cosmetics.Rarities[outcome.rarity].DupeBonks or 0,
+				preview = previewItem(outcome.itemId, args.cosmetics),
 			})
 		end
+	end
+	if odds then
+		table.sort(odds, function(left, right)
+			local leftOrder = args.cosmetics.Rarities[left.rarity].DisplayOrder or math.huge
+			local rightOrder = args.cosmetics.Rarities[right.rarity].DisplayOrder or math.huge
+			if leftOrder ~= rightOrder then
+				return leftOrder < rightOrder
+			end
+			return left.itemId < right.itemId
+		end)
+	end
+	local pityRemaining = {}
+	for rarity, threshold in crate.Pity or {} do
+		local count = if args.pity[crateId] then args.pity[crateId][rarity] or 0 else 0
+		pityRemaining[rarity] = math.max(1, threshold - count)
 	end
 	local hintText = if originalBonksPrice ~= nil and bonksPrice ~= nil
 		then `{bonksPrice} BONKS  |  WAS {originalBonksPrice}`
@@ -199,15 +230,15 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 		id = cardId,
 		kind = "Crate",
 		displayName = crate.DisplayName,
-		description = "Open for a random cosmetic. View every possible reward before purchasing.",
+		description = crate.Description or "A new look with every opening.",
 		hintText = hintText,
 		status = status,
 		badge = if featured then "FEATURED" else nil,
 		thumbnail = if crate.Thumbnail ~= "" then crate.Thumbnail else configuredIcon(product),
 		bonksPrice = bonksPrice,
 		originalBonksPrice = if originalBonksPrice ~= bonksPrice then originalBonksPrice else nil,
-		robuxPrice = if productStatus == "Active" then robuxPrice else nil,
-		productId = if productStatus == "Active" then product.Id else nil,
+		robuxPrice = if status == "Active" and productStatus == "Active" then robuxPrice else nil,
+		productId = if status == "Active" and productStatus == "Active" then product.Id else nil,
 		passId = nil,
 		itemId = nil,
 		crateId = crateId,
@@ -219,6 +250,7 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 		previewItems = previews,
 		odds = odds,
 		pity = crate.Pity,
+		pityRemaining = pityRemaining,
 		openQuantities = args.crateBatch.quantitiesFor(crate),
 		bonksAvailable = args.bonks,
 		definition = crate,
@@ -357,7 +389,7 @@ local function passCard(args: any, key: string, definition: any): Card
 	local status = definition.CatalogStatus
 	local price = nil
 	if status == "Active" then
-		if info == nil then
+		if info == nil or info.loading == true then
 			status = "Loading"
 		elseif info.failed == true or info.isForSale == false or type(info.priceInRobux) ~= "number" then
 			status = "Unavailable"
@@ -366,6 +398,13 @@ local function passCard(args: any, key: string, definition: any): Card
 		end
 	end
 	local owned = args.ownedPasses[key] == true
+	local previews = {}
+	for _, itemId in definition.EntitlementItemIds do
+		local preview = previewItem(itemId, args.cosmetics)
+		if preview then
+			table.insert(previews, preview)
+		end
+	end
 	return {
 		id = `GamePass:{key}`,
 		kind = "GamePass",
@@ -389,7 +428,7 @@ local function passCard(args: any, key: string, definition: any): Card
 		affordable = true,
 		owned = owned,
 		pending = definition.Id ~= nil and args.pending[`GamePassId:{definition.Id}`] == true,
-		previewItems = {},
+		previewItems = previews,
 		odds = nil,
 		pity = nil,
 		definition = definition,
@@ -415,7 +454,9 @@ function ShopViewModel.build(options: any): Model
 
 	local args = table.clone(options)
 	args.bonks = economy.Bonks
+	args.paidRandomAllowed = shopState.paidRandomAllowed
 	args.owned = economy.Cosmetics.Owned
+	args.pity = if economy.Crates then economy.Crates.Pity else {}
 	args.premiumSeasons = if economy.Entitlements then economy.Entitlements.PremiumSeasons else {}
 	args.serverNow = model.serverNow
 	args.pending = options.pending or {}
@@ -486,7 +527,11 @@ function ShopViewModel.build(options: any): Model
 	end
 	for _, key in
 		sortedKeys(args.products, function(definition)
-			return definition.CatalogStatus ~= "Hidden" and definition.Type == "SeasonPass"
+			local season = BattlePassLogic.activeSeason(args.seasons or {}, args.now)
+			return definition.CatalogStatus ~= "Hidden"
+				and definition.Type == "SeasonPass"
+				and season ~= nil
+				and season.Id == definition.SeasonId
 		end)
 	do
 		appendCard(model, more.cards, productCard(args, key, args.products[key]))

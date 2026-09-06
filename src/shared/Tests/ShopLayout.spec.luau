@@ -47,6 +47,15 @@ local function overlaps(placements): boolean
 end
 
 T.describe("ShopLayout", function()
+	T.it("fits a complete card row below its heading on a short landscape phone", function()
+		local class = table.clone(CLASSES.Pass)
+		class.MinHeightPx = 120
+		class.MaxHeightPx = 120
+		local grid = ShopLayout.grid(460, 3, class, CARD_GAP, 4)
+		T.expect(grid.rows):toEqual(1)
+		T.expect(ShopLayout.sectionHeight(grid, HEADER, EMPTY) <= 160):toBeTruthy()
+		T.expect(ShopLayout.grid(1046, 3, CLASSES.Pass, CARD_GAP, 4).cardHeight > 120):toBeTruthy()
+	end)
 	T.it("keeps a card class the same size whatever a section holds", function()
 		local one = ShopLayout.grid(1046, 1, CLASSES.Pass, CARD_GAP, 4)
 		local eight = ShopLayout.grid(1046, 8, CLASSES.Pass, CARD_GAP, 4)

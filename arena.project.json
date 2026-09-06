@@ -94,6 +94,10 @@
             "$path": "src/server/Modules/DirectPurchaseService.luau"
           },
 
+          "MatchAwardService": {
+            "$path": "src/server/Modules/MatchAwardService.luau"
+          },
+
           "EconomyService": {
             "$path": "src/server/Modules/EconomyService.luau"
           },
@@ -136,6 +140,10 @@
     "ServerStorage": {
       "Tests": {
         "$path": "places/arena/tests",
+
+        "Shared": {
+          "$path": "src/tests/Shared"
+        },
 
         "Runner": {
           "$path": "src/tests/Runner.luau"

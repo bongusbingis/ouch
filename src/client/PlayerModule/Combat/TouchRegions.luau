@@ -22,7 +22,9 @@ local function refreshViewport()
 	local camera = Workspace.CurrentCamera
 	if camera then
 		local size = camera.ViewportSize
-		if size.X > 0 and size.Y > 0 then
+		-- ViewportSize is (1, 1) until the client renders its first frame; latching
+		-- that stands in for a real screen and collapses every derived region.
+		if size.X > 1 and size.Y > 1 then
 			viewport = size
 		end
 	end
@@ -140,15 +142,18 @@ function TouchRegions.bottomSwipeAnchor(): Vector2
 	end
 	local target = if biasRight then rect.minX + width * 0.72 else rect.minX + width * 0.28
 	local step = math.max(width * 0.03, 6)
+	-- A rect narrower than two steps has no room for the edge inset, which would
+	-- invert the clamp bounds and throw.
+	local inset = math.min(step, width / 2)
+	local minimum = rect.minX + inset
+	local maximum = rect.maxX - inset
 	local offset = 0
 	while offset <= width * 0.6 do
-		local toward =
-			math.clamp(if biasRight then target + offset else target - offset, rect.minX + step, rect.maxX - step)
+		local toward = math.clamp(if biasRight then target + offset else target - offset, minimum, maximum)
 		if TouchRegions.isInBottomSwipeRegion(toward, y) then
 			return Vector2.new(toward, y)
 		end
-		local away =
-			math.clamp(if biasRight then target - offset else target + offset, rect.minX + step, rect.maxX - step)
+		local away = math.clamp(if biasRight then target - offset else target + offset, minimum, maximum)
 		if TouchRegions.isInBottomSwipeRegion(away, y) then
 			return Vector2.new(away, y)
 		end

@@ -23,7 +23,6 @@ export type VisualDef = {
 	Size: Vector3?,
 	Color: Color3?,
 	Material: Enum.Material?,
-	TextureId: number?,
 	SurfaceMaps: SurfaceMaps?,
 }
 
@@ -32,7 +31,6 @@ export type VisualTemplateDef = {
 	Size: Vector3,
 	Color: Color3,
 	Material: Enum.Material,
-	EffectsCarrier: string?,
 	SurfaceMaps: SurfaceMaps?,
 }
 
@@ -56,6 +54,7 @@ export type ItemDef = {
 	Rarity: string,
 	DisplayName: string,
 	EffectId: string?,
+	EmoteStyle: string?,
 	Thumbnail: string,
 	SplatColor: Color3?,
 	AlwaysAvailable: boolean?,
@@ -70,6 +69,7 @@ export type DefaultDef = {
 	DisplayName: string,
 	Rarity: string,
 	EffectId: string?,
+	EmoteStyle: string?,
 	SplatColor: Color3?,
 	SortOrder: number?,
 	PreviewColor: Color3?,
@@ -78,9 +78,9 @@ export type DefaultDef = {
 }
 
 local Rarities: { [string]: RarityDef } = {
-	Common = { Weight = 70, DupeBonks = 50, DirectBonks = 1200, DisplayOrder = 4 },
-	Rare = { Weight = 24, DupeBonks = 150, DirectBonks = 3500, DisplayOrder = 3 },
-	Legendary = { Weight = 6, DupeBonks = 400, DirectBonks = 12000, DisplayOrder = 2 },
+	Common = { Weight = 70, DupeBonks = 50, DirectBonks = 1000, DisplayOrder = 4 },
+	Rare = { Weight = 24, DupeBonks = 150, DirectBonks = 2500, DisplayOrder = 3 },
+	Legendary = { Weight = 6, DupeBonks = 400, DirectBonks = 10000, DisplayOrder = 2 },
 	Exclusive = { Weight = 0, DupeBonks = 0, DirectBonks = 0, DisplayOrder = 1 },
 }
 
@@ -88,6 +88,15 @@ local Rarities: { [string]: RarityDef } = {
 -- separate slots on purpose: a ball trail and an elimination effect are
 -- unrelated in play, and one slot would make equipping one silently unequip the
 -- other.
+-- Folder under Assets.Cosmetics holding one authored MeshPart per item in that
+-- category. A mesh and its PBR maps cannot be written from a runtime script, so
+-- an item's visual can only be authored and cloned -- never built from config.
+-- Categories absent here have no per-item mesh.
+local VisualFolders = {
+	BallAssets = "DodgeBalls",
+	HammerAssets = "InflatableHammers",
+}
+
 local Slots = {
 	BallAssets = true,
 	HammerAssets = true,
@@ -105,7 +114,6 @@ local VisualTemplates: { [string]: VisualTemplateDef } = {
 		Size = Vector3.new(2, 2, 2),
 		Color = Color3.fromRGB(248, 248, 248),
 		Material = Enum.Material.SmoothPlastic,
-		EffectsCarrier = "DodgeballBase",
 	},
 	Hammer = {
 		MeshId = 95803748037612,
@@ -122,6 +130,11 @@ local VisualTemplates: { [string]: VisualTemplateDef } = {
 }
 
 local Defaults: { [string]: DefaultDef } = {
+	EmoteAssets = {
+		DisplayName = "Victory Wave",
+		Rarity = "Common",
+		EmoteStyle = require(script.Parent.Emotes).DefaultStyle,
+	},
 	BallAssets = {
 		DisplayName = "Default Dodgeball",
 		Rarity = "Common",
@@ -189,6 +202,33 @@ local function eliminationEffect(rarity: string, displayName: string, sound: str
 end
 
 local Items: { [string]: ItemDef } = {
+	ShowtimeTwirl = {
+		Category = "EmoteAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Confetti Twirl",
+		EmoteStyle = "ConfettiTwirl",
+		Thumbnail = "",
+		ShopEligible = false,
+		SortOrder = 10,
+	},
+	ShowtimeFlex = {
+		Category = "EmoteAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Champion Flex",
+		EmoteStyle = "ChampionFlex",
+		Thumbnail = "",
+		ShopEligible = false,
+		SortOrder = 20,
+	},
+	ShowtimeBounce = {
+		Category = "EmoteAssets",
+		Rarity = "Exclusive",
+		DisplayName = "Party Bounce",
+		EmoteStyle = "PartyBounce",
+		Thumbnail = "",
+		ShopEligible = false,
+		SortOrder = 30,
+	},
 	CharacterColorRed = characterColor("Red", Color3.fromRGB(255, 0, 0), 1),
 	CharacterColorPink = characterColor("Pink", Color3.fromRGB(255, 0, 128), 2),
 	CharacterColorBlue = characterColor("Blue", Color3.fromRGB(0, 90, 255), 4),
@@ -323,6 +363,7 @@ end
 return {
 	Rarities = Rarities,
 	Slots = Slots,
+	VisualFolders = VisualFolders,
 	Defaults = Defaults,
 	Items = Items,
 	VisualTemplates = VisualTemplates,

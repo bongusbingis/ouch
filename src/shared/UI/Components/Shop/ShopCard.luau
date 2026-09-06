@@ -5,6 +5,8 @@
 
 --!strict
 
+local formatNumber = require(script.Parent.Parent.Parent.Models.NumberText)
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
@@ -71,7 +73,7 @@ local function actionContent(card, hasHint: boolean): (string?, number?)
 		return nil, card.bonksPrice
 	end
 	if card.robuxPrice ~= nil then
-		return `{ShopConfig.RobuxSymbol}{card.robuxPrice}`, nil
+		return `{ShopConfig.RobuxSymbol}{formatNumber(card.robuxPrice)}`, nil
 	end
 	if card.kind == "Crate" then
 		return "VIEW ODDS", nil
@@ -290,7 +292,7 @@ local function priceLine(card, native, alignment: Enum.TextXAlignment): any
 					),
 					LayoutOrder = 2,
 					Size = UDim2.fromScale(0.44, 0.86),
-					Text = `WAS {card.originalBonksPrice}`,
+					Text = `WAS {formatNumber(card.originalBonksPrice)}`,
 					TextColor3 = Color3.fromRGB(216, 230, 240),
 					TextXAlignment = alignment,
 					ZIndex = 8,

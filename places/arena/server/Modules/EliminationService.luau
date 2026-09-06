@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 
 type HumanoidState = {
+	EvaluateStateMachine: boolean?,
 	AutoRotate: boolean,
 	PlatformStand: boolean,
 	RequiresNeck: boolean,
@@ -31,6 +32,8 @@ type RagdollState = {
 	Instances: { Instance },
 	HumanoidState: HumanoidState?,
 	PartStates: { [BasePart]: PartState },
+	CleanupConnection: RBXScriptConnection?,
+	RemovalConnection: RBXScriptConnection?,
 }
 
 local active: { [Model]: RagdollState } = {}
@@ -72,6 +75,24 @@ local function setNetworkOwnerServer(part: BasePart)
 	local ok, canSet = pcall(part.CanSetNetworkOwnership, part)
 	if ok and canSet then
 		pcall(part.SetNetworkOwner, part, nil)
+	end
+end
+
+-- A character is always owned by its own player, stated outright rather than
+-- left to the engine to assign: the ragdoll hands every part to the server, and
+-- nothing reloads the character afterwards, so without this the character stays
+-- server-simulated for the rest of the session and every input round-trips.
+-- Runs over the live descendants, not the saved set, so parts that appeared
+-- while the player was down are covered too.
+local function claimCharacter(character: Model, player: Player)
+	for _, descendant in character:GetDescendants() do
+		if not descendant:IsA("BasePart") then
+			continue
+		end
+		local ok, canSet = pcall(descendant.CanSetNetworkOwnership, descendant)
+		if ok and canSet then
+			pcall(descendant.SetNetworkOwner, descendant, player)
+		end
 	end
 end
 
@@ -122,7 +143,11 @@ local function restorePartPhysics(state: RagdollState)
 end
 
 local function applyHumanoidPhysics(humanoid: Humanoid, state: RagdollState)
+	local canReadEvaluation, evaluation = pcall(function()
+		return humanoid.EvaluateStateMachine
+	end)
 	state.HumanoidState = {
+		EvaluateStateMachine = if canReadEvaluation then evaluation else nil,
 		AutoRotate = humanoid.AutoRotate,
 		PlatformStand = humanoid.PlatformStand,
 		RequiresNeck = humanoid.RequiresNeck,
@@ -152,9 +177,11 @@ local function restoreHumanoidPhysics(humanoid: Humanoid?, state: RagdollState)
 	humanoid.RequiresNeck = humanoidState.RequiresNeck
 	humanoid.BreakJointsOnDeath = humanoidState.BreakJointsOnDeath
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, humanoidState.GettingUpEnabled)
-	pcall(function()
-		humanoid.EvaluateStateMachine = true
-	end)
+	if humanoidState.EvaluateStateMachine ~= nil then
+		pcall(function()
+			humanoid.EvaluateStateMachine = humanoidState.EvaluateStateMachine
+		end)
+	end
 	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 end
 
@@ -255,6 +282,16 @@ function EliminationService.down(player: Player, impulseVelocity: Vector3?): boo
 		PartStates = {},
 	}
 	active[character] = state
+	state.RemovalConnection = player.CharacterRemoving:Connect(function(removed)
+		if removed == character then
+			EliminationService.forget(character)
+		end
+	end)
+	state.CleanupConnection = character.AncestryChanged:Connect(function()
+		if not character:IsDescendantOf(workspace) then
+			EliminationService.forget(character)
+		end
+	end)
 
 	applyHumanoidPhysics(humanoid, state)
 	applyPartPhysics(character, state)
@@ -278,6 +315,12 @@ function EliminationService.up(player: Player): boolean
 
 	if state then
 		active[character] = nil
+		if state.CleanupConnection then
+			state.CleanupConnection:Disconnect()
+		end
+		if state.RemovalConnection then
+			state.RemovalConnection:Disconnect()
+		end
 		for _, instance in state.Instances do
 			if instance.Parent ~= nil then
 				instance:Destroy()
@@ -296,8 +339,33 @@ function EliminationService.up(player: Player): boolean
 		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 	end
 
+	claimCharacter(character, player)
 	setCombatState(player, character, true)
 	return true
+end
+
+function EliminationService.forget(character: Model)
+	local state = active[character]
+	if state == nil then
+		return
+	end
+	active[character] = nil
+	if state.CleanupConnection then
+		state.CleanupConnection:Disconnect()
+	end
+	if state.RemovalConnection then
+		state.RemovalConnection:Disconnect()
+	end
+	for _, instance in state.Instances do
+		instance:Destroy()
+	end
+	for _, motor in state.Motors do
+		if motor.Parent then
+			motor.Enabled = true
+		end
+	end
+	restorePartPhysics(state)
+	restoreHumanoidPhysics(humanoidOf(character), state)
 end
 
 return EliminationService

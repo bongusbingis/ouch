@@ -13,6 +13,8 @@ local Config = {
 	ModeVoteOptions = table.clone(GameModes.VoteOptions),
 
 	PartyMinPlayers = 1,
+	ReturnQueueWaitSeconds = 20,
+	ReturnQueuePollSeconds = 1,
 	PartyMaxPlayers = 4,
 	MatchTargetPlayers = 20,
 	MatchPopulationExpansion = {
@@ -20,7 +22,7 @@ local Config = {
 		{ AfterSeconds = 8, MinimumPlayers = 16 },
 		{ AfterSeconds = 16, MinimumPlayers = 12 },
 		{ AfterSeconds = 24, MinimumPlayers = 8 },
-		{ AfterSeconds = 30, MinimumPlayers = 1 },
+		{ AfterSeconds = 30, MinimumPlayers = 2 },
 	},
 
 	PartyRecordLifetime = 600,

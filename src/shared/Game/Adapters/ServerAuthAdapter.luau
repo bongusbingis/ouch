@@ -78,7 +78,11 @@ local function collectCharacters(): ({ [string]: CharacterEntry }, { Instance })
 			continue
 		end
 		local admission = player:GetAttribute("ArenaAdmission")
-		if (admission ~= "Direct" and admission ~= "Matched") or player:GetAttribute("ArenaReady") ~= true then
+		if
+			(admission ~= "Direct" and admission ~= "Matched")
+			or player:GetAttribute("ArenaReady") ~= true
+			or player:GetAttribute("ArenaRoundEligible") == false
+		then
 			table.insert(excluded, model)
 			continue
 		end
@@ -206,7 +210,7 @@ local pendingIntents: { Intent } = {}
 local pendingEquips: { [string]: string } = {}
 
 local function queueEquip(player: Player, weapon: string)
-	if player:GetAttribute("ArenaReady") ~= true then
+	if player:GetAttribute("ArenaReady") ~= true or player:GetAttribute("ArenaRoundEligible") == false then
 		return
 	end
 	pendingEquips[PlayerIds.toId(player)] = weapon
@@ -219,7 +223,7 @@ local function queueIntent(
 	targetId: string?,
 	charge: number?
 )
-	if player:GetAttribute("ArenaReady") ~= true then
+	if player:GetAttribute("ArenaReady") ~= true or player:GetAttribute("ArenaRoundEligible") == false then
 		return
 	end
 	if #pendingIntents >= MAX_QUEUED_INTENTS then
@@ -339,6 +343,7 @@ function ServerAuthAdapter.start()
 	Players.PlayerRemoving:Connect(function(player)
 		local id = PlayerIds.toId(player)
 		pendingWeaponResets[id] = nil
+		pendingEquips[id] = nil
 		for index = #pendingIntents, 1, -1 do
 			if pendingIntents[index].playerId == id then
 				table.remove(pendingIntents, index)
@@ -361,7 +366,7 @@ function ServerAuthAdapter.start()
 	Network.handleProtected("SubmitCombatInput", {
 		rateLimit = 20,
 		validate = function(_player, kind, aimDir, targetId, charge, lob)
-			if kind ~= "Throw" and kind ~= "Catch" then
+			if kind ~= "Throw" and kind ~= "Catch" and kind ~= "BeginCharge" and kind ~= "CancelCharge" then
 				return false, "invalid_kind"
 			end
 			if typeof(aimDir) ~= "Vector3" then

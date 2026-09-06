@@ -16,6 +16,8 @@ local WriteThroughProxy = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
 )
 
+local MatchAwards = require(ReplicatedStorage.Shared.Game.Progression.MatchAwards)
+
 local Data = {}
 Data._profiles = {}
 Data._loaded = {}
@@ -28,7 +30,7 @@ local loadedListeners = {}
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
 
-_dataStore = _dataStore.Mock
+--_dataStore = _dataStore.Mock
 
 local WRITE_LEASE_TIMEOUT_SECONDS = 10
 
@@ -105,6 +107,10 @@ local function _loadPlayerData(player)
 		profile:AddUserId(player.UserId)
 
 		profile:Reconcile()
+		local journal = MatchAwards.ensure(profile.Data)
+		for _, record in journal.Pending do
+			record.Ready = true
+		end
 
 		local sessionConn
 		sessionConn = profile.OnSessionEnd:Connect(function()
@@ -225,6 +231,30 @@ function Data.isLoaded(player)
 	return Data._loaded[player.UserId] == true
 end
 
+function Data.confirmReceiptSaved(player, receiptKey): boolean
+	local entry = Data._profiles[player.UserId]
+	if entry == nil then
+		return false
+	end
+	local profile = entry.Profile
+	local function saved()
+		local receipts = profile.LastSavedData and profile.LastSavedData.Receipts
+		return receipts ~= nil and receipts[receiptKey] ~= nil
+	end
+	if saved() then
+		return true
+	end
+	if not profile:IsActive() then
+		return false
+	end
+	profile:Save()
+	local deadline = os.clock() + DataConfig.Persistence.ReceiptSaveTimeoutSeconds
+	while not saved() and profile:IsActive() and os.clock() < deadline do
+		task.wait(DataConfig.Persistence.SavePollSeconds)
+	end
+	return saved()
+end
+
 function Data.onLoaded(listener)
 	table.insert(loadedListeners, listener)
 	local connected = true
@@ -255,12 +285,7 @@ function Data.addXP(player, amount)
 	end
 end
 
-function Data.applyProgression(player, delta: ProgressionDelta)
-	local d = Data.get(player)
-	if not d then
-		return false
-	end
-
+local function applyProgressionDelta(d, delta)
 	local progression = d.Progression
 	progression.Elims += delta.Elims or 0
 	progression.Deaths += delta.Deaths or 0
@@ -271,7 +296,115 @@ function Data.applyProgression(player, delta: ProgressionDelta)
 	d.Level.Points += delta.XP or 0
 	d.Bonks += delta.Bonks or 0
 	_recalculateKDR(d)
+end
+
+function Data.applyProgression(player, delta: ProgressionDelta)
+	local d = Data.get(player)
+	if d == nil then
+		return false
+	end
+	applyProgressionDelta(d, delta)
 	_syncLeaderStats(player)
+	return true
+end
+
+function Data.canQueueMatchAward(player): boolean
+	local data = Data.get(player)
+	return data ~= nil
+		and MatchAwards.hasCapacity(MatchAwards.ensure(data), DataConfig.Persistence.MaxPendingMatchAwards)
+end
+
+function Data.matchAwards(player)
+	local data = Data.get(player)
+	return if data then MatchAwards.ensure(data) else nil
+end
+
+function Data.beginMatchAward(player, id, seasonId)
+	local journal = Data.matchAwards(player)
+	if journal == nil then
+		return nil
+	end
+	return MatchAwards.enqueue(journal, id, {
+		SeasonId = seasonId,
+		Ready = false,
+		ProgressionApplied = false,
+		SeasonApplied = false,
+		Progress = { Elims = 0, Deaths = 0, Catches = 0, Wins = 0, Losses = 0, MatchesPlayed = 0, XP = 0, Bonks = 0 },
+	}, DataConfig.Persistence.MaxPendingMatchAwards)
+end
+
+function Data.addMatchProgress(player, id, delta)
+	local journal = Data.matchAwards(player)
+	local record = journal and journal.Pending[id]
+	if record == nil or record.Ready then
+		return false
+	end
+	for field, value in delta do
+		record.Progress[field] = (record.Progress[field] or 0) + value
+	end
+	return true
+end
+
+function Data.finishMatchAward(player, id, resultId, won)
+	local journal = Data.matchAwards(player)
+	local record = journal and journal.Pending[id]
+	if record == nil or record.Ready then
+		return false
+	end
+	record.ResultId = resultId
+	record.Won = won
+	record.Ready = true
+	return true
+end
+
+function Data.resolveMatchAward(player, id, awarded, multipliers)
+	local data = Data.get(player)
+	local record = data and MatchAwards.ensure(data).Pending[id]
+	if record == nil then
+		return nil
+	end
+	if record.Awarded == nil then
+		record.Awarded = awarded
+		record.Multipliers = multipliers
+		record.FirstMatch = data.Progression.MatchesPlayed == 0
+	end
+	return record
+end
+
+function Data.applyMatchAward(player, id): boolean
+	local journal = Data.matchAwards(player)
+	local record = journal and journal.Pending[id]
+	if record == nil or record.Awarded == nil then
+		return false
+	end
+	if record.ProgressionApplied then
+		return true
+	end
+	local data = Data.get(player)
+	if data == nil then
+		return false
+	end
+	applyProgressionDelta(data, record.Awarded)
+	record.ProgressionApplied = true
+	_syncLeaderStats(player)
+	return true
+end
+
+function Data.markMatchSeasonApplied(player, id)
+	local journal = Data.matchAwards(player)
+	local record = journal and journal.Pending[id]
+	if record then
+		record.SeasonApplied = true
+	end
+end
+
+function Data.completeMatchAward(player, id): boolean
+	local journal = Data.matchAwards(player)
+	local record = journal and journal.Pending[id]
+	if record == nil or not record.ProgressionApplied or not record.SeasonApplied then
+		return false
+	end
+	MatchAwards.complete(journal, id, os.time(), DataConfig.Persistence.CompletedMatchAwardHistory)
 	return true
 end
 
@@ -405,6 +538,9 @@ function Data.acquireWriteLease(player)
 			return
 		end
 		released = true
+		if Data._profiles[userId] ~= entry then
+			return
+		end
 		local count = Data._writeLeaseCounts[userId]
 		if count == nil then
 			return
@@ -426,6 +562,9 @@ function Data.save(player)
 	local entry = Data._profiles[userId]
 	if not entry or Data._pendingSaves[userId] ~= nil then
 		return
+	end
+	for _, record in MatchAwards.ensure(entry.Data).Pending do
+		record.Ready = true
 	end
 	Data._loaded[userId] = nil
 	Data._loadGeneration[userId] = (Data._loadGeneration[userId] or 0) + 1

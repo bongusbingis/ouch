@@ -43,7 +43,14 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 		}
 	end
 	local isLeader = snapshot.leaderUserId == userId
-	if snapshot.phase == "Lobby" then
+	if snapshot.phase == "Lobby" and snapshot.returnQueuePending then
+		return {
+			partyState = "REGROUPING TO FIND PLAYERS",
+			playText = "CANCEL",
+			playEnabled = isLeader and not busy,
+			showMatchmakingActivity = true,
+		}
+	elseif snapshot.phase == "Lobby" then
 		return {
 			partyState = if isLeader then "PRESS PLAY TO MATCHMAKE" else "WAITING FOR PARTY LEADER",
 			playText = "PLAY",

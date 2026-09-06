@@ -11,6 +11,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local c = React.createElement
 
@@ -36,6 +37,9 @@ return function(props)
 		},
 		OnActivated = props.OnActivated,
 	}, {
+		TargetSize = c("UISizeConstraint", {
+			MinSize = Vector2.new(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx),
+		}),
 		-- A Bonks amount is shown as the coin plus the number, never as the word:
 		-- the currency reads at a glance and the button keeps the same footprint
 		-- whichever currency it is priced in.

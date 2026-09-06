@@ -4,7 +4,7 @@ local modes = {
 	FFA = {
 		Enabled = true,
 		Title = "FREE-FOR-ALL",
-		Description = "First to 15 eliminations wins. Outlast other players to win.",
+		Description = "First to 15 eliminations wins. Everyone is a target.",
 		ThumbnailId = "",
 		SortOrder = 1,
 	},
@@ -41,6 +41,7 @@ end)
 -- neither can be changed live without the two drifting apart.
 return {
 	VoteDurationSeconds = 10,
+	OpponentGraceSeconds = 8,
 	Modes = table.freeze(modes),
 	VoteOptions = table.freeze(voteOptions),
 }

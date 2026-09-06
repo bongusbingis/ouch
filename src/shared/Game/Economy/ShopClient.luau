@@ -11,7 +11,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
+local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
+local BattlePassLogic = require(script.Parent.Parent.Progression.BattlePassLogic)
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local ClientRequest = require(script.Parent.Parent.Data.ClientRequest)
+local ShopConfig = require(ReplicatedStorage.Config.Economy.Shop)
 
 export type Snapshot = {
 	status: string,
@@ -143,7 +147,13 @@ end
 local function requestMetadata(kind: string, id: number, infoType: Enum.InfoType)
 	local key = metadataKey(kind, id)
 	local existing = state.metadata[key]
-	if existing ~= nil and existing.failed ~= true then
+	if
+		existing ~= nil
+		and (
+			existing.loading == true
+			or (existing.failed ~= true and os.clock() - (existing.fetchedAt or 0) < ShopConfig.MetadataRefreshSeconds)
+		)
+	then
 		return
 	end
 	local metadata = table.clone(state.metadata)
@@ -151,16 +161,17 @@ local function requestMetadata(kind: string, id: number, infoType: Enum.InfoType
 	update({ metadata = metadata })
 	local generation = lifecycleGeneration
 	task.spawn(function()
-		local ok, info = pcall(MarketplaceService.GetProductInfoAsync, MarketplaceService, id, infoType)
+		local ok, info = ClientRequest(MarketplaceService.GetProductInfoAsync, MarketplaceService, id, infoType)
 		if not started or generation ~= lifecycleGeneration then
 			return
 		end
 		local nextMetadata = table.clone(state.metadata)
-		if ok then
+		if ok and type(info) == "table" then
 			nextMetadata[key] = {
 				name = info.Name,
 				priceInRobux = info.PriceInRobux,
 				isForSale = info.IsForSale ~= false,
+				fetchedAt = os.clock(),
 			}
 		else
 			nextMetadata[key] = { failed = true }
@@ -268,7 +279,7 @@ function ShopClient.refresh(): (boolean, string?)
 	loadMarketplaceData()
 	local generation = refreshGeneration
 	update({ status = "Refreshing" })
-	local ok, result = pcall(Network.call, "GetShopState")
+	local ok, result = ClientRequest(Network.call, "GetShopState")
 	if generation ~= refreshGeneration then
 		return false, "stale"
 	end
@@ -297,7 +308,19 @@ function ShopClient.purchaseCosmetic(_cardId: string, itemId: string): (boolean,
 	return true, nil
 end
 
+local function randomPurchaseAllowed(): (boolean, string?)
+	local snapshot = state.shopState
+	if snapshot == nil or snapshot.paidRandomAllowed ~= true then
+		return false, if snapshot then snapshot.paidRandomReason or "policy_unavailable" else "policy_unavailable"
+	end
+	return true, nil
+end
+
 function ShopClient.openCrate(_cardId: string, crateId: string, count: number?): (boolean, string?)
+	local allowed, policyReason = randomPurchaseAllowed()
+	if not allowed then
+		return false, policyReason
+	end
 	local pendingKey = `Crate:{crateId}`
 	if state.pending[pendingKey] then
 		return false, "busy"
@@ -316,6 +339,22 @@ function ShopClient.openCrate(_cardId: string, crateId: string, count: number?):
 end
 
 function ShopClient.promptProduct(_cardId: string, productId: number): (boolean, string?)
+	local definition = Products.ById[productId]
+	if definition == nil or definition.CatalogStatus ~= "Active" then
+		return false, "unavailable"
+	end
+	if definition.Type == "Crate" then
+		local allowed, policyReason = randomPurchaseAllowed()
+		if not allowed then
+			return false, policyReason
+		end
+	end
+	if definition.Type == "SeasonPass" then
+		local season = BattlePassLogic.activeSeason(Seasons.Definitions, os.time())
+		if season == nil or season.Id ~= definition.SeasonId then
+			return false, "season_ended"
+		end
+	end
 	local pendingKey = `ProductId:{productId}`
 	if state.pending[pendingKey] then
 		return false, "busy"
@@ -332,6 +371,10 @@ function ShopClient.promptProduct(_cardId: string, productId: number): (boolean,
 end
 
 function ShopClient.promptGamePass(_cardId: string, passId: number): (boolean, string?)
+	local definition = GamePasses.ById[passId]
+	if definition == nil or definition.CatalogStatus ~= "Active" then
+		return false, "unavailable"
+	end
 	local pendingKey = `GamePassId:{passId}`
 	if state.pending[pendingKey] then
 		return false, "busy"

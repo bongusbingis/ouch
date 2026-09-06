@@ -10,6 +10,7 @@ export type FakePlayer = {
 	Name: string,
 	DisplayName: string,
 	Character: Model?,
+	CharacterRemoving: any,
 	Parent: Instance?,
 	GetAttribute: (self: FakePlayer, name: string) -> any,
 	SetAttribute: (self: FakePlayer, name: string, value: any) -> (),
@@ -18,6 +19,27 @@ export type FakePlayer = {
 }
 
 local FakePlayer = {}
+
+local function signal()
+	local listeners = {}
+	local event = {}
+	function event:Connect(callback)
+		local connection = {}
+		listeners[connection] = callback
+		function connection.Disconnect()
+			listeners[connection] = nil
+		end
+		return connection
+	end
+	function event:Fire(...)
+		for connection, callback in table.clone(listeners) do
+			if listeners[connection] then
+				callback(...)
+			end
+		end
+	end
+	return event
+end
 
 function FakePlayer.new(userId: number, name: string?): FakePlayer
 	local attributes: { [string]: any } = {}
@@ -28,6 +50,7 @@ function FakePlayer.new(userId: number, name: string?): FakePlayer
 		Name = playerName,
 		DisplayName = playerName,
 		Character = nil :: Model?,
+		CharacterRemoving = signal(),
 		Parent = nil :: Instance?,
 	}
 

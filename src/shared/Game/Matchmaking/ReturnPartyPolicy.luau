@@ -24,6 +24,9 @@ function ReturnPartyPolicy.resolve(party: any, payload: any, userId: number): Ac
 	if not isMember then
 		return nil
 	end
+	if party.phase == "Lobby" and party.lastReturnMatchId and party.lastReturnMatchId ~= payload.matchId then
+		return nil
+	end
 	if payload.returnMode == "Separate" then
 		if party.leaderUserId == userId then
 			return nil

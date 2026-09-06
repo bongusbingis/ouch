@@ -11,10 +11,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
+local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
+local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local EntitlementService = require(script.Parent.EntitlementService)
 local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 type StartOptions = {
 	marketplace: any?,
@@ -25,6 +28,7 @@ type StartOptions = {
 	gamePasses: any?,
 	cosmetics: any?,
 	network: any?,
+	analyticsService: any?,
 	runAsync: ((callback: () -> ()) -> ())?,
 	wait: ((seconds: number) -> ())?,
 }
@@ -32,10 +36,10 @@ type StartOptions = {
 local GamePassService = {}
 
 local PROFILE_ATTEMPTS = 120
-local PURCHASE_ATTEMPTS = 4
 local RETRY_SECONDS = 0.25
 
 local started = false
+local generation = 0
 local activeMarketplace: any = MarketplaceService
 local activePlayers: any = Players
 local activePlayerData: any = PlayerData
@@ -44,6 +48,7 @@ local activeEntitlementService: any = EntitlementService
 local activeGamePasses: any = GamePasses
 local activeCosmetics: any = Cosmetics
 local activeNetwork: any = Network
+local activeAnalytics: any = AnalyticsService
 local activeRunAsync: (callback: () -> ()) -> () = task.spawn
 local activeWait: (seconds: number) -> () = task.wait
 local connections: { any } = {}
@@ -116,8 +121,17 @@ local function grantConfiguredPass(player: Player, passId: number): (boolean, nu
 	end
 	local granted = 0
 	for _, itemId in definition.EntitlementItemIds do
-		if activeCosmeticsService.grant(player, itemId) then
+		local ok, accepted, reason = pcall(activeCosmeticsService.grant, player, itemId)
+		if not ok or (not accepted and reason ~= "already_owned") then
+			return false, granted
+		end
+		if accepted then
 			granted += 1
+			pcall(activeAnalytics.logCustomEvent, player, AnalyticsConfig.CustomEvents.CosmeticGranted, 1, {
+				itemId = itemId,
+				passId = passId,
+				source = "GamePass",
+			})
 		end
 	end
 	return true, granted
@@ -131,7 +145,11 @@ local function recordOwnership(passId: number, player: Player, owned: boolean)
 end
 
 local function reconcilePass(player: Player, passId: number): (boolean?, number)
+	local currentGeneration = generation
 	local owned = ownsPass(player, passId)
+	if currentGeneration ~= generation or player.Parent == nil then
+		return nil, 0
+	end
 	if owned ~= nil then
 		recordOwnership(passId, player, owned)
 	end
@@ -142,12 +160,25 @@ local function reconcilePass(player: Player, passId: number): (boolean?, number)
 	return if granted then true else nil, count
 end
 
-local function reconcilePlayer(player: Player)
+local function reconcilePlayer(player: Player, currentGeneration: number)
 	if not waitForProfile(player) then
 		return
 	end
-	for _, passId in sortedPassIds() do
-		reconcilePass(player, passId)
+	local remaining = sortedPassIds()
+	while currentGeneration == generation and player.Parent ~= nil and #remaining > 0 do
+		local failed = {}
+		for _, passId in remaining do
+			if currentGeneration ~= generation or player.Parent == nil then
+				return
+			end
+			if reconcilePass(player, passId) == nil then
+				table.insert(failed, passId)
+			end
+		end
+		remaining = failed
+		if #remaining > 0 then
+			activeWait(DataConfig.Persistence.EntitlementRetrySeconds)
+		end
 	end
 end
 
@@ -173,27 +204,26 @@ local function onPurchaseFinished(player: Player, passId: number, wasPurchased: 
 	if not wasPurchased or activeGamePasses.ById[passId] == nil then
 		return
 	end
+	local currentGeneration = generation
 	activeRunAsync(function()
-		if not waitForProfile(player) then
+		if not waitForProfile(player) or currentGeneration ~= generation then
 			return
 		end
-		for attempt = 1, PURCHASE_ATTEMPTS do
+		while currentGeneration == generation and player.Parent ~= nil do
 			local reconciled, itemCount = reconcilePass(player, passId)
 			if reconciled == true then
-				notifyPurchase(player, passId, itemCount)
+				pcall(notifyPurchase, player, passId, itemCount)
 				return
 			end
-			if attempt < PURCHASE_ATTEMPTS then
-				activeWait(RETRY_SECONDS)
-			end
+			activeWait(DataConfig.Persistence.EntitlementRetrySeconds)
 		end
-		warn(`[GamePassService] purchased pass {passId} was not confirmed for {player.Name}; retrying next join`)
 	end)
 end
 
 local function schedulePlayer(player: Player)
+	local currentGeneration = generation
 	activeRunAsync(function()
-		reconcilePlayer(player)
+		reconcilePlayer(player, currentGeneration)
 	end)
 end
 
@@ -212,6 +242,7 @@ function GamePassService.start(options: StartOptions?)
 	activeGamePasses = if options and options.gamePasses then options.gamePasses else GamePasses
 	activeCosmetics = if options and options.cosmetics then options.cosmetics else Cosmetics
 	activeNetwork = if options and options.network then options.network else Network
+	activeAnalytics = if options and options.analyticsService then options.analyticsService else AnalyticsService
 	activeRunAsync = if options and options.runAsync then options.runAsync else task.spawn
 	activeWait = if options and options.wait then options.wait else task.wait
 
@@ -224,6 +255,7 @@ function GamePassService.start(options: StartOptions?)
 end
 
 function GamePassService._resetForTest()
+	generation += 1
 	for _, connection in connections do
 		connection:Disconnect()
 	end
@@ -237,6 +269,7 @@ function GamePassService._resetForTest()
 	activeGamePasses = GamePasses
 	activeCosmetics = Cosmetics
 	activeNetwork = Network
+	activeAnalytics = AnalyticsService
 	activeRunAsync = task.spawn
 	activeWait = task.wait
 	table.clear(purchaseNotifications)

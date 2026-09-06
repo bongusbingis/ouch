@@ -58,9 +58,8 @@ T.describe("StarterOffer", function()
 		local pass = GamePasses.Catalog[offer.PassKey]
 		T.expect(pass ~= nil):toBeTruthy()
 		T.expect(offer.WindowSeconds > 0):toBeTruthy()
-		for _, definition in GamePasses.Catalog do
-			T.expect(pass.SuggestedRobux <= definition.SuggestedRobux):toBeTruthy()
-		end
+		T.expect(pass.CatalogStatus):toEqual("Active")
+		T.expect(pass.Id ~= nil):toBeTruthy()
 	end)
 end)
 

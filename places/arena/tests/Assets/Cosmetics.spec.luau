@@ -26,12 +26,55 @@ local HammerGrip = require(Client:WaitForChild("Modules"):WaitForChild("Presenta
 
 return function()
 	describe("Cosmetics assets", function()
-		it("has the effects carrier for templates that declare one", function()
-			for _, definition in Cosmetics.VisualTemplates do
-				if definition.EffectsCarrier then
-					local carrier =
-						TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "Templates", definition.EffectsCarrier)
-					expect(carrier:IsA("MeshPart")).to.equal(true)
+		it("has an authored template MeshPart carrying each visual template's mesh", function()
+			for name, definition in Cosmetics.VisualTemplates do
+				local template = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", "Templates", name)
+				expect(template:IsA("MeshPart")).to.equal(true)
+				expect(template.MeshId).to.equal(`rbxassetid://{definition.MeshId}`)
+			end
+		end)
+
+		-- A mesh and its PBR maps are authored, never written at runtime, so config
+		-- and the authored asset are two records of one thing. These hold them in
+		-- agreement: without this a mis-imported or misnamed part renders the wrong
+		-- skin with nothing failing.
+		it("has an authored MeshPart for every item in a category that has visuals", function()
+			for itemId, item in Cosmetics.Items do
+				local folder = Cosmetics.VisualFolders[item.Category]
+				if folder == nil or item.Visual == nil then
+					continue
+				end
+				local part = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folder, itemId)
+				expect(part:IsA("MeshPart")).to.equal(true)
+				local templateDef = Cosmetics.VisualTemplates[item.Visual.Template]
+				expect(part.MeshId).to.equal(`rbxassetid://{item.Visual.MeshId or templateDef.MeshId}`)
+			end
+		end)
+
+		it("matches every authored SurfaceAppearance to the maps its item declares", function()
+			for itemId, item in Cosmetics.Items do
+				local folder = Cosmetics.VisualFolders[item.Category]
+				if folder == nil or item.Visual == nil then
+					continue
+				end
+				local templateDef = Cosmetics.VisualTemplates[item.Visual.Template]
+				local maps = item.Visual.SurfaceMaps or templateDef.SurfaceMaps
+				local part = TestAssets.get(ReplicatedStorage, "Assets", "Cosmetics", folder, itemId)
+				local appearance = part:FindFirstChildOfClass("SurfaceAppearance")
+				if maps == nil then
+					expect(appearance).to.equal(nil)
+					continue
+				end
+				expect(appearance).to.be.ok()
+				for property, id in
+					{
+						ColorMap = maps.ColorMapId,
+						MetalnessMap = maps.MetalnessMapId,
+						NormalMap = maps.NormalMapId,
+						RoughnessMap = maps.RoughnessMapId,
+					}
+				do
+					expect((appearance :: any)[property]).to.equal(`rbxassetid://{id}`)
 				end
 			end
 		end)

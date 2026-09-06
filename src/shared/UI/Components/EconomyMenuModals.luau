@@ -17,6 +17,7 @@ local c = React.createElement
 
 export type Props = {
 	Controller: ControllerModule.Controller,
+	FocusEnabled: boolean?,
 }
 
 return function(props: Props)
@@ -24,12 +25,14 @@ return function(props: Props)
 	return c(React.Fragment, nil, {
 		ShopDetails = c(ShopDetailsModal, {
 			Card = controller.selectedShopCard,
+			FocusEnabled = props.FocusEnabled ~= false and controller.crateReveal == nil,
 			OnClose = controller.closeSelectedShopCard,
 			OnPurchaseBonks = controller.purchaseSelectedBonks,
 			OnPurchaseRobux = controller.purchaseSelectedRobux,
 		}),
 		CrateReveal = c(CrateRevealModal, {
 			Reveal = controller.crateReveal,
+			FocusEnabled = props.FocusEnabled,
 			OnClose = controller.closeReveal,
 			OnOpenAgain = if controller.crateReplay then controller.openAgain else nil,
 			OpenAgainEnabled = controller.crateReplay ~= nil and controller.crateReplay.affordable,

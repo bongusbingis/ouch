@@ -2,6 +2,26 @@
 
 Apply these changes manually in Studio. Repository tooling must not rewrite `game.rbxl`.
 
+## Victory-emote preview rig
+
+Both places use `ReplicatedStorage.Assets.Rigs.CharacterRig` for the free victory presentation and [Showtime](showtime-pass.md). It must be a complete R15 Model with HumanoidRootPart and paired `*RigAttachment` attachments forming the 15-link body graph. The preview renderer clones this model and strips physics/animation constraints from the clone only.
+
+The previously missing `LeftFoot` was repaired in both open Studio documents during the arena redesign. Required authored properties:
+
+| Property | Value |
+|---|---|
+| MeshId | `rbxassetid://134464286998182` |
+| Size | `Vector3.new(0.9913692474, 0.3178193867, 1.0258681774)` |
+| SurfaceAppearance.ColorMap | `rbxassetid://112685197447151` |
+| SurfaceAppearance.NormalMap | `rbxassetid://136829035030080` |
+| SurfaceAppearance.RoughnessMap | `rbxassetid://104036453087397` |
+| SurfaceAppearance.MetalnessMap | `rbxassetid://92127305842810` |
+| LeftAnkleRigAttachment.Position | `Vector3.new(-0.026809454, 0.154947519, -0.0771398768)` |
+
+Align the foot with `LeftLowerLeg.LeftAnkleRigAttachment.WorldCFrame * LeftFoot.LeftAnkleRigAttachment.CFrame:Inverse()`. Authored LeftAnkle/LeftAnkleBallSocket constraints connect those two attachments. Keep all other authored rig content. Run `ServerStorage.Tests.Shared.VictoryRig.spec` in both places after saving/importing these asset changes. Do not reconstruct or patch `.rbxl` contents with repository tooling.
+
+Arena loading now preloads this rig with the existing bounded critical manifest. ArenaService projects the authored `Workspace.Assets.Arena.MapOrigin.Position` as the nonstreamed arena Folder's `MapOriginPosition` attribute; loading and the vote camera use that projection so a streamed-out marker cannot stall the streaming request itself.
+
 ## Dodgeball template
 
 1. Open `ReplicatedStorage > Assets > Cosmetics > BallAssets > DefaultDodgeball`. It must remain a single anchored `BasePart` with `CanCollide`, `CanTouch`, and `CanQuery` disabled. This is both the authoritative ball template and the default visual.
@@ -196,3 +216,9 @@ The per-player selection checkmark on each mode card uses a placeholder image as
 9. Verify Starting counts down for 3 seconds without accepting held combat inputs; then test Throw and Catch on mouse/keyboard, touch, and gamepad.
 10. Verify FFA respawns in 1 second and TDM uses the displayed 4.5-second wave deadline. Confirm neither respawn creates a new ball, while a late join receives exactly one.
 11. Score a dodgeball elimination and verify one splat burst plus the `Splat` sound at the impact point, colored to the thrower's equipped ball skin (default skin → rubber red), identical on every client. Repeat under the latency settings from step 4: exactly one splat, and exactly one hammer squash on hammer hits.
+
+## Lobby scene streaming
+
+`Workspace.Views.Party` must be a **Model** with `ModelStreamingMode = Persistent`. Keep its existing `Background`, `Players`, `Static`, `podium_002`, `SplashScreenCamera`, `InventoryCamera`, and `ShopCamera` children and their authored properties. The backdrop and camera markers are required before the lobby loading controller finishes; a streamed Folder can lose its BaseParts and deadlock that initialization.
+
+This conversion was performed in the open lobby Studio document through MCP on 2026-09-06, preserving all children, attributes and tags. Save it through Studio together with the authored victory-rig repairs above before running the saved-place deployment suite. The lobby `Matchmaking/Scene.spec` asserts this requirement. The source controllers still use required-asset `WaitForChild` checks.

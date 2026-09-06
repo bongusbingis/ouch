@@ -17,6 +17,12 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local InputBuffer = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("InputBuffer")
 )
+local CombatActionRules = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Input")
+		:WaitForChild("CombatActionRules")
+)
 local AimDirector = require(script.Parent.AimDirector)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local CombatState = require(script.Parent.Parent.Presentation.CombatState)
@@ -31,6 +37,8 @@ local buffer = InputBuffer.new()
 type Style = { targetId: string?, charge: number? }
 
 local pendingStyle: Style? = nil
+local pendingWeapon: string? = nil
+local pendingCharacter: Model? = nil
 
 function CombatInputSender.onIntent(listener: (string) -> ()): () -> ()
 	table.insert(listeners, listener)
@@ -85,7 +93,7 @@ local function ballIncoming(): boolean
 end
 
 local function intentForTap(): string
-	if CombatState.canThrowBall() then
+	if CombatState.holdsBall() then
 		return "Throw"
 	end
 	return if ballIncoming() then "Catch" else "Throw"
@@ -100,53 +108,86 @@ local function send(kind: string, style: Style)
 	if typeof(aimDir) ~= "Vector3" or aimDir.Magnitude <= 1e-6 then
 		return
 	end
+	if kind == "Throw" and CombatState.canThrowBall() then
+		CombatState.onThrow(aimDir, style.charge)
+	end
 	Network.fireServer("SubmitCombatInput", kind, aimDir, style.targetId, style.charge)
 	notify(kind)
 end
 
-local function actionable(): boolean
-	local character = Players.LocalPlayer.Character
-	if character == nil or character:GetAttribute("CombatAlive") == false then
-		return false
-	end
+local function actionStatus(kind: string): string
+	local player = Players.LocalPlayer
+	local character = player.Character
 	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
-	return matchState ~= nil and matchState:GetAttribute("phase") == "Active"
+	local snapshot = CombatState.getSnapshot()
+	return CombatActionRules.status(kind, {
+		enabled = Combat.isInputEnabled(),
+		active = matchState ~= nil and matchState:GetAttribute("phase") == "Active",
+		alive = character ~= nil and character:GetAttribute("CombatAlive") ~= false,
+		eligible = player:GetAttribute("ArenaRoundEligible") ~= false,
+		weapon = snapshot.weapon,
+		holdsBall = snapshot.holdsBall,
+		throwCooldown = snapshot.throwCooldown,
+		hammerCooldown = snapshot.hammerCooldown,
+		catchCooldown = if character then (character:GetAttribute("dbCc") :: number?) or 0 else 0,
+	})
+end
+
+local function clearBuffer()
+	InputBuffer.clear(buffer)
+	pendingStyle = nil
+	pendingWeapon = nil
+	pendingCharacter = nil
 end
 
 local function submit(kind: string, style: Style)
-	if actionable() or not MobileInput.Buffer.Enabled then
+	local status = actionStatus(kind)
+	if status == "Ready" then
+		clearBuffer()
 		send(kind, style)
-		return
+	elseif status == "Cooldown" and MobileInput.Buffer.Enabled then
+		InputBuffer.push(buffer, kind, os.clock())
+		pendingStyle = style
+		pendingWeapon = CombatState.getSnapshot().weapon
+		pendingCharacter = Players.LocalPlayer.Character
+	else
+		clearBuffer()
 	end
-	InputBuffer.push(buffer, kind, os.clock())
-	pendingStyle = style
 end
 
 local function flush()
-	if not MobileInput.Buffer.Enabled or not actionable() then
+	local action = InputBuffer.peek(buffer, os.clock(), MobileInput.Buffer.WindowSeconds)
+	if
+		action == nil
+		or not MobileInput.Buffer.Enabled
+		or pendingWeapon ~= CombatState.getSnapshot().weapon
+		or pendingCharacter ~= Players.LocalPlayer.Character
+	then
+		clearBuffer()
 		return
 	end
-	local action = InputBuffer.take(buffer, os.clock(), MobileInput.Buffer.WindowSeconds)
-	if action == nil then
-		return
+	local status = actionStatus(action)
+	if status == "Unavailable" then
+		clearBuffer()
+	elseif status == "Ready" then
+		local style = pendingStyle or {}
+		clearBuffer()
+		send(action, style)
 	end
-	local style = pendingStyle or {}
-	pendingStyle = nil
-	send(action, style)
 end
 
 local function onIntent(intent: string)
 	if intent == "NormalThrow" then
 		local kind = intentForTap()
-		if CombatState.canStartThrow() then
-			CombatState.onThrow(AimDirector.currentAim())
-		elseif CombatState.canThrowBall() then
+		if actionStatus(kind) ~= "Ready" and CombatState.canThrowBall() then
 			CombatState.onBlocked()
 		end
 		submit(kind, {})
 	elseif intent == "BeginCharge" then
-		if CombatState.canStartThrow() then
+		if CombatState.canStartThrow() and actionStatus("Throw") == "Ready" then
+			clearBuffer()
 			CombatState.beginCharge(os.clock())
+			Network.fireServer("SubmitCombatInput", "BeginCharge", Vector3.zAxis)
 		else
 			if CombatState.canThrowBall() then
 				CombatState.onBlocked()
@@ -159,10 +200,12 @@ local function onIntent(intent: string)
 			return
 		end
 		local style: Style = { charge = CombatState.currentCharge() }
-		CombatState.onThrow(AimDirector.currentAim())
+		CombatState.endCharge()
 		submit("Throw", style)
 	elseif intent == "CancelCharge" then
+		clearBuffer()
 		CombatState.cancelCharge()
+		Network.fireServer("SubmitCombatInput", "CancelCharge", Vector3.zAxis)
 	elseif intent == "HammerAttack" then
 		submit("Throw", {})
 	elseif intent == "EquipHammer" then
@@ -192,7 +235,7 @@ function CombatInputSender.destroy()
 		heartbeat = nil
 	end
 	table.clear(listeners)
-	pendingStyle = nil
+	clearBuffer()
 	buffer = InputBuffer.new()
 	started = false
 end

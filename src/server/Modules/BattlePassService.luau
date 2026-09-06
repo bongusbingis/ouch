@@ -8,6 +8,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
 local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 local AnalyticsConfig =
@@ -75,21 +76,42 @@ local function premiumProductId(seasonId: string): number?
 	return nil
 end
 
-local function grantUnclaimedTiers(player: Player, data: any)
-	local stored = BattlePassLogic.readState(data.Season)
+local function grantUnclaimedTiers(player: Player, data: any, stored: any): boolean
 	local season = activeSeasons.Definitions[stored.Id]
 	if season == nil then
-		if stored.Id ~= "" then
-			warn(`[BattlePassService] season "{stored.Id}" is missing; unclaimed rewards cannot be settled`)
-		end
-		return
+		return stored.Id == ""
 	end
-	for _, owed in BattlePassLogic.unclaimedTiers(season, stored, hasPremium(data, stored.Id)) do
+	local complete = true
+	for _, owed in
+		BattlePassLogic.unclaimedTiers(season, BattlePassLogic.readState(stored), hasPremium(data, stored.Id))
+	do
 		local granted = activeRewardService.grant(player, owed.reward)
-		if not granted then
-			warn(`[BattlePassService] failed to settle {owed.track} tier {owed.tier} of season "{stored.Id}"`)
+		if granted then
+			local field = if owed.track == "Premium" then "ClaimedPremium" else "ClaimedFree"
+			stored[field][tostring(owed.tier)] = true
+		else
+			complete = false
 		end
 	end
+	return complete
+end
+
+local function archive(data: any, stored: any): boolean
+	if stored.Id == "" then
+		return true
+	end
+	if data.SeasonHistory[stored.Id] == nil then
+		local count = 0
+		for _ in data.SeasonHistory do
+			count += 1
+		end
+		if count >= DataConfig.Persistence.MaxSeasonArchives then
+			warn("[BattlePassService] season archive capacity reached; retaining all unpaid progress")
+			return false
+		end
+		data.SeasonHistory[stored.Id] = BattlePassLogic.readState(stored)
+	end
+	return true
 end
 
 function BattlePassService.ensureData(player: Player): any
@@ -104,11 +126,19 @@ function BattlePassService.ensureData(player: Player): any
 		data.Entitlements = { PremiumSeasons = {} }
 	end
 
+	if data.SeasonHistory == nil then
+		data.SeasonHistory = {}
+	end
 	local season = activeSeasonAt(activeTime())
 	local activeId = if season then season.Id else ""
 	if data.Season.Id ~= activeId then
-		grantUnclaimedTiers(player, data)
+		if not archive(data, data.Season) then
+			return nil
+		end
 		data.Season = BattlePassLogic.blankState(activeId)
+	end
+	for _, stored in data.SeasonHistory do
+		grantUnclaimedTiers(player, data, stored)
 	end
 	return data
 end
@@ -131,16 +161,34 @@ function BattlePassService.fireState(player: Player)
 	end
 end
 
-function BattlePassService.addSeasonXp(player: Player, amount: number)
+function BattlePassService.addSeasonXp(player: Player, amount: number, seasonId: string?): boolean
 	if amount <= 0 then
-		return
+		return true
 	end
 	local data = BattlePassService.ensureData(player)
-	if data == nil or data.Season.Id == "" then
-		return
+	if data == nil then
+		return false
 	end
-	data.Season.XP = data.Season.XP + amount
-	BattlePassService.fireState(player)
+	local id = seasonId or data.Season.Id
+	if id == "" then
+		return true
+	end
+	local stored = data.Season
+	if stored.Id ~= id then
+		if activeSeasons.Definitions[id] == nil then
+			return false
+		end
+		if not archive(data, BattlePassLogic.blankState(id)) then
+			return false
+		end
+		stored = data.SeasonHistory[id]
+	end
+	stored.XP += amount
+	if stored.Id ~= data.Season.Id then
+		pcall(grantUnclaimedTiers, player, data, stored)
+	end
+	pcall(BattlePassService.fireState, player)
+	return true
 end
 
 function BattlePassService.grantPremium(player: Player, seasonId: string?): boolean
@@ -156,8 +204,10 @@ function BattlePassService.grantPremium(player: Player, seasonId: string?): bool
 		return false
 	end
 	data.Entitlements.PremiumSeasons[seasonId] = true
+	local stored = data.SeasonHistory[seasonId]
+	local settled = stored == nil or grantUnclaimedTiers(player, data, stored)
 	BattlePassService.fireState(player)
-	return true
+	return settled
 end
 
 local function claimOne(player: Player, data: any, season: any, tier: number, track: string): (boolean, string?)
@@ -176,7 +226,7 @@ local function claimOne(player: Player, data: any, season: any, tier: number, tr
 
 	local field = if track == "Premium" then "ClaimedPremium" else "ClaimedFree"
 	data.Season[field][tostring(tier)] = true
-	activeAnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.SeasonTierClaimed, 1, {
+	pcall(activeAnalyticsService.logCustomEvent, player, AnalyticsConfig.CustomEvents.SeasonTierClaimed, 1, {
 		seasonId = season.Id,
 		tier = tier,
 		track = track,
@@ -215,14 +265,18 @@ function BattlePassService.claimAll(player: Player): (any?, string?, number)
 	local stored = BattlePassLogic.readState(data.Season)
 	local owed = BattlePassLogic.unclaimedTiers(season, stored, hasPremium(data, season.Id))
 	local claimed = 0
+	local failure: string? = nil
 	for _, entry in owed do
-		if claimOne(player, data, season, entry.tier, entry.track) then
+		local ok, reason = claimOne(player, data, season, entry.tier, entry.track)
+		if ok then
 			claimed += 1
+		else
+			failure = reason or "grant_failed"
 		end
 	end
 	local state = BattlePassService.stateFor(player)
 	activeNetwork.fire("SeasonPassStateChanged", player, state)
-	return state, nil, claimed
+	return if failure then nil else state, failure, claimed
 end
 
 local function sweep()

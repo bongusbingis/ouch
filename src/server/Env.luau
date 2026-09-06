@@ -4,7 +4,7 @@
 -- Created: 2026-07-12
 
 return {
-	PrimaryDataKey = "STAGING_007",
+	PrimaryDataKey = "STAGING_009",
 	LobbyPlaceId = 130584867985467,
 	Cmdr = {
 		Enabled = true,

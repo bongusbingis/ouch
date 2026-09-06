@@ -67,5 +67,5 @@ return {
 	-- every slider mode, a disabled row, and a Lobby-only row) to the real
 	-- Settings menu so every control mode can be exercised without real
 	-- settings existing yet. Never written to a player's profile.
-	SettingsShowExamples = true,
+	SettingsShowExamples = false,
 }

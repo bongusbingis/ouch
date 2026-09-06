@@ -57,7 +57,7 @@ local function base(overrides: { [string]: any }?): any
 		personalStats = {
 			{ id = "Eliminations", label = "ELIMINATIONS", value = 11, highlight = true },
 			{ id = "Catches", label = "CATCHES", value = 4 },
-			{ id = "Deaths", label = "KNOCKOUTS", value = 3 },
+			{ id = "Deaths", label = "TIMES BONKED", value = 3 },
 		},
 		rewards = {
 			matchXp = 850,
@@ -83,6 +83,32 @@ local function base(overrides: { [string]: any }?): any
 	for key, value in overrides or {} do
 		result[key] = if value == CLEAR then nil else value
 	end
+	result.podium = {}
+	local styles = { "ShowtimeTwirl", "ShowtimeFlex", "ShowtimeBounce" }
+	for index = 1, 3 do
+		local score = result.scores[index]
+		local entry = {
+			playerId = tostring(index),
+			userId = index,
+			username = ({ "YOU", "ALEX", "SAM" })[index],
+			displayName = ({ "YOU", "ALEX", "SAM" })[index],
+			emoteId = styles[index],
+			placement = index,
+			score = ({ 11, 8, 6 })[index],
+		}
+		if result.modeId == "FFA" and score then
+			entry.playerId = score.id
+			entry.userId = tonumber(score.id) or index
+			entry.displayName = score.label
+			entry.placement = score.placement or index
+			entry.score = score.score
+		end
+		if entry.placement <= 3 then
+			table.insert(result.podium, entry)
+		end
+	end
+	result.personalAppearance =
+		{ playerId = "1", userId = 1, username = "YOU", displayName = "YOU", emoteId = "ShowtimeTwirl" }
 	return result
 end
 
