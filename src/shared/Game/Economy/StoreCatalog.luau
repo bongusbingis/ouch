@@ -21,6 +21,20 @@ export type StoreOffer = {
 
 local StoreCatalog = {}
 
+function StoreCatalog.platformIndex(catalog: { [string]: any }): ({ [number]: any }, { [number]: string })
+	local byId, keyById = {}, {}
+	for key, definition in catalog do
+		local id = definition.Id
+		assert(definition.CatalogStatus ~= "Active" or id ~= nil, `active offer "{key}" must define Id`)
+		if id ~= nil then
+			assert(type(id) == "number" and id > 0 and id % 1 == 0, `offer "{key}" requires a positive integer Id`)
+			assert(byId[id] == nil, `duplicate platform offer id {id}`)
+			byId[id], keyById[id] = definition, key
+		end
+	end
+	return byId, keyById
+end
+
 local function statusFor(definition: any): string
 	if definition.CatalogStatus ~= nil then
 		return definition.CatalogStatus

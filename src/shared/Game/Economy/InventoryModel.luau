@@ -6,6 +6,7 @@
 --!strict
 
 local InventoryModel = {}
+local CosmeticsLogic = require(script.Parent.CosmeticsLogic)
 
 export type Entry = {
 	id: string,
@@ -24,10 +25,6 @@ type Catalog = {
 	Items: { [string]: any },
 	Rarities: { [string]: { DisplayOrder: number } }?,
 }
-
-local function available(itemId: string, item: any, owned: { [string]: any }): boolean
-	return item.AlwaysAvailable == true or owned[itemId] == true
-end
 
 local function sortEntries(entries: { Entry }, catalog: Catalog)
 	table.sort(entries, function(left, right)
@@ -68,7 +65,11 @@ function InventoryModel.entries(catalog: Catalog, owned: { [string]: any }, cate
 		end
 	end
 	for itemId, definition in catalog.Items or {} do
-		if (category == nil or definition.Category == category) and available(itemId, definition, owned) then
+		if
+			(category == nil or definition.Category == category)
+			and definition.InventoryVisible ~= false
+			and CosmeticsLogic.isOwned(catalog.Items, owned, itemId)
+		then
 			table.insert(entries, {
 				id = itemId,
 				itemId = itemId,

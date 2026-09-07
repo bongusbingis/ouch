@@ -177,6 +177,8 @@ local function grantReceipt(receiptInfo: { [string]: any }, player: Player): Enu
 			if payload.kind == "Crate" then
 				pcall(activeNetwork.fire, "CrateOpened", player, payload.reveal)
 			else
+				payload.productId = receiptInfo.ProductId
+				payload.grantId = receiptKey
 				pcall(activeNetwork.fire, "StorePurchaseGranted", player, payload)
 			end
 		end
@@ -236,10 +238,12 @@ function MonetizationService.start(options: StartOptions?)
 				activeCrates[definition.CrateId] ~= nil,
 				`[Monetization] product {productId} references an unknown crate`
 			)
-			assert(
-				activeCrates[definition.CrateId].CatalogStatus == "Active",
-				`[Monetization] product {productId} sells a crate that is not Active`
-			)
+			if definition.CatalogStatus == "Active" then
+				assert(
+					activeCrates[definition.CrateId].CatalogStatus == "Active",
+					`[Monetization] product {productId} sells a crate that is not Active`
+				)
+			end
 		elseif definition.Type == "Bundle" then
 			assert(
 				activeBundles.Catalog[definition.BundleId] ~= nil,

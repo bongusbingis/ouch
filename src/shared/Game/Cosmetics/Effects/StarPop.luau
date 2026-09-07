@@ -37,7 +37,8 @@ local function star(
 	scale: number,
 	index: number,
 	count: number,
-	layer: Runtime.Layer
+	layer: Runtime.Layer,
+	scope: Runtime.Scope?
 )
 	local angle = ((index - 1) / count) * math.pi * 2 + random:NextNumber(-0.12, 0.12)
 	local direction = Primitives.radial(frame, angle, random:NextNumber(0.12, 0.32))
@@ -51,7 +52,8 @@ local function star(
 		STAR_COLORS[(index - 1) % #STAR_COLORS + 1],
 		Palette.Ink,
 		origin,
-		Vector2.one * size
+		Vector2.one * size,
+		scope
 	)
 	local startRotation = random:NextNumber(-28, 28)
 	local spin = random:NextNumber(-190, 190)
@@ -70,12 +72,13 @@ local function star(
 end
 
 function StarPop.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
 	local count = Runtime.scaledCount(12, "Secondary")
 	for index = 1, count do
-		star(context, frame, scale, index, count, if index <= 5 then "Hero" else "Secondary")
+		star(context, frame, scale, index, count, if index <= 5 then "Hero" else "Secondary", scope)
 	end
 end
 

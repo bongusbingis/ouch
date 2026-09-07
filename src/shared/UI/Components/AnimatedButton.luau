@@ -38,6 +38,7 @@ export type Props = {
 	OnActivated: (() -> ())?,
 	OnSelectionGained: ((GuiButton) -> ())?,
 	ButtonRef: any?,
+	SelectionRadius: UDim?,
 	EntranceDelay: number?,
 	Visual: any?,
 	children: { [any]: any }?,
@@ -75,7 +76,10 @@ return function(props: Props)
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = (props.Native.ZIndex or 1) + 10,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Interaction.FocusCornerPx) }),
+			Corner = c(
+				"UICorner",
+				{ CornerRadius = props.SelectionRadius or UDim.new(0, UIConfig.Interaction.FocusCornerPx) }
+			),
 			Outline = c("UIStroke", {
 				Color = UIConfig.ProgressionStyle.Yellow,
 				Thickness = UIConfig.Interaction.FocusStrokePx,

@@ -19,7 +19,7 @@ return function(target: Instance)
 					then {}
 					else {
 						{
-							id = "catch",
+							questId = "catch",
 							title = "Catch 3 dodgeballs",
 							progress = 1,
 							goal = 3,
@@ -27,7 +27,7 @@ return function(target: Instance)
 							reward = { kind = "Bonks", amount = 150 },
 						},
 						{
-							id = "elims",
+							questId = "elims",
 							title = "Get 3 dodgeball eliminations",
 							progress = 3,
 							goal = 3,
@@ -35,7 +35,7 @@ return function(target: Instance)
 							reward = { kind = "Bonks", amount = 175 },
 						},
 						{
-							id = "wins",
+							questId = "wins",
 							title = "Win 2 matches",
 							progress = 2,
 							goal = 2,

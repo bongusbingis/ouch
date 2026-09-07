@@ -30,6 +30,7 @@ export type SeasonDef = {
 	XpThresholds: { number },
 	FreeRewards: { [number]: TierReward },
 	PremiumRewards: { [number]: TierReward },
+	CosmeticRewards: { [string]: { [number]: { { Key: string, ItemId: string } } } }?,
 }
 
 local TIER_COUNT = 25
@@ -54,15 +55,7 @@ local Definitions: { [string]: SeasonDef } = {
 		EndsAt = S1_START + SIX_WEEKS,
 		TierCount = TIER_COUNT,
 		XpThresholds = thresholds(TIER_COUNT),
-		-- The free track has to be worth engaging with: it is the on-ramp that
-		-- makes the premium track legible before anyone is asked to pay.
-		-- The cosmetic tiers pay Bonks until there is content to put in them.
-		-- The prototype trails these replaced were deleted, and a season reward
-		-- naming a missing cosmetic fails the validator below at require time --
-		-- so an empty tier is not an option and a placeholder id would be worse.
-		-- Amounts track the rarity each tier used to hold (Common 300, Rare 600,
-		-- Legendary 1500) so repointing one at a real cosmetic later is a
-		-- like-for-like swap.
+		-- Existing currency rewards remain payable; cosmetic additions have independent grant identities.
 		FreeRewards = {
 			[2] = { kind = "Bonks", amount = 250 },
 			[4] = { kind = "Bonks", amount = 300 },
@@ -92,6 +85,28 @@ local Definitions: { [string]: SeasonDef } = {
 			[23] = { kind = "Bonks", amount = 600 },
 			[24] = { kind = "Bonks", amount = 600 },
 			[25] = { kind = "Bonks", amount = 1500 },
+		},
+		CosmeticRewards = {
+			Free = {
+				[4] = { { Key = "launch", ItemId = "DodgeBall3" } },
+				[9] = { { Key = "launch", ItemId = "StarPop" } },
+				[15] = { { Key = "launch", ItemId = "Hammer1" } },
+				[21] = { { Key = "launch", ItemId = "ConfettiImpact" } },
+				[25] = { { Key = "launch", ItemId = "SundaeSprinter" } },
+			},
+			Premium = {
+				[1] = { { Key = "launch", ItemId = "DodgeBall1" } },
+				[5] = { { Key = "launch", ItemId = "Hammer10" } },
+				[7] = { { Key = "launch", ItemId = "FoamLeague" } },
+				[8] = { { Key = "launch", ItemId = "CandyCrash" } },
+				[10] = { { Key = "launch", ItemId = "JellySplash" } },
+				[14] = { { Key = "launch", ItemId = "Hammer20" } },
+				[16] = { { Key = "launch", ItemId = "RainHopper" } },
+				[17] = { { Key = "launch", ItemId = "BubbleBurst" } },
+				[20] = { { Key = "launch", ItemId = "OrbitRookie" } },
+				[23] = { { Key = "launch", ItemId = "RoyalParty" } },
+				[25] = { { Key = "launch", ItemId = "PartyRoyal" } },
+			},
 		},
 	},
 }
@@ -128,6 +143,20 @@ for key, definition in Definitions do
 				)
 			elseif reward.kind == "Bonks" then
 				assert((reward.amount or 0) > 0, `season "{key}" Bonks reward must be positive`)
+			end
+		end
+	end
+	for track, tiers in definition.CosmeticRewards or {} do
+		assert(track == "Free" or track == "Premium", `season "{key}" has an invalid cosmetic track`)
+		local baseRewards = if track == "Free" then definition.FreeRewards else definition.PremiumRewards
+		for tier, rewards in tiers do
+			assert(baseRewards[tier] ~= nil, `season "{key}" cosmetic tier must have a claimable base reward`)
+			local keys = {}
+			for _, reward in rewards do
+				assert(type(reward.Key) == "string" and reward.Key ~= "", `season "{key}" cosmetic needs a grant key`)
+				assert(not keys[reward.Key], `season "{key}" repeats a cosmetic grant key at tier {tier}`)
+				assert(Cosmetics.Items[reward.ItemId] ~= nil, `season "{key}" names unknown cosmetic {reward.ItemId}`)
+				keys[reward.Key] = true
 			end
 		end
 	end

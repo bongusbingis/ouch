@@ -1,6 +1,6 @@
 -- Name: InventoryPreview.luau
 -- Author: Jack C.
--- Description: Renders cosmetic inventory previews, using live 3D models where available and static badges for script effects and sounds.
+-- Description: Renders cosmetic inventory previews, using shared character appearance and marking effects that open in the live preview scene.
 -- Created: 2026-08-17
 
 --!strict
@@ -13,6 +13,7 @@ local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
+local CharacterAppearance = require(CosmeticsModules:WaitForChild("CharacterAppearance"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local PreviewScheduler = require(script.Parent.Parent.Services.PreviewScheduler)
@@ -50,16 +51,13 @@ local function preparePart(part: BasePart)
 	part.CanTouch = false
 end
 
-local function characterPreview(color: Color3): Model
+local function characterPreview(): Model
 	local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Rigs"):WaitForChild("CharacterRig")
 	assert(template:IsA("Model"), "[InventoryPreview] Assets.Rigs.CharacterRig must be a Model")
 	local rig = template:Clone()
 	for _, descendant in rig:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			preparePart(descendant)
-			if descendant.Transparency < 1 then
-				descendant.Color = color
-			end
 		end
 	end
 	return rig
@@ -90,75 +88,42 @@ export type Props = {
 	Definition: any,
 	ZIndex: number,
 	ColorId: string?,
+	CostumeId: string?,
 }
 
-local function impactPreview(props: Props)
+local function effectPreview(props: Props)
 	return c("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.5, 0.46),
-		Size = UDim2.fromScale(0.72, 0.58),
+		Size = UDim2.fromScale(1, 1),
 		ZIndex = props.ZIndex,
 	}, {
-		Burst = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 40,
+		Symbol = c(ResponsiveText, {
+			MeasurementFont = Enum.Font.SourceSansBold,
+			MaxTextSize = 76,
 			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Rotation = -8,
-				Size = UDim2.fromScale(1, 0.72),
-				Text = "HIT!",
+				Position = UDim2.fromScale(0.15, 0.1),
+				Size = UDim2.fromScale(0.7, 0.52),
+				Font = Enum.Font.SourceSansBold,
+				Text = if props.Category == "ElimEffectAssets" then "SFX" else "★",
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = props.ZIndex,
 			},
-		}, {
-			UIStroke = c("UIStroke", {
-				Color = Color3.fromRGB(30, 30, 30),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.08,
-			}),
 		}),
-	})
-end
-
-local function eliminationSoundPreview(props: Props)
-	return c("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(35, 47, 62),
-		BorderSizePixel = 0,
-		Position = UDim2.fromScale(0.5, 0.45),
-		Rotation = -6,
-		Size = UDim2.fromScale(0.58, 0.58),
-		ZIndex = props.ZIndex,
-	}, {
-		UICorner = c("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
-		UIStroke = c("UIStroke", {
-			Color = Color3.new(1, 1, 1),
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			Thickness = 0.075,
-		}),
-		Label = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 36,
+		Caption = c(ResponsiveText, {
+			Wrapped = true,
+			MeasurementFont = Enum.Font.SourceSansBold,
+			MaxTextSize = 18,
 			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.5, 0.54),
-				Size = UDim2.fromScale(0.8, 0.5),
-				Text = "SFX!",
+				Position = UDim2.fromScale(0.1, 0.62),
+				Size = UDim2.fromScale(0.8, 0.26),
+				Font = Enum.Font.SourceSansBold,
+				Text = if props.Category == "ElimEffectAssets" then "ELIMINATION SOUND" else "IMPACT EFFECT",
+				TextWrapped = true,
 				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = props.ZIndex + 1,
+				ZIndex = props.ZIndex,
 			},
-		}, {
-			UIStroke = c("UIStroke", {
-				Color = Color3.fromRGB(20, 24, 34),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.08,
-			}),
 		}),
 	})
 end
@@ -180,27 +145,46 @@ local ViewportPreview = React.memo(function(props: Props)
 		viewport.CurrentCamera = camera
 		local object: (Model | BasePart)? = nil
 		local unregister: (() -> ())? = nil
+		local appearance = nil
+		local resize = nil
 		local preparation = task.defer(function()
 			local prepared: Model | BasePart
-			if props.Category == "CharacterColor" then
-				local color = props.Definition.PreviewColor
-				assert(color ~= nil, "[InventoryPreview] character colors require PreviewColor")
-				prepared = characterPreview(color)
+			if props.Category == "CharacterColor" or props.Category == "CostumeAssets" then
+				local look = {
+					characterColorId = if props.Category == "CharacterColor" then props.ItemId else props.ColorId,
+					costumeId = if props.Category == "CostumeAssets" then props.ItemId else props.CostumeId,
+				}
+				CharacterAppearance.prepare(look)
+				prepared = characterPreview()
+				object = prepared
+				appearance = CharacterAppearance.create(prepared, look)
 			else
 				prepared = CosmeticVisualFactory.create(props.Category, props.ItemId)
 			end
 			object = prepared
 			setScale(prepared, config.Scale)
 			prepared.Parent = world
-			local target = config.TargetOffset
-			camera.CFrame = CFrame.lookAt(target + config.CameraOffset, target)
+			local basePivot = centerObject(prepared)
+			local extent = if prepared:IsA("Model") then select(2, prepared:GetBoundingBox()) else prepared.Size
+			local function frameCamera()
+				local size = viewport.AbsoluteSize
+				local aspect = math.max(size.X, 1) / math.max(size.Y, 1)
+				local target = config.TargetOffset
+				local radius = Vector2.new(extent.X, extent.Z).Magnitude / 2
+				local tangent = math.tan(math.rad(camera.FieldOfView / 2)) * InventoryConfig.ViewportFill
+				local distance = math.max((extent.Y / 2 + math.abs(target.Y)) / tangent, radius / (tangent * aspect))
+					+ radius
+				camera.CFrame = CFrame.lookAt(target + config.CameraOffset.Unit * distance, target)
+			end
+			frameCamera()
+			resize = viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(frameCamera)
 			unregister = register({
 				object = prepared,
 				viewport = viewport,
 				scroller = viewport:FindFirstAncestorWhichIsA("ScrollingFrame"),
 				category = props.Category,
 				config = config,
-				basePivot = centerObject(prepared),
+				basePivot = basePivot,
 				baseRotation = math.rad(config.RotationDegrees),
 				elapsed = 0,
 				updateAccumulator = 0,
@@ -210,8 +194,14 @@ local ViewportPreview = React.memo(function(props: Props)
 			if coroutine.status(preparation) ~= "dead" then
 				task.cancel(preparation)
 			end
+			if resize then
+				resize:Disconnect()
+			end
 			if unregister then
 				unregister()
+			end
+			if appearance then
+				appearance.destroy()
 			end
 			if object then
 				object:Destroy()
@@ -220,7 +210,7 @@ local ViewportPreview = React.memo(function(props: Props)
 				viewport.CurrentCamera = nil
 			end
 		end
-	end, { props.Category, props.ItemId, props.Definition })
+	end, { props.Category, props.ItemId, props.Definition, props.ColorId, props.CostumeId })
 
 	return c("ViewportFrame", {
 		ref = viewportRef,
@@ -230,21 +220,20 @@ local ViewportPreview = React.memo(function(props: Props)
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = props.ZIndex,
 	}, {
-		UIScale = c("UIScale", { Scale = 2 }),
-		PreviewCamera = c("Camera", { ref = cameraRef }),
+		PreviewCamera = c("Camera", { ref = cameraRef, FieldOfView = InventoryConfig.ViewportFieldOfView }),
 		PreviewWorld = c("WorldModel", { ref = worldRef }),
 	})
 end)
 
 return React.memo(function(props: Props)
 	if props.Category == "EmoteAssets" then
-		return c(CelebrationAvatar, { EmoteId = props.ItemId, ColorId = props.ColorId, ZIndex = props.ZIndex })
+		return c(
+			CelebrationAvatar,
+			{ EmoteId = props.ItemId, ColorId = props.ColorId, CostumeId = props.CostumeId, ZIndex = props.ZIndex }
+		)
 	end
-	if props.Category == "ImpactEffectAssets" then
-		return impactPreview(props)
-	end
-	if props.Category == "ElimEffectAssets" then
-		return eliminationSoundPreview(props)
+	if props.Category == "ImpactEffectAssets" or props.Category == "ElimEffectAssets" then
+		return effectPreview(props)
 	end
 	return c(ViewportPreview, props)
 end)

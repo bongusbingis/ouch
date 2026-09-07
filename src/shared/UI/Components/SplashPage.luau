@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local ButtonSurface = require(script.Parent.ButtonSurface)
 local DailyRewardsPanel = require(script.Parent.DailyRewardsPanel)
 local PartyStatus = require(script.Parent.PartyStatus)
 local QuestsPanel = require(script.Parent.QuestsPanel)
@@ -27,8 +28,8 @@ local function buttonText(text: string)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-			Position = UDim2.fromScale(0.5, 0.53533),
-			Size = UDim2.fromScale(0.9, 0.614132),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, -16, 1, -8),
 			Text = text,
 			TextColor3 = Color3.new(1, 1, 1),
 			ZIndex = 2,
@@ -52,6 +53,7 @@ export type Props = {
 	QuestState: any?,
 	OnClaimQuest: ((questId: string) -> ())?,
 	OnClaimSeason: (() -> ())?,
+	OnViewSeasonRewards: (() -> ())?,
 	PendingClaims: { [string]: boolean }?,
 }
 
@@ -109,12 +111,12 @@ return function(props: Props)
 				PaddingRight = if short or portrait then UDim.new(0, 0) else UDim.new(0.05, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Yellow }),
 				Native = {
 					BackgroundTransparency = 1,
-					Image = "rbxassetid://123095501298848",
+					Image = "",
 					LayoutOrder = 1,
 					Position = if portrait then UDim2.fromScale(0.025, 0) else UDim2.fromScale(0.343431, 0.675873),
-					ScaleType = Enum.ScaleType.Slice,
 					Size = if short
 						then UDim2.new(0.26, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
 						else if portrait
@@ -125,8 +127,6 @@ return function(props: Props)
 								0,
 								math.max(UIConfig.Interaction.MinTargetPx, safeArea.size.X * 0.424534 * 0.6 / 5.44)
 							),
-					SliceCenter = Rect.new(59, 31, 370, 78),
-					SliceScale = 0.9,
 				},
 				OnActivated = props.OnInvite,
 			}, {
@@ -134,11 +134,11 @@ return function(props: Props)
 				TextLabel = buttonText("INVITE FRIENDS"),
 			}),
 			JoinWithCode = c(AnimatedButton, {
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Cyan }),
 				Native = {
 					BackgroundTransparency = 1,
-					Image = "rbxassetid://112649977890456",
+					Image = "",
 					Position = if portrait then UDim2.fromScale(0.525, 0) else UDim2.fromScale(0.343431, 0.533477),
-					ScaleType = Enum.ScaleType.Slice,
 					Size = if short
 						then UDim2.new(0.26, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
 						else if portrait
@@ -149,8 +149,6 @@ return function(props: Props)
 								0,
 								math.max(UIConfig.Interaction.MinTargetPx, safeArea.size.X * 0.424534 * 0.6 / 5.44)
 							),
-					SliceCenter = Rect.new(59, 31, 370, 78),
-					SliceScale = 0.9,
 				},
 				OnActivated = props.OnJoinCode,
 			}, {
@@ -257,6 +255,7 @@ return function(props: Props)
 			},
 			State = props.SeasonState,
 			OnClaim = props.OnClaimSeason,
+			OnViewRewards = props.OnViewSeasonRewards,
 			Pending = props.PendingClaims and props.PendingClaims.Season,
 		}),
 		Quests = c(QuestsPanel, {

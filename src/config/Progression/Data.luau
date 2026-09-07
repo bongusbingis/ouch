@@ -72,6 +72,7 @@ return {
 			XP = 0,
 			ClaimedFree = {}, -- { [tostring(tier)]: true }
 			ClaimedPremium = {},
+			CosmeticClaims = {},
 		},
 		Entitlements = {
 			-- Never reset by rollover. Developer products are the only ownership

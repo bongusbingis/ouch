@@ -56,7 +56,7 @@ end
 return function(props)
 	local result = props.Result
 	local visible = props.Visible and result ~= nil
-	local safe = useSafeArea(Enum.ScreenInsets.None)
+	local safe = useSafeArea(Enum.ScreenInsets.None, Enum.ScreenInsets.CoreUISafeInsets)
 	local rootRef, primaryRef, returnRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
 	local scoresRef = React.useRef(nil)
 	local announced = React.useRef("")
@@ -144,7 +144,7 @@ return function(props)
 	end
 	local headerHeight = if short then Config.Results.ShortHeaderPx else Config.Results.HeaderPx
 	local footerHeight = if short then 78 else 104
-	local bodyTop = headerHeight + 12
+	local bodyTop = headerHeight + (if short then 8 else 12)
 	local bodyHeight = math.max(height - bodyTop - footerHeight - 8, 80)
 	local detailWidth = if width < 850 then 0.32 else 0.28
 	local stageWidth = 1 - detailWidth
@@ -191,22 +191,12 @@ return function(props)
 	end
 	return c("Frame", {
 		ref = rootRef,
-		BackgroundColor3 = colors.Ink,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		Active = true,
 		ZIndex = 10,
 	}, {
-		Gradient = c("UIGradient", { Color = ColorSequence.new(colors.Surface, colors.Ink), Rotation = 75 }),
-		Pattern = c("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://6794188517",
-			ImageTransparency = 0.95,
-			ScaleType = Enum.ScaleType.Tile,
-			TileSize = UDim2.fromOffset(180, 180),
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = 10,
-		}),
 		Canvas = c("Frame", {
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -219,13 +209,27 @@ return function(props)
 			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		}, {
+			HeaderSurface = c(Surface, {
+				Color = colors.Ink,
+				Transparency = 0.08,
+				Shadow = false,
+				Native = {
+					Position = UDim2.fromOffset(-4, -4),
+					Size = UDim2.new(1, -140, 0, headerHeight + 8),
+					ZIndex = 1,
+				},
+			}),
 			Title = c(Label, {
 				Text = result.presentation.title,
 				Title = true,
 				Size = if short then 34 else 52,
 				Color = accent,
 				Align = Enum.TextXAlignment.Left,
-				Native = { Size = UDim2.new(1, -148, 0, headerHeight * 0.64) },
+				Native = {
+					Position = UDim2.fromOffset(10, 0),
+					Size = UDim2.new(1, -168, 0, headerHeight * 0.64),
+					ZIndex = 3,
+				},
 			}),
 			Subtitle = c(Label, {
 				Text = result.modeName
@@ -234,7 +238,8 @@ return function(props)
 				Align = Enum.TextXAlignment.Left,
 				Color = colors.Muted,
 				Native = {
-					Position = UDim2.fromOffset(0, headerHeight * 0.68),
+					Position = UDim2.fromOffset(10, headerHeight * 0.68),
+					ZIndex = 3,
 					Size = UDim2.new(1, -148, 0, headerHeight * 0.3),
 				},
 			}),
@@ -261,17 +266,22 @@ return function(props)
 							then "READY FOR THE NEXT ONE"
 							else if result.modeId == "TDM" then "WINNING TEAM STANDOUTS" else "TOP FINISHERS",
 					Title = true,
-					Color = colors.Muted,
+					Color = colors.White,
 					Size = if short then 15 else 20,
-					Native = { Size = UDim2.new(1, 0, 0, 24) },
+					Native = { Size = UDim2.new(1, 0, 0, 24), Visible = not short },
 				}),
-				Podium = if not standings
-					then c("Frame", {
-						BackgroundTransparency = 1,
-						Position = UDim2.fromOffset(0, 24),
-						Size = UDim2.new(1, 0, 1, -24),
-					}, { Content = c(Podium, { Entries = result.podium, Compact = short }) })
-					else nil,
+				Podium = c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(0, if short then 0 else 24),
+					Size = UDim2.new(1, 0, 1, if short then 0 else -24),
+				}, {
+					Content = c(Podium, {
+						Entries = result.podium,
+						ResultId = result.resultId,
+						Compact = short,
+						ShowLabels = not standings,
+					}),
+				}),
 				Standings = if standings
 					then c("ScrollingFrame", {
 						BackgroundTransparency = 1,
@@ -290,19 +300,25 @@ return function(props)
 				Position = UDim2.new(stageWidth, 0, 0, bodyTop),
 				Size = UDim2.new(detailWidth, -6, 0, bodyHeight),
 				ZIndex = 12,
-			}, { Content = c(Progress, { Result = result, Compact = short }) }),
+			}, { Content = c(Progress, { Result = result, Compact = short, Height = bodyHeight }) }),
 			Footer = c("Frame", {
 				BackgroundTransparency = 1,
 				Position = UDim2.new(0, 0, 1, -footerHeight),
 				Size = UDim2.new(1, 0, 0, footerHeight),
 				ZIndex = 15,
 			}, {
+				Backdrop = c(Surface, {
+					Color = colors.Ink,
+					Shadow = false,
+					Transparency = 0.1,
+					Native = { Position = UDim2.fromOffset(-6, -3), Size = UDim2.new(1, 12, 1, 6), ZIndex = 1 },
+				}),
 				Status = c(Label, {
 					Text = if props.Error or actions.busy or not destination then message else destination,
 					Size = if short then 15 else 19,
 					Color = if props.Error then colors.Pink else colors.Muted,
 					Align = Enum.TextXAlignment.Left,
-					Native = { Size = UDim2.new(1, -72, 0, 26) },
+					Native = { Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -80, 0, 26), ZIndex = 3 },
 				}),
 				Countdown = c(Label, {
 					Text = `{remaining}s`,
@@ -310,7 +326,7 @@ return function(props)
 					Size = 23,
 					Color = colors.Yellow,
 					Align = Enum.TextXAlignment.Right,
-					Native = { Position = UDim2.new(1, -64, 0, 0), Size = UDim2.fromOffset(58, 26) },
+					Native = { Position = UDim2.new(1, -64, 0, 0), Size = UDim2.fromOffset(58, 26), ZIndex = 3 },
 				}),
 				PlayAgain = c(ActionButton, {
 					ButtonRef = primaryRef,
@@ -345,11 +361,11 @@ return function(props)
 									then "Your party is staying together"
 									else "You're staying for the next round"
 								else if actions.partySize > 1
-									then "Choose together • Your party leader controls the group"
-									else "Play again or head to the lobby to customize",
+									then "Your party leader picks the next stop"
+									else "Stay for another round or change your look in the lobby",
 						Size = 13,
 						Color = colors.Muted,
-						Native = { Position = UDim2.fromOffset(0, 91), Size = UDim2.new(1, -6, 0, 13) },
+						Native = { Position = UDim2.fromOffset(0, 91), Size = UDim2.new(1, -6, 0, 13), ZIndex = 3 },
 					})
 					else nil,
 			}),

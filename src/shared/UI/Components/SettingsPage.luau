@@ -113,7 +113,7 @@ return function(props: Props)
 					Position = UDim2.fromScale(0, 0),
 					Size = UDim2.fromScale(1, 1),
 					Text = category,
-					TextColor3 = Color3.fromRGB(97, 255, 237),
+					TextColor3 = UIConfig.ProgressionStyle.Ink,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					ZIndex = 5,
 				},

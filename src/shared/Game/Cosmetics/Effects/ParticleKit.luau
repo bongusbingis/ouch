@@ -17,6 +17,7 @@ export type Context = {
 	position: Vector3,
 	direction: Vector3?,
 	scale: number?,
+	scope: Runtime.Scope?,
 }
 
 export type EmitterSpec = {
@@ -95,7 +96,7 @@ local function anchorAt(context: Context): BasePart
 	part.CFrame = if context.direction
 		then CFrame.lookAt(context.position, context.position - context.direction)
 		else CFrame.new(context.position)
-	part.Parent = Runtime.container()
+	Runtime.mount(part, context.scope)
 	return part
 end
 
@@ -152,6 +153,9 @@ local function buildEmitter(spec: EmitterSpec, parent: BasePart, scale: number):
 end
 
 function ParticleKit.play(spec: EffectSpec, context: Context)
+	if context.scope and context.scope.destroyed then
+		return
+	end
 	local scale = math.clamp(context.scale or 1, 0.25, 2.5)
 	local anchor = anchorAt(context)
 	local longest = 0

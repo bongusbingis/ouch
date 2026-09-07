@@ -1,27 +1,13 @@
--- Name: BonksLabel.luau
--- Author: Jack C.
--- Description: Reusable currency display showing a coin icon and a formatted Bonks amount, used by splash panels, modals, and shop UI.
--- Created: 2026-09-01
-
+-- Keeps the coin and amount together as one fitted, aligned currency display.
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local React = require(Packages:WaitForChild("react"))
-local ResponsiveText = require(script.Parent.ResponsiveText)
-
-local c = React.createElement
-
-local BONKS_ICON_ASSET = "rbxassetid://106703644238993"
-local BONKS_STACK_ICON_ASSET = "rbxassetid://128078334031314"
-local BONKS_COLOR = Color3.fromRGB(255, 211, 51)
-
--- The stack art is the storefront's 1,100-Bonks "Bonks Stack" product icon, so
--- it takes over at the four-figure amounts it depicts. Every per-grant reward
--- and every crate price falls below this; every cosmetic price sits above it.
-local BONKS_STACK_THRESHOLD = 1000
-
+local React = require(ReplicatedStorage.Packages.react)
+local UI = require(ReplicatedStorage.Config.Interface.UI)
+local TextMetrics = require(script.Parent.Parent.TextMetrics)
+local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local formatAmount = require(script.Parent.Parent.Models.NumberText)
+local c = React.createElement
 
 export type Props = {
 	Amount: number,
@@ -32,69 +18,87 @@ export type Props = {
 	TextStroke: number?,
 	StackThreshold: number?,
 	StackIconAsset: string?,
+	Alignment: Enum.HorizontalAlignment?,
 	children: { [any]: any }?,
 }
 
 return function(props: Props)
-	local threshold = props.StackThreshold or BONKS_STACK_THRESHOLD
-	local icon = if props.Amount >= threshold then props.StackIconAsset or BONKS_STACK_ICON_ASSET else BONKS_ICON_ASSET
-
-	local container = {
+	local reference = React.useRef(nil)
+	local preferred = usePreferredTextSize()
+	local maximum =
+		math.round((props.MaxTextSize or UI.Text.DefaultMaxSize) * (UI.Text.PreferredScale[preferred.Name] or 1))
+	local textSize, setTextSize = React.useState(maximum)
+	local text = formatAmount(props.Amount)
+	local icon = if props.Amount >= (props.StackThreshold or 1000)
+		then props.StackIconAsset or "rbxassetid://128078334031314"
+		else "rbxassetid://106703644238993"
+	React.useEffect(function()
+		local object = reference.current
+		if object == nil then
+			return
+		end
+		local lastSize = Vector2.zero
+		local function fit()
+			local size = TextMetrics.layoutSize(object)
+			size = Vector2.new(math.round(size.X), math.round(size.Y))
+			if size == lastSize or size.X <= 0 or size.Y <= 0 then
+				return
+			end
+			lastSize = size
+			local cap = math.min(maximum, math.floor(size.Y * 0.82))
+			setTextSize(
+				TextMetrics.fittingIconTextSize(
+					text,
+					Enum.Font.LuckiestGuy,
+					Vector2.new(math.max(1, size.X - 4), size.Y - 2),
+					math.max(1, cap),
+					UI.Button.GapPx
+				)
+			)
+		end
+		local connection = object:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+		task.defer(fit)
+		return function()
+			connection:Disconnect()
+		end
+	end, { text, maximum })
+	local native = table.clone(props.Native or {})
+	native.ref = reference
+	native.BackgroundTransparency = native.BackgroundTransparency or 1
+	native.Size = native.Size or UDim2.fromScale(1, 1)
+	local children = table.clone(props.children or {})
+	children.Layout = c("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = props.Alignment or Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, UI.Button.GapPx),
+	})
+	children.Icon = c("ImageLabel", {
 		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-	}
-	if props.Native then
-		for key, value in props.Native do
-			container[key] = value
-		end
-	end
-
-	local children = {
-		Layout = c("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Padding = UDim.new(0.05, 0),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		}),
-		Icon = c("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = icon,
-			LayoutOrder = 1,
-			Size = props.IconSize or UDim2.fromScale(0.2, 0.8),
-		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
-		}),
-		Amount = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = props.MaxTextSize,
-			Native = {
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				LayoutOrder = 2,
-				Size = UDim2.fromScale(0.7, 0.8),
-				Text = formatAmount(props.Amount),
-				TextColor3 = props.TextColor or BONKS_COLOR,
-				TextXAlignment = Enum.TextXAlignment.Left,
-			},
-		}, {
-			-- Callers that sit the amount on a button match that button's own
-			-- outlined type rather than reading as a plain number beside it.
-			UIStroke = if props.TextStroke
-				then c("UIStroke", {
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = props.TextStroke,
-				})
-				else nil,
-		}),
-	}
-	-- Callers decorate the container itself (a corner, a stroke), so their own
-	-- children sit alongside the icon and the amount rather than replacing them.
-	if props.children then
-		for key, value in props.children do
-			children[key] = value
-		end
-	end
-
-	return c("Frame", container, children)
+		Image = icon,
+		ScaleType = Enum.ScaleType.Fit,
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(textSize, textSize),
+		ZIndex = native.ZIndex or 1,
+	})
+	children.Amount = c("TextLabel", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromScale(0, 1),
+		LayoutOrder = 2,
+		Font = Enum.Font.LuckiestGuy,
+		TextSize = textSize,
+		Text = text,
+		TextColor3 = props.TextColor or UI.ProgressionStyle.Yellow,
+		ZIndex = native.ZIndex or 1,
+	}, {
+		Stroke = if props.TextStroke
+			then c("UIStroke", {
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				Thickness = props.TextStroke,
+			})
+			else nil,
+	})
+	return c("Frame", native, children)
 end

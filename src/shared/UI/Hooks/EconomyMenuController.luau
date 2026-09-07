@@ -21,6 +21,9 @@ local EconomyStore = require(Economy:WaitForChild("EconomyStore"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local InventoryModel = require(Economy:WaitForChild("InventoryModel"))
 local ShopViewModel = require(Economy:WaitForChild("ShopViewModel"))
+local SeasonStore = require(Shared.Game.Progression.SeasonStore)
+local CosmeticPreviewClient =
+	require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CosmeticPreviewClient"))
 local UI = Shared:WaitForChild("UI")
 local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("NotificationContext"))
 local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
@@ -28,6 +31,7 @@ local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytic
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Bundles = require(Config:WaitForChild("Economy"):WaitForChild("Bundles"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Inventory = require(Config.Cosmetics.Inventory)
 local Crates = require(Config:WaitForChild("Economy"):WaitForChild("Crates"))
 local GamePasses = require(Config:WaitForChild("Economy"):WaitForChild("GamePasses"))
 local Products = require(Config:WaitForChild("Economy"):WaitForChild("Products"))
@@ -42,15 +46,18 @@ local EQUIP_ERRORS = {
 	not_owned = "That item is not owned.",
 	wrong_slot = "That item cannot be equipped in this slot.",
 	invalid_slot = "That inventory slot is invalid.",
-	network_error = "The inventory service is unavailable.",
+	network_error = "Backpack couldn’t load. Try again.",
 }
 
 local SHOP_ERRORS = {
+	grant_failed = "Some rewards are still being delivered. Claim again to collect anything remaining.",
+	profile_not_ready = "Your data is still loading.",
+	no_active_season = "This season has ended. Please refresh the shop.",
 	busy = "That purchase is already being processed.",
 	season_ended = "This season has ended. Please refresh the shop.",
-	network_error = "The shop service is unavailable. Please try again.",
+	network_error = "Shop couldn’t load. Try again.",
 	marketplace_error = "Roblox purchases are unavailable right now.",
-	no_profile = "Your profile is still loading.",
+	no_profile = "Your data is still loading.",
 	insufficient_bonks = "You do not have enough Bonks.",
 	already_owned = "You already own that item.",
 	not_offered = "That offer has expired.",
@@ -63,16 +70,32 @@ local SHOP_ERRORS = {
 	invalid_quantity = "That open quantity is unavailable.",
 	rate_limited = "You are opening crates too quickly. Try again in a moment.",
 	purchase_failed = "The purchase could not be completed.",
+	request_timed_out = "Still waiting on your purchase. Check your Backpack before trying again.",
 }
 
 export type Options = {
 	ShopClient: any,
 	EconomyData: any?,
 	ShopRefreshEnabled: boolean?,
+	OnViewInventory: (() -> ())?,
 }
 
 export type Controller = {
 	economyData: any?,
+	previewItem: any?,
+	previewEffect: (any) -> (),
+	closePreview: () -> (),
+	inspectInventory: (InventoryModel.Entry) -> (),
+	inspectReward: (any) -> (),
+	inspectingReward: boolean,
+	viewInventory: (string?) -> (),
+	viewSeason: () -> (),
+	canViewSeason: boolean,
+	equipPreview: (any) -> (),
+	busySlots: { [string]: boolean },
+	seasonState: any?,
+	claimSeason: () -> (),
+	claimPending: boolean,
 	inventoryTab: string,
 	setInventoryTab: (string) -> (),
 	shopModel: ShopViewModel.Model,
@@ -98,7 +121,14 @@ function EconomyMenuController.use(options: Options): Controller
 	local notifications = NotificationContext.useNotification()
 	local inventoryTab, setInventoryTab = React.useState("OUTFITS")
 	local selectedShopCardId, setSelectedShopCardId = React.useState(nil :: string?)
+	local selectedInventoryEntry, setSelectedInventoryEntry = React.useState(nil :: InventoryModel.Entry?)
+	local selectedRewardItemId, setSelectedRewardItemId = React.useState(nil :: string?)
+	local previewItem, setPreviewItem = React.useState(nil)
 	local busySlots = React.useRef({} :: { [string]: boolean })
+	local busySnapshot, setBusySnapshot = React.useState({} :: { [string]: boolean })
+	local claimPending, setClaimPending = React.useState(false)
+	local claimBusy = React.useRef(false)
+	local seasonState = useExternalStore(SeasonStore.snapshot, SeasonStore.subscribe)
 	local mounted = React.useRef(false)
 	local lifecycleGeneration = React.useRef(0)
 	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.onChanged)
@@ -125,7 +155,25 @@ function EconomyMenuController.use(options: Options): Controller
 			crateBatch = CrateBatch,
 		})
 	end, { economyData, shopSnapshot })
-	local selectedShopCard = if selectedShopCardId then shopModel.byId[selectedShopCardId] else nil
+	local selectedShopCard = if selectedRewardItemId
+		then ShopViewModel.reward(
+			selectedRewardItemId,
+			Cosmetics,
+			if economyData then economyData.Cosmetics.Owned else {}
+		)
+		elseif selectedInventoryEntry then ShopViewModel.inventory(selectedInventoryEntry)
+		else if selectedShopCardId then shopModel.byId[selectedShopCardId] else nil
+	local seasonCard = nil
+	for _, section in shopModel.sections do
+		for _, card in section.cards do
+			if
+				card.kind == "SeasonPass" and (seasonState == nil or card.definition.SeasonId == seasonState.seasonId)
+			then
+				seasonCard = card
+				break
+			end
+		end
+	end
 	local crateReveal = React.useMemo(function()
 		if shopSnapshot.reveal == nil then
 			return nil
@@ -156,6 +204,26 @@ function EconomyMenuController.use(options: Options): Controller
 				else `AGAIN  {formatNumber(total)}`,
 		}
 	end, { crateReveal, economyData })
+	local previewBlocked = notifications.request ~= nil
+		or (crateReveal ~= nil and selectedRewardItemId == nil)
+		or shopSnapshot.grant ~= nil
+	local closePreview = React.useCallback(function()
+		CosmeticPreviewClient.close()
+		setPreviewItem(nil)
+	end, {})
+
+	React.useEffect(function()
+		if previewBlocked and previewItem ~= nil then
+			closePreview()
+		end
+	end, { previewBlocked, previewItem, closePreview })
+
+	React.useEffect(function()
+		setSelectedRewardItemId(nil)
+		if shopSnapshot.reveal ~= nil then
+			closePreview()
+		end
+	end, { shopSnapshot.reveal, closePreview })
 
 	React.useEffect(function()
 		mounted.current = true
@@ -180,29 +248,31 @@ function EconomyMenuController.use(options: Options): Controller
 		if grant == nil then
 			return
 		end
+		closePreview()
 		local passKey = if grant.passId then GamePasses.KeyById[grant.passId] else nil
 		local pass = if passKey then GamePasses.Catalog[passKey] else nil
 		local description = if pass and pass.PurchaseMessage
 			then pass.PurchaseMessage
 			else if grant.kind == "Bonks"
 				then `YOU RECEIVED {grant.amount} BONKS.`
-				else "YOUR PURCHASE HAS BEEN ADDED TO YOUR ACCOUNT."
+				else "NEW GEAR! CHECK YOUR BACKPACK."
 		notifications.notify({
 			title = "PURCHASE COMPLETE",
 			description = description,
 			buttonText = "AWESOME!",
 		})
 		shopClient.clearGrant()
-	end, { shopSnapshot.grant, shopClient, notifications.notify })
+	end, { shopSnapshot.grant, shopClient, notifications.notify, closePreview })
 
 	local shopError = React.useCallback(function(reason: string?)
+		closePreview()
 		UIAnalytics.report("PurchaseFailed", { reason = reason or "purchase_failed" })
 		notifications.notify({
 			title = "SHOP",
 			description = SHOP_ERRORS[reason or "purchase_failed"] or "THE PURCHASE COULD NOT BE COMPLETED.",
 			buttonText = "OK",
 		})
-	end, { notifications.notify })
+	end, { notifications.notify, closePreview })
 
 	local runShopAction = React.useCallback(function(action, onSuccess)
 		if not mounted.current then
@@ -226,44 +296,60 @@ function EconomyMenuController.use(options: Options): Controller
 	end, { shopError })
 
 	local activateShopCard = React.useCallback(function(card: ShopViewModel.Card)
-		if card.status ~= "Active" or card.owned or card.pending then
+		UIAnalytics.report("OfferSelected", { offerKey = card.id, offerKind = card.kind })
+		setSelectedInventoryEntry(nil)
+		setSelectedRewardItemId(nil)
+		setSelectedShopCardId(card.id)
+	end, {})
+
+	local inspectInventory = React.useCallback(function(entry: InventoryModel.Entry)
+		setSelectedRewardItemId(nil)
+		setSelectedShopCardId(nil)
+		setSelectedInventoryEntry(entry)
+	end, {})
+
+	local inspectReward = React.useCallback(function(preview)
+		if preview == nil or Cosmetics.Items[preview.itemId] == nil then
 			return
 		end
-		UIAnalytics.report("OfferSelected", { offerKey = card.id, offerKind = card.kind })
-		if card.kind == "Crate" or card.kind == "GamePass" or (card.kind == "Cosmetic" and card.productId ~= nil) then
-			setSelectedShopCardId(card.id)
-		elseif card.kind == "Cosmetic" and card.itemId then
-			local itemId = card.itemId
-			notifications.confirm({
-				title = "BUY ITEM?",
-				description = `BUY {string.upper(card.displayName)} FOR {card.bonksPrice} BONKS?`,
-				confirmText = "BUY",
-				cancelText = "CANCEL",
-			}, function(confirmed)
-				if confirmed then
-					runShopAction(function()
-						return shopClient.purchaseCosmetic(card.id, itemId)
-					end, function()
-						notifications.notify({
-							title = "PURCHASE COMPLETE",
-							description = `{string.upper(card.displayName)} IS NOW IN YOUR INVENTORY.`,
-							buttonText = "AWESOME!",
-						})
-					end)
+		setSelectedRewardItemId(preview.itemId)
+	end, {})
+
+	local viewInventory = React.useCallback(function(category: string?)
+		closePreview()
+		setSelectedInventoryEntry(nil)
+		setSelectedRewardItemId(nil)
+		setSelectedShopCardId(nil)
+		shopClient.clearReveal()
+		for _, tab in Inventory.Tabs do
+			for _, section in tab.Sections do
+				if section.Category == category then
+					setInventoryTab(tab.Id)
 				end
-			end)
-		elseif card.passId then
-			UIAnalytics.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
-			runShopAction(function()
-				return shopClient.promptGamePass(card.id, card.passId)
-			end, nil)
-		elseif card.productId then
-			UIAnalytics.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
-			runShopAction(function()
-				return shopClient.promptProduct(card.id, card.productId)
-			end, nil)
+			end
 		end
-	end, { notifications.confirm, notifications.notify, runShopAction, shopClient })
+		if options.OnViewInventory then
+			options.OnViewInventory()
+		end
+	end, { closePreview, shopClient, options.OnViewInventory })
+
+	local viewSeason = React.useCallback(function()
+		if seasonCard == nil then
+			return
+		end
+		closePreview()
+		shopClient.clearReveal()
+		setSelectedInventoryEntry(nil)
+		setSelectedRewardItemId(nil)
+		setSelectedShopCardId(seasonCard.id)
+	end, { closePreview, shopClient, seasonCard })
+
+	local previewEffect = React.useCallback(function(entry)
+		if previewBlocked or not CosmeticPreviewClient.canPreview(entry.itemId, entry.category) then
+			return
+		end
+		setPreviewItem({ itemId = entry.itemId, category = entry.category })
+	end, { previewBlocked })
 
 	local equip = React.useCallback(function(entry: InventoryModel.Entry)
 		if not mounted.current or economyData == nil or busySlots.current[entry.category] then
@@ -273,6 +359,7 @@ function EconomyMenuController.use(options: Options): Controller
 			return
 		end
 		busySlots.current[entry.category] = true
+		setBusySnapshot(table.clone(busySlots.current))
 		local nextItemId = InventoryModel.nextEquip(entry, economyData.Cosmetics.Equipped)
 		local generation = lifecycleGeneration.current
 		task.spawn(function()
@@ -281,8 +368,10 @@ function EconomyMenuController.use(options: Options): Controller
 			if not mounted.current or lifecycleGeneration.current ~= generation then
 				return
 			end
+			setBusySnapshot(table.clone(busySlots.current))
 			if not callOk or not accepted then
 				local errorCode = if callOk then reason else "network_error"
+				closePreview()
 				notifications.notify({
 					title = "INVENTORY",
 					description = EQUIP_ERRORS[errorCode]
@@ -291,7 +380,39 @@ function EconomyMenuController.use(options: Options): Controller
 				})
 			end
 		end)
-	end, { economyData, notifications.notify })
+	end, { economyData, notifications.notify, closePreview })
+
+	local equipPreview = React.useCallback(function(preview)
+		if economyData == nil then
+			return
+		end
+		for _, entry in InventoryModel.entries(Cosmetics, economyData.Cosmetics.Owned, preview.category) do
+			if entry.itemId == preview.itemId then
+				equip(entry)
+				return
+			end
+		end
+	end, { economyData, equip })
+
+	local claimSeason = React.useCallback(function()
+		if claimBusy.current then
+			return
+		end
+		claimBusy.current = true
+		setClaimPending(true)
+		local generation = lifecycleGeneration.current
+		task.spawn(function()
+			local result, reason = SeasonStore.claimAll()
+			claimBusy.current = false
+			if not mounted.current or lifecycleGeneration.current ~= generation then
+				return
+			end
+			setClaimPending(false)
+			if result == nil then
+				shopError(reason)
+			end
+		end)
+	end, { shopError })
 
 	local refreshShop = React.useCallback(function()
 		if mounted.current then
@@ -300,10 +421,17 @@ function EconomyMenuController.use(options: Options): Controller
 	end, { shopClient })
 
 	local closeSelectedShopCard = React.useCallback(function()
+		if selectedRewardItemId ~= nil then
+			setSelectedRewardItemId(nil)
+			return
+		end
+		setSelectedRewardItemId(nil)
+		setSelectedInventoryEntry(nil)
 		setSelectedShopCardId(nil)
-	end, {})
+	end, { selectedRewardItemId })
 
 	local closeReveal = React.useCallback(function()
+		setSelectedRewardItemId(nil)
 		shopClient.clearReveal()
 	end, { shopClient })
 
@@ -320,32 +448,22 @@ function EconomyMenuController.use(options: Options): Controller
 
 	local purchaseSelectedBonks = React.useCallback(function(count: number?)
 		local card = selectedShopCard
-		if card == nil then
+		if card == nil or card.status ~= "Active" or card.pending or card.bonksPrice == nil then
 			return
 		end
-		setSelectedShopCardId(nil)
 		runShopAction(function()
 			if card.kind == "Crate" and card.crateId then
 				return shopClient.openCrate(card.id, card.crateId, count)
 			end
 			return shopClient.purchaseCosmetic(card.id, card.itemId)
-		end, function()
-			if card.kind == "Cosmetic" then
-				notifications.notify({
-					title = "PURCHASE COMPLETE",
-					description = `{string.upper(card.displayName)} IS NOW IN YOUR INVENTORY.`,
-					buttonText = "AWESOME!",
-				})
-			end
-		end)
+		end, nil)
 	end, { selectedShopCard, runShopAction, shopClient, notifications.notify })
 
 	local purchaseSelectedRobux = React.useCallback(function()
 		local card = selectedShopCard
-		if card == nil or (card.productId == nil and card.passId == nil) then
+		if card == nil or card.status ~= "Active" or card.pending or (card.productId == nil and card.passId == nil) then
 			return
 		end
-		setSelectedShopCardId(nil)
 		UIAnalytics.report("PromptOpened", { offerKey = card.id, offerKind = card.kind })
 		runShopAction(function()
 			if card.passId then
@@ -356,29 +474,63 @@ function EconomyMenuController.use(options: Options): Controller
 	end, { selectedShopCard, runShopAction, shopClient })
 
 	local closeTopLayer = React.useCallback(function(): boolean
-		if notifications.request ~= nil then
+		if previewItem ~= nil then
+			closePreview()
+			return true
+		elseif notifications.request ~= nil then
 			notifications.close(false)
+			return true
+		elseif selectedRewardItemId ~= nil then
+			setSelectedRewardItemId(nil)
 			return true
 		elseif crateReveal ~= nil then
 			shopClient.clearReveal()
 			return true
-		elseif selectedShopCardId ~= nil then
+		elseif selectedShopCardId ~= nil or selectedInventoryEntry ~= nil then
 			setSelectedShopCardId(nil)
+			setSelectedInventoryEntry(nil)
 			return true
 		end
 		return false
-	end, { crateReveal, selectedShopCardId, shopClient, notifications.request, notifications.close })
+	end, {
+		previewItem,
+		closePreview,
+		crateReveal,
+		selectedShopCardId,
+		selectedInventoryEntry,
+		selectedRewardItemId,
+		shopClient,
+		notifications.request,
+		notifications.close,
+	})
 
 	local closeAll = React.useCallback(function()
+		closePreview()
+		setSelectedInventoryEntry(nil)
+		setSelectedRewardItemId(nil)
 		shopClient.clearReveal()
 		setSelectedShopCardId(nil)
 		if notifications.request ~= nil then
 			notifications.close(false)
 		end
-	end, { shopClient, notifications.request, notifications.close })
+	end, { closePreview, shopClient, notifications.request, notifications.close })
 
 	return {
 		economyData = economyData,
+		previewItem = if previewBlocked then nil else previewItem,
+		previewEffect = previewEffect,
+		closePreview = closePreview,
+		inspectInventory = inspectInventory,
+		inspectReward = inspectReward,
+		inspectingReward = selectedRewardItemId ~= nil,
+		viewInventory = viewInventory,
+		viewSeason = viewSeason,
+		canViewSeason = seasonCard ~= nil,
+		equipPreview = equipPreview,
+		busySlots = busySnapshot,
+		seasonState = seasonState,
+		claimSeason = claimSeason,
+		claimPending = claimPending,
 		inventoryTab = inventoryTab,
 		setInventoryTab = setInventoryTab,
 		shopModel = shopModel,

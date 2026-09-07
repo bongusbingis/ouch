@@ -32,8 +32,8 @@ local particles = ParticleKit.effect({
 	},
 })
 
-local function centerPuff(position: Vector3, frame: CFrame, scale: number)
-	local part = Primitives.part("FoamPoofCore", Palette.White, Vector3.one * 0.1, frame)
+local function centerPuff(position: Vector3, frame: CFrame, scale: number, scope: Runtime.Scope?)
+	local part = Primitives.part("FoamPoofCore", Palette.White, Vector3.one * 0.1, frame, nil, scope)
 	part.Shape = Enum.PartType.Ball
 	Runtime.add(part, 0.42, function(alpha)
 		local spring = Primitives.popScale(alpha, 0.14, 1.18, 1)
@@ -47,7 +47,14 @@ local function centerPuff(position: Vector3, frame: CFrame, scale: number)
 	end, { layer = "Hero" })
 end
 
-local function puff(position: Vector3, frame: CFrame, scale: number, index: number, count: number)
+local function puff(
+	position: Vector3,
+	frame: CFrame,
+	scale: number,
+	index: number,
+	count: number,
+	scope: Runtime.Scope?
+)
 	local angle = ((index - 1) / count) * math.pi * 2 + random:NextNumber(-0.18, 0.18)
 	local outward = Primitives.radial(frame, angle, random:NextNumber(-0.12, 0.18))
 	local size = random:NextNumber(1.45, 2.35) * scale
@@ -57,7 +64,9 @@ local function puff(position: Vector3, frame: CFrame, scale: number, index: numb
 		"FoamPoofPuff",
 		PUFF_COLORS[(index - 1) % #PUFF_COLORS + 1],
 		Vector3.one * 0.1,
-		CFrame.new(origin)
+		CFrame.new(origin),
+		nil,
+		scope
 	)
 	part.Shape = Enum.PartType.Ball
 	local lifetime = random:NextNumber(0.55, 0.72)
@@ -74,13 +83,14 @@ local function puff(position: Vector3, frame: CFrame, scale: number, index: numb
 end
 
 function FoamPoof.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	centerPuff(context.position, frame, scale)
+	centerPuff(context.position, frame, scale, scope)
 	local count = Runtime.scaledCount(14, "Secondary")
 	for index = 1, count do
-		puff(context.position, frame, scale, index, count)
+		puff(context.position, frame, scale, index, count, scope)
 	end
 end
 

@@ -167,6 +167,7 @@ return function(props: Props)
 			OnVote = props.OnVote,
 			ButtonRef = if index == 1 then firstButtonRef else nil,
 			Portrait = portrait,
+			Compact = safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx,
 		})
 	end
 	local holderHeight = math.min(

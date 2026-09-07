@@ -132,13 +132,17 @@ local function resolveSpans(entries, unit: number): ()
 	end
 end
 
-local function measure(entries, unit: number, short: boolean): ()
+local function measure(entries, unit: number, shortHeight: number?): ()
 	for _, entry in entries do
 		local class = ShopUI.CardClasses[entry.style.Class]
-		if short then
+		if shortHeight then
 			class = table.clone(class)
-			class.MinHeightPx = ShopUI.ShortCardHeightPx
-			class.MaxHeightPx = ShopUI.ShortCardHeightPx
+			class.Layout = "Split"
+			class.ArtScale = 0.32
+			class.MinPx = math.max(class.MinPx, ShopUI.ShortCardWidthPx)
+			class.MaxPx = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
+			class.MinHeightPx = shortHeight
+			class.MaxHeightPx = shortHeight
 		end
 		entry.class = class
 		entry.width = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
@@ -147,11 +151,11 @@ local function measure(entries, unit: number, short: boolean): ()
 	end
 end
 
-local function renderBlocks(model, contentWidth: number, handlers, short: boolean): ({ [string]: any }, number)
+local function renderBlocks(model, contentWidth: number, handlers, shortHeight: number?): ({ [string]: any }, number)
 	local unit = ShopLayout.trackUnit(contentWidth, ShopUI.Tracks, ShopUI.GapPx)
 	local entries = orderedEntries(model, unit)
 	resolveSpans(entries, unit)
-	measure(entries, unit, short)
+	measure(entries, unit, shortHeight)
 	local placements, bottom = ShopLayout.place(entries, ShopUI.Tracks, ShopUI.GapPx)
 	local children = {}
 	for order, placement in placements do
@@ -243,7 +247,14 @@ return function(props: Props)
 
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
-	local content, bottom = renderBlocks(model, contentWidth, props, short)
+	local shortHeight = if short
+		then math.clamp(
+			math.floor(panelSize.Y * ShopUI.MainSizeScale.Y * ShopUI.ContentSizeScale.Y) - ShopUI.HeaderHeightPx - 6,
+			128,
+			ShopUI.ShortCardHeightPx
+		)
+		else nil
+	local content, bottom = renderBlocks(model, contentWidth, props, shortHeight)
 	content.UIPadding = c("UIPadding", {
 		PaddingLeft = UDim.new(0, ShopUI.PaddingXPx),
 		PaddingRight = UDim.new(0, ShopUI.PaddingXPx),
@@ -272,7 +283,7 @@ return function(props: Props)
 			Native = {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromScale(0.291804, 0.0540634),
-				Size = UDim2.fromScale(0.398251, 0.0898091),
+				Size = if short then UDim2.new(0.398251, 0, 0, 24) else UDim2.fromScale(0.398251, 0.0898091),
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				Text = "SHOP",
 				TextColor3 = Color3.new(1, 1, 1),
@@ -291,30 +302,23 @@ return function(props: Props)
 			else nil,
 		Bonks = c(BonksLabel, {
 			Amount = model.bonks,
-			MaxTextSize = 36,
-			TextColor = Color3.new(1, 1, 1),
+			MaxTextSize = 30,
+			TextColor = Color3.fromRGB(255, 220, 62),
 			TextStroke = 0.05,
-			IconSize = UDim2.fromScale(0.24, 0.76),
+			Alignment = Enum.HorizontalAlignment.Right,
 			Native = {
 				AnchorPoint = Vector2.new(1, 0.5),
-				BackgroundColor3 = Color3.fromRGB(255, 211, 51),
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0.954, 0.1),
-				Size = UDim2.fromScale(0.245, 0.078),
+				Size = if short then UDim2.new(0.245, 0, 0, 22) else UDim2.fromScale(0.245, 0.078),
 				ZIndex = 5,
 			},
-		}, {
-			UICorner = c("UICorner", { CornerRadius = UDim.new(0.25, 0) }),
-			UIStroke = c("UIStroke", {
-				Color = Color3.fromRGB(61, 61, 61),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.045,
-			}),
 		}),
 		Main = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.575),
+			Position = UDim2.fromScale(0.5, 0.555),
 			Size = UDim2.fromScale(ShopUI.MainSizeScale.X, ShopUI.MainSizeScale.Y),
 		}, {
 			Content = c("ScrollingFrame", {

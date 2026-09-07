@@ -28,7 +28,7 @@ local CLAIM_COLOR = Palette.Green
 local CLAIMED_COLOR = Palette.Raised
 local AVAILABLE_GLOW = Palette.Yellow
 
-local CLOSE_BUTTON_ASSET = "rbxassetid://94748581468730"
+local ButtonSurface = require(script.Parent.ButtonSurface)
 local CHECK_ICON_ASSET = "rbxassetid://505845268"
 
 export type PublicDay = {
@@ -287,18 +287,18 @@ return function(props: Props)
 				}),
 			}),
 			ActionButton = c(AnimatedButton, {
+				Visual = c(
+					ButtonSurface,
+					{ Color = if state.canClaim then CLAIM_COLOR else Palette.Pink, Enabled = not props.Pending }
+				),
 				Style = "Primary",
 				Enabled = not props.Pending and (if state.canClaim then props.OnClaim ~= nil else props.OnClose ~= nil),
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
 					BackgroundTransparency = 1,
-					Image = CLOSE_BUTTON_ASSET,
-					ImageColor3 = if state.canClaim then CLAIM_COLOR else Color3.new(1, 1, 1),
+					Image = "",
 					Position = UDim2.fromScale(0.5, 0.92),
-					ScaleType = Enum.ScaleType.Slice,
 					Size = UDim2.fromScale(0.64, 0.16),
-					SliceCenter = Rect.new(198, 228, 841, 468),
-					SliceScale = 0.2,
 				},
 				OnActivated = function()
 					if state.canClaim then
@@ -320,12 +320,9 @@ return function(props: Props)
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
 						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.5, 0.54),
+						Position = UDim2.fromScale(0.5, 0.5),
 						Size = UDim2.fromScale(0.7, 0.6),
-						Text = if props.Pending
-							then "CLAIMING..."
-							elseif state.canClaim then "CLAIM REWARD"
-							else "AWESOME!",
+						Text = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM REWARD" else "DONE",
 						TextColor3 = Color3.new(1, 1, 1),
 						ZIndex = 2,
 					},

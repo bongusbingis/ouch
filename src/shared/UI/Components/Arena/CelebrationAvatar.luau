@@ -32,15 +32,17 @@ return React.memo(function(props)
 		local resize = viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(frameCamera)
 		local display, unregister = nil, nil
 		local preparation = task.defer(function()
-			display = VictoryRig.create(world, props.ColorId)
+			display = VictoryRig.create(world, props.ColorId, props.CostumeId)
 			local time = 0
 			local function update(dt)
 				time += dt
-				display.pose(style, time, GuiService.ReducedMotionEnabled)
-				setElapsed(if GuiService.ReducedMotionEnabled then 0 else time)
+				display.pose(style, time, props.Static == true or GuiService.ReducedMotionEnabled)
+				setElapsed(if props.Static or GuiService.ReducedMotionEnabled then 0 else time)
 			end
 			update(0)
-			unregister = PreviewScheduler.register(viewport, update, Emotes.Preview.UpdateHz)
+			if not props.Static then
+				unregister = PreviewScheduler.register(viewport, update, Emotes.Preview.UpdateHz)
+			end
 		end)
 		return function()
 			resize:Disconnect()
@@ -57,7 +59,7 @@ return React.memo(function(props)
 				viewport.CurrentCamera = nil
 			end
 		end
-	end, { props.EmoteId, props.ColorId })
+	end, { props.EmoteId, props.ColorId, props.CostumeId, props.Static })
 	local z = props.ZIndex or 3
 	local confetti = {}
 	for index = 1, style.ConfettiCount do

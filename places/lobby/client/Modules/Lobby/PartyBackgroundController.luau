@@ -4,7 +4,9 @@
 -- Created: 2026-08-15
 
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local PresentationCamera = require(ReplicatedStorage.Shared.UI.Services.PresentationCamera)
 
 local PartyBackgroundController = {}
 PartyBackgroundController.__index = PartyBackgroundController
@@ -42,12 +44,13 @@ function PartyBackgroundController.start()
 	local self = setmetatable({
 		_connection = nil,
 		_enabled = true,
+		_visible = true,
 		_background = background,
 		_baseTransparency = background.Transparency,
 		_textures = textures,
 	}, PartyBackgroundController)
 	self._connection = RunService.RenderStepped:Connect(function(deltaTime)
-		if not self._enabled then
+		if not self._visible then
 			return
 		end
 		elapsed = (elapsed + deltaTime) % LOOP_DURATION
@@ -69,6 +72,10 @@ function PartyBackgroundController.start()
 			end
 		end
 	end)
+	self._unsubscribeCamera = PresentationCamera.subscribe(function()
+		self:_refreshVisibility()
+	end)
+	self:_refreshVisibility()
 	return self
 end
 
@@ -81,15 +88,25 @@ function PartyBackgroundController:setEnabled(value)
 		return
 	end
 	self._enabled = value
-	self._background.Transparency = if value then self._baseTransparency else 1
+	self:_refreshVisibility()
+end
+
+function PartyBackgroundController:_refreshVisibility()
+	local visible = self._enabled and PresentationCamera.getOwner() ~= "CosmeticPreview"
+	self._visible = visible
+	self._background.Transparency = if visible then self._baseTransparency else 1
 	for _, texture in self._textures do
 		if texture.instance.Parent then
-			texture.instance.Transparency = if value then texture.transparency else 1
+			texture.instance.Transparency = if visible then texture.transparency else 1
 		end
 	end
 end
 
 function PartyBackgroundController:destroy()
+	if self._unsubscribeCamera then
+		self._unsubscribeCamera()
+		self._unsubscribeCamera = nil
+	end
 	if self._connection then
 		self._connection:Disconnect()
 		self._connection = nil

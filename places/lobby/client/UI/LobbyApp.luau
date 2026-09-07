@@ -8,7 +8,6 @@
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -21,6 +20,8 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local useSafeArea = require(UI.Hooks.useSafeArea)
 local ResponsiveLayout = require(UI.Models.ResponsiveLayout)
 local Components = UI:WaitForChild("Components")
+local PresentationCamera = require(UI.Services.PresentationCamera)
+local CosmeticPreviewClient = require(UI.Services.CosmeticPreviewClient)
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local LobbyViewModel = require(UI:WaitForChild("Models"):WaitForChild("LobbyViewModel"))
@@ -153,14 +154,12 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 		local pageColor = PAGE_BACKGROUND_COLORS[cameraPage]
 		assert(pageColor ~= nil, `[LobbyApp] No background color configured for {cameraPage}`)
 		background.current = partyBackground
-		camera.CameraType = Enum.CameraType.Scriptable
 		if not initialized.current or reducedMotion then
 			initialized.current = true
 			startCFrame.current = target.CFrame
 			targetCFrame.current = target.CFrame
 			startColor.current = pageColor
 			targetColor.current = pageColor
-			camera.CFrame = target.CFrame
 			partyBackground.Color = pageColor
 			api.start({ Alpha = 1, immediate = true })
 			return function()
@@ -169,7 +168,7 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 				end
 			end
 		end
-		startCFrame.current = camera.CFrame
+		startCFrame.current = if PresentationCamera.getOwner() == "Lobby" then camera.CFrame else targetCFrame.current
 		targetCFrame.current = target.CFrame
 		startColor.current = partyBackground.Color
 		targetColor.current = pageColor
@@ -189,33 +188,23 @@ local function useWorldTransition(currentPage: string, enabled: boolean)
 		if not enabled then
 			return
 		end
-		local connection = RunService.RenderStepped:Connect(function()
+		local lease = PresentationCamera.acquire("Lobby", PresentationCamera.Priority.Lobby, function(camera)
 			local alpha = styles.Alpha:getValue()
-			local camera = Workspace.CurrentCamera
-			if camera then
-				camera.CameraType = Enum.CameraType.Scriptable
-				camera.CFrame = startCFrame.current:Lerp(targetCFrame.current, alpha)
-			end
+			camera.CFrame = startCFrame.current:Lerp(targetCFrame.current, alpha)
 			local partyBackground = background.current
 			if partyBackground then
 				partyBackground.Color = startColor.current:Lerp(targetColor.current, alpha)
 			end
 		end)
 		return function()
-			connection:Disconnect()
 			api.stop()
-			-- The loop pins CameraType to Scriptable every frame; without handing
-			-- it back the camera stays frozen on the last lobby framing and the
-			-- player can neither look around nor use the combat camera.
-			local camera = Workspace.CurrentCamera
-			if camera then
-				camera.CameraType = Enum.CameraType.Custom
-			end
+			PresentationCamera.release(lease)
 		end
 	end, { enabled })
 end
 
 local function LobbyContent(props)
+	local effectPreview = useExternalStore(CosmeticPreviewClient.getSnapshot, CosmeticPreviewClient.subscribe)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local partyClient = props.PartyClient
@@ -241,7 +230,9 @@ local function LobbyContent(props)
 		if onboardingClient == nil then
 			return
 		end
-		return onboardingClient.subscribe(setOnboarding)
+		local disconnect = onboardingClient.subscribe(setOnboarding)
+		setOnboarding(onboardingClient.getSnapshot())
+		return disconnect
 	end, { onboardingClient })
 
 	-- Studio-only combat test session (nil in production). While it runs it owns
@@ -255,7 +246,9 @@ local function LobbyContent(props)
 		if combatTestClient == nil then
 			return
 		end
-		return combatTestClient.subscribe(setCombatTest)
+		local disconnect = combatTestClient.subscribe(setCombatTest)
+		setCombatTest(combatTestClient.getSnapshot())
+		return disconnect
 	end, { combatTestClient })
 	local testActive = combatTest ~= nil and combatTest.active == true
 
@@ -318,10 +311,14 @@ local function LobbyContent(props)
 	local joinOpen, setJoinOpen = React.useState(false)
 	local codeVisible, setCodeVisible = React.useState(false)
 	local devTapState = React.useRef({ lastTapAt = 0, tapCount = 0 })
+	local viewInventory = React.useCallback(function()
+		setCurrentPage("Inventory")
+	end, {})
 	local economyMenu = EconomyMenuController.use({
 		ShopClient = props.ShopClient,
 		EconomyData = props.EconomyData,
 		ShopRefreshEnabled = props.ShopRefreshEnabled,
+		OnViewInventory = viewInventory,
 	})
 	local economyData = economyMenu.economyData
 	local inventoryTab = economyMenu.inventoryTab
@@ -340,6 +337,11 @@ local function LobbyContent(props)
 		loadingDetail = "THE MATCH IS READY"
 	end
 	local loadingTip = useLoadingTip(loadingVisible)
+	React.useEffect(function()
+		if loadingVisible or not lobbyVisible then
+			CosmeticPreviewClient.close(nil, "unavailable")
+		end
+	end, { loadingVisible, lobbyVisible })
 	local equipped = if economyData then economyData.Cosmetics.Equipped else {}
 	local skinPreviewState = React.useRef({})
 	skinPreviewState.current = {
@@ -368,6 +370,9 @@ local function LobbyContent(props)
 		end
 	end, {})
 	local function claimReward(key, action)
+		if type(key) ~= "string" or key == "" then
+			return
+		end
 		if claimRequests.current[key] then
 			return
 		end
@@ -389,7 +394,7 @@ local function LobbyContent(props)
 				else
 					notifications.notify({
 						title = "REWARD NOT CLAIMED",
-						description = "WE COULDN'T CONFIRM YOUR REWARD. PLEASE TRY AGAIN.",
+						description = "COULDN'T CLAIM THAT REWARD. TRY AGAIN.",
 					})
 				end
 			end
@@ -512,7 +517,10 @@ local function LobbyContent(props)
 			if onboardingActive then
 				return
 			end
-			if notifications.request ~= nil then
+			if effectPreview.active then
+				economyMenu.closePreview()
+				return
+			elseif notifications.request ~= nil then
 				notifications.close(false)
 				return
 			elseif showDailyRewardModal then
@@ -530,6 +538,8 @@ local function LobbyContent(props)
 			connection:Disconnect()
 		end
 	end, {
+		effectPreview.active,
+		economyMenu.closePreview,
 		economyMenu.CloseTopLayer,
 		notifications.request,
 		notifications.close,
@@ -573,6 +583,7 @@ local function LobbyContent(props)
 							setShowDailyRewardModal(true)
 						end,
 						SeasonState = seasonState,
+						OnViewSeasonRewards = if economyMenu.canViewSeason then economyMenu.viewSeason else nil,
 						QuestState = questState,
 						PendingClaims = pendingClaims,
 						OnClaimSeason = function()
@@ -591,6 +602,7 @@ local function LobbyContent(props)
 						SelectedTab = inventoryTab,
 						OnTabChanged = economyMenu.setInventoryTab,
 						OnEquip = economyMenu.equip,
+						OnInspect = economyMenu.inspectInventory,
 					})
 				elseif pageName == "Settings" then
 					return c(SettingsPage, { Position = position, Place = "Lobby" })
@@ -621,7 +633,7 @@ local function LobbyContent(props)
 		BaseClip = c("Frame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
-			Visible = lobbyVisible,
+			Visible = lobbyVisible and not effectPreview.active,
 		}, {
 			Views = c("Frame", {
 				BackgroundTransparency = 1,
@@ -686,6 +698,7 @@ local function LobbyContent(props)
 				Notification = c(NotificationModal, {
 					Request = notifications.request,
 					OnChoose = notifications.close,
+					FocusEnabled = not effectPreview.active,
 				}),
 				Economy = c(EconomyMenuModals, {
 					FocusEnabled = notifications.request == nil,

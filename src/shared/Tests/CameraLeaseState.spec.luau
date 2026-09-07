@@ -1,0 +1,46 @@
+--!strict
+
+local T = require(script.Parent.TestKit)
+local Leases = require(script.Parent.Parent.Game.Cosmetics.CameraLeaseState)
+
+T.describe("CameraLeaseState", function()
+	T.it("restores the suspended lobby owner after a preview closes", function()
+		local state = Leases.new()
+		local lobby = Leases.acquire(state, "Lobby", 10)
+		local preview = Leases.acquire(state, "Preview", 20)
+		T.expect(Leases.current(state)):toEqual(preview)
+		Leases.release(state, preview)
+		T.expect(Leases.current(state)):toEqual(lobby)
+	end)
+
+	T.it("does not let stale preview cleanup release a newer owner", function()
+		local state = Leases.new()
+		local first = Leases.acquire(state, "Preview", 20)
+		local second = Leases.acquire(state, "Preview", 20)
+		Leases.release(state, first)
+		Leases.release(state, first)
+		T.expect(Leases.current(state)):toEqual(second)
+	end)
+
+	T.it("keeps death and vote above a newly requested preview", function()
+		local state = Leases.new()
+		local death = Leases.acquire(state, "Death", 30)
+		local vote = Leases.acquire(state, "Vote", 40)
+		Leases.acquire(state, "Preview", 20)
+		T.expect(Leases.current(state)):toEqual(vote)
+		Leases.release(state, vote)
+		T.expect(Leases.current(state)):toEqual(death)
+	end)
+
+	T.it("returns to normal camera control only when every lease is released", function()
+		local state = Leases.new()
+		local lobby = Leases.acquire(state, "Lobby", 10)
+		local preview = Leases.acquire(state, "Preview", 20)
+		Leases.release(state, lobby)
+		T.expect(Leases.current(state)):toEqual(preview)
+		Leases.release(state, preview)
+		T.expect(Leases.current(state)):toBeNil()
+	end)
+end)
+
+return true

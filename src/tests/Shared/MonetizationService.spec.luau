@@ -212,5 +212,102 @@ return function()
 			expect(data.Bonks).to.equal(500)
 			expect(leases).to.equal(0)
 		end)
+
+		it("fulfills a retired crate receipt and correlates compensation with its purchase", function()
+			local player = { UserId = 720004 }
+			local data = { Bonks = 0, Receipts = {} }
+			local marketplace, grants = {}, {}
+			local opens = 0
+			MonetizationService.start({
+				marketplace = marketplace,
+				players = {
+					GetPlayerByUserId = function()
+						return player
+					end,
+				},
+				products = { ById = { [204] = { CatalogStatus = "Hidden", Type = "Crate", CrateId = "retired" } } },
+				crates = { retired = { CatalogStatus = "Hidden" } },
+				crateService = {
+					openFromReceipt = function()
+						opens += 1
+						data.Bonks += 100
+						return true, { kind = "Bonks", amount = 100 }
+					end,
+				},
+				playerData = {
+					get = function()
+						return data
+					end,
+					acquireWriteLease = function()
+						return function() end
+					end,
+					confirmReceiptSaved = function()
+						return true
+					end,
+				},
+				analyticsService = { logEconomyEvent = function() end },
+				network = {
+					fire = function(name, _player, payload)
+						table.insert(grants, { name = name, payload = payload })
+					end,
+				},
+			})
+			local receipt = { PlayerId = player.UserId, ProductId = 204, PurchaseId = "retired-crate" }
+			expect(marketplace.ProcessReceipt(receipt)).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(marketplace.ProcessReceipt(receipt)).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(data.Bonks).to.equal(100)
+			expect(opens).to.equal(1)
+			expect(#grants).to.equal(1)
+			expect(grants[1].name).to.equal("StorePurchaseGranted")
+			expect(grants[1].payload.productId).to.equal(204)
+			expect(grants[1].payload.grantId).to.equal("retired-crate")
+		end)
+
+		it("correlates a saved compensation payload from an earlier server without granting again", function()
+			local player = { UserId = 720005 }
+			local data = {
+				Receipts = { compensation = 1 },
+				ReceiptWork = { compensation = { Items = {}, Payload = { kind = "Bonks", amount = 100 } } },
+			}
+			local marketplace, grants = {}, {}
+			MonetizationService.start({
+				marketplace = marketplace,
+				players = {
+					GetPlayerByUserId = function()
+						return player
+					end,
+				},
+				products = { ById = { [205] = { CatalogStatus = "Hidden", Type = "Crate", CrateId = "retired" } } },
+				crates = { retired = { CatalogStatus = "Hidden" } },
+				crateService = {
+					openFromReceipt = function()
+						error("saved compensation must not reroll")
+					end,
+				},
+				playerData = {
+					get = function()
+						return data
+					end,
+					acquireWriteLease = function()
+						return function() end
+					end,
+					confirmReceiptSaved = function()
+						return true
+					end,
+				},
+				analyticsService = { logEconomyEvent = function() end },
+				network = {
+					fire = function(_name, _player, payload)
+						table.insert(grants, payload)
+					end,
+				},
+			})
+			expect(
+				marketplace.ProcessReceipt({ PlayerId = player.UserId, ProductId = 205, PurchaseId = "compensation" })
+			).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(grants[1].productId).to.equal(205)
+			expect(grants[1].grantId).to.equal("compensation")
+			expect(data.ReceiptWork.compensation).to.equal(nil)
+		end)
 	end)
 end

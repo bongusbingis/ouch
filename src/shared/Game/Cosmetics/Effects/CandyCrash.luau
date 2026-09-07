@@ -32,8 +32,8 @@ local particles = ParticleKit.effect({
 	},
 })
 
-local function core(position: Vector3, frame: CFrame, scale: number)
-	local part = Primitives.part("CandyCrashCore", Palette.White, Vector3.one * 0.1, frame)
+local function core(position: Vector3, frame: CFrame, scale: number, scope: Runtime.Scope?)
+	local part = Primitives.part("CandyCrashCore", Palette.White, Vector3.one * 0.1, frame, nil, scope)
 	part.Shape = Enum.PartType.Ball
 	Runtime.add(part, 0.28, function(alpha)
 		local spring = Primitives.popScale(alpha, 0.08, 1.2, 1)
@@ -43,20 +43,42 @@ local function core(position: Vector3, frame: CFrame, scale: number)
 	end, { layer = "Hero" })
 end
 
-local function chunk(position: Vector3, frame: CFrame, scale: number, index: number, count: number)
+local function chunk(
+	position: Vector3,
+	frame: CFrame,
+	scale: number,
+	index: number,
+	count: number,
+	scope: Runtime.Scope?
+)
 	local angle = ((index - 1) / count) * math.pi * 2 + random:NextNumber(-0.13, 0.13)
 	local outward = Primitives.radial(frame, angle, random:NextNumber(0.08, 0.3))
 	local velocity = outward * random:NextNumber(8.5, 12) * scale + Vector3.yAxis * random:NextNumber(2.8, 6.2) * scale
 	local color = CANDY_COLORS[(index - 1) % #CANDY_COLORS + 1]
 	local part: Part
 	if index % 3 == 1 then
-		part = Primitives.part("CandyGumdrop", color, Vector3.new(0.82, 0.95, 0.7) * scale, CFrame.new(position))
+		part = Primitives.part(
+			"CandyGumdrop",
+			color,
+			Vector3.new(0.82, 0.95, 0.7) * scale,
+			CFrame.new(position),
+			nil,
+			scope
+		)
 		part.Shape = Enum.PartType.Ball
 	elseif index % 3 == 2 then
-		part = Primitives.part("CandyWafer", color, Vector3.new(0.52, 0.96, 0.96) * scale, CFrame.new(position))
+		part = Primitives.part(
+			"CandyWafer",
+			color,
+			Vector3.new(0.52, 0.96, 0.96) * scale,
+			CFrame.new(position),
+			nil,
+			scope
+		)
 		part.Shape = Enum.PartType.Cylinder
 	else
-		part = Primitives.part("CandyChew", color, Vector3.new(0.78, 0.62, 0.92) * scale, CFrame.new(position))
+		part =
+			Primitives.part("CandyChew", color, Vector3.new(0.78, 0.62, 0.92) * scale, CFrame.new(position), nil, scope)
 	end
 	local baseSize = part.Size
 	local initial = CFrame.Angles(
@@ -78,7 +100,14 @@ local function chunk(position: Vector3, frame: CFrame, scale: number, index: num
 	end, { layer = if index <= 4 then "Hero" else "Secondary" })
 end
 
-local function sprinkle(position: Vector3, frame: CFrame, scale: number, index: number, count: number)
+local function sprinkle(
+	position: Vector3,
+	frame: CFrame,
+	scale: number,
+	index: number,
+	count: number,
+	scope: Runtime.Scope?
+)
 	local angle = ((index - 1) / count) * math.pi * 2 + 0.25
 	local outward = Primitives.radial(frame, angle, 0.12)
 	local velocity = outward * random:NextNumber(10, 14) * scale + Vector3.yAxis * random:NextNumber(2, 5) * scale
@@ -86,7 +115,9 @@ local function sprinkle(position: Vector3, frame: CFrame, scale: number, index: 
 		"CandySprinkle",
 		CANDY_COLORS[index % #CANDY_COLORS + 1],
 		Vector3.new(0.18, 0.62, 0.18) * scale,
-		CFrame.new(position)
+		CFrame.new(position),
+		nil,
+		scope
 	)
 	local baseSize = part.Size
 	Runtime.add(part, 0.62, function(alpha, elapsed)
@@ -100,17 +131,18 @@ local function sprinkle(position: Vector3, frame: CFrame, scale: number, index: 
 end
 
 function CandyCrash.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	core(context.position, frame, scale)
+	core(context.position, frame, scale, scope)
 	local chunkCount = Runtime.scaledCount(11, "Secondary")
 	for index = 1, chunkCount do
-		chunk(context.position, frame, scale, index, chunkCount)
+		chunk(context.position, frame, scale, index, chunkCount, scope)
 	end
 	local sprinkleCount = Runtime.scaledCount(8, "Tertiary")
 	for index = 1, sprinkleCount do
-		sprinkle(context.position, frame, scale, index, sprinkleCount)
+		sprinkle(context.position, frame, scale, index, sprinkleCount, scope)
 	end
 end
 

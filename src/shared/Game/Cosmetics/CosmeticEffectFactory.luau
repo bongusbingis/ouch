@@ -14,6 +14,7 @@ export type EffectContext = {
 	position: Vector3,
 	direction: Vector3?,
 	scale: number?,
+	scope: any?,
 }
 
 type ItemDef = { Category: string, EffectId: string?, [string]: any }
@@ -69,7 +70,7 @@ local function anchorFor(context: EffectContext): BasePart
 	anchor.CFrame = if context.direction
 		then CFrame.lookAt(context.position, context.position - context.direction)
 		else CFrame.new(context.position)
-	anchor.Parent = Runtime.container()
+	Runtime.mount(anchor, context.scope)
 	return anchor
 end
 
@@ -106,7 +107,11 @@ local function effectFolder(folderName: string): Instance
 		:WaitForChild(folderName)
 end
 
-function CosmeticEffectFactory.play(categoryId: string, effectId: string?, context: EffectContext)
+-- Gameplay fallback does not turn a failed requested effect into a successful result.
+function CosmeticEffectFactory.play(categoryId: string, effectId: string?, context: EffectContext): (boolean, string?)
+	if context.scope and context.scope.destroyed then
+		return false, "effect scope is closed"
+	end
 	local category = CosmeticEffectsConfig.Categories[categoryId]
 	assert(category ~= nil, `[CosmeticEffectFactory] unknown effect category {categoryId}`)
 	local resolvedId = if effectId ~= nil and effectId ~= "" then effectId else category.DefaultEffectId
@@ -116,28 +121,31 @@ function CosmeticEffectFactory.play(categoryId: string, effectId: string?, conte
 	if scriptEffect ~= nil then
 		local ok, err = pcall(scriptEffect.play, context)
 		if ok then
-			return
+			return true, nil
 		end
 		warn(`[CosmeticEffectFactory] script effect {resolvedId} failed: {err}`)
 		if resolvedId ~= category.DefaultEffectId then
 			local defaultScriptEffect = ScriptEffects.get(category.DefaultEffectId)
-			if defaultScriptEffect ~= nil then
-				local fallbackOk, fallbackErr = pcall(defaultScriptEffect.play, context)
-				if not fallbackOk then
-					warn(`[CosmeticEffectFactory] default script effect failed: {fallbackErr}`)
+			local fallbackOk, fallbackErr = pcall(function()
+				if defaultScriptEffect ~= nil then
+					defaultScriptEffect.play(context)
+				else
+					playInstance(
+						effectFolder(category.FolderName):WaitForChild(category.DefaultEffectId),
+						context,
+						category.DefaultEmitCount
+					)
 				end
-			else
-				playInstance(
-					effectFolder(category.FolderName):WaitForChild(category.DefaultEffectId),
-					context,
-					category.DefaultEmitCount
-				)
+			end)
+			if not fallbackOk then
+				warn(`[CosmeticEffectFactory] default effect failed: {fallbackErr}`)
 			end
 		end
-		return
+		return false, tostring(err)
 	end
 
 	playInstance(effectFolder(category.FolderName):WaitForChild(resolvedId), context, category.DefaultEmitCount)
+	return true, nil
 end
 
 return CosmeticEffectFactory

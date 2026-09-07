@@ -9,14 +9,8 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
-local CharacterColorLogic = require(
-	ReplicatedStorage:WaitForChild("Shared")
-		:WaitForChild("Game")
-		:WaitForChild("Economy")
-		:WaitForChild("CharacterColorLogic")
-)
+local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
 local CosmeticVisualFactory = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
@@ -62,6 +56,7 @@ function PartyCharacterRenderer.new(localUserId, onKick)
 		_skinsPreview = nil,
 		_destroyed = false,
 		_generation = 0,
+		_appearanceRevision = 0,
 	}, PartyCharacterRenderer)
 
 	self:Render({ members = {} })
@@ -243,25 +238,22 @@ function PartyCharacterRenderer:_remove(userId)
 	character.idleTrack:Stop(0)
 	character.idleTrack:Destroy()
 	character.nametag:Destroy()
+	character.appearance.destroy()
 	character.rig:Destroy()
 end
 
-function PartyCharacterRenderer:_spawn(userId, slot, characterColorId)
+function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId)
 	local rig = self._characterTemplate:Clone()
 	rig.Name = ("PartyCharacter_%d"):format(userId)
 	rig:SetAttribute("UserId", userId)
 	rig:SetAttribute("PartySlot", slot)
 
-	local color = CharacterColorLogic.resolve(Cosmetics, characterColorId)
 	for _, descendant in rig:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.CanCollide = false
 			descendant.CanQuery = false
 			descendant.CanTouch = false
 			descendant.Massless = true
-		end
-		if descendant:IsA("MeshPart") then
-			descendant.Color = color
 		end
 	end
 
@@ -308,6 +300,11 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId)
 
 	self._characters[userId] = {
 		rig = rig,
+		appearance = CharacterAppearance.create(
+			rig,
+			{ characterColorId = characterColorId, costumeId = costumeId },
+			{ live = true }
+		),
 		idleTrack = idleTrack,
 		nametag = nametag,
 		usernameLabel = usernameLabel,
@@ -316,23 +313,8 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId)
 		leftHand = leftHand,
 		rightHand = rightHand,
 		slot = slot,
-		characterColorId = characterColorId or "",
 	}
 	self:_requestUsername(userId)
-end
-
-function PartyCharacterRenderer:_setCharacterColor(character, characterColorId)
-	local normalizedId = characterColorId or ""
-	if character.characterColorId == normalizedId then
-		return
-	end
-	character.characterColorId = normalizedId
-	local color = CharacterColorLogic.resolve(Cosmetics, normalizedId)
-	for _, descendant in character.rig:GetDescendants() do
-		if descendant:IsA("MeshPart") then
-			descendant.Color = color
-		end
-	end
 end
 
 function PartyCharacterRenderer:_move(character, slot)
@@ -352,15 +334,17 @@ function PartyCharacterRenderer:Render(snapshot)
 	if self._destroyed then
 		return
 	end
+	self._appearanceRevision += 1
+	local revision = self._appearanceRevision
 	local isLocalLeader = snapshot.leaderUserId == self._localUserId
 	local orderedUserIds = { self._localUserId }
 	local includedUserIds = {
 		[self._localUserId] = true,
 	}
-	local characterColors = {}
+	local appearances = {}
 
 	for _, member in snapshot.members do
-		characterColors[member.userId] = member.characterColorId
+		appearances[member.userId] = member
 		if #orderedUserIds >= Config.PartyMaxPlayers then
 			break
 		end
@@ -368,6 +352,13 @@ function PartyCharacterRenderer:Render(snapshot)
 			includedUserIds[member.userId] = true
 			table.insert(orderedUserIds, member.userId)
 		end
+	end
+
+	for _, userId in orderedUserIds do
+		CharacterAppearance.prepare(appearances[userId] or {})
+	end
+	if self._destroyed or self._appearanceRevision ~= revision then
+		return
 	end
 
 	local removals = {}
@@ -381,13 +372,14 @@ function PartyCharacterRenderer:Render(snapshot)
 	end
 
 	for slot, userId in orderedUserIds do
-		local characterColorId = characterColors[userId]
+		local appearance = appearances[userId] or {}
+		local characterColorId, costumeId = appearance.characterColorId, appearance.costumeId
 		local character = self._characters[userId]
 		if character then
 			self:_move(character, slot)
-			self:_setCharacterColor(character, characterColorId)
+			character.appearance.update({ characterColorId = characterColorId, costumeId = costumeId })
 		else
-			self:_spawn(userId, slot, characterColorId)
+			self:_spawn(userId, slot, characterColorId, costumeId)
 			character = self._characters[userId]
 		end
 		local canKick = isLocalLeader and userId ~= snapshot.leaderUserId

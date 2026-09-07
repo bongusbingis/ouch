@@ -52,7 +52,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 		}
 	elseif snapshot.phase == "Lobby" then
 		return {
-			partyState = if isLeader then "PRESS PLAY TO MATCHMAKE" else "WAITING FOR PARTY LEADER",
+			partyState = if isLeader then "READY TO BRAWL?" else "WAITING FOR PARTY LEADER",
 			playText = "PLAY",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = false,
@@ -66,7 +66,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 		}
 	elseif snapshot.phase == "Claimed" then
 		return {
-			partyState = "FORMING MATCH",
+			partyState = "ROUND COMING UP",
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = true,
@@ -80,7 +80,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 		}
 	end
 	return {
-		partyState = "TRAVELING TO MATCH",
+		partyState = "HEADING TO THE ARENA",
 		playText = "PLAY",
 		playEnabled = false,
 		showMatchmakingActivity = false,

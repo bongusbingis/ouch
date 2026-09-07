@@ -19,6 +19,7 @@ export type Contestant = {
 	displayName: string,
 	teamId: string?,
 	colorId: string?,
+	costumeId: string?,
 	emoteId: string?,
 	ballId: string?,
 	hammerId: string?,
@@ -517,7 +518,7 @@ local function copyAppearance(value: any): Contestant?
 		displayName = value.displayName,
 		contribution = value.contribution,
 	}
-	for _, key in { "teamId", "colorId", "emoteId", "ballId", "hammerId" } do
+	for _, key in { "teamId", "colorId", "costumeId", "emoteId", "ballId", "hammerId" } do
 		if value[key] ~= nil and value[key] ~= "" then
 			if not validText(value[key], 100) then
 				return nil

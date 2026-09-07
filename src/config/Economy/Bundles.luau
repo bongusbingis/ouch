@@ -26,15 +26,12 @@ export type BundleDef = {
 }
 
 local Catalog: { [string]: BundleDef } = {
-	-- The shape to copy when the first outfit set is authored. ItemIds is empty
-	-- because no costume cosmetics exist yet; fill it in, add a Bundle product in
-	-- Config.Products naming this key, then flip both to Active.
 	StarterOutfitBundle = {
 		CatalogStatus = "Preview",
-		DisplayName = "Starter Outfit Bundle",
-		Description = "A complete look, cheaper than buying the pieces.",
+		DisplayName = "Foam League Starter Set",
+		Description = "The complete Foam League outfit, a blue dodgeball and the Star Pop elimination effect.",
 		DisplayOrder = 100,
-		ItemIds = {},
+		ItemIds = { "FoamLeague", "DodgeBall3", "StarPop" },
 	},
 }
 

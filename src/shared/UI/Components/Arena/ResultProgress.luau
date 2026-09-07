@@ -6,7 +6,6 @@ local React = require(ReplicatedStorage.Packages.react)
 local Colors = require(ReplicatedStorage.Config.Interface.ArenaPresentation).Colors
 local Label = require(script.Parent.Label)
 local Surface = require(script.Parent.Surface)
-local Avatar = require(script.Parent.CelebrationAvatar)
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local formatNumber = require(script.Parent.Parent.Parent.Models.NumberText)
 local c = React.createElement
@@ -14,9 +13,7 @@ local c = React.createElement
 return function(props)
 	local result = props.Result
 	local compact = props.Compact
-	local appearance = result.personalAppearance
-	local avatarHeight = if compact then 90 else 160
-	local rewardsTop = if appearance and not compact then avatarHeight + 36 else 38
+	local rewardsTop = 38
 	local rewards = result.rewards
 	local stats = {}
 	for _, stat in result.personalStats do
@@ -31,13 +28,6 @@ return function(props)
 			Size = 27,
 			Native = { Position = UDim2.fromOffset(12, 8), Size = UDim2.new(1, -24, 0, 30) },
 		}),
-		Avatar = if appearance and not compact
-			then c(Avatar, {
-				ColorId = appearance.colorId,
-				EmoteId = appearance.emoteId,
-				Native = { Position = UDim2.fromOffset(0, 36), Size = UDim2.new(1, 0, 0, avatarHeight) },
-			})
-			else nil,
 		XP = if rewards
 			then c(Label, {
 				Text = `+{formatNumber(rewards.matchXp)} XP`,
@@ -60,7 +50,7 @@ return function(props)
 			else nil,
 		Pending = if result.rewardsPending or not rewards
 			then c(Label, {
-				Text = if result.rewardsPending then "Saving your rewards…" else "Rewards are on their way…",
+				Text = if result.rewardsPending then "SAVING REWARDS…" else "LOADING REWARDS…",
 				Size = 19,
 				Color = Colors.Muted,
 				Native = { Position = UDim2.fromOffset(8, rewardsTop), Size = UDim2.new(1, -16, 0, 38) },
@@ -144,30 +134,20 @@ return function(props)
 		})
 		y += 34
 	end
-	if appearance and compact then
-		rows.Emote = c(Avatar, {
-			ColorId = appearance.colorId,
-			EmoteId = appearance.emoteId,
-			Native = { Position = UDim2.fromOffset(0, y), Size = UDim2.new(1, 0, 0, avatarHeight) },
-		})
-		y += avatarHeight
-	end
-	rows.EmoteHint = c(Label, {
-		Text = "VICTORY EMOTES IN SHOP\nCHOOSE YOURS IN BACKPACK",
-		Size = 14,
-		Color = Colors.Muted,
-		Native = { Position = UDim2.fromOffset(12, y + 8), Size = UDim2.new(1, -24, 0, 42) },
-	})
-	y += 54
-	return c(Surface, { Color = Colors.Surface, Native = { Size = UDim2.fromScale(1, 1) } }, {
-		Content = c("ScrollingFrame", {
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
-			CanvasSize = UDim2.fromOffset(0, y + 12),
-			ScrollBarThickness = 3,
-			ScrollBarImageColor3 = Colors.Cyan,
-			ZIndex = 3,
-		}, rows),
-	})
+	return c(
+		Surface,
+		{ Color = Colors.Surface, Native = { Size = UDim2.new(1, 0, 0, math.min(props.Height, y + 12)) } },
+		{
+			Content = c("ScrollingFrame", {
+				Selectable = false,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(1, 1),
+				CanvasSize = UDim2.fromOffset(0, y + 12),
+				ScrollBarThickness = 3,
+				ScrollBarImageColor3 = Colors.Cyan,
+				ZIndex = 3,
+			}, rows),
+		}
+	)
 end

@@ -252,4 +252,7 @@ script.Destroying:Connect(function()
 	CombatInputSender.destroy()
 	CombatState.destroy()
 	VoteCamera.destroy()
+	if DeathEffects then
+		DeathEffects.destroy()
+	end
 end)

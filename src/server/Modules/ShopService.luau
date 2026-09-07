@@ -16,6 +16,7 @@ local Economy = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):Wa
 local ShopRotation = require(Economy:WaitForChild("ShopRotation"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local DirectPurchase = require(Economy:WaitForChild("DirectPurchase"))
+local CosmeticsLogic = require(Economy:WaitForChild("CosmeticsLogic"))
 local PlayerData = require(script.Parent.PlayerData)
 local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
 
@@ -52,7 +53,8 @@ function ShopService.ensure(player: Player): any?
 			bucket,
 			rotationPool(),
 			data.Cosmetics.Owned,
-			Shop.Rotation.OfferCount
+			Shop.Rotation.OfferCount,
+			Cosmetics.Items
 		),
 	}
 	return data
@@ -64,7 +66,10 @@ local function offersFrom(data: any?): { string }
 	end
 	local offers = {}
 	for _, itemId in data.Shop.Offers do
-		table.insert(offers, itemId)
+		local item = Cosmetics.Items[itemId]
+		if item and ShopRotation.isEligible(item, Shop.Rotation.Categories) then
+			table.insert(offers, itemId)
+		end
 	end
 	return offers
 end
@@ -78,10 +83,11 @@ function ShopService.isPurchasable(player: Player, itemId: string): boolean
 	if item == nil then
 		return false
 	end
-	if not table.find(Shop.Rotation.Categories, item.Category) then
-		return true
+	if not ShopRotation.includes(item, Shop.Rotation.Categories) then
+		return DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities) ~= nil
 	end
-	return table.find(ShopService.offersFor(player), itemId) ~= nil
+	return ShopRotation.isEligible(item, Shop.Rotation.Categories)
+		and table.find(ShopService.offersFor(player), itemId) ~= nil
 end
 
 function ShopService.stateFor(player: Player): any
@@ -100,7 +106,7 @@ function ShopService.stateFor(player: Player): any
 				rarity = item.Rarity,
 				displayName = item.DisplayName,
 				bonksPrice = DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities),
-				owned = owned[itemId] == true,
+				owned = CosmeticsLogic.isOwned(Cosmetics.Items, owned, itemId),
 			})
 		end
 	end

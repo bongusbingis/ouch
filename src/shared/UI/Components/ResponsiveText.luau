@@ -19,20 +19,6 @@ local c = React.createElement
 -- ratchet the text down every re-measure.
 local UNBOUNDED = 1e6
 
-local function layoutScale(label: TextLabel): number
-	local scale = 1
-	local ancestor = label.Parent
-	while ancestor and not ancestor:IsA("ScreenGui") do
-		for _, child in ancestor:GetChildren() do
-			if child:IsA("UIScale") then
-				scale *= child.Scale
-			end
-		end
-		ancestor = ancestor.Parent
-	end
-	return math.max(scale, 0.001)
-end
-
 export type Props = {
 	Native: { [any]: any },
 	MeasurementFont: Enum.Font,
@@ -74,7 +60,7 @@ return function(props: Props)
 			if currentRevision ~= revision.current or label == nil then
 				return
 			end
-			local absoluteSize = label.AbsoluteSize / layoutScale(label)
+			local absoluteSize = TextMetrics.layoutSize(label)
 			if absoluteSize.X <= 0 or absoluteSize.Y <= 0 then
 				return
 			end

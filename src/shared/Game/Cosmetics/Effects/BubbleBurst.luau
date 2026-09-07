@@ -51,9 +51,16 @@ local function bubbleScale(alpha: number): number
 	return 1.18 * (1 - Primitives.easeInCubic((alpha - 0.91) / 0.09))
 end
 
-local function popStar(position: Vector3, scale: number, delay: number)
-	local glyph =
-		Primitives.glyph("BubblePopStar", "★", Palette.White, Palette.Cyan, position, Vector2.one * 0.52 * scale)
+local function popStar(position: Vector3, scale: number, delay: number, scope: Runtime.Scope?)
+	local glyph = Primitives.glyph(
+		"BubblePopStar",
+		"★",
+		Palette.White,
+		Palette.Cyan,
+		position,
+		Vector2.one * 0.52 * scale,
+		scope
+	)
 	glyph.label.TextTransparency = 1
 	glyph.label.TextStrokeTransparency = 1
 	Runtime.add(glyph.root, 0.24, function(alpha)
@@ -74,7 +81,8 @@ local function spawnBubble(
 	scale: number,
 	index: number,
 	count: number,
-	starAccent: boolean
+	starAccent: boolean,
+	scope: Runtime.Scope?
 )
 	local isCenter = index == 1
 	local angle = if isCenter then 0 else ((index - 2) / math.max(count - 1, 1)) * math.pi * 2
@@ -85,7 +93,7 @@ local function spawnBubble(
 	local delay = if isCenter then 0 else random:NextNumber(0.025, 0.16)
 	local duration = if isCenter then 0.6 else random:NextNumber(0.62, 0.78)
 	local bubble =
-		Primitives.bubble("BubbleBurstBubble", BUBBLE_COLORS[(index - 1) % #BUBBLE_COLORS + 1], origin, diameter)
+		Primitives.bubble("BubbleBurstBubble", BUBBLE_COLORS[(index - 1) % #BUBBLE_COLORS + 1], origin, diameter, scope)
 	bubble.sphere.Size = Vector3.one * 0.025
 	bubble.sphere.Transparency = 1
 	bubble.highlight.Size = Vector3.one * 0.025
@@ -108,18 +116,19 @@ local function spawnBubble(
 	if starAccent then
 		local popElapsed = duration * 0.84
 		local popPosition = Primitives.ballistic(origin, velocity, Vector3.yAxis * 1.2, popElapsed)
-		popStar(popPosition, scale, delay + popElapsed)
+		popStar(popPosition, scale, delay + popElapsed, scope)
 	end
 end
 
 function BubbleBurst.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
 	local count = Runtime.scaledCount(12, "Secondary")
 	local accentCount = Runtime.scaledCount(4, "Tertiary")
 	for index = 1, count do
-		spawnBubble(context, frame, scale, index, count, index > 1 and index <= accentCount + 1)
+		spawnBubble(context, frame, scale, index, count, index > 1 and index <= accentCount + 1, scope)
 	end
 end
 

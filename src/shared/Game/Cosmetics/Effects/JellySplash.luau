@@ -40,7 +40,8 @@ type SplashBlob = {
 }
 
 local function splash(context: Primitives.Context, frame: CFrame, scale: number)
-	local model = Primitives.group("JellySplashCore")
+	local scope = context.scope
+	local model = Primitives.group("JellySplashCore", scope)
 	local blobs: { SplashBlob } = {}
 	for index = 1, 6 do
 		local angle = ((index - 1) / 5) * math.pi * 2
@@ -50,7 +51,8 @@ local function splash(context: Primitives.Context, frame: CFrame, scale: number)
 			if isCore then Palette.HotPink else JELLY_COLORS[index],
 			Vector3.one * 0.1,
 			frame,
-			Enum.Material.SmoothPlastic
+			Enum.Material.SmoothPlastic,
+			scope
 		)
 		part.Shape = Enum.PartType.Ball
 		part.Transparency = if isCore then 0.04 else 0.08
@@ -79,6 +81,7 @@ local function splash(context: Primitives.Context, frame: CFrame, scale: number)
 end
 
 local function droplet(context: Primitives.Context, frame: CFrame, scale: number, index: number, count: number)
+	local scope = context.scope
 	local angle = ((index - 1) / count) * math.pi * 2 + random:NextNumber(-0.16, 0.16)
 	local outward = Primitives.radial(frame, angle, random:NextNumber(0.08, 0.28))
 	local origin = context.position + frame.LookVector * 0.15 * scale
@@ -90,7 +93,9 @@ local function droplet(context: Primitives.Context, frame: CFrame, scale: number
 		"JellyDroplet",
 		JELLY_COLORS[(index - 1) % #JELLY_COLORS + 1],
 		Vector3.one * 0.1,
-		CFrame.new(origin)
+		CFrame.new(origin),
+		nil,
+		scope
 	)
 	part.Shape = Enum.PartType.Ball
 	part.Transparency = 0.06

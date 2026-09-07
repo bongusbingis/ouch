@@ -35,7 +35,7 @@ return React.memo(function(props)
 	if props.PlaceholderBonks then
 		return c(BonksLabel, {
 			Amount = props.PlaceholderBonks,
-			MaxTextSize = 34,
+			MaxTextSize = props.BonksTextSize or 34,
 			TextStroke = 0.05,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -70,7 +70,7 @@ return React.memo(function(props)
 		local entry = props.Items[index]
 		local width = if count == 1 then 1 else 0.54
 		local x = if count == 1 then 0.5 else 0.2 + (index - 1) * (0.6 / math.max(count - 1, 1))
-		children[entry.itemId] = c("Frame", {
+		children[entry.itemId or `{entry.category}:{index}`] = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Position = UDim2.fromScale(x, 0.5),
@@ -81,6 +81,8 @@ return React.memo(function(props)
 				ItemId = entry.itemId,
 				Category = entry.category,
 				Definition = entry.definition,
+				ColorId = props.ColorId,
+				CostumeId = props.CostumeId,
 				ZIndex = (props.ZIndex or 5) + index,
 			}),
 		})

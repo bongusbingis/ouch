@@ -1,6 +1,6 @@
 -- Name: PartyService.luau
 -- Author: Jack C.
--- Description: Owns lobby party behavior end to end: request handling and validation, cross-server party state, member colors, queue toggling, analytics funnels, teleport hand-off, and restoring parties returning from the arena.
+-- Description: Owns lobby party behavior end to end: request handling and validation, cross-server party state, member appearance, queue toggling, analytics funnels, teleport hand-off, and restoring parties returning from the arena.
 -- Created: 2026-08-15
 
 local HttpService = game:GetService("HttpService")
@@ -22,7 +22,7 @@ local PartyModel = require(script.Parent.PartyModel)
 local PartyService = {}
 PartyService.__index = PartyService
 
-local CHARACTER_COLOR_ATTRIBUTE = "Equip_CharacterColor"
+local APPEARANCE_ATTRIBUTES = { "Equip_CharacterColor", "Equip_CostumeAssets" }
 
 function PartyService.new(
 	partyRepository,
@@ -48,8 +48,8 @@ function PartyService.new(
 		_initializing = {},
 		_teleportDispatching = {},
 		_teleportPresentationReady = {},
-		_colorConnections = {},
-		_colorRevisions = {},
+		_appearanceConnections = {},
+		_appearanceRevisions = {},
 		_joinCodeFailures = {},
 		_queueChangedHandler = nil,
 		_destroyed = false,
@@ -234,12 +234,36 @@ function PartyService:_detachFromLocalParty(player)
 end
 
 function PartyService:_characterColorId(player)
-	local itemId = player:GetAttribute(CHARACTER_COLOR_ATTRIBUTE)
+	local itemId = player:GetAttribute("Equip_CharacterColor")
 	return typeof(itemId) == "string" and itemId or ""
 end
 
-function PartyService:_syncMemberColor(player, revision)
-	if self._destroyed or player.Parent ~= self._players or self._colorRevisions[player.UserId] ~= revision then
+function PartyService:_costumeId(player)
+	local itemId = player:GetAttribute("Equip_CostumeAssets")
+	return typeof(itemId) == "string" and itemId or ""
+end
+
+function PartyService:_watchAppearance(player)
+	local connections = {}
+	for _, attribute in APPEARANCE_ATTRIBUTES do
+		table.insert(
+			connections,
+			player:GetAttributeChangedSignal(attribute):Connect(function()
+				self:_scheduleMemberAppearanceSync(player)
+			end)
+		)
+	end
+	return {
+		Disconnect = function()
+			for _, connection in connections do
+				connection:Disconnect()
+			end
+		end,
+	}
+end
+
+function PartyService:_syncMemberAppearance(player, revision)
+	if self._destroyed or player.Parent ~= self._players or self._appearanceRevisions[player.UserId] ~= revision then
 		return
 	end
 
@@ -247,12 +271,12 @@ function PartyService:_syncMemberColor(player, revision)
 	if not partyId then
 		return
 	end
-	local colorId = self:_characterColorId(player)
+	local colorId, costumeId = self:_characterColorId(player), self:_costumeId(player)
 	local updated = self._partyRepository:UpdateParty(partyId, function(current)
 		if
 			not current
 			or self._localPartyByUser[player.UserId] ~= partyId
-			or self._colorRevisions[player.UserId] ~= revision
+			or self._appearanceRevisions[player.UserId] ~= revision
 		then
 			return nil
 		end
@@ -260,11 +284,12 @@ function PartyService:_syncMemberColor(player, revision)
 		local nextParty
 		for index, member in current.members do
 			if member.userId == player.UserId then
-				if member.characterColorId == colorId then
+				if member.characterColorId == colorId and (member.costumeId or "") == costumeId then
 					return nil
 				end
 				nextParty = PartyModel.clone(current)
 				nextParty.members[index].characterColorId = colorId
+				nextParty.members[index].costumeId = costumeId
 				break
 			end
 		end
@@ -274,17 +299,17 @@ function PartyService:_syncMemberColor(player, revision)
 		return PartyModel.touch(nextParty, os.time())
 	end)
 
-	if updated and self._colorRevisions[player.UserId] == revision then
+	if updated and self._appearanceRevisions[player.UserId] == revision then
 		self:NotifyCommitted(updated, "MemberCosmeticChanged", player.UserId)
 	end
 end
 
-function PartyService:_scheduleMemberColorSync(player)
+function PartyService:_scheduleMemberAppearanceSync(player)
 	local userId = player.UserId
-	local revision = (self._colorRevisions[userId] or 0) + 1
-	self._colorRevisions[userId] = revision
+	local revision = (self._appearanceRevisions[userId] or 0) + 1
+	self._appearanceRevisions[userId] = revision
 	task.spawn(function()
-		self:_syncMemberColor(player, revision)
+		self:_syncMemberAppearance(player, revision)
 	end)
 end
 
@@ -294,7 +319,7 @@ function PartyService:_attach(player, party, reason)
 		self:_detachFromLocalParty(player)
 	elseif currentPartyId == party.partyId then
 		self:_sendSnapshot(player, party, reason)
-		self:_scheduleMemberColorSync(player)
+		self:_scheduleMemberAppearanceSync(player)
 		return
 	end
 
@@ -307,7 +332,7 @@ function PartyService:_attach(player, party, reason)
 	if not applied then
 		self:_sendSnapshot(player, party, reason)
 	end
-	self:_scheduleMemberColorSync(player)
+	self:_scheduleMemberAppearanceSync(player)
 end
 
 function PartyService:_moveMemberToSoloParty(player, previousPartyId, reason)
@@ -325,7 +350,8 @@ function PartyService:_moveMemberToSoloParty(player, previousPartyId, reason)
 		self:_detachFromLocalParty(player)
 		self._partyRepository:RemoveUserParty(userId, previousPartyId)
 
-		local party, createError = self._partyRepository:CreateParty(userId, self:_characterColorId(player))
+		local party, createError =
+			self._partyRepository:CreateParty(userId, self:_characterColorId(player), self:_costumeId(player))
 		if not party then
 			error(("Could not create replacement party for %d: %s"):format(userId, tostring(createError)))
 		end
@@ -449,6 +475,7 @@ function PartyService:_joinTarget(player, target, requireFriendAccess)
 			userId = userId,
 			joinedAt = os.time(),
 			characterColorId = self:_characterColorId(player),
+			costumeId = self:_costumeId(player),
 		})
 		return PartyModel.touch(nextParty, os.time())
 	end)
@@ -619,7 +646,8 @@ function PartyService:_initializePlayerUnlocked(player)
 		self:_removeMemberFromParty(player.UserId, previousPartyId, "MemberLeft", true)
 	end
 
-	local party, partyError = self._partyRepository:CreateParty(player.UserId, self:_characterColorId(player))
+	local party, partyError =
+		self._partyRepository:CreateParty(player.UserId, self:_characterColorId(player), self:_costumeId(player))
 	if not party then
 		warn(("[PartyService] Failed to initialize %s: %s"):format(player.Name, tostring(partyError)))
 		self:_sendError(player, Protocol.Errors.Internal)
@@ -749,7 +777,8 @@ function PartyService:_leaveParty(player)
 	end
 	self:_detachFromLocalParty(player)
 
-	local newParty, createError = self._partyRepository:CreateParty(player.UserId, self:_characterColorId(player))
+	local newParty, createError =
+		self._partyRepository:CreateParty(player.UserId, self:_characterColorId(player), self:_costumeId(player))
 	if not newParty then
 		return Protocol.failure(createError or Protocol.Errors.Internal)
 	end
@@ -1163,7 +1192,8 @@ function PartyService:_recoverMissingParty(partyId)
 	for _, player in players do
 		self:_detachFromLocalParty(player)
 		self._partyRepository:RemoveUserParty(player.UserId, partyId)
-		local party = self._partyRepository:CreateParty(player.UserId, self:_characterColorId(player))
+		local party =
+			self._partyRepository:CreateParty(player.UserId, self:_characterColorId(player), self:_costumeId(player))
 		if party then
 			self:_attach(player, party, "PartyRecovered")
 		else
@@ -1280,9 +1310,7 @@ end
 
 function PartyService:Start()
 	self._players.PlayerAdded:Connect(function(player)
-		self._colorConnections[player] = player:GetAttributeChangedSignal(CHARACTER_COLOR_ATTRIBUTE):Connect(function()
-			self:_scheduleMemberColorSync(player)
-		end)
+		self._appearanceConnections[player] = self:_watchAppearance(player)
 		task.spawn(function()
 			self:_initializePlayer(player)
 		end)
@@ -1291,11 +1319,11 @@ function PartyService:Start()
 	self._players.PlayerRemoving:Connect(function(player)
 		self._teleportPresentationReady[player.UserId] = nil
 		self._joinCodeFailures[player.UserId] = nil
-		self._colorRevisions[player.UserId] = (self._colorRevisions[player.UserId] or 0) + 1
-		local colorConnection = self._colorConnections[player]
-		if colorConnection then
-			colorConnection:Disconnect()
-			self._colorConnections[player] = nil
+		self._appearanceRevisions[player.UserId] = (self._appearanceRevisions[player.UserId] or 0) + 1
+		local appearanceConnection = self._appearanceConnections[player]
+		if appearanceConnection then
+			appearanceConnection:Disconnect()
+			self._appearanceConnections[player] = nil
 		end
 		local party = self:_partyForPlayer(player)
 		local inMatchTransition = party
@@ -1308,9 +1336,7 @@ function PartyService:Start()
 	end)
 
 	for _, player in self._players:GetPlayers() do
-		self._colorConnections[player] = player:GetAttributeChangedSignal(CHARACTER_COLOR_ATTRIBUTE):Connect(function()
-			self:_scheduleMemberColorSync(player)
-		end)
+		self._appearanceConnections[player] = self:_watchAppearance(player)
 		task.spawn(function()
 			self:_initializePlayer(player)
 		end)
@@ -1335,11 +1361,11 @@ end
 
 function PartyService:Shutdown()
 	self._destroyed = true
-	for player, connection in self._colorConnections do
-		self._colorRevisions[player.UserId] = (self._colorRevisions[player.UserId] or 0) + 1
+	for player, connection in self._appearanceConnections do
+		self._appearanceRevisions[player.UserId] = (self._appearanceRevisions[player.UserId] or 0) + 1
 		connection:Disconnect()
 	end
-	table.clear(self._colorConnections)
+	table.clear(self._appearanceConnections)
 	for _, player in self._players:GetPlayers() do
 		local party = self:_partyForPlayer(player)
 		if party and party.phase ~= "Assigned" and party.phase ~= "Teleporting" then

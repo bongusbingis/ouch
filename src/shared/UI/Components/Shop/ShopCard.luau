@@ -90,7 +90,7 @@ local function placeholderText(card): string
 		return string.upper((string.gsub(card.displayName, "[Cc][Rr][Aa][Tt][Ee]", "")))
 	end
 	if card.kind == "Bundle" then
-		return "WEEKLY BUNDLE"
+		return "OUTFIT SET"
 	end
 	return card.badge or string.upper(card.kind)
 end
@@ -114,8 +114,8 @@ type Bands = {
 local function bands(class, card, height: number): Bands
 	local inner = innerHeight(height)
 	local action = math.clamp(math.floor(height * class.ActionScale), class.ActionMinPx, class.ActionMaxPx)
-	local name = math.clamp(math.floor(height * class.NameScale), 14, 32)
-	local hint = math.clamp(math.floor(height * 0.1), 11, 20)
+	local name = if class.Layout == "Split" then 40 else 42
+	local hint = 22
 	local budget = if class.Layout == "Split"
 		then math.floor(inner * 0.84)
 		else inner - math.floor(inner * MIN_ART_SHARE) - 5
@@ -124,7 +124,7 @@ local function bands(class, card, height: number): Bands
 	-- thing on a laptop and another on a desktop. The fit check is only a guard.
 	local wanted = class.ShowHint == true and card.hintText ~= nil and card.hintText ~= ""
 	local showHint = wanted and name + BAND_GAP + hint + BAND_GAP + action <= budget
-	local info = action + BAND_GAP + name + (if showHint then hint + 2 else 0) + 6
+	local info = action + BAND_GAP + name + (if showHint then hint + 2 else 0) + 12
 	return {
 		action = action,
 		name = name,
@@ -141,11 +141,14 @@ local function nameLabel(card, class, native, alignment: Enum.TextXAlignment): a
 	merged.Text = string.upper(card.displayName)
 	merged.TextColor3 = Color3.new(1, 1, 1)
 	merged.TextXAlignment = alignment
+	merged.TextWrapped = true
 	merged.ZIndex = 8
 	return c(ResponsiveText, {
 		HostName = "Name",
 		MeasurementFont = Enum.Font.LuckiestGuy,
-		MaxTextSize = class.NameTextSize,
+		MinTextSize = 15,
+		MaxTextSize = 21,
+		Wrapped = true,
 		Native = merged,
 	}, {
 		UIStroke = c("UIStroke", {
@@ -160,7 +163,7 @@ local function hintLabel(card, native, alignment: Enum.TextXAlignment): any
 	merged.BackgroundTransparency = 1
 	merged.FontFace =
 		Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
-	merged.Text = card.hintText
+	merged.Text = if card.kind == "Bundle" then "OUTFIT BUNDLE" else card.hintText
 	merged.TextColor3 = Color3.fromRGB(238, 248, 255)
 	merged.TextTransparency = 0.04
 	merged.TextXAlignment = alignment
@@ -204,6 +207,17 @@ local function badgeLabel(card): any
 end
 
 local function artwork(card, position: UDim2, size: UDim2): any
+	local items = card.previewItems
+	if #items > 1 then
+		local hero = items[1]
+		for _, item in items do
+			if item.category == "CostumeAssets" then
+				hero = item
+				break
+			end
+		end
+		items = { hero }
+	end
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Position = position,
@@ -211,7 +225,7 @@ local function artwork(card, position: UDim2, size: UDim2): any
 		ZIndex = 5,
 	}, {
 		Content = c(ShopPreview, {
-			Items = card.previewItems,
+			Items = items,
 			Thumbnail = card.thumbnail,
 			Placeholder = placeholderText(card),
 			PlaceholderBonks = placeholderBonks(card),
@@ -242,6 +256,8 @@ local function priceButton(card, band: Bands, enabled: boolean, native, onActiva
 	merged.Text = text
 	merged.BonksAmount = bonks
 	merged.OnActivated = onActivated
+	merged.Compact = true
+	merged.TextSize = 20
 	return c(ShopPriceButton, merged)
 end
 
@@ -306,26 +322,26 @@ end
 local function stackContent(card, class, band: Bands, enabled: boolean, onActivated, layoutOrder)
 	return {
 		Artwork = artwork(card, UDim2.new(0.06, 0, 0, 3), UDim2.new(0.88, 0, 0, band.art)),
-		InfoBackdrop = infoBackdrop(Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -1), UDim2.new(0.92, 0, 0, band.info)),
+		InfoBackdrop = infoBackdrop(Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -1), UDim2.new(0.94, 0, 0, band.info)),
 		Name = nameLabel(card, class, {
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(
 				0.5,
 				0,
 				1,
-				-(2 + band.action + BAND_GAP + (if band.hint > 0 then band.hint + 2 else 0))
+				-(8 + band.action + BAND_GAP + (if band.hint > 0 then band.hint + 2 else 0))
 			),
 			Size = UDim2.new(0.88, 0, 0, band.name),
 		}, Enum.TextXAlignment.Center),
 		SupportingText = if band.hint > 0
 			then (if pricedHint(card) then priceLine else hintLabel)(card, {
 				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, -(2 + band.action + BAND_GAP)),
+				Position = UDim2.new(0.5, 0, 1, -(8 + band.action + BAND_GAP)),
 				Size = UDim2.new(0.86, 0, 0, band.hint),
 			}, Enum.TextXAlignment.Center)
 			else nil,
 		Action = priceButton(card, band, enabled, {
-			Position = UDim2.new(0.5, 0, 1, -2),
+			Position = UDim2.new(0.5, 0, 1, -8),
 			Size = UDim2.new(0.86, 0, 0, band.action),
 		}, onActivated, layoutOrder),
 	}
@@ -386,8 +402,7 @@ return React.memo(function(props: Props)
 	local card = props.Card
 	local class = props.Class
 	local stacked = class.Layout ~= "Split"
-	local canAfford = card.kind == "Crate" or card.robuxPrice ~= nil or card.bonksPrice == nil or card.affordable
-	local enabled = card.status == "Active" and not card.owned and not card.pending and canAfford
+	local enabled = true
 	local band = bands(class, card, props.CardHeight)
 	local onActivated = function()
 		props.OnActivated(card)

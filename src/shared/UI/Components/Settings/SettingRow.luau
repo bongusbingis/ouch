@@ -102,7 +102,7 @@ return React.memo(function(props: Props)
 					Position = UDim2.fromScale(0, 0),
 					Size = UDim2.fromScale(1, if hasDescription then 0.52 else 1),
 					Text = string.upper(definition.Label),
-					TextColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(150, 150, 150),
+					TextColor3 = if enabled then Color3.new(1, 1, 1) else UIConfig.ProgressionStyle.Surface,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextYAlignment = Enum.TextYAlignment.Center,
 					ZIndex = 5,
@@ -121,7 +121,7 @@ return React.memo(function(props: Props)
 						Text = if not enabled and props.DisabledReason
 							then props.DisabledReason
 							else definition.Description,
-						TextColor3 = Color3.fromRGB(190, 190, 190),
+						TextColor3 = UIConfig.ProgressionStyle.Ink,
 						TextWrapped = true,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextYAlignment = Enum.TextYAlignment.Top,

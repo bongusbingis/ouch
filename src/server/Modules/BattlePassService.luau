@@ -21,6 +21,7 @@ local BattlePassLogic = require(
 		:WaitForChild("BattlePassLogic")
 )
 local PlayerData = require(script.Parent.PlayerData)
+local SeasonCosmetics = require(ReplicatedStorage.Shared.Game.Progression.SeasonCosmetics)
 local RewardService = require(script.Parent.RewardService)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 
@@ -69,11 +70,38 @@ end
 
 local function premiumProductId(seasonId: string): number?
 	for _, definition in activeProducts.Catalog do
-		if definition.Type == "SeasonPass" and definition.SeasonId == seasonId and definition.Id ~= nil then
+		if
+			definition.Type == "SeasonPass"
+			and definition.SeasonId == seasonId
+			and definition.Id ~= nil
+			and (definition.CatalogStatus == nil or definition.CatalogStatus == "Active")
+		then
 			return definition.Id
 		end
 	end
 	return nil
+end
+
+local function grantCosmetics(player: Player, data: any, stored: any): boolean
+	local season = activeSeasons.Definitions[stored.Id]
+	if season == nil then
+		return stored.Id == ""
+	end
+	local complete = true
+	stored.CosmeticClaims = stored.CosmeticClaims or {}
+	for _, reward in SeasonCosmetics.pending(season, stored, hasPremium(data, stored.Id)) do
+		local granted = activeRewardService.grant(player, {
+			kind = "Cosmetic",
+			itemId = reward.itemId,
+			duplicateRefund = false,
+		})
+		if granted then
+			stored.CosmeticClaims[reward.key] = true
+		else
+			complete = false
+		end
+	end
+	return complete
 end
 
 local function grantUnclaimedTiers(player: Player, data: any, stored: any): boolean
@@ -93,7 +121,7 @@ local function grantUnclaimedTiers(player: Player, data: any, stored: any): bool
 			complete = false
 		end
 	end
-	return complete
+	return grantCosmetics(player, data, stored) and complete
 end
 
 local function archive(data: any, stored: any): boolean
@@ -140,6 +168,7 @@ function BattlePassService.ensureData(player: Player): any
 	for _, stored in data.SeasonHistory do
 		grantUnclaimedTiers(player, data, stored)
 	end
+	grantCosmetics(player, data, data.Season)
 	return data
 end
 
@@ -226,6 +255,9 @@ local function claimOne(player: Player, data: any, season: any, tier: number, tr
 
 	local field = if track == "Premium" then "ClaimedPremium" else "ClaimedFree"
 	data.Season[field][tostring(tier)] = true
+	if not grantCosmetics(player, data, data.Season) then
+		return false, "grant_failed"
+	end
 	pcall(activeAnalyticsService.logCustomEvent, player, AnalyticsConfig.CustomEvents.SeasonTierClaimed, 1, {
 		seasonId = season.Id,
 		tier = tier,
@@ -276,6 +308,9 @@ function BattlePassService.claimAll(player: Player): (any?, string?, number)
 	end
 	local state = BattlePassService.stateFor(player)
 	activeNetwork.fire("SeasonPassStateChanged", player, state)
+	if #SeasonCosmetics.pending(season, data.Season, hasPremium(data, season.Id)) > 0 then
+		failure = failure or "grant_failed"
+	end
 	return if failure then nil else state, failure, claimed
 end
 

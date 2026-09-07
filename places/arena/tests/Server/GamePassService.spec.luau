@@ -139,6 +139,17 @@ return function()
 			expect(fixture.granted[2]).to.equal("BallBlue")
 		end)
 
+		it("continues reconciling a hidden pass that already has a platform identity", function()
+			local fixture = dependencies({ [91] = true })
+			local definition = fixture.options.gamePasses.Catalog.StarterPass
+			definition.CatalogStatus = "Hidden"
+			definition.Id = 91
+			fixture.options.gamePasses.ById[91] = definition
+			GamePassService.start(fixture.options)
+			expect(#fixture.granted).to.equal(2)
+			expect(fixture.ownershipWrites[1].owned).to.equal(true)
+		end)
+
 		it("fulfills the actual Showtime collection and recovers a partial grant", function()
 			local config = game:GetService("ReplicatedStorage").Config
 			local definition = require(config.Economy.GamePasses).Catalog.Showtime

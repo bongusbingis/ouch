@@ -21,6 +21,7 @@ local InventoryPreview = require(script.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
 
@@ -28,6 +29,7 @@ export type Props = {
 	Data: any?,
 	Position: any?,
 	OnEquip: (InventoryModel.Entry) -> (),
+	OnInspect: ((InventoryModel.Entry) -> ())?,
 	SelectedTab: string,
 	OnTabChanged: (string) -> (),
 }
@@ -64,18 +66,6 @@ local function cardColor(entry: InventoryModel.Entry): Color3
 	return color
 end
 
-local function scrollToCard(scroller: ScrollingFrame, card: GuiObject)
-	local top = card.AbsolutePosition.Y - scroller.AbsolutePosition.Y + scroller.CanvasPosition.Y
-	local bottom = top + card.AbsoluteSize.Y
-	local visibleTop = scroller.CanvasPosition.Y
-	local visibleBottom = visibleTop + scroller.AbsoluteWindowSize.Y
-	if top < visibleTop then
-		scroller.CanvasPosition = Vector2.new(0, math.max(0, top))
-	elseif bottom > visibleBottom then
-		scroller.CanvasPosition = Vector2.new(0, math.max(0, bottom - scroller.AbsoluteWindowSize.Y))
-	end
-end
-
 local function Card(props)
 	local entry: InventoryModel.Entry = props.Entry
 	return c(AnimatedButton, {
@@ -85,7 +75,7 @@ local function Card(props)
 			Image = "rbxassetid://123285423801571",
 			LayoutOrder = props.LayoutOrder,
 			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromOffset(props.CardSize, props.CardSize),
+			Size = UDim2.fromOffset(props.CardSize, props.CardHeight),
 			SliceCenter = Rect.new(107, 27, 126, 128),
 			TileSize = UDim2.fromScale(0.4, 0.35),
 		},
@@ -97,8 +87,8 @@ local function Card(props)
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://168702841",
 			ImageColor3 = Color3.fromRGB(0, 255, 42),
-			Position = UDim2.fromScale(0.485, 0.5),
-			Size = UDim2.fromScale(0.55, 0.55),
+			Position = UDim2.fromScale(0.82, 0.16),
+			Size = UDim2.fromScale(0.2, 0.2),
 			Visible = props.Equipped,
 			ZIndex = 6,
 		}),
@@ -119,37 +109,46 @@ local function Card(props)
 				Size = UDim2.fromScale(1, 1),
 			}),
 		}),
-		ItemName = c(ResponsiveText, {
-			HostName = "ItemName",
-			MeasurementFont = Enum.Font.SourceSansBold,
-			MaxTextSize = 30,
-			Truncate = true,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.649999976),
-				BackgroundTransparency = 1,
-				FontFace = Font.new(
-					"rbxasset://fonts/families/SourceSansPro.json",
-					Enum.FontWeight.Bold,
-					Enum.FontStyle.Normal
-				),
-				Position = UDim2.fromScale(0.506667, 1),
-				Size = UDim2.fromScale(1, 0.2),
-				Text = shortName(entry),
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 6,
-			},
+		NameBand = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
+			BackgroundTransparency = 0.12,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 1, -5),
+			Size = UDim2.new(1, -12, 0, 36),
+			ZIndex = 6,
 		}, {
-			UIStroke = c("UIStroke", {
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.075,
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+			ItemName = c(ResponsiveText, {
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 17,
+				MinTextSize = 12,
+				Wrapped = true,
+				Native = {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(4, 2),
+					Size = UDim2.new(1, -8, 1, -4),
+					Font = Enum.Font.LuckiestGuy,
+					Text = string.upper(shortName(entry)),
+					TextWrapped = true,
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 7,
+				},
 			}),
 		}),
-		ViewportFrame = c(InventoryPreview, {
-			ItemId = entry.itemId,
-			Category = entry.category,
-			Definition = entry.definition,
-			ColorId = props.ColorId,
+		Preview = c("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 1, -36),
 			ZIndex = 5,
+		}, {
+			Content = c(InventoryPreview, {
+				ItemId = entry.itemId,
+				Category = entry.category,
+				Definition = entry.definition,
+				ColorId = props.ColorId,
+				CostumeId = props.CostumeId,
+				ZIndex = 5,
+			}),
 		}),
 	})
 end
@@ -168,11 +167,13 @@ local function Section(props)
 		cardChildren[entry.id] = c(Card, {
 			Entry = entry,
 			CardSize = props.CardSize,
+			CardHeight = props.CardHeight,
 			LayoutOrder = index,
 			Equipped = InventoryModel.isEquipped(entry, props.Equipped),
 			ColorId = props.Equipped.CharacterColor,
+			CostumeId = props.Equipped.CostumeAssets,
 			OnActivated = function()
-				props.OnEquip(entry)
+				(props.OnInspect or props.OnEquip)(entry)
 			end,
 			OnSelectionGained = props.OnSelectionGained,
 		})
@@ -247,7 +248,6 @@ return function(props: Props)
 		inventoryLayout.MaxColumns
 	)
 	local selectedTab = props.SelectedTab
-	local scrollerRef = React.useRef(nil)
 	local ownedKey = ownershipKey(props.Data)
 	local sections = React.useMemo(function()
 		local result = {}
@@ -283,15 +283,20 @@ return function(props: Props)
 			Entries = section.Entries,
 			Equipped = equipped,
 			CardSize = cardSize,
+			CardHeight = if short
+				then math.min(
+					cardSize,
+					math.max(
+						76,
+						math.floor((contentBottom - contentTop) * 0.907841) - inventoryLayout.ShortHeaderHeightPx - 5
+					)
+				)
+				else cardSize,
 			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
 			LayoutOrder = (index - 1) * 3,
 			OnEquip = props.OnEquip,
-			OnSelectionGained = function(card)
-				local scroller = scrollerRef.current
-				if scroller then
-					scrollToCard(scroller, card)
-				end
-			end,
+			OnInspect = props.OnInspect,
+			OnSelectionGained = Selection.scrollIntoView,
 		})
 		categoryChildren[`CategoryHeader_{section.Title}`] = elements.Header
 		categoryChildren[`CategoryContent_{section.Title}`] = elements.Content
@@ -327,14 +332,14 @@ return function(props: Props)
 		}, {
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 28,
+				MaxTextSize = 24,
 				Truncate = false,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.48792, 0.57964),
-					Size = UDim2.fromScale(0.94, 0.6712),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.new(1, -12, 0.75, 0),
 					Text = definition.Id,
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 2,
@@ -358,13 +363,14 @@ return function(props: Props)
 			Truncate = true,
 			Native = {
 				BackgroundColor3 = Color3.fromRGB(63, 63, 63),
+				BackgroundTransparency = 0,
 				BorderColor3 = Color3.new(),
 				BorderSizePixel = 0,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				LayoutOrder = 3,
-				Position = UDim2.fromScale(0.291804, 0.0540634),
-				Size = UDim2.fromScale(0.398251, 0.0898091),
-				Text = "INVENTORY",
+				Position = UDim2.fromScale(0.12, 0.0540634),
+				Size = UDim2.fromScale(0.76, 0.0898091),
+				Text = "BACKPACK",
 				TextColor3 = Color3.new(1, 1, 1),
 			},
 		}),
@@ -381,7 +387,6 @@ return function(props: Props)
 		}, {
 			CategoriesHolder = if props.Data and #sections > 0
 				then c("ScrollingFrame", {
-					ref = scrollerRef,
 					Active = true,
 					AutomaticCanvasSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
@@ -402,7 +407,7 @@ return function(props: Props)
 							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 							Position = UDim2.fromScale(0.5, 0.44),
 							Size = UDim2.fromScale(0.75, 0.12),
-							Text = if props.Data then "NO ITEMS IN THIS CATEGORY" else "SYNCING INVENTORY",
+							Text = if props.Data then "NOTHING HERE YET" else "LOADING BACKPACK…",
 							TextColor3 = Color3.new(1, 1, 1),
 						},
 					}),

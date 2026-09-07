@@ -67,16 +67,21 @@ T.describe("PostMatchResult", function()
 	T.it("projects bounded podium ranks without breaking ties or rewarding ownership", function()
 		local result = global("FFA", "Player", "10")
 		result.contestants[2].emoteId = "ShowtimeTwirl"
+		result.contestants[2].costumeId = "PartyRoyal"
 		local projected = PostMatchResult.forPlayer(result, 20, nil, nil)
 		T.expect(#projected.podium):toEqual(3)
 		T.expect(projected.podium[1].userId):toEqual(10)
 		T.expect(projected.podium[2].placement):toEqual(2)
 		T.expect(projected.podium[3].placement):toEqual(2)
 		T.expect(projected.personalAppearance.emoteId):toEqual("ShowtimeTwirl")
+		T.expect(projected.personalAppearance.costumeId):toEqual("PartyRoyal")
 		local parsed = PostMatchResult.parse(projected)
 		T.expect(parsed.podium[2].emoteId):toEqual("ShowtimeTwirl")
+		T.expect(parsed.podium[2].costumeId):toEqual("PartyRoyal")
 		projected.podium[2].emoteId = "Changed"
+		projected.podium[2].costumeId = "RainHopper"
 		T.expect(parsed.podium[2].emoteId):toEqual("ShowtimeTwirl")
+		T.expect(parsed.podium[2].costumeId):toEqual("PartyRoyal")
 		projected.podium[3] = projected.podium[2]
 		T.expect(PostMatchResult.parse(projected)):toBeNil()
 	end)
@@ -96,10 +101,12 @@ T.describe("PostMatchResult", function()
 		local result = global("FFA", "Player", "10")
 		result.contestants[1].emoteId = ""
 		result.contestants[1].colorId = ""
+		result.contestants[1].costumeId = ""
 		local projected = PostMatchResult.forPlayer(result, 10, nil, nil)
 		local parsed = PostMatchResult.parse(projected)
 		T.expect(parsed.personalAppearance.emoteId):toBeNil()
 		T.expect(parsed.podium[1].colorId):toBeNil()
+		T.expect(parsed.podium[1].costumeId):toBeNil()
 	end)
 
 	T.it("orders FFA scores deterministically and assigns shared placements", function()

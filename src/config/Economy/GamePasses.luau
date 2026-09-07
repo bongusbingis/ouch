@@ -14,6 +14,8 @@
 
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
 
+local StoreCatalog = require(script.Parent.Parent.Parent.Shared.Game.Economy.StoreCatalog)
+
 export type Boosts = {
 	XpMultiplier: number?,
 	BonksMultiplier: number?,
@@ -39,7 +41,7 @@ local Catalog: { [string]: GamePassDef } = {
 		CatalogStatus = "Active",
 		DisplayName = "Showtime",
 		PurchaseMessage = "Your victory emotes are ready. Open Backpack → Emotes to choose your celebration.",
-		Description = "Celebrate your way with three exclusive victory emotes. Play them on your result card and every podium you earn.",
+		Description = "Twirl, flex or bounce! Three victory emotes for your result card and every podium you earn.",
 		DisplayOrder = 405,
 		Categories = { "EmoteAssets" },
 		EntitlementItemIds = { "ShowtimeTwirl", "ShowtimeFlex", "ShowtimeBounce" },
@@ -59,7 +61,7 @@ local Catalog: { [string]: GamePassDef } = {
 		Icon = "rbxassetid://133826079905432",
 		CatalogStatus = "Preview",
 		DisplayName = "Effect Collection",
-		Description = "Prismatic, Galaxy and Starlight impact effects. All three, yours to equip.",
+		Description = "Prismatic, Galaxy and Starlight impact effects. Make every hit a light show.",
 		DisplayOrder = 410,
 		Categories = { "ImpactEffectAssets" },
 		EntitlementItemIds = { "Prismatic", "Galaxy", "Starlight" },
@@ -88,9 +90,6 @@ local Catalog: { [string]: GamePassDef } = {
 	},
 }
 
-local ById: { [number]: GamePassDef } = {}
-local KeyById: { [number]: string } = {}
-
 for key, definition in Catalog do
 	assert(definition.DisplayOrder % 1 == 0, `game pass "{key}" must define an integer DisplayOrder`)
 	local icon = definition.Icon
@@ -105,18 +104,15 @@ for key, definition in Catalog do
 		assert(xp == nil or xp > 1, `game pass "{key}" XpMultiplier must be greater than 1`)
 		assert(bonks == nil or bonks > 1, `game pass "{key}" BonksMultiplier must be greater than 1`)
 	end
-	if definition.CatalogStatus == "Active" then
-		assert(definition.Id ~= nil, `active game pass "{key}" must define Id`)
-		assert(definition.Id > 0 and definition.Id % 1 == 0, `game pass "{key}" must define a positive integer Id`)
+	if definition.Id ~= nil then
 		assert(
 			#definition.EntitlementItemIds > 0 or definition.Boosts ~= nil,
-			`active game pass "{key}" must grant entitlements or boosts`
+			`configured game pass "{key}" must grant entitlements or boosts`
 		)
-		assert(ById[definition.Id] == nil, `duplicate game pass id {definition.Id}`)
-		ById[definition.Id] = definition
-		KeyById[definition.Id] = key
 	end
 end
+
+local ById, KeyById = StoreCatalog.platformIndex(Catalog)
 
 -- The one-time offer spotlights an ordinary pass; it never changes its price or
 -- what it grants, only how prominently it is merchandised and for how long.

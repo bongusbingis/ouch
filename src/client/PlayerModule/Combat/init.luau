@@ -13,6 +13,7 @@ local CommonUtils = require(script.Parent:WaitForChild("CommonUtils"))
 local PlayerModuleEventBus = CommonUtils.get("PlayerModuleEventBus")
 
 local CombatCamera = require(script:WaitForChild("CombatCamera"))
+local MovementSuppression = require(script:WaitForChild("MovementSuppression"))
 local CombatConfig = require(script:WaitForChild("CombatConfig"))
 local DeviceInput = require(script:WaitForChild("DeviceInput"))
 local TouchIntent = require(script:WaitForChild("TouchIntent"))
@@ -124,6 +125,14 @@ end
 
 function Combat.releaseCursor(reason: string)
 	CombatCamera.releaseCursor(reason)
+end
+
+function Combat.requestMovementSuppression(reason: string)
+	MovementSuppression.request(reason)
+end
+
+function Combat.releaseMovementSuppression(reason: string)
+	MovementSuppression.release(reason)
 end
 
 function Combat.onIntent(listener: (Intent) -> ()): () -> ()

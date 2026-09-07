@@ -6,14 +6,13 @@
 --!strict
 
 local Lighting = game:GetService("Lighting")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 local arenaOrigin = require(script.Parent.ArenaOrigin)
 
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+
+local PresentationCamera = require(ReplicatedStorage.Shared.UI.Services.PresentationCamera)
 
 local VoteCamera = {}
 
@@ -25,13 +24,12 @@ local angle = 0
 local generation = 0
 local origin: Vector3? = nil
 local blur: BlurEffect? = nil
-local renderConnection: RBXScriptConnection? = nil
+local cameraLease: PresentationCamera.Token? = nil
 local voteDisconnect: (() -> ())? = nil
 
-local function frame(deltaTime: number)
+local function frame(camera: Camera, deltaTime: number)
 	local part = origin
-	local camera = Workspace.CurrentCamera
-	if part == nil or camera == nil then
+	if part == nil then
 		return
 	end
 	angle += math.rad(config.RotationSpeedDeg) * deltaTime
@@ -46,20 +44,15 @@ local function activate()
 	end
 	active = true
 
-	local camera = Workspace.CurrentCamera
-	if camera then
-		camera.CameraType = Enum.CameraType.Scriptable
-	end
 	if blur == nil then
 		local effect = Instance.new("BlurEffect")
 		effect.Size = config.BlurSize
 		effect.Parent = Lighting
 		blur = effect
 	end
-	if renderConnection == nil then
-		renderConnection = RunService.RenderStepped:Connect(frame)
+	if cameraLease == nil then
+		cameraLease = PresentationCamera.acquire("Vote", PresentationCamera.Priority.Vote, frame)
 	end
-	frame(0)
 end
 
 local function deactivate()
@@ -68,23 +61,13 @@ local function deactivate()
 	end
 	active = false
 
-	if renderConnection then
-		renderConnection:Disconnect()
-		renderConnection = nil
+	if cameraLease then
+		PresentationCamera.release(cameraLease)
+		cameraLease = nil
 	end
 	if blur then
 		blur:Destroy()
 		blur = nil
-	end
-
-	local camera = Workspace.CurrentCamera
-	if camera then
-		local character = Players.LocalPlayer.Character
-		local humanoid = if character then character:FindFirstChildWhichIsA("Humanoid") else nil
-		if humanoid then
-			camera.CameraSubject = humanoid
-		end
-		camera.CameraType = Enum.CameraType.Custom
 	end
 end
 

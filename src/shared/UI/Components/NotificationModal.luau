@@ -11,12 +11,13 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
 
@@ -35,44 +36,23 @@ export type Request = {
 export type Props = {
 	Request: Request?,
 	OnChoose: (any) -> (),
+	FocusEnabled: boolean?,
 }
 
 local function notificationButton(definition: ButtonDefinition, order: number, onChoose: (any) -> (), buttonRef: any?)
 	local red = definition.Color == "Red"
-	return c(AnimatedButton, {
+	return c(ShopPriceButton, {
 		ButtonRef = buttonRef,
 		EntranceDelay = (order - 2) * 0.025,
-		Native = {
-			BackgroundTransparency = 1,
-			Image = if red then "rbxassetid://94748581468730" else "rbxassetid://136021539696619",
-			LayoutOrder = order,
-			Position = if red then UDim2.fromScale(0.520694, 0) else UDim2.fromScale(0.153547, 0),
-			ScaleType = Enum.ScaleType.Slice,
-			Size = if red then UDim2.fromScale(0.335, 1) else UDim2.fromScale(0.334921, 1),
-			SliceCenter = Rect.new(198, 228, 841, 468),
-			SliceScale = 0.2,
-		},
+		Red = red,
+		Text = definition.Text,
+		TextSize = 24,
+		LayoutOrder = order,
+		AnchorPoint = Vector2.zero,
+		Size = UDim2.fromScale(0.335, 1),
 		OnActivated = function()
 			onChoose(definition.Value)
 		end,
-	}, {
-		TextLabel = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = if red then UDim2.fromScale(0.463449, 0.57964) else UDim2.fromScale(0.48792, 0.57964),
-				Size = if red then UDim2.fromScale(0.680654, 0.6712) else UDim2.fromScale(0.8, 0.671),
-				Text = definition.Text,
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 2,
-			},
-		}),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 2.9 }),
-		UISizeConstraint = c("UISizeConstraint", {
-			MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
-		}),
 	})
 end
 
@@ -85,6 +65,7 @@ return function(props: Props)
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
 	local firstButtonRef = React.useRef(nil)
+	local modalRef = React.useRef(nil)
 	local reducedMotion = useReducedMotion()
 	local styles = ReactSpring.useSpring({
 		Scale = if props.Request then 1 else 0.82,
@@ -94,24 +75,29 @@ return function(props: Props)
 	})
 	local request = props.Request
 	React.useEffect(function()
-		if not request then
+		if not request or props.FocusEnabled == false then
 			return
 		end
 		local previous = GuiService.SelectedObject
+		local modal = modalRef.current
 		local active = true
 		task.defer(function()
 			local button = firstButtonRef.current
-			if active and button and button.Parent and button.Visible and button.Selectable then
+			if active and Selection.isSelectable(button) then
 				GuiService.SelectedObject = button
 			end
 		end)
 		return function()
 			active = false
-			if previous and previous.Parent and previous.Visible and previous.Selectable then
+			local selected = GuiService.SelectedObject
+			if
+				(selected == nil or (modal ~= nil and selected:IsDescendantOf(modal)))
+				and Selection.isSelectable(previous)
+			then
 				GuiService.SelectedObject = previous
 			end
 		end
-	end, { request })
+	end, { request, props.FocusEnabled })
 	if not request then
 		return nil
 	end
@@ -131,6 +117,7 @@ return function(props: Props)
 	end
 
 	return c("TextButton", {
+		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(),
@@ -185,26 +172,28 @@ return function(props: Props)
 			}),
 			Description = c(ResponsiveText, {
 				HostName = "Description",
-				MaxTextSize = 50,
+				Wrapped = true,
+				MaxTextSize = 26,
 				MeasurementFont = Enum.Font.Highway,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
+					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
-					Position = UDim2.fromScale(0.498537, 0.506245),
-					Size = UDim2.fromScale(0.9, 0.323246),
+					Position = UDim2.fromScale(0.5, 0.34),
+					Size = UDim2.new(0.9, 0, 0, math.max(30, panelSize.Y * 0.65 - 74)),
 					Text = request.Description,
+					TextWrapped = true,
 					TextColor3 = Color3.new(1, 1, 1),
 					TextYAlignment = Enum.TextYAlignment.Top,
 					ZIndex = 2,
 				},
 			}, {
-				UITextSizeConstraint = c("UITextSizeConstraint", { MaxTextSize = 50 }),
+				UITextSizeConstraint = c("UITextSizeConstraint", { MaxTextSize = 26 }),
 			}),
 			Buttons = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.5, 0.944206),
+				Position = UDim2.new(0.5, 0, 1, -20),
 				Size = UDim2.new(0.86, 0, 0, 54),
 			}, buttons),
 		}),

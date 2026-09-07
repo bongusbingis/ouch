@@ -13,6 +13,7 @@ export type Context = {
 	position: Vector3,
 	direction: Vector3?,
 	scale: number?,
+	scope: Runtime.Scope?,
 }
 
 export type Glyph = {
@@ -45,7 +46,7 @@ function Primitives.size(value: Vector3): Vector3
 	return Vector3.new(component(value.X), component(value.Y), component(value.Z))
 end
 
-local function prepare(part: BasePart, name: string, color: Color3, material: Enum.Material)
+local function prepare(part: BasePart, name: string, color: Color3, material: Enum.Material, scope: Runtime.Scope?)
 	part.Name = name
 	part.Anchored = true
 	part.CanCollide = false
@@ -54,12 +55,19 @@ local function prepare(part: BasePart, name: string, color: Color3, material: En
 	part.CastShadow = false
 	part.Color = color
 	part.Material = material
-	part.Parent = Runtime.container()
+	Runtime.mount(part, scope)
 end
 
-function Primitives.part(name: string, color: Color3, size: Vector3, cframe: CFrame, material: Enum.Material?): Part
+function Primitives.part(
+	name: string,
+	color: Color3,
+	size: Vector3,
+	cframe: CFrame,
+	material: Enum.Material?,
+	scope: Runtime.Scope?
+): Part
 	local part = Instance.new("Part")
-	prepare(part, name, color, material or Enum.Material.SmoothPlastic)
+	prepare(part, name, color, material or Enum.Material.SmoothPlastic, scope)
 	part.Size = Primitives.size(size)
 	part.CFrame = cframe
 	return part
@@ -70,19 +78,20 @@ function Primitives.wedge(
 	color: Color3,
 	size: Vector3,
 	cframe: CFrame,
-	material: Enum.Material?
+	material: Enum.Material?,
+	scope: Runtime.Scope?
 ): WedgePart
 	local part = Instance.new("WedgePart")
-	prepare(part, name, color, material or Enum.Material.SmoothPlastic)
+	prepare(part, name, color, material or Enum.Material.SmoothPlastic, scope)
 	part.Size = Primitives.size(size)
 	part.CFrame = cframe
 	return part
 end
 
-function Primitives.group(name: string): Model
+function Primitives.group(name: string, scope: Runtime.Scope?): Model
 	local model = Instance.new("Model")
 	model.Name = name
-	model.Parent = Runtime.container()
+	Runtime.mount(model, scope)
 	return model
 end
 
@@ -92,9 +101,10 @@ function Primitives.glyph(
 	color: Color3,
 	strokeColor: Color3,
 	position: Vector3,
-	studSize: Vector2
+	studSize: Vector2,
+	scope: Runtime.Scope?
 ): Glyph
-	local root = Primitives.part(name, color, Vector3.one * 0.1, CFrame.new(position))
+	local root = Primitives.part(name, color, Vector3.one * 0.1, CFrame.new(position), nil, scope)
 	root.Transparency = 1
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Billboard"
@@ -121,8 +131,8 @@ function Primitives.glyph(
 	}
 end
 
-function Primitives.ribbon(name: string, color: Color3, position: Vector3, width: number): Ribbon
-	local root = Primitives.part(name, color, Vector3.one * 0.1, CFrame.new(position))
+function Primitives.ribbon(name: string, color: Color3, position: Vector3, width: number, scope: Runtime.Scope?): Ribbon
+	local root = Primitives.part(name, color, Vector3.one * 0.1, CFrame.new(position), nil, scope)
 	root.Transparency = 1
 	local startAttachment = Instance.new("Attachment")
 	startAttachment.Name = "Start"
@@ -149,9 +159,16 @@ function Primitives.ribbon(name: string, color: Color3, position: Vector3, width
 	}
 end
 
-function Primitives.bubble(name: string, color: Color3, position: Vector3, diameter: number): Bubble
-	local root = Primitives.group(name)
-	local sphere = Primitives.part("Bubble", color, Vector3.one * diameter, CFrame.new(position), Enum.Material.Glass)
+function Primitives.bubble(
+	name: string,
+	color: Color3,
+	position: Vector3,
+	diameter: number,
+	scope: Runtime.Scope?
+): Bubble
+	local root = Primitives.group(name, scope)
+	local sphere =
+		Primitives.part("Bubble", color, Vector3.one * diameter, CFrame.new(position), Enum.Material.Glass, scope)
 	sphere.Shape = Enum.PartType.Ball
 	sphere.Transparency = 0.28
 	sphere.Parent = root
@@ -160,7 +177,8 @@ function Primitives.bubble(name: string, color: Color3, position: Vector3, diame
 		Color3.new(1, 1, 1),
 		Vector3.one * diameter * 0.2,
 		CFrame.new(position + Vector3.new(-diameter * 0.22, diameter * 0.22, -diameter * 0.24)),
-		Enum.Material.SmoothPlastic
+		Enum.Material.SmoothPlastic,
+		scope
 	)
 	highlight.Shape = Enum.PartType.Ball
 	highlight.Transparency = 0.08
@@ -246,7 +264,10 @@ function Primitives.lookAlong(position: Vector3, direction: Vector3, roll: numbe
 	return CFrame.lookAt(position, position + direction, up) * CFrame.Angles(0, 0, roll)
 end
 
-function Primitives.cameraRight(): Vector3
+function Primitives.cameraRight(scope: Runtime.Scope?): Vector3
+	if scope and scope.camera then
+		return scope.camera().RightVector
+	end
 	local camera = Workspace.CurrentCamera
 	return if camera then camera.CFrame.RightVector else Vector3.xAxis
 end

@@ -6,6 +6,8 @@
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
 export type ProductType = "Crate" | "Bonks" | "SeasonPass" | "Bundle" | "Cosmetic"
 
+local StoreCatalog = require(script.Parent.Parent.Parent.Shared.Game.Economy.StoreCatalog)
+
 -- Cosmetic products are how a rotating-shop offer is priced in Robux. One
 -- product per cosmetic rather than shared price tiers: a receipt then names
 -- exactly what was bought with no second lookup to get wrong, which matters
@@ -31,7 +33,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://93880146029014",
 		CatalogStatus = "Active",
 		DisplayName = "Pocket Stash",
-		Description = "A handy boost for your next crate.",
+		Description = "500 Bonks for skins, outfits and crates.",
 		DisplayOrder = 310,
 		Type = "Bonks",
 		BonksAmount = 500,
@@ -41,7 +43,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://128078334031314",
 		CatalogStatus = "Active",
 		DisplayName = "Bonks Stack",
-		Description = "1,100 Bonks for your next picks.",
+		Description = "1,100 Bonks for skins, outfits and crates.",
 		DisplayOrder = 320,
 		Type = "Bonks",
 		BonksAmount = 1100,
@@ -51,7 +53,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://120940829762396",
 		CatalogStatus = "Active",
 		DisplayName = "Bonks Haul",
-		Description = "A bigger haul for several crate opens.",
+		Description = "2,500 Bonks for skins, outfits and crates.",
 		DisplayOrder = 330,
 		Type = "Bonks",
 		BonksAmount = 2500,
@@ -61,7 +63,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://111667665844951",
 		CatalogStatus = "Active",
 		DisplayName = "Mega Vault",
-		Description = "5,500 Bonks for your collection.",
+		Description = "5,500 Bonks for skins, outfits and crates.",
 		DisplayOrder = 340,
 		Type = "Bonks",
 		BonksAmount = 5500,
@@ -71,7 +73,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://119117881625478",
 		CatalogStatus = "Active",
 		DisplayName = "Dodgeballs",
-		Description = "Open one Dodgeball Crate directly.",
+		Description = "One Dodgeball Crate. Let’s roll!",
 		DisplayOrder = 210,
 		Type = "Crate",
 		CrateId = "DodgeballCrate",
@@ -81,7 +83,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://134713149561894",
 		CatalogStatus = "Active",
 		DisplayName = "Hammers",
-		Description = "Open one Hammer Crate directly.",
+		Description = "One Hammer Crate. Let’s roll!",
 		DisplayOrder = 220,
 		Type = "Crate",
 		CrateId = "HammerCrate",
@@ -91,7 +93,7 @@ local Catalog: { [string]: ProductDef } = {
 		Icon = "rbxassetid://126538865895544",
 		CatalogStatus = "Active",
 		DisplayName = "Effects",
-		Description = "Open one Effects Crate directly.",
+		Description = "One Effects Crate. Let’s roll!",
 		DisplayOrder = 230,
 		Type = "Crate",
 		CrateId = "EffectsCrate",
@@ -102,8 +104,8 @@ local Catalog: { [string]: ProductDef } = {
 		Id = nil,
 		Icon = "",
 		CatalogStatus = "Preview",
-		DisplayName = "Starter Outfit Bundle",
-		Description = "A complete look, cheaper than buying the pieces.",
+		DisplayName = "Foam League Starter Set",
+		Description = "A complete outfit, blue dodgeball and Star Pop elimination effect.",
 		DisplayOrder = 100,
 		Type = "Bundle",
 		BundleId = "StarterOutfitBundle",
@@ -122,8 +124,6 @@ local Catalog: { [string]: ProductDef } = {
 	},
 }
 
-local ById: { [number]: ProductDef } = {}
-
 for key, definition in Catalog do
 	assert(definition.DisplayOrder % 1 == 0, `developer product "{key}" must define an integer DisplayOrder`)
 	local icon = definition.Icon
@@ -131,12 +131,7 @@ for key, definition in Catalog do
 		icon == nil or icon == "" or string.match(icon, "^rbxassetid://%d+$") ~= nil,
 		`developer product "{key}" Icon must be a Roblox asset id string`
 	)
-	if definition.CatalogStatus == "Active" then
-		assert(definition.Id ~= nil, `active developer product "{key}" must define Id`)
-		assert(
-			definition.Id > 0 and definition.Id % 1 == 0,
-			`developer product "{key}" must define a positive integer Id`
-		)
+	if definition.Id ~= nil then
 		if definition.Type == "Bonks" then
 			assert(
 				definition.BonksAmount ~= nil and definition.BonksAmount > 0 and definition.BonksAmount % 1 == 0,
@@ -163,10 +158,10 @@ for key, definition in Catalog do
 				`cosmetic product "{key}" must define ItemId`
 			)
 		end
-		assert(ById[definition.Id] == nil, `duplicate developer product id {definition.Id}`)
-		ById[definition.Id] = definition
 	end
 end
+
+local ById = StoreCatalog.platformIndex(Catalog)
 
 return {
 	Catalog = Catalog,

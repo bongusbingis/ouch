@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local GameModeVoteViewModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
@@ -52,6 +53,7 @@ export type Props = {
 	OnVote: (string) -> (),
 	ButtonRef: any?,
 	Portrait: boolean?,
+	Compact: boolean?,
 }
 
 return function(props: Props)
@@ -87,7 +89,7 @@ return function(props: Props)
 					Enum.FontStyle.Normal
 				),
 				Position = UDim2.fromScale(0.499634, if portrait then 0.035 else 0.0521707),
-				Size = UDim2.fromScale(if portrait then 0.9 else 0.967519, if portrait then 0.18 else 0.104411),
+				Size = UDim2.fromScale(if portrait then 0.9 else 0.88, if portrait then 0.18 else 0.104411),
 				Text = mode.Title,
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = 2,
@@ -110,12 +112,33 @@ return function(props: Props)
 		}),
 		Thumbnail = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundColor3 = UIConfig.ProgressionStyle.Surface,
 			Image = mode.ThumbnailId,
-			Position = UDim2.fromScale(if portrait then 0.23 else 0.496345, if portrait then 0.58 else 0.548243),
+			Position = UDim2.fromScale(if portrait then 0.23 else 0.496345, if portrait then 0.58 else 0.57),
 			Size = UDim2.fromScale(if portrait then 0.38 else 0.822196, if portrait then 0.58 else 0.661131),
 			ZIndex = 2,
 		}, {
+			Art = if mode.ThumbnailId == ""
+				then c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromScale(0, 0.1),
+					Size = UDim2.fromScale(1, 0.9),
+					ZIndex = 3,
+				}, {
+					First = c(CelebrationAvatar, {
+						Static = true,
+						ColorId = if mode.Id == "TDM" then "CharacterColorRed" else nil,
+						Native = { Position = UDim2.fromScale(0.04, 0), Size = UDim2.fromScale(0.6, 1) },
+						ZIndex = 3,
+					}),
+					Second = c(CelebrationAvatar, {
+						Static = true,
+						ColorId = "CharacterColorBlue",
+						Native = { Position = UDim2.fromScale(0.43, 0.05), Size = UDim2.fromScale(0.53, 0.9) },
+						ZIndex = 3,
+					}),
+				})
+				else nil,
 			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1.7,
 			}),
@@ -128,13 +151,13 @@ return function(props: Props)
 			VoteCount = c(ResponsiveText, {
 				HostName = "VoteCount",
 				MeasurementFont = Enum.Font.Highway,
-				MaxTextSize = 42,
+				MaxTextSize = 22,
 				Native = {
-					AnchorPoint = Vector2.new(1, 1),
+					AnchorPoint = Vector2.zero,
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
-					Position = UDim2.fromScale(0.633344, 0.190837),
-					Size = UDim2.fromScale(0.613327, 0.160588),
+					Position = UDim2.fromOffset(8, 6),
+					Size = UDim2.new(1, -16, 0, 24),
 					Text = GameModeVoteViewModel.formatVoteCount(mode.VoteCount),
 					TextColor3 = Color3.new(1, 1, 1),
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -149,6 +172,7 @@ return function(props: Props)
 			}),
 		}),
 		VoteButton = c(AnimatedButton, {
+			SelectionRadius = UDim.new(1, 0),
 			ButtonRef = props.ButtonRef,
 			Enabled = props.Enabled,
 			EntranceDelay = (mode.SortOrder - 1) * 0.025,
@@ -175,9 +199,9 @@ return function(props: Props)
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.491367, 0.579641),
+					Position = UDim2.fromScale(0.5, 0.5),
 					Size = UDim2.fromScale(0.736491, 0.6712),
-					Text = "VOTE",
+					Text = if mode.Selected then "VOTED" else "VOTE",
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 3,
 				},
@@ -190,8 +214,8 @@ return function(props: Props)
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundColor3 = Color3.new(),
 			BackgroundTransparency = 0.8,
-			Position = UDim2.fromScale(if portrait then 0.72 else 0.496873, if portrait then 0.31 else 0.181),
-			Size = UDim2.fromScale(if portrait then 0.5 else 0.850373, if portrait then 0.28 else 0.125969),
+			Position = UDim2.fromScale(if portrait then 0.72 else 0.496873, if portrait then 0.31 else 0.17),
+			Size = UDim2.fromScale(if portrait then 0.5 else 0.850373, if portrait then 0.28 else 0.18),
 			ZIndex = 2,
 		}, {
 			UICorner = c("UICorner", {
@@ -201,21 +225,19 @@ return function(props: Props)
 				TopRightRadius = UDim.new(0.25, 0),
 			}),
 			TextLabel = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.Highway,
-				Wrapped = portrait,
+				MeasurementFont = Enum.Font.SourceSansBold,
+				Wrapped = true,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/HighwayGothic.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
+					Font = Enum.Font.SourceSansBold,
 					Position = UDim2.fromScale(0.5, 0.511),
-					Size = UDim2.fromScale(0.927564, 0.8),
-					Text = mode.Description,
+					Size = UDim2.fromScale(0.927564, 0.9),
+					Text = if props.Compact
+						then string.match(mode.Description, "^[^.]+[.]?") or mode.Description
+						else mode.Description,
 					TextColor3 = Color3.new(1, 1, 1),
-					TextWrapped = portrait,
+					TextWrapped = true,
 					ZIndex = 3,
 				},
 			}),

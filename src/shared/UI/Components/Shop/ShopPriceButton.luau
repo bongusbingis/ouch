@@ -1,123 +1,90 @@
--- Name: ShopPriceButton.luau
--- Author: Jack C.
--- Description: The price button on a storefront card, rendering the currency, amount, any discount, and its pending or disabled state.
--- Created: 2026-08-23
-
+-- Store actions keep the label and live price centered within one consistent button face.
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local React = require(ReplicatedStorage.Packages.react)
+local UI = require(ReplicatedStorage.Config.Interface.UI)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
+local ButtonSurface = require(script.Parent.Parent.ButtonSurface)
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-
 local c = React.createElement
+
+local function label(text, position, size, maximum, color, zIndex)
+	return c(ResponsiveText, {
+		MeasurementFont = Enum.Font.LuckiestGuy,
+		MinTextSize = 12,
+		MaxTextSize = maximum,
+		Native = {
+			BackgroundTransparency = 1,
+			Position = position,
+			Size = size,
+			Text = text,
+			Font = Enum.Font.LuckiestGuy,
+			TextColor3 = color,
+			ZIndex = zIndex,
+		},
+	}, { Outline = c("UIStroke", { Thickness = 0.055, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }) })
+end
 
 return function(props)
 	local stacked = props.SubText ~= nil or props.SubBonks ~= nil
+	local enabled = props.Enabled ~= false
+	local z = props.ZIndex or 8
+	local color = if enabled then Color3.new(1, 1, 1) else UI.ProgressionStyle.Muted
+	local top = if stacked then UDim2.fromOffset(10, 3) else UDim2.fromOffset(10, 2)
+	local extent = if stacked then UDim2.new(1, -20, 0.5, -3) else UDim2.new(1, -20, 1, -4)
 	return c(AnimatedButton, {
+		SelectionRadius = if props.Compact then UDim.new(0, 8) else UDim.new(1, 0),
 		ButtonRef = props.ButtonRef,
 		EntranceDelay = props.EntranceDelay,
-		Enabled = props.Enabled,
+		Enabled = enabled,
 		Style = "Standard",
+		OnActivated = props.OnActivated,
+		Visual = c(ButtonSurface, {
+			Enabled = enabled,
+			Radius = if props.Compact then UDim.new(0, 8) else nil,
+			Color = props.Color or (if props.Red then UI.ProgressionStyle.Pink else UI.ProgressionStyle.Cyan),
+		}),
 		Native = {
 			AnchorPoint = props.AnchorPoint or Vector2.new(0.5, 1),
 			BackgroundTransparency = 1,
-			Image = props.Red and "rbxassetid://94748581468730" or "rbxassetid://136021539696619",
-			ImageColor3 = if props.Enabled == false then Color3.fromRGB(135, 135, 135) else Color3.new(1, 1, 1),
+			Image = "",
 			LayoutOrder = props.LayoutOrder,
 			Position = props.Position or UDim2.fromScale(0.5, 0.95),
-			ScaleType = Enum.ScaleType.Slice,
 			Size = props.Size or UDim2.fromScale(0.78, 0.19),
-			SliceCenter = Rect.new(198, 228, 841, 468),
-			SliceScale = 0.12,
-			ZIndex = props.ZIndex or 8,
+			ZIndex = z,
 		},
-		OnActivated = props.OnActivated,
 	}, {
-		TargetSize = c("UISizeConstraint", {
-			MinSize = Vector2.new(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx),
-		}),
-		-- A Bonks amount is shown as the coin plus the number, never as the word:
-		-- the currency reads at a glance and the button keeps the same footprint
-		-- whichever currency it is priced in.
-		BonksLabel = if props.BonksAmount
+		Minimum = c(
+			"UISizeConstraint",
+			{ MinSize = Vector2.new(UI.Interaction.MinTargetPx, UI.Interaction.MinTargetPx) }
+		),
+		Label = if props.BonksAmount
 			then c(BonksLabel, {
 				Amount = props.BonksAmount,
-				MaxTextSize = if stacked then 26 else 28,
-				TextColor = props.BonksColor or Color3.new(1, 1, 1),
-				TextStroke = 0.06,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Position = if stacked then UDim2.fromScale(0.5, 0.4) else UDim2.fromScale(0.5, 0.56),
-					Size = if stacked then UDim2.fromScale(0.88, 0.38) else UDim2.fromScale(0.88, 0.6),
-					ZIndex = (props.ZIndex or 8) + 1,
-				},
+				MaxTextSize = props.TextSize or UI.Button.TextPx,
+				TextColor = props.BonksColor or color,
+				TextStroke = 0.055,
+				Native = { Position = top, Size = extent, ZIndex = z + 1 },
 			})
-			else nil,
-		TextLabel = if props.BonksAmount
-			then nil
-			else c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = if stacked then 26 else 28,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = if stacked then UDim2.fromScale(0.5, 0.4) else UDim2.fromScale(0.5, 0.56),
-					Size = if stacked then UDim2.fromScale(0.88, 0.38) else UDim2.fromScale(0.88, 0.6),
-					Text = props.Text,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = (props.ZIndex or 8) + 1,
-				},
-			}, {
-				UIStroke = c("UIStroke", {
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = 0.06,
-				}),
-			}),
-		SubBonksLabel = if props.SubBonks
+			else label(props.Text, top, extent, props.TextSize or UI.Button.TextPx, color, z + 1),
+		Price = if props.SubBonks
 			then c(BonksLabel, {
 				Amount = props.SubBonks,
-				MaxTextSize = props.SubTextSize or 20,
-				TextColor = props.SubTextColor or Color3.fromRGB(255, 240, 190),
-				TextStroke = 0.08,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.5, 0.72),
-					Size = UDim2.fromScale(0.88, 0.3),
-					ZIndex = (props.ZIndex or 8) + 1,
-				},
+				MaxTextSize = props.SubTextSize or UI.Button.PricePx,
+				TextColor = props.SubTextColor or color,
+				TextStroke = 0.055,
+				Native = { Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(1, -20, 0.5, -3), ZIndex = z + 1 },
 			})
-			else nil,
-		SubLabel = if props.SubText and not props.SubBonks
-			then c(ResponsiveText, {
-				MeasurementFont = Enum.Font.SourceSansBold,
-				MaxTextSize = props.SubTextSize or 20,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/SourceSansPro.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
-					Position = UDim2.fromScale(0.5, 0.72),
-					Size = UDim2.fromScale(0.88, 0.3),
-					Text = props.SubText,
-					TextColor3 = props.SubTextColor or Color3.fromRGB(255, 240, 190),
-					ZIndex = (props.ZIndex or 8) + 1,
-				},
-			}, {
-				UIStroke = c("UIStroke", {
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = 0.08,
-				}),
-			})
+			elseif props.SubText then label(
+				props.SubText,
+				UDim2.new(0, 10, 0.5, 0),
+				UDim2.new(1, -20, 0.5, -3),
+				props.SubTextSize or UI.Button.PricePx,
+				props.SubTextColor or color,
+				z + 1
+			)
 			else nil,
 	})
 end

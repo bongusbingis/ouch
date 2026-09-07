@@ -8,7 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
@@ -17,15 +17,13 @@ local Palette = UIConfig.ProgressionStyle
 
 local c = React.createElement
 
-local CLAIM_BUTTON_ASSET = "rbxassetid://94748581468730"
-
 local DARK = Palette.Ink
 local MUTED = Palette.Muted
 local PROGRESS_FILL_COLOR = Palette.Cyan
 local CLAIM_BUTTON_COLOR = Palette.Green
 
 export type PublicQuest = {
-	id: string,
+	questId: string,
 	title: string,
 	progress: number,
 	goal: number,
@@ -146,42 +144,20 @@ local function QuestRow(rowProps: {
 			Size = if compact then UDim2.new(1, -16, 0, 44) else UDim2.new(0, 88, 1, -8),
 		}, {
 			ClaimButton = if completed and not quest.claimed
-				then c(AnimatedButton, {
-					Style = "Primary",
+				then c(ShopPriceButton, {
 					Enabled = rowProps.OnClaim ~= nil and not rowProps.Pending,
-					Native = {
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundTransparency = 1,
-						Image = CLAIM_BUTTON_ASSET,
-						ImageColor3 = CLAIM_BUTTON_COLOR,
-						Position = if compact then UDim2.new(1, -44, 0.5, 0) else UDim2.new(0.5, 0, 1, -22),
-						ScaleType = Enum.ScaleType.Slice,
-						Size = UDim2.fromOffset(88, 44),
-						SliceCenter = Rect.new(198, 228, 841, 468),
-						SliceScale = 0.2,
-					},
+					Color = CLAIM_BUTTON_COLOR,
+					Text = if rowProps.Pending then "CLAIMING…" else "CLAIM",
+					TextSize = 20,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = if compact then UDim2.new(1, -44, 0.5, 0) else UDim2.new(0.5, 0, 1, -24),
+					Size = UDim2.fromOffset(84, 44),
+					ZIndex = 2,
 					OnActivated = function()
 						if rowProps.OnClaim then
-							rowProps.OnClaim(quest.id)
+							rowProps.OnClaim(quest.questId)
 						end
 					end,
-				}, {
-
-					TextLabel = c(ResponsiveText, {
-						MeasurementFont = Enum.Font.LuckiestGuy,
-						MinTextSize = if compact then 8 else 10,
-						MaxTextSize = if compact then 13 else 19,
-						Native = {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundTransparency = 1,
-							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-							Position = UDim2.fromScale(0.5, 0.54),
-							Size = UDim2.fromScale(0.78, 0.58),
-							Text = if rowProps.Pending then "CLAIMING..." else "CLAIM",
-							TextColor3 = Color3.new(1, 1, 1),
-							ZIndex = 2,
-						},
-					}),
 				})
 				else nil,
 			Claimed = if quest.claimed
@@ -252,7 +228,7 @@ return function(props: Props)
 	for index, quest in state.quests do
 		questRows[`Quest{index}`] = c(QuestRow, {
 			Quest = quest,
-			Pending = props.PendingClaims and props.PendingClaims[quest.id],
+			Pending = props.PendingClaims and props.PendingClaims[quest.questId],
 			Order = index,
 			OnClaim = props.OnClaim,
 			Compact = compact,

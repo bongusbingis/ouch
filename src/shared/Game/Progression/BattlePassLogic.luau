@@ -6,6 +6,7 @@
 --!strict
 
 local BattlePassLogic = {}
+local SeasonCosmetics = require(script.Parent.SeasonCosmetics)
 
 export type TierReward = {
 	kind: string,
@@ -23,6 +24,7 @@ export type SeasonDef = {
 	XpThresholds: { number },
 	FreeRewards: { [number]: TierReward },
 	PremiumRewards: { [number]: TierReward },
+	CosmeticRewards: any?,
 }
 
 export type SeasonState = {
@@ -30,6 +32,7 @@ export type SeasonState = {
 	XP: number,
 	ClaimedFree: { [string]: boolean },
 	ClaimedPremium: { [string]: boolean },
+	CosmeticClaims: { [string]: boolean },
 }
 
 export type Track = "Free" | "Premium"
@@ -54,6 +57,7 @@ function BattlePassLogic.blankState(seasonId: string): SeasonState
 		XP = 0,
 		ClaimedFree = {},
 		ClaimedPremium = {},
+		CosmeticClaims = {},
 	}
 end
 
@@ -63,7 +67,7 @@ function BattlePassLogic.readState(raw: any): SeasonState
 	end
 	local state = BattlePassLogic.blankState(if type(raw.Id) == "string" then raw.Id else "")
 	state.XP = if type(raw.XP) == "number" then raw.XP else 0
-	for _, field in { "ClaimedFree", "ClaimedPremium" } do
+	for _, field in { "ClaimedFree", "ClaimedPremium", "CosmeticClaims" } do
 		local source = raw[field]
 		if type(source) == "table" then
 			for tier, claimed in source do
@@ -195,6 +199,8 @@ function BattlePassLogic.publicState(
 			premiumReward = cloneReward(BattlePassLogic.rewardAt(season, index, "Premium")),
 			freeClaimed = BattlePassLogic.isClaimed(state, index, "Free"),
 			premiumClaimed = BattlePassLogic.isClaimed(state, index, "Premium"),
+			freeCosmetics = SeasonCosmetics.public(season, state, index, "Free"),
+			premiumCosmetics = SeasonCosmetics.public(season, state, index, "Premium"),
 		})
 	end
 	return {

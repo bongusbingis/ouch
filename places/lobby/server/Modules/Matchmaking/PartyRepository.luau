@@ -72,7 +72,7 @@ function PartyRepository:_claimCode(partyId)
 	return nil, "code_space_unavailable"
 end
 
-function PartyRepository:CreateParty(userId, characterColorId)
+function PartyRepository:CreateParty(userId, characterColorId, costumeId)
 	local partyId = HttpService:GenerateGUID(false)
 	local joinCode, codeError = self:_claimCode(partyId)
 	if not joinCode then
@@ -91,6 +91,7 @@ function PartyRepository:CreateParty(userId, characterColorId)
 				userId = userId,
 				joinedAt = now,
 				characterColorId = characterColorId or "",
+				costumeId = costumeId or "",
 			},
 		},
 		allowFriendJoins = true,

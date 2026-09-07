@@ -139,6 +139,7 @@ local function rememberContestant(player: Player)
 		displayName = player.DisplayName,
 		teamId = playerTeam(player),
 		colorId = player:GetAttribute("Equip_CharacterColor"),
+		costumeId = player:GetAttribute("Equip_CostumeAssets"),
 		emoteId = player:GetAttribute("Equip_EmoteAssets"),
 		ballId = player:GetAttribute("Equip_BallAssets"),
 		hammerId = player:GetAttribute("Equip_HammerAssets"),

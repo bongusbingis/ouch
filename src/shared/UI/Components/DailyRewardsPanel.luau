@@ -8,7 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
@@ -211,36 +211,16 @@ return function(props: Props)
 				},
 			}),
 			ClaimButton = if props.OnClaim ~= nil
-				then c(AnimatedButton, {
-					Style = "Primary",
-					Enabled = props.OnClaim ~= nil,
-					Native = {
-						AnchorPoint = Vector2.new(1, 0.5),
-						BackgroundTransparency = 0,
-						BackgroundColor3 = CLAIM_COLOR,
-						Image = "",
-						Position = UDim2.fromScale(1, 0.5),
-						Size = UDim2.fromOffset(92, 44),
-					},
+				then c(ShopPriceButton, {
+					Enabled = true,
+					Color = Palette.Pink,
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, -2, 0.5, 0),
+					Size = UDim2.fromOffset(88, 44),
+					Text = "VIEW",
+					TextSize = 22,
 					OnActivated = props.OnClaim,
-				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
-					Stroke = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
-					TextLabel = c(ResponsiveText, {
-						MeasurementFont = Enum.Font.LuckiestGuy,
-						MinTextSize = if compact then 9 else 12,
-						MaxTextSize = if compact then 15 else 22,
-						Native = {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundTransparency = 1,
-							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-							Position = UDim2.fromScale(0.5, 0.54),
-							Size = UDim2.fromScale(0.76, 0.58),
-							Text = "VIEW",
-							TextColor3 = Color3.new(1, 1, 1),
-							ZIndex = 2,
-						},
-					}),
+					ZIndex = 2,
 				})
 				else nil,
 		}),

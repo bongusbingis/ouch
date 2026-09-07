@@ -30,8 +30,8 @@ type Spike = {
 	width: number,
 }
 
-local function burst(position: Vector3, frame: CFrame, scale: number)
-	local model = Primitives.group("ComicBonkBurst")
+local function burst(position: Vector3, frame: CFrame, scale: number, scope: Runtime.Scope?)
+	local model = Primitives.group("ComicBonkBurst", scope)
 	local spikes: { Spike } = {}
 	for index = 1, 8 do
 		local angle = ((index - 1) / 8) * math.pi * 2
@@ -40,7 +40,9 @@ local function burst(position: Vector3, frame: CFrame, scale: number)
 			"ComicSpike",
 			if index % 3 == 0 then Palette.Pink else Palette.Yellow,
 			Vector3.one * 0.1,
-			frame
+			frame,
+			nil,
+			scope
 		)
 		part.Parent = model
 		table.insert(spikes, {
@@ -62,10 +64,17 @@ local function burst(position: Vector3, frame: CFrame, scale: number)
 	end, { layer = "Hero" })
 end
 
-local function word(position: Vector3, frame: CFrame, scale: number)
+local function word(position: Vector3, frame: CFrame, scale: number, scope: Runtime.Scope?)
 	local origin = position + Vector3.yAxis * 1.25 * scale + frame.LookVector * 0.35 * scale
-	local glyph =
-		Primitives.glyph("ComicBonkWord", "BONK!", Palette.White, Palette.Ink, origin, Vector2.new(4.2, 1.55) * scale)
+	local glyph = Primitives.glyph(
+		"ComicBonkWord",
+		"BONK!",
+		Palette.White,
+		Palette.Ink,
+		origin,
+		Vector2.new(4.2, 1.55) * scale,
+		scope
+	)
 	Runtime.add(glyph.root, 0.62, function(alpha)
 		glyph.root.CFrame = CFrame.new(origin + Vector3.yAxis * Primitives.easeOutCubic(alpha) * 1.15 * scale)
 		local textScale: number
@@ -83,7 +92,7 @@ local function word(position: Vector3, frame: CFrame, scale: number)
 	end, { layer = "Hero" })
 end
 
-local function star(position: Vector3, frame: CFrame, scale: number, index: number)
+local function star(position: Vector3, frame: CFrame, scale: number, index: number, scope: Runtime.Scope?)
 	local angle = index * math.pi * 0.72
 	local glyph = Primitives.glyph(
 		"ComicBonkStar",
@@ -91,7 +100,8 @@ local function star(position: Vector3, frame: CFrame, scale: number, index: numb
 		if index == 2 then Palette.Pink else Palette.Yellow,
 		Palette.Ink,
 		position,
-		Vector2.one * 0.75 * scale
+		Vector2.one * 0.75 * scale,
+		scope
 	)
 	local phase = random:NextNumber(-0.2, 0.2)
 	Runtime.add(glyph.root, 0.56, function(alpha)
@@ -110,13 +120,14 @@ local function star(position: Vector3, frame: CFrame, scale: number, index: numb
 end
 
 function ComicBonk.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	burst(context.position, frame, scale)
-	word(context.position, frame, scale)
+	burst(context.position, frame, scale, scope)
+	word(context.position, frame, scale, scope)
 	for index = 1, Runtime.scaledCount(7, "Secondary") do
-		star(context.position, frame, scale, index)
+		star(context.position, frame, scale, index, scope)
 	end
 end
 

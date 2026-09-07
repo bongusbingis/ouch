@@ -19,7 +19,8 @@ function GameModeVoteViewModel.description(rules: any, teamMode: boolean): strin
 end
 
 function GameModeVoteViewModel.formatVoteCount(count: number): string
-	return string.format("%03d", math.max(0, math.floor(count)))
+	local total = math.max(0, math.floor(count))
+	return `{total} {if total == 1 then "VOTE" else "VOTES"}`
 end
 
 function GameModeVoteViewModel.progress(now: number, endsAt: number, durationSeconds: number): number

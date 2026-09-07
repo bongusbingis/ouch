@@ -1,109 +1,118 @@
--- Name: CharacterColorService.luau
--- Author: Jack C.
--- Description: Applies each player's equipped character color to their character's parts on spawn and whenever the equip changes.
--- Created: 2026-08-17
-
 --!strict
+
+-- Server appearance owner for the two equip projections; stale character work is canceled before rebuilding.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
-local CharacterColorLogic = require(
-	ReplicatedStorage:WaitForChild("Shared")
-		:WaitForChild("Game")
-		:WaitForChild("Economy")
-		:WaitForChild("CharacterColorLogic")
-)
+local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
+local CostumeVisualFactory = require(ReplicatedStorage.Shared.Game.Cosmetics.CostumeVisualFactory)
 
 local CharacterColorService = {}
-
-local ATTRIBUTE_NAME = "Equip_CharacterColor"
-
-type PlayerBinding = {
-	characterAdded: RBXScriptConnection,
-	appearanceLoaded: RBXScriptConnection,
-	colorChanged: RBXScriptConnection,
-	descendantAdded: RBXScriptConnection?,
-}
-
 local started = false
-local bindings: { [Player]: PlayerBinding } = {}
+local bindings: { [Player]: any } = {}
 
-local function equippedColor(player: Player): Color3
-	return CharacterColorLogic.resolve(Cosmetics, player:GetAttribute(ATTRIBUTE_NAME))
-end
-
-local function colorMeshPart(instance: Instance, color: Color3)
-	if instance:IsA("MeshPart") then
-		instance.Color = color
+local function cancelWork(binding)
+	if binding.worker and coroutine.status(binding.worker) ~= "dead" then
+		task.cancel(binding.worker)
 	end
+	binding.worker = nil
 end
 
-local function applyCharacter(player: Player, character: Model)
+local function clearCharacter(binding)
+	if binding.appearance then
+		binding.appearance.destroy()
+		binding.appearance = nil
+	end
+	for _, connection in binding.children do
+		connection:Disconnect()
+	end
+	table.clear(binding.children)
+	binding.character = nil
+end
+
+local function refresh(player: Player)
 	local binding = bindings[player]
-	if binding == nil then
+	if not binding then
 		return
 	end
-	if binding.descendantAdded ~= nil then
-		binding.descendantAdded:Disconnect()
-	end
-
-	local color = equippedColor(player)
-	for _, descendant in character:GetDescendants() do
-		colorMeshPart(descendant, color)
-	end
-
-	binding.descendantAdded = character.DescendantAdded:Connect(function(descendant)
-		if player.Character == character then
-			colorMeshPart(descendant, equippedColor(player))
+	cancelWork(binding)
+	binding.worker = task.defer(function()
+		local character = player.Character
+		if binding.character ~= character then
+			clearCharacter(binding)
+			binding.character = character
+			if character then
+				local function bodyChanged(child)
+					if CostumeVisualFactory.BodyParts[child.Name] then
+						refresh(player)
+					end
+				end
+				table.insert(binding.children, character.ChildAdded:Connect(bodyChanged))
+				table.insert(binding.children, character.ChildRemoved:Connect(bodyChanged))
+			end
+		end
+		if not character then
+			return
+		end
+		local appearance = {
+			characterColorId = player:GetAttribute("Equip_CharacterColor"),
+			costumeId = player:GetAttribute("Equip_CostumeAssets"),
+		}
+		if binding.appearance then
+			binding.appearance.update(appearance)
+		else
+			binding.appearance = CharacterAppearance.create(character, appearance, { live = true })
 		end
 	end)
 end
 
 local function bindPlayer(player: Player)
-	if bindings[player] ~= nil then
+	if bindings[player] then
 		return
 	end
-
-	local binding: PlayerBinding
-	binding = {
-		characterAdded = player.CharacterAdded:Connect(function(character)
-			applyCharacter(player, character)
-		end),
-		appearanceLoaded = player.CharacterAppearanceLoaded:Connect(function(character)
-			if player.Character == character then
-				applyCharacter(player, character)
-			end
-		end),
-		colorChanged = player:GetAttributeChangedSignal(ATTRIBUTE_NAME):Connect(function()
-			local character = player.Character
-			if character ~= nil then
-				applyCharacter(player, character)
-			end
-		end),
-		descendantAdded = nil,
-	}
+	local binding: any = { connections = {}, children = {} }
 	bindings[player] = binding
-
-	local character = player.Character
-	if character ~= nil then
-		applyCharacter(player, character)
+	for _, attribute in { "Equip_CharacterColor", "Equip_CostumeAssets" } do
+		table.insert(
+			binding.connections,
+			player:GetAttributeChangedSignal(attribute):Connect(function()
+				refresh(player)
+			end)
+		)
 	end
+	table.insert(
+		binding.connections,
+		player.CharacterAdded:Connect(function()
+			refresh(player)
+		end)
+	)
+	table.insert(
+		binding.connections,
+		player.CharacterAppearanceLoaded:Connect(function()
+			refresh(player)
+		end)
+	)
+	table.insert(
+		binding.connections,
+		player.CharacterRemoving:Connect(function()
+			cancelWork(binding)
+			clearCharacter(binding)
+		end)
+	)
+	refresh(player)
 end
 
 local function unbindPlayer(player: Player)
 	local binding = bindings[player]
-	if binding == nil then
+	if not binding then
 		return
 	end
-	binding.characterAdded:Disconnect()
-	binding.appearanceLoaded:Disconnect()
-	binding.colorChanged:Disconnect()
-	if binding.descendantAdded ~= nil then
-		binding.descendantAdded:Disconnect()
-	end
 	bindings[player] = nil
+	cancelWork(binding)
+	for _, connection in binding.connections do
+		connection:Disconnect()
+	end
+	clearCharacter(binding)
 end
 
 function CharacterColorService.start()
@@ -111,7 +120,6 @@ function CharacterColorService.start()
 		return
 	end
 	started = true
-
 	Players.PlayerAdded:Connect(bindPlayer)
 	Players.PlayerRemoving:Connect(unbindPlayer)
 	for _, player in Players:GetPlayers() do

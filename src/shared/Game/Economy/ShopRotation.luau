@@ -6,6 +6,7 @@
 --!strict
 
 local ShopRotation = {}
+local CosmeticsLogic = require(script.Parent.CosmeticsLogic)
 
 local MODULUS = 2147483647
 local MULTIPLIER = 16807
@@ -23,19 +24,23 @@ local function seedFor(userId: number, periodIndex: number): number
 	return step(step(state))
 end
 
+function ShopRotation.includes(item: ItemDef, categories: { string }): boolean
+	return table.find(categories, item.Category) ~= nil or item.ShopEligible == true
+end
+
+function ShopRotation.isEligible(item: ItemDef, categories: { string }): boolean
+	return ShopRotation.includes(item, categories)
+		and item.ShopEligible ~= false
+		and item.AlwaysAvailable ~= true
+		and item.InventoryVisible ~= false
+		and item.Rarity ~= "Exclusive"
+end
+
 function ShopRotation.pool(items: { [string]: ItemDef }, categories: { string }): { string }
-	local wanted: { [string]: boolean } = {}
-	for _, category in categories do
-		wanted[category] = true
-	end
 	local pool = {}
 	for itemId, item in items do
-		local inCategory = wanted[item.Category]
-		local eligible = item.ShopEligible
-		if (inCategory and eligible ~= false) or (eligible == true) then
-			if item.AlwaysAvailable ~= true and item.Rarity ~= "Exclusive" then
-				table.insert(pool, itemId)
-			end
+		if ShopRotation.isEligible(item, categories) then
+			table.insert(pool, itemId)
 		end
 	end
 	table.sort(pool)
@@ -47,11 +52,13 @@ function ShopRotation.draw(
 	periodIndex: number,
 	pool: { string },
 	owned: { [string]: any },
-	count: number
+	count: number,
+	items: { [string]: ItemDef }?
 ): { string }
 	local candidates = {}
 	for _, itemId in pool do
-		if owned[itemId] ~= true then
+		local isOwned = if items then CosmeticsLogic.isOwned(items, owned, itemId) else owned[itemId] == true
+		if not isOwned then
 			table.insert(candidates, itemId)
 		end
 	end

@@ -8,13 +8,14 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local SeasonClaims = require(script.Parent.Parent.Models.SeasonClaims)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
+local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
 
 local c = React.createElement
 
@@ -26,15 +27,23 @@ local TIER_BADGE_COLOR = Palette.Pink
 export type Props = {
 	State: any?,
 	OnClaim: (() -> ())?,
+	OnViewRewards: (() -> ())?,
 	Pending: boolean?,
 	Compact: boolean?,
+	ShowClaim: boolean?,
 	Native: { [any]: any }?,
 }
 
-local function findNextFreeReward(tiers: { any }): { kind: string, amount: number? }?
+local function findNextFreeReward(tiers: { any }): any?
 	for _, tier in tiers do
-		if not tier.unlocked and tier.freeReward then
-			return tier.freeReward
+		if not tier.unlocked then
+			local cosmetic = (tier.freeCosmetics or {})[1]
+			if cosmetic then
+				return cosmetic
+			end
+			if tier.freeReward then
+				return tier.freeReward
+			end
 		end
 	end
 	return nil
@@ -46,7 +55,8 @@ return function(props: Props)
 		return nil
 	end
 
-	local claimable = SeasonClaims.count(state)
+	local claimable = if props.ShowClaim == false then 0 else SeasonClaims.count(state)
+	local actionVisible = props.ShowClaim ~= false and (claimable > 0 or props.OnViewRewards ~= nil)
 	local compact = props.Compact == true
 	local claimWidth = if compact then UIConfig.Layout.SeasonCompactClaimWidthPx else UIConfig.Layout.SeasonClaimWidthPx
 	local tier = state.tier or 0
@@ -154,34 +164,19 @@ return function(props: Props)
 					},
 				}),
 			}),
-			Claim = if claimable > 0
-				then c(AnimatedButton, {
-					Style = "Primary",
-					Enabled = props.OnClaim ~= nil and not props.Pending,
-					OnActivated = props.OnClaim,
-					Native = {
-						AnchorPoint = Vector2.new(1, 0.5),
-						Position = UDim2.fromScale(1, 0.5),
-						Size = UDim2.fromOffset(claimWidth, UIConfig.Interaction.MinTargetPx),
-						BackgroundColor3 = Palette.Green,
-					},
-				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
-					Label = c(ResponsiveText, {
-						MinTextSize = 12,
-						MaxTextSize = 18,
-						MeasurementFont = Enum.Font.LuckiestGuy,
-						Native = {
-							BackgroundTransparency = 1,
-							Position = UDim2.fromScale(0.05, 0.1),
-							Size = UDim2.fromScale(0.9, 0.8),
-							Text = if props.Pending
-								then "CLAIMING..."
-								else if compact then "CLAIM" else `CLAIM ({claimable})`,
-							TextColor3 = Color3.new(1, 1, 1),
-							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						},
-					}),
+			Claim = if actionVisible
+				then c(ShopPriceButton, {
+					Enabled = props.OnViewRewards ~= nil or (props.OnClaim ~= nil and not props.Pending),
+					OnActivated = props.OnViewRewards or props.OnClaim,
+					Color = Palette.Pink,
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, -2, 0.5, 0),
+					Size = UDim2.fromOffset(claimWidth, UIConfig.Interaction.MinTargetPx),
+					Text = if props.OnViewRewards
+						then (if compact then "VIEW" else "REWARDS")
+						else if props.Pending then "CLAIMING…" else "CLAIM",
+					TextSize = 19,
+					ZIndex = (native.ZIndex or 1) + 2,
 				})
 				else nil,
 			Info = c("Frame", {
@@ -189,7 +184,7 @@ return function(props: Props)
 				Position = UDim2.fromScale(if compact then 0.22 else 0.27, 0.08),
 				Size = UDim2.new(
 					if compact then 0.75 else 0.7,
-					if claimable > 0 then -(claimWidth + UIConfig.Layout.InventoryContentGapPx) else 0,
+					if actionVisible then -(claimWidth + UIConfig.Layout.InventoryContentGapPx) else 0,
 					0.84,
 					0
 				),
@@ -203,7 +198,7 @@ return function(props: Props)
 						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
 						Position = UDim2.fromScale(0, 0),
 						Size = UDim2.fromScale(1, if compact then 0.42 else 0.24),
-						Text = if compact then "SEASON PROGRESS" else displayName,
+						Text = if compact then "SEASON" else displayName,
 						TextColor3 = Color3.new(1, 1, 1),
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextTruncate = Enum.TextTruncate.AtEnd,
@@ -238,9 +233,7 @@ return function(props: Props)
 						TextXAlignment = Enum.TextXAlignment.Left,
 					},
 				}),
-				NextReward = if not compact
-						and nextReward
-						and nextReward.kind == "Bonks"
+				NextReward = if not compact and nextReward
 					then c("Frame", {
 						BackgroundTransparency = 1,
 						Position = UDim2.fromScale(0, 0.72),
@@ -263,14 +256,31 @@ return function(props: Props)
 								TextXAlignment = Enum.TextXAlignment.Left,
 							},
 						}),
-						RewardLabel = c(BonksLabel, {
-							Amount = nextReward.amount or 0,
-							Native = {
-								Position = UDim2.fromScale(0.2, 0),
-								Size = UDim2.fromScale(0.55, 1),
-							},
-							IconSize = UDim2.fromScale(0.2, 0.8),
-						}),
+						RewardLabel = if nextReward.kind == "Bonks"
+							then c(BonksLabel, {
+								Amount = nextReward.amount or 0,
+								Native = {
+									Position = UDim2.fromScale(0.2, 0),
+									Size = UDim2.fromScale(0.55, 1),
+								},
+								IconSize = UDim2.fromScale(0.2, 0.8),
+							})
+							else c(ResponsiveText, {
+								MeasurementFont = Enum.Font.SourceSansBold,
+								MaxTextSize = 16,
+								Truncate = true,
+								Native = {
+									BackgroundTransparency = 1,
+									Position = UDim2.fromScale(0.22, 0),
+									Size = UDim2.fromScale(0.78, 1),
+									Font = Enum.Font.SourceSansBold,
+									Text = if Cosmetics.Items[nextReward.itemId]
+										then Cosmetics.Items[nextReward.itemId].DisplayName
+										else "Cosmetic",
+									TextColor3 = Palette.Yellow,
+									TextXAlignment = Enum.TextXAlignment.Left,
+								},
+							}),
 					})
 					else nil,
 			}),

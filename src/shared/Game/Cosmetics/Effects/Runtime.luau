@@ -12,6 +12,13 @@ local Runtime = {}
 
 export type Layer = "Hero" | "Secondary" | "Tertiary"
 
+export type Scope = {
+	parent: Instance,
+	camera: (() -> CFrame)?,
+	destroyed: boolean,
+	roots: { [Instance]: RBXScriptConnection },
+}
+
 export type Options = {
 	delay: number?,
 	layer: Layer?,
@@ -25,6 +32,7 @@ export type Stats = {
 
 type Animation = {
 	root: Instance,
+	scope: Scope?,
 	duration: number,
 	delay: number,
 	elapsed: number,
@@ -45,6 +53,7 @@ local connection: RBXScriptConnection? = nil
 local container: Folder? = nil
 local listeners: { [number]: (Stats) -> () } = {}
 local nextListenerId = 0
+local owners: { [Instance]: Scope } = {}
 
 local function effectContainer(): Folder
 	if container ~= nil and container.Parent ~= nil then
@@ -63,8 +72,32 @@ local function effectContainer(): Folder
 	return folder
 end
 
-function Runtime.container(): Folder
+function Runtime.container(scope: Scope?): Instance
+	if scope then
+		assert(not scope.destroyed, "[CosmeticEffectRuntime] scope is closed")
+		return scope.parent
+	end
 	return effectContainer()
+end
+
+function Runtime.createScope(parent: Instance, camera: (() -> CFrame)?): Scope
+	assert(parent:IsDescendantOf(Workspace), "[CosmeticEffectRuntime] scope must be in Workspace")
+	return { parent = parent, camera = camera, destroyed = false, roots = {} }
+end
+
+function Runtime.mount(root: Instance, scope: Scope?)
+	if scope and scope.destroyed then
+		root:Destroy()
+		error("[CosmeticEffectRuntime] cannot mount into a closed scope")
+	end
+	root.Parent = Runtime.container(scope)
+	if scope then
+		owners[root] = scope
+		scope.roots[root] = root.Destroying:Once(function()
+			owners[root] = nil
+			scope.roots[root] = nil
+		end)
+	end
 end
 
 function Runtime.stats(): Stats
@@ -135,10 +168,10 @@ local function startIfNeeded()
 	end
 end
 
-local function freeHeroSlot(): boolean
+local function freeHeroSlot(scope: Scope?): boolean
 	for _, layer in { "Tertiary", "Secondary" } :: { Layer } do
 		for index = #active, 1, -1 do
-			if active[index].layer == layer then
+			if active[index].layer == layer and active[index].scope == scope then
 				removeAt(index)
 				return true
 			end
@@ -147,9 +180,15 @@ local function freeHeroSlot(): boolean
 	return false
 end
 
-function Runtime.canSpawn(layer: Layer?): boolean
+function Runtime.canSpawn(layer: Layer?, scope: Scope?): boolean
 	local resolved = layer or "Secondary"
-	return #active < LAYER_LIMITS[resolved]
+	local count = 0
+	for _, animation in active do
+		if animation.scope == scope then
+			count += 1
+		end
+	end
+	return (scope == nil or not scope.destroyed) and count < LAYER_LIMITS[resolved]
 end
 
 function Runtime.add(
@@ -160,7 +199,8 @@ function Runtime.add(
 ): boolean
 	assert(duration > 0, "[CosmeticEffectRuntime] duration must be positive")
 	local layer = if options and options.layer then options.layer else "Secondary"
-	if not Runtime.canSpawn(layer) and (layer ~= "Hero" or not freeHeroSlot()) then
+	local scope = owners[root]
+	if not Runtime.canSpawn(layer, scope) and (layer ~= "Hero" or not freeHeroSlot(scope)) then
 		root:Destroy()
 		return false
 	end
@@ -169,6 +209,7 @@ function Runtime.add(
 	end
 	table.insert(active, {
 		root = root,
+		scope = scope,
 		duration = duration,
 		delay = if options and options.delay then math.max(options.delay, 0) else 0,
 		elapsed = 0,
@@ -201,9 +242,34 @@ function Runtime.observeStats(listener: (Stats) -> ()): () -> ()
 	end
 end
 
+function Runtime.destroyScope(scope: Scope)
+	if scope.destroyed then
+		return
+	end
+	scope.destroyed = true
+	for index = #active, 1, -1 do
+		if active[index].scope == scope then
+			removeAt(index)
+		end
+	end
+	local roots = table.clone(scope.roots)
+	table.clear(scope.roots)
+	for root, signal in roots do
+		signal:Disconnect()
+		owners[root] = nil
+	end
+	for root in roots do
+		root:Destroy()
+	end
+	disconnectIfIdle()
+	notify()
+end
+
 function Runtime.clear()
 	for index = #active, 1, -1 do
-		removeAt(index)
+		if active[index].scope == nil then
+			removeAt(index)
+		end
 	end
 	disconnectIfIdle()
 	notify()

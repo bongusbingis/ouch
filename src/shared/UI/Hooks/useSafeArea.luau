@@ -5,10 +5,10 @@ local GuiService = game:GetService("GuiService")
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useViewportSize = require(script.Parent.useViewportSize)
 
-return function(parentScreenInsets: Enum.ScreenInsets?): ResponsiveLayout.SafeRect
+return function(parentScreenInsets: Enum.ScreenInsets?, safeScreenInsets: Enum.ScreenInsets?): ResponsiveLayout.SafeRect
 	local viewport = useViewportSize()
 	local ok, area, parent = pcall(function()
-		return GuiService:GetInsetArea(Enum.ScreenInsets.DeviceSafeInsets),
+		return GuiService:GetInsetArea(safeScreenInsets or Enum.ScreenInsets.DeviceSafeInsets),
 			GuiService:GetInsetArea(parentScreenInsets or Enum.ScreenInsets.CoreUISafeInsets)
 	end)
 	if ok and typeof(area) == "Rect" and typeof(parent) == "Rect" then

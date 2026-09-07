@@ -24,6 +24,10 @@ local ShopPreview = require(script.Parent.Shop.ShopPreview)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local Selection = require(script.Parent.Parent.Services.Selection)
+local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
+local AnimatedButton = require(script.Parent.AnimatedButton)
 
 local c = React.createElement
 
@@ -101,20 +105,33 @@ local function subtitleFor(entry: any): string
 	return string.upper(entry.rarity)
 end
 
-local function gridCell(entry: any, index: number, revealedCount: number, zIndex: number)
+local function gridCell(entry: any, index: number, revealedCount: number, zIndex: number, selected, onSelect, onInspect)
 	local shown = index <= revealedCount
 	local color = rarityColor(entry.rarity)
-	return c("Frame", {
-		BackgroundColor3 = color,
-		BackgroundTransparency = if shown then 0.25 else 0.85,
-		BorderSizePixel = 0,
-		LayoutOrder = index,
-		ZIndex = zIndex,
+	return c(AnimatedButton, {
+		Enabled = shown and entry.preview ~= nil,
+		OnActivated = function()
+			onSelect(index)
+			if onInspect then
+				onInspect(entry.preview)
+			end
+		end,
+		OnSelectionGained = function(button)
+			onSelect(index)
+			Selection.scrollIntoView(button)
+		end,
+		Native = {
+			BackgroundColor3 = color,
+			BackgroundTransparency = if shown then 0.25 else 0.85,
+			BorderSizePixel = 0,
+			LayoutOrder = index,
+			ZIndex = zIndex,
+		},
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
 		Stroke = c("UIStroke", {
-			Color = color,
-			Thickness = if shown then 2 else 0,
+			Color = if selected then Color3.new(1, 1, 1) else color,
+			Thickness = if selected then 3 else if shown then 2 else 0,
 			Transparency = if shown then 0.1 else 1,
 		}),
 		Preview = if shown
@@ -167,18 +184,26 @@ return function(props)
 	)
 	local reveal = props.Reveal
 	local buttonRef = React.useRef(nil)
+	local modalRef = React.useRef(nil)
+	local lastSelection = React.useRef(nil)
+	local selectedIndex, setSelectedIndex = React.useState(nil :: number?)
 	local reducedMotion = useReducedMotion()
 	local generation = React.useRef(0)
 
 	local results = if reveal then reveal.results else nil
 	local count = if results then #results else 0
 	local isBulk = count > 1
-	local headline = if results then (if isBulk then bestEntry(results) else results[1]) else nil
+	local headline = if results
+		then (if selectedIndex then results[selectedIndex] else nil) or (if isBulk
+			then bestEntry(results)
+			else results[1])
+		else nil
 	local tier = tierFor(if headline then headline.rarity else nil)
 	local color = rarityColor(if headline then headline.rarity else nil)
 
 	local phase, setPhase = React.useState("Idle")
 	local revealedCount, setRevealedCount = React.useState(0)
+	local settled = phase == "Done" or (phase == "Item" and revealedCount >= count)
 
 	local shakeStyles, shakeApi = ReactSpring.useSpring(function()
 		return { Offset = 0 }
@@ -200,6 +225,8 @@ return function(props)
 	end, { count })
 
 	React.useEffect(function()
+		setSelectedIndex(nil)
+		lastSelection.current = nil
 		if reveal == nil then
 			setPhase("Idle")
 			setRevealedCount(0)
@@ -281,8 +308,13 @@ return function(props)
 			return
 		end
 		local previous = GuiService.SelectedObject
+		local modal = modalRef.current
 		return function()
-			if previous and previous.Parent and previous.Visible and previous.Selectable then
+			local selected = GuiService.SelectedObject
+			if
+				(selected == nil or (modal ~= nil and selected:IsDescendantOf(modal)))
+				and Selection.isSelectable(previous)
+			then
 				GuiService.SelectedObject = previous
 			end
 		end
@@ -294,15 +326,21 @@ return function(props)
 		end
 		local active = true
 		task.defer(function()
-			local button = buttonRef.current
-			if active and button and button.Parent and button.Visible and button.Selectable then
+			local button = if Selection.isSelectable(lastSelection.current)
+				then lastSelection.current
+				else buttonRef.current
+			if active and Selection.isSelectable(button) then
 				GuiService.SelectedObject = button
 			end
 		end)
 		return function()
 			active = false
+			local selected = GuiService.SelectedObject
+			if selected and modalRef.current and selected:IsDescendantOf(modalRef.current) then
+				lastSelection.current = selected
+			end
 		end
-	end, { reveal, props.FocusEnabled })
+	end, { reveal, props.FocusEnabled, settled })
 
 	React.useEffect(function()
 		return function()
@@ -317,14 +355,74 @@ return function(props)
 		return nil
 	end
 
-	local settled = phase == "Done" or (phase == "Item" and revealedCount >= count)
 	local building = phase == "Shake"
+	local short = not portrait and panelSize.Y < 420
+	local inset = if short then 16 else 22
+	local actionHeight = if short then 44 else 54
+	local bodyTop = if short then 56 else 76
+	local bodyHeight = math.max(44, panelSize.Y - bodyTop - actionHeight - inset * 2)
+	local preview = headline.preview
+	local owned = preview ~= nil and CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, preview.itemId)
+	local equipped = preview ~= nil and (props.Equipped or {})[preview.category] == preview.itemId
+	local busy = preview ~= nil and (props.BusySlots or {})[preview.category] == true
+	local actions = {}
+	if settled then
+		if preview and props.OnEquipItem then
+			table.insert(actions, {
+				text = if not owned
+					then "DELIVERING…"
+					else if busy then "EQUIPPING…" else if equipped then "EQUIPPED" else "EQUIP",
+				enabled = owned and not equipped and not busy,
+				run = function()
+					props.OnEquipItem(preview)
+				end,
+			})
+		end
+		if props.OnViewInventory then
+			table.insert(actions, {
+				text = "INVENTORY",
+				enabled = true,
+				focus = true,
+				run = function()
+					props.OnViewInventory(if preview then preview.category else nil)
+				end,
+			})
+		else
+			table.insert(actions, { text = "DONE", enabled = true, focus = true, run = props.OnClose })
+		end
+		if props.OnOpenAgain then
+			table.insert(actions, {
+				text = if props.OpenAgainCount
+					then `AGAIN {props.OpenAgainCount}x`
+					else props.OpenAgainText or "OPEN AGAIN",
+				bonks = props.OpenAgainBonks,
+				enabled = props.OpenAgainEnabled == true,
+				run = props.OnOpenAgain,
+			})
+		end
+	else
+		table.insert(actions, { text = "SKIP", enabled = true, focus = true, run = finish })
+	end
+	local buttons = {}
+	for index, action in actions do
+		buttons[`Action{index}`] = c(ShopPriceButton, {
+			ButtonRef = if action.focus then buttonRef else nil,
+			Enabled = action.enabled,
+			Position = UDim2.fromScale((index - 0.5) / #actions, 1),
+			Size = UDim2.new(1 / #actions, -6, 0, actionHeight),
+			Text = action.text,
+			SubBonks = action.bonks,
+			OnActivated = action.run,
+			ZIndex = 114,
+		})
+	end
 	local title = if building then "OPENING..." else if isBulk then `YOU GOT {count} ITEMS` else "YOU GOT"
 	local refundLine = if isBulk and reveal.totalRefund > 0
 		then `{formatNumber(reveal.totalRefund)} BONKS REFUNDED FROM DUPLICATES`
 		else nil
 
 	return c("TextButton", {
+		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(),
@@ -332,6 +430,7 @@ return function(props)
 		Selectable = false,
 		Size = UDim2.fromScale(1, 1),
 		Text = "",
+		Visible = props.Visible ~= false,
 		ZIndex = 111,
 		[React.Event.Activated] = function()
 			if not settled then
@@ -358,12 +457,25 @@ return function(props)
 			SliceScale = 0.5,
 			ZIndex = 112,
 		}, {
-			Aspect = if not portrait
-				then c("UIAspectRatioConstraint", {
-					AspectRatio = if isBulk then 1.45 else 1.15,
-					AspectType = Enum.AspectType.FitWithinMaxSize,
-				})
-				else nil,
+			Close = c(AnimatedButton, {
+				OnActivated = props.OnClose,
+				Native = {
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.new(1, -4, 0, 4),
+					Size = UDim2.fromOffset(44, 44),
+					BackgroundTransparency = 1,
+					ZIndex = 118,
+				},
+			}, {
+				Label = c("TextLabel", {
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					Text = "×",
+					TextSize = 32,
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 118,
+				}),
+			}),
 			Burst = if phase == "Burst" or phase == "Item"
 				then c("Frame", {
 					BackgroundTransparency = 1,
@@ -390,14 +502,14 @@ return function(props)
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.06),
-					Size = UDim2.fromScale(0.88, 0.12),
+					Position = UDim2.fromOffset(panelSize.X * 0.5, inset),
+					Size = UDim2.new(0.8, -24, 0, if short then 26 else 34),
 					Text = title,
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 114,
 				},
 			}),
-			Pity = if reveal.pityTriggered and not building
+			Pity = if not building
 				then c(ResponsiveText, {
 					MeasurementFont = Enum.Font.SourceSansBold,
 					MaxTextSize = 20,
@@ -409,21 +521,34 @@ return function(props)
 							Enum.FontWeight.Bold,
 							Enum.FontStyle.Normal
 						),
-						Position = UDim2.fromScale(0.5, 0.175),
-						Size = UDim2.fromScale(0.88, 0.06),
-						Text = `PITY  •  GUARANTEED {string.upper(reveal.pityTriggered)}`,
+						Position = UDim2.new(0.5, 0, 0, bodyTop - 20),
+						Size = UDim2.new(0.88, 0, 0, 18),
+						Text = if reveal.pityTriggered
+							then `PITY  •  GUARANTEED {string.upper(reveal.pityTriggered)}`
+							else "SELECT A REWARD TO INSPECT",
 						TextColor3 = Color3.fromRGB(255, 235, 130),
 						ZIndex = 115,
 					},
 				})
 				else nil,
 			Single = if not isBulk
-				then c("Frame", {
-					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.16, 0.18),
-					Size = UDim2.fromScale(0.68, 0.46),
-					Visible = revealedCount >= 1,
-					ZIndex = 113,
+				then c(AnimatedButton, {
+					Enabled = settled and preview ~= nil and props.OnInspectItem ~= nil,
+					OnActivated = function()
+						props.OnInspectItem(preview)
+					end,
+					Native = {
+						BackgroundTransparency = 1,
+						Position = UDim2.new(if portrait then 0.16 else 0.04, 0, 0, bodyTop),
+						Size = UDim2.new(
+							if portrait then 0.68 else 0.44,
+							0,
+							0,
+							bodyHeight * (if portrait then 0.64 else 1)
+						),
+						Visible = revealedCount >= 1,
+						ZIndex = 113,
+					},
 				}, {
 					Scale = c("UIScale", { Scale = itemStyles.Scale }),
 					Content = c(ShopPreview, {
@@ -440,46 +565,62 @@ return function(props)
 						AutomaticCanvasSize = Enum.AutomaticSize.Y,
 						BackgroundTransparency = 1,
 						CanvasSize = UDim2.fromOffset(0, 0),
-						Position = UDim2.fromScale(0.08, 0.24),
+						Position = UDim2.new(0.06, 0, 0, bodyTop),
 						ScrollBarImageTransparency = 0.2,
 						ScrollBarThickness = 5,
-						Size = UDim2.fromScale(0.84, 0.5),
+						Size = UDim2.new(0.88, 0, 0, math.max(44, bodyHeight - 42)),
 						VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 						ZIndex = 113,
 					},
 					(function()
 						local cells: { [string]: any } = {
 							Layout = c("UIGridLayout", {
-								CellPadding = if portrait then UDim2.fromOffset(8, 8) else UDim2.fromScale(0.02, 0.04),
+								CellPadding = UDim2.fromOffset(6, 6),
 								CellSize = if portrait
 									then UDim2.new(1 / 3, -6, 0, 112)
-									else UDim2.fromScale(0.18, 0.44),
+									else UDim2.new(1 / 5, -6, 0, if short then 78 else 112),
 								SortOrder = Enum.SortOrder.LayoutOrder,
 							}),
 						}
 						for index, entry in results :: { any } do
-							cells[`Cell{index}`] = gridCell(entry, index, revealedCount, 114)
+							cells[`Cell{index}`] = gridCell(
+								entry,
+								index,
+								revealedCount,
+								114,
+								entry == headline,
+								setSelectedIndex,
+								props.OnInspectItem
+							)
 						end
 						return cells
 					end)()
 				)
 				else nil,
-			Name = if not isBulk
-				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.LuckiestGuy,
-					MaxTextSize = 42,
-					Native = {
-						AnchorPoint = Vector2.new(0.5, 0),
-						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.5, 0.62),
-						Size = UDim2.fromScale(0.9, 0.12),
-						Text = if revealedCount >= 1 then string.upper(headline.displayName) else "",
-						TextColor3 = Color3.new(1, 1, 1),
-						ZIndex = 114,
-					},
-				})
-				else nil,
+			Name = c(ResponsiveText, {
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 42,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					Position = UDim2.new(
+						if isBulk or portrait then 0.5 else 0.73,
+						0,
+						0,
+						bodyTop + (if isBulk then bodyHeight - 40 else bodyHeight * (if portrait then 0.64 else 0.18))
+					),
+					Size = UDim2.new(
+						if isBulk or portrait then 0.9 else 0.44,
+						0,
+						0,
+						if isBulk then 22 else bodyHeight * (if portrait then 0.22 else 0.44)
+					),
+					Text = if settled then string.upper(headline.displayName) else "",
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 114,
+				},
+			}),
 			Subtitle = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.SourceSansBold,
 				MaxTextSize = 25,
@@ -491,36 +632,32 @@ return function(props)
 						Enum.FontWeight.Bold,
 						Enum.FontStyle.Normal
 					),
-					Position = UDim2.fromScale(0.5, if isBulk then 0.76 else 0.74),
-					Size = UDim2.fromScale(0.88, 0.08),
-					Text = if not settled then "" else if isBulk then (refundLine or "") else subtitleFor(headline),
+					Position = UDim2.new(
+						if isBulk or portrait then 0.5 else 0.73,
+						0,
+						0,
+						bodyTop + (if isBulk then bodyHeight - 18 else bodyHeight * (if portrait then 0.86 else 0.66))
+					),
+					Size = UDim2.new(
+						if isBulk or portrait then 0.88 else 0.44,
+						0,
+						0,
+						if isBulk then 18 else bodyHeight * (if portrait then 0.14 else 0.25)
+					),
+					Text = if not settled
+						then ""
+						else if isBulk and refundLine then refundLine else subtitleFor(headline),
 					TextColor3 = if isBulk then Color3.fromRGB(255, 235, 130) else Color3.new(1, 1, 1),
 					ZIndex = 114,
 				},
 			}),
-			Confirm = c(ShopPriceButton, {
-				ButtonRef = buttonRef,
-				Enabled = true,
-				Position = if props.OnOpenAgain and settled
-					then UDim2.fromScale(0.28, 0.94)
-					else UDim2.fromScale(0.5, 0.94),
-				Size = if props.OnOpenAgain and settled
-					then UDim2.fromScale(0.4, 0.13)
-					else UDim2.fromScale(0.46, 0.13),
-				Text = if settled then "AWESOME!" else "SKIP",
-				OnActivated = if settled then props.OnClose else finish,
+			Actions = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 1),
+				BackgroundTransparency = 1,
+				Position = UDim2.new(0.5, 0, 1, -inset),
+				Size = UDim2.new(0.9, 0, 0, actionHeight),
 				ZIndex = 114,
-			}),
-			Again = if props.OnOpenAgain and settled
-				then c(ShopPriceButton, {
-					Enabled = props.OpenAgainEnabled == true,
-					Position = UDim2.fromScale(0.72, 0.94),
-					Size = UDim2.fromScale(0.4, 0.13),
-					Text = props.OpenAgainText or "OPEN AGAIN",
-					OnActivated = props.OnOpenAgain,
-					ZIndex = 114,
-				})
-				else nil,
+			}, buttons),
 		}),
 	})
 end

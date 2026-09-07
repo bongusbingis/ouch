@@ -33,6 +33,7 @@ local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExter
 local useReducedMotion = require(UI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
 local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytics"))
 local CombatMenuClient = require(UI:WaitForChild("Services"):WaitForChild("CombatMenuClient"))
+local CosmeticPreviewClient = require(UI.Services.CosmeticPreviewClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local useSafeArea = require(UI.Hooks.useSafeArea)
@@ -229,10 +230,20 @@ local function CombatMenuContent(props)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local available = props.Available == true
 	local menu = useExternalStore(CombatMenuClient.getSnapshot, CombatMenuClient.subscribe)
+	local preview = useExternalStore(CosmeticPreviewClient.getSnapshot, CosmeticPreviewClient.subscribe)
+	React.useEffect(function()
+		if not menu.open then
+			CosmeticPreviewClient.close(nil, "menu_closed")
+		end
+	end, { menu.open })
 	local notifications = NotificationContext.useNotification()
+	local viewInventory = React.useCallback(function()
+		CombatMenuClient.navigate("Inventory")
+	end, {})
 	local controller = EconomyMenuController.use({
 		ShopClient = props.ShopClient,
 		ShopRefreshEnabled = menu.open and menu.page == "Shop",
+		OnViewInventory = viewInventory,
 	})
 	local rootRef = React.useRef(nil)
 	local inventoryTabRef = React.useRef(nil)
@@ -432,6 +443,7 @@ local function CombatMenuContent(props)
 						SelectedTab = controller.inventoryTab,
 						OnTabChanged = controller.setInventoryTab,
 						OnEquip = controller.equip,
+						OnInspect = controller.inspectInventory,
 					})
 				elseif pageName == "Shop" then
 					return c(ShopPage, {
@@ -448,6 +460,7 @@ local function CombatMenuContent(props)
 
 	return c("Frame", {
 		ref = rootRef,
+		Visible = not preview.active,
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 	}, {
@@ -489,6 +502,7 @@ local function CombatMenuContent(props)
 					Notification = c(NotificationModal, {
 						Request = notifications.request,
 						OnChoose = notifications.close,
+						FocusEnabled = not preview.active,
 					}),
 					Economy = c(EconomyMenuModals, {
 						FocusEnabled = notifications.request == nil,

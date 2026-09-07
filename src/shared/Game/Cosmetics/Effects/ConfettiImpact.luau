@@ -32,7 +32,7 @@ local particles = ParticleKit.effect({
 	},
 })
 
-local function paper(position: Vector3, scale: number, index: number, count: number)
+local function paper(position: Vector3, scale: number, index: number, count: number, scope: Runtime.Scope?)
 	local angle = (index / count) * math.pi * 2 + random:NextNumber() * 0.6
 	local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
 	local velocity = outward * random:NextNumber(7.5, 11) * scale + Vector3.yAxis * random:NextNumber(4.5, 8) * scale
@@ -41,7 +41,9 @@ local function paper(position: Vector3, scale: number, index: number, count: num
 		"ConfettiImpactPaper",
 		CONFETTI_COLORS[(index - 1) % #CONFETTI_COLORS + 1],
 		size,
-		CFrame.new(position + Vector3.yAxis * scale)
+		CFrame.new(position + Vector3.yAxis * scale),
+		nil,
+		scope
 	)
 	local origin = part.Position
 	local initial = CFrame.Angles(
@@ -65,11 +67,12 @@ local function paper(position: Vector3, scale: number, index: number, count: num
 end
 
 function ConfettiImpact.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local count = Runtime.scaledCount(18, "Secondary")
 	for index = 1, count do
-		paper(context.position, scale, index, count)
+		paper(context.position, scale, index, count, scope)
 	end
 end
 

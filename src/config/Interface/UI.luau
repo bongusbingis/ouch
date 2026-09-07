@@ -3,6 +3,7 @@
 return {
 	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1 },
 	ProgressionStyle = {
+		White = Color3.new(1, 1, 1),
 		Ink = Color3.fromRGB(27, 24, 47),
 		Surface = Color3.fromRGB(43, 39, 65),
 		Raised = Color3.fromRGB(62, 55, 86),
@@ -33,6 +34,13 @@ return {
 		MinTargetPx = 44,
 		FocusStrokePx = 3,
 		FocusCornerPx = 8,
+	},
+	Button = {
+		StrokePx = 2,
+		ShadowPx = 4,
+		TextPx = 28,
+		PricePx = 25,
+		GapPx = 5,
 	},
 	Layout = {
 		PagePosition = UDim2.fromScale(0.5, 0.56),
@@ -124,6 +132,7 @@ return {
 					HeightScale = 0.6,
 					MaxSize = Vector2.new(950, 720),
 					ShortHeightScale = 0.9,
+					ShortWidthScale = 0.86,
 				},
 			},
 			Loading = {
@@ -138,7 +147,7 @@ return {
 			},
 		},
 		Inventory = {
-			ShortCardSizePx = 76,
+			ShortCardSizePx = 124,
 			ShortHeaderHeightPx = 24,
 			CardGapPx = 7,
 			CardMinPx = 132,
@@ -162,7 +171,8 @@ return {
 		-- ragged. Order is the reading order ("Promo" expands to the limited-time
 		-- offers, "Rest" to any block no entry names).
 		Shop = {
-			ShortCardHeightPx = 120,
+			ShortCardHeightPx = 196,
+			ShortCardWidthPx = 210,
 			PaddingXPx = 16,
 			PaddingBottomPx = 20,
 			ScrollBarPx = 8,
@@ -173,7 +183,7 @@ return {
 			EmptyHeightPx = 54,
 			Tracks = 12,
 			SpanSteps = { 4, 8, 12 },
-			MainSizeScale = Vector2.new(0.93, 0.78),
+			MainSizeScale = Vector2.new(0.93, 0.82),
 			ContentSizeScale = Vector2.new(0.95, 0.93),
 			CardClasses = {
 				-- Premium passes: artwork over the name and the price, like the rest of
@@ -182,8 +192,8 @@ return {
 				Pass = {
 					MinPx = 130,
 					MaxPx = 300,
-					Aspect = 0.78,
-					MinHeightPx = 176,
+					Aspect = 1,
+					MinHeightPx = 210,
 					Layout = "Stack",
 					ShowHint = false,
 					NameScale = 0.15,
@@ -194,10 +204,10 @@ return {
 				},
 				-- Currency: the densest class, icon over name over price.
 				Tile = {
-					MinPx = 100,
+					MinPx = 140,
 					MaxPx = 200,
 					Aspect = 1.04,
-					MinHeightPx = 112,
+					MinHeightPx = 170,
 					Layout = "Stack",
 					ShowHint = false,
 					NameScale = 0.15,
@@ -208,10 +218,10 @@ return {
 				},
 				-- Crates and rotating offers: richer artwork, two to a quarter span.
 				Feature = {
-					MinPx = 100,
+					MinPx = 150,
 					MaxPx = 235,
-					Aspect = 0.68,
-					MinHeightPx = 118,
+					Aspect = 0.86,
+					MinHeightPx = 190,
 					Layout = "Stack",
 					ShowHint = false,
 					NameScale = 0.16,
@@ -225,7 +235,7 @@ return {
 					MinPx = 210,
 					MaxPx = 560,
 					Aspect = 0.44,
-					MinHeightPx = 118,
+					MinHeightPx = 150,
 					Layout = "Split",
 					ShowHint = true,
 					ArtScale = 0.32,
@@ -323,6 +333,7 @@ return {
 		},
 		InventoryContentGapPx = 8,
 		SeasonClaimWidthPx = 88,
+		ShopDetailsActionMaxWidthPx = 320,
 		SeasonCompactClaimWidthPx = 64,
 		SeasonDetailedMinHeightPx = 132,
 		QuestRow = { ShortHeightPx = 80, CompactHeightPx = 138, CompactInfoHeightPx = 82 },

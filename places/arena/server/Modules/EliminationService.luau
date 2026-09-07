@@ -112,14 +112,10 @@ local function applyPartPhysics(character: Model, state: RagdollState)
 		descendant.Anchored = false
 		setNetworkOwnerServer(descendant)
 
-		if descendant == root then
+		if descendant == root or descendant.Parent ~= character then
 			descendant.CanCollide = false
 			descendant.CanTouch = false
 			descendant.CanQuery = false
-			descendant.Massless = true
-		elseif descendant.Parent and descendant.Parent:IsA("Accessory") then
-			descendant.CanCollide = false
-			descendant.CanTouch = false
 			descendant.Massless = true
 		else
 			descendant.CanCollide = true

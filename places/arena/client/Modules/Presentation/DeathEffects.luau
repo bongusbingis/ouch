@@ -8,7 +8,6 @@
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -17,16 +16,22 @@ local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ModeRegistry = require(SharedGame:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 
+local PresentationCamera = require(ReplicatedStorage.Shared.UI.Services.PresentationCamera)
+local CosmeticPreviewClient = require(ReplicatedStorage.Shared.UI.Services.CosmeticPreviewClient)
+
 local DeathEffects = {}
 
 local localPlayer = Players.LocalPlayer
 
 local colorCorrection: ColorCorrectionEffect? = nil
 local matchState: Instance? = nil
-local zoomConnection: RBXScriptConnection? = nil
+local cameraLease: PresentationCamera.Token? = nil
 local activeTween: Tween? = nil
 local characterConnection: RBXScriptConnection? = nil
+local characterAddedConnection: RBXScriptConnection? = nil
 local sequenceToken = 0
+local started = false
+local startGeneration = 0
 
 local lastKillerId: string? = nil
 
@@ -76,13 +81,9 @@ local function bodyPosition(character: Model): Vector3?
 end
 
 local function stopZoom()
-	if zoomConnection then
-		zoomConnection:Disconnect()
-		zoomConnection = nil
-	end
-	local camera = Workspace.CurrentCamera
-	if camera then
-		camera.CameraType = Enum.CameraType.Custom
+	if cameraLease then
+		PresentationCamera.release(cameraLease)
+		cameraLease = nil
 	end
 end
 
@@ -103,20 +104,24 @@ local function startZoom(character: Model)
 	local startDistance = math.max(vector.magnitude(startPosition - startBody), 6)
 	local duration = respawnSeconds()
 
-	camera.CameraType = Enum.CameraType.Scriptable
 	local elapsed = 0
-	zoomConnection = RunService.RenderStepped:Connect(function(dt: number)
-		elapsed = math.min(elapsed + dt, duration)
-		local alpha = TweenService:GetValue(elapsed / duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		local body = bodyPosition(character) or startBody
-		local distance = startDistance + cfg.CameraZoomOutDistance * alpha
-		camera.CFrame = CFrame.lookAt(body + direction * distance, body)
-	end)
+	cameraLease = PresentationCamera.acquire(
+		"Death",
+		PresentationCamera.Priority.Death,
+		function(activeCamera, dt: number)
+			elapsed = math.min(elapsed + dt, duration)
+			local alpha = TweenService:GetValue(elapsed / duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			local body = bodyPosition(character) or startBody
+			local distance = startDistance + cfg.CameraZoomOutDistance * alpha
+			activeCamera.CFrame = CFrame.lookAt(body + direction * distance, body)
+		end
+	)
 end
 
 local endSequence: () -> ()
 
 local function beginSequence(character: Model)
+	CosmeticPreviewClient.close(nil, "death")
 	sequenceToken += 1
 	tweenSaturation(ensureColorCorrection(), -1, Combat.Elimination.DesaturateTime)
 	startZoom(character)
@@ -178,15 +183,49 @@ local function bindCharacter(character: Model)
 end
 
 function DeathEffects.start()
+	if started then
+		return
+	end
+	started = true
+	startGeneration += 1
+	local generation = startGeneration
 	task.spawn(function()
-		matchState = ReplicatedStorage:WaitForChild("MatchState")
+		local state = ReplicatedStorage:WaitForChild("MatchState")
+		if generation == startGeneration then
+			matchState = state
+		end
 	end)
 
-	localPlayer.CharacterAdded:Connect(bindCharacter)
+	characterAddedConnection = localPlayer.CharacterAdded:Connect(bindCharacter)
 	local character = localPlayer.Character
 	if character then
 		bindCharacter(character)
 	end
+end
+
+function DeathEffects.destroy()
+	started = false
+	startGeneration += 1
+	sequenceToken += 1
+	stopZoom()
+	if characterConnection then
+		characterConnection:Disconnect()
+		characterConnection = nil
+	end
+	if characterAddedConnection then
+		characterAddedConnection:Disconnect()
+		characterAddedConnection = nil
+	end
+	if activeTween then
+		activeTween:Cancel()
+		activeTween = nil
+	end
+	if colorCorrection then
+		colorCorrection:Destroy()
+		colorCorrection = nil
+	end
+	matchState = nil
+	lastKillerId = nil
 end
 
 return DeathEffects

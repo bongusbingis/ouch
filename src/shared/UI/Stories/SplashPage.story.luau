@@ -14,7 +14,7 @@ return function(target: Instance)
 	return mount(
 		target,
 		React.createElement(SplashPage, {
-			PartyState = "PRESS PLAY TO MATCHMAKE",
+			PartyState = "READY TO BRAWL?",
 			ShowMatchmakingActivity = false,
 			PlayText = "PLAY",
 			PlayEnabled = true,
@@ -96,7 +96,7 @@ return function(target: Instance)
 				resetAt = 0,
 				quests = {
 					{
-						id = "hammer",
+						questId = "hammer",
 						title = "Hit 5 players with the hammer",
 						progress = 2,
 						goal = 5,
@@ -104,7 +104,7 @@ return function(target: Instance)
 						reward = { kind = "Bonks", amount = 150 },
 					},
 					{
-						id = "throws",
+						questId = "throws",
 						title = "Throw 10 dodgeballs",
 						progress = 10,
 						goal = 10,
@@ -112,7 +112,7 @@ return function(target: Instance)
 						reward = { kind = "Bonks", amount = 125 },
 					},
 					{
-						id = "elims",
+						questId = "elims",
 						title = "Get 3 dodgeball eliminations",
 						progress = 3,
 						goal = 3,

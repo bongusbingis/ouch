@@ -6,6 +6,7 @@
 --!strict
 
 local DirectPurchase = {}
+local CosmeticsLogic = require(script.Parent.CosmeticsLogic)
 
 export type Reason = "unknown_item" | "not_purchasable" | "already_owned" | "insufficient_bonks"
 
@@ -21,7 +22,7 @@ function DirectPurchase.priceFor(
 	if item == nil then
 		return nil
 	end
-	if item.AlwaysAvailable == true then
+	if item.AlwaysAvailable == true or item.InventoryVisible == false then
 		return nil
 	end
 	local rarity = rarities[item.Rarity]
@@ -45,7 +46,7 @@ function DirectPurchase.evaluate(
 	if price == nil then
 		return nil, "not_purchasable"
 	end
-	if owned[itemId] == true then
+	if CosmeticsLogic.isOwned(items, owned, itemId) then
 		return nil, "already_owned"
 	end
 	if bonks < price then

@@ -13,6 +13,9 @@ local EliminationService =
 local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
 local FakePlayer = require(Helpers:WaitForChild("FakePlayer"))
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
 
 local function countDescendants(character: Model, className: string, namePrefix: string?): number
 	local count = 0
@@ -167,6 +170,37 @@ return function()
 		it("up on a never-downed character still marks it alive", function()
 			expect(EliminationService.up(player)).to.equal(true)
 			expect(rig:GetAttribute("CombatAlive")).to.equal(true)
+		end)
+
+		it("keeps all costumes visual through ragdoll, respawn and an equip while down", function()
+			CharacterFixture.destroy(rig)
+			rig = CharacterFixture.createBlob("CostumeElimRig")
+			player.Character = rig
+			local appearance = CharacterAppearance.create(rig, {}, { live = true })
+			local function expectCosmeticPhysics()
+				for _, part in rig.CostumeVisuals:GetDescendants() do
+					if part:IsA("BasePart") then
+						expect(part.CanCollide or part.CanQuery or part.CanTouch).to.equal(false)
+						expect(part.Massless).to.equal(true)
+					end
+				end
+			end
+			for id, item in Cosmetics.Items do
+				if not item.Contents then
+					continue
+				end
+				appearance.update({ costumeId = id })
+				expect(EliminationService.down(player, nil)).to.equal(true)
+				expectCosmeticPhysics()
+				expect(EliminationService.up(player)).to.equal(true)
+				expectCosmeticPhysics()
+			end
+			EliminationService.down(player, nil)
+			appearance.update({ costumeId = "RainHopper" })
+			expectCosmeticPhysics()
+			EliminationService.up(player)
+			expectCosmeticPhysics()
+			appearance.destroy()
 		end)
 	end)
 end

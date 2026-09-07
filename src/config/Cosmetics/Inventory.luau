@@ -3,6 +3,16 @@
 -- Lobby inventory grouping, card colors, and viewport framing.
 
 return {
+	ItemLabels = {
+		BallAssets = "DODGEBALL SKIN",
+		HammerAssets = "HAMMER SKIN",
+		CostumeAssets = "OUTFIT",
+		CharacterColor = "COLOR",
+		ImpactEffectAssets = "IMPACT EFFECT",
+		ElimEffectAssets = "ELIMINATION SOUND",
+		EmoteAssets = "EMOTE",
+		TrailAssets = "TRAIL",
+	},
 	Tabs = {
 		{
 			Id = "OUTFITS",
@@ -21,9 +31,8 @@ return {
 		{
 			Id = "EFFECTS",
 			Sections = {
-				{ Id = "TRAILS", Category = "TrailAssets" },
 				{ Id = "IMPACTS", Category = "ImpactEffectAssets" },
-				{ Id = "ELIMINATION SOUNDS", Category = "ElimEffectAssets" },
+				{ Id = "ELIMINATION EFFECTS", Category = "ElimEffectAssets" },
 			},
 		},
 		{
@@ -41,7 +50,16 @@ return {
 		Exclusive = Color3.fromRGB(209, 18, 252),
 	},
 
+	ViewportFieldOfView = 45,
+	ViewportFill = 0.9,
 	Viewport = {
+		CostumeAssets = {
+			CameraOffset = Vector3.new(0, 0.3, 8.8),
+			TargetOffset = Vector3.new(0, 0.1, 0),
+			Scale = 0.65,
+			RotationDegrees = 180,
+			SpinDegreesPerSecond = 8,
+		},
 		CharacterColor = {
 			CameraOffset = Vector3.new(0, 0.4, 7.5),
 			TargetOffset = Vector3.new(0, 0.25, 0),
@@ -63,7 +81,5 @@ return {
 			RotationDegrees = -20,
 			SpinDegreesPerSecond = 12,
 		},
-		-- Script effects and elimination sounds use InventoryPreview's static badges.
-		-- TrailAssets stays out of Tabs until it has a preview.
 	},
 }

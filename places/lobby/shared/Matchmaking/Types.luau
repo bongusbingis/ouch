@@ -10,6 +10,7 @@ export type PartyMember = {
 	userId: number,
 	joinedAt: number,
 	characterColorId: string?,
+	costumeId: string?,
 }
 
 export type QueueTicket = {

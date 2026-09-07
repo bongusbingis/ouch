@@ -4,7 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
 local Emotes = require(ReplicatedStorage.Config.Cosmetics.Emotes)
-local CharacterColorLogic = require(ReplicatedStorage.Shared.Game.Economy.CharacterColorLogic)
+local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
 local VictoryPose = require(ReplicatedStorage.Shared.Game.Cosmetics.VictoryPose)
 local VictoryRig = {}
 
@@ -31,14 +31,14 @@ local function rotation(name: string, pose): CFrame
 	return CFrame.identity
 end
 
-function VictoryRig.create(world: WorldModel, colorId: string?): any
+function VictoryRig.create(world: Instance, colorId: string?, costumeId: string?): any
 	local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Rigs"):WaitForChild("CharacterRig")
 	assert(template:IsA("Model"), "[VictoryRig] Assets.Rigs.CharacterRig must be a Model")
+	CharacterAppearance.prepare({ costumeId = costumeId })
 	local rig = template:Clone()
 	rig.Parent = world
 	local root = rig:WaitForChild("HumanoidRootPart")
 	assert(root:IsA("BasePart"), "[VictoryRig] HumanoidRootPart must be a BasePart")
-	local color = CharacterColorLogic.resolve(Cosmetics, colorId)
 	local pairsByName = {}
 	for _, descendant in rig:GetDescendants() do
 		if
@@ -56,9 +56,6 @@ function VictoryRig.create(world: WorldModel, colorId: string?): any
 			descendant.CanCollide = false
 			descendant.CanTouch = false
 			descendant.CanQuery = false
-			if descendant:IsA("MeshPart") then
-				descendant.Color = color
-			end
 		elseif descendant:IsA("Attachment") and string.match(descendant.Name, "RigAttachment$") then
 			local pair = pairsByName[descendant.Name] or {}
 			table.insert(pair, descendant)
@@ -95,19 +92,29 @@ function VictoryRig.create(world: WorldModel, colorId: string?): any
 		end
 	end
 	assert(#ordered == 15, "[VictoryRig] CharacterRig must have a connected R15 attachment graph")
+	for _, part in rig:GetDescendants() do
+		if part:IsA("BasePart") and not seen[part] then
+			assert(part.Transparency == 1, "[VictoryRig] visible rig parts must belong to the attachment graph")
+			part:Destroy()
+		end
+	end
 	rig:PivotTo(CFrame.identity)
 	local bounds = rig:GetBoundingBox()
 	local rootOffset = root.Position - bounds.Position
+	local appearance = CharacterAppearance.create(rig, { characterColorId = colorId, costumeId = costumeId })
 	local display = { model = rig }
-	function display.pose(style, time: number, reducedMotion: boolean?)
+	function display.pose(style, time: number, reducedMotion: boolean?, origin: CFrame?)
 		local pose = VictoryPose.sample(style.Pose, time, style.Duration, reducedMotion)
-		root.CFrame = CFrame.new(rootOffset + Vector3.new(0, pose.lift, 0))
+		root.CFrame = (origin or CFrame.identity)
+			* CFrame.new(rootOffset + Vector3.new(0, pose.lift, 0))
 			* CFrame.Angles(0, math.pi + pose.yaw, pose.lean)
 		for _, joint in ordered do
 			joint.child.CFrame = joint.parent.CFrame * joint.c0 * rotation(joint.name, pose) * joint.c1
 		end
+		appearance.updateMounts()
 	end
 	function display.destroy()
+		appearance.destroy()
 		rig:Destroy()
 	end
 	return display

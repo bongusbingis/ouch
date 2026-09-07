@@ -59,6 +59,77 @@ local function build(overrides)
 end
 
 T.describe("ShopViewModel", function()
+	T.it("derives outfit ownership from pieces and keeps every bundle item inspectable", function()
+		local owned = { DodgeBall1 = true }
+		for _, itemId in Cosmetics.Items.FoamLeague.Contents do
+			owned[itemId] = true
+		end
+		local model = build({
+			shopState = {
+				offers = { { itemId = "FoamLeague", bonksPrice = 1000 } },
+				bundle = { bundleId = "TestBundle" },
+			},
+			economyData = { Bonks = 2400, Cosmetics = { Owned = owned, Equipped = {} } },
+			bundles = {
+				Catalog = {
+					TestBundle = {
+						CatalogStatus = "Preview",
+						DisplayName = "Test",
+						Description = "Test",
+						ItemIds = { "FoamLeague", "DodgeBall1", "StarPop", "Hammer1" },
+					},
+				},
+			},
+		})
+		T.expect(model.byId["Cosmetic:FoamLeague"].owned):toEqual(true)
+		T.expect(model.byId["Cosmetic:FoamLeague"].bonksAvailable):toEqual(2400)
+		local bundle = model.byId["Bundle:TestBundle"]
+		T.expect(#bundle.previewItems):toEqual(4)
+		T.expect(bundle.previewItems[1].owned):toEqual(true)
+		T.expect(bundle.previewItems[3].owned):toEqual(false)
+		T.expect(bundle.owned):toEqual(false)
+	end)
+
+	T.it("keeps default inventory entries inspectable without inventing an owned item id", function()
+		local card = ShopViewModel.inventory({
+			id = "Default_CostumeAssets",
+			category = "CostumeAssets",
+			displayName = "No Costume",
+			rarity = "Common",
+			definition = Cosmetics.Defaults.CostumeAssets,
+		})
+		T.expect(card.status):toEqual("Owned")
+		T.expect(card.previewItems[1].itemId):toBeNil()
+		T.expect(card.previewItems[1].category):toEqual("CostumeAssets")
+	end)
+
+	T.it("keeps a granted reward inspectable while authoritative ownership is still arriving", function()
+		local awaiting = ShopViewModel.reward("DodgeBall1", Cosmetics, {})
+		T.expect(awaiting.owned):toEqual(false)
+		T.expect(awaiting.pending):toEqual(true)
+		T.expect(awaiting.status):toEqual("Loading")
+		T.expect(awaiting.previewItems[1].itemId):toEqual("DodgeBall1")
+		T.expect(awaiting.previewItems[1].owned):toEqual(false)
+		T.expect(awaiting.productId):toBeNil()
+		local delivered = ShopViewModel.reward("DodgeBall1", Cosmetics, { DodgeBall1 = true })
+		T.expect(delivered.owned):toEqual(true)
+		T.expect(delivered.pending):toEqual(false)
+		T.expect(delivered.status):toEqual("Owned")
+		T.expect(delivered.id):toEqual(awaiting.id)
+	end)
+
+	T.it("requires every outfit piece before a reward inspection offers equip", function()
+		local owned = {}
+		local pieces = Cosmetics.Items.FoamLeague.Contents
+		for index = 1, #pieces - 1 do
+			owned[pieces[index]] = true
+		end
+		T.expect(ShopViewModel.reward("FoamLeague", Cosmetics, owned).owned):toEqual(false)
+		owned[pieces[#pieces]] = true
+		T.expect(ShopViewModel.reward("FoamLeague", Cosmetics, owned).owned):toEqual(true)
+		T.expect(ShopViewModel.reward("UnknownReward", Cosmetics, owned)):toBeNil()
+	end)
+
 	T.it("builds the storefront in stable section order", function()
 		local model = build(nil)
 		T.expect(#model.hero):toEqual(2)

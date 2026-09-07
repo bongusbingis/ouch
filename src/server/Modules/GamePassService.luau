@@ -72,7 +72,7 @@ end
 
 local function validateCatalog()
 	for key, definition in activeGamePasses.Catalog do
-		if isActive(definition) then
+		if isActive(definition) or definition.Id ~= nil then
 			local allowedCategories = {}
 			for _, category in definition.Categories do
 				allowedCategories[category] = true

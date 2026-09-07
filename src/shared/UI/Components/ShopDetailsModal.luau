@@ -20,10 +20,14 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
+local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
+local Selection = require(script.Parent.Parent.Services.Selection)
+local ScrollFrame = require(script.Parent.ScrollFrame)
 local c = React.createElement
 local colors = UIConfig.ProgressionStyle
 
-local function label(text, position, size, maxSize, color, heading, alignment, wrapped)
+local function label(text, position, size, maxSize, color, heading, alignment, wrapped, order)
 	return c(ResponsiveText, {
 		MeasurementFont = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
 		MaxTextSize = maxSize,
@@ -38,6 +42,7 @@ local function label(text, position, size, maxSize, color, heading, alignment, w
 			TextColor3 = color or Color3.new(1, 1, 1),
 			TextXAlignment = alignment or Enum.TextXAlignment.Left,
 			ZIndex = 105,
+			LayoutOrder = order,
 		},
 	})
 end
@@ -58,7 +63,7 @@ local function guaranteeText(card)
 	return table.concat(entries, "  •  ")
 end
 
-return function(props)
+local function ItemDetails(props)
 	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safe.size, UIConfig.Layout.PortraitMaxAspect)
 	local size = ResponsiveLayout.panelSize(
@@ -70,6 +75,7 @@ return function(props)
 	local card = props.Card
 	local selectedId, setSelectedId = React.useState(nil)
 	local firstRef, robuxRef, closeRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
+	local inventoryRef = React.useRef(nil)
 	local panelRef = React.useRef(nil)
 	local reducedMotion = useReducedMotion()
 	local styles = ReactSpring.useSpring({
@@ -86,7 +92,7 @@ return function(props)
 		end
 		local previous = GuiService.SelectedObject
 		return function()
-			if previous and previous.Parent and previous.Visible and previous.Selectable then
+			if Selection.isSelectable(previous) then
 				GuiService.SelectedObject = previous
 			end
 		end
@@ -119,11 +125,12 @@ return function(props)
 				return
 			end
 			if selected and selected.Selectable and panelRef.current and selected:IsDescendantOf(panelRef.current) then
+				Selection.scrollIntoView(selected)
 				return
 			end
-			for _, reference in { firstRef, robuxRef, closeRef } do
+			for _, reference in { firstRef, robuxRef, inventoryRef, closeRef } do
 				local button = reference.current
-				if button and button.Parent and button.Visible and button.Selectable then
+				if Selection.isSelectable(button) then
 					GuiService.SelectedObject = button
 					break
 				end
@@ -150,22 +157,9 @@ return function(props)
 		and card.previewItems[1] ~= nil
 		and card.previewItems[1].category == "EmoteAssets"
 	local short = not portrait and size.Y < 420
-	local hasBonks = card.bonksPrice ~= nil
-	local hasRobux = (card.productId ~= nil or card.passId ~= nil) and card.robuxPrice ~= nil
+	local hasBonks = card.bonksPrice ~= nil and not card.owned
+	local hasRobux = not card.owned and (card.productId ~= nil or card.passId ~= nil) and card.robuxPrice ~= nil
 	local quantities = if isCrate and hasBonks then card.openQuantities or { 1 } else if hasBonks then { 1 } else {}
-	local slots = #quantities + (if hasRobux then 1 else 0)
-	local columns = if portrait then math.min(2, math.max(1, slots)) else math.max(1, slots)
-	local rows = math.max(1, math.ceil(slots / columns))
-	local buttonHeight = if short then 48 else if portrait then 54 else 60
-	local footerCopyHeight = if isCrate then (if short then 23 else 45) else 12
-	local footerHeight = rows * (buttonHeight + 6) + footerCopyHeight
-	local inset = if short then 12 else 16
-	local bodyTop = if short then 52 else 64
-	local bodyHeight = size.Y - bodyTop - footerHeight - inset
-	local previewHeight = if portrait then math.min(120, bodyHeight * 0.31) else bodyHeight
-	local listTop = if portrait then previewHeight + 8 else 0
-	local listX = if portrait then 0 else 0.35
-	local listWidth = if portrait then 1 else 0.65
 	local selected = nil
 	for _, outcome in card.odds or {} do
 		if outcome.itemId == selectedId then
@@ -173,7 +167,7 @@ return function(props)
 			break
 		end
 	end
-	if isEmoteCollection then
+	if not isCrate and #card.previewItems > 0 then
 		local entry = card.previewItems[1]
 		for _, item in card.previewItems do
 			if item.itemId == selectedId then
@@ -184,11 +178,23 @@ return function(props)
 		selected = { displayName = entry.definition.DisplayName, preview = entry }
 	end
 	local styleButtons = {}
-	if isEmoteCollection then
+	local listedItems = card.previewItems
+	if card.definition.Contents then
+		listedItems = {}
+		for _, pieceId in card.definition.Contents do
+			local definition = Cosmetics.Items[pieceId]
+			table.insert(listedItems, {
+				itemId = pieceId,
+				definition = definition,
+				owned = CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, pieceId),
+			})
+		end
+	end
+	if not isCrate then
 		styleButtons.Layout = c("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder })
-		for index, item in card.previewItems do
-			styleButtons[item.itemId] = c(AnimatedButton, {
-				Enabled = true,
+		for index, item in listedItems do
+			styleButtons[item.itemId or item.category] = c(AnimatedButton, {
+				Enabled = item.definition.CostumePiece == nil,
 				OnActivated = function()
 					setSelectedId(item.itemId)
 				end,
@@ -202,17 +208,55 @@ return function(props)
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
 				Name = label(
-					item.definition.DisplayName,
+					item.definition.DisplayName
+						.. (
+							if item.owned
+								then (if card.kind == "Bundle"
+									then ` · +{Cosmetics.Rarities[item.definition.Rarity].DupeBonks or 0} Bonks (owned)`
+									else " · OWNED")
+								else ""
+						),
 					UDim2.fromOffset(12, 0),
 					UDim2.new(1, -24, 1, 0),
 					23,
 					if selected.preview.itemId == item.itemId then colors.Yellow else nil,
+					false,
+					nil,
 					true
 				),
 			})
 		end
 	end
 	local previews = if selected and selected.preview then { selected.preview } else card.previewItems
+	local preview = previews[1]
+	local isEffect = preview
+		and (not isCrate or selected ~= nil)
+		and (preview.category == "ImpactEffectAssets" or preview.category == "ElimEffectAssets")
+	local previewOwned = preview
+		and (preview.itemId == nil or CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, preview.itemId))
+	local equipped = preview and ((props.Equipped or {})[preview.category] or "") == (preview.itemId or "")
+	local hasEquip = not isCrate and previewOwned and props.OnEquipItem ~= nil
+	local hasInventory = not isCrate and previewOwned and props.OnViewInventory ~= nil
+	local slots = #quantities
+		+ (if hasRobux then 1 else 0)
+		+ (if hasEquip then 1 else 0)
+		+ (if hasInventory then 1 else 0)
+	local columns = if portrait then math.min(2, math.max(1, slots)) else math.max(1, slots)
+	local rows = math.max(1, math.ceil(slots / columns))
+	local buttonHeight = if short then 52 else if portrait then 60 else 68
+	local footerCopyHeight = if isCrate then (if short then 23 else 45) else if hasBonks then 30 else 6
+	local footerHeight = rows * (buttonHeight + 6) + footerCopyHeight
+	local inset = if short then 12 else 16
+	local actionWidth = math.min(size.X - inset * 2, columns * (UIConfig.Layout.ShopDetailsActionMaxWidthPx + 8))
+	local bodyTop = if short then 52 else 64
+	local bodyHeight = size.Y - bodyTop - footerHeight - inset
+	local previewHeight = if portrait then math.min(132, math.max(104, bodyHeight * 0.31)) else bodyHeight
+	local listTop = if portrait then previewHeight + 8 else 0
+	local listX = if portrait then 0 else 0.35
+	local listWidth = if portrait then 1 else 0.65
+	local nameHeight = if short then 36 else 52
+	local previewFooter = if isEffect then 56 else if short or (not isCrate and not isEmoteCollection) then 8 else 34
+	local artHeight = math.max(44, bodyHeight - nameHeight - previewFooter - 16)
 	local contents = {
 		Layout = c(
 			"UIListLayout",
@@ -246,7 +290,7 @@ return function(props)
 		local chosen = selectedId == outcome.itemId
 		local refund = if outcome.owned
 			then `OWNED  •  +{formatNumber(outcome.bonksRefund or 0)} Bonks`
-			else `Repeat reward: +{formatNumber(outcome.bonksRefund or 0)} Bonks`
+			else `Duplicate: +{formatNumber(outcome.bonksRefund or 0)} Bonks`
 		contents[outcome.itemId] = c(AnimatedButton, {
 			Enabled = true,
 			OnActivated = function()
@@ -322,8 +366,10 @@ return function(props)
 				and (card.bonksAvailable or (if card.affordable then amount else 0)) >= amount
 				and not card.pending,
 			Position = position(index),
-			Size = UDim2.new(1 / columns, -8, 0, buttonHeight),
-			Text = if isCrate then "OPEN " .. quantity else "GET ITEM",
+			Size = UDim2.new(1 / columns, -14, 0, buttonHeight),
+			Text = if isCrate
+				then "OPEN " .. quantity
+				else if card.definition.Contents then "BUY OUTFIT" else "BUY ITEM",
 			SubBonks = amount,
 			OnActivated = function()
 				props.OnPurchaseBonks(quantity)
@@ -336,11 +382,49 @@ return function(props)
 			ButtonRef = robuxRef,
 			Enabled = card.status == "Active" and not card.pending,
 			Red = true,
-			Position = position(slots),
-			Size = UDim2.new(1 / columns, -8, 0, buttonHeight),
-			Text = if isCrate then "OPEN 1" else if card.passId then "GET PASS" else "GET ITEM",
+			Position = position(#quantities + 1),
+			Size = UDim2.new(1 / columns, -14, 0, buttonHeight),
+			Text = if isCrate
+				then "OPEN 1"
+				else if card.passId
+					then "GET PASS"
+					else if card.kind == "Bundle"
+						then "GET BUNDLE"
+						else if card.kind == "Bonks" then "GET BONKS" else "BUY OUTFIT",
 			SubText = ShopConfig.RobuxSymbol .. formatNumber(card.robuxPrice),
 			OnActivated = props.OnPurchaseRobux,
+			ZIndex = 105,
+		})
+	end
+
+	local actionIndex = #quantities + (if hasRobux then 1 else 0)
+	if hasEquip and preview then
+		actionIndex += 1
+		buttons.Equip = c(ShopPriceButton, {
+			ButtonRef = firstRef,
+			Enabled = previewOwned and not equipped and not (props.BusySlots or {})[preview.category],
+			Position = position(actionIndex),
+			Size = UDim2.new(1 / columns, -14, 0, buttonHeight),
+			Text = if (props.BusySlots or {})[preview.category]
+				then "EQUIPPING…"
+				else if equipped then "EQUIPPED" else "EQUIP",
+			OnActivated = function()
+				props.OnEquipItem(preview)
+			end,
+			ZIndex = 105,
+		})
+	end
+	if hasInventory and preview then
+		actionIndex += 1
+		buttons.Inventory = c(ShopPriceButton, {
+			ButtonRef = inventoryRef,
+			Enabled = true,
+			Position = position(actionIndex),
+			Size = UDim2.new(1 / columns, -14, 0, buttonHeight),
+			Text = "BACKPACK",
+			OnActivated = function()
+				props.OnViewInventory(preview.category)
+			end,
 			ZIndex = 105,
 		})
 	end
@@ -406,31 +490,47 @@ return function(props)
 					Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
 					Art = c("Frame", {
 						BackgroundTransparency = 1,
-						Size = if portrait then UDim2.fromScale(0.4, 1) else UDim2.fromScale(1, 0.65),
+						Size = if portrait then UDim2.fromScale(0.4, 1) else UDim2.new(1, 0, 0, artHeight),
 						ZIndex = 103,
 					}, {
 						Content = c(ShopPreview, {
 							Items = previews,
 							Thumbnail = if selected then nil else card.thumbnail,
 							ZIndex = 103,
+							ColorId = (props.Equipped or {}).CharacterColor,
+							CostumeId = (props.Equipped or {}).CostumeAssets,
 						}),
 					}),
 					Name = label(
-						if selected then selected.displayName else card.description,
-						if portrait then UDim2.new(0.43, 0, 0, 8) else UDim2.new(0, 10, 0.66, 0),
-						if portrait then UDim2.fromScale(0.53, 0.65) else UDim2.new(1, -20, 0.24, 0),
+						if selected then selected.displayName else card.displayName,
+						if portrait then UDim2.new(0.43, 0, 0, 8) else UDim2.fromOffset(10, artHeight + 8),
+						if portrait
+							then UDim2.new(0.53, 0, 0, previewHeight - previewFooter - 16)
+							else UDim2.new(1, -20, 0, nameHeight),
 						22,
 						nil,
 						false,
 						nil,
 						true
 					),
+					Play = if isEffect and props.OnPreviewEffect
+						then c(ShopPriceButton, {
+							Text = if preview.category == "ElimEffectAssets" then "PLAY SOUND" else "PLAY EFFECT",
+							Enabled = true,
+							Position = if portrait then UDim2.new(0.7, 0, 1, -4) else UDim2.new(0.5, 0, 1, -8),
+							Size = if portrait then UDim2.new(0.55, -8, 0, 44) else UDim2.new(1, -16, 0, 48),
+							OnActivated = function()
+								props.OnPreviewEffect(preview)
+							end,
+							ZIndex = 105,
+						})
+						else nil,
 					Hint = if short
+							or isEffect
+							or (not isCrate and not isEmoteCollection)
 						then nil
 						else label(
-							if isCrate
-								then "Select a reward to preview"
-								else if isEmoteCollection then "Equip in Backpack → Emotes" else "Yours to keep",
+							if isCrate then "PICK A REWARD TO PREVIEW" else "CHOOSE IN BACKPACK → EMOTES",
 							if portrait then UDim2.new(0.43, 0, 1, -27) else UDim2.new(0, 10, 1, -32),
 							if portrait then UDim2.new(0.53, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
 							15,
@@ -455,7 +555,7 @@ return function(props)
 							false,
 							Enum.TextXAlignment.Right
 						),
-						List = c("ScrollingFrame", {
+						List = c(ScrollFrame, {
 							AutomaticCanvasSize = Enum.AutomaticSize.Y,
 							CanvasSize = UDim2.new(),
 							BackgroundTransparency = 1,
@@ -467,51 +567,68 @@ return function(props)
 							ZIndex = 103,
 						}, contents),
 					})
-					else c("Frame", {
+					else c(ScrollFrame, {
+						AutomaticCanvasSize = Enum.AutomaticSize.Y,
+						CanvasSize = UDim2.new(),
+						ScrollBarThickness = 4,
+						BorderSizePixel = 0,
 						BackgroundTransparency = 1,
 						Position = UDim2.new(listX, 0, 0, listTop),
 						Size = UDim2.new(listWidth, 0, 1, -listTop),
 						ZIndex = 103,
 					}, {
-						Heading = label(
-							if isEmoteCollection then "THREE VICTORY EMOTES" else "YOURS TO KEEP",
-							UDim2.fromOffset(0, 0),
-							UDim2.new(1, 0, 0, 32),
-							26,
-							colors.Yellow,
-							true
+						Layout = c(
+							"UIListLayout",
+							{ Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }
 						),
-						Description = label(
+						AHeading = label(
+							if card.owned
+								then "IN YOUR BACKPACK"
+								else if card.definition.Contents
+									then "THE OUTFIT"
+									else if #card.previewItems > 0 then "WHAT’S INSIDE" else "THE GOODS",
+							UDim2.fromOffset(0, 0),
+							UDim2.new(1, -8, 0, if short then 24 else 32),
+							if short then 20 else 26,
+							colors.Yellow,
+							true,
+							nil,
+							nil,
+							1
+						),
+						BDescription = label(
 							card.description,
 							UDim2.fromOffset(0, 40),
-							UDim2.fromScale(1, 0.4),
-							24,
+							UDim2.new(1, -10, 0, if short then 52 else 80),
+							if short then 18 else 24,
 							nil,
 							false,
 							nil,
-							true
+							true,
+							2
 						),
-						Items = if isEmoteCollection
-							then c("ScrollingFrame", {
+						CItems = if #listedItems > 0
+							then c("Frame", {
 								BackgroundTransparency = 1,
 								BorderSizePixel = 0,
-								Position = UDim2.fromScale(0, if short then 0.48 else 0.5),
-								Size = UDim2.fromScale(1, if short then 0.52 else 0.5),
-								AutomaticCanvasSize = Enum.AutomaticSize.Y,
-								CanvasSize = UDim2.new(),
-								ScrollBarThickness = 3,
+								Size = UDim2.fromScale(1, 0),
+								AutomaticSize = Enum.AutomaticSize.Y,
+								LayoutOrder = 3,
 								ZIndex = 103,
 							}, styleButtons)
 							else c("Frame", {
 								BackgroundTransparency = 1,
-								Position = UDim2.fromScale(0, 0.5),
-								Size = UDim2.fromScale(1, 0.5),
+								Size = UDim2.new(1, -8, 0, 140),
 								ZIndex = 103,
 							}, {
-								Preview = c(
-									ShopPreview,
-									{ Items = card.previewItems, Placeholder = "PERMANENT BOOST", ZIndex = 103 }
-								),
+								Preview = c(ShopPreview, {
+									Items = card.previewItems,
+									Placeholder = if card.kind == "Bonks" then "BONKS" else "PERMANENT BOOST",
+									PlaceholderBonks = if card.kind == "Bonks"
+										then card.definition.BonksAmount
+										else nil,
+									ZIndex = 103,
+								}),
 							}),
 					}),
 			}),
@@ -533,7 +650,7 @@ return function(props)
 					else nil,
 				Rule = if isCrate and not short
 					then label(
-						"Each open updates the guarantee. Repeats give Bonks.",
+						"Duplicate items give Bonks. Guarantees update after every open.",
 						UDim2.fromOffset(0, 23),
 						UDim2.new(1, 0, 0, 18),
 						14,
@@ -542,9 +659,10 @@ return function(props)
 					)
 					else nil,
 				Buttons = c("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(0, footerCopyHeight),
-					Size = UDim2.new(1, 0, 0, rows * (buttonHeight + 6)),
+					Position = UDim2.new(0.5, 0, 0, footerCopyHeight),
+					Size = UDim2.fromOffset(actionWidth, rows * (buttonHeight + 6)),
 					ZIndex = 104,
 				}, buttons),
 				Pending = if card.pending
@@ -558,14 +676,31 @@ return function(props)
 						Enum.TextXAlignment.Right
 					)
 					else nil,
+				BalanceTitle = if hasBonks and not isCrate
+					then label("YOUR BONKS", UDim2.new(1, -252, 0, 0), UDim2.fromOffset(120, 25), 16, colors.Ink, true)
+					else nil,
 				Balance = if hasBonks and not isCrate
 					then c(BonksLabel, {
 						Amount = card.bonksAvailable or 0,
-						MaxTextSize = 18,
-						Native = { Size = UDim2.fromOffset(100, 20), ZIndex = 104 },
+						MaxTextSize = 21,
+						Alignment = Enum.HorizontalAlignment.Right,
+						Native = {
+							AnchorPoint = Vector2.new(1, 0),
+							Position = UDim2.fromScale(1, 0),
+							Size = UDim2.fromOffset(132, 25),
+							ZIndex = 104,
+						},
 					})
 					else nil,
 			}),
 		}),
 	})
+end
+
+local SeasonPassModal = require(script.Parent.SeasonPassModal)
+return function(props)
+	if props.Card and props.Card.kind == "SeasonPass" then
+		return c(SeasonPassModal, props)
+	end
+	return c(ItemDetails, props)
 end

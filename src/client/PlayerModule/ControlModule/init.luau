@@ -7,12 +7,14 @@
 		7/14/2025 - Use PreferredInput instead of LastInputType for enabling/disabling virtual thumbstick
 		7/24/2025 - Use PreferredInput instead of TouchEnabled for setting movement modes, camera modes, and shift lock
 
-]]--
+]]
+--
 
 local ControlModule = {}
 ControlModule.__index = ControlModule
 
---[[ Roblox Services ]]--
+--[[ Roblox Services ]]
+--
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -29,7 +31,8 @@ local FlagUtil = CommonUtils.get("FlagUtil")
 local FFlagUserPlayerScriptsCCLIntegrationC = FlagUtil.getUserFlag("UserPlayerScriptsCCLIntegrationC")
 local FFlagUserPSSpecifySimulationFrequency = FlagUtil.getUserFlag("UserPSSpecifySimulationFrequency")
 local FFlagUserPlayerScriptsBindActivateOnIAS = FlagUtil.getUserFlag("UserPlayerScriptsBindActivateOnIAS")
-local FFlagUserPlayerScriptsFireThroughScriptableBindings = FlagUtil.getUserFlag("UserPlayerScriptsFireThroughScriptableBindings")
+local FFlagUserPlayerScriptsFireThroughScriptableBindings =
+	FlagUtil.getUserFlag("UserPlayerScriptsFireThroughScriptableBindings")
 local FFlagUserPlayerScriptsUseReplicatedCameraAPI = FlagUtil.getUserFlag("UserPlayerScriptsUseReplicatedCameraAPI")
 local FFlagUserPlayerScriptsStopFireCameraAction = FlagUtil.getUserFlag("UserPlayerScriptsStopFireCameraAction")
 local FFlagUserPlayerScriptsSAuthDirectAPIs = FlagUtil.getUserFlag("UserPlayerScriptsSAuthDirectAPIs")
@@ -41,7 +44,9 @@ local CONNECTIONS = {
 }
 
 local ActionController = require(script:WaitForChild("ActionController"))
-local InputReplication = if FFlagUserPlayerScriptsCCLIntegrationC or FFlagUserPlayerScriptsPlayerControlState then require(script:WaitForChild("InputReplication")) else nil
+local InputReplication = if FFlagUserPlayerScriptsCCLIntegrationC or FFlagUserPlayerScriptsPlayerControlState
+	then require(script:WaitForChild("InputReplication"))
+	else nil
 local InputSlots = if FFlagUserPlayerScriptsCCLIntegrationC then require(script:WaitForChild("InputSlots")) else nil
 local DynamicThumbstick
 if RunService:IsClient() then
@@ -54,7 +59,9 @@ local ClassicThumbstick = require(script:WaitForChild("ClassicThumbstick"))
 -- TouchJump controller if any of these are active
 local ClickToMove = require(script:WaitForChild("ClickToMoveController"))
 local TouchJump = require(script:WaitForChild("TouchJump"))
-local TouchAbilities = if FFlagUserPlayerScriptsCCLIntegrationC then require(script:WaitForChild("TouchAbilities")) else nil
+local TouchAbilities = if FFlagUserPlayerScriptsCCLIntegrationC
+	then require(script:WaitForChild("TouchAbilities"))
+	else nil
 
 local VehicleController = require(script:WaitForChild("VehicleController"))
 local AvatarAbilitiesInterface
@@ -78,6 +85,7 @@ local function shouldUseCameraRelativeRotation(): boolean
 end
 
 local CONTROL_ACTION_PRIORITY = Enum.ContextActionPriority.Medium.Value
+local MovementSuppression = require(script.Parent:WaitForChild("Combat"):WaitForChild("MovementSuppression"))
 local NECK_OFFSET = -0.7
 local FIRST_PERSON_THRESHOLD_DISTANCE = 5
 
@@ -106,7 +114,7 @@ local movementEnumToModuleMap = {
 }
 
 function ControlModule.new() -- TODO ControlModule should be static
-	local self = setmetatable({},ControlModule)
+	local self = setmetatable({}, ControlModule)
 	if RunService:IsServer() then
 		-- ServerAuthority causes the server to require ControlModule
 		return self
@@ -116,7 +124,7 @@ function ControlModule.new() -- TODO ControlModule should be static
 	-- table is a map from Module to the instance created from it
 	self.controllers = {}
 
-	self.activeControlModule = nil	-- Used to prevent unnecessarily expensive checks on each input event
+	self.activeControlModule = nil -- Used to prevent unnecessarily expensive checks on each input event
 	self.activeController = nil
 	self.touchJumpController = nil
 	self.touchAbilitiesController = nil
@@ -132,12 +140,16 @@ function ControlModule.new() -- TODO ControlModule should be static
 	self.touchControlFrame = nil
 	self.currentTorsoAngle = 0
 
-	self.inputMoveVector = Vector3.new(0,0,0)
+	self.inputMoveVector = Vector3.new(0, 0, 0)
 
 	self.vehicleController = VehicleController.new()
 
-	Players.LocalPlayer.CharacterAdded:Connect(function(char) self:OnCharacterAdded(char) end)
-	Players.LocalPlayer.CharacterRemoving:Connect(function(char) self:OnCharacterRemoving(char) end)
+	Players.LocalPlayer.CharacterAdded:Connect(function(char)
+		self:OnCharacterAdded(char)
+	end)
+	Players.LocalPlayer.CharacterRemoving:Connect(function(char)
+		self:OnCharacterRemoving(char)
+	end)
 	if Players.LocalPlayer.Character then
 		self:OnCharacterAdded(Players.LocalPlayer.Character)
 	end
@@ -161,7 +173,8 @@ function ControlModule.new() -- TODO ControlModule should be static
 		end)
 	end
 
-	--[[ Touch Device UI ]]--
+	--[[ Touch Device UI ]]
+	--
 	self.playerGui = nil
 	self.touchGui = nil
 	self.playerGuiAddedConn = nil
@@ -195,7 +208,7 @@ function ControlModule.new() -- TODO ControlModule should be static
 end
 
 -- remove with FFlagUserPlayerScriptsCCLIntegrationC
-local function _fireCustomInputs(player:Player)
+local function _fireCustomInputs(player: Player)
 	local input = player:FindFirstChild("InputContexts")
 	if input == nil then
 		return
@@ -219,7 +232,9 @@ local function _fireCustomInputs(player:Player)
 	else
 		local shouldFireCameraAction = true
 		if FFlagUserPlayerScriptsStopFireCameraAction then
-			local success, state = pcall(function() return player:GetCameraState() end)
+			local success, state = pcall(function()
+				return player:GetCameraState()
+			end)
 			if success and state then
 				local cframe = state.CFrame
 				if cframe ~= CFrame.identity and state.FieldOfView > 0 and state.ViewportSize.Magnitude > 0 then
@@ -276,7 +291,7 @@ local function _fireCustomInputs(player:Player)
 end
 
 -- remove with FFlagUserPlayerScriptsCCLIntegrationC
-local function _cloneInputs(player:Player)
+local function _cloneInputs(player: Player)
 	local newInput = StarterPlayer.PlayerModule.InputContexts:Clone()
 	newInput.CharacterContext.Enabled = true
 	newInput.CameraContext.Enabled = true
@@ -304,7 +319,7 @@ function ControlModule:InitializeServerAuthority()
 			Players.PlayerAdded:Connect(InputReplication.createPlayerControlState)
 		end
 		-- Server processes all input
-		if (FFlagUserPSSpecifySimulationFrequency) then
+		if FFlagUserPSSpecifySimulationFrequency then
 			RunService:BindToSimulation(function(dt)
 				for _, player in Players:GetPlayers() do
 					self:ProcessInputs(player, dt)
@@ -315,7 +330,7 @@ function ControlModule:InitializeServerAuthority()
 				for _, player in Players:GetPlayers() do
 					self:ProcessInputs(player, dt)
 				end
-			end)		
+			end)
 		end
 	else
 		if FFlagUserPlayerScriptsPlayerControlState then
@@ -332,7 +347,7 @@ function ControlModule:InitializeServerAuthority()
 			end
 		end)
 		-- Client processes local player input only
-		if (FFlagUserPSSpecifySimulationFrequency) then
+		if FFlagUserPSSpecifySimulationFrequency then
 			RunService:BindToSimulation(function(dt)
 				self:ProcessInputs(Players.LocalPlayer, dt)
 			end, Enum.StepFrequency.Hz60)
@@ -349,28 +364,29 @@ function ControlModule:InitializeServerAuthority()
 	end
 end
 
-
 local function NormalizeAngle(angle): number
-	angle = (angle + math.pi*4) % (math.pi*2)
+	angle = (angle + math.pi * 4) % (math.pi * 2)
 	if angle > math.pi then
-		angle = angle - math.pi*2
+		angle = angle - math.pi * 2
 	end
 	return angle
 end
 
 local function AverageAngle(angleA, angleB): number
 	local difference = NormalizeAngle(angleB - angleA)
-	return NormalizeAngle(angleA + difference/2)
+	return NormalizeAngle(angleA + difference / 2)
 end
 
 function ControlModule:GetEstimatedVRTorsoFrame(): CFrame
 	local headFrame = VRService:GetUserCFrame(Enum.UserCFrame.Head)
 	local _, headAngle, _ = headFrame:ToEulerAnglesYXZ()
 	headAngle = -headAngle
-	if not VRService:GetUserCFrameEnabled(Enum.UserCFrame.RightHand) or 
-		not VRService:GetUserCFrameEnabled(Enum.UserCFrame.LeftHand) then
+	if
+		not VRService:GetUserCFrameEnabled(Enum.UserCFrame.RightHand)
+		or not VRService:GetUserCFrameEnabled(Enum.UserCFrame.LeftHand)
+	then
 		self.currentTorsoAngle = headAngle
-	else	
+	else
 		local leftHandPos = VRService:GetUserCFrame(Enum.UserCFrame.LeftHand)
 		local rightHandPos = VRService:GetUserCFrame(Enum.UserCFrame.RightHand)
 
@@ -383,9 +399,8 @@ function ControlModule:GetEstimatedVRTorsoFrame(): CFrame
 		local headAngleRelativeToCurrentAngle = NormalizeAngle(headAngle - self.currentTorsoAngle)
 		local averageHandAngleRelativeToCurrentAngle = NormalizeAngle(averageHandAngle - self.currentTorsoAngle)
 
-		local averageHandAngleValid =
-			averageHandAngleRelativeToCurrentAngle > -math.pi/2 and
-			averageHandAngleRelativeToCurrentAngle < math.pi/2
+		local averageHandAngleValid = averageHandAngleRelativeToCurrentAngle > -math.pi / 2
+			and averageHandAngleRelativeToCurrentAngle < math.pi / 2
 
 		if not averageHandAngleValid then
 			averageHandAngleRelativeToCurrentAngle = headAngleRelativeToCurrentAngle
@@ -412,7 +427,9 @@ function ControlModule:GetActiveController()
 end
 
 function ControlModule:UpdateAbilitiesControllers()
-	local shouldShowTouchControls = self.enabled and self.touchControlFrame and (UserInputService.PreferredInput == Enum.PreferredInput.Touch)
+	local shouldShowTouchControls = self.enabled
+		and self.touchControlFrame
+		and (UserInputService.PreferredInput == Enum.PreferredInput.Touch)
 		and (
 			self.activeControlModule == ClickToMove
 			or self.activeControlModule == ClassicThumbstick
@@ -457,14 +474,14 @@ function ControlModule:UpdateActiveControlModuleEnabled()
 		if FFlagUserPlayerScriptsCCLIntegrationC then
 			self:UpdateAbilitiesControllers()
 		else
-			if self.touchJumpController then 
+			if self.touchJumpController then
 				self.touchJumpController:Enable(false)
 			end
 		end
 
 		if self.moveFunction then
 			if not FFlagUserPlayerScriptsCCLIntegrationC or not avatarAbilitiesInterface:isEnabled() then
-				self.moveFunction(Players.LocalPlayer, Vector3.new(0,0,0), true)
+				self.moveFunction(Players.LocalPlayer, Vector3.new(0, 0, 0), true)
 			end
 		end
 	end
@@ -474,7 +491,9 @@ function ControlModule:UpdateActiveControlModuleEnabled()
 			self.enabled = true
 			self:UpdateAbilitiesControllers()
 		else
-			if self.touchControlFrame and (UserInputService.PreferredInput == Enum.PreferredInput.Touch)
+			if
+				self.touchControlFrame
+				and (UserInputService.PreferredInput == Enum.PreferredInput.Touch)
 				and (
 					self.activeControlModule == ClickToMove
 					or self.activeControlModule == ClassicThumbstick
@@ -521,9 +540,15 @@ function ControlModule:UpdateActiveControlModuleEnabled()
 
 	-- GuiService.TouchControlsEnabled == false and the active controller is a touch controller,
 	-- disable controls
-	if not GuiService.TouchControlsEnabled and (UserInputService.PreferredInput == Enum.PreferredInput.Touch) and
-		(self.activeControlModule == ClickToMove or self.activeControlModule == ClassicThumbstick or
-			self.activeControlModule == DynamicThumbstick) then
+	if
+		not GuiService.TouchControlsEnabled
+		and (UserInputService.PreferredInput == Enum.PreferredInput.Touch)
+		and (
+			self.activeControlModule == ClickToMove
+			or self.activeControlModule == ClassicThumbstick
+			or self.activeControlModule == DynamicThumbstick
+		)
+	then
 		disable()
 		return
 	end
@@ -536,7 +561,9 @@ function ControlModule:Enable(enable: boolean?)
 	if enable == nil then
 		enable = true
 	end
-	if self.controlsEnabled == enable then return end
+	if self.controlsEnabled == enable then
+		return
+	end
 	self.controlsEnabled = enable
 
 	if not self.activeController then
@@ -551,7 +578,6 @@ function ControlModule:Disable()
 	self:Enable(false)
 end
 
-
 -- Returns module (possibly nil) and success code to differentiate returning nil due to error vs Scriptable
 function ControlModule:SelectComputerMovementModule(): ({}?, boolean)
 	local preferMicroGamepad = false
@@ -560,8 +586,13 @@ function ControlModule:SelectComputerMovementModule(): ({}?, boolean)
 			preferMicroGamepad = UserInputService.PreferredInput == Enum.PreferredInput.MicroGamepad
 		end)
 	end
-	if not (UserInputService.PreferredInput == Enum.PreferredInput.KeyboardAndMouse or
-		UserInputService.PreferredInput == Enum.PreferredInput.Gamepad or preferMicroGamepad) then
+	if
+		not (
+			UserInputService.PreferredInput == Enum.PreferredInput.KeyboardAndMouse
+			or UserInputService.PreferredInput == Enum.PreferredInput.Gamepad
+			or preferMicroGamepad
+		)
+	then
 		return nil, false
 	end
 
@@ -629,7 +660,7 @@ function ControlModule:calculateRawMoveVector(humanoid: Humanoid, cameraRelative
 		end
 	end
 
-	if humanoid:GetState() == Enum.HumanoidStateType.Swimming then	
+	if humanoid:GetState() == Enum.HumanoidStateType.Swimming then
 		if VRService.VREnabled then
 			cameraRelativeMoveVector = Vector3.new(cameraRelativeMoveVector.X, 0, cameraRelativeMoveVector.Z)
 			if cameraRelativeMoveVector.Magnitude < 0.01 then
@@ -660,13 +691,13 @@ function ControlModule:calculateRawMoveVector(humanoid: Humanoid, cameraRelative
 		-- In this case the camera is looking straight up or straight down.
 		-- Use X components from right and up vectors.
 		c = R00
-		s = -R01*math.sign(R12)
+		s = -R01 * math.sign(R12)
 	end
-	local norm = math.sqrt(c*c + s*s)
+	local norm = math.sqrt(c * c + s * s)
 	return Vector3.new(
-		(c*cameraRelativeMoveVector.X + s*cameraRelativeMoveVector.Z)/norm,
+		(c * cameraRelativeMoveVector.X + s * cameraRelativeMoveVector.Z) / norm,
 		0,
-		(c*cameraRelativeMoveVector.Z - s*cameraRelativeMoveVector.X)/norm
+		(c * cameraRelativeMoveVector.Z - s * cameraRelativeMoveVector.X) / norm
 	)
 end
 
@@ -695,9 +726,13 @@ function ControlModule:Update(data, playerData, dt)
 
 	if self.activeController and self.activeController.enabled and self.humanoid then
 		ActionController.update(playerData)
-		
+
 		local clickToMoveController = self:GetClickToMoveController()
 		clickToMoveController:Update(playerData, dt)
+		if MovementSuppression.isActive() then
+			playerData.moveVector = Vector2.zero
+			playerData.isJumping = false
+		end
 
 		-- Now retrieve info from the controller
 		local moveVector = Vector3.new(playerData.moveVector.X, 0, -playerData.moveVector.Y)
@@ -729,8 +764,10 @@ function ControlModule:Update(data, playerData, dt)
 				end
 			end
 		else
-			if (not FFlagUserPlayerScriptsFixSAuthRenderStepMove or not data.isServerAuthority)
-				and (not FFlagUserPlayerScriptsCCLIntegrationC or not avatarAbilitiesInterface:isEnabled()) then
+			if
+				(not FFlagUserPlayerScriptsFixSAuthRenderStepMove or not data.isServerAuthority)
+				and (not FFlagUserPlayerScriptsCCLIntegrationC or not avatarAbilitiesInterface:isEnabled())
+			then
 				self.moveFunction(Players.LocalPlayer, moveVector, false)
 				-- And make them jump if needed
 				self.humanoid.Jump = playerData.isJumping
@@ -743,13 +780,17 @@ function ControlModule:updateVRMoveVector(moveVector)
 	local curCamera = workspace.CurrentCamera :: Camera
 
 	-- movement relative to VR frustum
-	local cameraDelta = curCamera.Focus.Position - curCamera.CFrame	.Position
+	local cameraDelta = curCamera.Focus.Position - curCamera.CFrame.Position
 	local firstPerson = cameraDelta.Magnitude < FIRST_PERSON_THRESHOLD_DISTANCE and true
 
 	-- if the player is not moving via input in first person, follow the VRHead
-	if moveVector.Magnitude == 0 and firstPerson and VRService.AvatarGestures and self.humanoid 
-		and not self.humanoid.Sit then
-
+	if
+		moveVector.Magnitude == 0
+		and firstPerson
+		and VRService.AvatarGestures
+		and self.humanoid
+		and not self.humanoid.Sit
+	then
 		local vrHeadOffset = VRService:GetUserCFrame(Enum.UserCFrame.Head)
 		vrHeadOffset = vrHeadOffset.Rotation + vrHeadOffset.Position * curCamera.HeadScale
 
@@ -804,7 +845,9 @@ function ControlModule:OnCharacterRemoving(char)
 end
 
 function ControlModule:UpdateTouchGuiVisibility()
-	local doShow = self.humanoid and GuiService.TouchControlsEnabled and UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	local doShow = self.humanoid
+		and GuiService.TouchControlsEnabled
+		and UserInputService.PreferredInput == Enum.PreferredInput.Touch
 	-- GAME MODIFICATION (Combat): also rebuild when the gui has been destroyed
 	-- out from under us. A destroyed instance is still a truthy reference, so the
 	-- original `not self.touchGui` check could never recover and the thumbstick
@@ -868,7 +911,8 @@ When any of the following values change, we need to recalculate which movement m
 		TouchControlsEnabled
 		self.playerGui			- the touch gui is attached here
 		self.humanoid			- this affects if the touch gui is enabled
-]]--
+]]
+--
 function ControlModule:UpdateMovementMode()
 	self:UpdateTouchGuiVisibility()
 
@@ -890,7 +934,9 @@ function ControlModule:CreateTouchGuiContainer()
 		return
 	end
 
-	if self.touchGui then self.touchGui:Destroy() end
+	if self.touchGui then
+		self.touchGui:Destroy()
+	end
 
 	-- Container for all touch device guis
 	self.touchGui = Instance.new("ScreenGui")
@@ -916,10 +962,10 @@ function ControlModule:GetClickToMoveController()
 	return self.controllers[ClickToMove]
 end
 
-function ControlModule:ProcessInputs(player:Player, dt:number)
+function ControlModule:ProcessInputs(player: Player, dt: number)
 	if FFlagUserPlayerScriptsCCLIntegrationC then
 		local thisAvatarAbilitiesInterface = AvatarAbilitiesInterface.get(player)
-		
+
 		-- when CCL is enabled, server inputs are instead handled within CCL code
 		if not thisAvatarAbilitiesInterface:isEnabled() then
 			if FFlagUserPlayerScriptsPlayerControlState then
@@ -955,22 +1001,24 @@ function ControlModule:ProcessInputs(player:Player, dt:number)
 		local rotationAction = characterContext.RotationAction
 		local jumpAction = characterContext.JumpAction
 
-		local function isValidInput2D(vector2:Vector2):boolean
+		local function isValidInput2D(vector2: Vector2): boolean
 			return not (
-				vector2.X ~= vector2.X or
-				vector2.Y ~= vector2.Y or
-				vector2.X == math.huge or
-				vector2.Y == math.huge)
+				vector2.X ~= vector2.X
+				or vector2.Y ~= vector2.Y
+				or vector2.X == math.huge
+				or vector2.Y == math.huge
+			)
 		end
 
-		local function isValidInput3D(vector3:Vector3):boolean
+		local function isValidInput3D(vector3: Vector3): boolean
 			return not (
-				vector3.X ~= vector3.X or
-				vector3.Y ~= vector3.Y or
-				vector3.Z ~= vector3.Z or
-				vector3.X == math.huge or
-				vector3.Y == math.huge or 
-				vector3.Z == math.huge)
+				vector3.X ~= vector3.X
+				or vector3.Y ~= vector3.Y
+				or vector3.Z ~= vector3.Z
+				or vector3.X == math.huge
+				or vector3.Y == math.huge
+				or vector3.Z == math.huge
+			)
 		end
 
 		local moveVector2D = if moveAction ~= nil then moveAction:GetState() else Vector2.new(0.0, 0.0)
@@ -978,7 +1026,9 @@ function ControlModule:ProcessInputs(player:Player, dt:number)
 		if FFlagUserPlayerScriptsSAuthDirectAPIs then
 			cameraVector3D = player:GetCameraState().CFrame.LookVector
 		elseif FFlagUserPlayerScriptsUseReplicatedCameraAPI then
-			local success, result = pcall(function() return player:GetCameraState() end)
+			local success, result = pcall(function()
+				return player:GetCameraState()
+			end)
 			if success and result then
 				local cframe = result.CFrame
 				if cframe ~= CFrame.identity and result.FieldOfView > 0 and result.ViewportSize.Magnitude > 0 then
@@ -1008,7 +1058,12 @@ function ControlModule:ProcessInputs(player:Player, dt:number)
 			-- not happen because both branches set AutoRotate false.
 			if rotationAction:GetState() then
 				humanoid.AutoRotate = false
-				if humanoid.SeatPart == nil and humanoid.RootPart ~= nil and not humanoid.Sit and not humanoid.RootPart:IsGrounded() then
+				if
+					humanoid.SeatPart == nil
+					and humanoid.RootPart ~= nil
+					and not humanoid.Sit
+					and not humanoid.RootPart:IsGrounded()
+				then
 					humanoid.RootPart.CFrame = CFrame.new(
 						humanoid.RootPart.CFrame.Position,
 						humanoid.RootPart.CFrame.Position + cameraVector3D

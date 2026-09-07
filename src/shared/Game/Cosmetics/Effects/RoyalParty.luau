@@ -31,8 +31,8 @@ type Jewel = {
 	size: number,
 }
 
-local function core(position: Vector3, frame: CFrame, scale: number)
-	local part = Primitives.part("RoyalPartyCore", Palette.Gold, Vector3.one * 0.1, frame, Enum.Material.Neon)
+local function core(position: Vector3, frame: CFrame, scale: number, scope: Runtime.Scope?)
+	local part = Primitives.part("RoyalPartyCore", Palette.Gold, Vector3.one * 0.1, frame, Enum.Material.Neon, scope)
 	part.Shape = Enum.PartType.Ball
 	Runtime.add(part, 0.34, function(alpha)
 		local spring = Primitives.popScale(alpha, 0.08, 1.2, 1)
@@ -42,9 +42,9 @@ local function core(position: Vector3, frame: CFrame, scale: number)
 	end, { layer = "Hero" })
 end
 
-local function jewelArc(position: Vector3, scale: number)
-	local model = Primitives.group("RoyalPartyArc")
-	local right = Primitives.cameraRight()
+local function jewelArc(position: Vector3, scale: number, scope: Runtime.Scope?)
+	local model = Primitives.group("RoyalPartyArc", scope)
+	local right = Primitives.cameraRight(scope)
 	local up = Vector3.yAxis
 	local forward = right:Cross(up)
 	if forward.Magnitude < 1e-5 then
@@ -65,7 +65,9 @@ local function jewelArc(position: Vector3, scale: number)
 			"RoyalJewel",
 			if index == 3 then Palette.White else Palette.Gold,
 			Vector3.one * 0.1,
-			CFrame.new(position)
+			CFrame.new(position),
+			nil,
+			scope
 		)
 		part.Parent = model
 		table.insert(jewels, {
@@ -92,7 +94,14 @@ local function jewelArc(position: Vector3, scale: number)
 	end, { layer = "Hero" })
 end
 
-local function burstPiece(position: Vector3, frame: CFrame, scale: number, index: number, count: number)
+local function burstPiece(
+	position: Vector3,
+	frame: CFrame,
+	scale: number,
+	index: number,
+	count: number,
+	scope: Runtime.Scope?
+)
 	local angle = ((index - 1) / count) * math.pi * 2 + random:NextNumber(-0.12, 0.12)
 	local outward = Primitives.radial(frame, angle, 0.2)
 	local origin = position + frame.LookVector * 0.18 * scale
@@ -104,7 +113,8 @@ local function burstPiece(position: Vector3, frame: CFrame, scale: number, index
 			Palette.Gold,
 			Palette.Ink,
 			origin,
-			Vector2.one * random:NextNumber(0.85, 1.25) * scale
+			Vector2.one * random:NextNumber(0.85, 1.25) * scale,
+			scope
 		)
 		local baseSize = random:NextNumber(0.85, 1.25) * scale
 		Runtime.add(glyph.root, 0.72, function(alpha, elapsed)
@@ -118,7 +128,8 @@ local function burstPiece(position: Vector3, frame: CFrame, scale: number, index
 		return
 	end
 	local color = if index % 2 == 0 then Palette.Cyan else Palette.Pink
-	local part = Primitives.part("RoyalPartyPiece", color, Vector3.new(0.38, 0.72, 0.18) * scale, CFrame.new(origin))
+	local part =
+		Primitives.part("RoyalPartyPiece", color, Vector3.new(0.38, 0.72, 0.18) * scale, CFrame.new(origin), nil, scope)
 	local baseSize = part.Size
 	Runtime.add(part, 0.68, function(alpha, elapsed)
 		part.CFrame = CFrame.new(Primitives.ballistic(origin, velocity, Vector3.new(0, -17, 0), elapsed))
@@ -130,9 +141,10 @@ local function burstPiece(position: Vector3, frame: CFrame, scale: number, index
 	end, { layer = "Secondary" })
 end
 
-local function glint(position: Vector3, scale: number)
-	local origin = position + Vector3.yAxis * 2.65 * scale + Primitives.cameraRight() * 0.25 * scale
-	local glyph = Primitives.glyph("RoyalGlint", "✦", Palette.White, Palette.Gold, origin, Vector2.one * 1.5 * scale)
+local function glint(position: Vector3, scale: number, scope: Runtime.Scope?)
+	local origin = position + Vector3.yAxis * 2.65 * scale + Primitives.cameraRight(scope) * 0.25 * scale
+	local glyph =
+		Primitives.glyph("RoyalGlint", "✦", Palette.White, Palette.Gold, origin, Vector2.one * 1.5 * scale, scope)
 	glyph.label.TextTransparency = 1
 	glyph.label.TextStrokeTransparency = 1
 	Runtime.add(glyph.root, 0.32, function(alpha)
@@ -147,16 +159,17 @@ local function glint(position: Vector3, scale: number)
 end
 
 function RoyalParty.play(context: Primitives.Context)
+	local scope = context.scope
 	particles.play(context)
 	local scale = Primitives.contextScale(context) * PRESENCE_SCALE
 	local frame = Primitives.frame(context.position, context.direction)
-	core(context.position, frame, scale)
-	jewelArc(context.position, scale)
+	core(context.position, frame, scale, scope)
+	jewelArc(context.position, scale, scope)
 	local count = Runtime.scaledCount(7, "Secondary")
 	for index = 1, count do
-		burstPiece(context.position, frame, scale, index, count)
+		burstPiece(context.position, frame, scale, index, count, scope)
 	end
-	glint(context.position, scale)
+	glint(context.position, scale, scope)
 end
 
 return RoyalParty

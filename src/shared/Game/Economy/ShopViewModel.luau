@@ -6,13 +6,15 @@
 --!strict
 
 local BattlePassLogic = require(script.Parent.Parent.Progression.BattlePassLogic)
+local CosmeticsLogic = require(script.Parent.CosmeticsLogic)
 
 local ShopViewModel = {}
 
 export type PreviewItem = {
-	itemId: string,
+	itemId: string?,
 	category: string,
 	definition: any,
+	owned: boolean?,
 }
 
 export type OddsEntry = {
@@ -198,7 +200,7 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 				rarity = outcome.rarity,
 				percent = percents[outcome.itemId],
 				basePercent = basePercents[outcome.itemId],
-				owned = args.owned[outcome.itemId] == true,
+				owned = CosmeticsLogic.isOwned(args.cosmetics.Items, args.owned, outcome.itemId),
 				bonksRefund = args.cosmetics.Rarities[outcome.rarity].DupeBonks or 0,
 				preview = previewItem(outcome.itemId, args.cosmetics),
 			})
@@ -230,7 +232,7 @@ local function crateCard(args: any, crateId: string, featured: boolean): Card
 		id = cardId,
 		kind = "Crate",
 		displayName = crate.DisplayName,
-		description = crate.Description or "A new look with every opening.",
+		description = crate.Description or "Dodgeball, hammer and effect rewards await.",
 		hintText = hintText,
 		status = status,
 		badge = if featured then "FEATURED" else nil,
@@ -267,11 +269,12 @@ local function bundleCard(args: any, bundleId: string): Card?
 	local previews = {}
 	local owned = #bundle.ItemIds > 0
 	for _, itemId in bundle.ItemIds do
-		if args.owned[itemId] ~= true then
+		if not CosmeticsLogic.isOwned(args.cosmetics.Items, args.owned, itemId) then
 			owned = false
 		end
-		local item = if #previews < 3 then previewItem(itemId, args.cosmetics) else nil
+		local item = previewItem(itemId, args.cosmetics)
 		if item ~= nil then
+			item.owned = CosmeticsLogic.isOwned(args.cosmetics.Items, args.owned, itemId)
 			table.insert(previews, item)
 		end
 	end
@@ -312,7 +315,7 @@ local function cosmeticCard(args: any, offer: any): Card?
 	end
 	local _, product = productFor(args.products, "ItemId", offer.itemId)
 	local productStatus, robuxPrice = productPresentation(product, args.metadata)
-	local owned = args.owned[offer.itemId] == true
+	local owned = CosmeticsLogic.isOwned(args.cosmetics.Items, args.owned, offer.itemId)
 	local preview = previewItem(offer.itemId, args.cosmetics)
 	local status = if owned
 		then "Owned"
@@ -323,12 +326,13 @@ local function cosmeticCard(args: any, offer: any): Card?
 		id = `Cosmetic:{offer.itemId}`,
 		kind = "Cosmetic",
 		displayName = definition.DisplayName,
-		description = `A {string.lower(definition.Rarity)} cosmetic available in your rotating shop.`,
+		description = definition.Description or `{definition.Rarity} style. Ready for your next brawl.`,
 		hintText = nil,
 		status = status,
 		badge = definition.Rarity,
 		thumbnail = if definition.Thumbnail ~= "" then definition.Thumbnail else nil,
 		bonksPrice = offer.bonksPrice,
+		bonksAvailable = args.bonks,
 		originalBonksPrice = nil,
 		robuxPrice = if productStatus == "Active" then robuxPrice else nil,
 		productId = if productStatus == "Active" then product.Id else nil,
@@ -353,6 +357,19 @@ local function productCard(args: any, key: string, definition: any): Card
 	local owned = definition.Type == "SeasonPass"
 		and definition.SeasonId ~= nil
 		and args.premiumSeasons[definition.SeasonId] == true
+	local previews = {}
+	local season = if definition.SeasonId then (args.seasons or {})[definition.SeasonId] else nil
+	if season then
+		for _, track in { "Free", "Premium" } do
+			local rewards = (season.CosmeticRewards or {})[track] or {}
+			for _, reward in rewards[season.TierCount] or {} do
+				local preview = previewItem(reward.ItemId, args.cosmetics)
+				if preview then
+					table.insert(previews, preview)
+				end
+			end
+		end
+	end
 	return {
 		id = `Product:{key}`,
 		kind = definition.Type,
@@ -365,7 +382,7 @@ local function productCard(args: any, key: string, definition: any): Card
 		hintText = if definition.Type == "SeasonPass" then "PREMIUM SEASON REWARDS" else nil,
 		status = if owned then "Owned" else status,
 		badge = if definition.Type == "SeasonPass" then "SEASON PASS" else nil,
-		thumbnail = configuredIcon(definition),
+		thumbnail = if #previews > 0 then nil else configuredIcon(definition),
 		bonksPrice = nil,
 		originalBonksPrice = nil,
 		robuxPrice = robuxPrice,
@@ -377,7 +394,7 @@ local function productCard(args: any, key: string, definition: any): Card
 		affordable = true,
 		owned = owned,
 		pending = definition.Id ~= nil and args.pending[`ProductId:{definition.Id}`] == true,
-		previewItems = {},
+		previewItems = previews,
 		odds = nil,
 		pity = nil,
 		definition = definition,
@@ -402,6 +419,7 @@ local function passCard(args: any, key: string, definition: any): Card
 	for _, itemId in definition.EntitlementItemIds do
 		local preview = previewItem(itemId, args.cosmetics)
 		if preview then
+			preview.owned = CosmeticsLogic.isOwned(args.cosmetics.Items, args.owned, itemId)
 			table.insert(previews, preview)
 		end
 	end
@@ -416,7 +434,7 @@ local function passCard(args: any, key: string, definition: any): Card
 		description = definition.Description,
 		status = if owned then "Owned" else status,
 		badge = "PERMANENT",
-		thumbnail = configuredIcon(definition),
+		thumbnail = if previews[1] and previews[1].category == "EmoteAssets" then nil else configuredIcon(definition),
 		bonksPrice = nil,
 		originalBonksPrice = nil,
 		robuxPrice = price,
@@ -539,6 +557,51 @@ function ShopViewModel.build(options: any): Model
 	table.insert(model.sections, more)
 
 	return model
+end
+
+function ShopViewModel.inventory(entry: any): Card
+	return {
+		id = `Inventory:{entry.id}`,
+		kind = "Inventory",
+		displayName = entry.displayName,
+		description = entry.definition.Description or "Take it for a spin.",
+		status = "Owned",
+		badge = entry.rarity,
+		itemId = entry.itemId,
+		affordable = true,
+		owned = true,
+		pending = false,
+		previewItems = {
+			{ itemId = entry.itemId, category = entry.category, definition = entry.definition, owned = true },
+		},
+		definition = entry.definition,
+	}
+end
+
+function ShopViewModel.reward(itemId: string, cosmetics: any, owned: { [string]: any }): Card?
+	local preview = previewItem(itemId, cosmetics)
+	if preview == nil then
+		return nil
+	end
+	local definition = preview.definition
+	local card = ShopViewModel.inventory({
+		id = itemId,
+		itemId = itemId,
+		category = definition.Category,
+		displayName = definition.DisplayName,
+		rarity = definition.Rarity,
+		definition = definition,
+	})
+	card.id = `Reward:{itemId}`
+	card.kind = "Reward"
+	card.owned = CosmeticsLogic.isOwned(cosmetics.Items, owned, itemId)
+	card.status = if card.owned then "Owned" else "Loading"
+	card.pending = not card.owned
+	card.previewItems[1].owned = card.owned
+	if not card.owned then
+		card.description = "Adding this reward to your Backpack…"
+	end
+	return card
 end
 
 local function revealEntry(entry: any, cosmetics: any): any

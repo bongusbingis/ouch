@@ -37,13 +37,16 @@ function CosmeticsService.grant(player: Player, itemId: string): (boolean, strin
 	if data == nil then
 		return false, "no_profile"
 	end
-	if Cosmetics.Items[itemId] == nil then
+	local grantIds = CosmeticsLogic.grantIds(Cosmetics.Items, itemId)
+	if grantIds == nil then
 		return false, "unknown_item"
 	end
-	if data.Cosmetics.Owned[itemId] == true then
+	if CosmeticsLogic.isOwned(Cosmetics.Items, data.Cosmetics.Owned, itemId) then
 		return false, "already_owned"
 	end
-	data.Cosmetics.Owned[itemId] = true
+	for _, atomicId in grantIds do
+		data.Cosmetics.Owned[atomicId] = true
+	end
 	return true, nil
 end
 
@@ -86,17 +89,22 @@ function CosmeticsService.revokeForTesting(player: Player, itemId: string): (boo
 	if item == nil then
 		return false, "unknown_item"
 	end
-	if data.Cosmetics.Owned[itemId] ~= true then
+	local grantIds = CosmeticsLogic.grantIds(Cosmetics.Items, itemId) :: { string }
+	local hasAny = false
+	for _, atomicId in grantIds do
+		hasAny = hasAny or data.Cosmetics.Owned[atomicId] == true
+	end
+	if not hasAny then
 		return false, "not_owned"
 	end
 
-	if data.Cosmetics.Equipped[item.Category] == itemId then
-		local ok, reason = CosmeticsService.equip(player, item.Category, nil)
-		if not ok then
-			return false, reason
-		end
+	for _, atomicId in grantIds do
+		data.Cosmetics.Owned[atomicId] = nil
 	end
-	data.Cosmetics.Owned[itemId] = nil
+	local equippedId = data.Cosmetics.Equipped[item.Category]
+	if equippedId and not CosmeticsLogic.isOwned(Cosmetics.Items, data.Cosmetics.Owned, equippedId) then
+		CosmeticsService.equip(player, item.Category, nil)
+	end
 	return true
 end
 

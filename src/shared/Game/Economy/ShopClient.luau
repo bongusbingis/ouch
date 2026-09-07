@@ -197,7 +197,7 @@ local function loadMarketplaceData()
 			loadingPasses[passKey] = true
 			local generation = lifecycleGeneration
 			task.spawn(function()
-				local ok, owned = pcall(
+				local ok, owned = ClientRequest(
 					MarketplaceService.UserOwnsGamePassAsync,
 					MarketplaceService,
 					Players.LocalPlayer.UserId,
@@ -297,10 +297,14 @@ function ShopClient.purchaseCosmetic(_cardId: string, itemId: string): (boolean,
 		return false, "busy"
 	end
 	setPending(pendingKey, true)
-	local ok, result, reason = pcall(Network.call, "PurchaseCosmetic", itemId)
+	local generation = lifecycleGeneration
+	local ok, result, reason = ClientRequest(Network.call, "PurchaseCosmetic", itemId)
+	if generation ~= lifecycleGeneration then
+		return false, "stale"
+	end
 	setPending(pendingKey, false)
 	if not ok then
-		return false, "network_error"
+		return false, if result == "request_timed_out" then "request_timed_out" else "network_error"
 	end
 	if result == nil then
 		return false, reason or "purchase_failed"
@@ -326,10 +330,14 @@ function ShopClient.openCrate(_cardId: string, crateId: string, count: number?):
 		return false, "busy"
 	end
 	setPending(pendingKey, true)
-	local ok, result, reason = pcall(Network.call, "OpenCrate", crateId, count)
+	local generation = lifecycleGeneration
+	local ok, result, reason = ClientRequest(Network.call, "OpenCrate", crateId, count)
+	if generation ~= lifecycleGeneration then
+		return false, "stale"
+	end
 	setPending(pendingKey, false)
 	if not ok then
-		return false, "network_error"
+		return false, if result == "request_timed_out" then "request_timed_out" else "network_error"
 	end
 	if result == nil then
 		return false, reason or "purchase_failed"

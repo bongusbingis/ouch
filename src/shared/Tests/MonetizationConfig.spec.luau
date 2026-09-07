@@ -9,6 +9,8 @@ local T = require(script.Parent.TestKit)
 local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
 local GamePasses = require(script.Parent.Parent.Parent.Config.Economy.GamePasses)
 local Products = require(script.Parent.Parent.Parent.Config.Economy.Products)
+local Bundles = require(script.Parent.Parent.Parent.Config.Economy.Bundles)
+local StoreCatalog = require(script.Parent.Parent.Game.Economy.StoreCatalog)
 
 T.describe("MonetizationConfig", function()
 	T.it("accepts only optional Roblox asset id strings for storefront icons", function()
@@ -24,7 +26,7 @@ T.describe("MonetizationConfig", function()
 		end
 	end)
 
-	T.it("maps active products into receipt processing and excludes previews", function()
+	T.it("maps every configured product into receipt processing independently of merchandising", function()
 		T.expect(Products.ById[Products.Catalog.Bonks500.Id]):toEqual(Products.Catalog.Bonks500)
 		T.expect(Products.ById[Products.Catalog.EffectsCrateOpen.Id]):toEqual(Products.Catalog.EffectsCrateOpen)
 		T.expect(Products.ById[Products.Catalog.HammerCrateOpen.Id]):toEqual(Products.Catalog.HammerCrateOpen)
@@ -33,7 +35,7 @@ T.describe("MonetizationConfig", function()
 		T.expect(Products.Catalog.Bonks2500.BonksAmount):toEqual(2500)
 		T.expect(Products.Catalog.Bonks5500.BonksAmount):toEqual(5500)
 		for _, definition in Products.Catalog do
-			if definition.CatalogStatus == "Active" then
+			if definition.Id ~= nil then
 				T.expect(Products.ById[definition.Id]):toEqual(definition)
 			else
 				T.expect(Products.ById[definition.Id]):toBeNil()
@@ -58,11 +60,46 @@ T.describe("MonetizationConfig", function()
 			if definition.CatalogStatus == "Active" then
 				T.expect(definition.Id ~= nil):toBeTruthy()
 				T.expect(#definition.EntitlementItemIds > 0 or definition.Boosts ~= nil):toBeTruthy()
-			else
-				T.expect(definition.Id):toBeNil()
 			end
 		end
 	end)
+
+	T.it("keeps retired identities available while hiding their purchase offers", function()
+		local catalog = {
+			Live = { Id = 1, CatalogStatus = "Active", DisplayOrder = 1 },
+			Retired = { Id = 2, CatalogStatus = "Hidden", DisplayOrder = 2 },
+			Future = { CatalogStatus = "Preview", DisplayOrder = 3 },
+		}
+		local byId, keyById = StoreCatalog.platformIndex(catalog)
+		T.expect(byId[2]):toEqual(catalog.Retired)
+		T.expect(keyById[2]):toEqual("Retired")
+		local offers = StoreCatalog.build({}, catalog)
+		T.expect(#offers):toEqual(2)
+		T.expect(offers[1].key):toEqual("Live")
+		T.expect(offers[2].key):toEqual("Future")
+		local duplicate = table.clone(catalog)
+		duplicate.Future = { Id = 2, CatalogStatus = "Preview" }
+		T.expect(pcall(StoreCatalog.platformIndex, duplicate)):toEqual(false)
+		T.expect(pcall(StoreCatalog.platformIndex, { Invalid = { CatalogStatus = "Active" } })):toEqual(false)
+	end)
+
+	T.it(
+		"prepares the starter bundle with complete usable cosmetics without activating an unconfigured product",
+		function()
+			local bundle = Bundles.Catalog.StarterOutfitBundle
+			T.expect(#bundle.ItemIds):toEqual(3)
+			for index, id in { "FoamLeague", "DodgeBall3", "StarPop" } do
+				T.expect(bundle.ItemIds[index]):toEqual(id)
+			end
+			T.expect(bundle.CatalogStatus):toEqual("Preview")
+			T.expect(Products.Catalog.StarterOutfitBundleBuy.Id):toBeNil()
+			T.expect(Products.Catalog.StarterOutfitBundleBuy.CatalogStatus):toEqual("Preview")
+			for _, id in bundle.ItemIds do
+				T.expect(Cosmetics.Items[id] ~= nil):toEqual(true)
+				T.expect(Cosmetics.Items[id].InventoryVisible ~= false):toEqual(true)
+			end
+		end
+	)
 
 	T.it("keeps Robux pricing out of both catalogs", function()
 		for _, catalog in { GamePasses.Catalog, Products.Catalog } do

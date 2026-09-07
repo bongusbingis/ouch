@@ -6,6 +6,7 @@
 --!strict
 
 local CrateOdds = require(script.Parent.CrateOdds)
+local CosmeticsLogic = require(script.Parent.CosmeticsLogic)
 
 local CrateRolls = {}
 
@@ -70,7 +71,7 @@ function CrateRolls.roll(
 
 	local bucket = model.buckets[chosenRarity]
 	local itemId = bucket[random:NextInteger(1, #bucket)]
-	local isDupe = owned[itemId] == true
+	local isDupe = CosmeticsLogic.isOwned(items, owned, itemId)
 
 	return {
 		itemId = itemId,

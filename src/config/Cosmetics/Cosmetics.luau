@@ -53,6 +53,11 @@ export type ItemDef = {
 	Category: string,
 	Rarity: string,
 	DisplayName: string,
+	Description: string?,
+	Contents: { string }?,
+	CostumePiece: string?,
+	InventoryVisible: boolean?,
+	Equippable: boolean?,
 	EffectId: string?,
 	EmoteStyle: string?,
 	Thumbnail: string,
@@ -130,6 +135,10 @@ local VisualTemplates: { [string]: VisualTemplateDef } = {
 }
 
 local Defaults: { [string]: DefaultDef } = {
+	CostumeAssets = {
+		DisplayName = "Classic Brawler",
+		Rarity = "Common",
+	},
 	EmoteAssets = {
 		DisplayName = "Victory Wave",
 		Rarity = "Common",
@@ -350,6 +359,7 @@ local Items: { [string]: ItemDef } = {
 
 local DodgeballItems = require(script.Parent.DodgeballItems)
 local HammerItems = require(script.Parent.HammerItems)
+local CostumeItems = require(script.Parent.CostumeItems)
 
 for itemId, def in DodgeballItems do
 	assert(Items[itemId] == nil, `[Cosmetics] duplicate item id: {itemId}`)
@@ -359,6 +369,12 @@ for itemId, def in HammerItems do
 	assert(Items[itemId] == nil, `[Cosmetics] duplicate item id: {itemId}`)
 	Items[itemId] = def
 end
+for itemId, def in CostumeItems do
+	assert(Items[itemId] == nil, `[Cosmetics] duplicate item id: {itemId}`)
+	Items[itemId] = def
+end
+
+require(script.Parent.Parent.Parent.Shared.Game.Economy.CosmeticsLogic).validate(Items)
 
 return {
 	Rarities = Rarities,

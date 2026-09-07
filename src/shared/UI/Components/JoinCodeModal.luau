@@ -12,7 +12,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local PriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
@@ -25,23 +25,6 @@ local HELP_TEXT = "Ex: 123-456"
 
 local function sanitize(text: string): string
 	return string.sub(string.gsub(text, "%D", ""), 1, CODE_LENGTH)
-end
-
-local function actionText(text: string, position: UDim2, size: UDim2)
-	return c(ResponsiveText, {
-		MeasurementFont = Enum.Font.LuckiestGuy,
-		MaxTextSize = 32,
-		Native = {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-			Position = position,
-			Size = size,
-			Text = text,
-			TextColor3 = Color3.new(1, 1, 1),
-			ZIndex = 2,
-		},
-	})
 end
 
 local function DigitBox(props)
@@ -94,7 +77,7 @@ local function DigitBox(props)
 				BackgroundTransparency = 1,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				LayoutOrder = 3,
-				Position = UDim2.fromScale(0.5, 0.599059),
+				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(0.8, 0.8),
 				Text = props.Character,
 				TextColor3 = Color3.fromRGB(63, 63, 63),
@@ -433,55 +416,25 @@ return function(props: Props)
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 				}),
-				Confirm = c(AnimatedButton, {
+				Confirm = c(PriceButton, {
 					Enabled = canSubmit,
+					Text = if submitting then "JOINING…" else "JOIN PARTY",
+					TextSize = 24,
 					EntranceDelay = 0.025,
-					Native = {
-						AutoButtonColor = canSubmit,
-						BackgroundTransparency = 1,
-						Image = "rbxassetid://136021539696619",
-						ImageColor3 = if canSubmit then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
-						LayoutOrder = 3,
-						Position = UDim2.fromScale(0.153547, 0),
-						ScaleType = Enum.ScaleType.Slice,
-						Size = UDim2.fromScale(0.334921, 1),
-						SliceCenter = Rect.new(198, 228, 841, 468),
-						SliceScale = 0.2,
-					},
+					LayoutOrder = 3,
+					AnchorPoint = Vector2.zero,
+					Size = UDim2.fromScale(0.4, 1),
 					OnActivated = submit,
-				}, {
-					TextLabel = actionText(
-						"CONFIRM",
-						UDim2.fromScale(0.48792, 0.57964),
-						UDim2.fromScale(0.685479, 0.6712)
-					),
-					UISizeConstraint = c("UISizeConstraint", {
-						MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
-					}),
 				}),
-				Cancel = c(AnimatedButton, {
+				Cancel = c(PriceButton, {
 					Enabled = not submitting,
-					EntranceDelay = 0,
-					Native = {
-						BackgroundTransparency = 1,
-						Image = "rbxassetid://94748581468730",
-						LayoutOrder = 2,
-						Position = UDim2.fromScale(0.520694, 0),
-						ScaleType = Enum.ScaleType.Slice,
-						Size = UDim2.fromScale(0.277094, 1),
-						SliceCenter = Rect.new(198, 228, 841, 468),
-						SliceScale = 0.2,
-					},
+					Text = "CANCEL",
+					TextSize = 24,
+					Red = true,
+					LayoutOrder = 2,
+					AnchorPoint = Vector2.zero,
+					Size = UDim2.fromScale(0.4, 1),
 					OnActivated = close,
-				}, {
-					TextLabel = actionText(
-						"CANCEL",
-						UDim2.fromScale(0.463449, 0.57964),
-						UDim2.fromScale(0.680654, 0.6712)
-					),
-					UISizeConstraint = c("UISizeConstraint", {
-						MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
-					}),
 				}),
 			}),
 			ErrorText = c(ResponsiveText, {

@@ -17,6 +17,7 @@ export type Reward = {
 	kind: string,
 	amount: number?,
 	itemId: string?,
+	duplicateRefund: boolean?,
 }
 
 type Handler = (player: Player, reward: Reward) -> (boolean, string?)
@@ -63,7 +64,7 @@ handlers.Cosmetic = function(player, reward)
 	if reason == "already_owned" then
 		local rarity = Cosmetics.Rarities[item.Rarity]
 		local refund = if rarity then rarity.DupeBonks else 0
-		if refund > 0 then
+		if refund > 0 and reward.duplicateRefund ~= false then
 			PlayerData.addBonks(player, refund)
 		end
 		return true, nil

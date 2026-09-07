@@ -129,10 +129,13 @@ Bonks is deliberately the *only* thing Robux converts into on the random-reward 
 
 | Crate | Bonks price | Pool |
 |---|---|---|
-| Ball Crate | 500 | 9 ball skins |
-| Trail Crate | 1,000 | 40 droppable trails |
+| Dodgeball Crate | 500 | Non-exclusive dodgeball skins |
+| Hammer Crate | 500 | Non-exclusive hammer skins |
+| Effects Crate | 500 | Non-exclusive impact effects and elimination sounds |
 
-Rarity weights: Common 70 / Rare 24 / Legendary 6. Exclusive is weight 0 — it never drops and exists only as pass entitlements.
+Rarity weights: Common 70 / Rare 24 / Legendary 6. Exclusive is weight 0 and is structurally excluded from crates and rotating Bonks offers. Exclusive cosmetics are granted by their declared pass or season reward. Trails are retired prototype content; retain their dormant extension points, but do not merchandise them as launch content. The ordinary ball-flight trail remains gameplay feedback.
+
+These are baked prices. Live configuration may override a crate price through the validated allowlist. The intended release removes the old Effects Crate 750-Bonk override so all three follow this table. Batch opens cost exact multiples with no hidden volume discount.
 
 **Duplicate protection.** A duplicate refunds Bonks by rarity (50 / 150 / 400).
 
@@ -142,35 +145,44 @@ Rarity weights: Common 70 / Rare 24 / Legendary 6. Exclusive is weight 0 — it 
 
 ### 7.3 Direct purchase
 
-Any droppable cosmetic can be bought outright for Bonks: Common 1,200 / Rare 3,500 / Legendary 12,000.
+Eligible non-exclusive cosmetics can be bought outright while offered in the player's daily shop: Common 1,000 / Rare 2,500 / Legendary 10,000 Bonks. The server stores the selected offers for the period; buying one does not reroll the others. Per-item eligibility is explicit, and exclusive items are never drawn.
 
 This exists because RNG-averse players otherwise have nothing to spend Bonks on, and because one sink is not an economy. The pricing holds two invariants, both pinned by tests:
 
-- Direct buy is **cheaper than chasing one specific item** through crates (12,000 vs ~200,000 expected for a named Legendary), so targeting is always the rational choice for a specific want.
-- One crate open is **cheaper than the cheapest direct buy** (1,000 vs 1,200), so crates stay the value play for breadth.
+- Direct buy is **cheaper than chasing one specific item** through its crate, so targeting is the lower-cost route for a specific offered cosmetic. The tests calculate this against the actual pool and configured prices.
+- One crate open is **cheaper than the cheapest direct buy**, so crates remain an option for building a broader collection.
 
 Crates win on breadth, direct buy wins on targeting. Neither dominates.
 
 ### 7.4 Gamepass catalog
 
-| Pass | Robux | Grants |
-|---|---|---|
-| Splat Starter Kit | 49 | 1 exclusive trail |
-| Trail Collection | 149 | 5 exclusive trails, no boosts |
-| Double XP | 199 | 2.0x XP |
-| Bonks Boost | 249 | 1.5x Bonks |
-| Brawler's Club | 499 | 2.5x XP, 1.5x Bonks, 2 club trails |
-| Founder's Pack | 999 | The above plus the Founder's Crown trail; retired after launch |
+| Pass | Grants |
+|---|---|
+| Splat Starter Kit | Starlight impact effect |
+| Effect Collection | Prismatic, Galaxy and Starlight impact effects |
+| Showtime | Three exclusive victory emotes: Twirl, Flex and Bounce |
+| Double XP | 2.0x match XP |
+| Bonks Boost | 1.5x match Bonks |
 
-**Stacking is max-wins per multiplier type**, never multiplicative — owning Double XP and Brawler's Club gives 2.5x, not 5x. Brawler's Club is deliberately 2.5x so that upgrading from Double XP is never a dead purchase.
+**Stacking is max-wins per multiplier type**, never multiplicative. Boosts apply only to the declared match earnings, not purchased currency, quest/login/season rewards, or duplicate refunds.
 
-Trail Collection is intentionally booster-free: there is a pure-cosmetic option for players who want no mechanical advantage at all.
+Cosmetic passes grant no progression boost. Existing owners reconcile missing entitlements on join without duplicate currency payouts. Hidden or retired sale entries retain historical fulfillment identities.
 
-Passes for hammer skins, costumes, and emotes stay merchandised as "coming soon" until that content exists. They are never sold empty.
+Robux prices and availability come from the player's Marketplace metadata and the native purchase prompt. Creator Hub owns final launch prices; there is no code fallback price. Effect Collection still requires a platform ID before activation. Historical Brawler's Club and Founder's Pack concepts are not part of this launch catalog. See [platform release settings](shop-platform-release.md).
+
+**Complete outfits.** Six looks use the existing blob rig and preserve its face, joints, collision and movement. Headwear, body wear and footwear have separate immutable component identities, combined under a complete outfit. Ownership is stored only on components; complete-outfit ownership is derived. Launch sells/equips whole looks. The same assets and ownership records support later individual-piece sales without reconstructing the catalog. Exposed skin follows the selected character color; authored clothing retains its palette.
+
+Foam League, Rain Hopper, Snack Stack and Orbit Rookie are eligible Bonks offers. Sundae Sprinter and Party Royal are the free and premium Season 1 finales. The Foam League Starter Set combines the full outfit, blue dodgeball and Star Pop as one developer product; its exact contents and duplicate treatment are disclosed before purchase. Its platform identity must be configured before sale.
+
+**Inspection and equip.** Owned and unaffordable offers remain inspectable. Model cosmetics show the actual authored geometry. Effects audition through the same renderer as live gameplay in a local 3D scene, with isolated cleanup and camera/input ownership. Both lobby and arena menus share the same purchase, inventory and equip flow; opening a menu never pauses a live match or grants protection.
 
 ### 7.5 Season pass
 
-**499 Robux** for Season 1 — introductory. The GDD previously targeted 799; that is the goal once the track has a proven season of content behind it, and pricing an unproven pass at 799 suppresses first-season attach rate.
+Season 1 has 25 tiers with a free and premium track. Existing Bonks rewards remain unchanged. Configurable cosmetic supplements add weapon skins, effects and complete outfits, including the free Sundae Sprinter and premium Party Royal finales. The browser exposes every tier, exact contents, unlock status, claims and item previews in both places.
+
+Supplemental rewards have stable grant identities and independent completion records. Previously claimed eligible tiers receive their missing cosmetics once; retries and reward replacements never reissue base Bonks or revoke prior ownership. Archived season definitions remain available for historical settlement.
+
+The premium price is set in Creator Hub and read from Marketplace. The current platform observation and any proposed launch changes are recorded in [shop-platform-release.md](shop-platform-release.md); older static price proposals do not override the actual product.
 
 One product per season rather than one reusable product, so receipt history is unambiguous about which season was bought.
 
@@ -182,7 +194,7 @@ One product per season rather than one reusable product, so receipt history is u
 
 ### 7.7 Pricing philosophy
 
-- A price point at every wallet size, 49 → 999, because a single tier converts far worse than a ladder.
+- Provide useful offers at multiple price points, with actual player prices and complete contents visible before purchase. Do not claim a fixed saving or best value when regional pricing can change the comparison.
 - **Soft urgency only.** Countdowns appear only on things that genuinely rotate or expire: the weekly featured slot, the season, the 72-hour starter offer, daily quests. No fake scarcity, no countdown on an evergreen SKU, no manufactured "only 3 left".
 - The featured slot rotates weekly on a **global** schedule with a real 15% discount the server actually charges — a per-player rotation would make the countdown a lie.
 - What is never sold: weapons, movement, damage, cooldowns, health, or anything else that decides a fight.

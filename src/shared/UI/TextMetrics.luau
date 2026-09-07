@@ -11,6 +11,20 @@ local TextMetrics = {}
 
 local PROBE_BOUNDS = Vector2.new(100000, 100000)
 
+function TextMetrics.layoutSize(object: GuiObject): Vector2
+	local scale = 1
+	local ancestor = object.Parent
+	while ancestor and not ancestor:IsA("ScreenGui") do
+		for _, child in ancestor:GetChildren() do
+			if child:IsA("UIScale") then
+				scale *= child.Scale
+			end
+		end
+		ancestor = ancestor.Parent
+	end
+	return object.AbsoluteSize / math.max(scale, 0.001)
+end
+
 function TextMetrics.fittingSize(
 	text: string,
 	font: Enum.Font,
@@ -27,6 +41,27 @@ function TextMetrics.fittingSize(
 		local measureBounds = if wrapped then Vector2.new(math.max(bounds.X, 1), 100000) else PROBE_BOUNDS
 		local measured = TextService:GetTextSize(text, candidate, font, measureBounds)
 		if measured.X <= bounds.X and measured.Y <= bounds.Y then
+			best = candidate
+			low = candidate + 1
+		else
+			high = candidate - 1
+		end
+	end
+	return best
+end
+
+function TextMetrics.fittingIconTextSize(
+	text: string,
+	font: Enum.Font,
+	bounds: Vector2,
+	maximum: number,
+	gap: number
+): number
+	local low, high, best = 1, math.max(1, math.floor(maximum)), 1
+	while low <= high do
+		local candidate = math.floor((low + high) * 0.5)
+		local measured = TextService:GetTextSize(text, candidate, font, PROBE_BOUNDS)
+		if measured.X + candidate + gap <= bounds.X and math.max(measured.Y, candidate) <= bounds.Y then
 			best = candidate
 			low = candidate + 1
 		else
