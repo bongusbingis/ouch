@@ -27,6 +27,14 @@ return function()
 			expect(profile.LastSavedData.Receipts.purchase).to.equal(1)
 		end)
 
+		it("exposes only saved receipts for client purchase recovery", function()
+			local saved = { old = { at = 10, productId = 20, payload = { kind = "Bonks", amount = 500 } } }
+			PlayerData._profiles[player.UserId] =
+				{ Profile = { Data = { Receipts = { unsaved = 99 } }, LastSavedData = { Receipts = saved } } }
+			expect(PlayerData.savedReceipts(player)).to.equal(saved)
+			expect(PlayerData.savedReceipts(player).unsaved).to.equal(nil)
+		end)
+
 		it("leaves an unsaved grant unacknowledged after session loss", function()
 			local profile = {
 				Data = { Receipts = { purchase = 1 } },

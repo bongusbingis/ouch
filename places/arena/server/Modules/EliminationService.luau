@@ -178,7 +178,7 @@ local function restoreHumanoidPhysics(humanoid: Humanoid?, state: RagdollState)
 			humanoid.EvaluateStateMachine = humanoidState.EvaluateStateMachine
 		end)
 	end
-	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	humanoid:ChangeState(if humanoid.Health <= 0 then Enum.HumanoidStateType.Dead else Enum.HumanoidStateType.GettingUp)
 end
 
 local function ragdollImpulsePart(character: Model): BasePart?
@@ -270,6 +270,9 @@ function EliminationService.down(player: Player, impulseVelocity: Vector3?): boo
 	end
 
 	setCombatState(player, character, false)
+	if humanoid.Health <= 0 then
+		return true
+	end
 
 	local state: RagdollState = {
 		Motors = {},
@@ -329,21 +332,25 @@ function EliminationService.up(player: Player): boolean
 		end
 		restorePartPhysics(state)
 		restoreHumanoidPhysics(humanoid, state)
-	elseif humanoid then
+	elseif humanoid and humanoid.Health > 0 then
 		humanoid.PlatformStand = false
 		humanoid.AutoRotate = true
 		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 	end
 
+	if humanoid and humanoid.Health <= 0 then
+		setCombatState(player, character, false)
+		return false
+	end
 	claimCharacter(character, player)
 	setCombatState(player, character, true)
 	return true
 end
 
-function EliminationService.forget(character: Model)
+function EliminationService.forget(character: Model): boolean
 	local state = active[character]
 	if state == nil then
-		return
+		return false
 	end
 	active[character] = nil
 	if state.CleanupConnection then
@@ -362,6 +369,7 @@ function EliminationService.forget(character: Model)
 	end
 	restorePartPhysics(state)
 	restoreHumanoidPhysics(humanoidOf(character), state)
+	return true
 end
 
 return EliminationService

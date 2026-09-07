@@ -10,6 +10,7 @@ local EntitlementService = require(script.Parent.EntitlementService)
 local BattlePassService = require(script.Parent.BattlePassService)
 
 local MatchAwardService = {}
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local started = false
 local workers: { [Player]: boolean } = {}
 local listeners: { (Player, any, any, any) -> () } = {}
@@ -54,6 +55,19 @@ local function commit(player: Player, id: string): boolean
 	local after = BattlePassService.stateFor(player)
 	if not PlayerData.completeMatchAward(player, id) then
 		return false
+	end
+	if record.Awarded.Bonks > 0 then
+		pcall(
+			AnalyticsService.logEconomyEvent,
+			player,
+			"Source",
+			"Bonks",
+			record.Awarded.Bonks,
+			data.Bonks,
+			"Gameplay",
+			"MatchRewards",
+			{ source = "MatchRewards" }
+		)
 	end
 	for _, listener in table.clone(listeners) do
 		local ok, err = pcall(listener, player, record, before, after)

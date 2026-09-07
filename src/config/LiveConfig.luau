@@ -17,6 +17,8 @@ export type Entry = {
 	Maximum: number?,
 }
 
+local GameModes = require(script.Parent.Gameplay.GameModes)
+
 local entries: { Entry } = {
 	{ Key = "Combat.Dodgeball.ThrowSpeed", Type = "number", Minimum = 10, Maximum = 1000 },
 	{ Key = "Combat.Dodgeball.Gravity", Type = "number", Minimum = 0, Maximum = 500 },
@@ -109,7 +111,7 @@ local entries: { Entry } = {
 	{ Key = "Crates.EffectsCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 900 },
 
 	{ Key = "Matchmaking.PartyMaxPlayers", Type = "number", Minimum = 1, Maximum = 8 },
-	{ Key = "Matchmaking.MatchTargetPlayers", Type = "number", Minimum = 1, Maximum = 100 },
+	{ Key = "Matchmaking.MatchTargetPlayers", Type = "number", Minimum = 1, Maximum = GameModes.MatchCapacity },
 	{ Key = "Matchmaking.QueueCandidateLimit", Type = "number", Minimum = 1, Maximum = 500 },
 	{ Key = "Matchmaking.WorkerPollInterval", Type = "number", Minimum = 0.5, Maximum = 30 },
 }

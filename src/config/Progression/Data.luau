@@ -1,4 +1,13 @@
 return {
+	Participation = {
+		SampleSeconds = 0.5,
+		MinimumMovementStuds = 2,
+		ActionWindowSeconds = 3,
+		MinimumActiveSeconds = 15,
+		QualifyingCatches = 3,
+		PerOpponent = { Elim = 8, Catch = 8 },
+		PerMatch = { Elim = 40, Catch = 24 },
+	},
 	Persistence = {
 		ReceiptSaveTimeoutSeconds = 8,
 		SavePollSeconds = 0.1,
@@ -6,6 +15,7 @@ return {
 		EntitlementRetrySeconds = 5,
 		MaxPendingMatchAwards = 64,
 		MaxPendingReceipts = 64,
+		ReceiptDetailHistory = 64,
 		CompletedMatchAwardHistory = 128,
 		MaxSeasonArchives = 64,
 	},
@@ -80,7 +90,7 @@ return {
 			PremiumSeasons = {}, -- { [seasonId]: true }
 		},
 		ReceiptWork = {},
-		Receipts = {}, -- { [purchaseId]: unix time } for ProcessReceipt idempotency
+		Receipts = {}, -- Permanent purchase tombstones; recent entries also retain receipt presentation details.
 	},
 
 	TutorialVersion = 1,

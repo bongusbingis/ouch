@@ -26,6 +26,9 @@ local Combat = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.Combat
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Interface.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Infra.Debug)
 local Network = require(script.Parent.Parent.Parent.Network)
+local IntentQueue = require(script.Parent.Parent.Input.IntentQueue)
+local CombatEventPackets = require(script.Parent.CombatEventPackets)
+local MovementGuard = require(script.Parent.MovementGuard)
 
 type SimEvent = SimTypes.SimEvent
 type InputCommand = SimTypes.InputCommand
@@ -193,7 +196,6 @@ local function buildSnapshot(entries: { [string]: CharacterEntry }, excluded: { 
 end
 
 local STEP_SECONDS = 1 / 60
-local MAX_QUEUED_INTENTS = 16
 local MAX_CATCHUP_STEPS = 8
 
 local droppedSeconds = 0
@@ -204,9 +206,10 @@ type Intent = {
 	aimDir: Vector3,
 	targetId: string?,
 	charge: number?,
+	sequence: number?,
 }
 
-local pendingIntents: { Intent } = {}
+local pendingIntents = IntentQueue.new(Combat.Network.MaxQueuedIntentsPerPlayer)
 local pendingEquips: { [string]: string } = {}
 
 local function queueEquip(player: Player, weapon: string)
@@ -226,10 +229,7 @@ local function queueIntent(
 	if player:GetAttribute("ArenaReady") ~= true or player:GetAttribute("ArenaRoundEligible") == false then
 		return
 	end
-	if #pendingIntents >= MAX_QUEUED_INTENTS then
-		return
-	end
-	table.insert(pendingIntents, {
+	pendingIntents.push(PlayerIds.toId(player), {
 		playerId = PlayerIds.toId(player),
 		kind = kind,
 		aimDir = aimDir,
@@ -241,9 +241,7 @@ end
 local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
 	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
-	if not active then
-		table.clear(pendingIntents)
-	end
+	local intents = pendingIntents.drain()
 
 	for playerId, weapon in pendingEquips do
 		if entries[playerId] ~= nil then
@@ -252,7 +250,7 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 	end
 	table.clear(pendingEquips)
 
-	for _, intent in pendingIntents do
+	for _, intent in if active then intents else {} do
 		local entry = entries[intent.playerId]
 		if entry == nil or entry.model:GetAttribute("CombatAlive") == false then
 			continue
@@ -264,6 +262,7 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 		table.insert(commands, {
 			playerId = intent.playerId,
 			kind = intent.kind,
+			sequence = intent.sequence,
 			aimOrigin = entry.root.CFrame.Position + aimDir * 2,
 			aimDir = aimDir,
 			targetId = intent.targetId,
@@ -272,7 +271,6 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 			assist = AssistProjection.strengths(assistFolder, deviceClass),
 		})
 	end
-	table.clear(pendingIntents)
 	return commands
 end
 
@@ -284,6 +282,15 @@ local function step(dt: number)
 
 	local entries, excluded = collectCharacters()
 	table.insert(excluded, ballsFolder)
+	for id, entry in entries do
+		if entry.model:GetAttribute("CombatAlive") == false then
+			MovementGuard.reset(entry.root)
+		elseif not MovementGuard.check(entry.root, excluded) then
+			pendingIntents.forget(id)
+			pendingEquips[id] = nil
+			entries[id] = nil
+		end
+	end
 
 	local characterModels: { [string]: Model } = {}
 	for id, entry in entries do
@@ -308,14 +315,8 @@ local function step(dt: number)
 	MovementSpeedService.step(state, characterModels, events)
 	SimStateCodec.encode(state, ballsFolder, characterModels)
 	dispatch(events)
-	local transientEvents = {}
-	for _, event in events do
-		if event.kind ~= "Elim" then
-			table.insert(transientEvents, event)
-		end
-	end
-	if #transientEvents > 0 then
-		Network.fire("CombatSimEvent", nil, transientEvents)
+	for _, batch in CombatEventPackets.encode(events) do
+		Network.fire("CombatSimEvent", nil, batch)
 	end
 end
 
@@ -344,11 +345,7 @@ function ServerAuthAdapter.start()
 		local id = PlayerIds.toId(player)
 		pendingWeaponResets[id] = nil
 		pendingEquips[id] = nil
-		for index = #pendingIntents, 1, -1 do
-			if pendingIntents[index].playerId == id then
-				table.remove(pendingIntents, index)
-			end
-		end
+		pendingIntents.forget(id)
 	end)
 
 	Network.handleProtected("SubmitWeaponEquip", {
@@ -405,6 +402,10 @@ function ServerAuthAdapter.takeDroppedMilliseconds(): number
 	local value = droppedSeconds * 1000
 	droppedSeconds = 0
 	return value
+end
+
+function ServerAuthAdapter.takeRejectedInputs(): number
+	return pendingIntents.takeRejected()
 end
 
 return ServerAuthAdapter

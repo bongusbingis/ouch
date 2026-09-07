@@ -84,7 +84,7 @@ function ArenaCoreUI.start()
 			if not started or current ~= generation then
 				return
 			end
-			local complete = true
+			local complete = pcall(StarterGui.SetCore, StarterGui, "ResetButtonCallback", false)
 			for _, coreType in replaced do
 				local ok = pcall(function()
 					if previous[coreType] == nil then
@@ -109,6 +109,7 @@ function ArenaCoreUI.start()
 end
 
 function ArenaCoreUI.destroy()
+	pcall(StarterGui.SetCore, StarterGui, "ResetButtonCallback", true)
 	started = false
 	generation += 1
 	for _, connection in connections do

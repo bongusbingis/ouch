@@ -13,6 +13,7 @@ local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
+local MovementGuard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
 
 local JumpPads = {}
 
@@ -67,6 +68,7 @@ local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: M
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	local velocity = root.AssemblyLinearVelocity
 	root.AssemblyLinearVelocity = Vector3.new(velocity.X, settings.BouncePower, velocity.Z)
+	MovementGuard.allow(root, "JumpPad", settings.MaxFloatSeconds + 1, 0, settings.BouncePower * 1.3)
 
 	local attachment = Instance.new("Attachment")
 	attachment.Name = ATTACHMENT_NAME

@@ -46,6 +46,7 @@ local definitions = {
 	PostMatchStatus = "event",
 	PostMatchRequest = "function",
 	GetShopState = "function",
+	GetPurchaseState = "function",
 	ShopStateChanged = "event",
 	GetQuestState = "function",
 	ClaimQuest = "function",

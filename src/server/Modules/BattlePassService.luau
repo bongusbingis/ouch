@@ -117,6 +117,19 @@ local function grantUnclaimedTiers(player: Player, data: any, stored: any): bool
 		if granted then
 			local field = if owed.track == "Premium" then "ClaimedPremium" else "ClaimedFree"
 			stored[field][tostring(owed.tier)] = true
+			if owed.reward.kind == "Bonks" then
+				pcall(
+					activeAnalyticsService.logEconomyEvent,
+					player,
+					"Source",
+					"Bonks",
+					owed.reward.amount,
+					data.Bonks,
+					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+					"SeasonReward",
+					{ source = "SeasonRollover" }
+				)
+			end
 		else
 			complete = false
 		end
@@ -255,6 +268,19 @@ local function claimOne(player: Player, data: any, season: any, tier: number, tr
 
 	local field = if track == "Premium" then "ClaimedPremium" else "ClaimedFree"
 	data.Season[field][tostring(tier)] = true
+	if reward.kind == "Bonks" then
+		pcall(
+			activeAnalyticsService.logEconomyEvent,
+			player,
+			"Source",
+			"Bonks",
+			reward.amount,
+			data.Bonks,
+			AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+			"SeasonReward",
+			{ source = "SeasonClaim" }
+		)
+	end
 	if not grantCosmetics(player, data, data.Season) then
 		return false, "grant_failed"
 	end

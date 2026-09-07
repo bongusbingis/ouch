@@ -53,7 +53,7 @@ local function dependencies(owned)
 	}
 	local playerData = {
 		get = function()
-			return {}
+			return { Cosmetics = { Owned = grantedSet } }
 		end,
 	}
 	local cosmeticsService = {
@@ -84,6 +84,14 @@ local function dependencies(owned)
 	}
 	local ownershipWrites = {}
 	local entitlementService = {
+		has = function(_player, key)
+			for index = #ownershipWrites, 1, -1 do
+				if ownershipWrites[index].passKey == key then
+					return ownershipWrites[index].owned
+				end
+			end
+			return false
+		end,
 		setOwnership = function(target, passKey, isOwned)
 			table.insert(ownershipWrites, { player = target, passKey = passKey, owned = isOwned })
 		end,
@@ -131,12 +139,60 @@ return function()
 			GamePassService._resetForTest()
 		end)
 
+		it("acknowledges a pass only after all configured items are granted", function()
+			local deps = dependencies({ [91] = true })
+			local held = deps.options.cosmeticsService.grant
+			deps.options.cosmeticsService.grant = function(player, id)
+				if id == "BallBlue" then
+					return false, "temporary"
+				end
+				return held(player, id)
+			end
+			local checkedPartial = false
+			deps.options.wait = function()
+				expect(GamePassService.purchaseState(deps.player).StarterPass).to.equal(nil)
+				checkedPartial = true
+				deps.options.cosmeticsService.grant = held
+			end
+			GamePassService.start(deps.options)
+			expect(checkedPartial).to.equal(true)
+			expect(GamePassService.purchaseState(deps.player).StarterPass).to.equal(true)
+		end)
+
 		it("grants configured cosmetics for passes owned on join", function()
 			local fixture = dependencies({ [91] = true })
 			GamePassService.start(fixture.options)
 			expect(#fixture.granted).to.equal(2)
 			expect(fixture.granted[1]).to.equal("BallRed")
 			expect(fixture.granted[2]).to.equal("BallBlue")
+		end)
+
+		it("reconciles a profile that loads after the former thirty-second deadline", function()
+			local fixture = dependencies({ [91] = true })
+			local elapsed = 0
+			fixture.options.playerData.get = function()
+				return if elapsed >= 45 then {} else nil
+			end
+			fixture.options.wait = function(seconds)
+				elapsed += seconds
+			end
+			GamePassService.start(fixture.options)
+			expect(elapsed >= 45).to.equal(true)
+			expect(#fixture.granted).to.equal(2)
+			expect(fixture.ownershipWrites[1].owned).to.equal(true)
+		end)
+
+		it("cancels an unresolved profile when its player leaves", function()
+			local fixture = dependencies({ [91] = true })
+			fixture.options.playerData.get = function()
+				return nil
+			end
+			fixture.options.wait = function()
+				fixture.player.Parent = nil
+			end
+			GamePassService.start(fixture.options)
+			expect(#fixture.granted).to.equal(0)
+			expect(#fixture.ownershipWrites).to.equal(0)
 		end)
 
 		it("continues reconciling a hidden pass that already has a platform identity", function()

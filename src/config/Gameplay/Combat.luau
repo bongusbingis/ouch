@@ -3,6 +3,22 @@
 -- Every combat feel constant. Units: studs, seconds, degrees.
 
 return {
+	Network = { MaxQueuedIntentsPerPlayer = 32 },
+	MovementValidation = {
+		CoordinateLimit = 100000,
+		SampleSeconds = 0.1,
+		BurstStuds = 32,
+		WalkTolerance = 1.6,
+		PlatformSpeedAllowance = 8,
+		PlatformReachPadding = 8,
+		UpwardSpeed = 70,
+		MaxAirborneSeconds = 12,
+		MinimumFallSpeed = 8,
+		GroundToleranceStuds = 1.5,
+		WallCheckMinimumStuds = 2,
+		WallProbeRadius = 0.7,
+		WallToleranceStuds = 2,
+	},
 	Dodgeball = {
 		ThrowSpeed = 140,
 		Gravity = 70,

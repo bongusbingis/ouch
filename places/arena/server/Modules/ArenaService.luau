@@ -7,8 +7,10 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameModes = require(ReplicatedStorage.Config.Gameplay.GameModes)
 local MapFeatures = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
 local Workspace = game:GetService("Workspace")
+local MovementGuard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
 
 local ArenaService = {}
 
@@ -68,6 +70,13 @@ function ArenaService.start(): Arena
 			Blue = spawnParts(blueSpawns, "Workspace.Assets.Arena.TeamSpawns.Blue"),
 		},
 	}
+	assert(#arena.playerSpawns >= GameModes.MatchCapacity, "[ArenaService] PlayerSpawns must cover MatchCapacity")
+	for teamId, spawns in arena.teamSpawns do
+		assert(
+			#spawns >= math.ceil(GameModes.MatchCapacity / 2),
+			`[ArenaService] {teamId} requires half MatchCapacity spawns`
+		)
+	end
 	return arena
 end
 
@@ -108,6 +117,7 @@ function ArenaService.teleport(character: Model, teamId: string?)
 	character:PivotTo(target * root.CFrame:Inverse() * character:GetPivot())
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
+	MovementGuard.reset(root)
 end
 
 return ArenaService

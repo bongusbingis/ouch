@@ -2,10 +2,11 @@
 --!strict
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataConfig = require(ReplicatedStorage.Config.Progression.Data)
-local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
+local Participation = require(ReplicatedStorage.Shared.Game.Economy.Participation)
 local PlayerIds = require(ReplicatedStorage.Shared.Game.Adapters.PlayerIds)
 local EventDedup = require(ReplicatedStorage.Shared.Game.Adapters.EventDedup)
 local Network = require(ReplicatedStorage.Shared.Network)
@@ -13,7 +14,6 @@ local PlayerData = require(script.Parent.PlayerData)
 local MatchAwardService = require(script.Parent.MatchAwardService)
 local BattlePassService = require(script.Parent.BattlePassService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
-local AnalyticsService = require(script.Parent.AnalyticsService)
 
 export type MatchSummary = {
 	firstMatch: boolean?,
@@ -41,6 +41,13 @@ local summaryByPlayerId: { [string]: MatchSummary } = {}
 local summaryListeners: { (Player, MatchSummary, string) -> () } = {}
 local seenEvents = EventDedup.new()
 local activeMatchService: any = nil
+local participation: { [Player]: any } = {}
+local function activity(player: Player): any
+	if not participation[player] then
+		participation[player] = Participation.new()
+	end
+	return participation[player]
+end
 
 local function ensureRecord(player: Player): any
 	if awardId == nil then
@@ -91,19 +98,6 @@ end
 
 local function committed(player: Player, record: any, before: any, after: any)
 	local progress, awarded, multipliers = record.Progress, record.Awarded, record.Multipliers
-	if awarded.Bonks > 0 then
-		local data = PlayerData.get(player)
-		pcall(
-			AnalyticsService.logEconomyEvent,
-			player,
-			"Source",
-			"Bonks",
-			awarded.Bonks,
-			if data then data.Bonks else 0,
-			AnalyticsConfig.EconomyTransactionTypes.Gameplay,
-			"MatchRewards"
-		)
-	end
 	if record.ResultId == nil then
 		return
 	end
@@ -148,13 +142,16 @@ local function commitMatch()
 		local winner = result.winnerId
 		local won = winner ~= nil and winner ~= "" and (contestant.playerId == winner or contestant.teamId == winner)
 		local completed = result.reason ~= "NoContest"
-		local delta = if completed then rewards("MatchComplete") else { XP = 0, Bonks = 0 }
+		local eligible = Participation.eligible(activity(player), record.Progress, DataConfig.Participation)
+		local delta = if completed and eligible then rewards("MatchComplete") else { XP = 0, Bonks = 0 }
 		delta.MatchesPlayed = if completed then 1 else 0
 		if winner ~= nil and winner ~= "" then
 			if won then
 				delta.Wins = 1
-				delta.XP += DataConfig.ProgressionXP.Win
-				delta.Bonks += DataConfig.ProgressionBonks.Win
+				if eligible then
+					delta.XP += DataConfig.ProgressionXP.Win
+					delta.Bonks += DataConfig.ProgressionBonks.Win
+				end
 			else
 				delta.Losses = 1
 			end
@@ -179,6 +176,7 @@ local function handleEvent(event: any)
 		currentResultId = nil
 		table.clear(summaryByPlayerId)
 		seenEvents.clear()
+		table.clear(participation)
 		for _, player in Players:GetPlayers() do
 			if ArenaSessionService.isRoundEligible(player) then
 				ensureRecord(player)
@@ -188,15 +186,28 @@ local function handleEvent(event: any)
 		local source = PlayerIds.fromId(event.sourceId)
 		local target = PlayerIds.fromId(event.targetId)
 		if source and source ~= target then
-			local delta = rewards("Elim")
+			local delta = if Participation.payout(activity(source), "Elim", event.targetId, DataConfig.Participation)
+				then rewards("Elim")
+				else { XP = 0, Bonks = 0 }
 			delta.Elims = 1
 			add(source, delta)
 		end
 		add(target, { Deaths = 1 })
 	elseif event.kind == "BallCaught" and seenEvents.markSeen(event) then
-		local delta = rewards("Catch")
-		delta.Catches = 1
-		add(PlayerIds.fromEvent(event), delta)
+		local player = PlayerIds.fromEvent(event)
+		if player then
+			local delta = if Participation.payout(activity(player), "Catch", event.targetId, DataConfig.Participation)
+				then rewards("Catch")
+				else { XP = 0, Bonks = 0 }
+			delta.Catches = 1
+			Participation.action(activity(player), os.clock())
+			add(player, delta)
+		end
+	elseif event.kind == "BallWindup" or event.kind == "HammerSwing" then
+		local player = PlayerIds.fromEvent(event)
+		if player and awardId ~= nil then
+			Participation.action(activity(player), os.clock())
+		end
 	elseif event.kind == "MatchEnded" then
 		commitMatch()
 	end
@@ -255,6 +266,34 @@ function ProgressionService.start(matchService: any)
 	activeMatchService = matchService
 	matchService.onEvent(handleEvent)
 	MatchAwardService.onCommitted(committed)
+	local elapsed = 0
+	RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed < DataConfig.Participation.SampleSeconds then
+			return
+		end
+		local interval = elapsed
+		elapsed = 0
+		if awardId == nil then
+			return
+		end
+		for _, player in Players:GetPlayers() do
+			if not ArenaSessionService.isRoundEligible(player) then
+				continue
+			end
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local position = if root
+					and root:IsA("BasePart")
+					and character:GetAttribute("CombatAlive") ~= false
+				then root.Position
+				else nil
+			Participation.sample(activity(player), position, os.clock(), interval, DataConfig.Participation)
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		participation[player] = nil
+	end)
 end
 
 return ProgressionService

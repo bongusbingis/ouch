@@ -231,6 +231,11 @@ function Data.isLoaded(player)
 	return Data._loaded[player.UserId] == true
 end
 
+function Data.savedReceipts(player)
+	local entry = Data._profiles[player.UserId]
+	return if entry and entry.Profile.LastSavedData then entry.Profile.LastSavedData.Receipts or {} else {}
+end
+
 function Data.confirmReceiptSaved(player, receiptKey): boolean
 	local entry = Data._profiles[player.UserId]
 	if entry == nil then

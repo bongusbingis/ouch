@@ -44,9 +44,14 @@ alone used — a second raw touch listener running in parallel with this one.
 
 ### Client/server boundary
 
-Everything here is client-only. The server sees exactly what it saw before: a
-`SubmitCombatInput` with kind, aim direction, optional target and charge. Server
-authority is unchanged.
+Classification is client-only. `SubmitCombatInput` carries kind, aim direction,
+optional target, and charge intent. The server records BeginCharge/CancelCharge
+through the existing codec and bounds releases by server-observed elapsed time.
+Per-player FIFO queues preserve accepted arrival order and cap each player at
+32 queued intents; one player cannot consume another player's input capacity.
+The authoritative adapter validates movement before building the simulation
+snapshot. Server teleports reset its origin; jump pads, hammer dashes, and
+rotating platforms have explicit allowances. Config owns all tolerances.
 
 ### How touch ownership is coordinated
 
@@ -353,6 +358,6 @@ measured one, and they interact — raising one usually means revisiting another
   If `ambiguous` is high relative to `taps` in real play, the thresholds are
   wrong, not the players.
 
-Two gaps remain in the implementation itself: there is **no hammer HUD button**
-(`Combat.hammerPressed()` and `registerHudExclusion` are ready and waiting for
-one), and haptics are not wired.
+The hammer HUD button is implemented in `src/client/CombatClient/UI/CombatHUD.luau`
+with a registered touch exclusion. Combat and UI haptics are wired through
+`CombatFeedback` and `UIFeedback`; physical device feel still needs hardware QA.

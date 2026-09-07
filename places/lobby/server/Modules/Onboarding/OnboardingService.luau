@@ -7,6 +7,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MovementGuard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -157,6 +158,10 @@ local function placeAtSafePoint(session: Session)
 		return
 	end
 	character:PivotTo(safeCFrame(session))
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		MovementGuard.reset(root)
+	end
 end
 
 local function clearDummies(session: Session)

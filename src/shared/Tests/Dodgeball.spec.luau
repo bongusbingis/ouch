@@ -94,6 +94,19 @@ T.describe("Dodgeball kit", function()
 		return MockWorld.snapshot(characters, { MockWorld.ground() }, { vector.create(1, 1, 0) })
 	end
 
+	T.it("honors charge cancellation after an accepted action in the same tick", function()
+		local world = arena()
+		local state = stateWithHeldBall(world)
+		SimCore.step(state, { throwCommand({ kind = "BeginCharge", sequence = 1 }) }, world, DT)
+		SimCore.step(
+			state,
+			{ catchCommand({ sequence = 2 }), throwCommand({ kind = "CancelCharge", sequence = 3 }) },
+			world,
+			DT
+		)
+		T.expect(state.players.p1.weapons.Dodgeball.chargeSeconds):toBeNil()
+	end)
+
 	T.it("does not create world balls inside the pure sim", function()
 		local world = arena()
 		local state = SimCore.newState()

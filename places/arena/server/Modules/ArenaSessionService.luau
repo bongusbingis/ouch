@@ -284,6 +284,21 @@ local function markReady(player: Player)
 end
 
 local function addArrival(player: Player, admission: Admission)
+	local count = 0
+	for _, current in Players:GetPlayers() do
+		if
+			current ~= player
+			and (admissionByUserId[current.UserId] == "Direct" or admissionByUserId[current.UserId] == "Matched")
+		then
+			count += 1
+		end
+	end
+	if count >= GameModes.MatchCapacity then
+		setAdmission(player, "Rejected")
+		publishLoadState()
+		warn(`[ArenaSessionService] Arena capacity reached for {player.Name}`)
+		return
+	end
 	local activeGate = assert(gate, "[ArenaSessionService] admission requires a readiness gate")
 	ArenaReadinessGate.arrive(activeGate, player.UserId)
 	setAdmission(player, admission)

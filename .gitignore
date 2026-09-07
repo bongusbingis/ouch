@@ -6,7 +6,6 @@
 
 # Wally
 /Packages
-/wally.lock
 
 # CI build artifacts
 /dist.rbxl

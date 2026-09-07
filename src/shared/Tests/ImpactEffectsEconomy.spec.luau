@@ -65,9 +65,9 @@ T.describe("Impact effect economy", function()
 		end
 	end)
 
-	T.it("routes exactly the exclusive impact collection through its preview pass", function()
+	T.it("routes exactly the exclusive impact collection through its hidden, unconfigured pass", function()
 		local pass = GamePasses.Catalog.EffectCollection
-		T.expect(pass.CatalogStatus):toEqual("Preview")
+		T.expect(pass.CatalogStatus):toEqual("Hidden")
 		T.expect(pass.Id):toBeNil()
 		T.expect(#pass.EntitlementItemIds):toEqual(#EXCLUSIVE_IDS)
 		for index, itemId in pass.EntitlementItemIds do

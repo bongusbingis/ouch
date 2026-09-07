@@ -26,7 +26,9 @@ The starting balance is template data for new profiles only. No balances, owned 
 
 ## Earning pace
 
-The model assumes a completed match. Wins are averaged over many matches; fractional results below are expectations, not fractional runtime awards.
+The model assumes an engaged, completed match. Wins are averaged over many matches; fractional results below are expectations, not fractional runtime awards.
+
+Completion and win XP/Bonks require 15 seconds of server-observed activity, one elimination, or three catches. Recent accepted attacks count as activity so stationary defensive play is not treated as idle. Elimination/catch XP and Bonks pay at most eight times per opponent per match, with match caps of 40 eliminations and 24 catches. Scores and career counts remain uncapped. These limits curb idle and repeated-opponent farming without changing combat outcomes; they are configurable under `Data.Participation`. They do not constitute a claim that automated farming is impossible.
 
 | Scenario | Elims | Catches | Win rate | Before Bonks/match | New Bonks/match | Matches per 500-Bonk crate |
 |---|---:|---:|---:|---:|---:|---:|
@@ -65,16 +67,17 @@ The simulation is a balance estimate. The UI displays the exact next-open probab
 
 | Pass | Identity | Implemented entitlement | Runtime behavior |
 |---|---|---|---|
-| Splat Starter Kit | 1968922292 | Starlight impact effect | Grant once; restore missing entitlement on join; no repeated Bonks refunds. |
+| Starlight Effect | 1968922292 | Starlight impact effect | Grant once; restore missing entitlement on join; no repeated Bonks refunds. |
 | Double XP | 1952133523 | 2× match XP | Applies to career and original-season match XP through the award owner; no combat advantage. |
 | Bonks Boost | 1955640877 | 1.5× match Bonks | Applies once to the resolved match award; unrelated currency sources are unchanged. |
-| Effect Collection | Platform ID not supplied | Prismatic, Galaxy, Starlight | Concrete preview configuration; cannot prompt until a real ID is provided and activated. Existing Starlight owners retain it without a duplicate payout. |
+| Showtime | 1970065084 | Twirl, Flex, Bounce victory emotes | Existing inventory/equip owner and world-podium playback; no gameplay advantage. |
+| Effect Collection | Platform ID not supplied | Prismatic, Galaxy, Starlight | Hidden for the base release; cannot prompt until a real ID is provided and activated. Existing Starlight owners retain it without a duplicate payout. |
 
 GamePassService verifies platform ownership after purchase and on join. Lookup outages retry while the player remains connected. Partial cosmetic grants retry missing items and accept already-owned items as fulfilled. EntitlementService derives the greatest applicable multiplier per type, rather than multiplying overlapping passes. Unknown boost ownership keeps the award pending in PlayerData instead of silently underpaying it.
 
 Earlier commented concepts (Founder's Pack, Hammer Cosmetics, Character Costumes, Elimination Emotes) have no platform IDs and no complete authored grant definitions. They are not existing purchasable products. Dead commented catalog blocks were removed. Their concepts remain outside the active storefront rather than inventing asset IDs or selling empty entitlements. Future activation must name exact authored items and categories; the active-pass validator rejects an empty grant without a real progression benefit.
 
-All three real passes currently report off sale in Marketplace. Existing owners can still reconcile; new purchase availability needs Creator Dashboard configuration. The code does not change sale status, regional settings, or platform prices.
+All four real passes currently report off sale in Marketplace. Existing owners can still reconcile; new purchase availability needs Creator Dashboard configuration. The code does not change sale status, regional settings, or platform prices.
 
 ## Storefront behavior
 
@@ -89,7 +92,7 @@ Mobile acceptance targets landscape. Portrait architecture remains intact at the
 ## Release steps and measurement
 
 1. Change or remove the live Crates.EffectsCrate.BonksPrice override, currently 750, when releasing the 500-Bonk balance. Keeping the override intentionally keeps the old price. Label any experimental cohort through Shop.VariantId.
-2. Configure the three existing passes for sale with their intended platform prices/descriptions. Test each using Roblox's Dynamic Price Check with at least two price/location settings. No source-code price edits are needed.
+2. Configure the four existing passes for sale with their intended platform prices/descriptions. Test each using Roblox's Dynamic Price Check with at least two price/location settings. No source-code price edits are needed.
 3. Create an Effect Collection pass only if that planned offer should launch, then supply its ID and activate the concrete grant definition.
 4. Run real receipt retry/duplicate purchase QA, regional/policy account checks, and cross-place rejoin recovery in an isolated staging experience. Studio fixtures do not prove platform billing behavior.
 5. Run the full saved-place cloud suites before publishing; current Studio Play runs exclude tests that explicitly require a non-running empty cloud server.

@@ -264,6 +264,18 @@ function EconomyMenuController.use(options: Options): Controller
 		shopClient.clearGrant()
 	end, { shopSnapshot.grant, shopClient, notifications.notify, closePreview })
 
+	React.useEffect(function()
+		if not shopSnapshot.purchaseNotice then
+			return
+		end
+		notifications.notify({
+			title = "PURCHASE PROCESSING",
+			description = "Roblox is still processing your purchase. You can keep playing. Your items will arrive when it completes.",
+			buttonText = "OK",
+		})
+		shopClient.clearPurchaseNotice()
+	end, { shopSnapshot.purchaseNotice, shopClient, notifications.notify })
+
 	local shopError = React.useCallback(function(reason: string?)
 		closePreview()
 		UIAnalytics.report("PurchaseFailed", { reason = reason or "purchase_failed" })

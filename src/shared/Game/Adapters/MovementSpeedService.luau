@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.Combat)
 local PlayerIds = require(script.Parent.PlayerIds)
+local MovementGuard = require(script.Parent.MovementGuard)
 
 local MovementSpeedService = {}
 
@@ -56,6 +57,13 @@ local function applyHammerMotion(events: { any })
 				local forwardSpeed = Vector3.new(velocity.X, 0, velocity.Z):Dot(direction)
 				local dashSpeed = (event.magnitude :: number?) or Combat.Hammer.DashSpeed
 				local deltaSpeed = math.max(dashSpeed - forwardSpeed, 0)
+				MovementGuard.allow(
+					root,
+					"Hammer",
+					Combat.Hammer.ActiveDuration + Combat.Hammer.HitRecovery + 0.5,
+					dashSpeed * 1.3,
+					0
+				)
 				root:ApplyImpulse(direction * root.AssemblyMass * deltaSpeed)
 			end
 		elseif event.kind == "HammerHit" and event.targetId ~= nil then

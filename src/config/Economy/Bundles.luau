@@ -27,7 +27,7 @@ export type BundleDef = {
 
 local Catalog: { [string]: BundleDef } = {
 	StarterOutfitBundle = {
-		CatalogStatus = "Preview",
+		CatalogStatus = "Hidden",
 		DisplayName = "Foam League Starter Set",
 		Description = "The complete Foam League outfit, a blue dodgeball and the Star Pop elimination effect.",
 		DisplayOrder = 100,

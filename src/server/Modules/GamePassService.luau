@@ -18,6 +18,7 @@ local CosmeticsService = require(script.Parent.CosmeticsService)
 local EntitlementService = require(script.Parent.EntitlementService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
+local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
 
 type StartOptions = {
 	marketplace: any?,
@@ -35,7 +36,6 @@ type StartOptions = {
 
 local GamePassService = {}
 
-local PROFILE_ATTEMPTS = 120
 local RETRY_SECONDS = 0.25
 
 local started = false
@@ -90,16 +90,13 @@ local function validateCatalog()
 end
 
 local function waitForProfile(player: Player): boolean
-	for _ = 1, PROFILE_ATTEMPTS do
+	local currentGeneration = generation
+	while currentGeneration == generation and player.Parent ~= nil do
 		if activePlayerData.get(player) ~= nil then
 			return true
 		end
-		if player.Parent == nil then
-			return false
-		end
 		activeWait(RETRY_SECONDS)
 	end
-	warn(`[GamePassService] profile unavailable for {player.Name}; pass grants will retry next join`)
 	return false
 end
 
@@ -273,6 +270,27 @@ function GamePassService._resetForTest()
 	activeRunAsync = task.spawn
 	activeWait = task.wait
 	table.clear(purchaseNotifications)
+end
+
+function GamePassService.purchaseState(player: Player): { [string]: boolean }
+	local result = {}
+	local data = activePlayerData.get(player)
+	if data == nil then
+		return result
+	end
+	for key, definition in activeGamePasses.Catalog do
+		if not activeEntitlementService.has(player, key) then
+			continue
+		end
+		local complete = true
+		for _, itemId in definition.EntitlementItemIds do
+			complete = complete and CosmeticsLogic.isOwned(activeCosmetics.Items, data.Cosmetics.Owned, itemId)
+		end
+		if complete then
+			result[key] = true
+		end
+	end
+	return result
 end
 
 return GamePassService

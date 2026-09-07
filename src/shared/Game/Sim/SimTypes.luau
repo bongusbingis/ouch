@@ -81,6 +81,7 @@ export type CommandKind = "Throw" | "Catch" | "Equip" | "BeginCharge" | "CancelC
 
 export type InputCommand = {
 	playerId: string,
+	sequence: number?,
 	kind: CommandKind,
 	weapon: string?,
 	aimOrigin: Vec?,

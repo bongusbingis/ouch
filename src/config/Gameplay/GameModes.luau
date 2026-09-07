@@ -40,6 +40,8 @@ end)
 -- VoteOptions is derived from Modes at load and is copied by the lobby, so
 -- neither can be changed live without the two drifting apart.
 return {
+	MatchCapacity = 20,
+	NativeRespawnRetrySeconds = 5,
 	VoteDurationSeconds = 10,
 	OpponentGraceSeconds = 8,
 	Modes = table.freeze(modes),

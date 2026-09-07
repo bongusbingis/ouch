@@ -15,6 +15,11 @@
   "tree": {
     "$className": "DataModel",
 
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$properties": { "ScreenOrientation": "LandscapeSensor" }
+    },
+
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared",

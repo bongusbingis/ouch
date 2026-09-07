@@ -20,6 +20,7 @@ local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
 
@@ -134,17 +135,7 @@ return function(props: Props)
 				Transparency = 0,
 				config = Motion.Modal,
 				immediate = immediate,
-			}):andThen(function()
-				task.defer(function()
-					if transitionRevision.current ~= revision or rootRef.current == nil then
-						return
-					end
-					local onPresented = onPresentedRef.current
-					if onPresented then
-						onPresented()
-					end
-				end)
-			end)
+			})
 		else
 			api.start({
 				Transparency = 1,
@@ -162,6 +153,25 @@ return function(props: Props)
 	end, { props.Visible, props.Static, reducedMotion })
 
 	React.useEffect(function()
+		if not props.Visible or not present then
+			return
+		end
+		local cancelled = false
+		task.defer(function()
+			if cancelled or rootRef.current == nil then
+				return
+			end
+			local onPresented = onPresentedRef.current
+			if onPresented then
+				onPresented()
+			end
+		end)
+		return function()
+			cancelled = true
+		end
+	end, { props.Visible, present })
+
+	React.useEffect(function()
 		return function()
 			transitionRevision.current += 1
 			api.stop()
@@ -177,7 +187,7 @@ return function(props: Props)
 		return function()
 			local selection = previousSelection.current
 			previousSelection.current = nil
-			if selection and selection.Parent and selection.Visible and selection.Selectable then
+			if Selection.isSelectable(selection) then
 				GuiService.SelectedObject = selection
 			end
 		end
@@ -189,13 +199,7 @@ return function(props: Props)
 		if props.Visible and props.Static ~= true and hasActions then
 			task.defer(function()
 				local button = firstActionRef.current
-				if
-					focusRevision.current == revision
-					and button
-					and button.Parent
-					and button.Visible
-					and button.Selectable
-				then
+				if focusRevision.current == revision and Selection.isSelectable(button) then
 					GuiService.SelectedObject = button
 				end
 			end)

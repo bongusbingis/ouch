@@ -5,7 +5,7 @@ put an offer on sale.
 
 ## Catalog status
 
-Both `src/config/GamePasses.luau` and `src/config/Products.luau` use
+Both `src/config/Economy/GamePasses.luau` and `src/config/Economy/Products.luau` use
 `CatalogStatus`, not the older `Enabled` boolean:
 
 | Status | In the storefront? | Purchasable? |
@@ -15,12 +15,14 @@ Both `src/config/GamePasses.luau` and `src/config/Products.luau` use
 | `Hidden` | No | No |
 
 `Preview` is how an offer is merchandised before it exists on the platform.
-Only `Active` definitions enter `ById`, which is the sole map receipt
-processing and ownership reconciliation consult.
+Every definition with a real platform ID enters `ById`. Hidden offers cannot
+start new purchases through the shop, but existing owners and delayed receipts
+still receive their original grants. Never remove an ID to hide an offer.
 
-Names, icons, sale state, and the Robux price shown to players all come from
-`MarketplaceService:GetProductInfoAsync()` on the client. `SuggestedRobux` is a
-planning note and is never displayed as a price.
+The Robux price and sale state shown to players come from
+`MarketplaceService:GetProductInfoAsync()` on the client. Catalog names, copy,
+and authored icons describe the concrete grant. No configured Robux prices or
+fallback amounts are permitted, including in preview offers.
 
 ## Going live with an offer
 
@@ -36,20 +38,22 @@ A pass grants cosmetics (`EntitlementItemIds`), boosters (`Boosts`), or both.
 
 ```luau
 EffectCollection = {
-    Id = 123456789,
-    CatalogStatus = "Active",
+    Id = nil,
+    CatalogStatus = "Hidden",
     DisplayName = "Effect Collection",
-    Description = "Exclusive effects, permanently unlocked.",
+    Description = "Prismatic, Galaxy and Starlight impact effects.",
     DisplayOrder = 410,
-    SuggestedRobux = 149,
-    Categories = { "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" },
+    Categories = { "ImpactEffectAssets" },
     EntitlementItemIds = { "Prismatic", "Galaxy", "Starlight" },
 },
 ```
 
 `GamePassService` verifies ownership with Roblox on join and again after a
 completed prompt, then grants every configured item through `CosmeticsService`.
-Repeating this is safe because ownership records are idempotent. An Active pass
+Profile readiness is retried for the entire connected session. Missing cosmetic
+grants retry independently; purchase recovery acknowledges the pass only after
+every configured entitlement is owned. Repeating this is safe because ownership
+records are idempotent. An Active pass
 fails startup if an item is unknown or outside its declared categories.
 
 **Boosters** declare multipliers instead of items:
@@ -72,23 +76,27 @@ strand a permanent booster flag on a player. The corollary matters:
 
 ## Developer products
 
-Three receipt-backed types: `Bonks`, `Crate`, and `SeasonPass`.
+Receipt-backed types: `Bonks`, `Crate`, `SeasonPass`, and `Bundle`.
 
 ```luau
 Bonks1100 = {
-    Id = 234567891,
+    Id = 3709429164,
     CatalogStatus = "Active",
     DisplayName = "Bonks Stack",
     DisplayOrder = 320,
     Type = "Bonks",
-    SuggestedRobux = 99,
     BonksAmount = 1100,
 },
 ```
 
 The client only opens Roblox's purchase prompt. `MonetizationService` is the
 single `ProcessReceipt` owner and records purchase ids permanently, so a retry
-after a grant acknowledges without re-granting. An Active product fails startup
+after a grant acknowledges without re-granting. A grant is acknowledged only
+after its receipt is durably saved. The latest 64 receipts retain their product
+and presentation payload; older IDs remain permanent deduplication tombstones.
+`GetPurchaseState` exposes only saved receipts and fulfilled pass entitlements
+to their owner so a lost notification cannot strand the purchase UI.
+An Active product fails startup
 if its type has no handler or its crate is unknown.
 
 ## Seasons
@@ -98,15 +106,14 @@ receipt history stays unambiguous about what was bought.
 
 ```luau
 SeasonPassS1 = {
-    Id = 345678912,
+    Id = 3711055761,
     CatalogStatus = "Active",
     Type = "SeasonPass",
-    SuggestedRobux = 499,
     SeasonId = "S1",
 },
 ```
 
-To open a new season, add a definition to `src/config/Seasons.luau` with its
+To open a new season, add a definition to `src/config/Progression/Seasons.luau` with its
 window, tier count, XP thresholds, and both reward tracks, then add a matching
 product.
 
@@ -122,7 +129,7 @@ that every Active product has a handler.
 
 ## Featured rotation
 
-`src/config/Shop.luau` holds the rotation list, period, and discount. The slot
+`src/config/Economy/Shop.luau` holds the rotation list, period, and discount. The slot
 is chosen from absolute UTC time alone, so every client and server agrees
 without replicating anything. The discount is real: `CrateService.priceFor` and
 the storefront call the same shared function, so the advertised price is the

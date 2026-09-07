@@ -20,7 +20,7 @@ local function compare(a: any, b: any): number
 end
 
 function CommandOrder.less(a: SimTypes.InputCommand, b: SimTypes.InputCommand): boolean
-	for _, field in { "playerId", "kind", "weapon", "targetId", "deviceClass", "charge" } do
+	for _, field in { "playerId", "sequence", "kind", "weapon", "targetId", "deviceClass", "charge" } do
 		local order = compare((a :: any)[field], (b :: any)[field])
 		if order ~= 0 then
 			return order < 0

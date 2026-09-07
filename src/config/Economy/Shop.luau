@@ -80,6 +80,8 @@ local RobuxSymbol = "\u{E002}"
 return {
 	VariantId = VariantId,
 	MetadataRefreshSeconds = 300,
+	PurchasePollSeconds = 5,
+	PurchaseNoticeSeconds = 30,
 	RobuxSymbol = RobuxSymbol,
 	Featured = Featured,
 	Bundle = Bundle,

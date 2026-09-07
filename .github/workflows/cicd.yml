@@ -87,7 +87,9 @@ jobs:
           key: tools-${{ hashFiles('aftman.toml') }}
 
       - name: Install Wally packages
-        run: wally install
+        run: |
+          wally install
+          git diff --exit-code -- wally.lock
 
       - name: Build place projects
         run: |
@@ -198,7 +200,9 @@ jobs:
           key: tools-${{ hashFiles('aftman.toml') }}
 
       - name: Install Wally packages
-        run: wally install
+        run: |
+          wally install
+          git diff --exit-code -- wally.lock
 
       # The Studio-authored place committed under places/<place>/ is the merge
       # base and the artifact that gets published. Its name is not fixed, so it

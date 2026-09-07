@@ -63,11 +63,15 @@ local args = table.clone(process.args)
 if args[1] == "--" then
 	table.remove(args, 1)
 end
-if #args < 2 or #args > 3 or (args[3] ~= nil and args[3] ~= "--test-only") then
-	fail(1, "usage: lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only]")
+if #args < 2 or #args > 3 or (args[3] ~= nil and args[3] ~= "--test-only" and args[3] ~= "--stage-only") then
+	fail(
+		1,
+		"usage: lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only|--stage-only]"
+	)
 end
 local placeFile, taskFile = args[1], args[2]
 local testOnly = args[3] == "--test-only"
+local stageOnly = args[3] == "--stage-only"
 
 if not testOnly and not fs.isFile(placeFile) then
 	fail(1, `missing place file: {placeFile}`)
@@ -433,7 +437,10 @@ if state ~= "COMPLETE" then
 end
 
 print("cloud tests passed")
-if testOnly then
+if stageOnly then
+	print(`staged and tested saved version {versionId}; nothing published`)
+end
+if testOnly or stageOnly then
 	process.exit(0)
 end
 

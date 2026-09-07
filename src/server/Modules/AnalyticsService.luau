@@ -34,6 +34,8 @@ local AssistResolver = require(
 )
 
 local AnalyticsService = {}
+local AnalyticsFields = require(ReplicatedStorage.Shared.Game.Economy.AnalyticsFields)
+local ShopConfig = require(ReplicatedStorage.Config.Economy.Shop)
 
 type OnboardingProgress = {
 	spawned: boolean,
@@ -62,7 +64,11 @@ local function tallyFor(userId: number): CombatTally
 	return tally
 end
 
-local function withDimensions(player: Player, customFields: { [string]: any }?): { [string]: any }
+local function withDimensions(
+	player: Player,
+	customFields: { [string]: any }?,
+	eventName: string?
+): { [string]: string }
 	local fields: { [string]: any } = table.clone(customFields or {})
 	local dimensions = AnalyticsConfig.Dimensions
 	fields[dimensions.DeviceClass] = (player:GetAttribute("DeviceClass") :: string?) or "Mouse"
@@ -70,7 +76,12 @@ local function withDimensions(player: Player, customFields: { [string]: any }?):
 	local projected = player:FindFirstChild(PlayerAssist.FolderName)
 	local folder = if projected and projected:IsA("Folder") then projected else nil
 	fields[dimensions.AssistBucket] = AssistResolver.bucket(PlayerAssist.Entries, AssistProjection.resolved(folder))
-	return fields
+	fields.variantId = if ShopConfig.VariantId == "" then "Default" else ShopConfig.VariantId
+	local schemas = AnalyticsConfig.FieldSchemas
+	local schema = if eventName == "Economy"
+		then schemas.Economy
+		else if eventName and string.sub(eventName, 1, 4) == "Shop" then schemas.Shop else schemas.Default
+	return AnalyticsFields.resolve(schema, fields)
 end
 
 local function isStudio(): boolean
@@ -112,7 +123,7 @@ local function logOnboardingStep(player: Player, step: number, stepName: string,
 		return
 	end
 	local ok, err = pcall(function()
-		RobloxAnalytics:LogOnboardingFunnelStepEvent(player, step, stepName, customFields)
+		RobloxAnalytics:LogOnboardingFunnelStepEvent(player, step, stepName, withDimensions(player, customFields))
 	end)
 	if not ok then
 		warn(`[AnalyticsService] LogOnboardingFunnelStepEvent failed: {err}`)
@@ -142,7 +153,7 @@ function AnalyticsService.logFunnelStep(
 			sessionId,
 			step,
 			stepName,
-			withDimensions(player, customFields)
+			withDimensions(player, customFields, funnelName)
 		)
 	end)
 	if not ok then
@@ -179,7 +190,7 @@ function AnalyticsService.logEconomyEvent(
 			endingBalance,
 			transactionType,
 			itemSku,
-			customFields
+			withDimensions(player, customFields, "Economy")
 		)
 	end)
 	if not ok then
@@ -204,7 +215,7 @@ function AnalyticsService.logCustomEvent(
 		return
 	end
 	local ok, err = pcall(function()
-		RobloxAnalytics:LogCustomEvent(player, eventName, value, withDimensions(player, customFields))
+		RobloxAnalytics:LogCustomEvent(player, eventName, value, withDimensions(player, customFields, eventName))
 	end)
 	if not ok then
 		warn(`[AnalyticsService] LogCustomEvent failed: {err}`)
@@ -342,6 +353,15 @@ local function handleMatchEvent(event: { [string]: any })
 				fields[name] = value
 			end
 			AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.CombatSummary, tally.throws, fields)
+			for _, metric in { "hits", "catches", "deaths" } do
+				AnalyticsService.logCustomEvent(player, "Combat_" .. metric, tally[metric], { modeId = modeId })
+			end
+		end
+		local reporter = Players:GetPlayers()[1]
+		if reporter then
+			for name, value in gaugeValues do
+				AnalyticsService.logCustomEvent(reporter, "Server_" .. name, value, { modeId = modeId })
+			end
 		end
 		table.clear(combatTallies)
 	end

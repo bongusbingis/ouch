@@ -21,6 +21,7 @@ local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local RewardService = require(script.Parent.RewardService)
+local ReceiptHistory = require(ReplicatedStorage.Shared.Game.Economy.ReceiptHistory)
 
 type StartOptions = {
 	marketplace: any?,
@@ -154,24 +155,31 @@ local function grantReceipt(receiptInfo: { [string]: any }, player: Player): Enu
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
 		data.ReceiptWork[receiptKey].Payload = payload
-		data.Receipts[receiptKey] = activeTime()
+		data.Receipts[receiptKey] = {
+			at = activeTime(),
+			productId = receiptInfo.ProductId,
+			payload = payload,
+		}
+		ReceiptHistory.prune(data.Receipts, DataConfig.Persistence.ReceiptDetailHistory, receiptKey)
 	end
 	if not activePlayerData.confirmReceiptSaved(player, receiptKey) then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	local work = data.ReceiptWork[receiptKey]
 	if work then
-		pcall(
-			activeAnalyticsService.logEconomyEvent,
-			player,
-			"Source",
-			"Robux",
-			(receiptInfo.CurrencySpent :: number?) or 0,
-			0,
-			AnalyticsConfig.EconomyTransactionTypes.IAP,
-			tostring(receiptInfo.ProductId),
-			{ productType = def.Type }
-		)
+		if def.Type == "Bonks" then
+			pcall(
+				activeAnalyticsService.logEconomyEvent,
+				player,
+				"Source",
+				"Bonks",
+				def.BonksAmount,
+				data.Bonks,
+				AnalyticsConfig.EconomyTransactionTypes.IAP,
+				tostring(receiptInfo.ProductId),
+				{ productType = def.Type }
+			)
+		end
 		local payload = if work.Payload then WriteThroughProxy.snapshot(work.Payload) else nil
 		if payload then
 			if payload.kind == "Crate" then
@@ -209,6 +217,10 @@ end
 
 function MonetizationService.registerHandler(productType: string, handler: Handler)
 	handlers[productType] = handler
+end
+
+function MonetizationService.purchaseState(player: Player): { any }
+	return ReceiptHistory.recent(activePlayerData.savedReceipts(player), DataConfig.Persistence.ReceiptDetailHistory)
 end
 
 function MonetizationService.start(options: StartOptions?)

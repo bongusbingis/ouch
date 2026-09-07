@@ -15,6 +15,7 @@ local GamePassService = require(script.Parent.GamePassService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
 local ShopService = require(script.Parent.ShopService)
+local Network = require(game:GetService("ReplicatedStorage").Shared.Network)
 
 local EconomyService = {}
 
@@ -36,6 +37,12 @@ function EconomyService.start()
 	GamePassService.start()
 	MatchAwardService.start()
 	DailyRewardService.start()
+	Network.handleProtected("GetPurchaseState", { rateLimit = 2 }, function(player)
+		return {
+			receipts = MonetizationService.purchaseState(player),
+			ownedPasses = GamePassService.purchaseState(player),
+		}
+	end)
 end
 
 return EconomyService

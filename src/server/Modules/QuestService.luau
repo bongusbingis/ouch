@@ -49,7 +49,20 @@ local function grantCompletedUnclaimed(data: any, player: Player)
 		end
 		local definition = definitionsById[entry.id]
 		if definition and entry.progress >= definition.goal then
-			RewardService.grant(player, definition.reward)
+			local granted = RewardService.grant(player, definition.reward)
+			if granted and definition.reward.kind == "Bonks" then
+				pcall(
+					AnalyticsService.logEconomyEvent,
+					player,
+					"Source",
+					"Bonks",
+					definition.reward.amount,
+					data.Bonks,
+					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+					entry.id,
+					{ source = "QuestRollover" }
+				)
+			end
 		end
 	end
 end

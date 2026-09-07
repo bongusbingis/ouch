@@ -55,6 +55,7 @@ local externalEventSequence = 0
 local started = false
 local startingMatch = false
 local watchedPlayers: { [number]: RBXScriptConnection } = {}
+local nativeDeathConnections: { [number]: RBXScriptConnection } = {}
 local lastResult: PostMatchResult.GlobalResult? = nil
 local resultRosterByUserId: { [number]: PostMatchResult.Contestant } = {}
 local opponentDeadline: number? = nil
@@ -462,9 +463,48 @@ local function onCharacterAdded(player: Player, character: Model)
 	if not ArenaSessionService.isRoundEligible(player) then
 		return
 	end
+	local humanoid = character:WaitForChild("Humanoid")
+	assert(humanoid:IsA("Humanoid"), "[MatchService] character Humanoid must be a Humanoid")
+	if player.Character ~= character or player.Parent == nil then
+		return
+	end
+	local previous = nativeDeathConnections[player.UserId]
+	if previous then
+		previous:Disconnect()
+	end
+	nativeDeathConnections[player.UserId] = humanoid.Died:Connect(function()
+		if player.Character == character and state.phase == "Active" then
+			MatchService.eliminate(player, nil)
+		end
+	end)
 	syncCharacterTeam(player, character)
-	EliminationService.up(player)
 	local key = PlayerIds.toId(player)
+	local deadline = player:GetAttribute("MatchRespawnAt")
+	if type(deadline) == "number" and state.phase == "Active" and mode and mode.rules.WaveRespawnSeconds then
+		EliminationService.down(player)
+		pendingWaveRespawns[key] = player
+		player:SetAttribute("MatchRespawnAt", Workspace:GetServerTimeNow() + math.max(waveTimer, 0))
+		return
+	end
+	if type(deadline) == "number" and deadline > Workspace:GetServerTimeNow() then
+		EliminationService.down(player)
+		local generation = respawnGeneration[key]
+		task.delay(deadline - Workspace:GetServerTimeNow(), function()
+			if
+				player.Character == character
+				and respawnGeneration[key] == generation
+				and player:GetAttribute("MatchRespawnAt") == deadline
+			then
+				onCharacterAdded(player, character)
+			end
+		end)
+		return
+	end
+	if humanoid.Health <= 0 then
+		return
+	end
+	EliminationService.up(player)
+	player:SetAttribute("MatchRespawnAt", nil)
 	if not isArenaJoinPhase() then
 		return
 	end
@@ -502,14 +542,31 @@ local function respawnPlayer(player: Player)
 	if player.Parent == nil then
 		return
 	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if character == nil or humanoid == nil then
+		return
+	end
+	if humanoid.Health <= 0 then
+		-- Native death during a combat ragdoll can bypass Roblox's automatic replacement.
+		if EliminationService.forget(character) then
+			task.spawn(function()
+				while player.Parent ~= nil and player.Character == character do
+					local ok, err = pcall(player.LoadCharacterAsync, player)
+					if ok then
+						return
+					end
+					warn(`[MatchService] Native character replacement failed: {err}`)
+					task.wait(GameModes.NativeRespawnRetrySeconds)
+				end
+			end)
+		end
+		return
+	end
 	if not EliminationService.up(player) then
 		return
 	end
 	player:SetAttribute("MatchRespawnAt", nil)
-	local character = player.Character
-	if character == nil then
-		return
-	end
 	if state.phase == "Active" then
 		ArenaService.teleport(character, playerTeam(player))
 	end
@@ -623,8 +680,14 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 		if character then
 			character:SetAttribute("minv", nil)
 		end
+		if state.phase == "Active" then
+			dispatch(table.clone(event))
+		end
 	end
 	if event.kind == "BallCaught" then
+		if state.phase ~= "Active" then
+			return false
+		end
 		local catcher = PlayerIds.fromId(event.playerId or event.sourceId)
 		if catcher == nil or not ArenaSessionService.isRoundEligible(catcher) then
 			return false
@@ -949,6 +1012,11 @@ function MatchService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		if resultRosterByUserId[player.UserId] then
 			rememberContestant(player)
+		end
+		local deathConnection = nativeDeathConnections[player.UserId]
+		if deathConnection then
+			deathConnection:Disconnect()
+			nativeDeathConnections[player.UserId] = nil
 		end
 		local watchedConnection = watchedPlayers[player.UserId]
 		if watchedConnection then

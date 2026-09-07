@@ -21,6 +21,7 @@ local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
 local REFERENCE_VIEWPORT = Vector2.new(1890, 1200)
@@ -124,14 +125,14 @@ return function(props: Props)
 					return
 				end
 				local button = firstButtonRef.current
-				if button and button.Parent and button.Visible and button.Selectable then
+				if Selection.isSelectable(button) then
 					GuiService.SelectedObject = button
 				end
 			end)
 		else
 			local selection = previousSelection.current
 			previousSelection.current = nil
-			if selection and selection.Parent and selection.Visible and selection.Selectable then
+			if Selection.isSelectable(selection) then
 				GuiService.SelectedObject = selection
 			end
 		end

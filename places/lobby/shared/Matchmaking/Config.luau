@@ -16,9 +16,9 @@ local Config = {
 	ReturnQueueWaitSeconds = 20,
 	ReturnQueuePollSeconds = 1,
 	PartyMaxPlayers = 4,
-	MatchTargetPlayers = 20,
+	MatchTargetPlayers = GameModes.MatchCapacity,
 	MatchPopulationExpansion = {
-		{ AfterSeconds = 0, MinimumPlayers = 20 },
+		{ AfterSeconds = 0, MinimumPlayers = GameModes.MatchCapacity },
 		{ AfterSeconds = 8, MinimumPlayers = 16 },
 		{ AfterSeconds = 16, MinimumPlayers = 12 },
 		{ AfterSeconds = 24, MinimumPlayers = 8 },

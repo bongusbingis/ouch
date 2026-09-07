@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local PlayerData = require(script.Parent.PlayerData)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 local RewardService = {}
 
@@ -66,6 +67,18 @@ handlers.Cosmetic = function(player, reward)
 		local refund = if rarity then rarity.DupeBonks else 0
 		if refund > 0 and reward.duplicateRefund ~= false then
 			PlayerData.addBonks(player, refund)
+			local data = PlayerData.get(player)
+			pcall(
+				AnalyticsService.logEconomyEvent,
+				player,
+				"Source",
+				"Bonks",
+				refund,
+				if data then data.Bonks else 0,
+				"Gameplay",
+				itemId,
+				{ source = "DuplicateReward" }
+			)
 		end
 		return true, nil
 	end

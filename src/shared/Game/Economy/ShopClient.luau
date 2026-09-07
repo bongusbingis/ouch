@@ -13,7 +13,10 @@ local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
 local BattlePassLogic = require(script.Parent.Parent.Progression.BattlePassLogic)
-local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local DefaultNetwork = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local Network = DefaultNetwork
+local Marketplace = MarketplaceService
+local localPlayer = Players.LocalPlayer
 local ClientRequest = require(script.Parent.Parent.Data.ClientRequest)
 local ShopConfig = require(ReplicatedStorage.Config.Economy.Shop)
 
@@ -25,12 +28,16 @@ export type Snapshot = {
 	pending: { [string]: boolean },
 	reveal: any?,
 	grant: any?,
+	purchaseNotice: boolean?,
 }
 
 local ShopClient = {}
 
 export type StartOptions = {
 	DeferMarketplaceData: boolean?,
+	Network: any?,
+	Marketplace: any?,
+	Player: any?,
 }
 
 local started = false
@@ -43,6 +50,9 @@ local pendingPasses: { [number]: string } = {}
 local loadingPasses: { [string]: boolean } = {}
 local seenOpens: { [string]: boolean } = {}
 local seenGrants: { [string]: boolean } = {}
+local purchaseBaselines: { [number]: { [string]: boolean } } = {}
+local purchaseFinishedAt: { [string]: number } = {}
+local purchaseNoticeShown: { [string]: boolean } = {}
 
 local state: Snapshot = {
 	status = "Idle",
@@ -82,6 +92,8 @@ local function setPending(key: string, value: boolean)
 		pending[key] = true
 	else
 		pending[key] = nil
+		purchaseFinishedAt[key] = nil
+		purchaseNoticeShown[key] = nil
 	end
 	update({ pending = pending })
 end
@@ -96,7 +108,12 @@ local function acceptReveal(payload: any)
 	local completedKey = nil
 	for productId, key in pendingProducts do
 		local definition = Products.ById[productId]
-		if definition ~= nil and definition.Type == "Crate" and definition.CrateId == payload.crateId then
+		if
+			payload.source == "Robux"
+			and definition ~= nil
+			and definition.Type == "Crate"
+			and definition.CrateId == payload.crateId
+		then
 			completedProductId = productId
 			completedKey = key
 			break
@@ -140,6 +157,38 @@ local function acceptGrant(payload: any)
 	update({ grant = payload })
 end
 
+local function recoverPurchases()
+	local generation = lifecycleGeneration
+	local ok, result = ClientRequest(Network.call, "GetPurchaseState")
+	if not ok or type(result) ~= "table" or not started or generation ~= lifecycleGeneration then
+		return
+	end
+	for _, receipt in result.receipts or {} do
+		local baseline = purchaseBaselines[receipt.productId]
+		if pendingProducts[receipt.productId] and baseline and not baseline[receipt.id] and receipt.payload then
+			local payload = table.clone(receipt.payload)
+			payload.productId = receipt.productId
+			payload.grantId = receipt.id
+			if payload.kind == "Crate" then
+				acceptReveal(payload.reveal)
+			else
+				acceptGrant(payload)
+			end
+		end
+	end
+	for key, owned in result.ownedPasses or {} do
+		local definition = GamePasses.Catalog[key]
+		if owned and definition and definition.Id then
+			local ownedPasses = table.clone(state.ownedPasses)
+			ownedPasses[key] = true
+			update({ ownedPasses = ownedPasses })
+			if pendingPasses[definition.Id] then
+				acceptGrant({ kind = "GamePass", passId = definition.Id, grantId = `pass:{definition.Id}` })
+			end
+		end
+	end
+end
+
 local function metadataKey(kind: string, id: number): string
 	return `{kind}:{id}`
 end
@@ -161,7 +210,7 @@ local function requestMetadata(kind: string, id: number, infoType: Enum.InfoType
 	update({ metadata = metadata })
 	local generation = lifecycleGeneration
 	task.spawn(function()
-		local ok, info = ClientRequest(MarketplaceService.GetProductInfoAsync, MarketplaceService, id, infoType)
+		local ok, info = ClientRequest(Marketplace.GetProductInfoAsync, Marketplace, id, infoType)
 		if not started or generation ~= lifecycleGeneration then
 			return
 		end
@@ -197,12 +246,8 @@ local function loadMarketplaceData()
 			loadingPasses[passKey] = true
 			local generation = lifecycleGeneration
 			task.spawn(function()
-				local ok, owned = ClientRequest(
-					MarketplaceService.UserOwnsGamePassAsync,
-					MarketplaceService,
-					Players.LocalPlayer.UserId,
-					passId
-				)
+				local ok, owned =
+					ClientRequest(Marketplace.UserOwnsGamePassAsync, Marketplace, localPlayer.UserId, passId)
 				if not started or generation ~= lifecycleGeneration then
 					return
 				end
@@ -221,6 +266,9 @@ function ShopClient.start(options: StartOptions?)
 	if started then
 		return
 	end
+	Network = if options and options.Network then options.Network else DefaultNetwork
+	Marketplace = if options and options.Marketplace then options.Marketplace else MarketplaceService
+	localPlayer = if options and options.Player then options.Player else Players.LocalPlayer
 	started = true
 	lifecycleGeneration += 1
 	table.insert(
@@ -233,33 +281,62 @@ function ShopClient.start(options: StartOptions?)
 	table.insert(connections, Network.on("StorePurchaseGranted", acceptGrant))
 	table.insert(
 		connections,
-		MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, purchased)
-			if userId ~= Players.LocalPlayer.UserId then
+		Marketplace.PromptProductPurchaseFinished:Connect(function(userId, productId, purchased)
+			if userId ~= localPlayer.UserId then
 				return
 			end
 			local key = pendingProducts[productId]
 			if key and not purchased then
 				pendingProducts[productId] = nil
 				setPending(key, false)
+			elseif key then
+				purchaseFinishedAt[key] = os.clock()
 			end
 		end)
 	)
 	table.insert(
 		connections,
-		MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
-			if player ~= Players.LocalPlayer then
+		Marketplace.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
+			if player ~= localPlayer then
 				return
 			end
 			local key = pendingPasses[passId]
 			if key and not purchased then
 				pendingPasses[passId] = nil
 				setPending(key, false)
+			elseif key then
+				purchaseFinishedAt[key] = os.clock()
 			end
 		end)
 	)
 	if not (options and options.DeferMarketplaceData) then
 		loadMarketplaceData()
 	end
+	local generation = lifecycleGeneration
+	task.spawn(function()
+		while started and generation == lifecycleGeneration do
+			task.wait(ShopConfig.PurchasePollSeconds)
+			if not started or generation ~= lifecycleGeneration then
+				return
+			end
+			if next(pendingProducts) or next(pendingPasses) then
+				recoverPurchases()
+			end
+			if not started or generation ~= lifecycleGeneration then
+				return
+			end
+			for key, finishedAt in purchaseFinishedAt do
+				if
+					state.pending[key]
+					and not purchaseNoticeShown[key]
+					and os.clock() - finishedAt >= ShopConfig.PurchaseNoticeSeconds
+				then
+					purchaseNoticeShown[key] = true
+					update({ purchaseNotice = true })
+				end
+			end
+		end
+	end)
 end
 
 function ShopClient.ensureMarketplaceData()
@@ -368,8 +445,22 @@ function ShopClient.promptProduct(_cardId: string, productId: number): (boolean,
 		return false, "busy"
 	end
 	setPending(pendingKey, true)
+	local generation = lifecycleGeneration
+	local fetched, status = ClientRequest(Network.call, "GetPurchaseState")
+	if not started or generation ~= lifecycleGeneration then
+		return false, "stale"
+	end
+	if not fetched or type(status) ~= "table" then
+		setPending(pendingKey, false)
+		return false, "marketplace_error"
+	end
+	local baseline = {}
+	for _, receipt in status.receipts or {} do
+		baseline[receipt.id] = true
+	end
+	purchaseBaselines[productId] = baseline
 	pendingProducts[productId] = pendingKey
-	local ok = pcall(MarketplaceService.PromptProductPurchase, MarketplaceService, Players.LocalPlayer, productId)
+	local ok = pcall(Marketplace.PromptProductPurchase, Marketplace, localPlayer, productId)
 	if not ok then
 		pendingProducts[productId] = nil
 		setPending(pendingKey, false)
@@ -389,7 +480,7 @@ function ShopClient.promptGamePass(_cardId: string, passId: number): (boolean, s
 	end
 	setPending(pendingKey, true)
 	pendingPasses[passId] = pendingKey
-	local ok = pcall(MarketplaceService.PromptGamePassPurchase, MarketplaceService, Players.LocalPlayer, passId)
+	local ok = pcall(Marketplace.PromptGamePassPurchase, Marketplace, localPlayer, passId)
 	if not ok then
 		pendingPasses[passId] = nil
 		setPending(pendingKey, false)
@@ -408,6 +499,10 @@ function ShopClient.clearGrant()
 	if state.grant ~= nil then
 		update({ grant = CLEAR })
 	end
+end
+
+function ShopClient.clearPurchaseNotice()
+	update({ purchaseNotice = CLEAR })
 end
 
 function ShopClient.snapshot(): Snapshot
@@ -442,6 +537,9 @@ function ShopClient.stop()
 	table.clear(loadingPasses)
 	table.clear(seenOpens)
 	table.clear(seenGrants)
+	table.clear(purchaseBaselines)
+	table.clear(purchaseFinishedAt)
+	table.clear(purchaseNoticeShown)
 	started = false
 	state = {
 		status = "Idle",

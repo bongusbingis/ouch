@@ -104,7 +104,8 @@ function SimCore.step(state: SimState, commands: { InputCommand }, world: WorldS
 			continue
 		end
 		local player = state.players[command.playerId]
-		if player and not handledPlayers[command.playerId] then
+		local control = command.kind == "BeginCharge" or command.kind == "CancelCharge"
+		if player and (control or not handledPlayers[command.playerId]) then
 			for _, kit in kitsFor(state, command.playerId, command.kind) do
 				if kit.handleInput(player.weapons[kit.kind], state, command, world, events) then
 					handledPlayers[command.playerId] = true

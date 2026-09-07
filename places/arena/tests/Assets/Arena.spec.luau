@@ -7,6 +7,7 @@
 
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
+local Capacity = require(game.ReplicatedStorage.Config.Gameplay.GameModes).MatchCapacity
 
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 
@@ -42,11 +43,11 @@ return function()
 			TestAssets.get(arena, "Scriptables")
 
 			local playerSpawns = TestAssets.get(arena, "PlayerSpawns")
-			expect(directPartCount(playerSpawns) > 0).to.equal(true)
+			expect(directPartCount(playerSpawns) >= Capacity).to.equal(true)
 
 			local teamSpawns = TestAssets.get(arena, "TeamSpawns")
-			expect(directPartCount(TestAssets.get(teamSpawns, "Red")) > 0).to.equal(true)
-			expect(directPartCount(TestAssets.get(teamSpawns, "Blue")) > 0).to.equal(true)
+			expect(directPartCount(TestAssets.get(teamSpawns, "Red")) >= math.ceil(Capacity / 2)).to.equal(true)
+			expect(directPartCount(TestAssets.get(teamSpawns, "Blue")) >= math.ceil(Capacity / 2)).to.equal(true)
 		end)
 	end)
 end

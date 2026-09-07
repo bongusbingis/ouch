@@ -91,9 +91,9 @@ T.describe("MonetizationConfig", function()
 			for index, id in { "FoamLeague", "DodgeBall3", "StarPop" } do
 				T.expect(bundle.ItemIds[index]):toEqual(id)
 			end
-			T.expect(bundle.CatalogStatus):toEqual("Preview")
+			T.expect(bundle.CatalogStatus):toEqual("Hidden")
 			T.expect(Products.Catalog.StarterOutfitBundleBuy.Id):toBeNil()
-			T.expect(Products.Catalog.StarterOutfitBundleBuy.CatalogStatus):toEqual("Preview")
+			T.expect(Products.Catalog.StarterOutfitBundleBuy.CatalogStatus):toEqual("Hidden")
 			for _, id in bundle.ItemIds do
 				T.expect(Cosmetics.Items[id] ~= nil):toEqual(true)
 				T.expect(Cosmetics.Items[id].InventoryVisible ~= false):toEqual(true)

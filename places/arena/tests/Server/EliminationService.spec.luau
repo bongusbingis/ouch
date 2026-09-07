@@ -115,6 +115,30 @@ return function()
 			expect(EliminationService.down(player, nil)).to.equal(false)
 		end)
 
+		it("preserves native death evaluation so Roblox can replace a dead character", function()
+			local humanoid = rig:FindFirstChildOfClass("Humanoid")
+			humanoid.BreakJointsOnDeath = false
+			humanoid.Health = 0
+			local evaluation = humanoid.EvaluateStateMachine
+			expect(EliminationService.down(player)).to.equal(true)
+			expect(humanoid.EvaluateStateMachine).to.equal(evaluation)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_")).to.equal(0)
+			expect(EliminationService.up(player)).to.equal(false)
+			expect(rig:GetAttribute("CombatAlive")).to.equal(false)
+		end)
+
+		it("restores native death evaluation when health reaches zero during a ragdoll", function()
+			local humanoid = rig:FindFirstChildOfClass("Humanoid")
+			EliminationService.down(player)
+			humanoid.Health = 0
+			expect(EliminationService.forget(rig)).to.equal(true)
+			expect(EliminationService.forget(rig)).to.equal(false)
+			expect(humanoid.EvaluateStateMachine).to.equal(true)
+			task.wait(0.1)
+			expect(humanoid:GetState()).to.equal(Enum.HumanoidStateType.Dead)
+			expect(EliminationService.up(player)).to.equal(false)
+		end)
+
 		it("down is rejected without a character", function()
 			local ghost = FakePlayer.new(200002)
 			expect(EliminationService.down(ghost, nil)).to.equal(false)

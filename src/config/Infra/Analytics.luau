@@ -80,6 +80,11 @@ local Analytics = {
 	-- to the largest known fairness gap, so it is sampled rather than inferred.
 	-- Frequent enough to see a connection degrade, rare enough not to be noise.
 	LatencySampleSeconds = 60,
+	FieldSchemas = {
+		Default = { { "deviceClass" }, { "assistBucket" }, { "modeId", "reason", "source", "track" } },
+		Shop = { { "deviceClass" }, { "variantId" }, { "offerKind", "section", "productType", "source" } },
+		Economy = { { "deviceClass" }, { "variantId" }, { "source", "productType", "modeId" } },
+	},
 
 	-- Match Enum.AnalyticsEconomyTransactionType names exactly.
 	EconomyTransactionTypes = {
