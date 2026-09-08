@@ -40,6 +40,7 @@ def main():
 
                     def decide():
                         observed["mapped"] = bool(window.winfo_ismapped())
+                        observed["focused"] = window.focus_displayof() is not None
                         observed["title"] = window.title()
                         if record["demo"] is not True:
                             raise RuntimeError("Synthetic GUI test cannot approve production")
@@ -66,9 +67,9 @@ def main():
                 with patch("tkinter.Tk", side_effect=test_window), patch("gate_runtime.credential", side_effect=AssertionError("Credential access forbidden")), patch("httpx.Client", side_effect=AssertionError("Network forbidden")):
                     gate.approval_window(store, record)
                 saved = store.get(record["id"])
-                if saved["state"] != expected or not observed.get("mapped"):
+                if saved["state"] != expected or not observed.get("mapped") or not observed.get("focused"):
                     raise RuntimeError("Native GUI smoke test failed")
-                results.append({"action": action, "state": saved["state"], "mapped_window": observed["mapped"], "network_writes": 0})
+                results.append({"action": action, "state": saved["state"], "mapped_window": observed["mapped"], "focused_window": observed["focused"], "network_writes": 0})
         finally:
             store.db.close()
     write_json(ROOT / ".review/native-gui-tests.json", results)

@@ -21,6 +21,6 @@ The runtime source is present for review and installation, but cannot upload whe
 
 Local regression evidence covers sanitized Claude environment, neutral/no-tools CLI invocation, restricted licensing, frozen hash/metadata invalidation, exact transmitted bytes and metadata with mocked transport, zero-network demo approval and production denial, window-close persistence, operation retention, non-retry after uncertain errors, durable SQLite after forced exit, deterministic credits, and idempotent reconciliation. The installed demo process was also terminated and recovered with the same hash.
 
-External Claude source review was retried twice under the renewed user request; both attempts timed out. No source-review verdict is claimed. Local regression evidence remains valid.
+Claude source review subsequently completed after diagnosing active generation beyond the former timeout. The valid batch-recovery finding was fixed; dispositions are in REVIEW_DISPOSITIONS.md. The user acknowledged the cooperative same-user boundary and requested no further hardening.
 
 The newly connected Studio MCP exposes an `upload_image` tool capable of bypassing this cooperative routing policy. It was not invoked. Studio MCP is for inspection and integration; standalone asset creation/update must use the external gate. This is another reason the same-user workflow cannot provide an adversarial universal guarantee.

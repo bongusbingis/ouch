@@ -299,7 +299,31 @@ def approval_window(store, record):
     ttk.Button(buttons, text="DENY", command=deny).pack(side="left")
     ttk.Button(buttons, text="DEMO APPROVE — NO UPLOAD" if record["demo"] else "APPROVE & UPLOAD", command=approve).pack(side="right")
     root.protocol("WM_DELETE_WINDOW", root.destroy)
+    def foreground_request():
+        root.deiconify()
+        root.attributes("-topmost", True)
+        root.lift()
+        root.focus_force()
+        root.after(500, lambda: root.attributes("-topmost", False))
+
+    root.after_idle(foreground_request)
     root.mainloop()
+
+
+def resume_requests(store, records):
+    failed = False
+    for record in records:
+        try:
+            if record.get("operation") and record["state"] in {"UPLOAD_OPERATION_KNOWN", "MODERATION_PENDING"}:
+                poll(store, record)
+            elif record["state"] == "WAITING_FOR_APPROVAL":
+                approval_window(store, record)
+        except (ValueError, OSError) as exc:
+            record["resume_error"] = type(exc).__name__ + "; inspect frozen files and metadata before resuming this request"
+            store.save(record)
+            print(f"Request {record['id']} could not resume: {record['resume_error']}", file=sys.stderr)
+            failed = True
+    return failed
 
 
 def main():
@@ -335,17 +359,15 @@ def main():
                 approval_window(store, record)
         else:
             records = [store.get(args.request_id)] if args.request_id else store.all()
-            for record in records:
-                if record.get("operation") and record["state"] in {"UPLOAD_OPERATION_KNOWN", "MODERATION_PENDING"}:
-                    poll(store, record)
-                elif record["state"] == "WAITING_FOR_APPROVAL":
-                    approval_window(store, record)
+            failed = resume_requests(store, records)
+            store.db.close()
+            return 1 if failed else 0
         store.db.close()
 
 
 if __name__ == "__main__":
     try:
-        main()
+        raise SystemExit(main())
     except Exception as error:
         print(f"Gate stopped: {type(error).__name__}", file=sys.stderr)
         raise SystemExit(1)

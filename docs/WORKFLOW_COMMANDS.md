@@ -16,7 +16,7 @@ Run commands from `C:\Users\jackc\Desktop\ouch` in native PowerShell. Explicit v
    .\.agent-venv\Scripts\python.exe tools\install_asset_gate.py
    ```
 
-3. Claude subscription test:
+3. Claude subscription test (medium effort; 900-second deadline; optional `--timeout 1200` for a longer review):
 
    ```powershell
    .\.agent-venv\Scripts\python.exe tools\reviewer.py claude --task "Smoke test: assess only this rule: uncertain uploads without a durable operation ID must never automatically retry. Return the required review structure."
@@ -44,7 +44,7 @@ Run commands from `C:\Users\jackc\Desktop\ouch` in native PowerShell. Explicit v
    .\.agent-venv\Scripts\python.exe tools\assetctl.py demo
    ```
 
-   DEMO APPROVE, DENY, and window close all cause zero Roblox network writes. Close leaves the request pending. Agents must never click the production approval button.
+   Each request window comes to the foreground and receives focus when shown. DEMO APPROVE, DENY, and window close all cause zero Roblox network writes. Close leaves the request pending. Agents must never click the production approval button.
 
 7. Forced interruption/recovery test (close other gate windows first):
 

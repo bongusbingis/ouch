@@ -8,6 +8,17 @@ import gate_runtime as gate
 
 
 class GateFailureTests(WorkflowFixture):
+    def test_broken_pending_request_does_not_block_known_operation(self):
+        from pathlib import Path
+
+        Path(self.record["frozen"]).unlink()
+        known = {**self.record, "id": "other", "state": "UPLOAD_OPERATION_KNOWN", "operation": "operations/other"}
+        with patch("gate_runtime.poll") as poll:
+            self.assertTrue(gate.resume_requests(self.store, [self.record, known]))
+        poll.assert_called_once_with(self.store, known)
+        self.assertIn("resume_error", self.store.get(self.record["id"]))
+        self.assertEqual(self.store.get(self.record["id"])["state"], "WAITING_FOR_APPROVAL")
+
     def production_action(self, transport):
         self.record["demo"] = False
         self.record["binding"] = gate.binding(self.record)

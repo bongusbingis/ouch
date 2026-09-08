@@ -6,14 +6,14 @@
   "studio_mcp": "PASS: native StudioMCP stdio inspect-only calls verified arena 121997450145716 and lobby 130584867985467 in Edit mode; Workspace and ReplicatedStorage inspected",
   "blender_computer_use": "PASS: visible Blender 5.2 inspected; recovery copy saved; disposable scene/cube created, saved, visually verified, removed; original scene and Edit mode restored",
   "real_roblox_upload": "NOT RUN: prohibited during bootstrap",
-  "claude_subscription": "PASS: restricted no-tools CLI returns structured review",
+  "claude_subscription": "PASS: subscription allowed requests; source review completed; streaming wrapper smoke completed in 12 seconds; 900-second configurable deadline and persisted progress",
   "gemini_text": "PASS",
   "gemini_image": "PASS",
   "iconify": "PASS: search, MIT metadata, original SVG, PNG rasterization, notices",
-  "offline_regressions": "PASS: 25 distinct tests",
-  "native_gate_gui": "PASS: Computer Use inspected resumed demo preview, hash, metadata and controls; demo completed with zero writes; scrollbar/buttons layout update passed native callback tests",
+  "offline_regressions": "PASS: 28 distinct tests",
+  "native_gate_gui": "PASS: every new/resumed popup raises and focuses once; all three successive native demo windows confirmed focused; zero writes",
   "installed_gate_interruption": "PASS: forced process-tree termination; same SHA-256 and WAITING_FOR_APPROVAL after recovery",
-  "claude_source_review": "PENDING: renewed source review attempted twice; both timed out after 240 seconds, including a narrower single-file packet; local packets and failure state retained",
+  "claude_source_review": "PASS: gate source reviewed successfully with explicit medium effort; valid batch recovery finding fixed and regression tested; remaining findings reconciled",
   "place_ci_scope": "Confirmed by user: preserve place CI; gate standalone asset uploads only",
-  "human_only_security_boundary": "BLOCKED: same-user Tkinter architecture cannot enforce an unforgeable human-only decision against arbitrary same-user code"
+  "human_only_security_boundary": "ACKNOWLEDGED: user accepts the documented cooperative same-user boundary; no further hardening requested"
 }

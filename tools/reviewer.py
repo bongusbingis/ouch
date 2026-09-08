@@ -8,6 +8,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import uuid
 
 from workflow_common import ROOT, atomic_write, project_path, read_json, write_json
@@ -41,21 +43,78 @@ def selected_file(value):
     return path
 
 
-def claude(packet, timeout):
+def stream_status(output):
+    status = {}
+    for line in (output.decode("utf-8", errors="replace") if isinstance(output, bytes) else output or "").splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("subtype") == "init":
+            status.update(model=event.get("model"), phase="connected")
+        elif event.get("subtype") == "thinking_tokens":
+            status["phase"] = "generating"
+        elif event.get("type") == "assistant":
+            status["phase"] = "responding"
+        elif event.get("type") == "rate_limit_event":
+            status["rate_limit_status"] = event.get("rate_limit_info", {}).get("status")
+        elif event.get("type") == "result":
+            status["phase"] = "finished"
+    return status
+
+
+def run_claude(command, *, input, cwd, env, timeout, progress=None):
+    started = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix="claude-stream-") as directory:
+        stdout_path, stderr_path = Path(directory) / "stdout", Path(directory) / "stderr"
+        with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open("w", encoding="utf-8") as err:
+            with subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=out, stderr=err, text=True, encoding="utf-8") as process:
+                def send_packet():
+                    try:
+                        process.stdin.write(input)
+                        process.stdin.close()
+                    except (BrokenPipeError, OSError):
+                        pass
+
+                writer = threading.Thread(target=send_packet, daemon=True)
+                writer.start()
+                while True:
+                    remaining = timeout - (time.monotonic() - started)
+                    try:
+                        process.wait(timeout=max(0.01, min(15, remaining)))
+                    except subprocess.TimeoutExpired:
+                        pass
+                    stdout = stdout_path.read_text(encoding="utf-8", errors="replace")
+                    status = {**stream_status(stdout), "elapsed_seconds": round(time.monotonic() - started)}
+                    if progress:
+                        progress(status)
+                    if process.poll() is not None:
+                        writer.join(timeout=1)
+                        stdout = stdout_path.read_text(encoding="utf-8", errors="replace")
+                        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr_path.read_text(encoding="utf-8", errors="replace"))
+                    if time.monotonic() - started >= timeout:
+                        process.kill()
+                        process.wait()
+                        writer.join(timeout=1)
+                        raise TimeoutError(f"Claude exceeded {timeout}s; last phase: {status.get('phase', 'starting')}; rate limit: {status.get('rate_limit_status', 'unknown')}. Increase --timeout for a long review.") from None
+
+
+def claude(packet, timeout, effort="medium", progress=None):
     executable = shutil.which("claude")
     if not executable:
         raise RuntimeError("Authenticated Claude CLI unavailable")
     env = child_environment()
     with tempfile.TemporaryDirectory(prefix="roblox-review-") as neutral:
         help_result = subprocess.run([executable, "--help"], cwd=neutral, env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
-        required = ("--tools", "--strict-mcp-config", "--safe-mode", "--restricted", "--output-format", "--system-prompt")
+        required = ("--tools", "--strict-mcp-config", "--safe-mode", "--restricted", "--output-format", "--system-prompt", "--effort", "--verbose")
         if help_result.returncode or any(flag not in help_result.stdout for flag in required):
             raise RuntimeError("Claude CLI lacks verified tool/customization isolation flags; upgrade or review compatibility")
-        result = subprocess.run([executable, "-p", "--tools", "", "--strict-mcp-config", "--safe-mode", "--restricted", "--output-format", "json", "--system-prompt", FORMAT + " Do not use tools or search. Evaluate only the supplied packet. If evidence is absent, say so."], input=packet,
-                                cwd=neutral, env=env, capture_output=True, text=True, encoding="utf-8", timeout=timeout)
+        result = run_claude([executable, "-p", "--tools", "", "--strict-mcp-config", "--safe-mode", "--restricted", "--effort", effort, "--output-format", "stream-json", "--verbose", "--system-prompt", FORMAT + " Do not use tools or search. Evaluate only the supplied packet. If evidence is absent, say so."], input=packet,
+                                cwd=neutral, env=env, timeout=timeout, progress=progress)
         if result.returncode:
             raise RuntimeError(f"Claude CLI failed (exit {result.returncode}); check subscription authentication")
-        envelope = json.loads(result.stdout)
+        events = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+        envelope = next((event for event in reversed(events) if event.get("type") == "result"), {})
         if envelope.get("is_error") or envelope.get("subtype") != "success":
             raise RuntimeError("Claude returned an unsuccessful review envelope")
         return envelope["result"]
@@ -91,8 +150,11 @@ def main():
     parser.add_argument("--test-output")
     parser.add_argument("--diff", action="store_true")
     parser.add_argument("--model")
+    parser.add_argument("--timeout", type=int, help="Review deadline in seconds")
     parser.add_argument("--prepare-only", action="store_true")
     args = parser.parse_args()
+    if args.timeout is not None and args.timeout <= 0:
+        parser.error("--timeout must be positive")
     config = read_json(ROOT / "tools/workflow.json")
     files = [selected_file(value) for value in args.file]
     images = [selected_file(value) for value in args.image]
@@ -128,15 +190,20 @@ def main():
         atomic_write(frozen, path.read_bytes())
         frozen_images.append(frozen)
     images = frozen_images
-    metadata = {"state": "PREPARED", "provider": args.provider, "model": args.model or config["gemini_model"], "original_images": original_images, "images": [str(p.relative_to(ROOT)) for p in images]}
+    metadata = {"state": "PREPARED", "provider": args.provider, "model": (args.model or config["gemini_model"]) if args.provider == "gemini" else "CLI default", "original_images": original_images, "images": [str(p.relative_to(ROOT)) for p in images]}
     write_json(output / "state.json", metadata)
     if args.prepare_only:
         print(output)
         return
     metadata["state"] = "RUNNING"
     write_json(output / "state.json", metadata)
+    def progress(status):
+        metadata.update(status)
+        write_json(output / "state.json", metadata)
+        print(f"Claude: {status.get('phase', 'starting')} ({status['elapsed_seconds']}s)", flush=True)
+
     try:
-        answer = claude(packet, config["review_timeout_seconds"]) if args.provider == "claude" else gemini(packet, images, metadata["model"])
+        answer = claude(packet, args.timeout or config["review_timeout_seconds"], config.get("claude_effort", "medium"), progress) if args.provider == "claude" else gemini(packet, images, metadata["model"])
         if not answer:
             raise RuntimeError("Reviewer returned no text")
         check_text(answer)
@@ -150,8 +217,10 @@ def main():
             raise RuntimeError("Reviewer response does not follow the required structure")
     except Exception as exc:
         metadata.update(state="FAILED", error_type=type(exc).__name__)
+        if isinstance(exc, TimeoutError):
+            metadata["error"] = str(exc)
         write_json(output / "state.json", metadata)
-        raise SystemExit(f"Review failed ({type(exc).__name__}); packet retained at {output}. Check configuration/authentication; do not blindly rerun paid calls.") from None
+        raise SystemExit(f"Review failed ({type(exc).__name__}); packet retained at {output}. " + metadata.get("error", "Check configuration/authentication; do not blindly rerun paid calls.")) from None
 
 
 if __name__ == "__main__":

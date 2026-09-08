@@ -55,9 +55,9 @@ class WorkflowTests(WorkflowFixture):
         self.assertIn("ANTHROPIC_API_KEY", parent)
 
     def test_claude_invocation_has_no_tools_and_uses_stdin(self):
-        help_response = MagicMock(returncode=0, stdout="--tools --strict-mcp-config --safe-mode --restricted --output-format --system-prompt")
-        review_response = MagicMock(returncode=0, stdout=json.dumps({"subtype": "success", "result": "review"}))
-        with patch("reviewer.shutil.which", return_value="claude.exe"), patch("reviewer.subprocess.run", side_effect=[help_response, review_response]) as run:
+        help_response = MagicMock(returncode=0, stdout="--tools --strict-mcp-config --safe-mode --restricted --output-format --system-prompt --effort --verbose")
+        review_response = MagicMock(returncode=0, stdout=json.dumps({"type": "result", "subtype": "success", "result": "review"}))
+        with patch("reviewer.shutil.which", return_value="claude.exe"), patch("reviewer.subprocess.run", return_value=help_response), patch("reviewer.run_claude", return_value=review_response) as run:
             reviewer.claude("bounded packet", 10)
         args, kwargs = run.call_args
         self.assertEqual(args[0][:2], ["claude.exe", "-p"])
@@ -75,6 +75,18 @@ class WorkflowTests(WorkflowFixture):
         changed["provenance"]["license"] = "unknown"
         with self.assertRaises(ValueError):
             validate_bytes(self.data, "asset.png", "Decal", changed)
+
+    def test_claude_timeout_reports_generation_and_terminates(self):
+        script = "import json,time; print(json.dumps({'type':'system','subtype':'thinking_tokens'}),flush=True); time.sleep(10)"
+        updates = []
+        with self.assertRaisesRegex(TimeoutError, "last phase: generating"):
+            reviewer.run_claude([sys.executable, "-c", script], input="packet", cwd=self.root, env=reviewer.child_environment(), timeout=0.5, progress=updates.append)
+        self.assertEqual(updates[-1]["phase"], "generating")
+
+    def test_claude_stream_status_excludes_review_and_reasoning(self):
+        events = [{'type':'system','subtype':'init','model':'test-model'}, {'type':'system','subtype':'thinking_tokens','text':'private reasoning'}, {'type':'rate_limit_event','rate_limit_info':{'status':'allowed','private':'omitted'}}]
+        status = reviewer.stream_status("\n".join(json.dumps(event) for event in events))
+        self.assertEqual(status, {'model':'test-model','phase':'generating','rate_limit_status':'allowed'})
 
     def test_invalid_bytes_and_update_fail(self):
         with self.assertRaises(ValueError):
