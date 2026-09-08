@@ -1,0 +1,103 @@
+{
+  "assets": {},
+  "requests": {
+    "3e6df78c-0a09-48ec-b651-00e11837c754": {
+      "asset_type": "Decal",
+      "binding": "e0f6778b99f704104dffe7fa8023f8090786bb7ee673fc6f8e0b2e02097980b6",
+      "creator": "user:1",
+      "demo": true,
+      "description": "Disposable workflow validation asset",
+      "display_name": "Disposable approval demo",
+      "filename": "approval-demo.png",
+      "id": "3e6df78c-0a09-48ec-b651-00e11837c754",
+      "model_evidence": null,
+      "moderation_state": "NOT_SUBMITTED",
+      "preview_hashes": {},
+      "production_file": ".review/approval-demo.png",
+      "production_ready": false,
+      "proposal_sha256": "1df91126accb7e1ae216d318fb97494d4b74c9d2cb79f1dcfce0317d871fd33d",
+      "provenance": {
+        "attribution_required": false,
+        "author": "Splat Brawl project",
+        "license": "Project-Owned",
+        "license_url": "local:demo-only",
+        "modifications": [],
+        "provider": "project",
+        "source_id": "approval-demo",
+        "source_url": "local:tools/assetctl.py"
+      },
+      "sequence": 1,
+      "sha256": "fde233a3c1863e9a33116448c0158fa61306d71218eee42fa3e1b1dd91fe04b2",
+      "source": null,
+      "state": "WAITING_FOR_APPROVAL",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 3965,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          512,
+          512
+        ],
+        "valid": true
+      }
+    },
+    "6ce2a8e6-8e59-4ad6-936a-13f97acddd25": {
+      "demo": true,
+      "production_file": ".review/approval-demo.png",
+      "sequence": 0,
+      "sha256": "fde233a3c1863e9a33116448c0158fa61306d71218eee42fa3e1b1dd91fe04b2",
+      "state": "PREPARED"
+    },
+    "fc03789d-225e-4b5f-abed-40945c5b29b9": {
+      "asset_type": "Decal",
+      "binding": "e0f6778b99f704104dffe7fa8023f8090786bb7ee673fc6f8e0b2e02097980b6",
+      "creator": "user:1",
+      "demo": true,
+      "description": "Disposable workflow validation asset",
+      "display_name": "Disposable approval demo",
+      "filename": "approval-demo.png",
+      "id": "fc03789d-225e-4b5f-abed-40945c5b29b9",
+      "model_evidence": null,
+      "moderation_state": "NOT_SUBMITTED",
+      "preview_hashes": {},
+      "production_file": ".review/approval-demo.png",
+      "production_ready": false,
+      "proposal_sha256": "fc148bb7354227c0bfd5ac132f5da7ba943b30e817d352f0d95de14b11beb0b9",
+      "provenance": {
+        "attribution_required": false,
+        "author": "Splat Brawl project",
+        "license": "Project-Owned",
+        "license_url": "local:demo-only",
+        "modifications": [],
+        "provider": "project",
+        "source_id": "approval-demo",
+        "source_url": "local:tools/assetctl.py"
+      },
+      "sequence": 1,
+      "sha256": "fde233a3c1863e9a33116448c0158fa61306d71218eee42fa3e1b1dd91fe04b2",
+      "source": null,
+      "state": "WAITING_FOR_APPROVAL",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 3965,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          512,
+          512
+        ],
+        "valid": true
+      }
+    }
+  },
+  "schema_version": 1
+}

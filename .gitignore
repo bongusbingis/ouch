@@ -19,3 +19,19 @@
 /stylua.toml
 /sourcemap.json
 /.DS_Store
+
+# Agent tooling
+.agent-venv/
+.review/
+.agent-cache/
+asset-library/kenney/raw/
+
+# Durable local request handoff (gate state stays outside the repository)
+.asset-requests/
+.asset-inbox/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.blend1
+*.blend2
