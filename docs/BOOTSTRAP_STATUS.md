@@ -4,7 +4,7 @@ Implementation is installed on `tooling/agent-workflow`. The existing `.gitignor
 
 Implemented: native Python reviewer wrappers, Iconify search/acquisition/PNG rendering, local Kenney CC0 indexing/acquisition, centralized asset validation, provenance manifests, deterministic notices/Luau credits, external Tkinter/SQLite gate installer and launcher, request preparation/status/reconciliation, doctor, recovery commands, Windows CI, and regression/smoke-test tools.
 
-Installed external app: `%LOCALAPPDATA%\RobloxAssetGate`. Both required Credential Manager entries were detected without printing secrets. Gemini is now configured as `gemini-3.1-pro-preview` at the user's request; see the Pro quota blocker below. Canonical Figma: https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled . It is currently empty; no production design system was invented.
+Installed external app: `%LOCALAPPDATA%\RobloxAssetGate`. Both required Credential Manager entries were detected without printing secrets. Gemini is now configured as `gemini-3.7-flash`; the user requested the strongest model currently usable without billing changes. Canonical Figma: https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled . It is currently empty; no production design system was invented.
 
 Verified on 2026-09-08:
 
@@ -36,3 +36,8 @@ No real Roblox upload was performed. No authentication was changed and no key wa
 
 
 Gemini Pro follow-up: selected `gemini-3.1-pro-preview`, confirmed it in the credential's model listing, and attempted both text and image smoke tests. Both were rejected. A bounded diagnostic confirmed HTTP 429 RESOURCE_EXHAUSTED with free-tier request and input-token limits of 0 for gemini-3.1-pro. This is an API-project entitlement/billing blocker, not a model-name or authentication failure. Pro remains selected; no Flash fallback was added. The user must enable billing for the existing key's project in Google AI Studio (and add prepaid credits if requested), then rerun the reviewer smoke tests. No billing settings were changed by the agent. Previous Gemini PASS results refer to Flash only.
+
+
+The later request to use the highest available model supersedes the Pro-only selection and billing action above. Pro 2.5 also returned 404 (unavailable to new users). Flash 3.8 returned HTTP 503 high demand, and a second reviewer call failed with ServerError. Flash 3.7 passed a direct text call and is selected explicitly. Availability evidence: `.review/gemini-model-availability.json`. No billing changes were made.
+
+Flash 3.7 also passed the full image-review wrapper with the required verdict structure: `.review/gemini-3c28ef35-0cc3-4c38-9f93-d8c16bfcfb82`. Text and image checks are both PASS; no manual Gemini setup remains.
