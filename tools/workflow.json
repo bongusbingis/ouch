@@ -1,7 +1,7 @@
 {
     "schema_version":  1,
     "figma_file_url":  "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
-    "gemini_model":  "gemini-3.5-flash",
+    "gemini_model":  "gemini-3.1-pro-preview",
     "review_timeout_seconds":  900,
     "claude_effort": "medium",
     "review_packet_max_bytes":  250000,
