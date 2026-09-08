@@ -22,3 +22,5 @@ Both reviewers return `VERDICT: APPROVED | CHANGES_REQUESTED`, followed by BLOCK
 For Blender, use short verified actions. Deterministic Python entered through the visible Blender UI is permitted for repetitive operations. Do not run Blender headlessly or install Blender MCP. When the UI is ambiguous, stop Blender actions and persist the pending task; continue independent work. Save source under `assets/source/blender/`, exports under `assets/models/`, and review imagery under `.review/`. Recover from the last saved source after interruption.
 
 Use native PowerShell/Python and the existing pinned Windows executables. For local Luau checks: `lune run src/scripts/lune/run-tests.luau`; pass explicit arena/lobby project files to Rojo. Existing shell-based CI remains the existing release system; this bootstrap introduces no WSL dependency.
+
+Studio MCP connection smoke test: allow Studio a few seconds to register after the native proxy starts, then list instances and match the explicit place IDs before inspection. Never invoke MCP `upload_image` or other asset-content upload methods; standalone uploads belong to the external approval gate.

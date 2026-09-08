@@ -11,19 +11,23 @@ Verified on 2026-09-08:
 - 25 distinct offline regressions passed, including mocked production transport byte/metadata checks, timeout and HTTP-error non-retry, credential isolation, hash binding, licensing, credits, local Kenney indexing, and reconciliation.
 - Native Tkinter windows mapped and demo approve/deny/close callbacks passed with credential/network traps. This is programmatic test evidence, not a human visual inspection.
 - Installed gate process tree was forcibly terminated during a demo, then recovered WAITING_FOR_APPROVAL with identical SHA-256 `fde233a3c1863e9a33116448c0158fa61306d71218eee42fa3e1b1dd91fe04b2`.
-- Recovery demo request `3e6df78c-0a09-48ec-b651-00e11837c754`; earlier pending demo `fc03789d-225e-4b5f-abed-40945c5b29b9`. Both may be resumed/denied locally; neither is a production upload.
+- Recovery demo request `3e6df78c-0a09-48ec-b651-00e11837c754` and earlier demo `fc03789d-225e-4b5f-abed-40945c5b29b9` both subsequently reached DEMO_COMPLETE with zero network writes. Their results are reconciled; the installed gate has no pending requests.
 - Claude subscription smoke test passed after the wrapper rejected an initial invalid response and added restricted/structured-output flags.
 - Gemini text and image review passed; advisory findings are reconciled in REVIEW_DISPOSITIONS.md.
 - Iconify search, MIT license metadata/text retrieval, original SVG preservation, native PNG export, provenance, and credit generation passed using `ph:star-fill`.
 - Figma authenticated inspect/write/cleanup passed: disposable node `5:2` removed and original empty Page 1 verified.
 - Manifest validation, syntax checks, and repository asset-write audit passed within the confirmed standalone-upload scope. Runtime executed from the repository refused operation as intended.
 
-Still blocked/pending:
+Retry verification on 2026-09-08:
 
-- Studio MCP exposes no tools in this session; inspect-only Studio smoke test has not run.
-- Computer Use cannot initialize: Windows sandbox `apply deny-read ACLs` / Node runtime failure. Blender 5.2 is detected, but visual inspection/modeling/saving smoke test did not run. No Blender MCP was installed.
-- Human visual inspection of the gate layout remains pending because Computer Use is unavailable.
-- Automatic approval review rejected sending selected private gate source to Claude. Exact bounded packet is local at `.review/claude-22311112-a9e7-4725-84e6-761cd970be83/packet.txt`; payload-specific user approval was requested and is still pending. Source changed further after that snapshot; any review must identify the reviewed snapshot and account for subsequent changes.
-- The specified same-user Tkinter architecture cannot enforce an unforgeable human-only approval against arbitrary same-user agents/code. The normal workflow is gated; an adversarial OS boundary requires a separately protected identity or trusted approval service. Do not represent the hard universal guarantee as completed.
+- Computer Use now works. Blender 5.2 was inspected in its unsaved scene. Recovery copies are `.review/blender-before-smoke.blend` and `.review/blender-after-smoke.blend`. A separate `WorkflowSmoke_20260908` scene and `WorkflowSmokeCube` were created through the visible Python console, saved at `assets/source/blender/workflow-smoke.blend`, visually verified, and removed from the live session. The original scene, objects, Edit mode, and viewport were restored. Visual evidence is `.review/blender-smoke-visual.png` and `.review/blender-smoke-cleanup.png`. The disposable source copy is ignored because it also contains the preexisting scene.
+- Native Studio MCP connected through the installed `StudioMCP.exe` stdio proxy after an eight-second registration delay. Both intended places passed `get_studio_state`, bounded `search_game_tree`, and `inspect_instance` calls in Edit mode. Evidence: `.review/studio-mcp-evidence.json`. No instance mutation, play transition, save, or publish occurred. The current session tool inventory still does not expose the server directly; this smoke test used its native MCP protocol.
+- Computer Use inspected the resumed gate preview, compliance text, SHA-256, upload metadata, and controls. Request `3e6df78c-0a09-48ec-b651-00e11837c754` completed in demo mode with `network_writes: 0` and the same hash. The gate now has a visible metadata scrollbar and bottom-anchored decision buttons; it was reinstalled, and all 25 regressions plus native approve/deny/close callback checks passed again.
+- Claude source review was retried under the renewed request, first with four selected files, then only the gate runtime. Both attempts timed out after 240 seconds. Evidence: `.review/claude-cfd7aacc-a8d2-4338-b439-cc3253f0786c` and `.review/claude-03712edd-d96e-409f-9101-a84e1397bda2`. No source verdict was obtained; the earlier approval-review blocker is superseded by these timeouts.
+
+Still pending:
+
+- A completed Claude source review. Retry the bounded packet when the CLI responds; account for the later GUI-only scrollbar/button layout change.
+- The specified same-user Tkinter architecture cannot enforce unforgeable human-only approval against arbitrary same-user agents/code. The normal workflow is gated; a separate protected identity or trusted approval service would be required for that stronger guarantee. Studio MCP also exposes `upload_image`; it must never be used to bypass the standalone asset gate. No such tool was invoked.
 
 No real Roblox upload was performed. No authentication was changed and no key was printed. Complete commands/prompts are in WORKFLOW_COMMANDS.md; begin recovery with RECOVERY.md and `tools/doctor.py`. Doctor intentionally reports pending integration/security limitations instead of declaring full readiness. Safe tests and local reviewer evidence live in `.review/` and survive process restarts but are not committed. Gate database/frozen content remain outside Git.

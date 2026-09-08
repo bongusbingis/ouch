@@ -194,6 +194,8 @@ def approval_window(store, record):
     root.minsize(760, 600)
     frame = ttk.Frame(root, padding=12)
     frame.pack(fill="both", expand=True)
+    buttons = ttk.Frame(frame)
+    buttons.pack(side="bottom", fill="x")
     ttk.Label(frame, text="HUMAN ROBLOX COMPLIANCE REVIEW REQUIRED.", font=("Segoe UI", 15, "bold"), foreground="#9b1515").pack(anchor="w")
     ttk.Label(frame, wraplength=980, text="Approving confirms that you have personally reviewed the displayed asset and upload metadata for suitability, rights/licensing, and Roblox policy compliance. Roblox moderation still applies.").pack(anchor="w", pady=8)
     notebook = ttk.Notebook(frame)
@@ -215,13 +217,16 @@ def approval_window(store, record):
         tab = ttk.Frame(notebook)
         notebook.add(tab, text=label)
         ttk.Label(tab, image=photo).pack(expand=True)
-    details = tk.Text(frame, height=14, wrap="word")
-    details.pack(fill="both", expand=True, pady=8)
+    detail_frame = ttk.Frame(frame)
+    detail_frame.pack(fill="both", expand=True, pady=8)
+    details = tk.Text(detail_frame, height=14, wrap="word")
+    scrollbar = ttk.Scrollbar(detail_frame, orient="vertical", command=details.yview)
+    scrollbar.pack(side="right", fill="y")
+    details.configure(yscrollcommand=scrollbar.set)
+    details.pack(side="left", fill="both", expand=True)
     shown = {key: record.get(key) for key in ("filename", "sha256", "asset_type", "creator", "display_name", "description", "target_asset_id", "validation", "provenance", "model_evidence", "demo")}
     details.insert("1.0", json.dumps(shown, indent=2, ensure_ascii=False))
     details.configure(state="disabled")
-    buttons = ttk.Frame(frame)
-    buttons.pack(fill="x")
 
     def deny():
         record["state"] = "DENIED"
