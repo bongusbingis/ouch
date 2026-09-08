@@ -172,3 +172,14 @@ Headless specs live in `src/shared/Tests/*.spec.luau` and use `TestKit` (`toEqua
 - Live admin command seams use `ForAdmin`; actual fixture/reset seams retain `ForTest` or `_resetForTest`. State subscriptions use `subscribe`; event streams retain `onEvent` and `onIntent`.
 - Comments follow rule 1: module-top responsibility/invariant blocks, minimal inline.
 - Selene (`std = "roblox"`) with `unused_variable` allowed.
+
+
+## Autonomous Windows development workflow
+
+Read `docs/TOOL_ROUTING.md`, `docs/ART_STYLE.md`, `docs/ASSET_PIPELINE.md`, and `docs/RECOVERY.md` for agent tooling. Native Windows only; never introduce WSL or Blender MCP. Codex/Astra owns planning, architecture, implementation, Git, reviewer reconciliation, and final technical/art direction. Claude/Gemini are advisory and receive bounded selected packets through `tools/reviewer.py`; no repository write authority. Never use the Anthropic SDK, API credentials, or Claude `--bare`.
+
+Figma is the canonical 2D/UI design source; its file URL and the selected Gemini model live in `tools/workflow.json`. Inspect existing components before inventing new ones. Implement UI with the existing React components and roots. Blender is controlled only through Computer Use, with visible verification and early/incremental `.blend` saves. Studio MCP is final integration/visual truth. Missing integrations must be recorded as pending, never fabricated.
+
+Project tools prepare assets; only the installed external RobloxAssetGate may retrieve the upload credential and write Assets API content after a human's exact-byte graphical approval. Agents must never press production APPROVE & UPLOAD, synthesize approval, mutate gate state, retrieve its key, or use another upload path. No real Roblox upload during bootstrap. No unattended retries after uncertain writes. Known operation IDs resume polling, never creation. Same-user GUI isolation is not an adversarial OS security boundary; see the documented limit.
+
+Persist consequential task decisions, source paths, review evidence, request IDs, and next actions before interruption in project documents/manifests. Save reviewer dispositions in durable project notes; `.review` is local scratch. Do not rely on conversation memory. Run `tools/doctor.py` on recovery. Use small logical commits on the current tooling branch; never commit secrets, virtualenvs, raw packs, local gate requests, or gate databases.
