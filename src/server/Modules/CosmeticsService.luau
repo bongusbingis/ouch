@@ -1,7 +1,4 @@
--- Name: CosmeticsService.luau
--- Author: Jack C.
 -- Description: The only writer of profile cosmetics: grants and equips items after validating ownership and slot, and projects each equip onto a player attribute so every client can render other players' looks.
--- Created: 2026-07-13
 
 --!strict
 
@@ -70,7 +67,7 @@ function CosmeticsService.equip(player: Player, slot: string, itemId: string?): 
 	return true
 end
 
-function CosmeticsService.grantAllForTesting(player: Player): number
+function CosmeticsService.grantAllForAdmin(player: Player): number
 	local granted = 0
 	for itemId in Cosmetics.Items do
 		if CosmeticsService.grant(player, itemId) then
@@ -80,7 +77,7 @@ function CosmeticsService.grantAllForTesting(player: Player): number
 	return granted
 end
 
-function CosmeticsService.revokeForTesting(player: Player, itemId: string): (boolean, string?)
+function CosmeticsService.revokeForAdmin(player: Player, itemId: string): (boolean, string?)
 	local data = PlayerData.get(player)
 	local item = Cosmetics.Items[itemId]
 	if data == nil then
@@ -117,7 +114,7 @@ local function onProfileReady(player: Player)
 			return
 		end
 		if Debug.AutoGrantAllItemsInStudio and RunService:IsStudio() then
-			CosmeticsService.grantAllForTesting(player)
+			CosmeticsService.grantAllForAdmin(player)
 		end
 		applyEquipAttributes(player)
 	end)

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Lints the given source directory with Selene (installed via Aftman).
+# Lints the given source directory with Selene (installed via Rokit).
 set -e
 
 TARGET="${1:?Usage: lint.sh <path>}"

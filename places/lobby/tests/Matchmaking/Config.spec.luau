@@ -1,7 +1,4 @@
--- Name: Config.spec.luau
--- Author: Jack C.
 -- Description: In-place spec checking the shipped lobby matchmaking configuration is coherent: a real arena place, usable party bounds, a reachable relaxing population target, positive lifetimes, and separated store namespaces.
--- Created: 2026-08-18
 
 --!strict
 

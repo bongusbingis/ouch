@@ -1,7 +1,4 @@
--- Name: SimCore.luau
--- Author: Jack C.
 -- Description: The pure fixed-tick simulation step: syncs players, applies weapon equips, canonically sorts commands, routes them to the equipped weapon kit, ticks weapons and projectiles, and returns mutated state plus an ordered event list.
--- Created: 2026-07-12
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: PostMatchActionPolicy.luau
--- Author: Jack C.
 -- Description: Pure authorization policy for post-match actions: the reveal gate, leader-owned party decisions, and non-leader self-separation.
--- Created: 2026-08-31
 
 --!strict
 

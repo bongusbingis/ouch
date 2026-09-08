@@ -1,7 +1,4 @@
--- Name: ConfigOverrides.spec.luau
--- Author: Jack C.
 -- Description: Spec for live config override validation: key parsing, type and range rejection, allowlist enforcement, sim-critical partitioning, and safe writes into existing leaves.
--- Created: 2026-08-18
 
 --!strict
 

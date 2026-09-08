@@ -1,7 +1,4 @@
--- Name: ThrowUXViewModel.luau
--- Author: Jack C.
 -- Description: Pure derivation of the throw HUD state from charge, cooldown, and feedback inputs.
--- Created: 2026-08-22
 
 --!strict
 

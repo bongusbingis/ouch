@@ -1,7 +1,4 @@
--- Name: AssistConfig.luau
--- Author: Jack C.
 -- Description: Client-side reader for the per-player aim-assist strengths the server projects onto the player, re-reading them whenever the projection changes.
--- Created: 2026-08-19
 
 --!strict
 

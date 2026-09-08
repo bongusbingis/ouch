@@ -1,7 +1,4 @@
--- Name: Boosts.spec.luau
--- Author: Jack C.
 -- Description: Spec for booster stacking: best-of rather than compounding, ignoring cosmetic-only passes, and that no shipped booster touches anything but XP and Bonks.
--- Created: 2026-08-12
 
 --!strict
 

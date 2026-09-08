@@ -1,7 +1,4 @@
--- Name: TouchIntent.luau
--- Author: Jack C.
 -- Description: Classifies touch input into combat intents, tracking each finger's lifecycle to separate camera drags from taps, charged holds, and bottom-screen swipes.
--- Created: 2026-08-20
 
 --!strict
 

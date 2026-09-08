@@ -1,7 +1,4 @@
--- Name: Boosts.luau
--- Author: Jack C.
 -- Description: Pure booster stacking that takes the best owned multiplier per type rather than compounding, so overlapping passes cannot run away.
--- Created: 2026-08-12
 
 --!strict
 

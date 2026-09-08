@@ -6,8 +6,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Modules = game:GetService("ServerScriptService"):WaitForChild("Server"):WaitForChild("Modules")
 local PartyService = require(Modules:WaitForChild("Matchmaking"):WaitForChild("PartyService"))
 local PartyModel = require(Modules.Matchmaking.PartyModel)
-local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
-local QueuePolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnQueuePolicy)
+local Protocol = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Protocol"))
+local QueuePolicy = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("ReturnQueuePolicy")
+)
 
 local function fixture()
 	local players = {}

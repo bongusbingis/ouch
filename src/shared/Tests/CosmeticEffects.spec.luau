@@ -1,7 +1,4 @@
--- Name: CosmeticEffects.spec.luau
--- Author: Jack C.
 -- Description: Spec for the cosmetic VFX registry: every effect category binds to a real slot with a resolvable default, effect-slot cosmetics carry EffectIds, triggers are well-formed, and equipped-effect resolution falls back to the category default.
--- Created: 2026-08-29
 
 --!strict
 

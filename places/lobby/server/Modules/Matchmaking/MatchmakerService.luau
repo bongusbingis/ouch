@@ -1,13 +1,15 @@
--- Name: MatchmakerService.luau
--- Author: Jack C.
 -- Description: Runs the matchmaking tick: reads queued candidates, selects and claims a viable set under the population policy, reconciles stale claims, and creates the match record the teleport coordinator acts on.
--- Created: 2026-08-15
 
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
-local PopulationPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.PopulationPolicy)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
+local PopulationPolicy = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("PopulationPolicy")
+)
 local PartyModel = require(script.Parent.PartyModel)
 
 local MatchmakerService = {}

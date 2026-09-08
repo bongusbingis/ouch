@@ -1,7 +1,4 @@
--- Name: sbCrateOpenFreeServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-crate-open-free, rolling and granting a crate without a currency charge while still firing the reveal event the client renders.
--- Created: 2026-07-15
 
 --!strict
 
@@ -34,7 +31,7 @@ return function(_context, players: { Player }, crateId: string): string
 
 	local output = {}
 	for _, player in targets do
-		local result, reason = CrateService.openForTesting(player, crateId)
+		local result, reason = CrateService.openForAdmin(player, crateId)
 		if result then
 			table.insert(output, `{player.Name}: {describe(result)}`)
 		else

@@ -1,7 +1,4 @@
--- Name: CombatMenu.luau
--- Author: Jack C.
 -- Description: React component tree for the in-combat overlay menu shared by both places: page routing, the shop, inventory, and settings pages, the toggle button, and its HUD input exclusion region. Availability is decided by the caller and passed in, so the arena and the lobby test session drive the same menu from their own gating.
--- Created: 2026-08-31
 
 --!strict
 
@@ -176,10 +173,15 @@ local function MenuToggle(props)
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = 82,
 			},
+		}, {
+			Stroke = c("UIStroke", {
+				Color = UIConfig.ProgressionStyle.Ink,
+				Thickness = UIConfig.Button.StrokePx,
+			}),
 		}),
 		Keycap = c("Frame", {
 			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundColor3 = Color3.fromRGB(52, 52, 52),
+			BackgroundColor3 = UIConfig.ProgressionStyle.Cyan,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, -toggleLayout.HorizontalPaddingPx, 0.51, 0),
 			Size = UDim2.fromScale(toggleLayout.KeycapWidthScale, 0.54),
@@ -204,20 +206,21 @@ local function MenuToggle(props)
 				else nil,
 			Text = if not showGamepadImage
 				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					MaxTextSize = 24,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = Font.new(
-							"rbxasset://fonts/families/SourceSansPro.json",
-							Enum.FontWeight.Bold,
-							Enum.FontStyle.Normal
-						),
+						Font = UIConfig.Text.BodyFont,
 						Size = UDim2.fromScale(1, 1),
 						Text = hint,
 						TextColor3 = Color3.new(1, 1, 1),
 						ZIndex = 83,
 					},
+				}, {
+					Stroke = c("UIStroke", {
+						Color = UIConfig.ProgressionStyle.Ink,
+						Thickness = UIConfig.Button.StrokePx,
+					}),
 				})
 				else nil,
 		}),

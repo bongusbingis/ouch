@@ -1,9 +1,8 @@
--- Name: ShopClient.luau
--- Author: Jack C.
 -- Description: Client adapter for the storefront: fetches offers, requests marketplace metadata, sends purchase and crate-open requests, and publishes the reveal and grant results for the UI.
--- Created: 2026-08-23
 
 --!strict
+
+local Listeners = require(script.Parent.Parent.Util.Listeners)
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -18,7 +17,7 @@ local Network = DefaultNetwork
 local Marketplace = MarketplaceService
 local localPlayer = Players.LocalPlayer
 local ClientRequest = require(script.Parent.Parent.Data.ClientRequest)
-local ShopConfig = require(ReplicatedStorage.Config.Economy.Shop)
+local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 
 export type Snapshot = {
 	status: string,
@@ -43,7 +42,7 @@ export type StartOptions = {
 local started = false
 local refreshGeneration = 0
 local lifecycleGeneration = 0
-local callbacks: { (Snapshot) -> () } = {}
+local callbacks: Listeners.Collection<Snapshot> = Listeners.new("ShopClient", false, "subscriber failed")
 local connections: { RBXScriptConnection } = {}
 local pendingProducts: { [number]: string } = {}
 local pendingPasses: { [number]: string } = {}
@@ -65,12 +64,9 @@ local state: Snapshot = {
 }
 
 local function notify()
-	for _, callback in callbacks do
-		local ok, err = pcall(callback, state)
-		if not ok then
-			warn(`[ShopClient] subscriber failed: {err}`)
-		end
-	end
+	callbacks.emitWith(function(callback)
+		callback(state)
+	end)
 end
 
 -- Clearing a field has to go through this sentinel: `{ reveal = nil }` is an
@@ -274,6 +270,7 @@ function ShopClient.start(options: StartOptions?)
 	table.insert(
 		connections,
 		Network.on("ShopStateChanged", function(shopState)
+			refreshGeneration += 1
 			update({ status = "Ready", shopState = shopState })
 		end)
 	)
@@ -324,6 +321,12 @@ function ShopClient.start(options: StartOptions?)
 			end
 			if not started or generation ~= lifecycleGeneration then
 				return
+			end
+			if state.status == "Error" then
+				ShopClient.refresh()
+				if not started or generation ~= lifecycleGeneration then
+					return
+				end
 			end
 			for key, finishedAt in purchaseFinishedAt do
 				if
@@ -510,18 +513,8 @@ function ShopClient.snapshot(): Snapshot
 end
 
 function ShopClient.subscribe(callback: (Snapshot) -> ()): () -> ()
-	table.insert(callbacks, callback)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(callbacks, callback)
-		if index then
-			table.remove(callbacks, index)
-		end
-	end
+	local unsubscribe = callbacks.add(callback)
+	return unsubscribe
 end
 
 function ShopClient.stop()
@@ -531,7 +524,7 @@ function ShopClient.stop()
 		connection:Disconnect()
 	end
 	table.clear(connections)
-	table.clear(callbacks)
+	callbacks.clear()
 	table.clear(pendingProducts)
 	table.clear(pendingPasses)
 	table.clear(loadingPasses)

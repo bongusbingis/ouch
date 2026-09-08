@@ -1,7 +1,4 @@
--- Name: JumpPadVisuals.luau
--- Author: Jack C.
 -- Description: Renders the arena jump pads, tracking their authored parts and playing the squash animation and launch sound when the server broadcasts a pad impulse.
--- Created: 2026-08-19
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: DevMatchSkip.luau
--- Author: Jack C.
 -- Description: Hidden tap-corner gesture that asks the server to end the active match with the local player as winner, for exercising the full match and post-match loop solo. The server re-checks the same developer group rank the lobby's solo-play path uses.
--- Created: 2026-08-25
 
 --!strict
 

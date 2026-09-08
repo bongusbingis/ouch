@@ -1,7 +1,4 @@
--- Name: Dodgeball.luau
--- Author: Jack C.
 -- Description: The dodgeball weapon kit: throw gating and cooldowns, soft-lock target selection and validation per device class, charged release, and the catch window, with ball possession read from projectile state rather than duplicated.
--- Created: 2026-07-12
 
 --!strict
 

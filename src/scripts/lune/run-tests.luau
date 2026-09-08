@@ -1,17 +1,14 @@
--- Name: run-tests.luau
--- Author: Jack C.
 -- Description: Headless test runner that refreshes the Rojo sourcemap, loads every shared spec module through the fake-instance loader, and exits nonzero on failure.
--- Created: 2026-07-12
 
 --!strict
 
 local process = require("@lune/process")
 local Loader = require("./loader")
 
-local sourcemap = process.exec("rojo", { "sourcemap", "arena.project.json", "-o", "sourcemap.json" })
+local sourcemap = process.exec("rojo", { "sourcemap", "tests.project.json", "-o", "sourcemap.json" })
 if not sourcemap.ok then
-	print("warning: rojo sourcemap failed, using existing sourcemap.json")
 	print(sourcemap.stderr)
+	process.exit(1)
 end
 
 local root, load = Loader.build("sourcemap.json")
@@ -25,6 +22,7 @@ for _, child in tests:GetChildren() do
 	end
 end
 table.sort(specNames)
+assert(#specNames > 0, "No headless specs found in tests.project.json")
 
 for _, name in specNames do
 	print(`-- {name}`)

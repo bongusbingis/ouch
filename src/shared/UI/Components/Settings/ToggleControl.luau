@@ -1,7 +1,4 @@
--- Name: ToggleControl.luau
--- Author: Jack C.
 -- Description: Reusable two-option This/That selector for the settings system. Options are arbitrary values with their own display labels -- never hardcoded to ON/OFF -- so the same control serves any binary setting. Mouse, touch, and controller all resolve through one OnChange call; the value updates immediately and the sliding highlight animates separately.
--- Created: 2026-08-25
 
 --!strict
 
@@ -14,13 +11,11 @@ local Motion = require(script.Parent.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Parent.Hooks.useReducedMotion)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local c = React.createElement
 
-local SELECTED_IMAGE = "rbxassetid://94748581468730"
-local SELECTED_SLICE = Rect.new(198, 228, 841, 468)
-local DIM_TEXT = Color3.fromRGB(190, 190, 190)
-local DISABLED_TEXT = Color3.fromRGB(120, 120, 120)
+local palette = UIConfig.ProgressionStyle
 
 export type Props = {
 	Value: any,
@@ -55,8 +50,8 @@ return function(props: Props)
 	end
 
 	local function cell(index: number)
-		local selected = index == selectedIndex
 		return c(AnimatedButton, {
+			SelectionRadius = UDim.new(1, 0),
 			Enabled = enabled,
 			Native = {
 				BackgroundTransparency = 1,
@@ -79,37 +74,42 @@ return function(props: Props)
 					Position = UDim2.fromScale(0.5, 0.5),
 					Size = UDim2.fromScale(0.86, 0.7),
 					Text = props.Labels[index],
-					TextColor3 = if not enabled
-						then DISABLED_TEXT
-						elseif selected then Color3.new(1, 1, 1)
-						else DIM_TEXT,
+					TextColor3 = palette.White,
 					ZIndex = 5,
 				},
+			}, {
+				Stroke = c("UIStroke", {
+					Color = palette.Ink,
+					Thickness = UIConfig.Button.StrokePx,
+				}),
 			}),
 		})
 	end
 
 	return c("Frame", {
 		AnchorPoint = props.AnchorPoint,
-		BackgroundColor3 = Color3.fromRGB(52, 52, 52),
-		BackgroundTransparency = if enabled then 0.12 else 0.5,
+		BackgroundColor3 = palette.Track,
+		BackgroundTransparency = if enabled then 0 else 0.3,
+		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Position = props.Position,
 		Size = props.Size or UDim2.fromScale(1, 1),
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-		Highlight = c("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = SELECTED_IMAGE,
-			ImageTransparency = if enabled then 0 else 0.5,
+		Highlight = c("Frame", {
+			BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,
+			BorderSizePixel = 0,
 			Position = styles.Alpha:map(function(alpha: number)
-				return UDim2.fromScale(alpha * 0.5, 0)
+				return UDim2.new(alpha * 0.5, 4, 0, 4)
 			end),
-			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromScale(0.5, 1),
-			SliceCenter = SELECTED_SLICE,
-			SliceScale = 0.2,
+			Size = UDim2.new(0.5, -8, 1, -8),
 			ZIndex = 3,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			Stroke = c("UIStroke", {
+				Color = if enabled then palette.White else palette.Muted,
+				Thickness = UIConfig.Button.StrokePx,
+			}),
 		}),
 		OptionA = cell(1),
 		OptionB = cell(2),

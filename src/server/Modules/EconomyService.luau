@@ -1,7 +1,4 @@
--- Name: EconomyService.luau
--- Author: Jack C.
 -- Description: Starts the shared economy service cohort in one call so both the lobby and the arena bring up the same set of storefront, entitlement, and monetization services.
--- Created: 2026-08-23
 
 --!strict
 

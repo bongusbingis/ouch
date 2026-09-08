@@ -1,7 +1,4 @@
--- Name: PlayerHighlights.luau
--- Author: Jack C.
 -- Description: Applies and clears the team and teammate outline highlights on other players' characters as they spawn, change team, and leave.
--- Created: 2026-08-18
 
 --!strict
 

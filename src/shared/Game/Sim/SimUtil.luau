@@ -1,7 +1,4 @@
--- Name: SimUtil.luau
--- Author: Jack C.
 -- Description: Predicates and helpers shared across every weapon and projectile module, including deterministic key ordering, team and line-of-sight checks, and event emission.
--- Created: 2026-07-12
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: sbCosmeticEquip.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-cosmetic-equip: equips an owned cosmetic in its configured slot.
--- Created: 2026-07-15
 
 --!strict
 

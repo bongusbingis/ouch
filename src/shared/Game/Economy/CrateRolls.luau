@@ -1,7 +1,4 @@
--- Name: CrateRolls.luau
--- Author: Jack C.
 -- Description: Pure crate roll driven by the shared probability model and an injected random source, including the pity guarantees and the duplicate refund rule.
--- Created: 2026-07-13
 
 --!strict
 

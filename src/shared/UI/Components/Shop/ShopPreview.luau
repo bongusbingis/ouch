@@ -1,13 +1,11 @@
--- Name: ShopPreview.luau
--- Author: Jack C.
 -- Description: Wraps the live item preview for use inside storefront cards and modals.
--- Created: 2026-08-23
 
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local InventoryPreview = require(script.Parent.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
@@ -36,7 +34,8 @@ return React.memo(function(props)
 		return c(BonksLabel, {
 			Amount = props.PlaceholderBonks,
 			MaxTextSize = props.BonksTextSize or 34,
-			TextStroke = 0.05,
+			TextColor = props.TextColor,
+			TextStroke = props.TextStroke or 0.05,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
@@ -57,10 +56,18 @@ return React.memo(function(props)
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(0.8, 0.55),
 				Text = props.Placeholder or "COMING SOON",
-				TextColor3 = Color3.new(1, 1, 1),
+				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
 				TextTransparency = 0.15,
 				ZIndex = props.ZIndex or 5,
 			},
+		}, {
+			Outline = if props.TextStroke
+				then c("UIStroke", {
+					Color = UI.ProgressionStyle.Ink,
+					Thickness = props.TextStroke,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				})
+				else nil,
 		})
 	end
 
@@ -83,6 +90,8 @@ return React.memo(function(props)
 				Definition = entry.definition,
 				ColorId = props.ColorId,
 				CostumeId = props.CostumeId,
+				TextColor = props.TextColor,
+				TextStroke = props.TextStroke or 0.045,
 				ZIndex = (props.ZIndex or 5) + index,
 			}),
 		})

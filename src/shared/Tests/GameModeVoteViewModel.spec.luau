@@ -1,7 +1,4 @@
--- Name: GameModeVoteViewModel.spec.luau
--- Author: Jack C.
 -- Description: Spec for the mode vote view model: vote count formatting and the clamped loading-bar fraction derived from server time.
--- Created: 2026-08-17
 
 --!strict
 

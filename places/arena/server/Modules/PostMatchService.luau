@@ -1,7 +1,4 @@
--- Name: PostMatchService.luau
--- Author: Jack C.
 -- Description: Sole owner of post-match result delivery and party replay intent, building result packets from match and progression facts, sending them per party group, and validating the actions players request from the results screen.
--- Created: 2026-08-24
 
 --!strict
 

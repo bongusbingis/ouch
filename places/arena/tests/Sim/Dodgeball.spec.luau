@@ -1,7 +1,4 @@
--- Name: Dodgeball.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the dodgeball weapon spec: throw gating, soft-lock selection and validation cones per device class, occlusion fail-open, and the catch window.
--- Created: 2026-07-16
 
 --!nonstrict
 
@@ -11,7 +8,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Sim = Shared:WaitForChild("Game"):WaitForChild("Sim")
 
-local MockWorld = require(Shared:WaitForChild("Tests"):WaitForChild("MockWorld"))
+local MockWorld =
+	require(game:GetService("ServerStorage"):WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("MockWorld"))
 local SimCore = require(Sim:WaitForChild("SimCore"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))

@@ -1,7 +1,4 @@
--- Name: MatchSim.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the match phase machine spec, covering phase transitions, scoring, win conditions, and the mode registry surface.
--- Created: 2026-07-16
 
 --!nonstrict
 

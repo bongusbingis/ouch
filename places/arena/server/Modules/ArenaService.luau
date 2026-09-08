@@ -1,16 +1,16 @@
--- Name: ArenaService.luau
--- Author: Jack C.
 -- Description: Validates the permanent Studio-authored arena and its spawn folders at startup and teleports players onto general or per-team spawn parts without cloning or modifying arena content.
--- Created: 2026-08-17
 
 --!strict
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local GameModes = require(ReplicatedStorage.Config.Gameplay.GameModes)
-local MapFeatures = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local MapFeatures =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Workspace = game:GetService("Workspace")
-local MovementGuard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
+local MovementGuard = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("MovementGuard")
+)
 
 local ArenaService = {}
 

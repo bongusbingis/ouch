@@ -1,7 +1,4 @@
--- Name: SettingsService.luau
--- Author: Jack C.
 -- Description: The only writer of profile Settings, shared by both places: validates an incoming preference against the same shared registry and value-resolution path the client uses, then persists it. Never trusts the client's normalization alone.
--- Created: 2026-08-25
 
 --!strict
 

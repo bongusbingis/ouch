@@ -1,7 +1,4 @@
--- Name: PlayerConfigResolver.luau
--- Author: Jack C.
 -- Description: Generic per-player AB config resolution: raw experience-config values in, validated and defaulted values out, plus the Default/Variant cohort label used for analytics. Schema-agnostic, so any per-player experiment resolves through it, not just aim assist.
--- Created: 2026-09-01
 
 --!strict
 

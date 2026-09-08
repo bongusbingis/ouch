@@ -1,7 +1,4 @@
--- Name: sb-cooldowns-resetServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-cooldowns-reset, queueing a weapon-state reset on the sim adapter for each targeted player.
--- Created: 2026-07-15
 
 --!strict
 
@@ -18,7 +15,7 @@ local ServerAuthAdapter = require(
 
 return function(_context: any, targets: { Player }): string
 	local result = CommandUtil.runForPlayers(targets, function(player)
-		if not ServerAuthAdapter.resetWeaponsForTesting(player) then
+		if not ServerAuthAdapter.resetWeaponsForAdmin(player) then
 			return false, "reset_rejected"
 		end
 		return true

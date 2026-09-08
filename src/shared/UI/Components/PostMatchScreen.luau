@@ -7,8 +7,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local React = require(ReplicatedStorage.Packages.react)
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Model = require(script.Parent.Parent.Models.PostMatchViewModel)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
@@ -59,6 +60,7 @@ return function(props)
 	local safe = useSafeArea(Enum.ScreenInsets.None, Enum.ScreenInsets.CoreUISafeInsets)
 	local rootRef, primaryRef, returnRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
 	local scoresRef = React.useRef(nil)
+	local clearedOutsideSelection = React.useRef(false)
 	local announced = React.useRef("")
 	local now, setNow = React.useState(Workspace:GetServerTimeNow())
 	local standings, setStandings = React.useState(false)
@@ -92,27 +94,47 @@ return function(props)
 		end)
 		local previous = GuiService.SelectedObject
 		local root = rootRef.current
+		clearedOutsideSelection.current = false
 		return function()
 			connection:Disconnect()
 			local selected = GuiService.SelectedObject
-			if root and selected and selected:IsDescendantOf(root) then
-				GuiService.SelectedObject = if selectable(previous) then previous else nil
+			if
+				(root and selected and selected:IsDescendantOf(root))
+				or (selected == nil and clearedOutsideSelection.current)
+			then
+				GuiService.SelectedObject = if string.find(UserInputService:GetLastInputType().Name, "Gamepad")
+						and selectable(previous)
+					then previous
+					else nil
 			end
 		end
 	end, { visible, if result then result.resultId else "" })
 	React.useEffect(function()
-		if not visible or not interactive or not gamepad or props.FocusEnabled == false then
+		if not visible or props.FocusEnabled == false then
 			return
 		end
 		local active = true
-		task.defer(function()
+		local function updateSelection()
 			if not active then
 				return
 			end
 			local selected = GuiService.SelectedObject
+			if selected and not selected:IsDescendantOf(Players.LocalPlayer.PlayerGui) then
+				return
+			end
 			local selectedRoot = if selected then selected:FindFirstAncestorWhichIsA("ScreenGui") else nil
 			local ownRoot = if rootRef.current then rootRef.current:FindFirstAncestorWhichIsA("ScreenGui") else nil
 			if selectedRoot and ownRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder then
+				return
+			end
+			if not gamepad then
+				if selected and rootRef.current and not selected:IsDescendantOf(rootRef.current) then
+					clearedOutsideSelection.current = true
+					GuiService.SelectedObject = nil
+				end
+				return
+			end
+			if not interactive then
 				return
 			end
 			if selected and rootRef.current and selected:IsDescendantOf(rootRef.current) and selectable(selected) then
@@ -124,9 +146,16 @@ return function(props)
 					break
 				end
 			end
-		end)
+		end
+		task.defer(updateSelection)
+		local connection = if not gamepad
+			then GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(updateSelection)
+			else nil
 		return function()
 			active = false
+			if connection then
+				connection:Disconnect()
+			end
 		end
 	end, { visible, interactive, gamepad, props.Requesting, props.Status, props.FocusEnabled })
 	if not visible then
@@ -165,7 +194,7 @@ return function(props)
 	for index, score in result.scores do
 		rows[score.id] = c(
 			Surface,
-			{ Shadow = false, Color = colors.Raised, Native = { Size = UDim2.new(1, -8, 0, 44), LayoutOrder = index } },
+			{ Shadow = false, Color = colors.Cyan, Native = { Size = UDim2.new(1, -8, 0, 44), LayoutOrder = index } },
 			{
 				Rank = c(Label, {
 					Text = if score.placement then tostring(score.placement) else "",
@@ -210,8 +239,7 @@ return function(props)
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		}, {
 			HeaderSurface = c(Surface, {
-				Color = colors.Ink,
-				Transparency = 0.08,
+				Color = accent,
 				Shadow = false,
 				Native = {
 					Position = UDim2.fromOffset(-4, -4),
@@ -223,7 +251,7 @@ return function(props)
 				Text = result.presentation.title,
 				Title = true,
 				Size = if short then 34 else 52,
-				Color = accent,
+				Color = colors.White,
 				Align = Enum.TextXAlignment.Left,
 				Native = {
 					Position = UDim2.fromOffset(10, 0),
@@ -236,7 +264,7 @@ return function(props)
 					.. (if result.presentation.detail then "  •  " .. result.presentation.detail else ""),
 				Size = if short then 15 else 21,
 				Align = Enum.TextXAlignment.Left,
-				Color = colors.Muted,
+				Color = colors.White,
 				Native = {
 					Position = UDim2.fromOffset(10, headerHeight * 0.68),
 					ZIndex = 3,
@@ -247,7 +275,7 @@ return function(props)
 				Text = if standings then "PODIUM" else "SCORES",
 				ButtonRef = scoresRef,
 				TextSize = 22,
-				Color = colors.Raised,
+				Color = colors.Cyan,
 				Native = { Position = UDim2.new(1, -134, 0, 0), Size = UDim2.fromOffset(128, 44) },
 				OnActivated = function()
 					setStandings(not standings)
@@ -308,15 +336,14 @@ return function(props)
 				ZIndex = 15,
 			}, {
 				Backdrop = c(Surface, {
-					Color = colors.Ink,
+					Color = colors.Cyan,
 					Shadow = false,
-					Transparency = 0.1,
 					Native = { Position = UDim2.fromOffset(-6, -3), Size = UDim2.new(1, 12, 1, 6), ZIndex = 1 },
 				}),
 				Status = c(Label, {
 					Text = if props.Error or actions.busy or not destination then message else destination,
 					Size = if short then 15 else 19,
-					Color = if props.Error then colors.Pink else colors.Muted,
+					Color = if props.Error then colors.Yellow else colors.White,
 					Align = Enum.TextXAlignment.Left,
 					Native = { Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -80, 0, 26), ZIndex = 3 },
 				}),
@@ -332,6 +359,7 @@ return function(props)
 					ButtonRef = primaryRef,
 					Text = primaryText,
 					Primary = true,
+					Completed = actions.replaySelected,
 					TextSize = if short then 22 else 29,
 					Enabled = interactive and actions.primaryEnabled,
 					Native = {
@@ -344,7 +372,7 @@ return function(props)
 					ButtonRef = returnRef,
 					Text = returnText,
 					TextSize = if short then 22 else 29,
-					Color = colors.Raised,
+					Color = colors.Cyan,
 					Enabled = interactive and not actions.busy,
 					Native = {
 						Position = UDim2.new(0.65, 4, 0, 30),
@@ -364,7 +392,7 @@ return function(props)
 									then "Your party leader picks the next stop"
 									else "Stay for another round or change your look in the lobby",
 						Size = 13,
-						Color = colors.Muted,
+						Color = colors.White,
 						Native = { Position = UDim2.fromOffset(0, 91), Size = UDim2.new(1, -6, 0, 13), ZIndex = 3 },
 					})
 					else nil,

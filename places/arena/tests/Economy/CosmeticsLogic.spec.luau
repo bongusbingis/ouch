@@ -1,7 +1,4 @@
--- Name: CosmeticsLogic.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the cosmetics equip-validation spec, covering slot and ownership rules and the configured category defaults.
--- Created: 2026-07-16
 
 --!nonstrict
 

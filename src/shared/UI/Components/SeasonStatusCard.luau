@@ -1,7 +1,4 @@
--- Name: SeasonStatusCard.luau
--- Author: Jack C.
 -- Description: Responsive splash card showing season tier, XP progress, and the next free reward.
--- Created: 2026-09-01
 
 --!strict
 
@@ -15,12 +12,12 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local Surface = require(script.Parent.Arena.Surface)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 local c = React.createElement
 
 local DARK = Palette.Ink
-local MUTED = Palette.Muted
 local PROGRESS_FILL_COLOR = Palette.Pink
 local TIER_BADGE_COLOR = Palette.Pink
 
@@ -70,7 +67,7 @@ return function(props: Props)
 	local native = {
 		AnchorPoint = Vector2.new(0, 0),
 		BackgroundTransparency = 0,
-		BackgroundColor3 = Palette.Surface,
+		BackgroundColor3 = Palette.Panel,
 		BorderSizePixel = 0,
 		Position = UDim2.fromScale(0, 0),
 		Size = UDim2.fromScale(1, 1),
@@ -81,9 +78,7 @@ return function(props: Props)
 		end
 	end
 
-	return c("Frame", native, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
-		Outline = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
+	return c(Surface, { Native = native, Color = Palette.Panel, Radius = 10 }, {
 		HeaderBand = c("Frame", {
 			BackgroundColor3 = Palette.Pink,
 			BorderSizePixel = 0,
@@ -115,7 +110,7 @@ return function(props: Props)
 			else nil,
 		Content = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = DARK,
+			BackgroundColor3 = Palette.Track,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
@@ -131,28 +126,26 @@ return function(props: Props)
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0.14, 0) }),
 				Stroke = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
-				Gradient = c(
-					"UIGradient",
-					{ Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 150, 220)), Rotation = 90 }
-				),
 				TierWord = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					MinTextSize = if compact then 8 else 10,
 					MaxTextSize = if compact then 12 else 16,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
+						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
 						Position = UDim2.fromScale(0.5, 0.07),
 						Size = UDim2.fromScale(0.82, 0.28),
 						Text = "TIER",
 						TextColor3 = Color3.new(1, 1, 1),
+						TextStrokeColor3 = Palette.Ink,
+						TextStrokeTransparency = 0.35,
 					},
 				}),
 				TierNumber = c(ResponsiveText, {
 					MeasurementFont = Enum.Font.LuckiestGuy,
 					MinTextSize = if compact then 10 else 14,
-					MaxTextSize = if compact then 18 else 32,
+					MaxTextSize = if compact then 24 else 32,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
@@ -161,6 +154,8 @@ return function(props: Props)
 						Size = UDim2.fromScale(0.82, 0.48),
 						Text = tostring(tier),
 						TextColor3 = Color3.new(1, 1, 1),
+						TextStrokeColor3 = Palette.Ink,
+						TextStrokeTransparency = 0.35,
 					},
 				}),
 			}),
@@ -169,6 +164,7 @@ return function(props: Props)
 					Enabled = props.OnViewRewards ~= nil or (props.OnClaim ~= nil and not props.Pending),
 					OnActivated = props.OnViewRewards or props.OnClaim,
 					Color = Palette.Pink,
+					Compact = true,
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, -2, 0.5, 0),
 					Size = UDim2.fromOffset(claimWidth, UIConfig.Interaction.MinTargetPx),
@@ -190,22 +186,24 @@ return function(props: Props)
 				),
 			}, {
 				SeasonName = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					MinTextSize = if compact then 9 else 12,
 					MaxTextSize = if compact then 17 else 23,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
+						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
 						Position = UDim2.fromScale(0, 0),
 						Size = UDim2.fromScale(1, if compact then 0.42 else 0.24),
 						Text = if compact then "SEASON" else displayName,
-						TextColor3 = Color3.new(1, 1, 1),
+						TextColor3 = Palette.White,
+						TextStrokeColor3 = Palette.Ink,
+						TextStrokeTransparency = 0.35,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextTruncate = Enum.TextTruncate.AtEnd,
 					},
 				}),
 				ProgressBar = c("Frame", {
-					BackgroundColor3 = DARK,
+					BackgroundColor3 = Palette.Track,
 					BorderSizePixel = 0,
 					Position = UDim2.fromScale(0, if compact then 0.48 else 0.3),
 					Size = UDim2.fromScale(1, if compact then 0.16 else 0.16),
@@ -220,16 +218,18 @@ return function(props: Props)
 					}),
 				}),
 				XPLabel = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					MinTextSize = if compact then 8 else 10,
 					MaxTextSize = if compact then 13 else 16,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
+						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
 						Position = UDim2.fromScale(0, if compact then 0.68 else 0.5),
 						Size = UDim2.fromScale(1, if compact then 0.3 else 0.18),
 						Text = if isMaxTier then "MAX TIER" else `{xpIntoTier} / {xpForNextTier} XP`,
-						TextColor3 = MUTED,
+						TextColor3 = Palette.White,
+						TextStrokeColor3 = Palette.Ink,
+						TextStrokeTransparency = 0.35,
 						TextXAlignment = Enum.TextXAlignment.Left,
 					},
 				}),
@@ -240,25 +240,26 @@ return function(props: Props)
 						Size = UDim2.fromScale(1, 0.24),
 					}, {
 						NextLabel = c(ResponsiveText, {
-							MeasurementFont = Enum.Font.SourceSansBold,
+							MeasurementFont = UIConfig.Text.BodyFont,
 							MinTextSize = 10,
 							MaxTextSize = 15,
 							Native = {
 								BackgroundTransparency = 1,
-								FontFace = Font.new(
-									"rbxasset://fonts/families/SourceSansPro.json",
-									Enum.FontWeight.Bold
-								),
+								FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
 								Position = UDim2.fromScale(0, 0),
 								Size = UDim2.fromScale(0.22, 1),
 								Text = "NEXT",
-								TextColor3 = MUTED,
+								TextColor3 = Palette.White,
+								TextStrokeColor3 = Palette.Ink,
+								TextStrokeTransparency = 0.35,
 								TextXAlignment = Enum.TextXAlignment.Left,
 							},
 						}),
 						RewardLabel = if nextReward.kind == "Bonks"
 							then c(BonksLabel, {
 								Amount = nextReward.amount or 0,
+								TextColor = Palette.White,
+								TextStroke = 0.045,
 								Native = {
 									Position = UDim2.fromScale(0.2, 0),
 									Size = UDim2.fromScale(0.55, 1),
@@ -266,18 +267,20 @@ return function(props: Props)
 								IconSize = UDim2.fromScale(0.2, 0.8),
 							})
 							else c(ResponsiveText, {
-								MeasurementFont = Enum.Font.SourceSansBold,
+								MeasurementFont = UIConfig.Text.BodyFont,
 								MaxTextSize = 16,
 								Truncate = true,
 								Native = {
 									BackgroundTransparency = 1,
 									Position = UDim2.fromScale(0.22, 0),
 									Size = UDim2.fromScale(0.78, 1),
-									Font = Enum.Font.SourceSansBold,
+									Font = UIConfig.Text.BodyFont,
 									Text = if Cosmetics.Items[nextReward.itemId]
 										then Cosmetics.Items[nextReward.itemId].DisplayName
 										else "Cosmetic",
-									TextColor3 = Palette.Yellow,
+									TextColor3 = Palette.White,
+									TextStrokeColor3 = Palette.Ink,
+									TextStrokeTransparency = 0.35,
 									TextXAlignment = Enum.TextXAlignment.Left,
 								},
 							}),

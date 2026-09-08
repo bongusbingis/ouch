@@ -1,7 +1,4 @@
--- Name: EliminationService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec for elimination state, ragdoll construction, and full restoration on a real humanoid rig fixture.
--- Created: 2026-07-16
 
 --!nonstrict
 
@@ -14,8 +11,13 @@ local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
 local FakePlayer = require(Helpers:WaitForChild("FakePlayer"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local CharacterAppearance = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CharacterAppearance")
+)
 
 local function countDescendants(character: Model, className: string, namePrefix: string?): number
 	local count = 0

@@ -1,7 +1,4 @@
--- Name: OnboardingImpactVFX.luau
--- Author: Jack C.
 -- Description: Plays the shared ConfettiImpact cosmetic effect for onboarding knockouts and completion, so the confetti/flash visual lives in one place rather than being duplicated here.
--- Created: 2026-08-26
 
 --!strict
 

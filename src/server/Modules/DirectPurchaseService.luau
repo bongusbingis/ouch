@@ -1,7 +1,4 @@
--- Name: DirectPurchaseService.luau
--- Author: Jack C.
 -- Description: Handles buying a single named cosmetic outright with Bonks, enforcing price, ownership, affordability, and whether the item is currently offered.
--- Created: 2026-08-12
 
 --!strict
 

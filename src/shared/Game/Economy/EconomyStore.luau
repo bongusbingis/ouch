@@ -1,9 +1,8 @@
--- Name: EconomyStore.luau
--- Author: Jack C.
 -- Description: Client-side projection of the replicated profile economy data, exposing a snapshot and change subscription the storefront and inventory UI read from.
--- Created: 2026-07-16
 
 --!strict
+
+local Listeners = require(script.Parent.Parent.Util.Listeners)
 
 export type EconomyData = {
 	Bonks: number,
@@ -26,7 +25,7 @@ local replicaSource: any = nil
 local profileReplica: any = nil
 local newReplicaConnection: any = nil
 local profileChangeConnection: any = nil
-local callbacks: { ChangedCallback } = {}
+local callbacks: Listeners.Collection<EconomyData> = Listeners.new("EconomyStore", false, "changed callback failed")
 
 local function disconnect(connection: any?)
 	if connection and type(connection.Disconnect) == "function" then
@@ -47,12 +46,7 @@ local function notify()
 	if data == nil then
 		return
 	end
-	for _, callback in callbacks do
-		local ok, err = pcall(callback, data)
-		if not ok then
-			warn(`[EconomyStore] changed callback failed: {err}`)
-		end
-	end
+	callbacks.emit(data)
 end
 
 local function watchProfile(replica: any)
@@ -85,23 +79,13 @@ function EconomyStore.snapshot(): EconomyData?
 	return snapshot()
 end
 
-function EconomyStore.onChanged(callback: ChangedCallback): () -> ()
-	table.insert(callbacks, callback)
-	local connected = true
+function EconomyStore.subscribe(callback: ChangedCallback): () -> ()
+	local unsubscribe = callbacks.add(callback)
 	local data = snapshot()
 	if data then
 		callback(data)
 	end
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(callbacks, callback)
-		if index then
-			table.remove(callbacks, index)
-		end
-	end
+	return unsubscribe
 end
 
 function EconomyStore.stop()
@@ -112,7 +96,7 @@ function EconomyStore.stop()
 	profileReplica = nil
 	newReplicaConnection = nil
 	profileChangeConnection = nil
-	table.clear(callbacks)
+	callbacks.clear()
 end
 
 function EconomyStore._resetForTest()

@@ -1,7 +1,4 @@
--- Name: JoinCodeModal.luau
--- Author: Jack C.
 -- Description: Modal for entering a six-digit party join code, with per-digit boxes, focus handling, validation, and error feedback.
--- Created: 2026-08-17
 
 --!strict
 
@@ -20,6 +17,7 @@ local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
+local Palette = UIConfig.ProgressionStyle
 local CODE_LENGTH = 6
 local HELP_TEXT = "Ex: 123-456"
 
@@ -49,8 +47,8 @@ local function DigitBox(props)
 		end
 	end, { props.Delay })
 	return c("Frame", {
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = 0.4,
+		BackgroundColor3 = Palette.PanelRaised,
+		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Position = UDim2.fromScale(0.409565, 0.0598802),
 		Size = UDim2.fromScale(0.8, 0.8),
@@ -64,9 +62,8 @@ local function DigitBox(props)
 			TopRightRadius = UDim.new(0, 20),
 		}),
 		UIStroke = c("UIStroke", {
-			Color = Color3.fromRGB(171, 171, 171),
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			Thickness = 0.01,
+			Color = Palette.White,
+			Thickness = 2,
 		}),
 		Char = c(ResponsiveText, {
 			HostName = "Char",
@@ -80,8 +77,14 @@ local function DigitBox(props)
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(0.8, 0.8),
 				Text = props.Character,
-				TextColor3 = Color3.fromRGB(63, 63, 63),
+				TextColor3 = Palette.White,
 			},
+		}, {
+			Outline = c("UIStroke", {
+				Color = Palette.Ink,
+				Thickness = 0.045,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			}),
 		}),
 	})
 end
@@ -145,7 +148,7 @@ return function(props: Props)
 		errorRevision.current += 1
 		local revision = errorRevision.current
 		setErrorText(message)
-		setErrorColor(Color3.fromRGB(255, 0, 0))
+		setErrorColor(Palette.Yellow)
 		task.delay(3, function()
 			if revision == errorRevision.current then
 				setErrorText(HELP_TEXT)
@@ -260,7 +263,7 @@ return function(props: Props)
 	local digits = {
 		Dash = c(ResponsiveText, {
 			HostName = "Dash",
-			MeasurementFont = Enum.Font.SourceSans,
+			MeasurementFont = Enum.Font.LuckiestGuy,
 			MaxTextSize = 42,
 			Native = {
 				BackgroundTransparency = 1,
@@ -268,8 +271,15 @@ return function(props: Props)
 				Position = UDim2.fromScale(0.500703, 0.109386),
 				Size = UDim2.fromScale(0.0492974, 0.781228),
 				Text = "-",
-				TextColor3 = Color3.fromRGB(26, 194, 230),
+				Font = Enum.Font.LuckiestGuy,
+				TextColor3 = Palette.White,
 			},
+		}, {
+			Outline = c("UIStroke", {
+				Color = Palette.Ink,
+				Thickness = 0.045,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			}),
 		}),
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
@@ -333,6 +343,12 @@ return function(props: Props)
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 2,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = Palette.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			Frame = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -344,16 +360,18 @@ return function(props: Props)
 			}),
 			Title2 = c(ResponsiveText, {
 				HostName = "Title",
-				MeasurementFont = Enum.Font.Highway,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				MaxTextSize = 32,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+					Font = UIConfig.Text.BodyFont,
 					Position = UDim2.fromScale(0.5, 0.275),
 					Size = UDim2.fromScale(0.9, 0.0881433),
 					Text = "Type the 6-digit code to join a party",
 					TextColor3 = Color3.new(1, 1, 1),
+					TextStrokeColor3 = Palette.Ink,
+					TextStrokeTransparency = 0.35,
 					ZIndex = 2,
 				},
 			}),
@@ -417,6 +435,7 @@ return function(props: Props)
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 				}),
 				Confirm = c(PriceButton, {
+					Color = Palette.Pink,
 					Enabled = canSubmit,
 					Text = if submitting then "JOINING…" else "JOIN PARTY",
 					TextSize = 24,
@@ -430,7 +449,7 @@ return function(props: Props)
 					Enabled = not submitting,
 					Text = "CANCEL",
 					TextSize = 24,
-					Red = true,
+					Color = Palette.Cyan,
 					LayoutOrder = 2,
 					AnchorPoint = Vector2.zero,
 					Size = UDim2.fromScale(0.4, 1),
@@ -439,15 +458,17 @@ return function(props: Props)
 			}),
 			ErrorText = c(ResponsiveText, {
 				HostName = "ErrorText",
-				MeasurementFont = Enum.Font.Highway,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+					Font = UIConfig.Text.BodyFont,
 					Position = UDim2.fromScale(0.495, 0.73),
 					Size = UDim2.fromScale(0.9, 0.0741377),
 					Text = errorText,
 					TextColor3 = errorColor,
+					TextStrokeColor3 = Palette.Ink,
+					TextStrokeTransparency = 0.35,
 					ZIndex = 2,
 				},
 			}),

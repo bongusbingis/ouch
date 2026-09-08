@@ -1,7 +1,4 @@
--- Name: Intercept.spec.luau
--- Author: Jack C.
 -- Description: Spec for the interception maths: leading a crossing target, slower projectiles leading further, receding targets converging, motion consistency scoring, and clamped aim bias.
--- Created: 2026-08-19
 
 --!strict
 

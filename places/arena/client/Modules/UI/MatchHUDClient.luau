@@ -8,9 +8,12 @@ local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local GameModes = require(ReplicatedStorage.Config.Gameplay.GameModes)
-local Presentation = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
-local Model = require(ReplicatedStorage.Shared.UI.Models.MatchHUDModel)
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local Presentation =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
+local Model = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("MatchHUDModel")
+)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)

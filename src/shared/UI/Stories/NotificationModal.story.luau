@@ -1,7 +1,4 @@
--- Name: NotificationModal.story.luau
--- Author: Jack C.
 -- Description: Studio story previewing the notification and confirmation modal.
--- Created: 2026-08-17
 
 --!strict
 

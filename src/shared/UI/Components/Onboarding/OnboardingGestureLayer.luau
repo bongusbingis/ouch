@@ -1,7 +1,4 @@
--- Name: OnboardingGestureLayer.luau
--- Author: Jack C.
 -- Description: Mounts the active onboarding gesture in raw viewport space.
--- Created: 2026-08-28
 
 --!strict
 

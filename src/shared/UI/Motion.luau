@@ -1,7 +1,4 @@
--- Name: Motion.luau
--- Author: Jack C.
 -- Description: The shared motion constants every animated component uses, so page, camera, control, and modal transitions all feel the same.
--- Created: 2026-08-17
 
 --!strict
 

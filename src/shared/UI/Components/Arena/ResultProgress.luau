@@ -2,8 +2,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local Colors = require(ReplicatedStorage.Config.Interface.ArenaPresentation).Colors
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Colors =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation")).Colors
 local Label = require(script.Parent.Label)
 local Surface = require(script.Parent.Surface)
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
@@ -32,7 +33,7 @@ return function(props)
 			then c(Label, {
 				Text = `+{formatNumber(rewards.matchXp)} XP`,
 				Title = true,
-				Color = Colors.Cyan,
+				Color = Colors.White,
 				Size = 28,
 				Native = { Position = UDim2.fromOffset(8, rewardsTop), Size = UDim2.new(0.5, -8, 0, 38) },
 			})
@@ -52,7 +53,7 @@ return function(props)
 			then c(Label, {
 				Text = if result.rewardsPending then "SAVING REWARDS…" else "LOADING REWARDS…",
 				Size = 19,
-				Color = Colors.Muted,
+				Color = Colors.White,
 				Native = { Position = UDim2.fromOffset(8, rewardsTop), Size = UDim2.new(1, -16, 0, 38) },
 			})
 			else nil,
@@ -67,7 +68,7 @@ return function(props)
 			Name = c(Label, {
 				Text = stat.label,
 				Size = 17,
-				Color = Colors.Muted,
+				Color = Colors.White,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Size = UDim2.fromScale(0.72, 1) },
 			}),
@@ -96,7 +97,7 @@ return function(props)
 		})
 		y += 36
 		rows.Progress = c("Frame", {
-			BackgroundColor3 = Colors.Ink,
+			BackgroundColor3 = Colors.Track,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(16, y),
 			Size = UDim2.new(1, -32, 0, 10),
@@ -112,7 +113,7 @@ return function(props)
 		rows.ProgressText = c(Label, {
 			Text = `{formatNumber(season.xpIntoTier)} / {formatNumber(season.xpForNextTier)} XP`,
 			Size = 15,
-			Color = Colors.Muted,
+			Color = Colors.White,
 			Native = { Position = UDim2.fromOffset(10, y), Size = UDim2.new(1, -20, 0, 22) },
 		})
 		y += 28
@@ -134,20 +135,16 @@ return function(props)
 		})
 		y += 34
 	end
-	return c(
-		Surface,
-		{ Color = Colors.Surface, Native = { Size = UDim2.new(1, 0, 0, math.min(props.Height, y + 12)) } },
-		{
-			Content = c("ScrollingFrame", {
-				Selectable = false,
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Size = UDim2.fromScale(1, 1),
-				CanvasSize = UDim2.fromOffset(0, y + 12),
-				ScrollBarThickness = 3,
-				ScrollBarImageColor3 = Colors.Cyan,
-				ZIndex = 3,
-			}, rows),
-		}
-	)
+	return c(Surface, { Color = Colors.Cyan, Native = { Size = UDim2.new(1, 0, 0, math.min(props.Height, y + 12)) } }, {
+		Content = c("ScrollingFrame", {
+			Selectable = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			CanvasSize = UDim2.fromOffset(0, y + 12),
+			ScrollBarThickness = 3,
+			ScrollBarImageColor3 = Colors.White,
+			ZIndex = 3,
+		}, rows),
+	})
 end

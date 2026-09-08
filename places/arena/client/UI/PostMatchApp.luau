@@ -1,7 +1,4 @@
--- Name: PostMatchApp.luau
--- Author: Jack C.
 -- Description: Mounts the shared post-match results screen against the arena post-match adapter's snapshot and actions.
--- Created: 2026-08-24
 
 --!strict
 

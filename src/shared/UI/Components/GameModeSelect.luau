@@ -1,7 +1,4 @@
--- Name: GameModeSelect.luau
--- Author: Jack C.
 -- Description: The game mode ballot screen: lays out the mode cards, the countdown bar, and the local player's selection, purely from the snapshot passed in.
--- Created: 2026-08-17
 
 --!strict
 
@@ -27,7 +24,8 @@ local c = React.createElement
 local REFERENCE_VIEWPORT = Vector2.new(1890, 1200)
 local VOTE_TEXT_BOUNDS = TextMetrics.scaleBounds(REFERENCE_VIEWPORT, Vector2.new(0.967519, 0.0574598))
 	- Vector2.new(2, 2)
-local VOTE_TEXT_STROKE = TextMetrics.scaledTextStroke(3.8, "Vote for a game mode!", Enum.Font.Highway, VOTE_TEXT_BOUNDS)
+local VOTE_TEXT_STROKE =
+	TextMetrics.scaledTextStroke(3.8, "Vote for a game mode!", UIConfig.Text.BodyFont, VOTE_TEXT_BOUNDS)
 
 export type Props = {
 	Active: boolean,
@@ -43,6 +41,8 @@ export type Props = {
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.None)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local short = safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local compact = not portrait and short
 	local present, setPresent = React.useState(props.Active or props.Prepared == true)
 	local revision = React.useRef(0)
 	local focusRevision = React.useRef(0)
@@ -168,7 +168,7 @@ return function(props: Props)
 			OnVote = props.OnVote,
 			ButtonRef = if index == 1 then firstButtonRef else nil,
 			Portrait = portrait,
-			Compact = safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx,
+			Compact = short,
 		})
 	end
 	local holderHeight = math.min(
@@ -197,7 +197,9 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://78333957912633",
 				Position = if portrait then UDim2.fromScale(0.04, 0.015) else UDim2.fromScale(0, -0.000749383),
-				Size = if portrait then UDim2.fromScale(0.5, 0.2) else UDim2.fromScale(0.321542, 0.301659),
+				Size = if portrait
+					then UDim2.fromScale(0.5, 0.2)
+					else if compact then UDim2.fromScale(0.25, 0.2) else UDim2.fromScale(0.321542, 0.301659),
 			}, {
 				UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 					AspectRatio = 1.55,
@@ -205,18 +207,14 @@ return function(props: Props)
 			}),
 			VoteText = c(ResponsiveText, {
 				HostName = "VoteText",
-				MeasurementFont = Enum.Font.Highway,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				MaxTextSize = 54,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
 					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/HighwayGothic.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
-					Position = UDim2.fromScale(0.522751, if portrait then 0.225 else 0.300167),
-					Size = UDim2.fromScale(0.94, if portrait then 0.065 else 0.0574598),
+					Font = UIConfig.Text.BodyFont,
+					Position = UDim2.fromScale(0.5, if portrait then 0.225 else if compact then 0.23 else 0.300167),
+					Size = UDim2.fromScale(0.94, if portrait then 0.065 else if compact then 0.075 else 0.0574598),
 					Text = "Vote for a game mode!",
 					TextColor3 = Color3.new(1, 1, 1),
 				},
@@ -233,18 +231,22 @@ return function(props: Props)
 				AutomaticCanvasSize = if portrait then Enum.AutomaticSize.Y else nil,
 				BackgroundTransparency = 1,
 				CanvasSize = if portrait then UDim2.fromOffset(0, 0) else nil,
-				Position = UDim2.fromScale(0.5, if portrait then 0.57 else 0.573),
+				Position = UDim2.fromScale(0.5, if portrait or compact then 0.57 else 0.573),
 				ScrollBarImageColor3 = if portrait then Color3.new(1, 1, 1) else nil,
 				ScrollBarThickness = if portrait then 5 else nil,
-				Size = if portrait then UDim2.new(0.94, 0, 0, holderHeight) else UDim2.fromScale(0.944456, 0.562031),
+				Size = if portrait
+					then UDim2.new(0.94, 0, 0, holderHeight)
+					else UDim2.fromScale(0.944456, if compact then 0.64 else 0.562031),
 				VerticalScrollBarInset = if portrait then Enum.ScrollBarInset.ScrollBar else nil,
 			}, cards),
 			LoadingBar = c(VoteLoadingBar, {
 				Active = props.Active,
 				EndsAt = props.EndsAt,
 				DurationSeconds = props.DurationSeconds,
-				Position = if portrait then UDim2.fromScale(0.5, 0.96) else nil,
-				Size = if portrait then UDim2.new(0.84, 0, 0, 20) else nil,
+				Position = if portrait or compact then UDim2.fromScale(0.5, 0.96) else nil,
+				Size = if portrait
+					then UDim2.new(0.84, 0, 0, 20)
+					else if compact then UDim2.new(0.6, 0, 0, 12) else nil,
 			}),
 		}),
 	})

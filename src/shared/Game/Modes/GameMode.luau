@@ -1,7 +1,4 @@
--- Name: GameMode.luau
--- Author: Jack C.
 -- Description: The interface every game mode implements, pairing the pure match rules readable by the sim, tests, and UI with the server-only lifecycle hooks.
--- Created: 2026-07-13
 
 --!strict
 

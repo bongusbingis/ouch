@@ -1,7 +1,4 @@
--- Name: QuestService.luau
--- Author: Jack C.
 -- Description: Server owner of daily quest state: assigns the deterministic daily set, advances progress from deduplicated match and combat events, handles claims, and grants rewards through the reward service.
--- Created: 2026-07-13
 
 --!strict
 
@@ -274,11 +271,11 @@ function QuestService.claim(player: Player, questId: string): (boolean, any)
 	return false, "not_active"
 end
 
-function QuestService.stateForTesting(player: Player): { [string]: any }?
+function QuestService.stateForAdmin(player: Player): { [string]: any }?
 	return stateFor(player, true)
 end
 
-function QuestService.resetForTesting(player: Player): boolean
+function QuestService.resetForAdmin(player: Player): boolean
 	local data = ensureData(player, nil, true)
 	if data == nil then
 		return false
@@ -288,7 +285,7 @@ function QuestService.resetForTesting(player: Player): boolean
 	return true
 end
 
-function QuestService.setProgressForTesting(player: Player, questId: string, progress: number): (boolean, string?)
+function QuestService.setProgressForAdmin(player: Player, questId: string, progress: number): (boolean, string?)
 	if progress ~= progress or math.abs(progress) == math.huge then
 		return false, "invalid_progress"
 	end
@@ -314,12 +311,12 @@ function QuestService.setProgressForTesting(player: Player, questId: string, pro
 	return false, "not_active"
 end
 
-function QuestService.completeForTesting(player: Player, questId: string): (boolean, string?)
+function QuestService.completeForAdmin(player: Player, questId: string): (boolean, string?)
 	local definition = definitionsById[questId]
 	if definition == nil then
 		return false, "unknown_quest"
 	end
-	return QuestService.setProgressForTesting(player, questId, definition.goal)
+	return QuestService.setProgressForAdmin(player, questId, definition.goal)
 end
 
 local function waitForProfile(player: Player)

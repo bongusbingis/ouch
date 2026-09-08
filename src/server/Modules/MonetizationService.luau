@@ -1,7 +1,4 @@
--- Name: MonetizationService.luau
--- Author: Jack C.
 -- Description: Owns receipt processing: records receipts in the profile for idempotency, dispatches to the registered handler per product type, and leaves unknown or failed receipts for Roblox to retry.
--- Created: 2026-07-13
 
 --!strict
 
@@ -9,8 +6,10 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local DataConfig = require(ReplicatedStorage.Config.Progression.Data)
-local WriteThroughProxy = require(ReplicatedStorage.Shared.Game.Data.WriteThroughProxy)
+local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
+local WriteThroughProxy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
+)
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates"))
 local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Bundles"))
@@ -21,7 +20,9 @@ local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local RewardService = require(script.Parent.RewardService)
-local ReceiptHistory = require(ReplicatedStorage.Shared.Game.Economy.ReceiptHistory)
+local ReceiptHistory = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("ReceiptHistory")
+)
 
 type StartOptions = {
 	marketplace: any?,

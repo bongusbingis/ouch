@@ -1,7 +1,4 @@
--- Name: BallVisuals.luau
--- Author: Jack C.
 -- Description: Renders every dodgeball in the world: clones the equipped ball cosmetic, smooths replicated ball positions, drives held/windup/flight/bounce effects and squash-stretch springs, and predicts the local player's own throws.
--- Created: 2026-07-12
 
 --!strict
 

@@ -1,12 +1,9 @@
--- Name: QueueRepository.luau
--- Author: Jack C.
 -- Description: Persistence for the matchmaking queue in the shared memory store: enqueue, refresh, remove, and read the current candidate tickets.
--- Created: 2026-08-15
 
 local MemoryStoreService = game:GetService("MemoryStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local QueueRepository = {}

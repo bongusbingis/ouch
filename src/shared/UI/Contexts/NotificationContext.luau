@@ -1,7 +1,4 @@
--- Name: NotificationContext.luau
--- Author: Jack C.
 -- Description: React context that lets any screen queue a notification or confirmation modal and await the player's response.
--- Created: 2026-08-17
 
 --!strict
 

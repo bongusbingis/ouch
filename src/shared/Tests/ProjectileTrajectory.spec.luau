@@ -1,12 +1,15 @@
--- Name: ProjectileTrajectory.spec.luau
--- Author: Jack C.
 -- Description: Spec that the shared trajectory sampler matches the authoritative simulation exactly for gravity, homing, carrier momentum, and charged release, and respects its buffer and substep bounds.
--- Created: 2026-08-24
 
 --!strict
 
 local T = require(script.Parent.TestKit)
-local MockWorld = require(script.Parent.MockWorld)
+local MockWorld = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ServerStorage")
+		:WaitForChild("Tests")
+		:WaitForChild("Helpers")
+		:WaitForChild("MockWorld")
+)
 local Sim = script.Parent.Parent.Game.Sim
 local SimTypes = require(Sim.SimTypes)
 local Projectiles = require(Sim.Projectiles)

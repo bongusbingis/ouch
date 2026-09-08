@@ -1,7 +1,4 @@
--- Name: FFA.luau
--- Author: Jack C.
 -- Description: Free-for-all game mode: its match rules and the server hooks that provision a ball per entrant and score every elimination individually.
--- Created: 2026-07-13
 
 --!strict
 

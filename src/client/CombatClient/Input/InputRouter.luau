@@ -1,7 +1,4 @@
--- Name: InputRouter.luau
--- Author: Jack C.
 -- Description: Drives per-frame aim and soft-lock target selection while combat is active, reports the player's device class to the server, and owns whether the mouse cursor is released for the mode-vote menu.
--- Created: 2026-07-12
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CombatHUD.luau
--- Author: Jack C.
 -- Description: React combat heads-up display: the aim reticle, predicted trajectory, swipe feedback, charge state, and the touch hammer button.
--- Created: 2026-08-22
 
 --!strict
 

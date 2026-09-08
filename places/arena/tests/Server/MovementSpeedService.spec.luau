@@ -1,7 +1,4 @@
--- Name: MovementSpeedService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec that named walk-speed modifiers replace, compose, and clear correctly and are only applied during the synchronized adapter step.
--- Created: 2026-07-16
 
 --!nonstrict
 

@@ -1,7 +1,4 @@
--- Name: EventDedup.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the event dedup spec: single admission, identity fields, clearing, and eviction at the cap.
--- Created: 2026-07-16
 
 --!nonstrict
 

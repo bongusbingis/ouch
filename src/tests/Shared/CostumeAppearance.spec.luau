@@ -1,10 +1,17 @@
 --!nonstrict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local Appearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
-local VictoryRig = require(ReplicatedStorage.Shared.UI.Services.VictoryRig)
-local Emotes = require(ReplicatedStorage.Config.Cosmetics.Emotes)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Appearance = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CharacterAppearance")
+)
+local VictoryRig = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("VictoryRig")
+)
+local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local TestAssets = require(script.Parent.Parent.Helpers.TestAssets)
 local CharacterFixture = require(script.Parent.Parent.Helpers.CharacterFixture)
 

@@ -1,7 +1,4 @@
--- Name: CrateConfig.spec.luau
--- Author: Jack C.
 -- Description: Spec guarding the shipped crate configuration: disclosed odds summing to exactly one hundred, pity only for droppable rarities, and the price guarantees between direct buying and crate chasing.
--- Created: 2026-08-12
 
 --!strict
 

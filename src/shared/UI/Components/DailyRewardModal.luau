@@ -1,11 +1,9 @@
--- Name: DailyRewardModal.luau
--- Author: Jack C.
 -- Description: Animated modal that presents the daily reward claim: spring entrance, 7-day progress strip, reward display, and a dismiss button.
--- Created: 2026-09-01
 
 --!strict
 
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -15,6 +13,8 @@ local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
+local Selection = require(script.Parent.Parent.Services.Selection)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
@@ -24,12 +24,11 @@ local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 
 local c = React.createElement
 
-local CLAIM_COLOR = Palette.Green
-local CLAIMED_COLOR = Palette.Raised
+local CLAIM_COLOR = Palette.Pink
+local CLAIMED_COLOR = Palette.Claimed
 local AVAILABLE_GLOW = Palette.Yellow
 
 local ButtonSurface = require(script.Parent.ButtonSurface)
-local CHECK_ICON_ASSET = "rbxassetid://505845268"
 
 export type PublicDay = {
 	day: number,
@@ -60,7 +59,7 @@ export type Props = {
 local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 	local day = dayProps.Day
 	local claimed = day.claimed and not day.available
-	local bgColor = if claimed then CLAIMED_COLOR elseif day.available then AVAILABLE_GLOW else Palette.Ink
+	local bgColor = if claimed then CLAIMED_COLOR elseif day.available then AVAILABLE_GLOW else Palette.PanelRaised
 
 	return c("Frame", {
 		BackgroundColor3 = bgColor,
@@ -73,21 +72,24 @@ local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 			then c("ImageLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				Image = CHECK_ICON_ASSET,
+				Image = "rbxassetid://168702841",
+				ImageColor3 = Palette.White,
 				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromScale(0.82, 0.9),
 				ScaleType = Enum.ScaleType.Fit,
-				Size = UDim2.fromScale(0.8, 0.7),
 			})
 			else c(ResponsiveText, {
-				MeasurementFont = Enum.Font.SourceSansBold,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold),
+					FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
 					Position = UDim2.fromScale(0.5, 0.5),
 					Size = UDim2.fromScale(0.9, 0.8),
 					Text = tostring(day.day),
-					TextColor3 = if day.available then Palette.Ink else Color3.new(1, 1, 1),
+					TextColor3 = Palette.White,
+					TextStrokeColor3 = Palette.Ink,
+					TextStrokeTransparency = 0.35,
 				},
 			}),
 	})
@@ -100,16 +102,40 @@ return function(props: Props)
 			return
 		end
 		local previous = GuiService.SelectedObject
+		local panel = if actionRef.current then actionRef.current.Parent else nil
 		local active = true
-		task.defer(function()
+		local function focus()
 			local button = actionRef.current
-			if active and button and button.Parent and button.Selectable then
+			if not active or DeviceClass.current() ~= "Gamepad" or not Selection.isSelectable(button) then
+				return
+			end
+			local selected = GuiService.SelectedObject
+			if selected and not selected:IsDescendantOf(Players.LocalPlayer.PlayerGui) then
+				return
+			end
+			local ownRoot = button:FindFirstAncestorWhichIsA("ScreenGui")
+			local selectedRoot = if selected then selected:FindFirstAncestorWhichIsA("ScreenGui") else nil
+			if selectedRoot and ownRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder then
+				return
+			end
+			if not (selected and panel and selected:IsDescendantOf(panel) and Selection.isSelectable(selected)) then
 				GuiService.SelectedObject = button
+			end
+		end
+		local disconnect = DeviceClass.observe(function(input)
+			if input == "Gamepad" then
+				task.defer(focus)
 			end
 		end)
 		return function()
 			active = false
-			if previous and previous.Parent and previous.Visible and previous.Selectable then
+			disconnect()
+			local selected = GuiService.SelectedObject
+			if
+				DeviceClass.current() == "Gamepad"
+				and (selected == nil or (panel and selected:IsDescendantOf(panel)))
+				and Selection.isSelectable(previous)
+			then
 				GuiService.SelectedObject = previous
 			end
 		end
@@ -187,14 +213,14 @@ return function(props: Props)
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Palette.Surface,
+			BackgroundColor3 = Palette.Panel,
 			BorderSizePixel = 0,
 			Position = UDim2.fromScale(0.5, 0.5),
 			Rotation = styles.Rotation,
 			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		}, {
 			ModalScale = c("UIScale", { Scale = styles.Scale }),
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 18) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
 			Outline = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 3 }),
 			HeaderBand = c("Frame", {
 				BackgroundColor3 = Palette.Yellow,
@@ -205,33 +231,33 @@ return function(props: Props)
 			Title = c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 36,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.05),
-					Size = UDim2.new(1, -120, 0.12, 0),
-					Text = "DAILY REWARD!",
-					TextColor3 = Palette.Ink,
+					Position = UDim2.fromOffset(18, 6),
+					Size = UDim2.new(1, -86, 0.17, 0),
+					Text = "DAILY REWARDS",
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextColor3 = Palette.White,
 					ZIndex = 2,
 				},
-			}),
-			Divider = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundColor3 = Palette.Pink,
-				BorderSizePixel = 0,
-				Position = UDim2.new(0.5, 0, 0.17, 16),
-				Size = UDim2.fromScale(0.88, 0.012),
+			}, {
+				Outline = c("UIStroke", {
+					Color = Palette.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			DayStrip = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0.5, 0, 0.17, 26),
+				Position = UDim2.new(0.5, 0, 0.17, 18),
 				Size = UDim2.fromScale(0.85, 0.1),
 			}, miniDays),
 			RewardArea = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Palette.Ink,
+				BackgroundColor3 = Palette.PanelRaised,
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0.5, 0.48),
 				Size = UDim2.fromScale(0.7, 0.25),
@@ -242,12 +268,15 @@ return function(props: Props)
 					then c(BonksLabel, {
 						Amount = currentReward.amount or 0,
 						MaxTextSize = 54,
+						TextColor = Palette.White,
+						TextStroke = 0.045,
 						IconSize = UDim2.fromScale(0.25, 0.8),
 					})
 					else nil,
 			}),
 			StreakLabel = c(ResponsiveText, {
 				HostName = "Streak",
+				MaxTextSize = 24,
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
@@ -256,41 +285,51 @@ return function(props: Props)
 					Position = UDim2.fromScale(0.5, 0.63),
 					Size = UDim2.fromScale(0.8, 0.08),
 					Text = props.ErrorText or streakText,
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = Palette.White,
 					ZIndex = 2,
 				},
+			}, {
+				Outline = c(
+					"UIStroke",
+					{ Color = Palette.Ink, Thickness = 0.045, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
+				),
 			}),
 			CloseButton = c(AnimatedButton, {
 				ButtonRef = actionRef,
+				SelectionRadius = UDim.new(0.5, 0),
+				Visual = c(ButtonSurface, { Color = Palette.Pink, Radius = UDim.new(0.5, 0) }),
 				Enabled = props.OnClose ~= nil,
 				OnActivated = props.OnClose,
 				Native = {
 					AnchorPoint = Vector2.new(1, 0),
 					Position = UDim2.new(1, -8, 0, 8),
 					Size = UDim2.fromOffset(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx),
-					BackgroundColor3 = Palette.Ink,
+					BackgroundTransparency = 1,
 					ZIndex = 3,
 				},
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
 				Label = c(ResponsiveText, {
-					MaxTextSize = 28,
-					MeasurementFont = Enum.Font.LuckiestGuy,
+					MaxTextSize = 42,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					Native = {
 						BackgroundTransparency = 1,
 						Size = UDim2.fromScale(1, 1),
 						Text = "×",
 						TextColor3 = Color3.new(1, 1, 1),
-						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+						Font = UIConfig.Text.BodyFont,
 						ZIndex = 4,
 					},
+				}, {
+					Outline = c("UIStroke", {
+						Color = Palette.Ink,
+						Thickness = 0.045,
+						StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					}),
 				}),
 			}),
 			ActionButton = c(AnimatedButton, {
-				Visual = c(
-					ButtonSurface,
-					{ Color = if state.canClaim then CLAIM_COLOR else Palette.Pink, Enabled = not props.Pending }
-				),
+				SelectionRadius = UDim.new(0.5, 0),
+				Visual = c(ButtonSurface, { Color = CLAIM_COLOR, Enabled = not props.Pending }),
 				Style = "Primary",
 				Enabled = not props.Pending and (if state.canClaim then props.OnClaim ~= nil else props.OnClose ~= nil),
 				Native = {
@@ -298,7 +337,7 @@ return function(props: Props)
 					BackgroundTransparency = 1,
 					Image = "",
 					Position = UDim2.fromScale(0.5, 0.92),
-					Size = UDim2.fromScale(0.64, 0.16),
+					Size = UDim2.fromScale(0.72, 0.16),
 				},
 				OnActivated = function()
 					if state.canClaim then
@@ -316,16 +355,19 @@ return function(props: Props)
 				),
 				TextLabel = c(ResponsiveText, {
 					MeasurementFont = Enum.Font.LuckiestGuy,
+					MaxTextSize = 30,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
 						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 						Position = UDim2.fromScale(0.5, 0.5),
-						Size = UDim2.fromScale(0.7, 0.6),
+						Size = UDim2.fromScale(0.88, 0.72),
 						Text = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM REWARD" else "DONE",
 						TextColor3 = Color3.new(1, 1, 1),
 						ZIndex = 2,
 					},
+				}, {
+					Outline = c("UIStroke", { Thickness = 0.05, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }),
 				}),
 			}),
 		}),

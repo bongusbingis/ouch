@@ -1,7 +1,4 @@
--- Name: ReturnPartyPolicy.spec.luau
--- Author: Jack C.
 -- Description: Spec for restoring a party returning from the arena: reviving the surviving record, accepting one an earlier arrival restored, and rejecting mismatched matches and outsiders.
--- Created: 2026-08-24
 
 --!strict
 

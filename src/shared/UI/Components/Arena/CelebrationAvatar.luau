@@ -3,9 +3,10 @@
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local Emotes = require(ReplicatedStorage.Config.Cosmetics.Emotes)
-local Colors = require(ReplicatedStorage.Config.Interface.ArenaPresentation).Colors
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
+local Colors =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation")).Colors
 local VictoryRig = require(script.Parent.Parent.Parent.Services.VictoryRig)
 local PreviewScheduler = require(script.Parent.Parent.Parent.Services.PreviewScheduler)
 local c = React.createElement

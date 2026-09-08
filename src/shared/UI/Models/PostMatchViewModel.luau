@@ -1,7 +1,4 @@
--- Name: PostMatchViewModel.luau
--- Author: Jack C.
 -- Description: Pure post-match presentation rules for party roles, action copy, request state, countdowns, and bounded responsive canvas sizing.
--- Created: 2026-08-31
 
 --!strict
 

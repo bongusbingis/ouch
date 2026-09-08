@@ -1,7 +1,4 @@
--- Name: CombatPoseService.luau
--- Author: Jack C.
 -- Description: Applies the authored combat idle pose to characters as they spawn so players stand in the combat stance rather than the default one.
--- Created: 2026-08-20
 
 --!strict
 

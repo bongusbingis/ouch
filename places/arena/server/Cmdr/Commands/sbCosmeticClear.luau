@@ -1,7 +1,4 @@
--- Name: sbCosmeticClear.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-cosmetic-clear: clears an equipped cosmetic slot.
--- Created: 2026-07-15
 
 --!strict
 

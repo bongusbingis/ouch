@@ -1,12 +1,15 @@
--- Name: Hammer.spec.luau
--- Author: Jack C.
 -- Description: Spec for the hammer weapon kit: routing against held balls, closest-target-in-front hits, team rules, the cooldown and recovery phases, and assisted swing turning and lunging.
--- Created: 2026-07-13
 
 --!strict
 
 local T = require(script.Parent.TestKit)
-local MockWorld = require(script.Parent.MockWorld)
+local MockWorld = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ServerStorage")
+		:WaitForChild("Tests")
+		:WaitForChild("Helpers")
+		:WaitForChild("MockWorld")
+)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)

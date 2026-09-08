@@ -3,8 +3,10 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local DataConfig = require(ReplicatedStorage.Config.Progression.Data)
-local Boosts = require(ReplicatedStorage.Shared.Game.Economy.Boosts)
+local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
+local Boosts = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
+)
 local PlayerData = require(script.Parent.PlayerData)
 local EntitlementService = require(script.Parent.EntitlementService)
 local BattlePassService = require(script.Parent.BattlePassService)

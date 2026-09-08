@@ -1,15 +1,14 @@
--- Name: BanRepository.luau
--- Author: Jack C.
 -- Description: Looks up matchmaking bans for party members through the cloud store with retry, applying the shared ban policy to decide whether a party may queue.
--- Created: 2026-08-17
 
 --!strict
 
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local BanPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.BanPolicy)
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local BanPolicy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Matchmaking"):WaitForChild("BanPolicy")
+)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local BanRepository = {}

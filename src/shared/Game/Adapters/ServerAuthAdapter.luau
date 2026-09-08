@@ -1,7 +1,4 @@
--- Name: ServerAuthAdapter.luau
--- Author: Jack C.
 -- Description: The server-only bridge between the engine and the pure simulation: runs the fixed-rate accumulator, builds the world snapshot, turns queued client intents into commands, steps the sim, encodes state back onto instances, and broadcasts events.
--- Created: 2026-07-12
 
 --!strict
 
@@ -320,7 +317,7 @@ local function step(dt: number)
 	end
 end
 
-function ServerAuthAdapter.resetWeaponsForTesting(player: Player): boolean
+function ServerAuthAdapter.resetWeaponsForAdmin(player: Player): boolean
 	if player.Parent ~= Players then
 		return false
 	end

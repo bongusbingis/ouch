@@ -32,8 +32,13 @@ if CLEAR then
 	return "Review sheet removed and camera restored"
 end
 
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local Factory = require(ReplicatedStorage.Shared.Game.Cosmetics.CosmeticVisualFactory)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Factory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CosmeticVisualFactory")
+)
 local sheet = Instance.new("Folder")
 sheet.Name = "CosmeticNamingSheet"
 sheet:SetAttribute("ReviewOwner", "CosmeticContactSheet")

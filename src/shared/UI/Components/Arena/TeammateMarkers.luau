@@ -2,8 +2,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Model = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
 local Label = require(script.Parent.Label)
 local c = React.createElement

@@ -1,7 +1,4 @@
--- Name: AssistProjection.luau
--- Author: Jack C.
 -- Description: Reads and writes the per-player aim-assist projection, turning resolved assist scalars into replicated values and back for the client.
--- Created: 2026-08-19
 
 --!strict
 

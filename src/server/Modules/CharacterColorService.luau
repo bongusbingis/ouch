@@ -4,8 +4,18 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
-local CostumeVisualFactory = require(ReplicatedStorage.Shared.Game.Cosmetics.CostumeVisualFactory)
+local CharacterAppearance = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CharacterAppearance")
+)
+local CostumeVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CostumeVisualFactory")
+)
 
 local CharacterColorService = {}
 local started = false

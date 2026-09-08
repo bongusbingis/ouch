@@ -7,7 +7,8 @@ local Factory = require(Cosmetics.CosmeticEffectFactory)
 local ScriptEffects = require(Cosmetics.Effects.ScriptEffects)
 local Runtime = require(Cosmetics.Effects.Runtime)
 local Primitives = require(Cosmetics.Effects.Primitives)
-local EffectConfig = require(ReplicatedStorage.Config.Cosmetics.CosmeticEffects)
+local EffectConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("CosmeticEffects"))
 
 return function()
 	describe("Cosmetic effect playback results", function()

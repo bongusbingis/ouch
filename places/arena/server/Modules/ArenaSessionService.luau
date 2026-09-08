@@ -1,7 +1,4 @@
--- Name: ArenaSessionService.luau
--- Author: Jack C.
 -- Description: Owns the arena server's matchmaking session identity: validates arriving teleport payloads and their source place, tracks admission and party identity across reconnects, and gates the start of play on client readiness.
--- Created: 2026-08-17
 
 --!strict
 

@@ -10,6 +10,10 @@
 # CI build artifacts
 /dist.rbxl
 /build.rbxl
+/.ci-build/
+/.ci-release/
+/dist.rbxl.tested.json
+/dist.rbxl.published.json
 
 #misc
 /stylua.toml

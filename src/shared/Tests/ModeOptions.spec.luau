@@ -1,7 +1,4 @@
--- Name: ModeOptions.spec.luau
--- Author: Jack C.
 -- Description: Spec for ballot option canonicalization: filtering unavailable and duplicate options, falling back after complete version skew, and comparing canonical sequences.
--- Created: 2026-08-24
 
 --!strict
 

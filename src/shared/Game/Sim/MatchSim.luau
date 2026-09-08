@@ -1,7 +1,4 @@
--- Name: MatchSim.luau
--- Author: Jack C.
 -- Description: Pure match phase machine parameterized by the active mode's rules, deciding phase transitions, scores, and the winner, and nothing about how those outcomes are applied.
--- Created: 2026-07-13
 
 --!strict
 

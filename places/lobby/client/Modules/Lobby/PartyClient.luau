@@ -1,7 +1,4 @@
--- Name: PartyClient.luau
--- Author: Jack C.
 -- Description: Client adapter for the lobby party system: holds the party snapshot, sends join, kick, matchmaking-toggle and invite requests, tracks busy and teleport status, and surfaces errors to the UI.
--- Created: 2026-08-17
 
 --!strict
 

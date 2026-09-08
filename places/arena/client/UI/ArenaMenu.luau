@@ -1,7 +1,4 @@
--- Name: ArenaMenu.luau
--- Author: Jack C.
 -- Description: Arena wrapper around the shared CombatMenu: derives menu availability from the arena's loading, vote, and teleport adapters and renders the shared overlay menu with the arena's settings context.
--- Created: 2026-08-24
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: ConfigOverrides.luau
--- Author: Jack C.
 -- Description: Pure rules for turning raw experience config values into applicable overrides, validating each against its declared type and range and partitioning the simulation-critical ones.
--- Created: 2026-08-18
 
 --!strict
 

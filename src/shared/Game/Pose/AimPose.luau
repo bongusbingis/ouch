@@ -1,7 +1,4 @@
--- Name: AimPose.luau
--- Author: Jack C.
 -- Description: Pure maths for the throwing-arm pose, deciding how strongly the solver pulls and how far into the wind-up the hand has travelled, in plain numbers with no rig knowledge.
--- Created: 2026-08-20
 
 --!strict
 

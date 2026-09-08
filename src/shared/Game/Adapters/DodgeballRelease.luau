@@ -1,7 +1,4 @@
--- Name: DodgeballRelease.luau
--- Author: Jack C.
 -- Description: Computes the world position a thrown ball is released from, resolving the configured release socket relative to the thrower.
--- Created: 2026-08-24
 
 --!strict
 

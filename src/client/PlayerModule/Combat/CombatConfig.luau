@@ -1,7 +1,4 @@
--- Name: CombatConfig.luau
--- Author: Jack C.
 -- Description: Tuning values for the combat input and camera layer: thresholds, timings, touch regions, and camera behavior constants.
--- Created: 2026-08-20
 
 --!strict
 

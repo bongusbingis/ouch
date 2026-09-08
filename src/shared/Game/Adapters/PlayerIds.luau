@@ -1,7 +1,4 @@
--- Name: PlayerIds.luau
--- Author: Jack C.
 -- Description: Single owner of the simulation player-id convention, translating between players and the string ids used throughout sim state and events.
--- Created: 2026-07-16
 
 --!strict
 

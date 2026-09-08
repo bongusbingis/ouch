@@ -1,7 +1,4 @@
--- Name: EntitlementService.luau
--- Author: Jack C.
 -- Description: Caches which game passes each player owns and derives the best applicable XP and Bonks multipliers from them, exposing a readiness signal so awards never apply a half-known set.
--- Created: 2026-08-12
 
 --!strict
 

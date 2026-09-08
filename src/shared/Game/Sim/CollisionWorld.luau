@@ -1,7 +1,4 @@
--- Name: CollisionWorld.luau
--- Author: Jack C.
 -- Description: Pure collision maths for the simulation: closest points on segments, swept sphere against capsule tests, and the clamped rotation helper used for homing.
--- Created: 2026-07-12
 
 --!strict
 

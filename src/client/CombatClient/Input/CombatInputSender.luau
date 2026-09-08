@@ -1,7 +1,4 @@
--- Name: CombatInputSender.luau
--- Author: Jack C.
 -- Description: Turns local combat intents (throw, charge, catch, hammer swing, weapon equip) into server submissions over the combat remotes, buffering inputs that arrive while an action is not yet legal.
--- Created: 2026-08-18
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CrateRevealModal.luau
--- Author: Jack C.
 -- Description: Animated crate reveal: a rarity-scaled shake and burst that resolves into the item a single open produced, or a staggered grid for a bulk open, with skip, replay and duplicate-refund reporting.
--- Created: 2026-08-23
 
 --!strict
 
@@ -25,8 +22,10 @@ local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local CosmeticsLogic = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
+)
 local AnimatedButton = require(script.Parent.AnimatedButton)
 
 local c = React.createElement
@@ -380,7 +379,7 @@ return function(props)
 		end
 		if props.OnViewInventory then
 			table.insert(actions, {
-				text = "INVENTORY",
+				text = "BACKPACK",
 				enabled = true,
 				focus = true,
 				run = function()

@@ -1,7 +1,4 @@
--- Name: Config.luau
--- Author: Jack C.
 -- Description: Lobby matchmaking tunables: arena place id, party bounds, queue and store lifetimes, retry policy, and the memory store namespaces separating Studio from live.
--- Created: 2026-08-15
 
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

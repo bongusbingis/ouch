@@ -1,7 +1,4 @@
--- Name: CharacterRig.luau
--- Author: Jack C.
 -- Description: Central lookup for character rig part names and grip transforms, including the R15/R6 fallback for the throwing hand, so no presentation module hardcodes rig conventions.
--- Created: 2026-07-16
 
 --!strict
 

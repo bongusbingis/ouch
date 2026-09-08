@@ -1,7 +1,4 @@
--- Name: QuestCompleteServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-quest-complete, forcing an active daily quest to its completion threshold for each targeted player.
--- Created: 2026-07-15
 
 --!strict
 
@@ -14,7 +11,7 @@ local QuestService = require(Server:WaitForChild("Modules"):WaitForChild("QuestS
 
 return function(_context: any, players: { Player }, questId: string): string
 	local result = CommandUtil.runForPlayers(players, function(player)
-		return QuestService.completeForTesting(player, questId)
+		return QuestService.completeForAdmin(player, questId)
 	end)
 	return `Completed {questId} | {result}`
 end

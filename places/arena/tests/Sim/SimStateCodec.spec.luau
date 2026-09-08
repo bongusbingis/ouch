@@ -1,7 +1,4 @@
--- Name: SimStateCodec.spec.luau
--- Author: Jack C.
 -- Description: In-place spec running the sim state codec against real instances so attribute typing, ball CFrame storage, authored rotation, and the replication attribute limits are all exercised for real.
--- Created: 2026-07-16
 
 --!nonstrict
 

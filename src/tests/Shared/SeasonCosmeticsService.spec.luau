@@ -2,7 +2,12 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BattlePassService = require(game:GetService("ServerScriptService").Server.Modules.BattlePassService)
-local BattlePassLogic = require(ReplicatedStorage.Shared.Game.Progression.BattlePassLogic)
+local BattlePassLogic = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("BattlePassLogic")
+)
 
 local function fixture()
 	local player = { UserId = -773904, Name = "SeasonCosmetics", Parent = true }

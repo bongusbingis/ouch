@@ -1,7 +1,4 @@
--- Name: ElimZones.luau
--- Author: Jack C.
 -- Description: Map feature kit for out-of-bounds volumes: eliminates any player whose root enters an authored elimination zone, routing through the match service so scoring and respawn stay in one place.
--- Created: 2026-08-18
 
 --!strict
 

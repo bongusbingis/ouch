@@ -4,7 +4,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local ArenaCoreUI = {}
 local replaced = { Enum.CoreGuiType.PlayerList, Enum.CoreGuiType.Health, Enum.CoreGuiType.Backpack }
 local previous: { [Enum.CoreGuiType]: boolean } = {}

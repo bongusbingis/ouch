@@ -1,7 +1,4 @@
--- Name: sb-match-restart.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-match-restart: restarts the match, optionally with a specific mode.
--- Created: 2026-07-15
 
 --!strict
 

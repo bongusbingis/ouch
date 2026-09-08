@@ -1,7 +1,4 @@
--- Name: ShopRotation.spec.luau
--- Author: Jack C.
 -- Description: Spec for the per-player shop draw: determinism per player and period, exclusion of owned items, distinct results, pool edge cases, and why the drawn set must be persisted.
--- Created: 2026-08-22
 
 --!strict
 

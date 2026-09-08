@@ -1,7 +1,4 @@
--- Name: SimCore.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the end-to-end sim spec, replaying a deterministic pickup, throw, curve, and elimination scenario and pinning command arrival-order canonicalization.
--- Created: 2026-07-16
 
 --!nonstrict
 
@@ -11,7 +8,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Sim = Shared:WaitForChild("Game"):WaitForChild("Sim")
 
-local MockWorld = require(Shared:WaitForChild("Tests"):WaitForChild("MockWorld"))
+local MockWorld =
+	require(game:GetService("ServerStorage"):WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("MockWorld"))
 local SimCore = require(Sim:WaitForChild("SimCore"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))
 

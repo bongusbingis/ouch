@@ -1,7 +1,4 @@
--- Name: ConfigLiveService.luau
--- Author: Jack C.
 -- Description: Reads the Roblox experience config snapshot, validates every declared override against its type and range, installs it into the live config tables, and restores the shipped value when an override disappears.
--- Created: 2026-08-18
 
 --!strict
 

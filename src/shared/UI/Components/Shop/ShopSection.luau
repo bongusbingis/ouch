@@ -1,7 +1,4 @@
--- Name: ShopSection.luau
--- Author: Jack C.
 -- Description: One category block in the storefront dashboard: a compact label, its rotation countdown, and the card grid the resolved layout gives its column.
--- Created: 2026-08-23
 
 --!strict
 
@@ -37,19 +34,17 @@ return function(props: Props)
 	if #section.cards == 0 then
 		children.Empty = c(ResponsiveText, {
 			HostName = "Empty",
-			MeasurementFont = Enum.Font.SourceSansBold,
+			MeasurementFont = UIConfig.Text.BodyFont,
 			MaxTextSize = 20,
 			Native = {
-				BackgroundColor3 = Color3.fromRGB(58, 58, 58),
-				BackgroundTransparency = 0.42,
-				FontFace = Font.new(
-					"rbxasset://fonts/families/SourceSansPro.json",
-					Enum.FontWeight.Bold,
-					Enum.FontStyle.Normal
-				),
+				BackgroundColor3 = UIConfig.ProgressionStyle.PanelRaised,
+				BackgroundTransparency = 0,
+				Font = UIConfig.Text.BodyFont,
 				Size = UDim2.fromScale(1, 1),
 				Text = "NEW ITEMS ARE ON THE WAY!",
 				TextColor3 = Color3.new(1, 1, 1),
+				TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
+				TextStrokeTransparency = 0.35,
 				ZIndex = 5,
 			},
 		}, {

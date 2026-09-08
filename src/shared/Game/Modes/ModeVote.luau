@@ -1,7 +1,4 @@
--- Name: ModeVote.luau
--- Author: Jack C.
 -- Description: Pure ballot state: one vote per player, tallying, finalist selection, random resolution of ties and empty ballots, and the capped extension for late-ready players.
--- Created: 2026-08-17
 
 --!strict
 

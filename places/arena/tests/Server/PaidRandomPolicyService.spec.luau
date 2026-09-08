@@ -1,7 +1,4 @@
--- Name: PaidRandomPolicyService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec that paid random crate offers are blocked and cached for restricted players while earned-currency crates stay available.
--- Created: 2026-08-08
 
 --!nonstrict
 

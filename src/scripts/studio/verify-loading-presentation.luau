@@ -4,9 +4,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 assert(RunService:IsRunning() and RunService:IsClient(), "Run this check in a Play client")
-local React = require(ReplicatedStorage.Packages.react)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
-local LoadingScreen = require(ReplicatedStorage.Shared.UI.Components.LoadingScreen)
+local LoadingScreen = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Components"):WaitForChild("LoadingScreen")
+)
 local host = Instance.new("ScreenGui")
 host.Name = "LoadingPresentationCheck"
 host.IgnoreGuiInset = true

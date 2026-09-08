@@ -2,9 +2,10 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local Scene = require(script.Parent.Parent.Parent.Services.PostMatchScene)
-local Colors = require(ReplicatedStorage.Config.Interface.ArenaPresentation).Colors
+local Colors =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation")).Colors
 local Label = require(script.Parent.Label)
 local Surface = require(script.Parent.Surface)
 local c = React.createElement
@@ -33,13 +34,14 @@ return function(props)
 		local entry = entries[index]
 		local x = if index == 1 then 0.5 else if index == 2 then 0.22 else 0.78
 		labels[entry.playerId] = c(Surface, {
-			Color = Colors.Ink,
+			Color = if entry.placement == 1
+				then Colors.Yellow
+				else if entry.placement == 2 then Colors.Cyan else Colors.Pink,
 			Shadow = false,
-			Transparency = 0.12,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.fromScale(x, 1),
-				Size = UDim2.new(0.265, 0, 0, if props.Compact then 30 else 52),
+				Size = UDim2.new(0.265, 0, 0, if props.Compact then 44 else 52),
 				Visible = props.ShowLabels ~= false,
 			},
 		}, {
@@ -48,22 +50,25 @@ return function(props)
 				Title = true,
 				Size = if props.Compact then 15 else 21,
 				Native = {
-					Position = UDim2.fromOffset(6, if props.Compact then 0 else 3),
-					Size = UDim2.new(1, -12, 0.55, 0),
+					Position = UDim2.fromOffset(6, 3),
+					Size = if props.Compact then UDim2.new(1, -12, 0, 20) else UDim2.new(1, -12, 0.55, 0),
 				},
 			}),
 			Score = c(Label, {
 				Text = `{entry.score} ELIMS`,
-				Color = Colors.Muted,
+				Color = Colors.White,
 				Size = if props.Compact then 12 else 15,
-				Native = { Position = UDim2.fromScale(0, 0.58), Size = UDim2.fromScale(1, 0.34) },
+				Native = {
+					Position = if props.Compact then UDim2.fromOffset(0, 24) else UDim2.fromScale(0, 0.58),
+					Size = if props.Compact then UDim2.new(1, 0, 0, 16) else UDim2.fromScale(1, 0.34),
+				},
 			}),
 		})
 	end
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, {
 		Region = c(
 			"Frame",
-			{ ref = region, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, if props.Compact then -32 else -56) }
+			{ ref = region, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, if props.Compact then -48 else -56) }
 		),
 		Names = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 5 }, labels),
 	})

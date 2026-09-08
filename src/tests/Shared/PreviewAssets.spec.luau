@@ -5,7 +5,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 local CharacterFixture = require(ServerStorage.Tests.Helpers.CharacterFixture)
-local CostumeVisualFactory = require(ReplicatedStorage.Shared.Game.Cosmetics.CostumeVisualFactory)
+local CostumeVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CostumeVisualFactory")
+)
 
 return function()
 	describe("Shared preview assets", function()

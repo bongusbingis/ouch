@@ -1,7 +1,4 @@
--- Name: StarterOffer.spec.luau
--- Author: Jack C.
 -- Description: Spec for the starter offer window: active only before it elapses and before conversion, formatted countdowns, and that it points at a real purchasable pass.
--- Created: 2026-08-12
 
 --!strict
 

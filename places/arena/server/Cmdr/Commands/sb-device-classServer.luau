@@ -1,7 +1,4 @@
--- Name: sb-device-classServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-device-class, stamping a validated device class onto each targeted player so aim-assist tuning can be tested per input device.
--- Created: 2026-07-15
 
 --!strict
 

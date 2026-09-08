@@ -1,11 +1,8 @@
--- Name: PartyModel.luau
--- Author: Jack C.
 -- Description: Pure party record operations, including cloning, membership changes, timestamp refresh, return-to-lobby transitions, and projection to the snapshot the client renders.
--- Created: 2026-08-15
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 
 local PartyModel = {}
 

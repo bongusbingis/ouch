@@ -1,9 +1,14 @@
--- Name: PostMatchClient.luau
--- Author: Jack C.
 -- Description: Arena adapter for authoritative post-match result packets, replay and return actions, and combat-cursor ownership while the results screen is up.
--- Created: 2026-08-25
 
 --!strict
+
+local Listeners = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Util")
+		:WaitForChild("Listeners")
+)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -39,7 +44,7 @@ local state: Snapshot = {
 	pendingAction = nil,
 	error = nil,
 }
-local listeners: { (Snapshot) -> () } = {}
+local listeners: Listeners.Collection<Snapshot> = Listeners.new("PostMatchClient", true, "listener failed")
 local connections: { RBXScriptConnection } = {}
 local matchState: Folder? = nil
 local phaseConnection: RBXScriptConnection? = nil
@@ -62,12 +67,9 @@ local function publish(changes: { [string]: any })
 		return
 	end
 	state = nextState :: Snapshot
-	for _, listener in table.clone(listeners) do
-		local ok, err = pcall(listener, state)
-		if not ok then
-			warn(`[PostMatchClient] listener failed: {err}`)
-		end
-	end
+	listeners.emitWith(function(callback)
+		callback(state)
+	end)
 end
 
 local function setVisible(visible: boolean)
@@ -188,19 +190,9 @@ end
 
 function PostMatchClient.subscribe(listener: (Snapshot) -> ()): () -> ()
 	PostMatchClient.start()
-	table.insert(listeners, listener)
+	local unsubscribe = listeners.add(listener)
 	listener(state)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(listeners, listener)
-		if index then
-			table.remove(listeners, index)
-		end
-	end
+	return unsubscribe
 end
 
 function PostMatchClient.request(action: Action)
@@ -258,7 +250,7 @@ function PostMatchClient.destroy()
 		connection:Disconnect()
 	end
 	table.clear(connections)
-	table.clear(listeners)
+	listeners.clear()
 	Combat.releaseCursor(CURSOR_REASON)
 	matchState = nil
 	pendingStatus = nil

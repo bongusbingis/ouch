@@ -5,6 +5,9 @@
   "servePlaceIds": [130584867985467],
   "blockedPlaceIds": [121997450145716],
   "globIgnorePaths": [
+    "src/shared/Tests/**",
+    "src/shared/UI/Stories/**",
+    "places/lobby/client/UI/Stories/**",
     "**/_Index/**/*.server.lua",
     "**/_Index/**/*.server.luau",
     "**/_Index/**/*.client.lua",

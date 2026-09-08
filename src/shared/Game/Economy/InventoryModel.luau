@@ -1,7 +1,4 @@
--- Name: InventoryModel.luau
--- Author: Jack C.
 -- Description: Pure projection of profile ownership and equips into the ordered inventory categories and entries the locker UI renders.
--- Created: 2026-08-16
 
 --!strict
 

@@ -4,8 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Modules = game:GetService("ServerScriptService").Server.Modules
 local PlayerData = require(Modules.PlayerData)
 local MonetizationService = require(Modules.MonetizationService)
-local Bundles = require(ReplicatedStorage.Config.Economy.Bundles)
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Bundles"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local FakePlayer = require(script.Parent.Parent.Helpers.FakePlayer)
 
 return function()

@@ -1,7 +1,4 @@
--- Name: HammerGrip.luau
--- Author: Jack C.
 -- Description: Re-export of the shared hammer grip solver so arena presentation modules can require it from their own tree.
--- Created: 2026-07-25
 
 --!strict
 

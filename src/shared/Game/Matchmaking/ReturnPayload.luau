@@ -1,7 +1,4 @@
--- Name: ReturnPayload.luau
--- Author: Jack C.
 -- Description: Builds and parses the teleport payload the arena sends back to the lobby, validating the party identity, match id, and member list against the schema.
--- Created: 2026-08-18
 
 --!strict
 

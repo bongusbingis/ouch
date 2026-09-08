@@ -1,7 +1,4 @@
--- Name: BanPolicy.spec.luau
--- Author: Jack C.
 -- Description: Spec for ban record interpretation: permanent, temporary, expired, missing, and malformed entries.
--- Created: 2026-08-17
 
 --!strict
 

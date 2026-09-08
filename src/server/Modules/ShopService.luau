@@ -1,7 +1,4 @@
--- Name: ShopService.luau
--- Author: Jack C.
 -- Description: Sole owner of the stored shop state: draws each player's rotating offers deterministically for the current period, persists them so a purchase cannot reshuffle the rest, and answers whether an item is currently purchasable.
--- Created: 2026-08-22
 
 --!strict
 

@@ -1,21 +1,39 @@
--- Name: PartyService.luau
--- Author: Jack C.
 -- Description: Owns lobby party behavior end to end: request handling and validation, cross-server party state, member appearance, queue toggling, analytics funnels, teleport hand-off, and restoring parties returning from the arena.
--- Created: 2026-08-15
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
-local Loading = require(ReplicatedStorage.Config.Interface.Loading)
-local DevSoloPlay = require(ReplicatedStorage.Shared.Game.Matchmaking.DevSoloPlay)
-local Network = require(ReplicatedStorage.Shared.Network)
-local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
-local ReturnPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPayload)
-local ReturnPartyPolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnPartyPolicy)
-local ReturnQueuePolicy = require(ReplicatedStorage.Shared.Game.Matchmaking.ReturnQueuePolicy)
-local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
+local Loading = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Loading"))
+local DevSoloPlay = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("DevSoloPlay")
+)
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local Protocol = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Protocol"))
+local ReturnPayload = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("ReturnPayload")
+)
+local ReturnPartyPolicy = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("ReturnPartyPolicy")
+)
+local ReturnQueuePolicy = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("ReturnQueuePolicy")
+)
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local AnalyticsService = require(script.Parent.Parent.AnalyticsService)
 local PartyModel = require(script.Parent.PartyModel)
 

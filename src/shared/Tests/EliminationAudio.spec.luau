@@ -1,7 +1,4 @@
--- Name: EliminationAudio.spec.luau
--- Author: Jack C.
 -- Description: Spec for elimination sound resolution: weapon variants, environmental eliminations, equipped-item validation, and default fallbacks.
--- Created: 2026-08-31
 
 --!strict
 

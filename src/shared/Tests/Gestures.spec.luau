@@ -1,7 +1,4 @@
--- Name: Gestures.spec.luau
--- Author: Jack C.
 -- Description: Spec for the touch gesture classifier: taps, holds, charge ramping, drag promotion with buffered movement, swipe direction and tolerance, and double-tap pairing.
--- Created: 2026-08-19
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: WorldAudio.luau
--- Author: Jack C.
 -- Description: Plays a Studio-authored sound at a world position or on an instance by wiring an audio player to an emitter, the shared entry point for spatial one-shots.
--- Created: 2026-07-13
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: useEntrance.luau
--- Author: Jack C.
 -- Description: Returns a spring that replays from zero to one whenever the given key changes, for content that should pop in each time it is replaced rather than cross-fade in place.
--- Created: 2026-08-26
 
 --!strict
 

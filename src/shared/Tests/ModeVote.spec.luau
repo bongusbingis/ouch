@@ -1,7 +1,4 @@
--- Name: ModeVote.spec.luau
--- Author: Jack C.
 -- Description: Spec for the pure ballot: one vote per player, removal of departed voters, random selection when nobody votes or leaders tie, and the capped late-ready extension.
--- Created: 2026-08-17
 
 --!strict
 

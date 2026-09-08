@@ -1,7 +1,4 @@
--- Name: ArenaReadinessGate.spec.luau
--- Author: Jack C.
 -- Description: Spec for the arena readiness gate: release on a full ready roster, release at the deadline, never opening with nobody ready, and tolerance of duplicate arrivals.
--- Created: 2026-08-24
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: ShopLayout.luau
--- Author: Jack C.
 -- Description: Pure layout model for the storefront dashboard: the card grid a block fills its span with, and the track-based packer that places each block at the earliest position its span will fit so a taller neighbour never leaves a hole beneath a shorter one.
--- Created: 2026-09-02
 
 --!strict
 

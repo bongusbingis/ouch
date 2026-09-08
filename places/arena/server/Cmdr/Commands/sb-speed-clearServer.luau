@@ -1,7 +1,4 @@
--- Name: sb-speed-clearServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-speed-clear, removing the named Cmdr walk-speed modifier from each targeted player.
--- Created: 2026-07-15
 
 --!strict
 

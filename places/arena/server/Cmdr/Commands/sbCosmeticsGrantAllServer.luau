@@ -1,7 +1,4 @@
--- Name: sbCosmeticsGrantAllServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-cosmetics-grant-all, granting the entire configured cosmetic catalog to each targeted player.
--- Created: 2026-07-15
 
 --!strict
 
@@ -20,7 +17,7 @@ return function(_context, players: { Player }): string
 		if PlayerData.get(player) == nil then
 			return false, "no_profile"
 		end
-		granted += CosmeticsService.grantAllForTesting(player)
+		granted += CosmeticsService.grantAllForAdmin(player)
 		return true
 	end)
 	return `{output} | Granted {granted} new cosmetics`

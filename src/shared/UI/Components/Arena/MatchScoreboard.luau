@@ -2,10 +2,13 @@
 --!strict
 
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local React = require(ReplicatedStorage.Packages.react)
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Surface = require(script.Parent.Surface)
 local Label = require(script.Parent.Label)
 local ActionButton = require(script.Parent.ActionButton)
@@ -15,23 +18,42 @@ local c = React.createElement
 
 return function(props)
 	local safe = useSafeArea(Enum.ScreenInsets.None)
+	local rootRef = React.useRef(nil)
 	local closeRef = React.useRef(nil)
 	React.useEffect(function()
 		if not props.Visible then
 			return
 		end
 		local previous = GuiService.SelectedObject
+		local root = rootRef.current
 		local active = true
-		if string.find(UserInputService:GetLastInputType().Name, "Gamepad") then
-			task.defer(function()
-				if active and Selection.isSelectable(closeRef.current) then
+		local clearedSelection = false
+		task.defer(function()
+			if not active then
+				return
+			end
+			local selected = GuiService.SelectedObject
+			if selected and not selected:IsDescendantOf(Players.LocalPlayer.PlayerGui) then
+				return
+			end
+			local selectedRoot = if selected then selected:FindFirstAncestorWhichIsA("ScreenGui") else nil
+			local ownRoot = if root then root:FindFirstAncestorWhichIsA("ScreenGui") else nil
+			if selectedRoot and ownRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder then
+				return
+			end
+			if string.find(UserInputService:GetLastInputType().Name, "Gamepad") then
+				if Selection.isSelectable(closeRef.current) then
 					GuiService.SelectedObject = closeRef.current
 				end
-			end)
-		end
+			elseif selected and root and not selected:IsDescendantOf(root) then
+				clearedSelection = true
+				GuiService.SelectedObject = nil
+			end
+		end)
 		return function()
 			active = false
-			if GuiService.SelectedObject == closeRef.current then
+			local selected = GuiService.SelectedObject
+			if (root and selected and selected:IsDescendantOf(root)) or (selected == nil and clearedSelection) then
 				GuiService.SelectedObject = if Selection.isSelectable(previous) then previous else nil
 			end
 		end
@@ -42,11 +64,23 @@ return function(props)
 	local view = props.Snapshot
 	local colors = Config.Colors
 	local width = math.min(safe.size.X * Config.Scoreboard.WidthScale, Config.Scoreboard.MaxWidthPx)
-	local height = safe.size.Y * Config.Scoreboard.HeightScale
-	local rows = { Layout = c("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }) }
+	local rowCount = math.max(#view.entries, Config.Scoreboard.MinRows)
+	local height = math.min(
+		safe.size.Y * Config.Scoreboard.HeightScale,
+		Config.Scoreboard.ChromePx + rowCount * Config.Scoreboard.RowPx + (rowCount - 1) * Config.Scoreboard.RowGapPx
+	)
+	local rows = {
+		Layout = c("UIListLayout", {
+			Padding = UDim.new(0, Config.Scoreboard.RowGapPx),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	}
 	for index, entry in view.entries do
+		local status = if not entry.alive
+			then "RESPAWNING"
+			else if view.teamMode and entry.teamId then string.upper(entry.teamId) else ""
 		rows[tostring(entry.userId)] = c(Surface, {
-			Color = if entry.isLocal then colors.Raised else colors.Surface,
+			Color = if entry.isLocal then colors.PanelRaised else colors.Track,
 			Shadow = false,
 			StrokeTransparency = if entry.isLocal then 0 else 0.8,
 			Native = { Size = UDim2.new(1, -8, 0, Config.Scoreboard.RowPx), LayoutOrder = index },
@@ -63,14 +97,15 @@ return function(props)
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromScale(0.11, 0), Size = UDim2.fromScale(0.49, 1) },
 			}),
-			Status = c(Label, {
-				Text = if not entry.alive
-					then "RESPAWNING"
-					else if view.teamMode and entry.teamId then string.upper(entry.teamId) else "",
-				Color = if entry.teamId == "Red" then colors.Pink else colors.Cyan,
-				Size = 17,
-				Native = { Position = UDim2.fromScale(0.62, 0), Size = UDim2.fromScale(0.23, 1) },
-			}),
+			Status = if status ~= ""
+				then c(Surface, {
+					Color = if entry.teamId == "Red"
+						then colors.Pink
+						else if entry.teamId == "Blue" then colors.Cyan else colors.Disabled,
+					Shadow = false,
+					Native = { Position = UDim2.fromScale(0.62, 0.15), Size = UDim2.fromScale(0.23, 0.7) },
+				}, { Text = c(Label, { Text = status, Size = 17 }) })
+				else nil,
 			Score = c(Label, {
 				Text = tostring(entry.score),
 				Title = true,
@@ -81,6 +116,7 @@ return function(props)
 		})
 	end
 	return c("TextButton", {
+		ref = rootRef,
 		Text = "",
 		AutoButtonColor = false,
 		Selectable = false,
@@ -91,7 +127,7 @@ return function(props)
 		ZIndex = 80,
 	}, {
 		Panel = c(Surface, {
-			Color = colors.Ink,
+			Color = UI.ProgressionStyle.Panel,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, safe.position.Y + safe.size.Y / 2),
@@ -110,20 +146,21 @@ return function(props)
 			Close = c(ActionButton, {
 				ButtonRef = closeRef,
 				Text = "BACK",
+				Color = colors.Cyan,
 				TextSize = 22,
 				OnActivated = props.OnClose,
 				Native = { Position = UDim2.new(1, -106, 0, 8), Size = UDim2.fromOffset(92, 44) },
 			}),
 			Mode = c(Label, {
 				Text = view.title .. "  •  " .. view.clock,
-				Color = colors.Muted,
+				Color = colors.White,
 				Size = 18,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromOffset(16, 57), Size = UDim2.new(1, -128, 0, 25) },
 			}),
 			ScoreHeading = c(Label, {
 				Text = "ELIMS",
-				Color = colors.Yellow,
+				Color = colors.White,
 				Title = true,
 				Size = 18,
 				Native = { Position = UDim2.new(1, -94, 0, 57), Size = UDim2.fromOffset(74, 25) },
@@ -132,11 +169,11 @@ return function(props)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Position = UDim2.fromOffset(16, 92),
-				Size = UDim2.new(1, -32, 1, -108),
+				Size = UDim2.new(1, -32, 1, -Config.Scoreboard.ChromePx),
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				CanvasSize = UDim2.new(),
 				ScrollBarThickness = 4,
-				ScrollBarImageColor3 = colors.Cyan,
+				ScrollBarImageColor3 = colors.White,
 				ZIndex = 3,
 			}, rows),
 		}),

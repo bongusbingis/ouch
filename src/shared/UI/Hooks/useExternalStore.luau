@@ -1,7 +1,4 @@
--- Name: useExternalStore.luau
--- Author: Jack C.
 -- Description: React hook that renders the current snapshot of an external store and re-renders when it changes.
--- Created: 2026-08-17
 
 --!strict
 

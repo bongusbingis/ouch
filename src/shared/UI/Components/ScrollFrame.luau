@@ -2,8 +2,8 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local UI = require(ReplicatedStorage.Config.Interface.UI)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local c = React.createElement
 
 return function(props)
@@ -28,6 +28,7 @@ return function(props)
 	local children = table.clone(props.children or {})
 	children.FocusImage = c("Frame", {
 		ref = imageRef,
+		Visible = false,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(0, 0),

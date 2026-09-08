@@ -1,7 +1,4 @@
--- Name: BallService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec exercising the ball service against the real authored ball template: held grants, cloning into the world folder, attribute seeding, naming, and clearing.
--- Created: 2026-07-16
 
 --!nonstrict
 

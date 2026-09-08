@@ -1,7 +1,4 @@
--- Name: EconomyMenuController.luau
--- Author: Jack C.
 -- Description: The shared hook driving the shop and inventory menus: builds the view models from config and live profile data, and owns purchase, crate-open, and reveal interactions.
--- Created: 2026-08-24
 
 --!strict
 
@@ -13,7 +10,7 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
-local ClientRequest = require(Shared.Game.Data.ClientRequest)
+local ClientRequest = require(Shared:WaitForChild("Game"):WaitForChild("Data"):WaitForChild("ClientRequest"))
 local Economy = Shared:WaitForChild("Game"):WaitForChild("Economy")
 local CrateBatch = require(Economy:WaitForChild("CrateBatch"))
 local CrateOdds = require(Economy:WaitForChild("CrateOdds"))
@@ -21,7 +18,7 @@ local EconomyStore = require(Economy:WaitForChild("EconomyStore"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local InventoryModel = require(Economy:WaitForChild("InventoryModel"))
 local ShopViewModel = require(Economy:WaitForChild("ShopViewModel"))
-local SeasonStore = require(Shared.Game.Progression.SeasonStore)
+local SeasonStore = require(Shared:WaitForChild("Game"):WaitForChild("Progression"):WaitForChild("SeasonStore"))
 local CosmeticPreviewClient =
 	require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CosmeticPreviewClient"))
 local UI = Shared:WaitForChild("UI")
@@ -31,7 +28,7 @@ local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytic
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Bundles = require(Config:WaitForChild("Economy"):WaitForChild("Bundles"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
-local Inventory = require(Config.Cosmetics.Inventory)
+local Inventory = require(Config:WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local Crates = require(Config:WaitForChild("Economy"):WaitForChild("Crates"))
 local GamePasses = require(Config:WaitForChild("Economy"):WaitForChild("GamePasses"))
 local Products = require(Config:WaitForChild("Economy"):WaitForChild("Products"))
@@ -111,6 +108,7 @@ export type Controller = {
 	openAgain: () -> (),
 	purchaseSelectedBonks: (number?) -> (),
 	purchaseSelectedRobux: () -> (),
+	detailsBackRef: { current: (() -> boolean)? },
 	CloseTopLayer: () -> boolean,
 	CloseAll: () -> (),
 }
@@ -128,10 +126,11 @@ function EconomyMenuController.use(options: Options): Controller
 	local busySnapshot, setBusySnapshot = React.useState({} :: { [string]: boolean })
 	local claimPending, setClaimPending = React.useState(false)
 	local claimBusy = React.useRef(false)
+	local detailsBackRef = React.useRef(nil)
 	local seasonState = useExternalStore(SeasonStore.snapshot, SeasonStore.subscribe)
 	local mounted = React.useRef(false)
 	local lifecycleGeneration = React.useRef(0)
-	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.onChanged)
+	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.subscribe)
 	local economyData = options.EconomyData or storeData
 	local shopSnapshot = useExternalStore(shopClient.snapshot, shopClient.subscribe)
 	local shopModel = React.useMemo(function()
@@ -499,6 +498,9 @@ function EconomyMenuController.use(options: Options): Controller
 			shopClient.clearReveal()
 			return true
 		elseif selectedShopCardId ~= nil or selectedInventoryEntry ~= nil then
+			if detailsBackRef.current and detailsBackRef.current() then
+				return true
+			end
 			setSelectedShopCardId(nil)
 			setSelectedInventoryEntry(nil)
 			return true
@@ -558,6 +560,7 @@ function EconomyMenuController.use(options: Options): Controller
 		closeReveal = closeReveal,
 		purchaseSelectedBonks = purchaseSelectedBonks,
 		purchaseSelectedRobux = purchaseSelectedRobux,
+		detailsBackRef = detailsBackRef,
 		CloseTopLayer = closeTopLayer,
 		CloseAll = closeAll,
 	}

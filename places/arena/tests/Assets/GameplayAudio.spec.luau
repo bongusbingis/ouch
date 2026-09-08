@@ -1,7 +1,4 @@
--- Name: GameplayAudio.spec.luau
--- Author: Jack C.
 -- Description: In-place spec checking the gameplay audio config shape, since a malformed asset id or missing entry fails silently at runtime rather than erroring.
--- Created: 2026-08-19
 
 --!strict
 

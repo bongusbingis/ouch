@@ -1,7 +1,4 @@
--- Name: TargetSelect.luau
--- Author: Jack C.
 -- Description: Pure soft-lock target selection and steering: picks the enemy nearest the centre of aim within the cone, scores confidence by angle, and rotates a direction toward a point within a clamp.
--- Created: 2026-08-19
 
 --!strict
 

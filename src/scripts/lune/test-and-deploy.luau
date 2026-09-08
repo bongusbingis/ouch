@@ -1,7 +1,4 @@
--- Name: test-and-deploy.luau
--- Author: Jack C.
 -- Description: Deploy pipeline: uploads the merged place as a saved version, runs the in-place test suite against that exact version through Open Cloud, and publishes only when the suite is green.
--- Created: 2026-07-16
 
 --!strict
 
@@ -10,6 +7,8 @@ local net = require("@lune/net")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 local task = require("@lune/task")
+local Artifact = require("./release-artifact")
+local Receipt = require("./release-receipt")
 
 local POLL_SECONDS = 3
 local POLL_TIMEOUT_SECONDS = 600
@@ -63,15 +62,20 @@ local args = table.clone(process.args)
 if args[1] == "--" then
 	table.remove(args, 1)
 end
-if #args < 2 or #args > 3 or (args[3] ~= nil and args[3] ~= "--test-only" and args[3] ~= "--stage-only") then
+if
+	#args < 2
+	or #args > 3
+	or (args[3] ~= nil and args[3] ~= "--test-only" and args[3] ~= "--stage-only" and args[3] ~= "--publish-tested")
+then
 	fail(
 		1,
-		"usage: lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only|--stage-only]"
+		"usage: lune run src/scripts/lune/test-and-deploy.luau <place.rbxl> <task-script.luau> [--test-only|--stage-only|--publish-tested]"
 	)
 end
 local placeFile, taskFile = args[1], args[2]
 local testOnly = args[3] == "--test-only"
 local stageOnly = args[3] == "--stage-only"
+local publishTested = args[3] == "--publish-tested"
 
 if not testOnly and not fs.isFile(placeFile) then
 	fail(1, `missing place file: {placeFile}`)
@@ -83,6 +87,7 @@ end
 local apiKey = requireEnv("ROBLOX_API_KEY")
 local universeId = requireEnv("ROBLOX_UNIVERSE_ID")
 local placeId = requireEnv("ROBLOX_PLACE_ID")
+local artifactSha256 = if testOnly then nil else Artifact.hashFile(placeFile)
 
 local function rbxcloud(subcommand: { string }): (boolean, string, string)
 	local fullArgs = table.clone(subcommand)
@@ -228,6 +233,7 @@ local function looksBusy(stderr: string): boolean
 end
 
 local function upload(versionType: string): string
+	assert(Artifact.hashFile(placeFile) == artifactSha256, "[release] artifact changed during deployment")
 	print(`uploading {placeFile} as {versionType} version...`)
 	local ok, stdout, stderr = rbxcloud({
 		"experience",
@@ -410,11 +416,32 @@ local function printLogs(taskPath: string)
 	print("---- end cloud test logs ----")
 end
 
+local function publish(evidence: Receipt.Evidence)
+	evidence.publishedVersionId = upload("published")
+	Receipt.write(placeFile .. ".published.json", evidence)
+	print(`published version {evidence.publishedVersionId} from tested saved version {evidence.savedVersionId}`)
+end
+
+if publishTested then
+	publish(Receipt.verify(placeFile, universeId, placeId))
+	process.exit(0)
+end
+
 local versionId: string? = nil
+local evidence: Receipt.Evidence? = nil
 if testOnly then
 	print("running cloud tests against the current place version (--test-only)")
 else
 	versionId = upload("saved")
+	evidence = {
+		schemaVersion = 1,
+		universeId = universeId,
+		placeId = placeId,
+		artifactSha256 = artifactSha256 :: string,
+		savedVersionId = versionId,
+		state = "SAVED",
+	}
+	Receipt.write(placeFile .. ".tested.json", evidence)
 end
 
 print(`creating Luau execution task (timeout {TASK_EXECUTION_TIMEOUT})...`)
@@ -424,8 +451,17 @@ if typeof(taskPath) ~= "string" then
 	fail(1, `task creation returned no path:\n{serde.encode("json", createdTask)}`)
 end
 print(`task created: {taskPath}`)
+if evidence then
+	evidence.taskPath = taskPath :: string
+	evidence.state = "PROCESSING"
+	Receipt.write(placeFile .. ".tested.json", evidence)
+end
 
 local finishedTask = pollTask(taskPath :: string)
+if evidence then
+	evidence.state = finishedTask.state
+	Receipt.write(placeFile .. ".tested.json", evidence)
+end
 printLogs(taskPath :: string)
 
 local state = finishedTask.state
@@ -444,6 +480,5 @@ if testOnly or stageOnly then
 	process.exit(0)
 end
 
-upload("published")
-print("published")
+publish(Receipt.verify(placeFile, universeId, placeId))
 process.exit(0)

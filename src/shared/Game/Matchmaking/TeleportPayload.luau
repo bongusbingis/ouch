@@ -1,7 +1,4 @@
--- Name: TeleportPayload.luau
--- Author: Jack C.
 -- Description: Builds and parses the teleport payload the lobby sends to the arena, carrying session, party, and mode option data and rejecting malformed or obsolete versions.
--- Created: 2026-08-17
 
 --!strict
 

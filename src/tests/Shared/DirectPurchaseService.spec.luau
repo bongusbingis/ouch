@@ -5,9 +5,14 @@ local Modules = game:GetService("ServerScriptService").Server.Modules
 local PlayerData = require(Modules.PlayerData)
 local ShopService = require(Modules.ShopService)
 local DirectPurchaseService = require(Modules.DirectPurchaseService)
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local Shop = require(ReplicatedStorage.Config.Economy.Shop)
-local FeaturedRotation = require(ReplicatedStorage.Shared.Game.Economy.FeaturedRotation)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
+local FeaturedRotation = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Economy")
+		:WaitForChild("FeaturedRotation")
+)
 local FakePlayer = require(script.Parent.Parent.Helpers.FakePlayer)
 
 return function()

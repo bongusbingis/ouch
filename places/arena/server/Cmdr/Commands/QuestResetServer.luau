@@ -1,7 +1,4 @@
--- Name: QuestResetServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-quest-reset, clearing stored daily quest progress and claim flags for each targeted player.
--- Created: 2026-07-15
 
 --!strict
 
@@ -14,7 +11,7 @@ local QuestService = require(Server:WaitForChild("Modules"):WaitForChild("QuestS
 
 return function(_context: any, players: { Player }): string
 	local result = CommandUtil.runForPlayers(players, function(player)
-		local ok = QuestService.resetForTesting(player)
+		local ok = QuestService.resetForAdmin(player)
 		return ok, if ok then nil else "profile_not_ready"
 	end)
 	return `Reset daily quests | {result}`

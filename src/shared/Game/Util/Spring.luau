@@ -1,7 +1,4 @@
--- Name: Spring.luau
--- Author: Jack C.
 -- Description: Damped spring for presentation feel, pure number maths with deterministic steps and a clamped timestep so frame hitches cannot destabilize it.
--- Created: 2026-07-18
 
 --!strict
 

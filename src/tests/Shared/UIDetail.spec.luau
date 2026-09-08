@@ -1,9 +1,11 @@
 -- Engine font measurement and authored stage contracts catch issues absent from the headless renderer.
 --!nonstrict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Metrics = require(ReplicatedStorage.Shared.UI.TextMetrics)
+local Metrics = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("TextMetrics"))
 local TestAssets = require(game.ServerStorage.Tests.Helpers.TestAssets)
-local VictoryRig = require(ReplicatedStorage.Shared.UI.Services.VictoryRig)
+local VictoryRig = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("VictoryRig")
+)
 
 return function()
 	describe("UI detail contracts", function()

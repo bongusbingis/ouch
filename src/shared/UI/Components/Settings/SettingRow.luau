@@ -1,7 +1,4 @@
--- Name: SettingRow.luau
--- Author: Jack C.
 -- Description: One reusable row for the settings menu: label, optional description, and the control the definition's Type dispatches to. Adding a new setting never means hand-building a row -- only a new Type branch here, once, ever adds a new visual shape.
--- Created: 2026-08-25
 
 --!strict
 
@@ -90,15 +87,11 @@ return React.memo(function(props: Props)
 			Size = UDim2.fromScale(textWidth, textHeight),
 		}, {
 			Label = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.Highway,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				MaxTextSize = 24,
 				Native = {
 					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/HighwayGothic.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
+					Font = UIConfig.Text.BodyFont,
 					Position = UDim2.fromScale(0, 0),
 					Size = UDim2.fromScale(1, if hasDescription then 0.52 else 1),
 					Text = string.upper(definition.Label),
@@ -107,26 +100,38 @@ return React.memo(function(props: Props)
 					TextYAlignment = Enum.TextYAlignment.Center,
 					ZIndex = 5,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = 0.035,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			Description = if hasDescription
 				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSans,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					MaxTextSize = 17,
 					Wrapped = true,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json"),
+						Font = UIConfig.Text.BodyFont,
 						Position = UDim2.fromScale(0, 0.5),
 						Size = UDim2.fromScale(1, 0.46),
 						Text = if not enabled and props.DisabledReason
 							then props.DisabledReason
 							else definition.Description,
-						TextColor3 = UIConfig.ProgressionStyle.Ink,
+						TextColor3 = UIConfig.ProgressionStyle.White,
 						TextWrapped = true,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextYAlignment = Enum.TextYAlignment.Top,
 						ZIndex = 5,
 					},
+				}, {
+					Outline = c("UIStroke", {
+						Color = UIConfig.ProgressionStyle.Ink,
+						Thickness = 0.035,
+						StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					}),
 				})
 				else nil,
 		}),

@@ -1,7 +1,4 @@
--- Name: GameTypes.luau
--- Author: Jack C.
 -- Description: Registers the game-specific Cmdr argument types (cosmetics, crates, quests, profile fields) so commands can accept validated, autocompleted game identifiers.
--- Created: 2026-07-15
 
 --!strict
 
@@ -15,14 +12,8 @@ local ModeRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
 )
 
-local function sortedKeys(values: { [string]: any }): { string }
-	local keys = {}
-	for key in values do
-		table.insert(keys, key)
-	end
-	table.sort(keys)
-	return keys
-end
+local SimUtil =
+	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Sim"):WaitForChild("SimUtil"))
 
 return function(registry)
 	local modes = {}
@@ -39,9 +30,15 @@ return function(registry)
 
 	registry:RegisterType("modeId", registry.Cmdr.Util.MakeEnumType("mode", modes))
 	registry:RegisterType("questId", registry.Cmdr.Util.MakeEnumType("quest", quests))
-	registry:RegisterType("cosmeticId", registry.Cmdr.Util.MakeEnumType("cosmetic", sortedKeys(Cosmetics.Items)))
-	registry:RegisterType("cosmeticSlot", registry.Cmdr.Util.MakeEnumType("cosmetic slot", sortedKeys(Cosmetics.Slots)))
-	registry:RegisterType("crateId", registry.Cmdr.Util.MakeEnumType("crate", sortedKeys(Crates)))
+	registry:RegisterType(
+		"cosmeticId",
+		registry.Cmdr.Util.MakeEnumType("cosmetic", SimUtil.sortedKeys(Cosmetics.Items))
+	)
+	registry:RegisterType(
+		"cosmeticSlot",
+		registry.Cmdr.Util.MakeEnumType("cosmetic slot", SimUtil.sortedKeys(Cosmetics.Slots))
+	)
+	registry:RegisterType("crateId", registry.Cmdr.Util.MakeEnumType("crate", SimUtil.sortedKeys(Crates)))
 	registry:RegisterType(
 		"profileField",
 		registry.Cmdr.Util.MakeEnumType("profile field", {

@@ -1,7 +1,4 @@
--- Name: fetch-live-place.luau
--- Author: Jack C.
 -- Description: Downloads the currently published place file through Open Cloud's asset delivery API, resolving the signed CDN location and writing the resulting place bytes to disk.
--- Created: 2026-07-21
 
 --!strict
 

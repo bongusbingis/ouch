@@ -1,19 +1,30 @@
 --!strict
 
+local characterBody = {
+	Minimum = Vector3.new(-2.25, -3, -2.25),
+	Maximum = Vector3.new(2.25, 4.5, 2.25),
+}
+
 return {
 	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1 },
 	ProgressionStyle = {
 		White = Color3.new(1, 1, 1),
-		Ink = Color3.fromRGB(27, 24, 47),
-		Surface = Color3.fromRGB(43, 39, 65),
-		Raised = Color3.fromRGB(62, 55, 86),
-		Muted = Color3.fromRGB(211, 210, 229),
-		Cyan = Color3.fromRGB(53, 226, 218),
-		Pink = Color3.fromRGB(242, 40, 160),
+		Ink = Color3.fromRGB(30, 32, 36),
+		Surface = Color3.fromRGB(37, 41, 48),
+		Raised = Color3.fromRGB(55, 61, 70),
+		Panel = Color3.fromRGB(20, 189, 218),
+		PanelRaised = Color3.fromRGB(53, 204, 231),
+		Claimed = Color3.fromRGB(17, 133, 204),
+		Disabled = Color3.fromRGB(84, 169, 190),
+		Track = Color3.fromRGB(107, 222, 238),
+		Muted = Color3.fromRGB(220, 230, 238),
+		Cyan = Color3.fromRGB(20, 192, 222),
+		Pink = Color3.fromRGB(239, 18, 111),
 		Yellow = Color3.fromRGB(255, 220, 62),
 		Green = Color3.fromRGB(154, 233, 91),
 	},
 	Text = {
+		BodyFont = Enum.Font.BuilderSansBold,
 		DefaultFont = Font.new(
 			"rbxasset://fonts/families/ComicNeueAngular.json",
 			Enum.FontWeight.Bold,
@@ -44,6 +55,7 @@ return {
 	},
 	Layout = {
 		PagePosition = UDim2.fromScale(0.5, 0.56),
+		InventoryPagePosition = UDim2.fromScale(0.32, 0.56),
 		PageOffscreen = UDim2.fromScale(-1, 0.56),
 		ShortPagePosition = UDim2.fromScale(0.5, 0.62),
 		ShortPageOffscreen = UDim2.fromScale(-1, 0.62),
@@ -51,6 +63,24 @@ return {
 		PortraitMaxAspect = 1,
 		CompactMaxWidthPx = 820,
 		ShortLandscapeMaxHeightPx = 500,
+		PartyNametags = { GapPx = 3, ViewportPaddingPx = 8 },
+		WorldFraming = {
+			FieldOfView = 50,
+			CharacterBody = characterBody,
+			CharacterWidthStuds = 6,
+			CharacterHeightStuds = 6,
+			CharacterDepthStuds = 4,
+			NameHeadroomStuds = 3,
+			InventoryBody = {
+				Minimum = characterBody.Minimum,
+				Maximum = characterBody.Maximum + Vector3.new(0, 1.5, 0),
+			},
+			InventorySkins = {
+				Minimum = Vector3.new(-3.4, -3, -3.75),
+				Maximum = Vector3.new(3.4, 6, 3.55),
+			},
+			PixelPadding = 8,
+		},
 		Panels = {
 			DailyReward = {
 				Portrait = { WidthScale = 0.9, HeightScale = 0.48, MaxSize = Vector2.new(480, 430) },
@@ -147,6 +177,15 @@ return {
 			},
 		},
 		Inventory = {
+			ShortRailWidthPx = 88,
+			ShortRailGapPx = 4,
+			ShortContentLeftPx = 106,
+			ShortContentTopPx = 32,
+			ShortContentBottomPx = 10,
+			ShortCardMinPx = 104,
+			ShortPanelWidthScale = 0.58,
+			ShortPanelMinWidthPx = 360,
+			ShortWorldMinWidthPx = 170,
 			ShortCardSizePx = 124,
 			ShortHeaderHeightPx = 24,
 			CardGapPx = 7,
@@ -275,6 +314,8 @@ return {
 			LandscapeGapScale = 0.05,
 		},
 		Splash = {
+			ActionsGapPx = 8,
+			ActionTextPx = 26,
 			ShortActionsHeightPx = 56,
 			ShortActionButtonHeightPx = 48,
 			ShortActionsBottomPx = 8,
@@ -283,10 +324,11 @@ return {
 			SecondaryActionHeightPx = 56,
 			PrimaryActionHeightPx = 70,
 			ProgressPanels = {
-				DailyMinHeightPx = 98,
+				DailyMinHeightPx = 116,
 				EdgePaddingPx = 24,
 				GapPx = 10,
 				Landscape = {
+					ActionsReservePx = 252,
 					DailyBottomScale = 0.9,
 					SeasonTopScale = 0.145,
 					ShortTopPx = 80,
@@ -332,17 +374,25 @@ return {
 			LabelControlGapPx = 8,
 		},
 		InventoryContentGapPx = 8,
-		SeasonClaimWidthPx = 88,
+		SeasonClaimWidthPx = 102,
 		ShopDetailsActionMaxWidthPx = 320,
-		SeasonCompactClaimWidthPx = 64,
+		SeasonCompactClaimWidthPx = 70,
 		SeasonDetailedMinHeightPx = 132,
 		QuestRow = { ShortHeightPx = 80, CompactHeightPx = 138, CompactInfoHeightPx = 82 },
-		DailyCell = { MinWidthPx = 64 },
+		DailyCell = { MinWidthPx = 52 },
 		PartyCode = {
 			PortraitHeightPx = 118,
 			LandscapeWidthPx = 210,
 			LandscapeCodeHeightPx = 40,
 			CodeHeightPx = 58,
+			Members = {
+				MaxWidthPx = 620,
+				MaxHeightPx = 420,
+				MarginPx = 12,
+				GapPx = 8,
+				RowHeightPx = 56,
+				ActionWidthPx = 112,
+			},
 		},
 		MenuToggle = {
 			HorizontalPaddingPx = 12,

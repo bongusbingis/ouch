@@ -1,7 +1,4 @@
--- Name: CrateRolls.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the crate roll spec, pinning the weighted rarity distribution, zero-weight exclusion, dupe refunds, and empty-pool rejection with a scripted random source.
--- Created: 2026-07-16
 
 --!nonstrict
 

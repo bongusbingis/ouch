@@ -1,7 +1,4 @@
--- Name: DeviceClass.spec.luau
--- Author: Jack C.
 -- Description: Spec for device-class resolution: PreferredInput priority, last-input fallback, and the capability last resort that keeps a fresh console on Gamepad instead of Mouse.
--- Created: 2026-09-01
 
 --!strict
 

@@ -1,19 +1,16 @@
--- Name: ShopViewModel.spec.luau
--- Author: Jack C.
 -- Description: Spec for the storefront view model: stable section order, empty sections omitted, aspirational crate previews, live ownership over snapshot ownership, and the same featured discount the server charges.
--- Created: 2026-08-23
 
 --!strict
 
 local T = require(script.Parent.TestKit)
 local Config = script.Parent.Parent.Parent.Config
-local Bundles = require(Config.Economy.Bundles)
-local Cosmetics = require(Config.Cosmetics.Cosmetics)
-local Crates = require(Config.Economy.Crates)
-local GamePasses = require(Config.Economy.GamePasses)
-local Products = require(Config.Economy.Products)
-local Seasons = require(Config.Progression.Seasons)
-local Shop = require(Config.Economy.Shop)
+local Bundles = require(Config:WaitForChild("Economy"):WaitForChild("Bundles"))
+local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Crates = require(Config:WaitForChild("Economy"):WaitForChild("Crates"))
+local GamePasses = require(Config:WaitForChild("Economy"):WaitForChild("GamePasses"))
+local Products = require(Config:WaitForChild("Economy"):WaitForChild("Products"))
+local Seasons = require(Config:WaitForChild("Progression"):WaitForChild("Seasons"))
+local Shop = require(Config:WaitForChild("Economy"):WaitForChild("Shop"))
 local Economy = script.Parent.Parent.Game.Economy
 local CrateBatch = require(Economy.CrateBatch)
 local CrateOdds = require(Economy.CrateOdds)

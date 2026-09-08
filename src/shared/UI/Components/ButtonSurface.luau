@@ -2,13 +2,13 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local UI = require(ReplicatedStorage.Config.Interface.UI)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local c = React.createElement
 
 return function(props)
 	local enabled = props.Enabled ~= false
-	local color = if enabled then props.Color or UI.ProgressionStyle.Cyan else UI.ProgressionStyle.Raised
+	local color = if enabled then props.Color or UI.ProgressionStyle.Cyan else UI.ProgressionStyle.Disabled
 	local corner = props.Radius or UDim.new(0.5, 0)
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, {
 		Shadow = c("Frame", {

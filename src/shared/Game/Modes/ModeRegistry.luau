@@ -1,7 +1,4 @@
--- Name: ModeRegistry.luau
--- Author: Jack C.
 -- Description: Lists every registered game mode and resolves them by id, the single place a new mode is registered.
--- Created: 2026-07-13
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CrateService.luau
--- Author: Jack C.
 -- Description: Handles crate opening from both the Bonks purchase path and Robux receipts through one roll-and-grant routine, applying the pure roll model and firing the reveal event the client renders.
--- Created: 2026-07-13
 
 --!strict
 
@@ -285,7 +282,7 @@ function CrateService.openFromReceipt(player: Player, crateId: string, purchaseI
 	return true, { kind = "Crate", reveal = result }
 end
 
-function CrateService.openForTesting(player: Player, crateId: string): (OpenResult?, string?)
+function CrateService.openForAdmin(player: Player, crateId: string): (OpenResult?, string?)
 	if Crates[crateId] == nil then
 		return nil, "invalid_crate"
 	end

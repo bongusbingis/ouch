@@ -1,7 +1,4 @@
--- Name: RotatingPlatforms.luau
--- Author: Jack C.
 -- Description: Spins the authored rotating platform assemblies from a pure function of the synchronized clock, with a server-only mover and a client-side load so both sides agree without fighting over the same anchored parts.
--- Created: 2026-08-18
 
 --!strict
 

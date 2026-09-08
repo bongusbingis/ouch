@@ -1,7 +1,4 @@
--- Name: Environment.spec.luau
--- Author: Jack C.
 -- Description: In-place spec pinning the assumptions the rest of the cloud suite relies on: a server context, no players, a sane world, and no running place simulation.
--- Created: 2026-07-16
 
 --!nonstrict
 

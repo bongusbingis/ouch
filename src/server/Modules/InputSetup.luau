@@ -1,7 +1,4 @@
--- Name: InputSetup.luau
--- Author: Jack C.
 -- Description: Materializes the declarative input map as an InputContext, InputAction, and InputBinding tree under each player, and owns the validated device-class attribute the sim adapter reads.
--- Created: 2026-07-12
 
 --!strict
 

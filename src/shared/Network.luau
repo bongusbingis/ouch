@@ -1,7 +1,4 @@
--- Name: Network.luau
--- Author: Jack C.
--- Description: The single declaration point for every remote in the game, materializing them from one definitions table and providing the rate-limiting, validation, and logging middleware every client-invokable handler wraps in.
--- Created: 2026-07-12
+-- Description: Declares and materializes every remote, with rate-limiting and validation middleware for client-invokable handlers.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -140,21 +137,11 @@ function Network.withValidation(validate, handler)
 	end
 end
 
-function Network.withLogging(handler)
-	return function(player, ...)
-		print(("[Network] called by %s"):format(player.Name))
-		return handler(player, ...)
-	end
-end
-
 function Network.handleProtected(name, middleware, callback)
 	assert(IS_SERVER, "[Network] handleProtected can only be called on the server")
 	local handler = callback
 	if middleware.validate then
 		handler = Network.withValidation(middleware.validate, handler)
-	end
-	if middleware.logging then
-		handler = Network.withLogging(handler)
 	end
 	if middleware.rateLimit then
 		handler = Network.withRateLimit(middleware.rateLimit, handler, name)

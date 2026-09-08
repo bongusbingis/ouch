@@ -1,7 +1,4 @@
--- Name: OnboardingCombat.luau
--- Author: Jack C.
 -- Description: Brings the real server-side combat stack up inside the lobby so training teaches with the same simulation the arena runs. Provides the minimal replicated MatchState the adapter reads, starts input/assist/ball provisioning and the authoritative adapter, and guarantees an onboarding player actually has a character to fight with.
--- Created: 2026-08-26
 
 --!strict
 

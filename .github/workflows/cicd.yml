@@ -4,42 +4,20 @@ on:
   pull_request:
     branches: [main, prod]
   push:
-    branches: [main]
+    branches: [main, prod]
+
+concurrency:
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/prod' && 'production-release' || format('ci-{0}', github.run_id) }}
+  queue: max
+  cancel-in-progress: false
 
 jobs:
-  install-tools:
-    name: Install tools
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.3.0
-
-      - name: Install Aftman
-        uses: ok-nick/setup-aftman@v0.4.2
-
-      - name: Cache Aftman tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.aftman
-          key: tools-${{ hashFiles('aftman.toml') }}
-
   linting:
     name: Lint with Selene
     runs-on: ubuntu-latest
-    needs: [install-tools]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.3.0
-
-      - name: Install Aftman
-        uses: ok-nick/setup-aftman@v0.4.2
-
-      - name: Restore cached Aftman tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.aftman
-          key: tools-${{ hashFiles('aftman.toml') }}
-
+      - uses: actions/checkout@v3.3.0
+      - uses: ./.github/actions/setup-tools
       - name: Lint
         run: |
           bash src/scripts/shell/lint.sh src
@@ -49,20 +27,9 @@ jobs:
   formatting:
     name: Format with StyLua
     runs-on: ubuntu-latest
-    needs: [install-tools]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.3.0
-
-      - name: Install Aftman
-        uses: ok-nick/setup-aftman@v0.4.2
-
-      - name: Restore cached Aftman tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.aftman
-          key: tools-${{ hashFiles('aftman.toml') }}
-
+      - uses: actions/checkout@v3.3.0
+      - uses: ./.github/actions/setup-tools
       - name: Check format
         run: |
           bash src/scripts/shell/check-format.sh src
@@ -72,177 +39,98 @@ jobs:
   lune-tests:
     name: Run Lune tests
     runs-on: ubuntu-latest
-    needs: [install-tools]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.3.0
-
-      - name: Install Aftman
-        uses: ok-nick/setup-aftman@v0.4.2
-
-      - name: Restore cached Aftman tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.aftman
-          key: tools-${{ hashFiles('aftman.toml') }}
-
+      - uses: actions/checkout@v3.3.0
+      - uses: ./.github/actions/setup-tools
       - name: Install Wally packages
         run: |
+          git ls-files --error-unmatch wally.lock
           wally install
           git diff --exit-code -- wally.lock
-
-      - name: Build place projects
-        run: |
-          rojo build arena.project.json --output /tmp/arena.rbxl
-          rojo build lobby.project.json --output /tmp/lobby.rbxl
-
-      # The runner regenerates sourcemap.json via rojo and exits nonzero on
-      # any failing spec.
       - name: Run tests
         run: lune run src/scripts/lune/run-tests.luau
+      - name: Test deployment tooling
+        run: |
+          bash src/scripts/shell/test-changed-places.sh
+          lune run src/scripts/lune/test-release-artifact.luau
+          lune run src/scripts/lune/test-release.luau
 
-  # Which places this change actually affects. Anything under src/ is shared by
-  # both places, so it forces both; places/<name>/ and <name>.project.json force
-  # only that one. Emits a JSON array consumed as the deploy matrix, so a change
-  # touching neither place skips deployment entirely.
+  build-places:
+    name: Build ${{ matrix.place }} artifact
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        place: [arena, lobby]
+    steps:
+      - uses: actions/checkout@v3.3.0
+        with:
+          lfs: true
+      - uses: ./.github/actions/setup-tools
+      - name: Install Wally packages
+        run: |
+          git ls-files --error-unmatch wally.lock
+          wally install
+          git diff --exit-code -- wally.lock
+      - name: Build and validate merged place
+        run: bash src/scripts/shell/build-place.sh ${{ matrix.place }} .ci-build/${{ matrix.place }}
+      - name: Retain merged place and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: place-${{ matrix.place }}
+          path: |
+            .ci-build/${{ matrix.place }}/dist.rbxl
+            .ci-build/${{ matrix.place }}/manifest.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
   changed-places:
     name: Detect changed places
     runs-on: ubuntu-latest
     outputs:
       places: ${{ steps.detect.outputs.places }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.3.0
+      - uses: actions/checkout@v3.3.0
         with:
           fetch-depth: 0
-
       - name: Detect
         id: detect
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          set -euo pipefail
-          arena=no
-          lobby=no
-
-          if [ -z "${BASE_SHA}" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            echo "No usable base commit; treating both places as changed."
-            arena=yes
-            lobby=yes
-          else
-            echo "Comparing ${BASE_SHA}...HEAD"
-            files=$(git diff --name-only "${BASE_SHA}" HEAD)
-            echo "$files"
-            while IFS= read -r file; do
-              [ -n "$file" ] || continue
-              case "$file" in
-                src/*|Packages/*|wally.toml|wally.lock|aftman.toml)
-                  arena=yes
-                  lobby=yes
-                  ;;
-                places/arena/*|arena.project.json)
-                  arena=yes
-                  ;;
-                places/lobby/*|lobby.project.json)
-                  lobby=yes
-                  ;;
-              esac
-            done <<< "$files"
-          fi
-
-          if [ "$arena" = yes ] && [ "$lobby" = yes ]; then
-            places='["arena","lobby"]'
-          elif [ "$arena" = yes ]; then
-            places='["arena"]'
-          elif [ "$lobby" = yes ]; then
-            places='["lobby"]'
-          else
-            places='[]'
-          fi
-
+          places=$(bash src/scripts/shell/changed-places.sh "$BASE_SHA")
           echo "Places to deploy: $places"
           echo "places=$places" >> "$GITHUB_OUTPUT"
 
   deploy:
-    name: Deploy ${{ matrix.place }}
+    name: Release affected places
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [install-tools, linting, formatting, lune-tests, changed-places]
-    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'prod' && needs.changed-places.outputs.places != '[]' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        place: ${{ fromJson(needs.changed-places.outputs.places) }}
-    # Shared across matrix legs and across runs: the Luau Execution API is
-    # serialised, so the two places deploy one after the other.
-    concurrency:
-      group: luau-execution
-      cancel-in-progress: false
-    env:
-      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
-      ROBLOX_UNIVERSE_ID: ${{ vars.OUCH_UNIVERSE_ID }}
-      ROBLOX_PLACE_ID: ${{ matrix.place == 'arena' && vars.ARENA_PLACE_ID || vars.LOBBY_PLACE_ID }}
+    timeout-minutes: 45
+    needs: [linting, formatting, lune-tests, build-places, changed-places]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/prod' && needs.changed-places.outputs.places != '[]' }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.3.0
+      - uses: actions/checkout@v3.3.0
+      - uses: ./.github/actions/setup-tools
+      - name: Download validated place artifacts
+        uses: actions/download-artifact@v4
         with:
-          # The place files are Git LFS binaries; without this the merge base
-          # would be a pointer text file.
-          lfs: true
-
-      - name: Install Aftman
-        uses: ok-nick/setup-aftman@v0.4.2
-
-      - name: Restore cached Aftman tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.aftman
-          key: tools-${{ hashFiles('aftman.toml') }}
-
-      - name: Install Wally packages
-        run: |
-          wally install
-          git diff --exit-code -- wally.lock
-
-      # The Studio-authored place committed under places/<place>/ is the merge
-      # base and the artifact that gets published. Its name is not fixed, so it
-      # is discovered; exactly one must exist or the deploy is ambiguous.
-      - name: Resolve place file
-        id: place-file
-        run: |
-          set -euo pipefail
-          dir="places/${{ matrix.place }}"
-          count=$(find "$dir" -maxdepth 1 -name '*.rbxl' | wc -l)
-          if [ "$count" -ne 1 ]; then
-            echo "::error::Expected exactly one .rbxl in $dir, found $count."
-            find "$dir" -maxdepth 1 -name '*.rbxl'
-            exit 1
-          fi
-          file=$(find "$dir" -maxdepth 1 -name '*.rbxl')
-          echo "Using place file: $file"
-          # An LFS pointer is a few hundred bytes; a real place is far larger.
-          size=$(wc -c < "$file")
-          if [ "$size" -lt 10000 ]; then
-            echo "::error::$file is only ${size} bytes - Git LFS content was not fetched."
-            exit 1
-          fi
-          echo "file=$file" >> "$GITHUB_OUTPUT"
-
-      - name: Upload base place artifact
+          pattern: place-*
+          path: .ci-release
+      - name: Test every affected place, then publish
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          ROBLOX_UNIVERSE_ID: ${{ vars.OUCH_UNIVERSE_ID }}
+          ARENA_PLACE_ID: ${{ vars.ARENA_PLACE_ID }}
+          LOBBY_PLACE_ID: ${{ vars.LOBBY_PLACE_ID }}
+          PLACES: ${{ needs.changed-places.outputs.places }}
+        run: lune run src/scripts/lune/release-places.luau .ci-release "$PLACES"
+      - name: Retain release versions and test evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: base-place-${{ matrix.place }}
-          path: ${{ steps.place-file.outputs.file }}
+          name: release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci-release
+          if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
-
-      - name: Build, merge, test, and publish
-        timeout-minutes: 15
-        run: |
-          set +e
-          bash src/scripts/shell/deploy.sh ${{ matrix.place }}.project.json "${{ steps.place-file.outputs.file }}"
-          code=$?
-          set -e
-          if [ "$code" -eq 2 ]; then
-            echo "::warning::Roblox Open Cloud was busy after retries; nothing was published for ${{ matrix.place }}. Re-run this job."
-          fi
-          exit "$code"

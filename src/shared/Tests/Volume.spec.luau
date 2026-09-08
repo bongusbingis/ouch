@@ -1,7 +1,4 @@
--- Name: Volume.spec.luau
--- Author: Jack C.
 -- Description: Spec for the map feature volume test: inclusion inside the box, exclusion past any axis, surfaces counting as inside, and vertical-only padding.
--- Created: 2026-08-18
 
 --!strict
 

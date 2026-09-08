@@ -1,7 +1,4 @@
--- Name: ThrowPoseConfig.spec.luau
--- Author: Jack C.
 -- Description: Spec for the throw pose configuration: every section and value the arm module indexes, reach within the arm's limits, weights within the ceiling, and stable under-damped motion values.
--- Created: 2026-08-20
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: Server.server.luau
--- Author: Jack C.
 -- Description: Arena profile lifecycle script, loading each player's profile on join and saving it on leave and at server shutdown.
--- Created: 2026-07-12
 
 local Players = game:GetService("Players")
 

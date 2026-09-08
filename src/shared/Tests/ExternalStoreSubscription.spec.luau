@@ -1,7 +1,4 @@
--- Name: ExternalStoreSubscription.spec.luau
--- Author: Jack C.
 -- Description: Spec that the external store subscription helper catches a mutation between render and subscribe and forwards updates without a duplicate unchanged read.
--- Created: 2026-08-24
 
 --!strict
 

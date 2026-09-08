@@ -1,7 +1,4 @@
--- Name: OnboardingOverlay.luau
--- Author: Jack C.
 -- Description: Renders the first-session instruction panel, progress, skip action, and completion card.
--- Created: 2026-08-26
 
 --!strict
 

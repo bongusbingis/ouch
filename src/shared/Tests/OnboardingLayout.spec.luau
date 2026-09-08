@@ -1,7 +1,4 @@
--- Name: OnboardingLayout.spec.luau
--- Author: Jack C.
 -- Description: Spec for the tutorial arena's geometry, pinned to the real authored marker positions: that the approach axis is derived from the spawn, that distances place points where the map actually has ground, and that the bridge is correctly carved out of the elimination ring.
--- Created: 2026-08-26
 
 --!strict
 

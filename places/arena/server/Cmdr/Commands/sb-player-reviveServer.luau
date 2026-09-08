@@ -1,7 +1,4 @@
--- Name: sb-player-reviveServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-player-revive, respawning each targeted eliminated player through the normal match respawn path.
--- Created: 2026-07-15
 
 --!strict
 
@@ -13,6 +10,6 @@ local MatchService = require(Server:WaitForChild("Modules"):WaitForChild("MatchS
 
 return function(_context: any, targets: { Player }): string
 	return CommandUtil.runForPlayers(targets, function(player)
-		return MatchService.reviveForTesting(player)
+		return MatchService.reviveForAdmin(player)
 	end)
 end

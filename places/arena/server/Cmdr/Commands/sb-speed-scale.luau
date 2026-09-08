@@ -1,7 +1,4 @@
--- Name: sb-speed-scale.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-speed-scale: applies the Cmdr movement-speed multiplier to players.
--- Created: 2026-07-15
 
 --!strict
 

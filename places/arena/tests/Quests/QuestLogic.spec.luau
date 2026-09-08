@@ -1,7 +1,4 @@
--- Name: QuestLogic.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the quest logic spec, covering deterministic daily selection, UTC reset keys, event-to-progress mapping, and clamped public payloads.
--- Created: 2026-07-16
 
 --!nonstrict
 

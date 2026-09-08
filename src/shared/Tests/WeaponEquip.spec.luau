@@ -1,12 +1,15 @@
--- Name: WeaponEquip.spec.luau
--- Author: Jack C.
 -- Description: Spec pinning the rules the equipped-weapon field obeys: the registry default, switching on command, auto-equipping on picking up a ball, deliberate switches winning, and equips costing no action budget.
--- Created: 2026-08-22
 
 --!strict
 
 local T = require(script.Parent.TestKit)
-local MockWorld = require(script.Parent.MockWorld)
+local MockWorld = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ServerStorage")
+		:WaitForChild("Tests")
+		:WaitForChild("Helpers")
+		:WaitForChild("MockWorld")
+)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local WeaponRegistry = require(script.Parent.Parent.Game.Sim.WeaponRegistry)

@@ -34,6 +34,7 @@ export type SplashPanelConfig = {
 	EdgePaddingPx: number,
 	GapPx: number,
 	Landscape: {
+		ActionsReservePx: number?,
 		DailyBottomScale: number,
 		SeasonTopScale: number,
 		ShortTopPx: number?,
@@ -64,6 +65,7 @@ export type SplashPanelLayout = {
 	daily: SplashPanelRect,
 	season: SplashPanelRect,
 	quests: SplashPanelRect,
+	progressStack: SplashPanelRect?,
 }
 
 function ResponsiveLayout.isPortrait(size: Vector2, maxAspect: number): boolean
@@ -185,9 +187,22 @@ function ResponsiveLayout.splashPanels(
 	local questsTop =
 		math.max(math.floor(available.Y * config.Landscape.QuestsTopScale), seasonTop + seasonSize.Y + config.GapPx)
 	local bottom = if short then available.Y - (config.Landscape.ShortBottomPx or 0) else available.Y
-	questsSize = Vector2.new(questsSize.X, math.min(questsSize.Y, math.max(44, bottom - questsTop)))
+	local questsBottom = if short then bottom else available.Y - (config.Landscape.ActionsReservePx or 0)
+	questsSize = Vector2.new(questsSize.X, math.min(questsSize.Y, math.max(44, questsBottom - questsTop)))
 	return {
 		portrait = false,
+		progressStack = if short
+			then {
+				position = Vector2.new(
+					available.X - edge - math.max(seasonSize.X, questsSize.X) - config.GapPx,
+					seasonTop
+				),
+				size = Vector2.new(
+					math.max(seasonSize.X, questsSize.X) + config.GapPx * 2,
+					math.max(1, bottom - seasonTop)
+				),
+			}
+			else nil,
 		daily = {
 			position = Vector2.new(
 				edge,
@@ -203,6 +218,67 @@ function ResponsiveLayout.splashPanels(
 			position = Vector2.new(available.X - edge - questsSize.X, questsTop),
 			size = questsSize,
 		},
+	}
+end
+
+function ResponsiveLayout.inventoryComposition(available: Vector2, layout: any)
+	local portrait = ResponsiveLayout.isPortrait(available, layout.PortraitMaxAspect)
+	local short = not portrait and available.Y <= layout.ShortLandscapeMaxHeightPx
+	local edge = 12
+	local size = ResponsiveLayout.panelSize(
+		available,
+		layout.Panels.Inventory,
+		layout.PortraitMaxAspect,
+		layout.ShortLandscapeMaxHeightPx
+	)
+	local center = if portrait then layout.PagePosition else layout.InventoryPagePosition
+	local position = Vector2.new(
+		available.X * center.X.Scale + center.X.Offset - size.X / 2,
+		available.Y * center.Y.Scale + center.Y.Offset - size.Y / 2
+	)
+	if short then
+		position = Vector2.new(edge, layout.TopBar.ShortHeightPx + 8)
+		local inventory = layout.Inventory
+		local preferredWidth =
+			math.max(inventory.ShortPanelMinWidthPx, math.floor(available.X * inventory.ShortPanelWidthScale) - edge)
+		local maximumWidth = math.max(1, available.X - edge * 3 - inventory.ShortWorldMinWidthPx)
+		size = Vector2.new(math.min(preferredWidth, maximumWidth), math.max(1, available.Y - position.Y - edge))
+	end
+	local worldX = position.X + size.X + edge
+	return {
+		panel = { position = position, size = size },
+		world = {
+			position = Vector2.new(worldX, position.Y),
+			size = Vector2.new(math.max(1, available.X - worldX - edge), size.Y),
+		},
+	}
+end
+
+function ResponsiveLayout.splashWorldWindow(available: Vector2, layout: any): SafeRect
+	local panels = ResponsiveLayout.splashPanels(
+		available,
+		layout.Splash.ProgressPanels,
+		layout.PortraitMaxAspect,
+		layout.ShortLandscapeMaxHeightPx
+	)
+	local edge = layout.Splash.ProgressPanels.GapPx
+	if panels.progressStack then
+		local top = layout.TopBar.ShortHeightPx + 8
+		return {
+			position = Vector2.new(edge, top),
+			size = Vector2.new(
+				math.max(1, panels.progressStack.position.X - edge * 2),
+				math.max(1, available.Y - top - 96)
+			),
+		}
+	end
+	local left = if panels.portrait then edge else panels.daily.position.X + panels.daily.size.X + edge
+	local top = math.floor(available.Y * (if panels.portrait then 0.38 else 0.25))
+	local right = math.min(panels.season.position.X, panels.quests.position.X) - edge
+	local bottom = if panels.portrait then panels.daily.position.Y - edge else available.Y - edge
+	return {
+		position = Vector2.new(left, top),
+		size = Vector2.new(math.max(1, right - left), math.max(1, bottom - top)),
 	}
 end
 

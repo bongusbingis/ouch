@@ -1,7 +1,4 @@
--- Name: QuestStatusServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-quest-status, listing a player's active daily quests with their progress, targets, and claim state.
--- Created: 2026-07-15
 
 --!strict
 
@@ -12,7 +9,7 @@ local QuestService = require(Server:WaitForChild("Modules"):WaitForChild("QuestS
 
 return function(context: any, player: Player?): string
 	local target = player or context.Executor
-	local state = QuestService.stateForTesting(target)
+	local state = QuestService.stateForAdmin(target)
 	if state == nil then
 		return `{target.Name}: profile not ready`
 	end

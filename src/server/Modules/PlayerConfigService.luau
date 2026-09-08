@@ -1,7 +1,4 @@
--- Name: PlayerConfigService.luau
--- Author: Jack C.
 -- Description: Generic per-player AB config engine. Resolves each registered schema from the player's Roblox experience-config snapshot and projects it onto a Player-owned folder, so the sim and client read the same validated values. Aim assist (Config.PlayerAssist) is one schema; a new per-player experiment is a new schema plus its own consumer, with no change here.
--- Created: 2026-08-19
 
 --!strict
 

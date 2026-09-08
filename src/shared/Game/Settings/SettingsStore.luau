@@ -1,9 +1,8 @@
--- Name: SettingsStore.luau
--- Author: Jack C.
 -- Description: Client-side current value for every setting: the authoritative source every control and every consuming system reads. A local write applies and notifies instantly; persistence is a separate, explicit commit so dragging a slider never waits on or spams the network.
--- Created: 2026-08-25
 
 --!strict
+
+local Listeners = require(script.Parent.Parent.Util.Listeners)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -27,7 +26,7 @@ local queued: { [string]: any } = {}
 local workers: { [string]: boolean } = {}
 local statuses: { [string]: string } = {}
 local generation = 0
-local callbacks: { ChangedCallback } = {}
+local callbacks: Listeners.Collection<string> = Listeners.new("SettingsStore", true, "changed callback failed")
 
 local function disconnect(connection: any?)
 	if connection and type(connection.Disconnect) == "function" then
@@ -36,12 +35,7 @@ local function disconnect(connection: any?)
 end
 
 local function notify(id: string)
-	for _, callback in table.clone(callbacks) do
-		local ok, err = pcall(callback, id)
-		if not ok then
-			warn(`[SettingsStore] changed callback failed: {err}`)
-		end
-	end
+	callbacks.emit(id)
 end
 
 local function replicatedValue(id: string): any
@@ -179,18 +173,8 @@ function SettingsStore.start(overrides: { replica: any?, network: any? }?)
 end
 
 function SettingsStore.subscribe(callback: ChangedCallback): () -> ()
-	table.insert(callbacks, callback)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(callbacks, callback)
-		if index then
-			table.remove(callbacks, index)
-		end
-	end
+	local unsubscribe = callbacks.add(callback)
+	return unsubscribe
 end
 
 function SettingsStore.stop()
@@ -208,7 +192,7 @@ function SettingsStore.stop()
 	newReplicaConnection = nil
 	profileChangeConnection = nil
 	table.clear(localValues)
-	table.clear(callbacks)
+	callbacks.clear()
 end
 
 function SettingsStore._resetForTest()

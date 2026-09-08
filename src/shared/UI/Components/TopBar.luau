@@ -1,7 +1,4 @@
--- Name: TopBar.luau
--- Author: Jack C.
 -- Description: The persistent top bar showing balances and the menu navigation actions.
--- Created: 2026-08-17
 
 --!strict
 
@@ -150,16 +147,12 @@ return function(props: Props)
 			}),
 			Label = c(ResponsiveText, {
 				HostName = "Label",
-				MeasurementFont = Enum.Font.SourceSansBold,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				Native = {
 					Active = true,
 					AnchorPoint = Vector2.new(0.5, 1),
 					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/SourceSansPro.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
+					Font = UIConfig.Text.BodyFont,
 					Position = definition.LabelPosition or UDim2.fromScale(0.5, 0),
 					Size = definition.LabelSize
 						or UDim2.fromScale(1.4, if definition.Id == "Inventory" then 0.420305 else 0.42),
@@ -172,7 +165,7 @@ return function(props: Props)
 	end
 
 	return c("Frame", {
-		BackgroundColor3 = Color3.fromRGB(63, 63, 63),
+		BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
 		BorderColor3 = Color3.new(),
 		BorderSizePixel = 0,
 		Size = if short then UDim2.new(1, 0, 0, UIConfig.Layout.TopBar.ShortHeightPx) else UDim2.fromScale(1, 0.113754),

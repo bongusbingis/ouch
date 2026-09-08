@@ -1,0 +1,15 @@
+name: Set up pinned tools
+description: Restore tool binaries before installation, keeping authentication out of the cache.
+runs:
+  using: composite
+  steps:
+    - name: Restore Rokit binaries
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.rokit/tool-storage
+        key: ${{ runner.os }}-${{ runner.arch }}-rokit-binaries-v1-${{ hashFiles('rokit.toml') }}
+    - name: Install Rokit and tools
+      uses: CompeyDev/setup-rokit@v0.2.1
+      with:
+        version: v1.0.0

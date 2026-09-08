@@ -1,7 +1,4 @@
--- Name: CombatState.luau
--- Author: Jack C.
 -- Description: Client-side view of the local player's combat state, deriving charge progress and whether a throw or swing is currently legal from replicated sim attributes, and publishing snapshots to the HUD and presentation modules.
--- Created: 2026-08-20
 
 --!strict
 

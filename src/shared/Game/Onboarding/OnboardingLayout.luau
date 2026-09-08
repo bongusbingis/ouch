@@ -1,7 +1,4 @@
--- Name: OnboardingLayout.luau
--- Author: Jack C.
 -- Description: Pure geometry for the tutorial arena. Derives one frame of reference from the authored MapOrigin and PlayerSpawn markers, then answers every positional question the training flow asks -- where a dummy stands, where a waypoint sits, whether the player is on the bridge or out over the elimination ring -- so no module measures the map for itself.
--- Created: 2026-08-26
 
 --!strict
 

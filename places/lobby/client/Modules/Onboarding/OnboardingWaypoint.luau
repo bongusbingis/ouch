@@ -1,7 +1,4 @@
--- Name: OnboardingWaypoint.luau
--- Author: Jack C.
 -- Description: Renders the training waypoint arrow. Rides a ring around the player at the bearing of the current objective, which is either a fixed place the server named or whichever live dummy is nearest, and clears once the player has arrived. Presentation only: the objective comes from the server and is never invented here.
--- Created: 2026-08-26
 
 --!strict
 

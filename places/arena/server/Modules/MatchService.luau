@@ -1,7 +1,4 @@
--- Name: MatchService.luau
--- Author: Jack C.
 -- Description: Drives the match lifecycle from the selected mode's rules: assigns teams, provisions balls, applies elimination consequences and scoring, schedules respawns, publishes the replicated match state, and orchestrates results and reset.
--- Created: 2026-07-13
 
 --!strict
 
@@ -754,7 +751,7 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	return true
 end
 
-function MatchService.stateForTesting(): { [string]: any }
+function MatchService.stateForAdmin(): { [string]: any }
 	return {
 		phase = state.phase,
 		modeId = if mode then mode.id else nil,
@@ -859,7 +856,7 @@ function MatchService.beginMode(modeId: string): (boolean, string?)
 	return true, nil
 end
 
-function MatchService.restartForTesting(modeId: string?): (boolean, string?)
+function MatchService.restartForAdmin(modeId: string?): (boolean, string?)
 	local nextMode = if modeId then ModeRegistry.get(modeId) else mode or ModeRegistry.default()
 	if nextMode == nil then
 		return false, "unknown_mode"
@@ -885,7 +882,7 @@ function MatchService.restartForTesting(modeId: string?): (boolean, string?)
 	return true
 end
 
-function MatchService.endForTesting(): (boolean, string?)
+function MatchService.endForAdmin(): (boolean, string?)
 	local activeMode = mode
 	if activeMode == nil then
 		return false, "no_selected_mode"
@@ -920,7 +917,7 @@ function MatchService.devEndMatchForPlayer(player: Player): (boolean, string?)
 	return true
 end
 
-function MatchService.setTimeForTesting(seconds: number): (boolean, string?)
+function MatchService.setTimeForAdmin(seconds: number): (boolean, string?)
 	if state.phase ~= "Active" then
 		return false, "match_not_active"
 	end
@@ -949,12 +946,12 @@ function MatchService.eliminate(target: Player, source: Player?): boolean
 	return MatchService.handleCombatEvent(buildElimEvent(source, target))
 end
 
-function MatchService.eliminateForTesting(source: Player?, target: Player): (boolean, { [string]: any })
+function MatchService.eliminateForAdmin(source: Player?, target: Player): (boolean, { [string]: any })
 	local event = buildElimEvent(source, target)
 	return MatchService.handleCombatEvent(event), event
 end
 
-function MatchService.reviveForTesting(player: Player): (boolean, string?)
+function MatchService.reviveForAdmin(player: Player): (boolean, string?)
 	local character = player.Character
 	if character == nil then
 		return false, "no_character"
@@ -969,7 +966,7 @@ function MatchService.reviveForTesting(player: Player): (boolean, string?)
 	return true
 end
 
-function MatchService.teleportToSpawnForTesting(player: Player): (boolean, string?)
+function MatchService.teleportToSpawnForAdmin(player: Player): (boolean, string?)
 	local character = player.Character
 	if character == nil then
 		return false, "no_character"

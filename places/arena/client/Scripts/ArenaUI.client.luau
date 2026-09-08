@@ -1,7 +1,4 @@
--- Name: ArenaUI.client.luau
--- Author: Jack C.
 -- Description: Arena client entry point for user interface: mounts the React root, hands off from the bootstrap loading screen, and starts the UI adapter modules.
--- Created: 2026-08-17
 
 --!strict
 

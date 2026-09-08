@@ -1,7 +1,4 @@
--- Name: ArenaApp.luau
--- Author: Jack C.
 -- Description: Root React component for the arena, rendering the loading screen, the game-mode ballot, and the in-match menu from their adapters' snapshots.
--- Created: 2026-08-17
 
 --!strict
 
@@ -16,7 +13,12 @@ local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameMode
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
-local GameModeVoteViewModel = require(ReplicatedStorage.Shared.UI.Models.GameModeVoteViewModel)
+local GameModeVoteViewModel = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Models")
+		:WaitForChild("GameModeVoteViewModel")
+)
 local GameModeSelect = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameModeSelect"))
 local GameVersion = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameVersion"))
 local LoadingBackdrop = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("LoadingBackdrop"))
@@ -30,11 +32,12 @@ local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 local PostMatchClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("PostMatchClient"))
-local MatchHUD = require(Shared.UI.Components.MatchHUD)
-local TeammateMarkers = require(Shared.UI.Components.Arena.TeammateMarkers)
+local MatchHUD = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("MatchHUD"))
+local TeammateMarkers =
+	require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("Arena"):WaitForChild("TeammateMarkers"))
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local MatchHUDClient = require(script.Parent.Parent.Modules.UI.MatchHUDClient)
-local CombatMenuClient = require(Shared.UI.Services.CombatMenuClient)
+local CombatMenuClient = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CombatMenuClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local c = React.createElement

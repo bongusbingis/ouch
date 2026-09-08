@@ -1,7 +1,4 @@
--- Name: PartyTeamAllocator.luau
--- Author: Jack C.
 -- Description: Pure team assignment that keeps lobby parties together while minimizing team imbalance, deterministically for the same entrants.
--- Created: 2026-08-17
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: useReducedMotion.luau
--- Author: Jack C.
 -- Description: React hook exposing whether the player has asked for reduced motion, so components can skip animations.
--- Created: 2026-08-17
 
 --!strict
 

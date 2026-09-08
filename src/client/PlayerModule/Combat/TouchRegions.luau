@@ -1,7 +1,4 @@
--- Name: TouchRegions.luau
--- Author: Jack C.
 -- Description: Defines and tests the on-screen touch regions used by combat input, including HUD exclusion rectangles registered by UI and the bottom swipe region.
--- Created: 2026-08-20
 
 --!strict
 

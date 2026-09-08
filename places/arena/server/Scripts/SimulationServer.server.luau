@@ -1,7 +1,4 @@
--- Name: SimulationServer.server.luau
--- Author: Jack C.
 -- Description: Arena server entry point: starts every gameplay, economy, and analytics service in order and wires sim events through to animations, feedback, and progression consumers.
--- Created: 2026-07-12
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +11,7 @@ local InputSetup = require(Modules:WaitForChild("InputSetup"))
 local PlayerConfigService = require(Modules:WaitForChild("PlayerConfigService"))
 local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PlayerAssist"))
 local ArenaReturnService = require(Modules:WaitForChild("ArenaReturnService"))
+local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local BallService = require(Modules:WaitForChild("BallService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
@@ -77,15 +75,7 @@ local function forwardDamageFeedback(event)
 end
 
 ConfigLiveService.start({
-	modules = {
-		Combat = Combat,
-		AimAssist = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("AimAssist")),
-		GameModes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("GameModes")),
-		MapFeatures = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("MapFeatures")),
-		Modes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Modes")),
-		Shop = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Shop")),
-		Crates = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Crates")),
-	},
+	modules = LiveConfig.loadModules("arena"),
 	holdSimOverrides = function()
 		local phase = MatchService.phase()
 		return phase == "Starting" or phase == "Active"

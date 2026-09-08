@@ -1,9 +1,14 @@
--- Name: ModeVoteClient.luau
--- Author: Jack C.
 -- Description: Client adapter for the authoritative game-mode ballot, decoding the replicated vote snapshot into the shape the mode-select UI renders and submitting the local player's vote.
--- Created: 2026-08-17
 
 --!strict
+
+local Listeners = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Util")
+		:WaitForChild("Listeners")
+)
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -31,7 +36,7 @@ local started = false
 local stateFolder: Folder? = nil
 local stateConnections: { RBXScriptConnection } = {}
 local connections: { RBXScriptConnection } = {}
-local listeners: { (Snapshot) -> () } = {}
+local listeners: Listeners.Collection<Snapshot> = Listeners.new("ModeVoteClient", false, "listener failed")
 local projected = {
 	open = false,
 	startsAt = 0,
@@ -67,12 +72,7 @@ end
 
 local function notify()
 	local value = snapshot()
-	for _, listener in listeners do
-		local ok, err = pcall(listener, value)
-		if not ok then
-			warn(`[ModeVoteClient] listener failed: {err}`)
-		end
-	end
+	listeners.emit(value)
 end
 
 local function decode(value: string)
@@ -195,19 +195,9 @@ end
 
 function ModeVoteClient.subscribe(callback: (Snapshot) -> ()): () -> ()
 	ModeVoteClient.start()
-	table.insert(listeners, callback)
+	local unsubscribe = listeners.add(callback)
 	callback(snapshot())
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(listeners, callback)
-		if index then
-			table.remove(listeners, index)
-		end
-	end
+	return unsubscribe
 end
 
 function ModeVoteClient.vote(modeId: string)
@@ -225,7 +215,7 @@ function ModeVoteClient.destroy()
 	end
 	table.clear(connections)
 	table.clear(stateConnections)
-	table.clear(listeners)
+	listeners.clear()
 	stateFolder = nil
 	started = false
 end

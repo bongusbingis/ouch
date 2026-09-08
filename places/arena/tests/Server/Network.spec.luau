@@ -1,7 +1,4 @@
--- Name: Network.spec.luau
--- Author: Jack C.
 -- Description: In-place spec that every declared remote is materialized with the right class and that the rate-limiting and validation middleware wrappers behave and compose correctly.
--- Created: 2026-07-16
 
 --!nonstrict
 

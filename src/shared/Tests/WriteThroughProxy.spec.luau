@@ -1,7 +1,4 @@
--- Name: WriteThroughProxy.spec.luau
--- Author: Jack C.
 -- Description: Spec that the write-through proxy stores assigned tables raw while replicating the same value and keeps repeated nested reads bounded and writable.
--- Created: 2026-08-23
 
 --!strict
 

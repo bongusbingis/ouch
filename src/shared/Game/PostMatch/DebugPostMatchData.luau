@@ -1,7 +1,4 @@
--- Name: DebugPostMatchData.luau
--- Author: Jack C.
 -- Description: Studio story fixtures for the post-match screen, providing complete result packets for every scenario without touching a production service or profile data.
--- Created: 2026-08-25
 
 --!strict
 

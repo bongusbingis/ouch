@@ -1,7 +1,4 @@
--- Name: PostMatchResult.luau
--- Author: Jack C.
 -- Description: Pure projection between the authoritative match and progression services and the post-match screen, building, formatting, and parsing result packets while leaving unavailable fields absent rather than fabricated.
--- Created: 2026-08-25
 
 --!strict
 

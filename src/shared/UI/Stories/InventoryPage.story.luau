@@ -1,15 +1,14 @@
--- Name: InventoryPage.story.luau
--- Author: Jack C.
 -- Description: Studio story previewing the locker page with fixture inventory data.
--- Created: 2026-08-17
 
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local InventoryPage = require(script.Parent.Parent.Components.InventoryPage)
-local InventoryModel = require(ReplicatedStorage.Shared.Game.Economy.InventoryModel)
-local GamePasses = require(ReplicatedStorage.Config.Economy.GamePasses)
+local InventoryModel = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("InventoryModel")
+)
+local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
 local mount = require(script.Parent.StoryRoot)
 
 local function Story()

@@ -1,7 +1,4 @@
--- Name: sb-match-timeServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-match-time, overwriting the running match's remaining clock.
--- Created: 2026-07-15
 
 --!strict
 
@@ -15,7 +12,7 @@ return function(_context: any, seconds: number): string
 		return "Seconds must be a finite, non-negative number."
 	end
 
-	local ok, reason = MatchService.setTimeForTesting(seconds)
+	local ok, reason = MatchService.setTimeForAdmin(seconds)
 	if not ok then
 		return `Could not set match time: {reason or "unknown_error"}.`
 	end

@@ -1,7 +1,4 @@
--- Name: Infection.spec.luau
--- Author: Jack C.
 -- Description: Spec for the infection mode rules: survivor counting, conversion only on an infected elimination, patient zero selection, and the survivors winning on the clock.
--- Created: 2026-08-19
 
 --!strict
 

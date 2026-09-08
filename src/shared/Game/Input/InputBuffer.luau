@@ -1,7 +1,4 @@
--- Name: InputBuffer.luau
--- Author: Jack C.
 -- Description: One-slot input buffer that holds an action arriving during a cooldown and fires it the instant it becomes legal, so late touch inputs are not silently dropped.
--- Created: 2026-08-19
 
 --!strict
 

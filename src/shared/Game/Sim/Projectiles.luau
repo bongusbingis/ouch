@@ -1,7 +1,4 @@
--- Name: Projectiles.luau
--- Author: Jack C.
 -- Description: The generic swept-projectile subsystem: fixed-tick kinematics, homing, swept collision against characters and static geometry with substepping to prevent tunneling, and the held, windup, flight, bounce, and roll phase machine.
--- Created: 2026-07-12
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: SettingsPage.luau
--- Author: Jack C.
 -- Description: The settings screen: every applicable setting for the current place, grouped by category and rendered as reusable rows from the shared registry. Presentation only -- it reads current values from SettingsStore and writes changes back through it, never owning gameplay behavior itself.
--- Created: 2026-08-25
 
 --!strict
 
@@ -113,10 +110,16 @@ return function(props: Props)
 					Position = UDim2.fromScale(0, 0),
 					Size = UDim2.fromScale(1, 1),
 					Text = category,
-					TextColor3 = UIConfig.ProgressionStyle.Ink,
+					TextColor3 = UIConfig.ProgressionStyle.White,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					ZIndex = 5,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 		})
 		for _, definition in byCategory[category] do
@@ -178,6 +181,7 @@ return function(props: Props)
 				Active = true,
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
 				CanvasSize = UDim2.fromOffset(0, 0),
 				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
 				Position = UDim2.fromScale(0.025, 0),
@@ -185,6 +189,7 @@ return function(props: Props)
 				ScrollBarImageColor3 = Color3.new(1, 1, 1),
 				ScrollBarImageTransparency = 0.1,
 				ScrollBarThickness = if compact then 5 else 7,
+				Selectable = false,
 				Size = UDim2.new(0.95, 0, 1, -38),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 			}, content),

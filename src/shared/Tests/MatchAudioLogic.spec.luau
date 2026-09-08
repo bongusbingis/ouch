@@ -1,7 +1,4 @@
--- Name: MatchAudioLogic.spec.luau
--- Author: Jack C.
 -- Description: Spec for match audio routing: which phases play music, the whistle firing only on entering results, and track selection never immediately repeating.
--- Created: 2026-07-25
 
 --!strict
 

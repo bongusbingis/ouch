@@ -1,7 +1,4 @@
--- Name: SimStateCodec.luau
--- Author: Jack C.
 -- Description: Encodes and decodes simulation state to and from the attributes on ball and character instances, the between-tick source of truth that replicates to clients for presentation.
--- Created: 2026-07-12
 
 --!strict
 

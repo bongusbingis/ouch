@@ -1,7 +1,4 @@
--- Name: ModeVoteService.luau
--- Author: Jack C.
 -- Description: Sole owner of the authoritative game-mode ballot: opens the vote for admitted ready players, counts validated votes, extends for late arrivals, resolves ties randomly, and projects a coherent snapshot for the UI.
--- Created: 2026-08-17
 
 --!strict
 

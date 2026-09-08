@@ -1,7 +1,4 @@
--- Name: WeaponViewport.luau
--- Author: Jack C.
 -- Description: Renders an equipped dodgeball or hammer cosmetic as a reusable icon-sized 3D preview.
--- Created: 2026-08-28
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CrateRolls.spec.luau
--- Author: Jack C.
 -- Description: Spec for crate rolling against a scripted random source: weighted rarity distribution, zero-weight exclusion, duplicate refunds, and the pity guarantee bounding the worst-case streak.
--- Created: 2026-07-13
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CombatToolbar.story.luau
--- Author: Jack C.
 -- Description: Studio story for cycling combat dock states and input-device presentations.
--- Created: 2026-08-28
 
 --!strict
 

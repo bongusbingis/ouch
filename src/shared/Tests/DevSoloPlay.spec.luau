@@ -1,7 +1,4 @@
--- Name: DevSoloPlay.spec.luau
--- Author: Jack C.
 -- Description: Spec for the developer gate shared by lobby solo play and the arena match skip: only sufficiently ranked group members pass, and an unreadable rank is a refusal rather than an error.
--- Created: 2026-08-25
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: sb-player-eliminateServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-player-eliminate, routing through the match service elimination seam so scoring, quests, and respawn scheduling all run.
--- Created: 2026-07-15
 
 --!strict
 
@@ -17,7 +14,7 @@ return function(context: any, targets: { Player }, source: Player?): string
 	local creditedSource = source or context.Executor
 	return CommandUtil.runForPlayers(targets, function(target)
 		local eventSource = if target == creditedSource then nil else creditedSource
-		local accepted, event = MatchService.eliminateForTesting(eventSource, target)
+		local accepted, event = MatchService.eliminateForAdmin(eventSource, target)
 		if not accepted then
 			return false, "elimination_rejected"
 		end

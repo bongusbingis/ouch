@@ -1,7 +1,4 @@
--- Name: OnboardingAssist.spec.luau
--- Author: Jack C.
 -- Description: Spec for training throw steering: that a ball turns toward a target it is already aimed near, keeps its speed, refuses targets outside the cone or out of range, and never overshoots the target heading.
--- Created: 2026-08-26
 
 --!strict
 

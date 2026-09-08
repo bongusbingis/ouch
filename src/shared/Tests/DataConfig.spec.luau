@@ -1,7 +1,4 @@
--- Name: DataConfig.spec.luau
--- Author: Jack C.
 -- Description: Spec for the profile template every service writes through, since a missing branch fails silently rather than erroring: starting balances, owned branches, and positive progression awards.
--- Created: 2026-08-22
 
 --!strict
 

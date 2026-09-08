@@ -1,7 +1,4 @@
--- Name: HammerVisuals.luau
--- Author: Jack C.
 -- Description: Renders every player's equipped hammer: clones the cosmetic carrier, solves its grip onto the hand, scales and springs it through swings, and hosts the swing audio.
--- Created: 2026-07-13
 
 --!strict
 

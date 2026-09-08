@@ -1,7 +1,4 @@
--- Name: SliderControl.luau
--- Author: Jack C.
 -- Description: Reusable slider for the settings system: continuous, step-snapped, or an explicit set of allowed stops, all resolved through SettingsValues' single alpha/value mapping so track clicks, thumb drags, and controller nudges can never disagree. Mouse and touch both drive one InputBegan/Changed/Ended path declared on the hit-target frame, so no lingering connection needs cleanup when the row unmounts.
--- Created: 2026-08-25
 
 --!strict
 
@@ -14,13 +11,11 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local SettingsValues = require(Shared:WaitForChild("Game"):WaitForChild("Settings"):WaitForChild("SettingsValues"))
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local UIFeedback = require(script.Parent.Parent.Parent.Services.UIFeedback)
+local Selection = require(script.Parent.Parent.Parent.Services.Selection)
 
 local c = React.createElement
 
-local TRACK_COLOR = Color3.fromRGB(52, 52, 52)
-local FILL_COLOR = Color3.fromRGB(97, 255, 237)
-local DISABLED_FILL = Color3.fromRGB(130, 130, 130)
-local THUMB_STROKE = Color3.fromRGB(63, 63, 63)
+local palette = UIConfig.ProgressionStyle
 local DRAG_CLAIM_PIXELS = 10
 
 export type Props = {
@@ -47,13 +42,22 @@ return function(props: Props)
 	local enabled = props.Enabled ~= false
 	local definition = props.Definition
 	local trackRef = React.useRef(nil)
+	local selectionImageRef = React.useRef(nil)
+	local focused, setFocused = React.useState(false)
 	local drag = React.useRef(nil :: DragState?)
 
 	React.useEffect(function()
 		local target = trackRef.current
+		local selectionImage = selectionImageRef.current
 		if target then
 			target.NextSelectionLeft = target
 			target.NextSelectionRight = target
+			target.SelectionImageObject = selectionImage
+		end
+		return function()
+			if target and target.SelectionImageObject == selectionImage then
+				target.SelectionImageObject = nil
+			end
 		end
 	end, {})
 
@@ -145,23 +149,26 @@ return function(props: Props)
 		Size = props.Size or UDim2.fromScale(1, 1),
 	}, {
 		Value = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.SourceSansBold,
+			MeasurementFont = UIConfig.Text.BodyFont,
 			MaxTextSize = 20,
 			Native = {
 				AnchorPoint = Vector2.new(1, 0.5),
 				BackgroundTransparency = 1,
-				FontFace = Font.new(
-					"rbxasset://fonts/families/SourceSansPro.json",
-					Enum.FontWeight.Bold,
-					Enum.FontStyle.Normal
-				),
+				Font = UIConfig.Text.BodyFont,
 				Position = UDim2.fromScale(1, 0.16),
 				Size = UDim2.fromScale(0.24, 0.4),
 				Text = displayText,
-				TextColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(150, 150, 150),
+				TextColor3 = palette.White,
+				TextTransparency = if enabled then 0 else 0.3,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = 5,
 			},
+		}, {
+			Outline = c("UIStroke", {
+				Color = palette.Ink,
+				Thickness = 0.035,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			}),
 		}),
 		HitTarget = c("Frame", {
 			ref = trackRef,
@@ -171,6 +178,13 @@ return function(props: Props)
 			Selectable = enabled,
 			Size = UDim2.new(1, 0, 0, UIConfig.Interaction.MinTargetPx),
 			ZIndex = 4,
+			[React.Event.SelectionGained] = function(target)
+				setFocused(true)
+				Selection.scrollIntoView(target)
+			end,
+			[React.Event.SelectionLost] = function()
+				setFocused(false)
+			end,
 			[React.Event.InputBegan] = function(_object, input: InputObject)
 				if not enabled then
 					return
@@ -201,10 +215,25 @@ return function(props: Props)
 				end
 			end,
 		}, {
+			SelectionImage = c("Frame", {
+				ref = selectionImageRef,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 10,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Interaction.FocusCornerPx) }),
+				Outline = c("UIStroke", {
+					Color = palette.Yellow,
+					Thickness = UIConfig.Interaction.FocusStrokePx,
+					Transparency = if focused and enabled then 0 else 1,
+				}),
+			}),
 			Track = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
-				BackgroundColor3 = TRACK_COLOR,
-				BackgroundTransparency = if enabled then 0.12 else 0.5,
+				BackgroundColor3 = palette.Track,
+				BackgroundTransparency = if enabled then 0 else 0.3,
+				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0, 0.5),
 				Size = UDim2.fromScale(1, 0.34),
 				ZIndex = 4,
@@ -212,7 +241,8 @@ return function(props: Props)
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 				Fill = c("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
-					BackgroundColor3 = if enabled then FILL_COLOR else DISABLED_FILL,
+					BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,
+					BorderSizePixel = 0,
 					Position = UDim2.fromScale(0, 0.5),
 					Size = UDim2.fromScale(alpha, 1),
 					ZIndex = 5,
@@ -228,8 +258,9 @@ return function(props: Props)
 							for index, stop in stops do
 								marks[`Tick{index}`] = c("Frame", {
 									AnchorPoint = Vector2.new(0.5, 0.5),
-									BackgroundColor3 = Color3.new(1, 1, 1),
+									BackgroundColor3 = palette.White,
 									BackgroundTransparency = 0.55,
+									BorderSizePixel = 0,
 									Position = UDim2.fromScale(SettingsValues.valueToAlpha(definition, stop), 0.5),
 									Size = UDim2.fromOffset(6, 6),
 									ZIndex = 6,
@@ -244,15 +275,16 @@ return function(props: Props)
 			}),
 			Thumb = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Color3.new(1, 1, 1),
+				BackgroundColor3 = if enabled then palette.White else palette.Muted,
+				BorderSizePixel = 0,
 				Position = UDim2.fromScale(alpha, 0.5),
 				Size = UDim2.fromOffset(26, 26),
 				ZIndex = 6,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 				Stroke = c("UIStroke", {
-					Color = THUMB_STROKE,
-					Thickness = 2,
+					Color = palette.Ink,
+					Thickness = UIConfig.Button.StrokePx,
 				}),
 			}),
 		}),

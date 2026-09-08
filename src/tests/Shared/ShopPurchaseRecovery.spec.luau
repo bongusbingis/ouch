@@ -25,12 +25,16 @@ local function signal()
 end
 return function()
 	describe("Shop purchase recovery", function()
-		local status, events, market, player, oldPoll
+		local status, events, market, player, oldPoll, shopCalls, shopReply
 		beforeEach(function()
 			Shop.stop()
 			oldPoll = Config.PurchasePollSeconds
 			Config.PurchasePollSeconds = 0.02
 			status = { receipts = {}, ownedPasses = {} }
+			shopCalls = 0
+			shopReply = function()
+				return {}
+			end
 			events = {}
 			player = { UserId = -550123 }
 			market = {
@@ -47,6 +51,9 @@ return function()
 					call = function(name)
 						if name == "GetPurchaseState" then
 							return status
+						elseif name == "GetShopState" then
+							shopCalls += 1
+							return shopReply()
 						end
 						return {}
 					end,
@@ -73,6 +80,46 @@ return function()
 			until not Shop.snapshot().pending[key] or os.clock() >= deadline
 			expect(Shop.snapshot().pending[key]).to.equal(nil)
 		end
+		it("recovers a failed initial shop request without a manual retry", function()
+			local ready = { paidRandomAllowed = true, offers = {} }
+			shopReply = function()
+				if shopCalls == 1 then
+					error("temporarily unavailable")
+				end
+				return ready
+			end
+			expect(Shop.refresh()).to.equal(false)
+			local deadline = os.clock() + 1
+			repeat
+				task.wait()
+			until Shop.snapshot().status == "Ready" or os.clock() >= deadline
+			expect(Shop.snapshot().status).to.equal("Ready")
+			expect(Shop.snapshot().shopState).to.equal(ready)
+			expect(shopCalls).to.equal(2)
+		end)
+		it("keeps a newer pushed shop state over an older request response", function()
+			local newest = { paidRandomAllowed = false, offers = {} }
+			shopReply = function()
+				events.ShopStateChanged(newest)
+				return { paidRandomAllowed = true, offers = {} }
+			end
+			local ok, reason = Shop.refresh()
+			expect(ok).to.equal(false)
+			expect(reason).to.equal("stale")
+			expect(Shop.snapshot().status).to.equal("Ready")
+			expect(Shop.snapshot().shopState).to.equal(newest)
+		end)
+		it("stops shop recovery when the client stops", function()
+			shopReply = function()
+				error("offline")
+			end
+			expect(Shop.refresh()).to.equal(false)
+			Shop.stop()
+			local completed = shopCalls
+			task.wait(0.1)
+			expect(shopCalls).to.equal(completed)
+			expect(Shop.snapshot().status).to.equal("Idle")
+		end)
 		it("does not mistake a Bonks crate opening for an outstanding Robux purchase", function()
 			local id = Products.Catalog.EffectsCrateOpen.Id
 			expect(Shop.promptProduct("crate", id)).to.equal(true)

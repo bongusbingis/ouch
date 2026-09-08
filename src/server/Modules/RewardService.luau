@@ -1,7 +1,4 @@
--- Name: RewardService.luau
--- Author: Jack C.
 -- Description: Single entry point for granting rewards, dispatching each reward type to its registered handler so quests, passes, and crates all award through one path.
--- Created: 2026-07-13
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: ArenaReturnService.luau
--- Author: Jack C.
 -- Description: Owns party continuation and lobby returns, grouping return intent and checking committed rewards through the shared retry coordinator.
--- Created: 2026-08-18
 
 --!strict
 

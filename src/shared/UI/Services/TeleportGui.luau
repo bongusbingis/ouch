@@ -1,7 +1,4 @@
--- Name: TeleportGui.luau
--- Author: Jack C.
 -- Description: Prepares and registers the screen shown during a teleport so it is carried into the destination place.
--- Created: 2026-08-24
 
 --!strict
 

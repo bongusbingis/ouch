@@ -1,7 +1,4 @@
--- Name: AimPose.spec.luau
--- Author: Jack C.
 -- Description: Spec for the pure throwing-arm pose maths: how charge raises the solver weight without ever reaching full control, and how charge stretches the wind-up reach.
--- Created: 2026-08-20
 
 --!strict
 

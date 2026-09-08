@@ -1,7 +1,4 @@
--- Name: ProjectileTrajectory.luau
--- Author: Jack C.
 -- Description: Pure projectile kinematics shared by the authoritative sim and the client's aim preview: launch speed and velocity, substep counts, homing steering, and sampling a predicted path.
--- Created: 2026-08-24
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CameraAssist.luau
--- Author: Jack C.
 -- Description: Applies rotational friction and adhesion to the camera when the player is aiming near a valid target, making gamepad and touch aiming stick without taking control away.
--- Created: 2026-08-19
 
 --!strict
 

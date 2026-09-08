@@ -1,7 +1,4 @@
--- Name: VoteCamera.luau
--- Author: Jack C.
 -- Description: Moves the camera to the authored vote framing while the game-mode ballot is open and returns it to the player on close.
--- Created: 2026-08-18
 
 --!strict
 
@@ -12,7 +9,12 @@ local arenaOrigin = require(script.Parent.ArenaOrigin)
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
 
-local PresentationCamera = require(ReplicatedStorage.Shared.UI.Services.PresentationCamera)
+local PresentationCamera = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("PresentationCamera")
+)
 
 local VoteCamera = {}
 

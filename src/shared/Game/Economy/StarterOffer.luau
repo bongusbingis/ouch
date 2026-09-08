@@ -1,7 +1,4 @@
--- Name: StarterOffer.luau
--- Author: Jack C.
 -- Description: Pure eligibility rules for the one-time starter offer window, deciding only whether an ordinary game pass is merchandised more prominently.
--- Created: 2026-08-12
 
 --!strict
 

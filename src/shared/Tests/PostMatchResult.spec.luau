@@ -1,7 +1,4 @@
--- Name: PostMatchResult.spec.luau
--- Author: Jack C.
 -- Description: Spec for the post-match result projection: deterministic score ordering with shared placements, victory derived from team membership, absent rather than fabricated fields, and rejection of malformed packets.
--- Created: 2026-08-25
 
 --!strict
 

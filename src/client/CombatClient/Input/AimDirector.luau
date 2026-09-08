@@ -1,7 +1,4 @@
--- Name: AimDirector.luau
--- Author: Jack C.
 -- Description: Owns the local player's aim direction and soft-lock target selection each frame, sampling the camera and nearby characters to produce the aim vector, chosen target, target motion, and a confidence score for the rest of the client.
--- Created: 2026-07-13
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: DirectPurchase.luau
--- Author: Jack C.
 -- Description: Pure rules for buying one named cosmetic outright with Bonks, shared by the server transaction and the client storefront so both agree on price and eligibility.
--- Created: 2026-08-12
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: AssistResolver.spec.luau
--- Author: Jack C.
 -- Description: Spec for aim-assist resolution: rejection of malformed overrides, device scaling, features gated off per device, and the cohort labelling used for analytics.
--- Created: 2026-08-19
 
 --!strict
 

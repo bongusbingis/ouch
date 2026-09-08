@@ -1,7 +1,4 @@
--- Name: StoreCatalog.luau
--- Author: Jack C.
 -- Description: Produces the deterministic storefront projection, keeping preview offers visible without platform ids and omitting hidden ones.
--- Created: 2026-08-08
 
 --!strict
 

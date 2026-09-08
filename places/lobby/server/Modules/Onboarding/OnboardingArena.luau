@@ -1,7 +1,4 @@
--- Name: OnboardingArena.luau
--- Author: Jack C.
 -- Description: Owns the training arena instance. Clones the authored TutorialArena once per learner onto a ring far below the lobby, anchors it, and resolves its markers into a layout frame, so every position the training flow asks for is measured from the map the player is actually standing in.
--- Created: 2026-08-26
 
 --!strict
 

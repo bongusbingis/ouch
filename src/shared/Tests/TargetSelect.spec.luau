@@ -1,12 +1,15 @@
--- Name: TargetSelect.spec.luau
--- Author: Jack C.
 -- Description: Spec for soft-lock selection and steering: nearest to the centre of aim, tie breaking by distance, cone and range limits, teammates and the dead ignored, confidence scoring, and clamped steering.
--- Created: 2026-08-19
 
 --!strict
 
 local T = require(script.Parent.TestKit)
-local MockWorld = require(script.Parent.MockWorld)
+local MockWorld = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ServerStorage")
+		:WaitForChild("Tests")
+		:WaitForChild("Helpers")
+		:WaitForChild("MockWorld")
+)
 local TargetSelect = require(script.Parent.Parent.Game.Sim.TargetSelect)
 
 local ORIGIN = vector.create(0, 2.5, 0)

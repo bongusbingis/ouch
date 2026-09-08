@@ -1,7 +1,4 @@
--- Name: sb-match-statusServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-match-status, formatting the current phase, mode, time remaining, and per-player scores.
--- Created: 2026-07-15
 
 --!strict
 
@@ -11,7 +8,7 @@ local MatchService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MatchService"))
 
 return function(_context: any): string
-	local state = MatchService.stateForTesting()
+	local state = MatchService.stateForAdmin()
 	local scoreEntries: { string } = {}
 	for id, score in state.scores do
 		table.insert(scoreEntries, `{id}={score}`)

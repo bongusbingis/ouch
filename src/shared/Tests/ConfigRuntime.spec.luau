@@ -1,7 +1,4 @@
--- Name: ConfigRuntime.spec.luau
--- Author: Jack C.
 -- Description: Spec that overrides are written into the config tables consumers read, that the shipped value is captured once and restored exactly, and that listeners fire only on real changes.
--- Created: 2026-08-18
 
 --!strict
 
@@ -67,7 +64,7 @@ T.describe("ConfigRuntime", function()
 		local combat = freshCombat()
 		ConfigRuntime.register("Combat", combat)
 		local notifications = 0
-		ConfigRuntime.onChanged(function()
+		ConfigRuntime.subscribe(function()
 			notifications += 1
 		end)
 		ConfigRuntime.apply({ ["Combat.Dodgeball.ThrowSpeed"] = 250 })

@@ -1,7 +1,4 @@
--- Name: InventoryPreview.luau
--- Author: Jack C.
 -- Description: Renders cosmetic inventory previews, using shared character appearance and marking effects that open in the live preview scene.
--- Created: 2026-08-17
 
 --!strict
 
@@ -9,6 +6,7 @@ local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
@@ -89,7 +87,19 @@ export type Props = {
 	ZIndex: number,
 	ColorId: string?,
 	CostumeId: string?,
+	TextColor: Color3?,
+	TextStroke: number?,
 }
+
+local function previewStroke(thickness: number?)
+	return if thickness
+		then c("UIStroke", {
+			Color = UI.ProgressionStyle.Ink,
+			Thickness = thickness,
+			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+		})
+		else nil
+end
 
 local function effectPreview(props: Props)
 	return c("Frame", {
@@ -106,25 +116,25 @@ local function effectPreview(props: Props)
 				Size = UDim2.fromScale(0.7, 0.52),
 				Font = Enum.Font.SourceSansBold,
 				Text = if props.Category == "ElimEffectAssets" then "SFX" else "★",
-				TextColor3 = Color3.new(1, 1, 1),
+				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
 				ZIndex = props.ZIndex,
 			},
-		}),
+		}, { Outline = previewStroke(props.TextStroke) }),
 		Caption = c(ResponsiveText, {
 			Wrapped = true,
-			MeasurementFont = Enum.Font.SourceSansBold,
+			MeasurementFont = UI.Text.BodyFont,
 			MaxTextSize = 18,
 			Native = {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromScale(0.1, 0.62),
 				Size = UDim2.fromScale(0.8, 0.26),
-				Font = Enum.Font.SourceSansBold,
+				Font = UI.Text.BodyFont,
 				Text = if props.Category == "ElimEffectAssets" then "ELIMINATION SOUND" else "IMPACT EFFECT",
 				TextWrapped = true,
-				TextColor3 = Color3.new(1, 1, 1),
+				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
 				ZIndex = props.ZIndex,
 			},
-		}),
+		}, { Outline = previewStroke(props.TextStroke) }),
 	})
 end
 

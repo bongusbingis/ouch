@@ -1,7 +1,4 @@
--- Name: HammerGrip.luau
--- Author: Jack C.
 -- Description: Solves the grip transform that stands an arbitrary hammer mesh upright in the hand by finding its dominant axis, rejecting ambiguous meshes rather than guessing.
--- Created: 2026-07-25
 
 --!strict
 

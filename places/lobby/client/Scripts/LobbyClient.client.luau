@@ -1,7 +1,4 @@
--- Name: LobbyClient.client.luau
--- Author: Jack C.
 -- Description: Lobby client entry point: starts the party adapter, background controller, teleport presentation, and mounts the lobby React root.
--- Created: 2026-08-15
 
 local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
@@ -38,6 +35,7 @@ local ShopClient = require(
 local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )
+local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigReplication = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
@@ -109,12 +107,7 @@ local root = ReactRoblox.createRoot(container)
 local combatContainer = ReactRoot.create("LobbyCombatRoot", Enum.ScreenInsets.None, 100)
 local combatRoot = ReactRoblox.createRoot(combatContainer)
 
-ConfigReplication.startClient({
-	GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes")),
-	Matchmaking = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")),
-	Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop")),
-	Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates")),
-})
+ConfigReplication.startClient(LiveConfig.loadModules("lobby"))
 EconomyStore.start()
 SettingsStore.start()
 ShopClient.start()

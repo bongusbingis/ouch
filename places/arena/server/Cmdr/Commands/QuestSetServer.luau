@@ -1,7 +1,4 @@
--- Name: QuestSetServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-quest-set, writing an explicit progress value onto an active daily quest for each targeted player.
--- Created: 2026-07-15
 
 --!strict
 
@@ -14,7 +11,7 @@ local QuestService = require(Server:WaitForChild("Modules"):WaitForChild("QuestS
 
 return function(_context: any, players: { Player }, questId: string, progress: number): string
 	local result = CommandUtil.runForPlayers(players, function(player)
-		return QuestService.setProgressForTesting(player, questId, progress)
+		return QuestService.setProgressForAdmin(player, questId, progress)
 	end)
 	return `Set {questId} to {progress} | {result}`
 end

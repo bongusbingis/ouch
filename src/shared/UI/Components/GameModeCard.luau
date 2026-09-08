@@ -1,7 +1,4 @@
--- Name: GameModeCard.luau
--- Author: Jack C.
 -- Description: One selectable game mode card on the vote ballot, showing its art, name, live vote count, and selection state.
--- Created: 2026-08-17
 
 --!strict
 
@@ -10,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local ButtonSurface = require(script.Parent.ButtonSurface)
 local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local GameModeVoteViewModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
@@ -24,7 +22,7 @@ local TITLE_BOUNDS = TextMetrics.scaleBounds(CARD_BOUNDS, Vector2.new(0.967519, 
 local THUMBNAIL_BOUNDS =
 	TextMetrics.fitAspect(TextMetrics.scaleBounds(CARD_BOUNDS, Vector2.new(0.822196, 0.661131)), 1.7)
 local VOTE_COUNT_BOUNDS = TextMetrics.scaleBounds(THUMBNAIL_BOUNDS, Vector2.new(0.613327, 0.160588)) - Vector2.new(2, 2)
-local VOTE_COUNT_STROKE = TextMetrics.scaledTextStroke(3.8, "000", Enum.Font.Highway, VOTE_COUNT_BOUNDS)
+local VOTE_COUNT_STROKE = TextMetrics.scaledTextStroke(3.8, "000", UIConfig.Text.BodyFont, VOTE_COUNT_BOUNDS)
 local CHECKMARK_SCALE = Vector2.new(100 / CARD_BOUNDS.X, 100 / CARD_BOUNDS.Y)
 local titleStrokes: { [string]: number } = {}
 
@@ -59,6 +57,7 @@ export type Props = {
 return function(props: Props)
 	local mode = props.Mode
 	local portrait = props.Portrait == true
+	local compact = props.Compact == true and not portrait
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		LayoutOrder = mode.SortOrder,
@@ -75,7 +74,9 @@ return function(props: Props)
 			SliceCenter = Rect.new(224, 202, 770, 474),
 			SliceScale = 0.2,
 		}),
-		UIAspectRatioConstraint = if portrait then nil else c("UIAspectRatioConstraint", { AspectRatio = 0.87 }),
+		UIAspectRatioConstraint = if portrait
+			then nil
+			else c("UIAspectRatioConstraint", { AspectRatio = if compact then 1.05 else 0.87 }),
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
@@ -88,15 +89,19 @@ return function(props: Props)
 					Enum.FontWeight.Bold,
 					Enum.FontStyle.Normal
 				),
-				Position = UDim2.fromScale(0.499634, if portrait then 0.035 else 0.0521707),
-				Size = UDim2.fromScale(if portrait then 0.9 else 0.88, if portrait then 0.18 else 0.104411),
+				Position = if compact
+					then UDim2.new(0.5, 0, 0, 8)
+					else UDim2.fromScale(0.499634, if portrait then 0.035 else 0.0521707),
+				Size = if compact
+					then UDim2.new(0.88, 0, 0, 24)
+					else UDim2.fromScale(if portrait then 0.9 else 0.88, if portrait then 0.18 else 0.104411),
 				Text = mode.Title,
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = 2,
 			},
 		}, {
 			UIStroke = c("UIStroke", {
-				Color = Color3.fromRGB(77, 77, 77),
+				Color = UIConfig.ProgressionStyle.Ink,
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 				Thickness = titleStroke(mode.Title),
 			}),
@@ -106,16 +111,22 @@ return function(props: Props)
 			BackgroundColor3 = Color3.new(1, 1, 1),
 			BorderColor3 = Color3.new(),
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, if portrait then 0.22 else 0.147617),
-			Size = if portrait then UDim2.new(0.88, 0, 0, 2) else UDim2.fromScale(0.817, 0.008),
+			Position = if compact
+				then UDim2.new(0.5, 0, 0, 37)
+				else UDim2.fromScale(0.5, if portrait then 0.22 else 0.147617),
+			Size = if portrait or compact then UDim2.new(0.88, 0, 0, 2) else UDim2.fromScale(0.817, 0.008),
 			ZIndex = 2,
 		}),
 		Thumbnail = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = UIConfig.ProgressionStyle.Surface,
+			AnchorPoint = Vector2.new(0.5, if compact then 0 else 0.5),
+			BackgroundColor3 = UIConfig.ProgressionStyle.PanelRaised,
 			Image = mode.ThumbnailId,
-			Position = UDim2.fromScale(if portrait then 0.23 else 0.496345, if portrait then 0.58 else 0.57),
-			Size = UDim2.fromScale(if portrait then 0.38 else 0.822196, if portrait then 0.58 else 0.661131),
+			Position = if compact
+				then UDim2.new(0.5, 0, 0, 80)
+				else UDim2.fromScale(if portrait then 0.23 else 0.496345, if portrait then 0.58 else 0.57),
+			Size = if compact
+				then UDim2.new(0.84, 0, 1, -144)
+				else UDim2.fromScale(if portrait then 0.38 else 0.822196, if portrait then 0.58 else 0.661131),
 			ZIndex = 2,
 		}, {
 			Art = if mode.ThumbnailId == ""
@@ -141,6 +152,7 @@ return function(props: Props)
 				else nil,
 			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
 				AspectRatio = 1.7,
+				AspectType = Enum.AspectType.FitWithinMaxSize,
 			}),
 			UICorner = c("UICorner"),
 			UIStroke = c("UIStroke", {
@@ -150,14 +162,14 @@ return function(props: Props)
 			}),
 			VoteCount = c(ResponsiveText, {
 				HostName = "VoteCount",
-				MeasurementFont = Enum.Font.Highway,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				MaxTextSize = 22,
 				Native = {
 					AnchorPoint = Vector2.zero,
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
-					Position = UDim2.fromOffset(8, 6),
-					Size = UDim2.new(1, -16, 0, 24),
+					Font = UIConfig.Text.BodyFont,
+					Position = UDim2.fromOffset(8, if compact then 2 else 6),
+					Size = UDim2.new(1, -16, 0, if compact then 18 else 24),
 					Text = GameModeVoteViewModel.formatVoteCount(mode.VoteCount),
 					TextColor3 = Color3.new(1, 1, 1),
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -165,7 +177,7 @@ return function(props: Props)
 				},
 			}, {
 				UIStroke = c("UIStroke", {
-					Color = Color3.fromRGB(77, 77, 77),
+					Color = UIConfig.ProgressionStyle.Ink,
 					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 					Thickness = VOTE_COUNT_STROKE,
 				}),
@@ -179,15 +191,20 @@ return function(props: Props)
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
-				Image = "rbxassetid://94748581468730",
+				Image = "",
 				LayoutOrder = 2,
-				Position = UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.92 else 0.95),
-				ScaleType = Enum.ScaleType.Slice,
-				Size = if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.fromScale(0.651625, 0.156114),
-				SliceCenter = Rect.new(198, 228, 841, 468),
-				SliceScale = 0.2,
+				Position = if compact
+					then UDim2.new(0.5, 0, 1, -8)
+					else UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.92 else 0.95),
+				Size = if compact
+					then UDim2.new(0.84, 0, 0, UIConfig.Interaction.MinTargetPx)
+					else if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.fromScale(0.651625, 0.156114),
 				ZIndex = 2,
 			},
+			Visual = c(ButtonSurface, {
+				Color = if mode.Selected then UIConfig.ProgressionStyle.Pink else UIConfig.ProgressionStyle.Cyan,
+				Enabled = props.Enabled,
+			}),
 			OnActivated = function()
 				props.OnVote(mode.Id)
 			end,
@@ -205,17 +222,28 @@ return function(props: Props)
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 3,
 				},
+			}, {
+				Stroke = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = UIConfig.Button.StrokePx,
+				}),
 			}),
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 3.48,
-			}),
+			UIAspectRatioConstraint = if compact
+				then nil
+				else c("UIAspectRatioConstraint", {
+					AspectRatio = 3.48,
+				}),
 		}),
 		Description = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = Color3.new(),
-			BackgroundTransparency = 0.8,
-			Position = UDim2.fromScale(if portrait then 0.72 else 0.496873, if portrait then 0.31 else 0.17),
-			Size = UDim2.fromScale(if portrait then 0.5 else 0.850373, if portrait then 0.28 else 0.18),
+			BackgroundColor3 = UIConfig.ProgressionStyle.PanelRaised,
+			BorderSizePixel = 0,
+			Position = if compact
+				then UDim2.new(0.5, 0, 0, 43)
+				else UDim2.fromScale(if portrait then 0.72 else 0.496873, if portrait then 0.31 else 0.17),
+			Size = if compact
+				then UDim2.new(0.86, 0, 0, 32)
+				else UDim2.fromScale(if portrait then 0.5 else 0.850373, if portrait then 0.28 else 0.18),
 			ZIndex = 2,
 		}, {
 			UICorner = c("UICorner", {
@@ -225,12 +253,12 @@ return function(props: Props)
 				TopRightRadius = UDim.new(0.25, 0),
 			}),
 			TextLabel = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.SourceSansBold,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				Wrapped = true,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					Font = Enum.Font.SourceSansBold,
+					Font = UIConfig.Text.BodyFont,
 					Position = UDim2.fromScale(0.5, 0.511),
 					Size = UDim2.fromScale(0.927564, 0.9),
 					Text = if props.Compact
@@ -240,6 +268,11 @@ return function(props: Props)
 					TextWrapped = true,
 					ZIndex = 3,
 				},
+			}, {
+				Stroke = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = UIConfig.Button.StrokePx,
+				}),
 			}),
 		}),
 		Checkmark = c("ImageLabel", {

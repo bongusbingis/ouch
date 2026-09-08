@@ -1,7 +1,4 @@
--- Name: LobbyViewModel.luau
--- Author: Jack C.
 -- Description: Pure lobby presentation rules: party code sanitizing and formatting, and which actions and status text a party state offers its leader and members.
--- Created: 2026-08-17
 
 --!strict
 

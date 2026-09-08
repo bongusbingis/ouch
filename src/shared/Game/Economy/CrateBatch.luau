@@ -1,7 +1,4 @@
--- Name: CrateBatch.luau
--- Author: Jack C.
 -- Description: Pure rules for opening several crates in one purchase: which quantities a crate offers, whether a requested quantity is legal, and what a batch of that size costs, shared by the server transaction and the client storefront so both agree.
--- Created: 2026-08-25
 
 --!strict
 

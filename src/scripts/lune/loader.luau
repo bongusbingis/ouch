@@ -1,7 +1,4 @@
--- Name: loader.luau
--- Author: Jack C.
 -- Description: Builds a fake instance tree from Rojo's sourcemap so modules written with Roblox-style requires can be loaded and run headlessly under Lune.
--- Created: 2026-07-12
 
 --!strict
 

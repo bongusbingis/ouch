@@ -1,7 +1,4 @@
--- Name: OnboardingCombatClient.luau
--- Author: Jack C.
 -- Description: Starts the combat client stack inside the lobby so training uses the same input, state, aim and presentation path the arena runs. Mirrors the arena simulation client's combat startup, minus everything match-specific, and routes broadcast sim events to the visual modules.
--- Created: 2026-08-26
 
 --!strict
 
@@ -18,16 +15,6 @@ local started = false
 local connections: { RBXScriptConnection } = {}
 local disposers: { () -> () } = {}
 local optional: { [string]: any } = {}
-
-local function startOptional(name: string, callback: () -> any?): any?
-	local ok, result = pcall(callback)
-	if not ok then
-		warn(`[OnboardingCombatClient] optional {name} unavailable: {result}`)
-		return nil
-	end
-	optional[name] = result or true
-	return result
-end
 
 function OnboardingCombatClient.start()
 	if started then
@@ -57,57 +44,47 @@ function OnboardingCombatClient.start()
 	CameraAssist.start()
 	CombatInputSender.start()
 
-	local BallVisuals = startOptional("BallVisuals", function()
-		local module = require(presentation:WaitForChild("BallVisuals")) :: any
-		module.start()
-		return module
-	end)
-	local HammerVisuals = startOptional("HammerVisuals", function()
-		local module = require(presentation:WaitForChild("HammerVisuals")) :: any
-		module.start()
-		return module
-	end)
-	-- Feeds the reticle, charge and swipe feedback the arena HUD renders. Without
-	-- it the HUD mounts but every value it reads stays at its idle default.
-	startOptional("ThrowUXClient", function()
-		local module = require(ui:WaitForChild("ThrowUXClient")) :: any
-		module.start()
-		return module
-	end)
-	startOptional("ChargeAim", function()
-		local module = require(presentation:WaitForChild("ChargeAim")) :: any
-		module.start()
-		return module
-	end)
-	-- The throwing arm tracking the aim, and the one-shots a throw makes, are
-	-- most of what separates training from the real thing.
-	startOptional("ArmIK", function()
-		local module = require(presentation:WaitForChild("ArmIK")) :: any
-		module.start({ replicate = false })
-		return module
-	end)
-	local GameAudio = startOptional("GameAudio", function()
-		return require(presentation:WaitForChild("GameAudio")) :: any
-	end)
-	startOptional("WeaponAnimations", function()
-		local module = require(presentation:WaitForChild("WeaponAnimations")) :: any
-		module.start()
-		table.insert(disposers, CombatInputSender.onIntent(module.onIntent))
-		return module
-	end)
+	local presenters = {}
+	local systems = {
+		{ name = "BallVisuals", parent = presentation, start = true, combat = true },
+		{ name = "HammerVisuals", parent = presentation, start = true, combat = true },
+		{ name = "ThrowUXClient", parent = ui, start = true },
+		{ name = "ChargeAim", parent = presentation, start = true },
+		{ name = "ArmIK", parent = presentation, start = true, options = { replicate = false } },
+		{ name = "GameAudio", parent = presentation, combat = true },
+		{ name = "WeaponAnimations", parent = presentation, start = true, intent = true },
+	}
+	for _, system in systems do
+		local ok, result = pcall(function()
+			local module = require(system.parent:WaitForChild(system.name)) :: any
+			if system.start then
+				if system.options then
+					module.start(system.options)
+				else
+					module.start()
+				end
+			end
+			if system.intent then
+				table.insert(disposers, CombatInputSender.onIntent(module.onIntent))
+			end
+			return module
+		end)
+		if ok then
+			optional[system.name] = result or true
+			if result and system.combat then
+				table.insert(presenters, result.onEvent)
+			end
+		else
+			warn(`[OnboardingCombatClient] optional {system.name} unavailable: {result}`)
+		end
+	end
 
 	table.insert(
 		connections,
 		Network.on("CombatSimEvent", function(events)
 			for _, event in events do
-				if BallVisuals then
-					BallVisuals.onEvent(event)
-				end
-				if HammerVisuals then
-					HammerVisuals.onEvent(event)
-				end
-				if GameAudio then
-					GameAudio.onEvent(event)
+				for _, present in presenters do
+					present(event)
 				end
 			end
 		end)

@@ -1,7 +1,4 @@
--- Name: SimTypes.luau
--- Author: Jack C.
 -- Description: Type declarations and state constructors for the simulation, using the native vector type so trajectories stay bit-identical between the game and headless tests.
--- Created: 2026-07-12
 
 --!strict
 

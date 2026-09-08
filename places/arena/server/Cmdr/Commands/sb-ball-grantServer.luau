@@ -1,7 +1,4 @@
--- Name: sb-ball-grantServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-ball-grant, asking the ball service to clone and place a held ball for each targeted player.
--- Created: 2026-07-15
 
 --!strict
 

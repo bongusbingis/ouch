@@ -1,7 +1,4 @@
--- Name: InputBuffer.spec.luau
--- Author: Jack C.
 -- Description: Spec for the one-slot input buffer: firing inside the window, dropping after it, consuming exactly once, and keeping only the newest input.
--- Created: 2026-08-19
 
 --!strict
 

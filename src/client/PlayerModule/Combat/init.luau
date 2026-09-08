@@ -1,7 +1,4 @@
--- Name: init.luau
--- Author: Jack C.
 -- Description: The combat input layer's public surface: raw device input in, device-independent intents out, so the rest of the game never touches the input service or mouse behavior directly for combat.
--- Created: 2026-08-20
 
 --!strict
 
@@ -270,7 +267,7 @@ function Combat.start()
 	RunService.Heartbeat:Connect(TouchIntent.step)
 	local player = Players.LocalPlayer
 	player.CharacterRemoving:Connect(cancelEverything)
-	CombatCamera.onChanged(function(active)
+	CombatCamera.subscribe(function(active)
 		if not active then
 			cancelEverything()
 		end

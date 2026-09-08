@@ -1,7 +1,4 @@
--- Name: WeaponKit.luau
--- Author: Jack C.
 -- Description: The interface every weapon implements, declaring the commands it claims and the initialization, input, and tick hooks the simulation calls.
--- Created: 2026-07-12
 
 --!strict
 

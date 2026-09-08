@@ -1,7 +1,4 @@
--- Name: ModeOptions.luau
--- Author: Jack C.
 -- Description: Canonicalizes a list of ballot options across version skew, dropping unavailable and duplicate modes and falling back to the current enabled ballot if none survive.
--- Created: 2026-08-24
 
 --!strict
 

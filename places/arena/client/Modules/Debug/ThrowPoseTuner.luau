@@ -1,7 +1,4 @@
--- Name: ThrowPoseTuner.luau
--- Author: Jack C.
 -- Description: Developer-only live tuning harness that binds keys to the throw-pose config values so arm offsets and timings can be adjusted in Studio without editing the config module.
--- Created: 2026-08-20
 
 --!strict
 

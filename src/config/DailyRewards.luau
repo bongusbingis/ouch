@@ -1,11 +1,8 @@
--- Name: DailyRewards.luau
--- Author: Jack C.
 -- Description: Reward schedule, cycle length, and UI styling hints for the 7-day daily login reward system.
--- Created: 2026-09-01
 
 --!strict
 
-local Cosmetics = require(script.Parent.Cosmetics)
+local Cosmetics = require(script.Parent:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 export type Reward = {
 	kind: "Bonks" | "Cosmetic",

@@ -1,7 +1,4 @@
--- Name: PostMatchViewModel.spec.luau
--- Author: Jack C.
 -- Description: Spec for post-match action permissions, explicit self-separation copy, countdown rounding, and bounded responsive canvas sizing.
--- Created: 2026-08-31
 
 --!strict
 

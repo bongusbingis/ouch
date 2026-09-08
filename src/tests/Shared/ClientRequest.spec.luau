@@ -1,8 +1,10 @@
 --!nonstrict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local request = require(ReplicatedStorage.Shared.Game.Data.ClientRequest)
-local Config = require(ReplicatedStorage.Config.Infra.ClientRequests)
+local request = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("ClientRequest")
+)
+local Config = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("ClientRequests"))
 
 return function()
 	describe("Bounded client requests", function()

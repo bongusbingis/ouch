@@ -1,7 +1,4 @@
--- Name: TextMetrics.luau
--- Author: Jack C.
 -- Description: Text measurement helpers that fit labels to a box, scale strokes with size, and compute aspect-correct bounds.
--- Created: 2026-08-17
 
 --!strict
 

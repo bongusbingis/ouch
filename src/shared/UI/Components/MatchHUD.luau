@@ -2,8 +2,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Surface = require(script.Parent.Arena.Surface)
 local Label = require(script.Parent.Arena.Label)
@@ -22,8 +23,7 @@ return function(props)
 	local height = if short then 64 else 78
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = props.Visible }, {
 		HUD = c(Surface, {
-			Color = colors.Ink,
-			Transparency = 0.1,
+			Color = colors.Cyan,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, top),
@@ -34,38 +34,44 @@ return function(props)
 			Objective = c(Label, {
 				Text = view.title .. " • " .. (if view.target > 0 then `FIRST TO {view.target} ELIMS` else "SURVIVE"),
 				Size = if short then 14 else 17,
-				Color = colors.Muted,
+				Color = colors.White,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -172, 0, 22) },
 			}),
-			Clock = c(Label, {
-				Text = view.clock,
-				Title = true,
-				Size = 29,
-				Color = if view.remaining <= layout.UrgentSeconds then colors.Pink else colors.Yellow,
+			Clock = c(Surface, {
+				Color = if view.remaining <= layout.UrgentSeconds then colors.Pink else colors.PanelRaised,
+				Shadow = false,
 				Native = { Position = UDim2.new(1, -164, 0, 4), Size = UDim2.fromOffset(70, 30) },
-			}),
+			}, { Text = c(Label, { Text = view.clock, Title = true, Size = 29 }) }),
 			Scores = if view.teamMode
 				then c("Frame", {
 					BackgroundTransparency = 1,
 					Position = UDim2.fromOffset(12, 28),
 					Size = UDim2.new(1, -192, 1, -31),
 				}, {
-					Red = c(Label, {
-						Text = `RED  {view.redScore}`,
-						Title = true,
+					Red = c(Surface, {
 						Color = colors.Pink,
-						Size = 27,
-						Align = Enum.TextXAlignment.Left,
+						Shadow = false,
 						Native = { Size = UDim2.fromScale(0.42, 1) },
+					}, {
+						Text = c(Label, {
+							Text = `RED  {view.redScore}`,
+							Title = true,
+							Size = 27,
+							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0) },
+						}),
 					}),
-					Blue = c(Label, {
-						Text = `BLUE  {view.blueScore}`,
-						Title = true,
+					Blue = c(Surface, {
 						Color = colors.Cyan,
-						Size = 27,
-						Align = Enum.TextXAlignment.Left,
+						Shadow = false,
 						Native = { Position = UDim2.fromScale(0.46, 0), Size = UDim2.fromScale(0.54, 1) },
+					}, {
+						Text = c(Label, {
+							Text = `BLUE  {view.blueScore}`,
+							Title = true,
+							Size = 27,
+							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0) },
+						}),
 					}),
 				})
 				else c(Label, {
@@ -86,13 +92,13 @@ return function(props)
 				Enabled = not view.starting,
 				Text = "SCORES",
 				TextSize = 15,
-				Color = colors.Raised,
+				Color = colors.Cyan,
 				Native = { Position = UDim2.new(1, -80, 0, 9), Size = UDim2.fromOffset(68, 44) },
 				OnActivated = props.OnToggleScores,
 			}),
 			Respawn = if view.respawn
 				then c(Surface, {
-					Color = colors.Ink,
+					Color = colors.Pink,
 					Native = {
 						Position = UDim2.new(0.06, 0, 1, 8),
 						Size = UDim2.new(0.88, 0, 0, layout.RespawnHeightPx),
@@ -102,7 +108,7 @@ return function(props)
 						Text = view.respawn,
 						Title = true,
 						Size = 23,
-						Color = colors.Yellow,
+						Color = colors.White,
 						Native = { Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -16, 1, 0) },
 					}),
 				})
@@ -110,7 +116,7 @@ return function(props)
 		}),
 		Start = if view.starting
 			then c(Surface, {
-				Color = colors.Surface,
+				Color = colors.Cyan,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, top + height + 12),
@@ -121,7 +127,7 @@ return function(props)
 				Title = c(Label, {
 					Text = `BRAWL IN {view.remaining}`,
 					Title = true,
-					Color = colors.Yellow,
+					Color = colors.White,
 					Size = 32,
 					Native = { Size = UDim2.new(1, 0, 0, 42) },
 				}),

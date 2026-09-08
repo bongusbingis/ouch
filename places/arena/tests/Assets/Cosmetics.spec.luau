@@ -1,7 +1,4 @@
--- Name: Cosmetics.spec.luau
--- Author: Jack C.
 -- Description: In-place spec validating the authored cosmetic carriers, their meshes and textures, the hammer grip axis, elimination effect audio, and that crate pools only reference real purchasable items.
--- Created: 2026-07-16
 
 --!nonstrict
 

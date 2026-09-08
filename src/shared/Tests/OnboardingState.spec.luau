@@ -1,7 +1,4 @@
--- Name: OnboardingState.spec.luau
--- Author: Jack C.
 -- Description: Spec for the onboarding status rules: who is eligible, where a partial player resumes, which transitions are legal, that CoreComplete lands exactly on the third mandatory mechanic, and that a completed or skipped player is never forced through training again.
--- Created: 2026-08-26
 
 --!strict
 

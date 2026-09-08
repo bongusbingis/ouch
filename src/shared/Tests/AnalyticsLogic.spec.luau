@@ -1,7 +1,4 @@
--- Name: AnalyticsLogic.spec.luau
--- Author: Jack C.
 -- Description: Spec for the pure analytics routing rules: once-only onboarding advancement, weapon inference from eliminations, and which funnel or custom event each UI interaction becomes.
--- Created: 2026-07-22
 
 --!strict
 

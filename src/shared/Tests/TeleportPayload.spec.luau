@@ -1,7 +1,4 @@
--- Name: TeleportPayload.spec.luau
--- Author: Jack C.
 -- Description: Spec for the lobby-to-arena teleport payload: leaving mode selection to the arena ballot, correct parsing and copying, and rejection of malformed and obsolete payloads.
--- Created: 2026-08-17
 
 --!strict
 

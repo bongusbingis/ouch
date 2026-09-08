@@ -2,8 +2,8 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local UI = require(ReplicatedStorage.Config.Interface.UI)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ButtonSurface = require(script.Parent.Parent.ButtonSurface)
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
@@ -31,7 +31,7 @@ return function(props)
 	local stacked = props.SubText ~= nil or props.SubBonks ~= nil
 	local enabled = props.Enabled ~= false
 	local z = props.ZIndex or 8
-	local color = if enabled then Color3.new(1, 1, 1) else UI.ProgressionStyle.Muted
+	local color = UI.ProgressionStyle.White
 	local top = if stacked then UDim2.fromOffset(10, 3) else UDim2.fromOffset(10, 2)
 	local extent = if stacked then UDim2.new(1, -20, 0.5, -3) else UDim2.new(1, -20, 1, -4)
 	return c(AnimatedButton, {

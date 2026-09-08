@@ -1,7 +1,4 @@
--- Name: OnboardingTargetMarkers.luau
--- Author: Jack C.
 -- Description: Draws the "hit this" marker over every live training dummy, turning it to face the camera each frame so a flat arrow mesh reads from any angle. Presentation only, over the target set OnboardingTargets owns.
--- Created: 2026-08-26
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CrateOdds.luau
--- Author: Jack C.
 -- Description: Builds the single deterministic crate probability model used by both rolling and public odds disclosure, allocating displayed percentages so they sum to exactly one hundred.
--- Created: 2026-08-11
 
 --!strict
 

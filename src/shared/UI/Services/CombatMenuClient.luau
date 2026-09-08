@@ -1,9 +1,14 @@
--- Name: CombatMenuClient.luau
--- Author: Jack C.
 -- Description: Owns the in-combat overlay menu state shared by both places: which page is open, layered close handling, input-method awareness, and the interception hook other screens use to claim the close action.
--- Created: 2026-08-31
 
 --!strict
+
+local Listeners = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Util")
+		:WaitForChild("Listeners")
+)
 
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +37,7 @@ local ACTION_PRIORITY = Enum.ContextActionPriority.High.Value + 1
 
 local started = false
 local closeInterceptor: (() -> boolean)? = nil
-local listeners: { (Snapshot) -> () } = {}
+local listeners: Listeners.Collection<Snapshot> = Listeners.new("CombatMenuClient", false, "listener failed")
 local deviceDisconnect: (() -> ())? = nil
 local state: Snapshot = {
 	open = false,
@@ -63,12 +68,9 @@ local function publish(changes: { [string]: any })
 		return
 	end
 	state = nextState :: Snapshot
-	for _, listener in listeners do
-		local ok, err = pcall(listener, state)
-		if not ok then
-			warn(`[CombatMenuClient] listener failed: {err}`)
-		end
-	end
+	listeners.emitWith(function(callback)
+		callback(state)
+	end)
 end
 
 local function setOpen(open: boolean)
@@ -137,19 +139,9 @@ end
 
 function CombatMenuClient.subscribe(listener: (Snapshot) -> ()): () -> ()
 	CombatMenuClient.start()
-	table.insert(listeners, listener)
+	local unsubscribe = listeners.add(listener)
 	listener(state)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(listeners, listener)
-		if index then
-			table.remove(listeners, index)
-		end
-	end
+	return unsubscribe
 end
 
 function CombatMenuClient.setAvailable(available: boolean)
@@ -199,7 +191,7 @@ function CombatMenuClient.destroy()
 		available = false,
 		inputMethod = "KeyboardMouse",
 	}
-	table.clear(listeners)
+	listeners.clear()
 	started = false
 end
 

@@ -2,9 +2,13 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local QuestLogic = require(ReplicatedStorage.Shared.Game.Quests.QuestLogic)
-local Quests = require(ReplicatedStorage.Config.Progression.Quests)
-local Panel = require(ReplicatedStorage.Shared.UI.Components.QuestsPanel)
+local QuestLogic = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Quests"):WaitForChild("QuestLogic")
+)
+local Quests = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Quests"))
+local Panel = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Components"):WaitForChild("QuestsPanel")
+)
 
 return function()
 	describe("Quest panel contract", function()

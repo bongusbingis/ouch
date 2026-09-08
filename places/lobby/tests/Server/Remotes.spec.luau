@@ -1,7 +1,4 @@
--- Name: Remotes.spec.luau
--- Author: Jack C.
 -- Description: In-place spec that the lobby's party remotes are materialized with their declared classes at startup.
--- Created: 2026-08-18
 
 --!strict
 

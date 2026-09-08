@@ -1,7 +1,4 @@
--- Name: OnboardingState.luau
--- Author: Jack C.
 -- Description: Pure onboarding status rules: which stored state makes a player eligible, which step a partial player resumes at, which step transitions are legal, and what a stored record normalizes to. Shared so the server's persistence and the client's routing can never disagree about who sees training.
--- Created: 2026-08-26
 
 --!strict
 

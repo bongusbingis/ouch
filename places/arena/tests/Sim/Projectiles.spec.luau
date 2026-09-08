@@ -1,7 +1,4 @@
--- Name: Projectiles.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the projectile spec: swept kinematics, homing clamps, bounce and roll transitions, release sockets, and hit rules.
--- Created: 2026-07-16
 
 --!nonstrict
 
@@ -11,7 +8,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Sim = Shared:WaitForChild("Game"):WaitForChild("Sim")
 
-local MockWorld = require(Shared:WaitForChild("Tests"):WaitForChild("MockWorld"))
+local MockWorld =
+	require(game:GetService("ServerStorage"):WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("MockWorld"))
 local SimTypes = require(Sim:WaitForChild("SimTypes"))
 local Projectiles = require(Sim:WaitForChild("Projectiles"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))

@@ -2,10 +2,17 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local Emotes = require(ReplicatedStorage.Config.Cosmetics.Emotes)
-local CharacterAppearance = require(ReplicatedStorage.Shared.Game.Cosmetics.CharacterAppearance)
-local VictoryPose = require(ReplicatedStorage.Shared.Game.Cosmetics.VictoryPose)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
+local CharacterAppearance = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CharacterAppearance")
+)
+local VictoryPose = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("VictoryPose")
+)
 local VictoryRig = {}
 
 function VictoryRig.style(itemId: string?): any

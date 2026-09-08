@@ -1,22 +1,26 @@
--- Name: PlayerData.luau
--- Author: Jack C.
 -- Description: Loads, saves, and replicates player profiles, exposing a write-through proxy so mutations replicate automatically, plus the balance, XP, and progression mutators every other service goes through.
--- Created: 2026-07-12
 
 local PlayersService = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Replica = require(ReplicatedStorage.Packages.replica)
-local ProfileStore = require(ReplicatedStorage.Packages.profilestore)
-local Promise = require(ReplicatedStorage.Packages.promise)
+local Replica = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replica"))
+local ProfileStore = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("profilestore"))
+local Promise = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("promise"))
 
 local Env = require(script.Parent.Parent.Env)
-local DataConfig = require(game.ReplicatedStorage.Config.Progression.Data)
+local DataConfig = require(
+	game:GetService("ReplicatedStorage"):WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data")
+)
 local WriteThroughProxy = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
 )
 
-local MatchAwards = require(ReplicatedStorage.Shared.Game.Progression.MatchAwards)
+local MatchAwards = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("MatchAwards")
+)
 
 local Data = {}
 Data._profiles = {}
@@ -442,7 +446,7 @@ function Data.markSwipeThrowLearned(player): boolean
 	return true
 end
 
-function Data.setFieldForTesting(player, field, value)
+function Data.setFieldForAdmin(player, field, value)
 	local d = Data.get(player)
 	if not d or typeof(value) ~= "number" or value ~= value or math.abs(value) == math.huge then
 		return false
@@ -464,7 +468,7 @@ function Data.setFieldForTesting(player, field, value)
 	return true
 end
 
-function Data.addFieldForTesting(player, field, amount)
+function Data.addFieldForAdmin(player, field, amount)
 	local d = Data.get(player)
 	if not d or typeof(amount) ~= "number" or amount ~= amount or math.abs(amount) == math.huge then
 		return false
@@ -481,7 +485,7 @@ function Data.addFieldForTesting(player, field, amount)
 		return false
 	end
 
-	return Data.setFieldForTesting(player, field, current + amount)
+	return Data.setFieldForAdmin(player, field, current + amount)
 end
 
 function Data.load(player)

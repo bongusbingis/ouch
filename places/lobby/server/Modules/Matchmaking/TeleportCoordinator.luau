@@ -1,14 +1,21 @@
--- Name: TeleportCoordinator.luau
--- Author: Jack C.
 -- Description: Reserves an arena server for a matched party and teleports its members with the built payload, reporting status and delegating retries to the shared retry coordinator.
--- Created: 2026-08-15
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
-local TeleportPayload = require(ReplicatedStorage.Shared.Game.Matchmaking.TeleportPayload)
-local TeleportRetryCoordinator = require(ReplicatedStorage.Shared.Game.Matchmaking.TeleportRetryCoordinator)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
+local TeleportPayload = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("TeleportPayload")
+)
+local TeleportRetryCoordinator = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("TeleportRetryCoordinator")
+)
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local TeleportCoordinator = {}

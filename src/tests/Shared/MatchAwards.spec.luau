@@ -2,7 +2,9 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlayerData = require(game:GetService("ServerScriptService").Server.Modules.PlayerData)
-local WriteThroughProxy = require(ReplicatedStorage.Shared.Game.Data.WriteThroughProxy)
+local WriteThroughProxy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
+)
 
 return function()
 	describe("Persisted match awards", function()

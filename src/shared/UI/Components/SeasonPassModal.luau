@@ -3,14 +3,17 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
-local React = require(ReplicatedStorage.Packages.react)
-local UI = require(ReplicatedStorage.Config.Interface.UI)
-local Shop = require(ReplicatedStorage.Config.Economy.Shop)
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local ItemLabels = require(ReplicatedStorage.Config.Cosmetics.Inventory).ItemLabels
+local Players = game:GetService("Players")
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local ItemLabels =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory")).ItemLabels
 local Model = require(script.Parent.Parent.Models.SeasonRewardsModel)
 local Claims = require(script.Parent.Parent.Models.SeasonClaims)
 local Selection = require(script.Parent.Parent.Services.Selection)
+local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local PriceButton = require(script.Parent.Shop.ShopPriceButton)
@@ -22,7 +25,7 @@ local colors = UI.ProgressionStyle
 
 local function label(text, position, size, maximum, color, heading, alignment)
 	return c(ResponsiveText, {
-		MeasurementFont = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
+		MeasurementFont = if heading then Enum.Font.LuckiestGuy else UI.Text.BodyFont,
 		MaxTextSize = maximum,
 		MinTextSize = 12,
 		Wrapped = true,
@@ -31,12 +34,22 @@ local function label(text, position, size, maximum, color, heading, alignment)
 			Position = position,
 			Size = size,
 			Text = text,
-			Font = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
-			TextColor3 = color or Color3.new(1, 1, 1),
+			Font = if heading then Enum.Font.LuckiestGuy else UI.Text.BodyFont,
+			TextColor3 = color or colors.White,
+			TextStrokeColor3 = colors.Ink,
+			TextStrokeTransparency = if heading then 1 else 0.35,
 			TextWrapped = true,
 			TextXAlignment = alignment or Enum.TextXAlignment.Left,
 			ZIndex = 105,
 		},
+	}, {
+		Outline = if heading
+			then c("UIStroke", {
+				Color = colors.Ink,
+				Thickness = 0.045,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			})
+			else nil,
 	})
 end
 
@@ -48,6 +61,10 @@ return function(props)
 	local card = props.Card
 	local state = props.SeasonState
 	local ready = state ~= nil and state.seasonId == card.definition.SeasonId
+	local loading = state == nil
+	local seasonActive = ready and state.active == true
+	local ended = ready and not seasonActive and state.endsAt ~= nil and state.endsAt <= workspace:GetServerTimeNow()
+	local unavailableText = if ended then "SEASON ENDED" else "SEASON UNAVAILABLE"
 	local entries = Model.entries(if ready then state else nil)
 	local selectedKey, setSelectedKey = React.useState(nil)
 	local previewOpen, setPreviewOpen = React.useState(false)
@@ -57,35 +74,81 @@ return function(props)
 		setSelectedKey(nil)
 		setPreviewOpen(false)
 	end, { card.id })
+	React.useLayoutEffect(function()
+		local backRef = props.BackRef
+		if not backRef then
+			return
+		end
+		local function back()
+			if props.FocusEnabled ~= false and compact and previewOpen then
+				setPreviewOpen(false)
+				return true
+			end
+			return false
+		end
+		backRef.current = back
+		return function()
+			if backRef.current == back then
+				backRef.current = nil
+			end
+		end
+	end, { props.BackRef, compact, previewOpen, props.FocusEnabled })
 	React.useEffect(function()
 		if props.FocusEnabled == false then
 			return
 		end
 		local previous = GuiService.SelectedObject
+		local panel = if closeRef.current then closeRef.current.Parent else nil
 		local active = true
-		task.defer(function()
-			if active then
-				GuiService.SelectedObject = if Selection.isSelectable(claimRef.current)
-					then claimRef.current
-					else closeRef.current
+		local function focus()
+			if not active or DeviceClass.current() ~= "Gamepad" then
+				return
+			end
+			local button = if Selection.isSelectable(claimRef.current) then claimRef.current else closeRef.current
+			if not Selection.isSelectable(button) then
+				return
+			end
+			local focused = GuiService.SelectedObject
+			if focused and not focused:IsDescendantOf(Players.LocalPlayer.PlayerGui) then
+				return
+			end
+			local ownRoot = button:FindFirstAncestorWhichIsA("ScreenGui")
+			local selectedRoot = if focused then focused:FindFirstAncestorWhichIsA("ScreenGui") else nil
+			if selectedRoot and ownRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder then
+				return
+			end
+			if not (focused and panel and focused:IsDescendantOf(panel) and Selection.isSelectable(focused)) then
+				GuiService.SelectedObject = button
+			end
+		end
+		local disconnect = DeviceClass.observe(function(input)
+			if input == "Gamepad" then
+				task.defer(focus)
 			end
 		end)
 		return function()
 			active = false
-			if Selection.isSelectable(previous) then
+			disconnect()
+			local focused = GuiService.SelectedObject
+			if
+				DeviceClass.current() == "Gamepad"
+				and (focused == nil or (panel and focused:IsDescendantOf(panel)))
+				and Selection.isSelectable(previous)
+			then
 				GuiService.SelectedObject = previous
 			end
 		end
 	end, { card.id, props.FocusEnabled })
-	local claimable = if ready then Claims.count(state) else 0
+	local claimable = if seasonActive then Claims.count(state) else 0
 	local premiumOwned = ready and state.hasPremium
-	local canBuy = ready
+	local showPremium = seasonActive and not premiumOwned
+	local canBuy = seasonActive
 		and not premiumOwned
 		and card.status == "Active"
 		and card.robuxPrice ~= nil
 		and card.productId ~= nil
 		and not card.pending
-	local bodyTop = if compact then 70 else 100
+	local bodyTop = if compact then 68 else 100
 	local footerHeight = if compact then 78 else 98
 	local bodyHeight = math.max(64, height - bodyTop - footerHeight - (if compact then 8 else 16))
 	local previewVisible = selected ~= nil and (not compact or previewOpen)
@@ -153,17 +216,22 @@ return function(props)
 				end,
 			}),
 			ProgressLabel = label(
-				if complete
-					then "ALL TIERS EARNED!"
-					else `TIER {tier}  •  {formatNumber(math.max(target - xp, 0))} XP TO TIER {tier + 1}`,
+				if loading
+					then "LOADING REWARDS…"
+					else if not seasonActive
+						then unavailableText
+						else if complete
+							then "ALL TIERS EARNED!"
+							else `TIER {tier}  •  {formatNumber(math.max(target - xp, 0))} XP TO TIER {tier + 1}`,
 				UDim2.fromOffset(16, if compact then 35 else 50),
 				UDim2.new(1, -148, 0, 20),
 				if compact then 14 else 19,
-				colors.Ink,
+				colors.White,
 				false
 			),
 			Progress = c("Frame", {
-				BackgroundColor3 = colors.Ink,
+				BackgroundColor3 = colors.Track,
+				Visible = seasonActive,
 				BorderSizePixel = 0,
 				Position = UDim2.fromOffset(16, if compact then 59 else 78),
 				Size = UDim2.new(1, -152, 0, 5),
@@ -183,9 +251,20 @@ return function(props)
 				Size = UDim2.new(1, -32, 0, bodyHeight),
 				ZIndex = 103,
 			}, {
+				Status = if not loading and not ready
+					then label(
+						unavailableText,
+						UDim2.fromScale(0, 0.35),
+						UDim2.fromScale(1, 0.3),
+						if compact then 22 else 30,
+						colors.White,
+						true,
+						Enum.TextXAlignment.Center
+					)
+					else nil,
 				Preview = if previewVisible
 					then c("Frame", {
-						BackgroundColor3 = colors.Surface,
+						BackgroundColor3 = colors.PanelRaised,
 						BorderSizePixel = 0,
 						Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
 						ZIndex = 103,
@@ -196,7 +275,7 @@ return function(props)
 							UDim2.new(if compact then 0.4 else 0, 12, 0, 8),
 							UDim2.new(if compact then 0.6 else 1, -24, 0, 24),
 							20,
-							if selected.track == "Premium" then colors.Yellow else colors.Cyan,
+							colors.White,
 							true
 						),
 						Art = c("Frame", {
@@ -211,6 +290,8 @@ return function(props)
 								PlaceholderBonks = if selected.kind == "Bonks" then selected.amount else nil,
 								ColorId = (props.Equipped or {}).CharacterColor,
 								CostumeId = (props.Equipped or {}).CostumeAssets,
+								TextColor = colors.White,
+								TextStroke = 0.045,
 								ZIndex = 104,
 							}),
 						}),
@@ -219,7 +300,7 @@ return function(props)
 							if compact then UDim2.new(0.4, 12, 0, 35) else UDim2.new(0, 12, 1, -82),
 							if compact then UDim2.new(0.6, -24, 0.5, -24) else UDim2.new(1, -24, 0, 40),
 							if compact then 23 else 28,
-							nil,
+							colors.White,
 							true
 						),
 						Kind = label(
@@ -227,20 +308,22 @@ return function(props)
 							if compact then UDim2.new(0.4, 12, 0.5, -2) else UDim2.new(0, 12, 1, -104),
 							if compact then UDim2.new(0.6, -24, 0, 18) else UDim2.new(1, -24, 0, 18),
 							13,
-							colors.Muted,
+							colors.White,
 							false
 						),
 						Requirement = label(
-							Model.requirement(selected),
+							if not seasonActive and not selected.claimed
+								then unavailableText
+								else Model.requirement(selected),
 							if compact then UDim2.new(0.4, 12, 0.5, 22) else UDim2.new(0, 12, 1, -42),
 							if compact then UDim2.new(0.6, -24, 0.5, -28) else UDim2.new(1, -24, 0, 36),
 							17,
-							if selected.claimable then colors.Green else colors.Muted,
+							colors.White,
 							false
 						),
 					})
 					else nil,
-				Tracks = if not compact or not previewOpen
+				Tracks = if ready and (not compact or not previewOpen)
 					then c("Frame", {
 						BackgroundTransparency = 1,
 						Position = UDim2.fromScale(if compact then 0 else 0.34, 0),
@@ -272,22 +355,26 @@ return function(props)
 				ZIndex = 103,
 			}, {
 				Explanation = label(
-					if premiumOwned
-						then "PREMIUM PASS OWNED • Play matches to earn XP and unlock rewards."
-						else "Play matches to earn tiers. The Premium Pass adds rewards for this season.",
+					if loading
+						then ""
+						else if not seasonActive
+							then "This season isn't active. Check back for the next one!"
+							else if premiumOwned
+								then "PREMIUM UNLOCKED • Earn XP to collect both reward tracks."
+								else "Earn XP to unlock free rewards. Get Premium for the extra reward track.",
 					UDim2.fromOffset(0, if compact then -4 else 0),
 					UDim2.new(1, 0, 0, if compact then 18 else 22),
 					if compact then 14 else 18,
-					colors.Ink,
+					colors.White,
 					false
 				),
-				Premium = if not premiumOwned
+				Premium = if showPremium
 					then c(PriceButton, {
 						Text = if card.pending then "PROCESSING…" else "GET PREMIUM PASS",
 						TextSize = if compact then 18 else 23,
 						SubText = if card.robuxPrice
 							then Shop.RobuxSymbol .. formatNumber(card.robuxPrice)
-							else "PRICE UNAVAILABLE",
+							else if card.status == "Loading" then "LOADING PRICE…" else "UNAVAILABLE",
 						SubTextSize = 22,
 						Red = true,
 						Compact = true,
@@ -302,12 +389,16 @@ return function(props)
 					ButtonRef = claimRef,
 					Text = if props.ClaimPending
 						then "CLAIMING…"
-						else if claimable > 0 then "CLAIM REWARDS" else "NO REWARDS READY",
+						else if loading
+							then "LOADING REWARDS…"
+							else if not seasonActive
+								then unavailableText
+								else if claimable > 0 then "CLAIM ALL READY" else "NO REWARDS READY",
 					TextSize = if compact then 19 else 25,
 					Compact = true,
 					Enabled = claimable > 0 and not props.ClaimPending,
-					Position = UDim2.new(if premiumOwned then 0.5 else 0.75, if premiumOwned then 0 else 4, 1, -4),
-					Size = UDim2.new(if premiumOwned then 1 else 0.5, -8, 0, if compact then 48 else 60),
+					Position = UDim2.new(if showPremium then 0.75 else 0.5, if showPremium then 4 else 0, 1, -4),
+					Size = UDim2.new(if showPremium then 0.5 else 1, -8, 0, if compact then 48 else 60),
 					ZIndex = 105,
 					OnActivated = props.OnClaimSeason,
 				}),

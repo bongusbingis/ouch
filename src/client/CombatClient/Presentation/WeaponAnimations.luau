@@ -1,7 +1,4 @@
--- Name: WeaponAnimations.luau
--- Author: Jack C.
 -- Description: Plays the local character's weapon animation clips directly from its own combat intents so they are not delayed by a server round trip, resolving clips per weapon and state.
--- Created: 2026-08-18
 
 --!strict
 

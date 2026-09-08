@@ -1,7 +1,4 @@
--- Name: DeathEffects.luau
--- Author: Jack C.
 -- Description: Plays the local elimination sequence: desaturates the screen, pulls the camera into a spectator zoom, and holds it until the respawn timer configured by the active mode elapses.
--- Created: 2026-07-13
 
 --!strict
 
@@ -16,8 +13,18 @@ local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ModeRegistry = require(SharedGame:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 
-local PresentationCamera = require(ReplicatedStorage.Shared.UI.Services.PresentationCamera)
-local CosmeticPreviewClient = require(ReplicatedStorage.Shared.UI.Services.CosmeticPreviewClient)
+local PresentationCamera = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("PresentationCamera")
+)
+local CosmeticPreviewClient = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("CosmeticPreviewClient")
+)
 
 local DeathEffects = {}
 

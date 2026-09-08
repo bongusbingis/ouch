@@ -1,7 +1,4 @@
--- Name: Intercept.luau
--- Author: Jack C.
 -- Description: Pure interception maths: where to aim to lead a moving target, how consistent that target's recent motion has been, and how far to bias aim by that confidence.
--- Created: 2026-08-19
 
 --!strict
 

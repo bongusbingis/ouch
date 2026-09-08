@@ -1,7 +1,13 @@
 -- Hidden ancestor screens cannot receive restored gamepad focus after a phase transition.
 --!nonstrict
 
-local Selection = require(game.ReplicatedStorage.Shared.UI.Services.Selection)
+local Selection = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("Selection")
+)
 
 local function scrollFixture(position, size)
 	local scroller = {
@@ -47,6 +53,29 @@ return function()
 			local button, scroller = scrollFixture(235, 44)
 			Selection.scrollIntoView(button)
 			expect(scroller.CanvasPosition).to.equal(Vector2.new(12, 259))
+		end)
+		it("keeps buttons and slider hit targets selectable inside a nonselectable scroller", function()
+			local gui = Instance.new("ScreenGui")
+			gui.Parent = game.ReplicatedStorage
+			local scroller = Instance.new("ScrollingFrame")
+			scroller.Selectable = false
+			scroller.Parent = gui
+			local button = Instance.new("TextButton")
+			button.Parent = scroller
+			local slider = Instance.new("Frame")
+			slider.Selectable = true
+			slider.Parent = scroller
+			expect(Selection.isSelectable(scroller)).to.equal(false)
+			expect(Selection.isSelectable(button)).to.equal(true)
+			expect(Selection.isSelectable(slider)).to.equal(true)
+			gui:Destroy()
+		end)
+		it("reveals child controls without selecting their scroll container", function()
+			local button, scroller = scrollFixture(235, 44)
+			scroller.Selectable = false
+			Selection.scrollIntoView(button)
+			expect(scroller.CanvasPosition).to.equal(Vector2.new(12, 259))
+			expect(scroller.Selectable).to.equal(false)
 		end)
 		it("reveals horizontal season rewards beyond the visible strip", function()
 			local button, scroller = scrollFixture(110, 44)

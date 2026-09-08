@@ -1,7 +1,4 @@
--- Name: useViewportSize.luau
--- Author: Jack C.
 -- Description: React hook exposing the current viewport size, updating as the camera and window change, so layouts can respond per device.
--- Created: 2026-08-17
 
 --!strict
 

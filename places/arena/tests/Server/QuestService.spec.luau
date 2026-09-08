@@ -1,7 +1,4 @@
--- Name: QuestService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec for the quest service injection seam and the guard paths reachable without loaded profiles.
--- Created: 2026-07-16
 
 --!nonstrict
 

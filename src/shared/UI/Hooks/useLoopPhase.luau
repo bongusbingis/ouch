@@ -1,7 +1,4 @@
--- Name: useLoopPhase.luau
--- Author: Jack C.
 -- Description: Returns a binding that cycles from 0 to 1 over a fixed period, for looping demonstration animations that should not re-render the tree each frame. Holds at zero when the player has reduced motion enabled.
--- Created: 2026-08-26
 
 --!strict
 

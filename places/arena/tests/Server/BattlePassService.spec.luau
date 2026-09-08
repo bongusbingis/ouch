@@ -1,7 +1,4 @@
--- Name: BattlePassService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec for the battle pass service: season adoption, XP accrual and tier derivation, premium gating and idempotent grants, claim rules, and season rollover settlement.
--- Created: 2026-08-12
 
 --!nonstrict
 

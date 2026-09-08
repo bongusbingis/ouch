@@ -1,7 +1,4 @@
--- Name: PostMatchScreen.story.luau
--- Author: Jack C.
 -- Description: Studio story previewing the post-match results screen against the debug result fixtures.
--- Created: 2026-08-24
 
 --!strict
 

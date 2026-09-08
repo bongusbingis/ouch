@@ -1,7 +1,4 @@
--- Name: UIAnalytics.luau
--- Author: Jack C.
 -- Description: Reports user interface interactions to the analytics service through one entry point.
--- Created: 2026-08-24
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: EventDedup.luau
--- Author: Jack C.
 -- Description: Shared dedup guard for simulation and match event consumers, so a broadcast event observed more than once cannot apply a side effect twice.
--- Created: 2026-07-16
 
 --!strict
 

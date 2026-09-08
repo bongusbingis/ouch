@@ -1,7 +1,4 @@
--- Name: Volume.luau
--- Author: Jack C.
 -- Description: Volume test shared by every authored map feature, deciding when a character's root counts as inside a feature part with extra vertical padding.
--- Created: 2026-08-18
 
 --!strict
 

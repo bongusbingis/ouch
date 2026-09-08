@@ -1,7 +1,4 @@
--- Name: ChargeAim.luau
--- Author: Jack C.
 -- Description: Computes and renders the predicted throw trajectory while charging, sweeping the arc against world geometry and characters to find the impact point and driving the aiming field-of-view change.
--- Created: 2026-08-20
 
 --!strict
 

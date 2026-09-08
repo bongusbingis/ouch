@@ -1,7 +1,4 @@
--- Name: TDM.luau
--- Author: Jack C.
 -- Description: Team deathmatch game mode: its match rules and the server hooks that assign teams, provision balls, and score eliminations to the scorer's team.
--- Created: 2026-07-13
 
 --!strict
 

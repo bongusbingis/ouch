@@ -1,7 +1,4 @@
--- Name: RunTests.luau
--- Author: Jack C.
 -- Description: Open Cloud Luau Execution payload submitted by the deploy pipeline, running the in-place test suite and erroring on any failure so the cloud task lands in a failed state.
--- Created: 2026-07-16
 
 local ServerStorage = game:GetService("ServerStorage")
 
@@ -11,14 +8,17 @@ assert(tests and tests:IsA("Folder"), "[cloud-tests] ServerStorage.Tests must be
 local runner = tests:FindFirstChild("Runner")
 assert(runner and runner:IsA("ModuleScript"), "[cloud-tests] ServerStorage.Tests.Runner must be a ModuleScript")
 local runSuite = require(runner)
+local helpers = tests:WaitForChild("Helpers")
+assert(helpers:IsA("Folder"), "[cloud-tests] ServerStorage.Tests.Helpers must be a Folder")
+local gate = helpers:WaitForChild("CloudTestGate")
+assert(gate:IsA("ModuleScript"), "[cloud-tests] ServerStorage.Tests.Helpers.CloudTestGate must be a ModuleScript")
+local assertCloudTestSuccess = require(gate)
 print("[cloud-tests] running suite")
 local summary = runSuite()
 print("[cloud-tests] suite returned")
 
 print(string.format("cloud tests: %d passed, %d failed, %d skipped", summary.passed, summary.failed, summary.skipped))
 
-if summary.failed > 0 then
-	error(string.format("cloud tests: %d failing spec(s); see logs above", summary.failed), 0)
-end
+assertCloudTestSuccess(summary.passed, summary.failed, summary.failureMessages)
 
 return summary

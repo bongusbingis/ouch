@@ -1,7 +1,4 @@
--- Name: GameModesConfig.spec.luau
--- Author: Jack C.
 -- Description: Spec that the shipped game mode configuration offers the launch modes and keeps the disabled entries as explicit stubs.
--- Created: 2026-08-17
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: ShopPage.luau
--- Author: Jack C.
 -- Description: The storefront page, arranging the view model's sections and limited-time offers into the responsive dashboard rows the shop layout resolves for the measured content width.
--- Created: 2026-08-17
 
 --!strict
 
@@ -324,6 +321,7 @@ return function(props: Props)
 			Content = c("ScrollingFrame", {
 				Active = true,
 				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
 				-- The packer already knows the exact extent of what it placed, so
 				-- the canvas is set from that rather than measured back off the
 				-- absolutely positioned blocks.
@@ -334,6 +332,7 @@ return function(props: Props)
 				ScrollBarImageColor3 = Color3.new(1, 1, 1),
 				ScrollBarImageTransparency = 0.1,
 				ScrollBarThickness = ShopUI.ScrollBarPx,
+				Selectable = false,
 				Size = UDim2.fromScale(ShopUI.ContentSizeScale.X, ShopUI.ContentSizeScale.Y),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 				-- The scroll bar is inset out of the canvas, so the usable width is

@@ -1,13 +1,12 @@
--- Name: Arena.spec.luau
--- Author: Jack C.
 -- Description: In-place spec asserting the permanent authored arena exists with its map, scriptables, and spawn folders populated.
--- Created: 2026-08-17
 
 --!nonstrict
 
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
-local Capacity = require(game.ReplicatedStorage.Config.Gameplay.GameModes).MatchCapacity
+local Capacity = require(
+	game:GetService("ReplicatedStorage"):WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes")
+).MatchCapacity
 
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 

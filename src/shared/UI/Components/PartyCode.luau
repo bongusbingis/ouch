@@ -1,7 +1,4 @@
--- Name: PartyCode.luau
--- Author: Jack C.
--- Description: Displays the local party's join code with a copy action.
--- Created: 2026-08-17
+-- Displays the local party code and toggles its visibility without owning party state.
 
 --!strict
 
@@ -9,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local ButtonSurface = require(script.Parent.ButtonSurface)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
@@ -19,12 +17,53 @@ export type Props = {
 	CodeText: string,
 	CodeVisible: boolean,
 	OnToggle: () -> (),
+	OnOpen: (() -> ())?,
 	Position: any?,
 }
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	if short then
+		return c(AnimatedButton, {
+			OnActivated = props.OnOpen or props.OnToggle,
+			SelectionRadius = UDim.new(0, 8),
+			Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Yellow, Radius = UDim.new(0, 8) }),
+			Native = {
+				AnchorPoint = Vector2.new(1, 0),
+				BackgroundTransparency = 1,
+				Position = props.Position or UDim2.new(1, -8, 0, 14),
+				Size = UDim2.fromOffset(
+					UIConfig.Layout.PartyCode.LandscapeWidthPx * 0.7,
+					UIConfig.Interaction.MinTargetPx
+				),
+			},
+		}, {
+			Label = c(ResponsiveText, {
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = 20,
+				Native = {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(10, 3),
+					Size = UDim2.new(1, -20, 1, -6),
+					Font = Enum.Font.LuckiestGuy,
+					Text = if props.OnOpen
+						then "PARTY CODE"
+						elseif props.CodeVisible then string.gsub(props.CodeText, "^PARTY CODE:%s*", "")
+						else "PARTY CODE",
+					TextColor3 = UIConfig.ProgressionStyle.White,
+					ZIndex = 2,
+				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
+			}),
+		})
+	end
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundTransparency = 1,

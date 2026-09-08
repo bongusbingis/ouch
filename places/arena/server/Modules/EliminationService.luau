@@ -1,7 +1,4 @@
--- Name: EliminationService.luau
--- Author: Jack C.
 -- Description: Owns eliminated character body state without touching Humanoid health or reloading the character: flips the CombatAlive attribute, builds and removes the ragdoll constraints, and restores the saved joint and physics state.
--- Created: 2026-07-13
 
 --!strict
 

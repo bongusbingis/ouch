@@ -1,7 +1,4 @@
--- Name: OnboardingAssist.luau
--- Author: Jack C.
 -- Description: Pure steering for training throws. Turns a ball's velocity toward a target by a capped amount per tick, only while the target is ahead of it and in range, so a first throw curves in instead of sailing past.
--- Created: 2026-08-26
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: Spring.spec.luau
--- Author: Jack C.
 -- Description: Spec that the damped spring settles on its target and stays stable and finite across low frame rates and every frequency the game configures.
--- Created: 2026-07-18
 
 --!strict
 

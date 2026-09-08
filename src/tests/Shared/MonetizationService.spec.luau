@@ -1,7 +1,4 @@
--- Name: MonetizationService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec that receipts grant exactly once and emit one authoritative grant event, and that unknown products are left for Roblox to retry.
--- Created: 2026-08-11
 
 --!nonstrict
 

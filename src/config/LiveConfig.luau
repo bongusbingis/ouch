@@ -17,7 +17,19 @@ export type Entry = {
 	Maximum: number?,
 }
 
-local GameModes = require(script.Parent.Gameplay.GameModes)
+local GameModes = require(script.Parent:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+
+type Place = "arena" | "lobby"
+local moduleDefinitions = {
+	Combat = { path = { "Config", "Gameplay", "Combat" }, arena = true },
+	AimAssist = { path = { "Config", "Gameplay", "AimAssist" }, arena = true },
+	GameModes = { path = { "Config", "Gameplay", "GameModes" }, arena = true, lobby = true },
+	MapFeatures = { path = { "Config", "Gameplay", "MapFeatures" }, arena = true },
+	Modes = { path = { "Config", "Gameplay", "Modes" }, arena = true },
+	Shop = { path = { "Config", "Economy", "Shop" }, arena = true, lobby = true },
+	Crates = { path = { "Config", "Economy", "Crates" }, arena = true, lobby = true },
+	Matchmaking = { path = { "Shared", "Matchmaking", "Config" }, lobby = true },
+}
 
 local entries: { Entry } = {
 	{ Key = "Combat.Dodgeball.ThrowSpeed", Type = "number", Minimum = 10, Maximum = 1000 },
@@ -116,8 +128,39 @@ local entries: { Entry } = {
 	{ Key = "Matchmaking.WorkerPollInterval", Type = "number", Minimum = 0.5, Maximum = 30 },
 }
 
+local function moduleNames(place: Place?): { string }
+	local names = {}
+	local seen: { [string]: boolean } = {}
+	for _, entry in entries do
+		local name = string.match(entry.Key, "^([^.]+)%.")
+		assert(name, `[LiveConfig] Invalid key: {entry.Key}`)
+		local definition = moduleDefinitions[name]
+		assert(definition, `[LiveConfig] Missing module definition: {name}`)
+		if not seen[name] and (place == nil or definition[place]) then
+			seen[name] = true
+			table.insert(names, name)
+		end
+	end
+	table.sort(names)
+	return names
+end
+
+local function loadModules(place: Place): { [string]: any }
+	local modules = {}
+	for _, name in moduleNames(place) do
+		local node = script.Parent.Parent
+		for _, segment in moduleDefinitions[name].path do
+			node = node:WaitForChild(segment)
+		end
+		modules[name] = require(node)
+	end
+	return modules
+end
+
 return table.freeze({
 	Entries = table.freeze(entries),
+	moduleNames = moduleNames,
+	loadModules = loadModules,
 	SimCritical = table.freeze({ Combat = true, AimAssist = true }),
 	StateFolderName = "ConfigState",
 	RevisionAttribute = "revision",

@@ -1,7 +1,4 @@
--- Name: BattlePassLogic.spec.luau
--- Author: Jack C.
 -- Description: Spec for the pure season pass rules: tier derivation from XP, progress into the next tier, active season selection, claim legality, what is owed, and stored state normalization.
--- Created: 2026-08-12
 
 --!strict
 

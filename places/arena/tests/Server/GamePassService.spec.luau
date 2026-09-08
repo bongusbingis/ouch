@@ -1,7 +1,4 @@
--- Name: GamePassService.spec.luau
--- Author: Jack C.
 -- Description: In-place spec for game pass reconciliation: idempotent cosmetic grants on join and after purchase, ownership caching including negative results, and rejection of passes naming unknown cosmetics.
--- Created: 2026-08-08
 
 --!nonstrict
 

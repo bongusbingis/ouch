@@ -1,7 +1,4 @@
--- Name: ReturnPayload.spec.luau
--- Author: Jack C.
 -- Description: Spec for grouped and self-separating arena return payloads, including legacy grouped payload compatibility.
--- Created: 2026-08-31
 
 --!strict
 

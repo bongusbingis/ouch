@@ -1,13 +1,12 @@
--- Name: OnboardingService.luau
--- Author: Jack C.
 -- Description: Server owner of first-session training: resolves eligibility from the profile, gives each learner their own arena, stages the encounter each step calls for, judges every hit against the real weapon geometry, and persists a checkpoint only once the player has actually performed the mechanic. The client presents; this module decides and remembers.
--- Created: 2026-08-26
 
 --!strict
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local MovementGuard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
+local MovementGuard = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("MovementGuard")
+)
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 

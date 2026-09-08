@@ -1,7 +1,4 @@
--- Name: ResponsiveText.luau
--- Author: Jack C.
 -- Description: Text component that scales its size and stroke with the viewport and measured bounds so labels stay legible on every device.
--- Created: 2026-08-17
 
 --!strict
 

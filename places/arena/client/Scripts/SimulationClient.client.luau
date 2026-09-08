@@ -1,7 +1,4 @@
--- Name: SimulationClient.client.luau
--- Author: Jack C.
 -- Description: Arena client entry point for gameplay: starts every input, presentation, and audio module and wires them to the replicated match and combat state.
--- Created: 2026-07-12
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
@@ -14,6 +11,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
 local Debug = require(ConfigRoot:WaitForChild("Infra"):WaitForChild("Debug"))
+local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigReplication = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
@@ -37,34 +35,11 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local ArenaLoadingClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
 
 local connections = {}
-local optionalSystems = {}
-local BallVisuals
-local DamageFeedback
+local combatPresenters = {}
+local damagePresenters = {}
 local DeathEffects
-local HammerVisuals
-local SplatEffects
-local CosmeticEffects
-local GameAudio
-local DebugVisuals
 
-local function startOptional(name, callback)
-	local ok, err = pcall(callback)
-	optionalSystems[name] = ok
-	if not ok then
-		warn(`[SimulationClient] Optional {name} unavailable: {err}`)
-	end
-	return ok
-end
-
-ConfigReplication.startClient({
-	Combat = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Combat")),
-	AimAssist = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("AimAssist")),
-	GameModes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("GameModes")),
-	MapFeatures = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("MapFeatures")),
-	Modes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Modes")),
-	Shop = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Shop")),
-	Crates = require(ConfigRoot:WaitForChild("Economy"):WaitForChild("Crates")),
-})
+ConfigReplication.startClient(LiveConfig.loadModules("arena"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 Combat.setCameraEnabled(true)
 Combat.setInputEnabled(false)
@@ -77,77 +52,70 @@ CombatInputSender.start()
 VoteCamera.start()
 ArenaLoadingClient.markSimulationReady()
 
-startOptional("ArmIK", function()
-	require(Presentation:WaitForChild("ArmIK")).start()
-end)
-startOptional("BallVisuals", function()
-	BallVisuals = require(Presentation:WaitForChild("BallVisuals"))
-	BallVisuals.start()
-end)
-startOptional("DamageFeedback", function()
-	DamageFeedback = require(Presentation:WaitForChild("DamageFeedback"))
-	DamageFeedback.start()
-end)
-startOptional("DeathEffects", function()
-	DeathEffects = require(Presentation:WaitForChild("DeathEffects"))
-	DeathEffects.start()
-end)
-startOptional("HammerVisuals", function()
-	HammerVisuals = require(Presentation:WaitForChild("HammerVisuals"))
-	HammerVisuals.start()
-end)
-startOptional("SplatEffects", function()
-	SplatEffects = require(Presentation:WaitForChild("SplatEffects"))
-	SplatEffects.start()
-end)
-startOptional("CosmeticEffects", function()
-	CosmeticEffects = require(
-		ReplicatedStorage:WaitForChild("Shared")
-			:WaitForChild("Game")
-			:WaitForChild("Cosmetics")
-			:WaitForChild("CosmeticEffects")
-	)
-	CosmeticEffects.start()
-end)
-startOptional("MatchAudio", function()
-	require(Presentation:WaitForChild("MatchAudio")).start()
-end)
-startOptional("GameAudio", function()
-	GameAudio = require(Presentation:WaitForChild("GameAudio"))
-end)
-startOptional("PlayerHighlights", function()
-	require(Presentation:WaitForChild("PlayerHighlights")).start()
-end)
-startOptional("JumpPadVisuals", function()
-	require(Presentation:WaitForChild("JumpPadVisuals")).start()
-end)
-startOptional("RotatingPlatforms", function()
-	require(MapFeatures:WaitForChild("RotatingPlatforms")).load()
-end)
-startOptional("PlatformRider", function()
-	require(Movement:WaitForChild("PlatformRider")).start()
-end)
-startOptional("DebugVisuals", function()
-	DebugVisuals = require(DebugModules:WaitForChild("DebugVisuals"))
-	DebugVisuals.start()
-end)
-startOptional("ThrowPoseTuner", function()
-	require(DebugModules:WaitForChild("ThrowPoseTuner")).start()
-end)
-startOptional("CosmeticVFXGallery", function()
-	require(DebugModules:WaitForChild("CosmeticVFXGallery")).start()
-end)
-startOptional("DevMatchSkip", function()
-	require(DebugModules:WaitForChild("DevMatchSkip")).start()
-end)
-startOptional("ChargeAim", function()
-	require(Presentation:WaitForChild("ChargeAim")).start()
-end)
-startOptional("WeaponAnimations", function()
-	local WeaponAnimations = require(Presentation:WaitForChild("WeaponAnimations"))
-	WeaponAnimations.start()
-	table.insert(connections, CombatInputSender.onIntent(WeaponAnimations.onIntent))
-end)
+local systems = {
+	{ name = "ArmIK", parent = Presentation, method = "start" },
+	{ name = "BallVisuals", parent = Presentation, method = "start", combat = true },
+	{ name = "DamageFeedback", parent = Presentation, method = "start", damage = "onEvent" },
+	{
+		name = "DeathEffects",
+		parent = Presentation,
+		method = "start",
+		damage = "notifyElim",
+		onLoaded = function(module)
+			DeathEffects = module
+		end,
+	},
+	{ name = "HammerVisuals", parent = Presentation, method = "start", combat = true },
+	{ name = "SplatEffects", parent = Presentation, method = "start", combat = true },
+	{
+		name = "CosmeticEffects",
+		load = function()
+			return require(
+				ReplicatedStorage:WaitForChild("Shared")
+					:WaitForChild("Game")
+					:WaitForChild("Cosmetics")
+					:WaitForChild("CosmeticEffects")
+			)
+		end,
+		method = "start",
+		combat = true,
+	},
+	{ name = "MatchAudio", parent = Presentation, method = "start" },
+	{ name = "GameAudio", parent = Presentation, combat = true },
+	{ name = "PlayerHighlights", parent = Presentation, method = "start" },
+	{ name = "JumpPadVisuals", parent = Presentation, method = "start" },
+	{ name = "RotatingPlatforms", parent = MapFeatures, method = "load" },
+	{ name = "PlatformRider", parent = Movement, method = "start" },
+	{ name = "DebugVisuals", parent = DebugModules, method = "start", combat = true },
+	{ name = "ThrowPoseTuner", parent = DebugModules, method = "start" },
+	{ name = "CosmeticVFXGallery", parent = DebugModules, method = "start" },
+	{ name = "DevMatchSkip", parent = DebugModules, method = "start" },
+	{ name = "ChargeAim", parent = Presentation, method = "start" },
+	{ name = "WeaponAnimations", parent = Presentation, method = "start", intent = true },
+}
+for _, system in systems do
+	local ok, err = pcall(function()
+		local module = if system.load then system.load() else require(system.parent:WaitForChild(system.name))
+		if system.onLoaded then
+			system.onLoaded(module)
+		end
+		if system.method then
+			module[system.method]()
+		end
+		if system.combat then
+			table.insert(combatPresenters, module.onEvent)
+		end
+		if system.damage then
+			table.insert(damagePresenters, module[system.damage])
+		end
+		if system.intent then
+			table.insert(connections, CombatInputSender.onIntent(module.onIntent))
+		end
+	end)
+	if not ok then
+		warn(`[SimulationClient] Optional {system.name} unavailable: {err}`)
+	end
+end
 
 local matchState: Folder? = nil
 local matchStateConnection: RBXScriptConnection? = nil
@@ -183,23 +151,8 @@ table.insert(
 table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
 
 local function presentCombatEvent(event)
-	if optionalSystems.BallVisuals then
-		BallVisuals.onEvent(event)
-	end
-	if optionalSystems.HammerVisuals then
-		HammerVisuals.onEvent(event)
-	end
-	if optionalSystems.SplatEffects then
-		SplatEffects.onEvent(event)
-	end
-	if optionalSystems.CosmeticEffects then
-		CosmeticEffects.onEvent(event)
-	end
-	if optionalSystems.GameAudio then
-		GameAudio.onEvent(event)
-	end
-	if optionalSystems.DebugVisuals then
-		DebugVisuals.onEvent(event)
+	for _, present in combatPresenters do
+		present(event)
 	end
 	if Debug.CombatTrace and (event.kind == "Elim" or event.kind == "BallThrown") then
 		print(`[Combat/client] {event.kind} {event.projectileId or ""}`)
@@ -227,11 +180,8 @@ table.insert(
 table.insert(
 	connections,
 	Network.on("DamageFeedback", function(event)
-		if optionalSystems.DamageFeedback then
-			DamageFeedback.onEvent(event)
-		end
-		if optionalSystems.DeathEffects then
-			DeathEffects.notifyElim(event)
+		for _, present in damagePresenters do
+			present(event)
 		end
 	end)
 )

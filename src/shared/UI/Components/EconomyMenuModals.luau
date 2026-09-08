@@ -1,7 +1,4 @@
--- Name: EconomyMenuModals.luau
--- Author: Jack C.
 -- Description: Renders the shop and crate modals for whichever economy interaction is currently open, driven by the shared menu controller.
--- Created: 2026-08-24
 
 --!strict
 
@@ -35,6 +32,7 @@ return function(props: Props)
 		}),
 		ShopDetails = c(ShopDetailsModal, {
 			Card = controller.selectedShopCard,
+			BackRef = controller.detailsBackRef,
 			FocusEnabled = props.FocusEnabled ~= false
 				and (controller.crateReveal == nil or controller.inspectingReward)
 				and not preview.active,

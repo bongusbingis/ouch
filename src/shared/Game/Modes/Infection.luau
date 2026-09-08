@@ -1,7 +1,4 @@
--- Name: Infection.luau
--- Author: Jack C.
 -- Description: Infection game mode: picks patient zero, converts eliminated survivors to the infected side instead of scoring, and hands the win to the survivors if the clock runs out.
--- Created: 2026-08-19
 
 --!strict
 

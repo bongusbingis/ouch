@@ -10,13 +10,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactRoblox = require(Packages:WaitForChild("react-roblox"))
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local UIConfig = require(ReplicatedStorage.Config.Interface.UI)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local PreviewClient = require(script.Parent.Parent.Services.CosmeticPreviewClient)
 local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local useExternalStore = require(script.Parent.Parent.Hooks.useExternalStore)
 local ResponsiveText = require(script.Parent.ResponsiveText)
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local PriceButton = require(script.Parent.Shop.ShopPriceButton)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
@@ -31,19 +31,27 @@ export type Props = {
 
 local function textLabel(text: string, position: UDim2, size: UDim2, maximum: number, heading: boolean)
 	return c(ResponsiveText, {
-		MeasurementFont = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
+		MeasurementFont = if heading then Enum.Font.LuckiestGuy else UIConfig.Text.BodyFont,
 		MaxTextSize = maximum,
 		Wrapped = true,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
-			Font = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
+			Font = if heading then Enum.Font.LuckiestGuy else UIConfig.Text.BodyFont,
 			Text = text,
 			TextColor3 = Color3.new(1, 1, 1),
 			TextStrokeColor3 = colors.Ink,
-			TextStrokeTransparency = if heading then 0.15 else 0.5,
+			TextStrokeTransparency = if heading then 1 else 0.35,
 		},
+	}, {
+		Outline = if heading
+			then c("UIStroke", {
+				Color = colors.Ink,
+				Thickness = 0.045,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			})
+			else nil,
 	})
 end
 
@@ -87,7 +95,7 @@ return function(props: Props)
 		local disconnect = DeviceClass.observe(function(input)
 			if input == "Gamepad" then
 				task.defer(function()
-					if mounted and Selection.isSelectable(backRef.current) then
+					if mounted and DeviceClass.current() == "Gamepad" and Selection.isSelectable(backRef.current) then
 						GuiService.SelectedObject = backRef.current
 					end
 				end)
@@ -98,7 +106,8 @@ return function(props: Props)
 			disconnect()
 			local selected = GuiService.SelectedObject
 			if
-				(selected == nil or (screen ~= nil and selected:IsDescendantOf(screen)))
+				DeviceClass.current() == "Gamepad"
+				and (selected == nil or (screen ~= nil and selected:IsDescendantOf(screen)))
 				and Selection.isSelectable(previous)
 			then
 				GuiService.SelectedObject = previous
@@ -114,9 +123,9 @@ return function(props: Props)
 	local title = if item then item.DisplayName else "PREVIEW"
 	local message = if snapshot.error and snapshot.error ~= ""
 		then snapshot.error
-		elseif not snapshot.ready then "PREPARING PREVIEW"
-		elseif isSound then "PLAY TO HEAR YOUR ELIMINATION SOUND"
-		else "PLAY AGAIN TO SEE THE EFFECT IN ACTION"
+		elseif not snapshot.ready then "PREPARING PREVIEW…"
+		else nil
+	local controlsHeight = if message then 114 else 68
 	return ReactRoblox.createPortal(
 		c("ScreenGui", {
 			ref = screenRef,
@@ -141,42 +150,38 @@ return function(props: Props)
 				Controls = c("Frame", {
 					AnchorPoint = Vector2.new(0.5, 1),
 					Position = UDim2.new(0.5, 0, 1, -16),
-					Size = UDim2.new(0.9, 0, 0, 118),
-					BackgroundColor3 = colors.Ink,
-					BackgroundTransparency = 0.08,
+					Size = UDim2.new(0.9, 0, 0, controlsHeight),
+					BackgroundColor3 = colors.Panel,
+					BorderSizePixel = 0,
 					SelectionGroup = true,
 					SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
 					SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 					SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 					SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 				}, {
-					Constraint = c("UISizeConstraint", { MaxSize = Vector2.new(560, 118) }),
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, 16) }),
-					Message = textLabel(message, UDim2.fromOffset(14, 8), UDim2.new(1, -28, 0, 44), 17, false),
-					Replay = c(AnimatedButton, {
+					Constraint = c("UISizeConstraint", { MaxSize = Vector2.new(560, controlsHeight) }),
+					Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+					Outline = c("UIStroke", { Color = colors.White, Thickness = 2 }),
+					Message = if message
+						then textLabel(message, UDim2.fromOffset(14, 6), UDim2.new(1, -28, 0, 40), 17, false)
+						else nil,
+					Replay = c(PriceButton, {
 						Enabled = snapshot.ready and snapshot.canReplay,
-						Style = "Primary",
+						Red = true,
+						Compact = true,
 						OnActivated = PreviewClient.replay,
-						Native = {
-							Position = UDim2.new(0.04, 0, 0, 58),
-							Size = UDim2.new(0.44, 0, 0, 46),
-							BackgroundColor3 = colors.Cyan,
-						},
-					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
-						Label = textLabel(
-							if isSound
-								then "PLAY SOUND"
-								elseif snapshot.replayRevision == 0 then "PLAY EFFECT"
-								else "PLAY AGAIN",
-							UDim2.new(),
-							UDim2.fromScale(1, 1),
-							21,
-							true
-						),
+						AnchorPoint = Vector2.new(0, 1),
+						Position = UDim2.new(0.04, 0, 1, -12),
+						Size = UDim2.new(0.44, 0, 0, 48),
+						Text = if isSound
+							then "PLAY SOUND"
+							elseif snapshot.replayRevision == 0 then "PLAY EFFECT"
+							else "PLAY AGAIN",
+						TextSize = 21,
 					}),
-					Back = c(AnimatedButton, {
+					Back = c(PriceButton, {
 						ButtonRef = backRef,
+						Compact = true,
 						OnActivated = function()
 							if sessionRef.current then
 								PreviewClient.close(sessionRef.current)
@@ -184,14 +189,11 @@ return function(props: Props)
 								closeRef.current()
 							end
 						end,
-						Native = {
-							Position = UDim2.new(0.52, 0, 0, 58),
-							Size = UDim2.new(0.44, 0, 0, 46),
-							BackgroundColor3 = colors.Raised,
-						},
-					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
-						Label = textLabel("BACK", UDim2.new(), UDim2.fromScale(1, 1), 21, true),
+						AnchorPoint = Vector2.new(0, 1),
+						Position = UDim2.new(0.52, 0, 1, -12),
+						Size = UDim2.new(0.44, 0, 0, 48),
+						Text = "BACK",
+						TextSize = 21,
 					}),
 				}),
 			}),

@@ -2,8 +2,10 @@
 --!nonstrict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VictoryRig = require(ReplicatedStorage.Shared.UI.Services.VictoryRig)
-local Emotes = require(ReplicatedStorage.Config.Cosmetics.Emotes)
+local VictoryRig = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("VictoryRig")
+)
+local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 
 return function()
 	describe("VictoryRig", function()

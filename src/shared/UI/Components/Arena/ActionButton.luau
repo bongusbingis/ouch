@@ -2,8 +2,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local Surface = require(script.Parent.Surface)
 local Label = require(script.Parent.Label)
@@ -24,7 +25,11 @@ return function(props)
 		OnActivated = props.OnActivated,
 		ButtonRef = props.ButtonRef,
 		Visual = c(Surface, {
-			Color = if not enabled then Config.Colors.Raised else props.Color or Config.Colors.Cyan,
+			Color = if props.Completed
+				then Config.Colors.Claimed
+				else if not enabled
+					then Config.Colors.Disabled
+					else props.Color or (if props.Primary then Config.Colors.Pink else Config.Colors.Cyan),
 		}),
 	}, {
 		Minimum = c("UISizeConstraint", {
@@ -34,7 +39,7 @@ return function(props)
 			Text = props.Text,
 			Title = true,
 			Size = props.TextSize or Config.Action.TextPx,
-			Color = if enabled then Config.Colors.White else Config.Colors.Muted,
+			Color = Config.Colors.White,
 			Native = {
 				Position = UDim2.fromOffset(10, 2),
 				Size = UDim2.new(1, -20, 1, -4),

@@ -1,7 +1,4 @@
--- Name: sb-speed-scaleServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-speed-scale, setting a named multiplicative walk-speed modifier on each targeted player.
--- Created: 2026-07-15
 
 --!strict
 

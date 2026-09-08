@@ -1,7 +1,4 @@
--- Name: sbCrateOpenCashServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-crate-open-bonks, charging Bonks and running the normal crate roll and grant so the paid path can be exercised end to end.
--- Created: 2026-07-15
 
 --!strict
 

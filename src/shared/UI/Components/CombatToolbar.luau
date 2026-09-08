@@ -1,7 +1,4 @@
--- Name: CombatToolbar.luau
--- Author: Jack C.
 -- Description: Renders one compact combat action bar from derived weapon state without owning gameplay authority.
--- Created: 2026-08-28
 
 --!strict
 
@@ -26,9 +23,8 @@ local Palette = UIConfig.ProgressionStyle
 local c = React.createElement
 local INK = Palette.Ink
 local SHADOW = Palette.Ink
-local BAR_TOP = Palette.Surface
-local BAR_BOTTOM = Palette.Ink
-local SELECTED_SURFACE = Palette.Raised
+local BAR_TOP = Palette.PanelRaised
+local BAR_BOTTOM = Palette.Cyan
 local SELECTED_ACCENT = Palette.Yellow
 local WARNING = Palette.Yellow
 local WHITE = Color3.new(1, 1, 1)
@@ -73,7 +69,7 @@ local function InputCue(props: {
 	}, {
 		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1.08 }),
 		Plate = c("Frame", {
-			BackgroundColor3 = INK,
+			BackgroundColor3 = Palette.Claimed,
 			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
@@ -243,7 +239,6 @@ local function ActionSlot(props: {
 	local styles = ReactSpring.useSpring({
 		Scale = scale,
 		Lift = if slot.selected then SELECTED_LIFT else 0,
-		SurfaceTransparency = if slot.selected then 0 else 0.6,
 		WashTransparency = if muted then 0.72 else 1,
 		IconTransparency = if kind == "Disabled"
 			then 0.62
@@ -297,19 +292,14 @@ local function ActionSlot(props: {
 		}),
 		SelectedSurface = c("Frame", {
 			BackgroundColor3 = if slot.weapon == "Hammer" then Palette.Pink else Palette.Cyan,
-			BackgroundTransparency = styles.SurfaceTransparency,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 54,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
-			Gradient = c("UIGradient", {
-				Color = ColorSequence.new(Color3.new(1, 1, 1), SELECTED_SURFACE),
-				Rotation = 90,
-			}),
 		}),
 		MutedWash = c("Frame", {
-			BackgroundColor3 = INK,
+			BackgroundColor3 = Palette.White,
 			BackgroundTransparency = styles.WashTransparency,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
@@ -496,7 +486,7 @@ return function(props: Props)
 		}),
 		Bar = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = BAR_TOP,
+			BackgroundColor3 = WHITE,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
 			Position = UDim2.new(0.5, 0, 0.5, -1),

@@ -3,7 +3,12 @@
 -- Teleport preflight failures remain recoverable without crossing a place boundary.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Coordinator = require(ReplicatedStorage.Shared.Game.Matchmaking.TeleportRetryCoordinator)
+local Coordinator = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Matchmaking")
+		:WaitForChild("TeleportRetryCoordinator")
+)
 
 local function signal()
 	return {

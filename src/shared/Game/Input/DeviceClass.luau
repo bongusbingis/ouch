@@ -1,7 +1,4 @@
--- Name: DeviceClass.luau
--- Author: Jack C.
 -- Description: Single owner of client device-class resolution (Mouse/Touch/Gamepad): a pure decision over the input signals plus thin UserInputService samplers, so every consumer classifies the player the same way and a console that has produced no input yet still reads as Gamepad instead of defaulting to Mouse.
--- Created: 2026-09-01
 
 --!strict
 

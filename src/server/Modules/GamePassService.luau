@@ -1,7 +1,4 @@
--- Name: GamePassService.luau
--- Author: Jack C.
 -- Description: Reconciles game pass ownership on join and after purchase, granting the cosmetics a pass entitles idempotently and recording ownership for the entitlement cache.
--- Created: 2026-08-08
 
 --!strict
 
@@ -12,13 +9,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
 local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
-local AnalyticsConfig = require(ReplicatedStorage.Config.Infra.Analytics)
+local AnalyticsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local CosmeticsService = require(script.Parent.CosmeticsService)
 local EntitlementService = require(script.Parent.EntitlementService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
-local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
+local CosmeticsLogic = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
+)
 
 type StartOptions = {
 	marketplace: any?,

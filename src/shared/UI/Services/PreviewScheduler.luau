@@ -4,7 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local Config = require(ReplicatedStorage.Config.Interface.UI).Preview
+local Config = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI")).Preview
 local PreviewScheduler = {}
 local active = {}
 local connection: RBXScriptConnection? = nil

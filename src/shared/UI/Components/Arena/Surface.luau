@@ -2,8 +2,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local Config = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Config =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local c = React.createElement
 
 return function(props)
@@ -34,7 +35,7 @@ return function(props)
 			})
 			else nil,
 		Face = c("Frame", {
-			BackgroundColor3 = props.Color or Config.Colors.Surface,
+			BackgroundColor3 = props.Color or Config.Colors.Cyan,
 			BackgroundTransparency = props.Transparency or 0,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),

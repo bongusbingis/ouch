@@ -1,7 +1,4 @@
--- Name: GestureGlyph.luau
--- Author: Jack C.
 -- Description: Draws the shared touch contact, hold, and swipe notation in the game's teal accent. Physical gestures only -- bound-key prompts are shown inline by the surface that needs them.
--- Created: 2026-08-28
 
 --!strict
 

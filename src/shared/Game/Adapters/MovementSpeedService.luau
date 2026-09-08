@@ -1,7 +1,4 @@
--- Name: MovementSpeedService.luau
--- Author: Jack C.
 -- Description: The only writer of walk speed: composes named multiplicative modifiers over each character's captured base speed and applies them during the synchronized simulation step.
--- Created: 2026-07-15
 
 --!strict
 

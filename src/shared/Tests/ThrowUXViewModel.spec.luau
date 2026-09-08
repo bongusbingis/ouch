@@ -1,7 +1,4 @@
--- Name: ThrowUXViewModel.spec.luau
--- Author: Jack C.
 -- Description: Spec for the throw HUD view model: ready, pending, charging, and full-charge states, cancel and release feedback priority, and clamped cooldown presentation.
--- Created: 2026-08-22
 
 --!strict
 

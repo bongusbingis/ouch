@@ -2,8 +2,8 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage.Packages.react)
-local UI = require(ReplicatedStorage.Config.Interface.UI)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local formatAmount = require(script.Parent.Parent.Models.NumberText)

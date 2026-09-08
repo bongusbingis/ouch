@@ -1,11 +1,15 @@
--- Name: MockWorld.luau
--- Author: Jack C.
 -- Description: Test helper that builds box-collision world snapshots and character entries for simulation specs, so scenarios can be described without any engine instances.
--- Created: 2026-07-12
 
 --!strict
 
-local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
+local SimTypes = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Sim")
+		:WaitForChild("SimTypes")
+)
 
 type Vec = SimTypes.Vec
 type SweepHit = SimTypes.SweepHit

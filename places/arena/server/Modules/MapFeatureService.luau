@@ -1,7 +1,4 @@
--- Name: MapFeatureService.luau
--- Author: Jack C.
 -- Description: Drives every authored arena map feature from one heartbeat, discovering each kit's folder under the arena scriptables, keeping its parts current as they change, and dispatching the per-player and per-world hooks.
--- Created: 2026-07-14
 
 --!strict
 

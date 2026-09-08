@@ -52,6 +52,9 @@ return {
 
 	ViewportFieldOfView = 45,
 	ViewportFill = 0.9,
+	WorldPreview = {
+		HammerGripAlongLongAxis = -0.4,
+	},
 	Viewport = {
 		CostumeAssets = {
 			CameraOffset = Vector3.new(0, 0.3, 8.8),

@@ -1,7 +1,4 @@
--- Name: CrateBatch.spec.luau
--- Author: Jack C.
 -- Description: Spec for the bulk crate-open rules: which quantities a crate offers, rejection of quantities outside that set or outside the hard cap, straight-multiple pricing with no volume discount, and best-rarity selection for the reveal summary.
--- Created: 2026-08-25
 
 --!strict
 

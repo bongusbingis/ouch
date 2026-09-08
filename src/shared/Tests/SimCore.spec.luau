@@ -1,12 +1,15 @@
--- Name: SimCore.spec.luau
--- Author: Jack C.
 -- Description: Spec for the end-to-end simulation: a deterministic throw at a strafing dummy producing an elimination, bit-identical replays, and cleanup when a player leaves holding a ball.
--- Created: 2026-07-12
 
 --!strict
 
 local T = require(script.Parent.TestKit)
-local MockWorld = require(script.Parent.MockWorld)
+local MockWorld = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ServerStorage")
+		:WaitForChild("Tests")
+		:WaitForChild("Helpers")
+		:WaitForChild("MockWorld")
+)
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)

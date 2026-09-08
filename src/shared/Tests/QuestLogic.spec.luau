@@ -1,7 +1,4 @@
--- Name: QuestLogic.spec.luau
--- Author: Jack C.
 -- Description: Spec for the pure quest rules: deterministic daily ids, UTC daily keys and reset times, event-to-progress mapping, and clamped public payloads.
--- Created: 2026-07-13
 
 --!strict
 

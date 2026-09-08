@@ -1,7 +1,4 @@
--- Name: ShopViewModel.luau
--- Author: Jack C.
 -- Description: Builds the storefront view model: turns catalog, crate, bundle, pass, and product configuration plus live ownership into the ordered sections and cards the shop UI renders.
--- Created: 2026-08-23
 
 --!strict
 
@@ -75,7 +72,7 @@ export type Model = {
 	byId: { [string]: Card },
 }
 
-local function sortedKeys(catalog: { [string]: any }, predicate: ((any) -> boolean)?): { string }
+local function orderedCatalogKeys(catalog: { [string]: any }, predicate: ((any) -> boolean)?): { string }
 	local keys = {}
 	for key, definition in catalog do
 		if predicate == nil or predicate(definition) then
@@ -96,7 +93,7 @@ local function sortedKeys(catalog: { [string]: any }, predicate: ((any) -> boole
 end
 
 local function productFor(products: { [string]: any }, field: string, value: string): (string?, any?)
-	for _, key in sortedKeys(products) do
+	for _, key in orderedCatalogKeys(products) do
 		local definition = products[key]
 		if definition[field] == value then
 			return key, definition
@@ -517,7 +514,7 @@ function ShopViewModel.build(options: any): Model
 
 	local crates: Section = { id = "Crates", title = "CRATES", countdownAt = nil, cards = {} }
 	for _, crateId in
-		sortedKeys(args.crates, function(definition)
+		orderedCatalogKeys(args.crates, function(definition)
 			return definition.CatalogStatus ~= "Hidden"
 		end)
 	do
@@ -527,7 +524,7 @@ function ShopViewModel.build(options: any): Model
 
 	local bonks: Section = { id = "Bonks", title = "BONKS", countdownAt = nil, cards = {} }
 	for _, key in
-		sortedKeys(args.products, function(definition)
+		orderedCatalogKeys(args.products, function(definition)
 			return definition.CatalogStatus ~= "Hidden" and definition.Type == "Bonks"
 		end)
 	do
@@ -537,14 +534,14 @@ function ShopViewModel.build(options: any): Model
 
 	local more: Section = { id = "More", title = "PASSES & MORE", countdownAt = nil, cards = {} }
 	for _, key in
-		sortedKeys(args.gamePasses.Catalog, function(definition)
+		orderedCatalogKeys(args.gamePasses.Catalog, function(definition)
 			return definition.CatalogStatus ~= "Hidden"
 		end)
 	do
 		appendCard(model, more.cards, passCard(args, key, args.gamePasses.Catalog[key]))
 	end
 	for _, key in
-		sortedKeys(args.products, function(definition)
+		orderedCatalogKeys(args.products, function(definition)
 			local season = BattlePassLogic.activeSeason(args.seasons or {}, args.now)
 			return definition.CatalogStatus ~= "Hidden"
 				and definition.Type == "SeasonPass"

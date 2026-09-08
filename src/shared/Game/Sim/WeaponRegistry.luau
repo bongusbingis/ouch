@@ -1,7 +1,4 @@
--- Name: WeaponRegistry.luau
--- Author: Jack C.
 -- Description: Lists every weapon kit, resolves which kit a command routes to, and names the default and the kit auto-equipped on picking up a ball.
--- Created: 2026-07-12
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: ShopCard.luau
--- Author: Jack C.
 -- Description: One storefront card, in either of the two compositions its class asks for: artwork stacked over the copy for grid cards, or set beside it for the shallow scan rows and promotional banners.
--- Created: 2026-08-23
 
 --!strict
 
@@ -13,6 +10,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.ShopPriceButton)
@@ -20,6 +18,7 @@ local ShopPreview = require(script.Parent.ShopPreview)
 local ShopLayout = require(script.Parent.Parent.Parent.Models.ShopLayout)
 
 local c = React.createElement
+local Palette = UIConfig.ProgressionStyle
 
 local CATEGORY_COLORS = {
 	Crate = Color3.fromRGB(53, 226, 218),
@@ -45,6 +44,11 @@ end
 
 local function colorFor(card): Color3
 	return InventoryConfig.RarityColors[card.badge] or CATEGORY_COLORS[card.kind] or Color3.fromRGB(97, 255, 237)
+end
+
+local function bandColor(card): Color3
+	local hue, saturation, value = colorFor(card):ToHSV()
+	return Color3.fromHSV(hue, math.min(saturation * 1.15, 1), math.max(value * 0.82, 0.65))
 end
 
 -- A crate opens its odds sheet, so that is what its button says -- unless the
@@ -161,16 +165,17 @@ end
 local function hintLabel(card, native, alignment: Enum.TextXAlignment): any
 	local merged = table.clone(native)
 	merged.BackgroundTransparency = 1
-	merged.FontFace =
-		Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+	merged.Font = UIConfig.Text.BodyFont
 	merged.Text = if card.kind == "Bundle" then "OUTFIT BUNDLE" else card.hintText
-	merged.TextColor3 = Color3.fromRGB(238, 248, 255)
+	merged.TextColor3 = Palette.White
+	merged.TextStrokeColor3 = Palette.Ink
+	merged.TextStrokeTransparency = 0.35
 	merged.TextTransparency = 0.04
 	merged.TextXAlignment = alignment
 	merged.ZIndex = 8
 	return c(ResponsiveText, {
 		HostName = "SupportingText",
-		MeasurementFont = Enum.Font.SourceSansBold,
+		MeasurementFont = UIConfig.Text.BodyFont,
 		MaxTextSize = 18,
 		Native = merged,
 	})
@@ -179,22 +184,20 @@ end
 local function badgeLabel(card): any
 	return c(ResponsiveText, {
 		HostName = "Badge",
-		MeasurementFont = Enum.Font.SourceSansBold,
+		MeasurementFont = UIConfig.Text.BodyFont,
 		MaxTextSize = 16,
 		Native = {
 			AnchorPoint = Vector2.new(0, 0),
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = Color3.fromRGB(52, 52, 52),
-			BackgroundTransparency = 0.12,
-			FontFace = Font.new(
-				"rbxasset://fonts/families/SourceSansPro.json",
-				Enum.FontWeight.Bold,
-				Enum.FontStyle.Normal
-			),
+			BackgroundColor3 = bandColor(card),
+			BackgroundTransparency = 0,
+			Font = UIConfig.Text.BodyFont,
 			Position = UDim2.new(0.05, 0, 0, 4),
 			Size = UDim2.fromOffset(0, 16),
 			Text = string.upper(card.badge),
 			TextColor3 = Color3.new(1, 1, 1),
+			TextStrokeColor3 = Palette.Ink,
+			TextStrokeTransparency = 0.35,
 			ZIndex = 8,
 		},
 	}, {
@@ -234,11 +237,11 @@ local function artwork(card, position: UDim2, size: UDim2): any
 	})
 end
 
-local function infoBackdrop(anchor: Vector2, position: UDim2, size: UDim2): any
+local function infoBackdrop(card, anchor: Vector2, position: UDim2, size: UDim2): any
 	return c("Frame", {
 		AnchorPoint = anchor,
-		BackgroundColor3 = Color3.fromRGB(32, 39, 48),
-		BackgroundTransparency = 0.18,
+		BackgroundColor3 = bandColor(card),
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Position = position,
 		Size = size,
@@ -258,6 +261,7 @@ local function priceButton(card, band: Bands, enabled: boolean, native, onActiva
 	merged.OnActivated = onActivated
 	merged.Compact = true
 	merged.TextSize = 20
+	merged.Color = if card.owned then Palette.Claimed else Palette.Cyan
 	return c(ShopPriceButton, merged)
 end
 
@@ -286,7 +290,8 @@ local function priceLine(card, native, alignment: Enum.TextXAlignment): any
 		Price = c(BonksLabel, {
 			Amount = card.bonksPrice,
 			MaxTextSize = 20,
-			TextColor = Color3.fromRGB(255, 226, 120),
+			TextColor = Palette.White,
+			TextStroke = 0.045,
 			Native = {
 				BackgroundTransparency = 1,
 				LayoutOrder = 1,
@@ -297,19 +302,17 @@ local function priceLine(card, native, alignment: Enum.TextXAlignment): any
 			then nil
 			else c(ResponsiveText, {
 				HostName = "Was",
-				MeasurementFont = Enum.Font.SourceSansBold,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				MaxTextSize = 16,
 				Native = {
 					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/SourceSansPro.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
+					Font = UIConfig.Text.BodyFont,
 					LayoutOrder = 2,
 					Size = UDim2.fromScale(0.44, 0.86),
 					Text = `WAS {formatNumber(card.originalBonksPrice)}`,
-					TextColor3 = Color3.fromRGB(216, 230, 240),
+					TextColor3 = Palette.White,
+					TextStrokeColor3 = Palette.Ink,
+					TextStrokeTransparency = 0.35,
 					TextXAlignment = alignment,
 					ZIndex = 8,
 				},
@@ -317,12 +320,15 @@ local function priceLine(card, native, alignment: Enum.TextXAlignment): any
 	})
 end
 
--- Grid composition: artwork above, a dark band across the bottom carrying the
--- name, the supporting line and the call to action.
 local function stackContent(card, class, band: Bands, enabled: boolean, onActivated, layoutOrder)
 	return {
 		Artwork = artwork(card, UDim2.new(0.06, 0, 0, 3), UDim2.new(0.88, 0, 0, band.art)),
-		InfoBackdrop = infoBackdrop(Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -1), UDim2.new(0.94, 0, 0, band.info)),
+		InfoBackdrop = infoBackdrop(
+			card,
+			Vector2.new(0.5, 1),
+			UDim2.new(0.5, 0, 1, -1),
+			UDim2.new(0.94, 0, 0, band.info)
+		),
 		Name = nameLabel(card, class, {
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(
@@ -356,7 +362,12 @@ local function splitContent(card, class, band: Bands, enabled: boolean, onActiva
 	local infoWidth = 0.96 - infoX
 	return {
 		Artwork = if art > 0 then artwork(card, UDim2.fromScale(0.03, 0.08), UDim2.fromScale(art, 0.84)) else nil,
-		InfoBackdrop = infoBackdrop(Vector2.new(0, 0.5), UDim2.fromScale(infoX, 0.5), UDim2.fromScale(infoWidth, 0.88)),
+		InfoBackdrop = infoBackdrop(
+			card,
+			Vector2.new(0, 0.5),
+			UDim2.fromScale(infoX, 0.5),
+			UDim2.fromScale(infoWidth, 0.88)
+		),
 		Info = c("Frame", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			BackgroundTransparency = 1,

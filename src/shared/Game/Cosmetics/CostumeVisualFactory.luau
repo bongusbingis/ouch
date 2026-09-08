@@ -3,7 +3,7 @@
 -- Clones authored components and aligns their BodyMount frames to the R15 body; cosmetics never affect collision or mass.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CostumeVisualFactory = {}
 
 CostumeVisualFactory.BodyParts = table.freeze({

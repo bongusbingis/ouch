@@ -1,7 +1,4 @@
--- Name: merge-places.luau
--- Author: Jack C.
 -- Description: Merges the Studio-authored place with the Rojo-built one into a deployable artifact, replacing every Rojo-mapped tree in a copy of the base place while never writing the base file itself.
--- Created: 2026-07-16
 
 --!strict
 

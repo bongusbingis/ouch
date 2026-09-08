@@ -1,9 +1,14 @@
--- Name: ArenaTeleportClient.luau
--- Author: Jack C.
 -- Description: Client adapter for the return-to-lobby teleport, publishing the teleport status the UI shows and exposing retry, stay, and manual return actions.
--- Created: 2026-08-24
 
 --!strict
+
+local Listeners = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Util")
+		:WaitForChild("Listeners")
+)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,17 +27,12 @@ export type Snapshot = {
 
 local started = false
 local snapshot: Snapshot = nil
-local listeners: { (Snapshot) -> () } = {}
+local listeners: Listeners.Collection<Snapshot> = Listeners.new("ArenaTeleportClient", false, "listener failed")
 local connection: RBXScriptConnection? = nil
 
 local function publish(value: Snapshot)
 	snapshot = value
-	for _, listener in listeners do
-		local ok, err = pcall(listener, value)
-		if not ok then
-			warn(`[ArenaTeleportClient] listener failed: {err}`)
-		end
-	end
+	listeners.emit(value)
 end
 
 function ArenaTeleportClient.start()
@@ -61,19 +61,9 @@ end
 
 function ArenaTeleportClient.subscribe(listener: (Snapshot) -> ()): () -> ()
 	ArenaTeleportClient.start()
-	table.insert(listeners, listener)
+	local unsubscribe = listeners.add(listener)
 	listener(snapshot)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(listeners, listener)
-		if index then
-			table.remove(listeners, index)
-		end
-	end
+	return unsubscribe
 end
 
 function ArenaTeleportClient.retry()
@@ -93,7 +83,7 @@ function ArenaTeleportClient.destroy()
 		connection:Disconnect()
 		connection = nil
 	end
-	table.clear(listeners)
+	listeners.clear()
 	snapshot = nil
 	started = false
 end

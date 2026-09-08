@@ -1,13 +1,10 @@
--- Name: PartyBus.luau
--- Author: Jack C.
 -- Description: Cross-server party messaging: subscribes to each party's topic, publishes snapshot and deletion messages, and manages subscription lifetimes as members join and leave a server.
--- Created: 2026-08-15
 
 local MessagingService = game:GetService("MessagingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
-local Protocol = require(ReplicatedStorage.Shared.Matchmaking.Protocol)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
+local Protocol = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Protocol"))
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local PartyBus = {}

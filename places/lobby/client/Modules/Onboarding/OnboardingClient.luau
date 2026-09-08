@@ -1,9 +1,14 @@
--- Name: OnboardingClient.luau
--- Author: Jack C.
 -- Description: Client flow controller for first-session training: owns the current step, watches the real combat intents to detect throws, hammer swings and charged releases, escalates assistance on repeated misses or inactivity, and publishes one snapshot the onboarding UI renders. Detection and presentation only -- the server decides and persists.
--- Created: 2026-08-26
 
 --!strict
+
+local Listeners = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Util")
+		:WaitForChild("Listeners")
+)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -45,7 +50,7 @@ export type Snapshot = {
 local CLEAR = table.freeze({})
 
 local started = false
-local listeners: { (Snapshot) -> () } = {}
+local listeners: Listeners.Collection<Snapshot> = Listeners.new("OnboardingClient", true, "listener failed")
 local connections: { any } = {}
 local disposers: { () -> () } = {}
 local heartbeat: RBXScriptConnection? = nil
@@ -85,12 +90,9 @@ local function publish(changes: { [string]: any })
 		next[key] = if value == CLEAR then nil else value
 	end
 	state = next :: Snapshot
-	for _, listener in table.clone(listeners) do
-		local ok, err = pcall(listener, state)
-		if not ok then
-			warn(`[OnboardingClient] listener failed: {err}`)
-		end
-	end
+	listeners.emitWith(function(callback)
+		callback(state)
+	end)
 end
 
 function OnboardingClient.getSnapshot(): Snapshot
@@ -98,18 +100,8 @@ function OnboardingClient.getSnapshot(): Snapshot
 end
 
 function OnboardingClient.subscribe(listener: (Snapshot) -> ()): () -> ()
-	table.insert(listeners, listener)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(listeners, listener)
-		if index then
-			table.remove(listeners, index)
-		end
-	end
+	local unsubscribe = listeners.add(listener)
+	return unsubscribe
 end
 
 local function reportAttempt(escalated: boolean?)
@@ -316,7 +308,7 @@ function OnboardingClient.destroy()
 	Combat.setCameraEnabled(false)
 	Combat.setWeaponLocked(false)
 	ThrowUXClient.setHintGate(nil)
-	table.clear(listeners)
+	listeners.clear()
 	started = false
 end
 

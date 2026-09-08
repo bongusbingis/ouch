@@ -1,9 +1,14 @@
--- Name: ArenaLoadingClient.luau
--- Author: Jack C.
 -- Description: Owns the arena loading gate on the client: preloads critical assets, tracks streaming and initialization progress, reports readiness to the server, and publishes a snapshot the loading screen renders.
--- Created: 2026-08-24
 
 --!strict
+
+local Listeners = require(
+	game:GetService("ReplicatedStorage")
+		:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Util")
+		:WaitForChild("Listeners")
+)
 
 local CollectionService = game:GetService("CollectionService")
 local ContentProvider = game:GetService("ContentProvider")
@@ -63,7 +68,7 @@ local started = false
 local destroyed = false
 local generation = 0
 local readyTaskRunning = false
-local listeners: { (Snapshot) -> () } = {}
+local listeners: Listeners.Collection<Snapshot> = Listeners.new("ArenaLoadingClient", false, "listener failed")
 local connections: { RBXScriptConnection } = {}
 local stateConnections: { RBXScriptConnection } = {}
 local loadState: Folder? = nil
@@ -156,12 +161,7 @@ end
 
 local function notify()
 	local snapshot = currentSnapshot()
-	for _, listener in listeners do
-		local ok, err = pcall(listener, snapshot)
-		if not ok then
-			warn(`[ArenaLoadingClient] listener failed: {err}`)
-		end
-	end
+	listeners.emit(snapshot)
 end
 
 local function tryReady()
@@ -449,19 +449,9 @@ function ArenaLoadingClient.getSnapshot(): Snapshot
 end
 
 function ArenaLoadingClient.subscribe(listener: (Snapshot) -> ()): () -> ()
-	table.insert(listeners, listener)
+	local unsubscribe = listeners.add(listener)
 	listener(currentSnapshot())
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(listeners, listener)
-		if index then
-			table.remove(listeners, index)
-		end
-	end
+	return unsubscribe
 end
 
 function ArenaLoadingClient.markUiPresented()
@@ -562,7 +552,7 @@ function ArenaLoadingClient.destroy()
 	end
 	disconnectStateConnections()
 	table.clear(connections)
-	table.clear(listeners)
+	listeners.clear()
 	started = false
 end
 

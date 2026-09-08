@@ -1,12 +1,14 @@
--- Name: PartyBackgroundController.luau
--- Author: Jack C.
 -- Description: Controls the lobby background scene camera and its transitions while the party and matchmaking UI is shown. Sole owner of the backdrop's placement and visibility, so anything that needs the lobby view out of the way -- onboarding, for one -- switches it off here rather than moving the part itself.
--- Created: 2026-08-15
 
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local PresentationCamera = require(ReplicatedStorage.Shared.UI.Services.PresentationCamera)
+local PresentationCamera = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("PresentationCamera")
+)
 
 local PartyBackgroundController = {}
 PartyBackgroundController.__index = PartyBackgroundController

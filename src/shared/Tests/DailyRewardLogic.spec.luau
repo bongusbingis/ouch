@@ -1,7 +1,4 @@
--- Name: DailyRewardLogic.spec.luau
--- Author: Jack C.
 -- Description: Spec for the pure daily reward rules: UTC-day gating, cycle progression, claim legality, and public state construction.
--- Created: 2026-09-01
 
 --!strict
 

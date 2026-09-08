@@ -1,7 +1,4 @@
--- Name: Hammer.spec.luau
--- Author: Jack C.
 -- Description: In-place port of the hammer weapon spec: input routing against held balls, closest-target-in-front hits, team rules, and the cooldown, active, and recovery phases.
--- Created: 2026-07-16
 
 --!nonstrict
 
@@ -11,7 +8,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Sim = Shared:WaitForChild("Game"):WaitForChild("Sim")
 
-local MockWorld = require(Shared:WaitForChild("Tests"):WaitForChild("MockWorld"))
+local MockWorld =
+	require(game:GetService("ServerStorage"):WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("MockWorld"))
 local SimCore = require(Sim:WaitForChild("SimCore"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))

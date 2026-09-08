@@ -1,7 +1,4 @@
--- Name: CosmeticsLogic.spec.luau
--- Author: Jack C.
 -- Description: Spec for the shipped cosmetic catalog and equip rules: slot and ownership validation, category defaults, crate pool spread, and that every exclusive item is obtainable and backed by real audio.
--- Created: 2026-07-13
 
 --!strict
 

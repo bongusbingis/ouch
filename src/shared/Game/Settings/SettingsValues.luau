@@ -1,7 +1,4 @@
--- Name: SettingsValues.luau
--- Author: Jack C.
 -- Description: Pure value resolution shared by every setting control: clamping and step/allowed-value snapping for sliders, option validation for toggles, and the one alpha-to-value mapping every input path (click, drag, controller) goes through so none of them can disagree.
--- Created: 2026-08-25
 
 --!strict
 

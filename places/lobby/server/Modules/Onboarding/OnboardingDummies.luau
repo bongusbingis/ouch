@@ -1,7 +1,4 @@
--- Name: OnboardingDummies.luau
--- Author: Jack C.
 -- Description: Owns the training dummies from spawn to removal: clones the authored character rig, walks it at its learner with the Humanoid, holds it at arm's length so it can never shove them, and knocks it flying when it is hit. A dummy's standing-or-knocked state lives here and nowhere else.
--- Created: 2026-08-26
 
 --!strict
 

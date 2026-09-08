@@ -1,7 +1,4 @@
--- Name: GameAudio.luau
--- Author: Jack C.
 -- Description: Maps sim events to the one-shot sounds declared in the audio config, spawning world-space emitters for spatial cues and routing flat cues to local playback, including the three elimination variants.
--- Created: 2026-08-19
 
 --!strict
 

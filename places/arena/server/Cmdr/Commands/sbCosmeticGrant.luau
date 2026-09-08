@@ -1,7 +1,4 @@
--- Name: sbCosmeticGrant.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-cosmetic-grant: grants a cosmetic to one or more players.
--- Created: 2026-07-15
 
 --!strict
 

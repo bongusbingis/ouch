@@ -1,7 +1,4 @@
--- Name: DeviceInput.luau
--- Author: Jack C.
 -- Description: Translates raw mouse, keyboard, and gamepad input into combat press, release, and cancel callbacks, including the analog trigger handling.
--- Created: 2026-08-20
 
 --!strict
 

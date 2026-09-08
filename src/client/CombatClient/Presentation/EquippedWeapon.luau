@@ -1,7 +1,4 @@
--- Name: EquippedWeapon.luau
--- Author: Jack C.
 -- Description: Reads which weapon a character currently has equipped from the replicated sim attribute, the single source consulted by the HUD and animation layer.
--- Created: 2026-08-22
 
 --!strict
 

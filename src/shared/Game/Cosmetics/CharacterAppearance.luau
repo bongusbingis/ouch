@@ -3,7 +3,7 @@
 -- Applies body color and composed costumes through one appearance path; authored clothing retains its colors.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CharacterColorLogic = require(script.Parent.Parent.Economy.CharacterColorLogic)
 local CostumeVisualFactory = require(script.Parent.CostumeVisualFactory)
 local CharacterAppearance = {}

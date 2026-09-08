@@ -10,7 +10,7 @@ dependencies = []
 [[package]]
 name = "bongusbingis/v1"
 version = "0.1.0"
-dependencies = [["camera-shaker", "encrxyptedethan/camerashaker@1.0.0"], ["cmdr", "evaera/cmdr@1.12.0"], ["goodsignal", "stravant/goodsignal@0.2.1"], ["janitor", "howmanysmall/janitor@1.18.3"], ["profilestore", "vyon/profilestore@1.0.3"], ["promise", "evaera/promise@4.0.0"], ["react", "jsdotlua/react@17.2.1"], ["react-roblox", "jsdotlua/react-roblox@17.2.1"], ["react-spring", "chriscerie/react-spring@2.0.0"], ["replica", "ayrezrblx/replica@0.1.9"], ["table-util", "sleitnick/table-util@1.2.1"], ["testEZ", "roblox/testez@0.4.1"], ["zone-plus", "legendoj1/zoneplus@3.2.2"]]
+dependencies = [["camera-shaker", "encrxyptedethan/camerashaker@1.0.0"], ["cmdr", "evaera/cmdr@1.12.0"], ["profilestore", "vyon/profilestore@1.0.3"], ["promise", "evaera/promise@4.0.0"], ["react", "jsdotlua/react@17.2.1"], ["react-roblox", "jsdotlua/react-roblox@17.2.1"], ["react-spring", "chriscerie/react-spring@2.0.0"], ["replica", "ayrezrblx/replica@0.1.9"], ["testEZ", "roblox/testez@0.4.1"]]
 
 [[package]]
 name = "chriscerie/react-spring"
@@ -31,16 +31,6 @@ dependencies = []
 name = "evaera/promise"
 version = "4.0.0"
 dependencies = []
-
-[[package]]
-name = "howmanysmall/janitor"
-version = "1.18.3"
-dependencies = [["Promise", "howmanysmall/typed-promise@4.0.6"]]
-
-[[package]]
-name = "howmanysmall/typed-promise"
-version = "4.0.6"
-dependencies = [["Promise", "evaera/promise@4.0.0"]]
 
 [[package]]
 name = "jsdotlua/boolean"
@@ -128,23 +118,8 @@ version = "1.2.7"
 dependencies = [["collections", "jsdotlua/collections@1.2.7"]]
 
 [[package]]
-name = "legendoj1/zoneplus"
-version = "3.2.2"
-dependencies = []
-
-[[package]]
 name = "roblox/testez"
 version = "0.4.1"
-dependencies = []
-
-[[package]]
-name = "sleitnick/table-util"
-version = "1.2.1"
-dependencies = []
-
-[[package]]
-name = "stravant/goodsignal"
-version = "0.2.1"
 dependencies = []
 
 [[package]]

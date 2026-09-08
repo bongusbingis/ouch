@@ -1,7 +1,4 @@
--- Name: ShopRotation.luau
--- Author: Jack C.
 -- Description: Deterministic per-player shop draw seeded from the player and the period, excluding already-owned items, whose result is persisted because purchases change the candidate pool.
--- Created: 2026-08-22
 
 --!strict
 

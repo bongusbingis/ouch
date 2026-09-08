@@ -1,7 +1,4 @@
--- Name: BattlePassLogic.luau
--- Author: Jack C.
 -- Description: Pure season pass rules: which season is live, what tier an XP total buys, what is still owed, and whether a claim is legal, with time always passed in.
--- Created: 2026-08-12
 
 --!strict
 

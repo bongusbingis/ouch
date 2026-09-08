@@ -1,7 +1,4 @@
--- Name: OnboardingTargets.luau
--- Author: Jack C.
 -- Description: Tracks which training dummies belong to the local player, from the attribute the server projects onto each live one. Single client-side owner of that set, so the target markers and the waypoint arrow always agree on what counts as a target.
--- Created: 2026-08-26
 
 --!strict
 

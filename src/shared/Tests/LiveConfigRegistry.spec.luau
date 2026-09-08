@@ -1,7 +1,4 @@
--- Name: LiveConfigRegistry.spec.luau
--- Author: Jack C.
 -- Description: Spec for the live config allowlist: every key names a real config leaf with a usable range, projects onto a distinct attribute name within the length limit, and stays within the cloud key limit.
--- Created: 2026-08-18
 
 --!strict
 
@@ -33,17 +30,24 @@ T.describe("LiveConfig registry", function()
 	end)
 
 	T.it("points every key at a config leaf that actually exists", function()
-		local configRoot = script.Parent.Parent.Parent.Config
+		local modules = LiveConfig.loadModules("arena")
 		for _, entry in LiveConfig.Entries do
 			local moduleName, path = ConfigOverrides.parseKey(entry.Key)
-			local moduleScript = configRoot:FindFirstChild(moduleName :: string, true)
-			if moduleScript == nil then
+			if moduleName == "Matchmaking" then
 				continue
 			end
-			local leaf = ConfigOverrides.readPath(require(moduleScript), path :: { string })
+			T.expect(modules[moduleName]):toBeTruthy()
+			local leaf = ConfigOverrides.readPath(modules[moduleName], path :: { string })
 			T.expect(leaf ~= nil):toBeTruthy()
 			T.expect(typeof(leaf)):toEqual(entry.Type)
 		end
+	end)
+
+	T.it("preserves each place's override scope with unique ordered module names", function()
+		T.expect(table.concat(LiveConfig.moduleNames("arena"), ","))
+			:toEqual("AimAssist,Combat,Crates,GameModes,MapFeatures,Modes,Shop")
+		T.expect(table.concat(LiveConfig.moduleNames("lobby"), ",")):toEqual("Crates,GameModes,Matchmaking,Shop")
+		T.expect(#LiveConfig.moduleNames()):toEqual(8)
 	end)
 
 	T.it("stays within the Open Cloud repository key limit", function()

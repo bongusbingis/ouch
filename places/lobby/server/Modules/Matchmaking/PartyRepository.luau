@@ -1,13 +1,10 @@
--- Name: PartyRepository.luau
--- Author: Jack C.
 -- Description: Persistence for parties in the shared memory store: creation with a claimed join code, atomic updates, code and user lookups, refresh, and deletion.
--- Created: 2026-08-15
 
 local HttpService = game:GetService("HttpService")
 local MemoryStoreService = game:GetService("MemoryStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage.Shared.Matchmaking.Config)
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 local CloudRetry = require(script.Parent.CloudRetry)
 
 local PartyRepository = {}

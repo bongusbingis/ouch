@@ -1,7 +1,4 @@
--- Name: SettingsValues.spec.luau
--- Author: Jack C.
 -- Description: Spec for the centralized slider value-resolution path: clamping, step snapping without float drift, explicit allowed-value stops, and the alpha/value mapping every input method (click, drag, controller) shares.
--- Created: 2026-08-25
 
 --!strict
 

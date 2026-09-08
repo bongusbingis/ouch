@@ -1,7 +1,4 @@
--- Name: OnboardingHit.spec.luau
--- Author: Jack C.
 -- Description: Spec for the training hit predicates: that the hammer cone matches the real weapon's reach, spread and vertical band, and that a thrown ball is caught by the segment it swept rather than only where it happened to be sampled.
--- Created: 2026-08-26
 
 --!strict
 

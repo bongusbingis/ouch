@@ -1,7 +1,4 @@
--- Name: CmdrService.luau
--- Author: Jack C.
 -- Description: Installs the Cmdr developer console in the arena, registering the game's commands and argument types and restricting who may open it based on the environment configuration.
--- Created: 2026-07-15
 
 --!strict
 

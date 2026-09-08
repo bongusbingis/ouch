@@ -1,7 +1,4 @@
--- Name: Animations.spec.luau
--- Author: Jack C.
 -- Description: In-place spec asserting that every required combat animation clip declared in config is actually authored in Studio with a valid animation priority.
--- Created: 2026-07-16
 
 --!nonstrict
 

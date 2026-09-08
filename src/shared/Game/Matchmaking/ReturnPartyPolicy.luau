@@ -1,7 +1,4 @@
--- Name: ReturnPartyPolicy.luau
--- Author: Jack C.
 -- Description: Pure rule for restoring a party returning from the arena, deciding whether to revive the surviving record or accept one an earlier arrival already restored.
--- Created: 2026-08-24
 
 --!strict
 

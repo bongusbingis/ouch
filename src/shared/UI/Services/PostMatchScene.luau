@@ -6,9 +6,10 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Presentation = require(ReplicatedStorage.Config.Interface.ArenaPresentation)
+local Presentation =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Config = Presentation.Results
-local Emotes = require(ReplicatedStorage.Config.Cosmetics.Emotes)
+local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local Camera = require(script.Parent.PresentationCamera)
 local VictoryRig = require(script.Parent.VictoryRig)
 local Framing = require(script.Parent.Parent.Models.StageFraming)

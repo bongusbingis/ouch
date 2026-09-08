@@ -1,7 +1,4 @@
--- Name: LobbyCombatTest.luau
--- Author: Jack C.
 -- Description: Studio-only lobby combat/cosmetics test session. Brings a developer into the real combat stack on the Workspace baseplate with stationary respawning dummies and both weapons, judging hits against the real weapon geometry (dummies are not simulation entities) and broadcasting the same Elim/HammerHit sim events the arena emits so equipped cosmetics render through the identical presentation path. Gated to Studio and never runs live.
--- Created: 2026-08-31
 
 --!strict
 

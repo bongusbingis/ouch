@@ -1,7 +1,4 @@
--- Name: GestureHint.luau
--- Author: Jack C.
 -- Description: Places an onboarding touch gesture against the combat input layer's live viewport geometry, clear of the reticle and the swipe zone.
--- Created: 2026-08-26
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: Rotation.spec.luau
--- Author: Jack C.
 -- Description: Spec that the rotation schedule derives its angle from the clock alone, wraps a full turn, agrees across machines, and honours a per-model speed.
--- Created: 2026-08-18
 
 --!strict
 

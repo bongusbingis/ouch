@@ -1,7 +1,4 @@
--- Name: MatchServiceSmoke.spec.luau
--- Author: Jack C.
 -- Description: In-place smoke spec that the match service publishes its replicated match state surface, stays idle with no players, and rejects combat events from outside the playable roster.
--- Created: 2026-07-16
 
 --!nonstrict
 

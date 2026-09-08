@@ -1,7 +1,4 @@
--- Name: PaidRandomPolicyService.luau
--- Author: Jack C.
 -- Description: Decides whether a player may be offered paid random items, so restricted regions and accounts see crates as preview-only rather than purchasable.
--- Created: 2026-08-08
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: InputSetup.server.luau
--- Author: Jack C.
 -- Description: Server script that creates the input action and binding instances the player module expects and signals when input setup is complete.
--- Created: 2026-08-20
 
 --!strict
 local Players = game:GetService("Players")

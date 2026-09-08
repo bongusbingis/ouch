@@ -1,7 +1,4 @@
--- Name: TestKit.luau
--- Author: Jack C.
 -- Description: Minimal pure-Luau describe, it, and expect framework so specs register as a side effect of being required and run headlessly under Lune.
--- Created: 2026-07-12
 
 --!strict
 

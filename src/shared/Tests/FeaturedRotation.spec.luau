@@ -1,7 +1,4 @@
--- Name: FeaturedRotation.spec.luau
--- Author: Jack C.
 -- Description: Spec for the featured rotation schedule: one entry per period, agreement across servers from absolute time, countdowns, and discounts that round in the player's favour.
--- Created: 2026-08-12
 
 --!strict
 

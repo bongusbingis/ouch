@@ -1,7 +1,4 @@
--- Name: Runner.luau
--- Author: Jack C.
 -- Description: Bootstraps the in-place test suite, running every spec module under the tests folder and returning a plain summary table for the cloud task and the Studio command bar.
--- Created: 2026-07-16
 
 --!strict
 

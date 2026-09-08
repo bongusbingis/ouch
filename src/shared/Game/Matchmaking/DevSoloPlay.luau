@@ -1,7 +1,4 @@
--- Name: DevSoloPlay.luau
--- Author: Jack C.
 -- Description: Developer-only gate shared by the lobby's hidden solo-play path and the arena's match skip, checking group rank so either server can authorize a request only a tester may make.
--- Created: 2026-08-20
 
 --!strict
 

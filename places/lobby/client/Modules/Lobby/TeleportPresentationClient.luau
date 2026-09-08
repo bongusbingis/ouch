@@ -1,7 +1,4 @@
--- Name: TeleportPresentationClient.luau
--- Author: Jack C.
 -- Description: Mounts the teleport loading screen the lobby shows while a party is being sent to the arena, and reports back when it is on screen.
--- Created: 2026-08-24
 
 --!strict
 

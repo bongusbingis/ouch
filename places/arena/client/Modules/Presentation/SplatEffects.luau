@@ -1,7 +1,4 @@
--- Name: SplatEffects.luau
--- Author: Jack C.
 -- Description: Spawns the world-space paint splat at the impact point of a dodgeball elimination, colored from the thrower's equipped ball cosmetic and deduplicated against repeated broadcasts.
--- Created: 2026-07-18
 
 --!strict
 

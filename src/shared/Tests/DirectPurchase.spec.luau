@@ -1,7 +1,4 @@
--- Name: DirectPurchase.spec.luau
--- Author: Jack C.
 -- Description: Spec for direct cosmetic purchases: pricing from rarity, refusal of grant-only and always-available items, ownership checked before affordability, and a deterministic catalog.
--- Created: 2026-08-12
 
 --!strict
 

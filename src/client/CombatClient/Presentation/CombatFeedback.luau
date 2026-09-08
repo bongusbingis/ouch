@@ -1,7 +1,4 @@
--- Name: CombatFeedback.luau
--- Author: Jack C.
 -- Description: Plays the short local confirmation feedback for combat inputs: haptic pulses, charge cues, and 2D audio for throws, catches, and blocked actions.
--- Created: 2026-08-22
 
 --!strict
 

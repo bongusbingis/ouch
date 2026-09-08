@@ -1,7 +1,4 @@
--- Name: SettingsRegistry.luau
--- Author: Jack C.
 -- Description: The single declarative list of every setting in the game -- its stable id, control type, place scope, and default -- so a new setting is one entry here rather than hand-built UI, input handling, and persistence wiring.
--- Created: 2026-08-25
 
 --!strict
 

@@ -1,7 +1,9 @@
 -- Server movement rejection restores the accepted pose without refreshing exploitable movement credit.
 --!nonstrict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Guard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
+local Guard = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("MovementGuard")
+)
 return function()
 	describe("Movement acceptance", function()
 		local model, root, wall

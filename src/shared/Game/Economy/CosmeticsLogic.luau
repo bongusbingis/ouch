@@ -1,7 +1,4 @@
--- Name: CosmeticsLogic.luau
--- Author: Jack C.
 -- Description: Pure catalog composition, atomic ownership and equip validation shared by the server and storefront.
--- Created: 2026-07-13
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: LoadingScreen.luau
--- Author: Jack C.
 -- Description: The full loading screen: progress, status copy, rotating tips, and the retry and continue actions, rendered purely from the props its adapter supplies.
--- Created: 2026-08-24
 
 --!strict
 

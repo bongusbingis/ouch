@@ -1,7 +1,4 @@
--- Name: BallService.luau
--- Author: Jack C.
 -- Description: The only creator of ball instances: clones the Studio-authored default ball into the world balls folder, grants held balls to match entrants, seeds their sim attributes, and handles recovery and timed ground spawns.
--- Created: 2026-07-13
 
 --!strict
 

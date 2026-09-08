@@ -65,6 +65,21 @@ local function overlaps(positionA: Vector2, sizeA: Vector2, positionB: Vector2, 
 		and positionA.Y + sizeA.Y > positionB.Y
 end
 
+local function landscapePanels()
+	local config = table.clone(SPLASH_PANELS)
+	config.DailyMinHeightPx = 116
+	config.Landscape = table.clone(config.Landscape)
+	config.Landscape.ActionsReservePx = 252
+	config.Landscape.ShortTopPx = 80
+	config.Landscape.ShortBottomPx = 70
+	config.Season = table.clone(config.Season)
+	config.Season.ShortHeightScale = 0.19
+	config.Season.ShortAspectRatio = 4
+	config.Quests = table.clone(config.Quests)
+	config.Quests.ShortHeightScale = 0.4
+	return config
+end
+
 T.describe("Inset coordinate conversion", function()
 	T.it("restores full-screen height when engine rectangles start above the Core UI origin", function()
 		local rect = ResponsiveLayout.insetRect(
@@ -97,6 +112,56 @@ T.describe("Inset coordinate conversion", function()
 end)
 
 T.describe("Responsive UI layout", function()
+	T.it("keeps desktop quests clear of the full action stack across the short-layout boundary", function()
+		local config = landscapePanels()
+		for _, size in
+			{
+				Vector2.new(820, 501),
+				Vector2.new(1158, 520),
+				Vector2.new(1158, 600),
+				Vector2.new(1158, 725),
+				Vector2.new(1920, 1080),
+			}
+		do
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local actionsTop = size.Y - 252
+			T.expect(layout.quests.position.Y + layout.quests.size.Y <= actionsTop):toBeTruthy()
+			T.expect(layout.quests.position.Y >= layout.season.position.Y + layout.season.size.Y + config.GapPx)
+				:toBeTruthy()
+			T.expect(layout.quests.size.Y >= 44):toBeTruthy()
+		end
+	end)
+
+	T.it("applies the desktop action reserve only after the short-landscape breakpoint", function()
+		local config = landscapePanels()
+		local unreserved = landscapePanels()
+		unreserved.Landscape.ActionsReservePx = 0
+		for _, size in { Vector2.new(666, 258), Vector2.new(750, 303), Vector2.new(820, 499), Vector2.new(820, 500) } do
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local original = ResponsiveLayout.splashPanels(size, unreserved, 1, 500)
+			for _, name in { "daily", "season", "quests" } do
+				T.expect(layout[name].position.Y):toEqual(original[name].position.Y)
+				T.expect(layout[name].size.Y):toEqual(original[name].size.Y)
+			end
+			T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 70):toBeTruthy()
+		end
+		local size = Vector2.new(820, 501)
+		local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+		local original = ResponsiveLayout.splashPanels(size, unreserved, 1, 500)
+		T.expect(original.quests.position.Y + original.quests.size.Y > size.Y - 252):toBeTruthy()
+		T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252):toBeTruthy()
+	end)
+
+	T.it("preserves full quest panel height when the desktop action stack already has room", function()
+		local config = landscapePanels()
+		local spec = { Portrait = config.Quests, Landscape = config.Quests }
+		local size = Vector2.new(1920, 1080)
+		local preferred = ResponsiveLayout.panelSize(size, spec, 1, 500)
+		local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+		T.expect(layout.quests.size.Y):toEqual(preferred.Y)
+		T.expect(layout.quests.size.X):toEqual(preferred.X)
+	end)
+
 	T.it("uses short landscape dimensions without changing the portrait branch", function()
 		local spec = {
 			Portrait = INVENTORY_PANEL.Portrait,
@@ -231,6 +296,23 @@ T.describe("Responsive UI layout", function()
 end)
 
 T.describe("Phone progression readability", function()
+	T.it("gives the short progression stack the action-safe column with room to discover quests", function()
+		local config = landscapePanels()
+		for _, size in { Vector2.new(666, 258), Vector2.new(666, 316), Vector2.new(750, 303), Vector2.new(820, 500) } do
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(layout.progressStack)
+			T.expect(stack.position.Y):toEqual(layout.season.position.Y)
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - config.Landscape.ShortBottomPx)
+			T.expect(stack.position.X >= 0 and stack.position.X + stack.size.X <= size.X):toEqual(true)
+			T.expect(stack.size.X - config.GapPx * 2 >= layout.season.size.X):toEqual(true)
+			T.expect(stack.size.Y >= layout.season.size.Y + config.GapPx * 1.5 + 36):toEqual(true)
+		end
+	end)
+	T.it("leaves desktop and portrait progression unstacked", function()
+		for _, size in { Vector2.new(820, 501), Vector2.new(1158, 725), Vector2.new(390, 844) } do
+			T.expect(ResponsiveLayout.splashPanels(size, landscapePanels(), 1, 500).progressStack):toBeNil()
+		end
+	end)
 	T.it("reserves a full quest title and readable daily amounts in portrait", function()
 		local layout = ResponsiveLayout.splashPanels(Vector2.new(374, 618), SPLASH_PANELS, PORTRAIT_MAX_ASPECT, 500)
 		T.expect(layout.quests.size.Y - 56 >= 42):toEqual(true)

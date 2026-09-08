@@ -1,7 +1,4 @@
--- Name: DailyRewardLogic.luau
--- Author: Jack C.
 -- Description: Pure daily reward rules: UTC-day gating, cycle progression without streak reset, and client payload construction, with time always passed in.
--- Created: 2026-09-01
 
 --!strict
 

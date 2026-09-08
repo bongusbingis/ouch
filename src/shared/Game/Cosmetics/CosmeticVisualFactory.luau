@@ -1,7 +1,4 @@
--- Name: CosmeticVisualFactory.luau
--- Author: Jack C.
 -- Description: Builds the visual instance for a cosmetic by cloning its authored MeshPart, the shared path used by both world rendering and inventory previews.
--- Created: 2026-08-16
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: Server.server.luau
--- Author: Jack C.
 -- Description: Lobby server entry point for player lifecycle: loads and saves profiles and starts the shared analytics, config, cosmetics, character color, and economy services.
--- Created: 2026-07-12
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Modules = script:WaitForChild("Modules")
 local _ = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
+local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local CosmeticsService = require(Modules:WaitForChild("CosmeticsService"))
@@ -21,16 +19,7 @@ local QuestService = require(Modules:WaitForChild("QuestService"))
 local LobbyCombatTest = require(Modules:WaitForChild("Debug"):WaitForChild("LobbyCombatTest"))
 
 ConfigLiveService.start({
-	modules = {
-		GameModes = require(
-			ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes")
-		),
-		Matchmaking = require(
-			ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config")
-		),
-		Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop")),
-		Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates")),
-	},
+	modules = LiveConfig.loadModules("lobby"),
 })
 AnalyticsService.start()
 CosmeticsService.start()

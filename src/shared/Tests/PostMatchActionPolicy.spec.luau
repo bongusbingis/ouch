@@ -1,7 +1,4 @@
--- Name: PostMatchActionPolicy.spec.luau
--- Author: Jack C.
 -- Description: Spec for the reveal gate, leader-only party actions, and non-leader self-separation authorization.
--- Created: 2026-08-31
 
 --!strict
 

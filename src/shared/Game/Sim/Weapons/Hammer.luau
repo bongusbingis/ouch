@@ -1,7 +1,4 @@
--- Name: Hammer.luau
--- Author: Jack C.
 -- Description: The inflatable hammer weapon kit: a cooldown, active dash, and recovery phase machine plus the closest-target-in-front hit resolution and assisted swing turning.
--- Created: 2026-07-13
 
 --!strict
 

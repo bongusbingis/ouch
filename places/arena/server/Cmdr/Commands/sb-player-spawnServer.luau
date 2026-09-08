@@ -1,7 +1,4 @@
--- Name: sb-player-spawnServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-player-spawn, teleporting each targeted player to an authored arena spawn through the arena service.
--- Created: 2026-07-15
 
 --!strict
 
@@ -13,6 +10,6 @@ local MatchService = require(Server:WaitForChild("Modules"):WaitForChild("MatchS
 
 return function(_context: any, targets: { Player }): string
 	return CommandUtil.runForPlayers(targets, function(player)
-		return MatchService.teleportToSpawnForTesting(player)
+		return MatchService.teleportToSpawnForAdmin(player)
 	end)
 end

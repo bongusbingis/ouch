@@ -1,7 +1,4 @@
--- Name: DailyRewardService.luau
--- Author: Jack C.
 -- Description: Server owner of daily reward state: validates and grants one claim per UTC day, advancing through a 7-day cycle without streak reset, and pushes state changes to the client.
--- Created: 2026-09-01
 
 --!strict
 

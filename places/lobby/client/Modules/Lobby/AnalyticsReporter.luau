@@ -1,7 +1,4 @@
--- Name: AnalyticsReporter.luau
--- Author: Jack C.
 -- Description: Re-export of the shared UI analytics service so lobby client modules can require it from their own tree.
--- Created: 2026-08-18
 
 --!strict
 

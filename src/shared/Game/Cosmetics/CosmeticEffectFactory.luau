@@ -1,7 +1,4 @@
--- Name: CosmeticEffectFactory.luau
--- Author: Jack C.
 -- Description: Resolves a cosmetic effect id to its authored particle template or registered script effect and plays it at a world location, the single path both the arena driver and the onboarding flow use.
--- Created: 2026-08-29
 
 --!strict
 

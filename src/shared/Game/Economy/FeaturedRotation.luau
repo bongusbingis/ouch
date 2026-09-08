@@ -1,7 +1,4 @@
--- Name: FeaturedRotation.luau
--- Author: Jack C.
 -- Description: Pure featured-slot schedule derived from absolute time so every client and server agrees on the current entry, its discounted price, and when it rotates.
--- Created: 2026-08-12
 
 --!strict
 

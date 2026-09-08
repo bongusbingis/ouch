@@ -1,7 +1,4 @@
--- Name: HammerGrip.spec.luau
--- Author: Jack C.
 -- Description: Spec for the hammer grip solver: upright grips for each dominant mesh axis and rejection of ambiguous dimensions.
--- Created: 2026-07-25
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: NotificationModal.luau
--- Author: Jack C.
 -- Description: The shared notification and confirmation modal, rendering a title, message, and action buttons for whatever the notification context has queued.
--- Created: 2026-08-17
 
 --!strict
 
@@ -20,6 +17,7 @@ local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
+local Palette = UIConfig.ProgressionStyle
 
 export type ButtonDefinition = {
 	Color: "Red" | "Blue",
@@ -161,6 +159,12 @@ return function(props: Props)
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 2,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = Palette.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			Frame = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -174,15 +178,17 @@ return function(props: Props)
 				HostName = "Description",
 				Wrapped = true,
 				MaxTextSize = 26,
-				MeasurementFont = Enum.Font.Highway,
+				MeasurementFont = UIConfig.Text.BodyFont,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+					Font = UIConfig.Text.BodyFont,
 					Position = UDim2.fromScale(0.5, 0.34),
 					Size = UDim2.new(0.9, 0, 0, math.max(30, panelSize.Y * 0.65 - 74)),
 					Text = request.Description,
 					TextWrapped = true,
+					TextStrokeColor3 = Palette.Ink,
+					TextStrokeTransparency = 0.35,
 					TextColor3 = Color3.new(1, 1, 1),
 					TextYAlignment = Enum.TextYAlignment.Top,
 					ZIndex = 2,

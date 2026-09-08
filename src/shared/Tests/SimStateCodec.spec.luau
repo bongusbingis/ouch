@@ -1,7 +1,4 @@
--- Name: SimStateCodec.spec.luau
--- Author: Jack C.
 -- Description: Spec for the simulation state codec: velocity, equipped weapon, and hammer state surviving encode and decode, and the equipped weapon surviving the full decode-step-encode loop.
--- Created: 2026-07-13
 
 --!strict
 
@@ -11,7 +8,13 @@ local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimStateCodec = require(script.Parent.Parent.Game.Adapters.SimStateCodec)
 local WeaponRegistry = require(script.Parent.Parent.Game.Sim.WeaponRegistry)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
-local MockWorld = require(script.Parent.MockWorld)
+local MockWorld = require(
+	script.Parent.Parent.Parent.Parent
+		:WaitForChild("ServerStorage")
+		:WaitForChild("Tests")
+		:WaitForChild("Helpers")
+		:WaitForChild("MockWorld")
+)
 local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)
 
 type FakeInstance = {

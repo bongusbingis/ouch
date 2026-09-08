@@ -1,7 +1,4 @@
--- Name: DailyRewardModal.story.luau
--- Author: Jack C.
 -- Description: Studio story for the daily reward modal's claimable and already-claimed presentations.
--- Created: 2026-09-05
 
 --!strict
 

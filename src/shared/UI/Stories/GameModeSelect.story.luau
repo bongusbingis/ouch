@@ -1,7 +1,4 @@
--- Name: GameModeSelect.story.luau
--- Author: Jack C.
 -- Description: Studio story previewing the game mode ballot with fixed vote snapshots.
--- Created: 2026-08-17
 
 --!strict
 

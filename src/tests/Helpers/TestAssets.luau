@@ -1,7 +1,4 @@
--- Name: TestAssets.luau
--- Author: Jack C.
 -- Description: Fail-fast lookups for Studio-authored assets inside specs, surfacing a missing asset as a named failure instead of hanging the cloud task.
--- Created: 2026-07-16
 
 --!strict
 

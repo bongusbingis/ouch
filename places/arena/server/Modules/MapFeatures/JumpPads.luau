@@ -1,7 +1,4 @@
--- Name: JumpPads.luau
--- Author: Jack C.
 -- Description: Map feature kit for trampolines: launches players who jump from or fall fast onto an authored pad, cancelling part of gravity for the floaty arc and broadcasting the impulse that drives the client squash effect.
--- Created: 2026-08-19
 
 --!strict
 
@@ -13,7 +10,9 @@ local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
-local MovementGuard = require(ReplicatedStorage.Shared.Game.Adapters.MovementGuard)
+local MovementGuard = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("MovementGuard")
+)
 
 local JumpPads = {}
 

@@ -1,7 +1,4 @@
--- Name: Gestures.luau
--- Author: Jack C.
 -- Description: Pure touch-lifecycle classifier that turns one finger's event stream into a tap, hold, charged release, drag, or swipe using plain numbers so it can be tested headlessly.
--- Created: 2026-08-19
 
 --!strict
 

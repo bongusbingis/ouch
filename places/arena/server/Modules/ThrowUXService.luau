@@ -1,7 +1,4 @@
--- Name: ThrowUXService.luau
--- Author: Jack C.
 -- Description: Serves the throw onboarding flag from the player's profile so the client knows whether the first-time swipe-throw prompt still needs to be shown, and records when it has been learned.
--- Created: 2026-08-22
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: CombatCamera.luau
--- Author: Jack C.
 -- Description: Owns combat camera behavior and mouse cursor ownership: locks the camera for aiming, suppresses it while charging or when a menu asks for the cursor, and notifies listeners when that state changes.
--- Created: 2026-08-20
 
 --!strict
 
@@ -128,7 +125,7 @@ function CombatCamera.releaseCursor(reason: string)
 	notify()
 end
 
-function CombatCamera.onChanged(listener: (boolean) -> ()): () -> ()
+function CombatCamera.subscribe(listener: (boolean) -> ()): () -> ()
 	table.insert(listeners, listener)
 	listener(isActive())
 	return function()

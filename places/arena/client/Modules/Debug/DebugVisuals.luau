@@ -1,7 +1,4 @@
--- Name: DebugVisuals.luau
--- Author: Jack C.
 -- Description: Developer-only on-screen debug drawing for combat: renders aim cones, soft-lock targets, predicted ball trajectories, bounce normals, and arm-pose state as temporary world lines and shapes, gated behind the debug config flags.
--- Created: 2026-07-13
 
 --!strict
 

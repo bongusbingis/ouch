@@ -1,7 +1,4 @@
--- Name: AnimatedButton.luau
--- Author: Jack C.
--- Description: The shared button component: hover, press, and release motion, sound and haptic feedback, and gamepad selection handling, used by every screen instead of raw buttons.
--- Created: 2026-08-17
+-- The button owns a stable layout and hitbox; its face and foreground share one animated visual.
 
 --!strict
 
@@ -14,6 +11,7 @@ local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
+local Selection = require(script.Parent.Parent.Services.Selection)
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local c = React.createElement
@@ -68,7 +66,17 @@ return function(props: Props)
 	local visualRotation = styles.Rotation:map(function(value: number)
 		return value + (props.Native.Rotation or 0)
 	end)
-	local children = merge(props.children, {
+	local layoutChildren = {}
+	local visualChildren = {}
+	for key, child in props.children or {} do
+		local childType = if React.isValidElement(child) then child.type else nil
+		if childType == "UIAspectRatioConstraint" or childType == "UISizeConstraint" or childType == "UIScale" then
+			layoutChildren[key] = child
+		else
+			visualChildren[key] = child
+		end
+	end
+	local children = merge(layoutChildren, {
 		SelectionImage = c("Frame", {
 			ref = selectionImageRef,
 			BackgroundTransparency = 1,
@@ -86,29 +94,37 @@ return function(props: Props)
 				Transparency = if focused and enabled then 0 else 1,
 			}),
 		}),
-		InteractionVisual = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = props.Native.Image,
-			ImageColor3 = props.Native.ImageColor3,
-			ImageRectOffset = props.Native.ImageRectOffset,
-			ImageRectSize = props.Native.ImageRectSize,
-			ImageTransparency = props.Native.ImageTransparency,
-			Position = UDim2.fromScale(0.5, 0.5),
-			ResampleMode = props.Native.ResampleMode,
-			Rotation = visualRotation,
-			ScaleType = props.Native.ScaleType,
-			Size = UDim2.fromScale(1, 1),
-			SliceCenter = props.Native.SliceCenter,
-			SliceScale = props.Native.SliceScale,
-			TileSize = props.Native.TileSize,
-			ZIndex = (props.Native.ZIndex or 1) - 1,
-		}, {
-			Visual = props.Visual,
-			InteractionScale = c("UIScale", {
-				Scale = styles.Scale,
-			}),
-		}),
+		InteractionVisual = c(
+			"ImageLabel",
+			{
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = props.Native.BackgroundColor3,
+				BackgroundTransparency = props.Native.BackgroundTransparency,
+				BorderColor3 = props.Native.BorderColor3,
+				BorderMode = props.Native.BorderMode,
+				BorderSizePixel = props.Native.BorderSizePixel,
+				Image = props.Native.Image,
+				ImageColor3 = props.Native.ImageColor3,
+				ImageRectOffset = props.Native.ImageRectOffset,
+				ImageRectSize = props.Native.ImageRectSize,
+				ImageTransparency = props.Native.ImageTransparency,
+				Position = UDim2.fromScale(0.5, 0.5),
+				ResampleMode = props.Native.ResampleMode,
+				Rotation = visualRotation,
+				ScaleType = props.Native.ScaleType,
+				Size = UDim2.fromScale(1, 1),
+				SliceCenter = props.Native.SliceCenter,
+				SliceScale = props.Native.SliceScale,
+				TileSize = props.Native.TileSize,
+				ZIndex = props.Native.ZIndex or 1,
+			},
+			merge(visualChildren, {
+				Visual = props.Visual,
+				InteractionScale = c("UIScale", {
+					Scale = styles.Scale,
+				}),
+			})
+		),
 	})
 	React.useEffect(function()
 		local button: ImageButton? = buttonRef.current
@@ -169,6 +185,8 @@ return function(props: Props)
 		merge(props.Native, {
 			ref = buttonRef,
 			Active = enabled,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
 			ImageTransparency = 1,
 			Selectable = enabled,
 			Rotation = 0,
@@ -193,7 +211,19 @@ return function(props: Props)
 				end
 				else nil,
 			[React.Event.InputBegan] = if enabled
-				then function(_button, input)
+				then function(button, input)
+					local pointerInput = input.UserInputType == Enum.UserInputType.MouseButton1
+						or input.UserInputType == Enum.UserInputType.Touch
+					local selected = GuiService.SelectedObject
+					if pointerInput and selected then
+						local screen = button:FindFirstAncestorWhichIsA("ScreenGui")
+						if screen and selected:IsDescendantOf(screen) then
+							GuiService.SelectedObject = nil
+							if selected == button then
+								setHovering(input.UserInputType == Enum.UserInputType.MouseButton1)
+							end
+						end
+					end
 					if isPressInput(input) then
 						setPressing(true)
 					end
@@ -213,6 +243,8 @@ return function(props: Props)
 				end
 				if props.OnSelectionGained then
 					props.OnSelectionGained(button)
+				else
+					Selection.scrollIntoView(button)
 				end
 			end,
 			[React.Event.SelectionLost] = function()

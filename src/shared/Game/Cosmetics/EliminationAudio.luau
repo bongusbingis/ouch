@@ -1,7 +1,4 @@
--- Name: EliminationAudio.luau
--- Author: Jack C.
 -- Description: Pure resolution of an elimination event and the eliminator's equipped sound cosmetic into configured primary and fallback audio cues.
--- Created: 2026-08-31
 
 --!strict
 

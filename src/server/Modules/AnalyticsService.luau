@@ -1,7 +1,4 @@
--- Name: AnalyticsService.luau
--- Author: Jack C.
 -- Description: Central analytics reporting: funnel steps, onboarding progression, economy and custom events, match and combat tallies, and periodic performance gauges, all deduplicated and dimensioned before being sent.
--- Created: 2026-07-22
 
 --!strict
 
@@ -34,8 +31,13 @@ local AssistResolver = require(
 )
 
 local AnalyticsService = {}
-local AnalyticsFields = require(ReplicatedStorage.Shared.Game.Economy.AnalyticsFields)
-local ShopConfig = require(ReplicatedStorage.Config.Economy.Shop)
+local AnalyticsFields = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Economy")
+		:WaitForChild("AnalyticsFields")
+)
+local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 
 type OnboardingProgress = {
 	spawned: boolean,

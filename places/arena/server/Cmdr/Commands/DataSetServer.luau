@@ -1,7 +1,4 @@
--- Name: DataSetServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-data-set, writing an absolute value to the named profile field through PlayerData for each targeted player.
--- Created: 2026-07-15
 
 --!strict
 
@@ -14,7 +11,7 @@ local PlayerData = require(Server:WaitForChild("Modules"):WaitForChild("PlayerDa
 
 return function(_context: any, players: { Player }, field: string, value: number): string
 	local result = CommandUtil.runForPlayers(players, function(player)
-		local ok = PlayerData.setFieldForTesting(player, field, value)
+		local ok = PlayerData.setFieldForAdmin(player, field, value)
 		return ok, if ok then nil else "profile_not_ready"
 	end)
 	return `Set {field} to {value} | {result}`

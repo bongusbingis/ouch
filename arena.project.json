@@ -4,6 +4,11 @@
   "servePort": 34872,
   "servePlaceIds": [121997450145716],
   "blockedPlaceIds": [130584867985467],
+  "globIgnorePaths": [
+    "src/shared/Tests/**",
+    "src/shared/UI/Stories/**",
+    "places/lobby/client/UI/Stories/**"
+  ],
   "tree": {
     "$className": "DataModel",
 

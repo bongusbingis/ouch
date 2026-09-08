@@ -1,7 +1,4 @@
--- Name: OnboardingHit.luau
--- Author: Jack C.
 -- Description: Pure hit predicates for first-session training targets. Mirrors the geometry the real weapons use -- the hammer's forward/lateral/height cone and a swept segment for a thrown ball -- so a training dummy is judged by the same shape as a live opponent without having to be a simulation entity.
--- Created: 2026-08-26
 
 --!strict
 

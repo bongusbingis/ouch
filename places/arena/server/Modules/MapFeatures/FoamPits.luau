@@ -1,7 +1,4 @@
--- Name: FoamPits.luau
--- Author: Jack C.
 -- Description: Map feature kit for foam pits: applies a named movement-speed modifier while a player's root is inside an authored pit volume and clears it on exit.
--- Created: 2026-08-18
 
 --!strict
 

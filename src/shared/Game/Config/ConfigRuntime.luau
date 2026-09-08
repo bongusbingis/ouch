@@ -1,7 +1,4 @@
--- Name: ConfigRuntime.luau
--- Author: Jack C.
 -- Description: Applies validated overrides onto the live config tables, capturing each leaf's shipped value on first override and restoring it exactly when the override disappears.
--- Created: 2026-08-18
 
 --!strict
 
@@ -19,7 +16,7 @@ function ConfigRuntime.register(name: string, moduleTable: any)
 	modules[name] = moduleTable
 end
 
-function ConfigRuntime.onChanged(listener: ({ [string]: any }) -> ())
+function ConfigRuntime.subscribe(listener: ({ [string]: any }) -> ())
 	table.insert(listeners, listener)
 end
 

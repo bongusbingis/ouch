@@ -1,7 +1,4 @@
--- Name: ConfigReplication.luau
--- Author: Jack C.
 -- Description: Client half of live config: reads the replicated override projection, re-validates every value, and applies it onto the local config tables as the revision changes.
--- Created: 2026-08-18
 
 --!strict
 

@@ -2,10 +2,17 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ShopService = require(game:GetService("ServerScriptService").Server.Modules.ShopService)
-local Shop = require(ReplicatedStorage.Config.Economy.Shop)
-local FeaturedRotation = require(ReplicatedStorage.Shared.Game.Economy.FeaturedRotation)
-local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
+local FeaturedRotation = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Economy")
+		:WaitForChild("FeaturedRotation")
+)
+local CosmeticsLogic = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
+)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 return function()
 	describe("Shop migration and policy projection", function()

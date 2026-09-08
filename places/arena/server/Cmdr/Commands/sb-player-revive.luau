@@ -1,7 +1,4 @@
--- Name: sb-player-revive.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-player-revive: revives eliminated players through the match respawn flow.
--- Created: 2026-07-15
 
 --!strict
 

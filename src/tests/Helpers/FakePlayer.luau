@@ -1,7 +1,4 @@
--- Name: FakePlayer.luau
--- Author: Jack C.
 -- Description: Player-shaped test doubles for service seams that only read the player surface, since real players cannot exist in the cloud execution environment.
--- Created: 2026-07-16
 
 --!strict
 

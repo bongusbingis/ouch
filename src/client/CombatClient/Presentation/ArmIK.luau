@@ -1,7 +1,4 @@
--- Name: ArmIK.luau
--- Author: Jack C.
 -- Description: Procedurally poses the local character's throwing arm toward the aim direction with a spring-driven IK chain, blending against the authored animation by a weight derived from charge state.
--- Created: 2026-08-20
 
 --!strict
 

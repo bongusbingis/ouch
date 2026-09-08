@@ -1,7 +1,4 @@
--- Name: TeleportRetryCoordinator.luau
--- Author: Jack C.
 -- Description: Shared teleport driver that classifies failures, retries the transient ones with backoff, reports status to the client, and exposes retry and stay actions after a final failure.
--- Created: 2026-08-24
 
 --!strict
 

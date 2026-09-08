@@ -1,7 +1,4 @@
--- Name: MonetizationConfig.spec.luau
--- Author: Jack C.
 -- Description: Spec for the shipped monetization configuration: active products mapping into receipt processing, a price ladder with a cosmetic option at every tier, and nothing sold that grants nothing.
--- Created: 2026-07-22
 
 --!strict
 

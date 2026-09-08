@@ -1,7 +1,4 @@
--- Name: BattlePassService.luau
--- Author: Jack C.
 -- Description: Server owner of season pass state: adopts the active season, accrues season XP, gates and grants premium ownership idempotently, validates claims, and settles what is owed at a season rollover.
--- Created: 2026-08-12
 
 --!strict
 
@@ -21,7 +18,12 @@ local BattlePassLogic = require(
 		:WaitForChild("BattlePassLogic")
 )
 local PlayerData = require(script.Parent.PlayerData)
-local SeasonCosmetics = require(ReplicatedStorage.Shared.Game.Progression.SeasonCosmetics)
+local SeasonCosmetics = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("SeasonCosmetics")
+)
 local RewardService = require(script.Parent.RewardService)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 

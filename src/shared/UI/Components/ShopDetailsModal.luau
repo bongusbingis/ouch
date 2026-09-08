@@ -5,12 +5,14 @@
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
 
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ReactSpring = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react-spring"))
-local UIConfig = require(ReplicatedStorage.Config.Interface.UI)
-local InventoryConfig = require(ReplicatedStorage.Config.Cosmetics.Inventory)
-local ShopConfig = require(ReplicatedStorage.Config.Economy.Shop)
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local InventoryConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
+local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
@@ -20,23 +22,26 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
-local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
-local CosmeticsLogic = require(ReplicatedStorage.Shared.Game.Economy.CosmeticsLogic)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local CosmeticsLogic = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
+)
 local Selection = require(script.Parent.Parent.Services.Selection)
+local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local ScrollFrame = require(script.Parent.ScrollFrame)
 local c = React.createElement
 local colors = UIConfig.ProgressionStyle
 
 local function label(text, position, size, maxSize, color, heading, alignment, wrapped, order)
 	return c(ResponsiveText, {
-		MeasurementFont = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
+		MeasurementFont = if heading then Enum.Font.LuckiestGuy else UIConfig.Text.BodyFont,
 		MaxTextSize = maxSize,
 		Wrapped = wrapped,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
-			Font = if heading then Enum.Font.LuckiestGuy else Enum.Font.SourceSansBold,
+			Font = if heading then Enum.Font.LuckiestGuy else UIConfig.Text.BodyFont,
 			Text = text,
 			TextWrapped = wrapped,
 			TextColor3 = color or Color3.new(1, 1, 1),
@@ -44,6 +49,12 @@ local function label(text, position, size, maxSize, color, heading, alignment, w
 			ZIndex = 105,
 			LayoutOrder = order,
 		},
+	}, {
+		Outline = c("UIStroke", {
+			Color = colors.Ink,
+			Thickness = if heading then 0.045 else 0.035,
+			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+		}),
 	})
 end
 
@@ -91,8 +102,14 @@ local function ItemDetails(props)
 			return
 		end
 		local previous = GuiService.SelectedObject
+		local panel = panelRef.current
 		return function()
-			if Selection.isSelectable(previous) then
+			local selected = GuiService.SelectedObject
+			if
+				DeviceClass.current() == "Gamepad"
+				and (selected == nil or (panel and selected:IsDescendantOf(panel)))
+				and Selection.isSelectable(previous)
+			then
 				GuiService.SelectedObject = previous
 			end
 		end
@@ -105,10 +122,13 @@ local function ItemDetails(props)
 		local queued = false
 		local function focus()
 			queued = false
-			if not active then
+			if not active or DeviceClass.current() ~= "Gamepad" then
 				return
 			end
 			local selected = GuiService.SelectedObject
+			if selected and not selected:IsDescendantOf(Players.LocalPlayer.PlayerGui) then
+				return
+			end
 			local panel = panelRef.current
 			local ancestor: Instance? = panel
 			while ancestor do
@@ -136,16 +156,22 @@ local function ItemDetails(props)
 				end
 			end
 		end
-		local connection = GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(function()
+		local function scheduleFocus()
 			if not queued then
 				queued = true
 				task.delay(0, focus)
 			end
+		end
+		local connection = GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(scheduleFocus)
+		local disconnect = DeviceClass.observe(function(input)
+			if input == "Gamepad" then
+				scheduleFocus()
+			end
 		end)
-		task.defer(focus)
 		return function()
 			active = false
 			connection:Disconnect()
+			disconnect()
 		end
 	end, { card, props.FocusEnabled })
 	if card == nil then
@@ -160,6 +186,23 @@ local function ItemDetails(props)
 	local hasBonks = card.bonksPrice ~= nil and not card.owned
 	local hasRobux = not card.owned and (card.productId ~= nil or card.passId ~= nil) and card.robuxPrice ~= nil
 	local quantities = if isCrate and hasBonks then card.openQuantities or { 1 } else if hasBonks then { 1 } else {}
+	local balance = card.bonksAvailable or 0
+	local minimumPrice = math.huge
+	for _, quantity in quantities do
+		minimumPrice = math.min(minimumPrice, card.bonksPrice * quantity)
+	end
+	local shortfall = if minimumPrice < math.huge then math.max(0, minimumPrice - balance) else 0
+	local statusText = if card.pending
+		then (if isCrate then "OPENING…" else "PROCESSING…")
+		else if card.owned
+			then "OWNED"
+			else if card.status == "Loading"
+				then "LOADING PRICE…"
+				else if card.status == "Preview"
+					then "COMING SOON"
+					else if card.status == "Unavailable"
+						then "UNAVAILABLE"
+						else if shortfall > 0 then `NEED {formatNumber(shortfall)} MORE BONKS` else ""
 	local selected = nil
 	for _, outcome in card.odds or {} do
 		if outcome.itemId == selectedId then
@@ -199,7 +242,9 @@ local function ItemDetails(props)
 					setSelectedId(item.itemId)
 				end,
 				Native = {
-					BackgroundColor3 = if selected.preview.itemId == item.itemId then colors.Surface else colors.Ink,
+					BackgroundColor3 = if selected.preview.itemId == item.itemId
+						then colors.Pink
+						else colors.PanelRaised,
 					BorderSizePixel = 0,
 					Size = UDim2.new(1, -8, 0, 44),
 					LayoutOrder = index,
@@ -232,6 +277,7 @@ local function ItemDetails(props)
 	local isEffect = preview
 		and (not isCrate or selected ~= nil)
 		and (preview.category == "ImpactEffectAssets" or preview.category == "ElimEffectAssets")
+	local compactEffect = short and isEffect
 	local previewOwned = preview
 		and (preview.itemId == nil or CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, preview.itemId))
 	local equipped = preview and ((props.Equipped or {})[preview.category] or "") == (preview.itemId or "")
@@ -244,9 +290,15 @@ local function ItemDetails(props)
 	local columns = if portrait then math.min(2, math.max(1, slots)) else math.max(1, slots)
 	local rows = math.max(1, math.ceil(slots / columns))
 	local buttonHeight = if short then 52 else if portrait then 60 else 68
-	local footerCopyHeight = if isCrate then (if short then 23 else 45) else if hasBonks then 30 else 6
-	local footerHeight = rows * (buttonHeight + 6) + footerCopyHeight
+	local summaryHeight = if hasBonks or statusText ~= "" then 26 else 0
+	local guarantee = if isCrate then guaranteeText(card) else ""
+	local guaranteeHeight = if guarantee ~= "" then 23 else 0
+	local ruleHeight = if isCrate and not short then 20 else 0
+	local footerCopyHeight = summaryHeight + guaranteeHeight + ruleHeight + 4
+	local actionHeight = if slots > 0 then rows * (buttonHeight + 6) else 0
+	local footerHeight = actionHeight + footerCopyHeight
 	local inset = if short then 12 else 16
+	local balanceWidth = if short then 214 else 252
 	local actionWidth = math.min(size.X - inset * 2, columns * (UIConfig.Layout.ShopDetailsActionMaxWidthPx + 8))
 	local bodyTop = if short then 52 else 64
 	local bodyHeight = size.Y - bodyTop - footerHeight - inset
@@ -297,8 +349,8 @@ local function ItemDetails(props)
 				setSelectedId(outcome.itemId)
 			end,
 			Native = {
-				BackgroundColor3 = if chosen then colors.Surface else colors.Ink,
-				BackgroundTransparency = if chosen then 0 else 0.25,
+				BackgroundColor3 = if chosen then colors.Pink else colors.PanelRaised,
+				BackgroundTransparency = 0,
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, if short then 44 else 50),
 				LayoutOrder = index * 2 + 1,
@@ -326,7 +378,7 @@ local function ItemDetails(props)
 				UDim2.fromOffset(12, if short then 23 else 27),
 				UDim2.new(1, -94, 0, 18),
 				14,
-				colors.Muted,
+				colors.White,
 				false
 			),
 			Chance = label(
@@ -344,7 +396,7 @@ local function ItemDetails(props)
 					UDim2.new(1, -80, 0, if short then 23 else 27),
 					UDim2.fromOffset(70, 18),
 					13,
-					colors.Muted,
+					colors.White,
 					false,
 					Enum.TextXAlignment.Right
 				)
@@ -362,6 +414,7 @@ local function ItemDetails(props)
 		local amount = card.bonksPrice * quantity
 		buttons["Open" .. quantity] = c(ShopPriceButton, {
 			ButtonRef = if index == 1 then firstRef else nil,
+			Red = true,
 			Enabled = card.status == "Active"
 				and (card.bonksAvailable or (if card.affordable then amount else 0)) >= amount
 				and not card.pending,
@@ -481,8 +534,8 @@ local function ItemDetails(props)
 				ZIndex = 103,
 			}, {
 				Preview = c("Frame", {
-					BackgroundColor3 = colors.Ink,
-					BackgroundTransparency = 0.35,
+					BackgroundColor3 = colors.PanelRaised,
+					BackgroundTransparency = 0,
 					BorderSizePixel = 0,
 					Size = if portrait then UDim2.new(1, 0, 0, previewHeight) else UDim2.fromScale(0.32, 1),
 					ZIndex = 103,
@@ -490,7 +543,11 @@ local function ItemDetails(props)
 					Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
 					Art = c("Frame", {
 						BackgroundTransparency = 1,
-						Size = if portrait then UDim2.fromScale(0.4, 1) else UDim2.new(1, 0, 0, artHeight),
+						Size = if portrait
+							then UDim2.fromScale(0.4, 1)
+							else if compactEffect
+								then UDim2.new(0.36, 0, 1, -56)
+								else UDim2.new(1, 0, 0, artHeight),
 						ZIndex = 103,
 					}, {
 						Content = c(ShopPreview, {
@@ -499,14 +556,22 @@ local function ItemDetails(props)
 							ZIndex = 103,
 							ColorId = (props.Equipped or {}).CharacterColor,
 							CostumeId = (props.Equipped or {}).CostumeAssets,
+							TextColor = colors.White,
+							TextStroke = 0.045,
 						}),
 					}),
 					Name = label(
 						if selected then selected.displayName else card.displayName,
-						if portrait then UDim2.new(0.43, 0, 0, 8) else UDim2.fromOffset(10, artHeight + 8),
+						if portrait
+							then UDim2.new(0.43, 0, 0, 8)
+							else if compactEffect
+								then UDim2.new(0.36, 8, 0, 4)
+								else UDim2.fromOffset(10, artHeight + 8),
 						if portrait
 							then UDim2.new(0.53, 0, 0, previewHeight - previewFooter - 16)
-							else UDim2.new(1, -20, 0, nameHeight),
+							else if compactEffect
+								then UDim2.new(0.64, -16, 1, -64)
+								else UDim2.new(1, -20, 0, nameHeight),
 						22,
 						nil,
 						false,
@@ -534,7 +599,7 @@ local function ItemDetails(props)
 							if portrait then UDim2.new(0.43, 0, 1, -27) else UDim2.new(0, 10, 1, -32),
 							if portrait then UDim2.new(0.53, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
 							15,
-							colors.Muted,
+							colors.White,
 							false
 						),
 				}),
@@ -551,7 +616,7 @@ local function ItemDetails(props)
 							UDim2.fromScale(0.52, 0),
 							UDim2.new(0.48, -8, 0, 26),
 							15,
-							colors.Muted,
+							colors.White,
 							false,
 							Enum.TextXAlignment.Right
 						),
@@ -563,7 +628,7 @@ local function ItemDetails(props)
 							Position = UDim2.fromOffset(0, 28),
 							Size = UDim2.new(1, 0, 1, -28),
 							ScrollBarThickness = 4,
-							ScrollBarImageColor3 = colors.Cyan,
+							ScrollBarImageColor3 = colors.White,
 							ZIndex = 103,
 						}, contents),
 					})
@@ -638,23 +703,33 @@ local function ItemDetails(props)
 				Size = UDim2.new(1, -inset * 2, 0, footerHeight),
 				ZIndex = 103,
 			}, {
-				Guarantee = if isCrate
+				Status = if statusText ~= ""
 					then label(
-						guaranteeText(card),
+						statusText,
 						UDim2.fromOffset(0, 0),
-						UDim2.new(1, 0, 0, 23),
+						UDim2.new(1, if hasBonks then -balanceWidth - 12 else 0, 0, summaryHeight),
+						if short then 15 else 18,
+						colors.White,
+						false
+					)
+					else nil,
+				Guarantee = if guarantee ~= ""
+					then label(
+						guarantee,
+						UDim2.fromOffset(0, summaryHeight),
+						UDim2.new(1, 0, 0, guaranteeHeight),
 						17,
 						colors.Yellow,
 						false
 					)
 					else nil,
-				Rule = if isCrate and not short
+				Rule = if ruleHeight > 0
 					then label(
 						"Duplicate items give Bonks. Guarantees update after every open.",
-						UDim2.fromOffset(0, 23),
-						UDim2.new(1, 0, 0, 18),
+						UDim2.fromOffset(0, summaryHeight + guaranteeHeight),
+						UDim2.new(1, 0, 0, ruleHeight),
 						14,
-						colors.Muted,
+						colors.White,
 						false
 					)
 					else nil,
@@ -662,32 +737,30 @@ local function ItemDetails(props)
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
 					Position = UDim2.new(0.5, 0, 0, footerCopyHeight),
-					Size = UDim2.fromOffset(actionWidth, rows * (buttonHeight + 6)),
+					Size = UDim2.fromOffset(actionWidth, actionHeight),
 					ZIndex = 104,
 				}, buttons),
-				Pending = if card.pending
+				BalanceTitle = if hasBonks
 					then label(
-						if isCrate then "OPENING…" else "PROCESSING…",
-						UDim2.fromOffset(0, -20),
-						UDim2.new(1, 0, 0, 20),
+						if short then "BONKS" else "YOUR BONKS",
+						UDim2.new(1, -balanceWidth, 0, 0),
+						UDim2.fromOffset(balanceWidth - 132, summaryHeight),
 						16,
-						colors.Cyan,
-						false,
-						Enum.TextXAlignment.Right
+						colors.White,
+						true
 					)
 					else nil,
-				BalanceTitle = if hasBonks and not isCrate
-					then label("YOUR BONKS", UDim2.new(1, -252, 0, 0), UDim2.fromOffset(120, 25), 16, colors.Ink, true)
-					else nil,
-				Balance = if hasBonks and not isCrate
+				Balance = if hasBonks
 					then c(BonksLabel, {
-						Amount = card.bonksAvailable or 0,
+						Amount = balance,
 						MaxTextSize = 21,
+						TextColor = colors.White,
+						TextStroke = 0.045,
 						Alignment = Enum.HorizontalAlignment.Right,
 						Native = {
 							AnchorPoint = Vector2.new(1, 0),
 							Position = UDim2.fromScale(1, 0),
-							Size = UDim2.fromOffset(132, 25),
+							Size = UDim2.fromOffset(132, summaryHeight),
 							ZIndex = 104,
 						},
 					})

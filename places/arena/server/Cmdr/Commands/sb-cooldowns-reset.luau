@@ -1,7 +1,4 @@
--- Name: sb-cooldowns-reset.luau
--- Author: Jack C.
 -- Description: Cmdr definition for sb-cooldowns-reset: queues a reset of all weapon cooldown and phase state for players.
--- Created: 2026-07-15
 
 --!strict
 

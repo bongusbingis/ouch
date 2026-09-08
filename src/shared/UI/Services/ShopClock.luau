@@ -1,7 +1,4 @@
--- Name: ShopClock.luau
--- Author: Jack C.
 -- Description: Shared ticking clock the storefront countdowns subscribe to, so every timer on screen updates together from one loop.
--- Created: 2026-08-23
 
 --!strict
 

@@ -1,7 +1,4 @@
--- Name: ThrowUXClient.luau
--- Author: Jack C.
 -- Description: Derives the throw HUD state from gestures, charge progress, and cooldowns, including the first-time onboarding prompt, and publishes it for the combat HUD.
--- Created: 2026-08-22
 
 --!strict
 

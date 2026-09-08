@@ -1,7 +1,4 @@
--- Name: ReactRoot.luau
--- Author: Jack C.
 -- Description: Creates and mounts React roots for the game's screens, including detached roots used for previews and stories.
--- Created: 2026-08-20
 
 --!strict
 

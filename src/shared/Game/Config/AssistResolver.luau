@@ -1,7 +1,4 @@
--- Name: AssistResolver.luau
--- Author: Jack C.
 -- Description: Aim-assist device scaling on top of the generic PlayerConfigResolver: turns a resolved 0-1 strength into a per-device strength (a zero device scale reads as off), and re-exports the generic resolve/coerce/bucket so aim consumers keep one import.
--- Created: 2026-08-19
 
 --!strict
 

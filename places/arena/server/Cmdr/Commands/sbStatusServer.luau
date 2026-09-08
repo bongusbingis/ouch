@@ -1,7 +1,4 @@
--- Name: sbStatusServer.luau
--- Author: Jack C.
 -- Description: Server implementation of sb-status, gathering match phase, combat and ball state, world position, profile balances, and equipped cosmetics into one diagnostic dump.
--- Created: 2026-07-15
 
 --!strict
 
@@ -15,14 +12,8 @@ local MatchService = require(Modules:WaitForChild("MatchService"))
 local PlayerData = require(Modules:WaitForChild("PlayerData"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
-local function sortedKeys(values: { [string]: any }): { string }
-	local keys = {}
-	for key in values do
-		table.insert(keys, key)
-	end
-	table.sort(keys)
-	return keys
-end
+local SimUtil =
+	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Sim"):WaitForChild("SimUtil"))
 
 local function positionFor(player: Player): string
 	local character = player.Character
@@ -56,7 +47,7 @@ local function profileFor(player: Player): (string, string)
 	end
 
 	local equips = {}
-	for _, slot in sortedKeys(Cosmetics.Slots) do
+	for _, slot in SimUtil.sortedKeys(Cosmetics.Slots) do
 		table.insert(equips, `{slot}={data.Cosmetics.Equipped[slot] or "-"}`)
 	end
 
@@ -66,7 +57,7 @@ end
 
 return function(context, target: Player?): string
 	local player = target or context.Executor
-	local match = MatchService.stateForTesting()
+	local match = MatchService.stateForAdmin()
 	local profile, equipped = profileFor(player)
 	return table.concat({
 		`{player.Name} ({player.UserId}) team={player:GetAttribute("TeamId") or "-"}`,
