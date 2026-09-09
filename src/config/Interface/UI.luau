@@ -328,6 +328,7 @@ return {
 			},
 			Order = { "More", "Promo", "Crates", "Bonks", "ForYou", "MorePasses", "Rest" },
 		},
+		EmoteWheel = require(script.Parent.EmoteWheel),
 		TopBar = {
 			ShortHeightPx = 72,
 			ShortWidthScale = 0.7,

@@ -154,6 +154,9 @@ local function reconcilePass(player: Player, passId: number): (boolean?, number)
 		return owned, 0
 	end
 	local granted, count = grantConfiguredPass(player, passId)
+	if activeCosmeticsService.refreshEquipAttributes ~= nil then
+		pcall(activeCosmeticsService.refreshEquipAttributes, player)
+	end
 	return if granted then true else nil, count
 end
 

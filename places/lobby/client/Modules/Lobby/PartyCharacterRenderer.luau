@@ -26,6 +26,9 @@ local CosmeticVisualFactory = require(
 local HammerGrip = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("HammerGrip")
 )
+local EmotePlayer = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("EmotePlayer")
+)
 
 local USERNAME_LOOKUP_ATTEMPTS = 3
 local USERNAME_RETRY_DELAY = 1
@@ -542,6 +545,15 @@ function PartyCharacterRenderer:_requestUsername(userId)
 	end)
 end
 
+function PartyCharacterRenderer:PlayEmote(userId, emoteId)
+	local character = self._characters[userId]
+	if character == nil then
+		return
+	end
+	EmotePlayer.stop(character.emoteTrack)
+	character.emoteTrack = EmotePlayer.play(character.animator, emoteId)
+end
+
 function PartyCharacterRenderer:_remove(userId)
 	local character = self._characters[userId]
 	if not character then
@@ -622,7 +634,9 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 			{ characterColorId = characterColorId, costumeId = costumeId },
 			{ live = true }
 		),
+		animator = animator,
 		idleTrack = idleTrack,
+		emoteTrack = nil :: AnimationTrack?,
 		nametag = nametag,
 		usernameLabel = usernameLabel,
 		crownLabel = crownLabel,

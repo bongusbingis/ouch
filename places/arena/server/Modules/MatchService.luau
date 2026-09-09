@@ -138,7 +138,7 @@ local function rememberContestant(player: Player)
 		teamId = playerTeam(player),
 		colorId = player:GetAttribute("Equip_CharacterColor"),
 		costumeId = player:GetAttribute("Equip_CostumeAssets"),
-		emoteId = player:GetAttribute("Equip_EmoteAssets"),
+		emoteId = player:GetAttribute("EmoteSlot_1"),
 		ballId = player:GetAttribute("Equip_BallAssets"),
 		hammerId = player:GetAttribute("Equip_HammerAssets"),
 		contribution = playerMatchElims[PlayerIds.toId(player)] or 0,

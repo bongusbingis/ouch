@@ -85,6 +85,8 @@ local systems = {
 	{ name = "GameAudio", parent = Presentation, combat = true },
 	{ name = "PlayerHighlights", parent = Presentation, method = "start" },
 	{ name = "JumpPadVisuals", parent = Presentation, method = "start" },
+	{ name = "BumperVisuals", parent = Presentation, method = "start" },
+	{ name = "EmotePlayback", parent = Presentation, method = "start" },
 	{
 		name = "FanAirflow",
 		parent = Presentation,

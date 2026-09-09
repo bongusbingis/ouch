@@ -449,6 +449,9 @@ local function CombatMenuContent(props)
 						OnTabChanged = controller.setInventoryTab,
 						OnEquip = controller.equip,
 						OnInspect = controller.inspectInventory,
+						OnLockedSlot = function()
+							CombatMenuClient.navigate("Shop")
+						end,
 					})
 				elseif pageName == "Shop" then
 					return c(ShopPage, {

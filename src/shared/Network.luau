@@ -20,6 +20,9 @@ local definitions = {
 	PartyRequest = "function",
 	PartyPacket = "event",
 	EquipCosmetic = "function",
+	SetEmoteSlot = "function",
+	PlayEmote = "event",
+	EmotePlayed = "event",
 	OpenCrate = "function",
 	AcknowledgeBonksCrate = "event",
 	PurchaseCosmetic = "function",
@@ -65,6 +68,7 @@ local definitions = {
 	SubmitWeaponEquip = "event",
 	CombatSimEvent = "unreliable",
 	JumpPadImpulse = "unreliable",
+	BumperHit = "unreliable",
 	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}

@@ -73,6 +73,16 @@ local OnboardingGestureLayer = require(
 		:WaitForChild("Onboarding")
 		:WaitForChild("OnboardingGestureLayer")
 )
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local EmoteWheel = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Components"):WaitForChild("EmoteWheel")
+)
+local EmoteWheelController = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("EmoteWheelController")
+)
 
 local RunService = game:GetService("RunService")
 local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
@@ -162,6 +172,19 @@ combatRoot:render(React.createElement(React.Fragment, nil, {
 		OnboardingClient = OnboardingClient,
 	}),
 }))
+local emoteContainer = ReactRoot.create("LobbyEmoteRoot", Enum.ScreenInsets.CoreUISafeInsets, 800, true)
+local emoteRoot = ReactRoblox.createRoot(emoteContainer)
+emoteRoot:render(React.createElement(EmoteWheel))
+EmoteWheelController.start({
+	onPlay = function(emoteId)
+		Network.fireServer("PlayEmote", emoteId)
+	end,
+	isEnabled = function()
+		return not OnboardingClient.getSnapshot().active
+			and not LobbyCombatTestClient.getSnapshot().active
+			and Players.LocalPlayer:GetAttribute("EmoteWheelBlocked") ~= true
+	end,
+})
 
 -- The arena's overlay menu, mounted only for the Studio test session so a
 -- developer can switch cosmetics mid-session exactly as they would in a match.
@@ -188,6 +211,9 @@ script.Destroying:Connect(function()
 	container:Destroy()
 	combatRoot:unmount()
 	combatContainer:Destroy()
+	EmoteWheelController.stop()
+	emoteRoot:unmount()
+	emoteContainer:Destroy()
 	partyClient:destroy()
 	unsubscribeBackground()
 	unsubscribeMovement()

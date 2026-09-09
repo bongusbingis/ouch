@@ -19,6 +19,9 @@ local ShopClient = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):W
 local LoadingScreen = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("LoadingScreen"))
 local ReactRoot = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("ReactRoot"))
 local TeleportGui = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("TeleportGui"))
+local EmoteWheel = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("EmoteWheel"))
+local EmoteWheelController =
+	require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteWheelController"))
 
 local c = React.createElement
 
@@ -141,6 +144,34 @@ end
 if postMatchOk then
 	postMatchRoot:render(c(PostMatchApp))
 end
+local emoteContainer = ReactRoot.create("ArenaEmoteRoot", Enum.ScreenInsets.CoreUISafeInsets, 800, true)
+local emoteRoot = ReactRoblox.createRoot(emoteContainer)
+emoteRoot:render(c(EmoteWheel, { EmptySlotsAssignable = false }))
+EmoteWheelController.start({
+	onPlay = function(emoteId)
+		Network.fireServer("PlayEmote", emoteId)
+	end,
+	isEnabled = function()
+		if ArenaMenuClient.getSnapshot().open then
+			return false
+		end
+		if PostMatchClient.getSnapshot().visible then
+			return true
+		end
+		local state = ReplicatedStorage:FindFirstChild("MatchState")
+		return state ~= nil
+			and state:GetAttribute("phase") == "Active"
+			and Players.LocalPlayer:GetAttribute("ArenaReady") == true
+	end,
+})
+local Combat = require(game:GetService("StarterPlayer"):WaitForChild("PlayerModule")).Combat
+local emoteCameraUnsubscribe = EmoteWheelController.subscribe(function(wheel)
+	if wheel.open then
+		Combat.requestCameraSuppression("EmoteWheel")
+	else
+		Combat.releaseCameraSuppression("EmoteWheel")
+	end
+end)
 Replica.RequestData()
 
 local teleportContainer = ReactRoot.createDetached("ArenaReturnLoadingScreen", Enum.ScreenInsets.None, 1100)
@@ -204,6 +235,11 @@ script.Destroying:Connect(function()
 	end
 	ArenaTeleportClient.destroy()
 	ArenaMenuClient.destroy()
+	emoteCameraUnsubscribe()
+	Combat.releaseCameraSuppression("EmoteWheel")
+	EmoteWheelController.stop()
+	emoteRoot:unmount()
+	emoteContainer:Destroy()
 	PostMatchClient.destroy()
 	ArenaCoreUI.destroy()
 	ModeVoteClient.destroy()

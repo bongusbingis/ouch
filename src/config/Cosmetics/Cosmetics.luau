@@ -59,7 +59,6 @@ export type ItemDef = {
 	InventoryVisible: boolean?,
 	Equippable: boolean?,
 	EffectId: string?,
-	EmoteStyle: string?,
 	Thumbnail: string,
 	SplatColor: Color3?,
 	AlwaysAvailable: boolean?,
@@ -74,7 +73,6 @@ export type DefaultDef = {
 	DisplayName: string,
 	Rarity: string,
 	EffectId: string?,
-	EmoteStyle: string?,
 	SplatColor: Color3?,
 	SortOrder: number?,
 	PreviewColor: Color3?,
@@ -140,9 +138,8 @@ local Defaults: { [string]: DefaultDef } = {
 		Rarity = "Common",
 	},
 	EmoteAssets = {
-		DisplayName = "Victory Wave",
+		DisplayName = "Wave",
 		Rarity = "Common",
-		EmoteStyle = require(script.Parent.Emotes).DefaultStyle,
 	},
 	BallAssets = {
 		DisplayName = "Default Dodgeball",
@@ -211,11 +208,18 @@ local function eliminationEffect(rarity: string, displayName: string, sound: str
 end
 
 local Items: { [string]: ItemDef } = {
+	EmoteWave = {
+		Category = "EmoteAssets",
+		Rarity = "Common",
+		DisplayName = "Wave",
+		Thumbnail = "",
+		AlwaysAvailable = true,
+		ShopEligible = false,
+	},
 	ShowtimeTwirl = {
 		Category = "EmoteAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Confetti Twirl",
-		EmoteStyle = "ConfettiTwirl",
 		Thumbnail = "",
 		ShopEligible = false,
 		SortOrder = 10,
@@ -224,7 +228,6 @@ local Items: { [string]: ItemDef } = {
 		Category = "EmoteAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Champion Flex",
-		EmoteStyle = "ChampionFlex",
 		Thumbnail = "",
 		ShopEligible = false,
 		SortOrder = 20,
@@ -233,7 +236,6 @@ local Items: { [string]: ItemDef } = {
 		Category = "EmoteAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Party Bounce",
-		EmoteStyle = "PartyBounce",
 		Thumbnail = "",
 		ShopEligible = false,
 		SortOrder = 30,

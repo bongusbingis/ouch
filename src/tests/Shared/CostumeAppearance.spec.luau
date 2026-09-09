@@ -8,10 +8,9 @@ local Appearance = require(
 		:WaitForChild("Cosmetics")
 		:WaitForChild("CharacterAppearance")
 )
-local VictoryRig = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("VictoryRig")
+local EmoteRig = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteRig")
 )
-local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local TestAssets = require(script.Parent.Parent.Helpers.TestAssets)
 local CharacterFixture = require(script.Parent.Parent.Helpers.CharacterFixture)
 
@@ -70,19 +69,16 @@ return function()
 				end
 				local world = Instance.new("WorldModel")
 				table.insert(roots, world)
-				local display = VictoryRig.create(world, "CharacterColorRed", itemId)
+				local display = EmoteRig.create(world, "CharacterColorRed", itemId)
 				table.insert(displays, display)
-				for _, style in Emotes.Styles do
-					display.pose(style, style.Duration / 2)
-					for _, part in display.model.CostumeVisuals:GetDescendants() do
-						if not part:IsA("BasePart") then
-							continue
-						end
-						local target = display.model[part:GetAttribute("BodyPart")]
-						expect((part.BodyMount.WorldCFrame.Position - target.Position).Magnitude < 0.001).to.equal(true)
-						expect(part.Anchored and part.Massless).to.equal(true)
-						expect(part.CanCollide or part.CanQuery or part.CanTouch).to.equal(false)
+				for _, part in display.model.CostumeVisuals:GetDescendants() do
+					if not part:IsA("BasePart") then
+						continue
 					end
+					local target = display.model[part:GetAttribute("BodyPart")]
+					expect((part.BodyMount.WorldCFrame.Position - target.Position).Magnitude < 0.001).to.equal(true)
+					expect(part.Massless).to.equal(true)
+					expect(part.CanCollide or part.CanQuery or part.CanTouch).to.equal(false)
 				end
 				display.destroy()
 				expect(#world:GetChildren()).to.equal(0)

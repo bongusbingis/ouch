@@ -53,12 +53,49 @@ local FakeVector3 = {
 	one = { X = 1, Y = 1, Z = 1 },
 }
 
+local FakeVector2Meta = {}
+local function fakeVector2(x: number, y: number)
+	return setmetatable({ X = x, Y = y }, FakeVector2Meta)
+end
+local function vec2Component(value: any, key: string): number
+	return if type(value) == "table" then value[key] else value
+end
+FakeVector2Meta.__index = function(self, key)
+	if key == "Magnitude" then
+		return math.sqrt(self.X * self.X + self.Y * self.Y)
+	elseif key == "Unit" then
+		local magnitude = math.sqrt(self.X * self.X + self.Y * self.Y)
+		if magnitude <= 0 then
+			return fakeVector2(0, 0)
+		end
+		return fakeVector2(self.X / magnitude, self.Y / magnitude)
+	end
+	return nil
+end
+FakeVector2Meta.__add = function(a, b)
+	return fakeVector2(a.X + b.X, a.Y + b.Y)
+end
+FakeVector2Meta.__sub = function(a, b)
+	return fakeVector2(a.X - b.X, a.Y - b.Y)
+end
+FakeVector2Meta.__unm = function(a)
+	return fakeVector2(-a.X, -a.Y)
+end
+FakeVector2Meta.__mul = function(a, b)
+	return fakeVector2(vec2Component(a, "X") * vec2Component(b, "X"), vec2Component(a, "Y") * vec2Component(b, "Y"))
+end
+FakeVector2Meta.__div = function(a, b)
+	return fakeVector2(vec2Component(a, "X") / vec2Component(b, "X"), vec2Component(a, "Y") / vec2Component(b, "Y"))
+end
+FakeVector2Meta.__eq = function(a, b)
+	return a.X == b.X and a.Y == b.Y
+end
 local FakeVector2 = {
 	new = function(x: number?, y: number?)
-		return { X = x or 0, Y = y or 0 }
+		return fakeVector2(x or 0, y or 0)
 	end,
-	zero = { X = 0, Y = 0 },
-	one = { X = 1, Y = 1 },
+	zero = fakeVector2(0, 0),
+	one = fakeVector2(1, 1),
 }
 
 local FakeNumberRange = {

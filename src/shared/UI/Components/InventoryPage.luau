@@ -19,6 +19,9 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
+local EmoteSlotRail = require(script.Parent.EmoteSlotRail)
+local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
+local Network = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Network"))
 
 local c = React.createElement
 
@@ -30,6 +33,7 @@ export type Props = {
 	OnInspect: ((InventoryModel.Entry) -> ())?,
 	SelectedTab: string,
 	OnTabChanged: (string) -> (),
+	OnLockedSlot: (() -> ())?,
 }
 
 local function ownershipKey(data: any?): string
@@ -90,9 +94,32 @@ local function Card(props)
 			ImageColor3 = UIConfig.ProgressionStyle.Yellow,
 			Position = UDim2.fromScale(0.82, 0.16),
 			Size = UDim2.fromScale(0.2, 0.2),
-			Visible = props.Equipped,
+			Visible = props.Equipped and props.SlotIndex == nil,
 			ZIndex = 6,
 		}),
+		SlotBadge = if props.SlotIndex
+			then c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = UIConfig.ProgressionStyle.Yellow,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.82, 0.16),
+				Size = UDim2.fromScale(0.24, 0.24),
+				ZIndex = 7,
+			}, {
+				Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Outline = c("UIStroke", { Color = UIConfig.ProgressionStyle.Ink, Thickness = 2 }),
+				Text = c("TextLabel", {
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					Size = UDim2.fromScale(1, 1),
+					Text = tostring(props.SlotIndex),
+					TextColor3 = UIConfig.ProgressionStyle.Ink,
+					TextScaled = true,
+					ZIndex = 8,
+				}),
+			})
+			else nil,
 		Background = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = Color3.new(1, 1, 1),
@@ -181,7 +208,10 @@ local function Section(props)
 			CardSize = props.CardSize,
 			CardHeight = props.CardHeight,
 			LayoutOrder = index,
-			Equipped = InventoryModel.isEquipped(entry, props.Equipped),
+			Equipped = if props.SlotOf
+				then props.SlotOf(entry.itemId) ~= nil
+				else InventoryModel.isEquipped(entry, props.Equipped),
+			SlotIndex = if props.SlotOf then props.SlotOf(entry.itemId) else nil,
 			ColorId = props.Equipped.CharacterColor,
 			CostumeId = props.Equipped.CostumeAssets,
 			OnActivated = function()
@@ -283,6 +313,53 @@ return function(props: Props)
 		inventoryLayout.MaxColumns
 	)
 	local selectedTab = props.SelectedTab
+	local emoteTab = selectedTab == "EMOTES"
+	local wheel = EmoteWheelController.useSnapshot()
+	local selectedSlot, setSelectedSlot = React.useState(nil :: number?)
+	local function slotOf(itemId: string?): number?
+		if itemId == nil then
+			return nil
+		end
+		for index = 1, wheel.capacity do
+			if wheel.slots[index] == itemId then
+				return index
+			end
+		end
+		return nil
+	end
+	local function assignEmote(entry: InventoryModel.Entry)
+		local itemId = entry.itemId
+		if itemId == nil then
+			return
+		end
+		local current = slotOf(itemId)
+		if current then
+			task.spawn(Network.call, "SetEmoteSlot", current, nil)
+			return
+		end
+		local target = selectedSlot
+		if target == nil or target > wheel.capacity then
+			target = nil
+			for index = 1, wheel.capacity do
+				if wheel.slots[index] == nil then
+					target = index
+					break
+				end
+			end
+			target = target or 1
+		end
+		task.spawn(Network.call, "SetEmoteSlot", target, itemId)
+		local nextEmpty = nil
+		for index = 1, wheel.capacity do
+			if index ~= target and wheel.slots[index] == nil then
+				nextEmpty = index
+				break
+			end
+		end
+		setSelectedSlot(nextEmpty)
+	end
+	local onEquip = if emoteTab then assignEmote else props.OnEquip
+	local onInspect = if emoteTab then nil else props.OnInspect
 	local categoriesRef = React.useRef(nil :: ScrollingFrame?)
 	React.useLayoutEffect(function()
 		local scroller = categoriesRef.current
@@ -301,6 +378,15 @@ return function(props: Props)
 			if tab.Id == selectedTab then
 				for _, section in tab.Sections do
 					local entries = InventoryModel.entries(Cosmetics, owned, section.Category)
+					if tab.Id == "EMOTES" then
+						local filtered = {}
+						for _, entry in entries do
+							if not entry.isDefault then
+								table.insert(filtered, entry)
+							end
+						end
+						entries = filtered
+					end
 					if #entries > 0 then
 						table.insert(result, { Title = section.Id, Entries = entries })
 					end
@@ -321,6 +407,16 @@ return function(props: Props)
 			PaddingBottom = UDim.new(0, UIConfig.Layout.InventoryContentGapPx),
 		}),
 	}
+	if emoteTab then
+		categoryChildren.EmoteSlotRail = c(EmoteSlotRail, {
+			LayoutOrder = -3,
+			Compact = short,
+			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
+			SelectedSlot = selectedSlot,
+			OnSelectSlot = setSelectedSlot,
+			OnLockedSlot = props.OnLockedSlot,
+		})
+	end
 	for index, section in sections do
 		local elements = Section({
 			Title = section.Title,
@@ -331,8 +427,9 @@ return function(props: Props)
 			CardHeight = cardSize,
 			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
 			LayoutOrder = (index - 1) * 3,
-			OnEquip = props.OnEquip,
-			OnInspect = props.OnInspect,
+			OnEquip = onEquip,
+			OnInspect = onInspect,
+			SlotOf = if emoteTab then slotOf else nil,
 			OnSelectionGained = Selection.scrollIntoView,
 		})
 		categoryChildren[`CategoryHeader_{section.Title}`] = elements.Header

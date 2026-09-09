@@ -14,11 +14,27 @@ local RotatingPlatforms = {}
 
 local FOLDER_NAME = "Rotating"
 
-type LocalRotor = {
+export type LocalRotor = {
 	part: BasePart,
 	relativeCenter: CFrame,
 	centerToPart: CFrame,
+	axis: "X" | "Y",
+	mode: "spin" | "rock",
 	degreesPerSecond: number,
+	amplitude: number,
+	period: number,
+	phase: number,
+	carriesRiders: boolean,
+}
+
+type RotorOptions = {
+	axis: "X" | "Y",
+	mode: "spin" | "rock",
+	degreesPerSecond: number?,
+	amplitude: number?,
+	period: number?,
+	phase: number?,
+	carriesRiders: boolean,
 }
 
 export type Platform = {
@@ -53,7 +69,32 @@ function RotatingPlatforms.currentBounds(platform: Platform): CFrame
 	return platform.assembly:GetPivot() * platform.pivotToBounds
 end
 
+function RotatingPlatforms.rotorFor(part: BasePart): (Platform?, LocalRotor?)
+	for _, platform in platforms do
+		for _, rotor in platform.localRotors do
+			if rotor.part == part and rotor.carriesRiders then
+				return platform, rotor
+			end
+		end
+	end
+	return nil, nil
+end
+
 local MINIMUM_TURN_RADIANS = 1e-5
+
+local function rotorSpin(rotor: LocalRotor, now: number): CFrame
+	local a = if rotor.mode == "rock"
+		then Rotation.rockAt(now, rotor.amplitude, rotor.period, rotor.phase)
+		else Rotation.angleAt(now, rotor.degreesPerSecond)
+	if rotor.axis == "X" then
+		return CFrame.Angles(a, 0, 0)
+	end
+	return CFrame.Angles(0, a, 0)
+end
+
+function RotatingPlatforms.rotorPoseAt(platform: Platform, rotor: LocalRotor, now: number): CFrame
+	return RotatingPlatforms.poseAt(platform, now) * rotor.relativeCenter * rotorSpin(rotor, now)
+end
 
 local function step()
 	local now = Workspace:GetServerTimeNow()
@@ -64,11 +105,10 @@ local function step()
 			platform.appliedAngle = angle
 			platform.assembly:PivotTo(pose)
 		end
-		-- One server mover composes the ring with its fan blades and paddles.
+		-- One server mover composes the ring with its fan blades, paddles, discs, and swing panels.
 		for _, rotor in platform.localRotors do
 			if rotor.part:IsDescendantOf(platform.assembly) then
-				local localAngle = Rotation.angleAt(now, rotor.degreesPerSecond)
-				rotor.part.CFrame = pose * rotor.relativeCenter * CFrame.Angles(0, localAngle, 0) * rotor.centerToPart
+				rotor.part.CFrame = pose * rotor.relativeCenter * rotorSpin(rotor, now) * rotor.centerToPart
 			end
 		end
 	end
@@ -78,15 +118,20 @@ local function build(origin: BasePart, assembly: Model): Platform
 	local pivot = assembly:GetPivot()
 	local boundsCFrame, boundsSize = assembly:GetBoundingBox()
 	local localRotors: { LocalRotor } = {}
-	local function addRotor(part: BasePart, degreesPerSecond: number)
-		-- Imported pivot orientations are arbitrary; use only the authored center
-		-- so the local rotation stays around world up within the moving ring.
-		local center = CFrame.new(part.CFrame:PointToWorldSpace(part.PivotOffset.Position))
+	-- Imported pivot orientations are arbitrary; use only the authored center so
+	-- the local rotation stays around a stable axis within the moving ring.
+	local function addRotor(part: BasePart, center: CFrame, options: RotorOptions)
 		table.insert(localRotors, {
 			part = part,
 			relativeCenter = pivot:ToObjectSpace(center),
 			centerToPart = center:ToObjectSpace(part.CFrame),
-			degreesPerSecond = degreesPerSecond,
+			axis = options.axis,
+			mode = options.mode,
+			degreesPerSecond = options.degreesPerSecond or 0,
+			amplitude = options.amplitude or 0,
+			period = options.period or 1,
+			phase = options.phase or 0,
+			carriesRiders = options.carriesRiders,
 		})
 	end
 	for _, base in assembly:GetDescendants() do
@@ -94,12 +139,51 @@ local function build(origin: BasePart, assembly: Model): Platform
 			continue
 		end
 		if MapFeatures.Spinner.EnabledNames[base.Name] then
-			addRotor(base, MapFeatures.Spinner.DegreesPerSecond)
+			local center = CFrame.new(base.CFrame:PointToWorldSpace(base.PivotOffset.Position))
+			addRotor(base, center, {
+				axis = "Y",
+				mode = "spin",
+				degreesPerSecond = MapFeatures.Spinner.DegreesPerSecond,
+				carriesRiders = false,
+			})
 		end
 		if MapFeatures.Fan.EnabledNames[base.Name] then
 			for _, blade in base:GetChildren() do
 				if blade:IsA("BasePart") and blade.Name:find("propeller_trampoline_2_", 1, true) == 1 then
-					addRotor(blade, MapFeatures.Fan.BladeDegreesPerSecond)
+					local center = CFrame.new(blade.CFrame:PointToWorldSpace(blade.PivotOffset.Position))
+					addRotor(blade, center, {
+						axis = "Y",
+						mode = "spin",
+						degreesPerSecond = MapFeatures.Fan.BladeDegreesPerSecond,
+						carriesRiders = false,
+					})
+				end
+			end
+		end
+		if base.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1 then
+			for _, plate in base:GetChildren() do
+				if plate:IsA("BasePart") and plate.Name:find(MapFeatures.Disc.PlatePrefix, 1, true) == 1 then
+					addRotor(plate, CFrame.new(plate.Position), {
+						axis = "Y",
+						mode = "spin",
+						degreesPerSecond = MapFeatures.Disc.DegreesPerSecond,
+						carriesRiders = true,
+					})
+				end
+			end
+		end
+		if base.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1 then
+			local suffix = tonumber(base.Name:match("%.(%d+)$")) or 0
+			for _, panel in base:GetChildren() do
+				if panel:IsA("BasePart") and panel.Name:find(MapFeatures.SwingPanel.PanelPrefix, 1, true) == 1 then
+					addRotor(panel, CFrame.new(base.Position), {
+						axis = "X",
+						mode = "rock",
+						amplitude = math.rad(MapFeatures.SwingPanel.AmplitudeDegrees),
+						period = MapFeatures.SwingPanel.PeriodSeconds,
+						phase = suffix * MapFeatures.SwingPanel.PhaseStepSeconds,
+						carriesRiders = false,
+					})
 				end
 			end
 		end

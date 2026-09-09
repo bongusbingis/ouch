@@ -3,8 +3,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Metrics = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("TextMetrics"))
 local TestAssets = require(game.ServerStorage.Tests.Helpers.TestAssets)
-local VictoryRig = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("VictoryRig")
+local EmoteRig = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteRig")
 )
 
 return function()
@@ -31,15 +31,14 @@ return function()
 				expect(TestAssets.get(stand, "Plaque", "Label", "Rank"):IsA("TextLabel")).to.equal(true)
 			end
 		end)
-		it("poses shared emotes at a world origin without drifting the character", function()
+		it("sets the shared emote rig origin at a world origin without drifting the character", function()
 			local world = Instance.new("Folder")
 			world.Parent = workspace
-			local display = VictoryRig.create(world)
-			local style = VictoryRig.style("ShowtimeTwirl")
-			display.pose(style, 0.6, false)
+			local display = EmoteRig.create(world)
+			display.setOrigin(CFrame.identity)
 			local first = display.model.HumanoidRootPart.CFrame
 			local origin = CFrame.new(20, 10000, 30)
-			display.pose(style, 0.6, false, origin)
+			display.setOrigin(origin)
 			local offset = display.model.HumanoidRootPart.Position - (origin * first).Position
 			local _, size = display.model:GetBoundingBox()
 			expect(size.Magnitude < 20).to.equal(true)

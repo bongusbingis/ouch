@@ -57,8 +57,14 @@ return {
 		GuardSeconds = 3, -- covers the residual arc after leaving the airflow
 	},
 	Spinner = {
-		-- Prove the representative authored paddle before enabling the other five.
-		EnabledNames = { ["obstacle_6_001.002"] = true },
+		EnabledNames = {
+			["obstacle_6_001.001"] = true,
+			["obstacle_6_001.002"] = true,
+			["obstacle_6_001.003"] = true,
+			["obstacle_6_001.005"] = true,
+			["obstacle_6_001.006"] = true,
+			["obstacle_6_001.007"] = true,
+		},
 		DegreesPerSecond = 100,
 		KnockbackSpeed = 42,
 		UpwardSpeed = 16,
@@ -77,5 +83,39 @@ return {
 		MaxFrameDisplacement = 16,
 		MaxCarryDelta = 4,
 		MinimumCarryStuds = 1e-3,
+	},
+	Disc = {
+		HubPrefix = "obstacle_14_001",
+		PlatePrefix = "obstacle_14_002",
+		DegreesPerSecond = 45,
+	},
+	SwingPanel = {
+		AxlePrefix = "obstacle_8_001",
+		PanelPrefix = "obstacle_8_002",
+		AmplitudeDegrees = 28,
+		PeriodSeconds = 2.8,
+		PhaseStepSeconds = 0.55, -- per numeric suffix, so the five panels are not in lockstep
+	},
+	Bumper = {
+		NamePrefixes = { "obstacle_18_001", "obstacle_19_001" },
+		KnockbackSpeed = 36,
+		UpwardSpeed = 14,
+		ShoveSeconds = 0.12,
+		RetriggerCooldown = 0.6,
+		GuardSeconds = 0.6,
+		SquashFrequencyHz = 3.2,
+		SquashDampingRatio = 0.22,
+		SquashImpulse = -4,
+		MinimumSquash = 0.6,
+		WidenScale = 0.35,
+	},
+	BeachBall = {
+		NamePrefix = "ball_001",
+		Density = 0.08,
+		Friction = 0.7,
+		Elasticity = 0.45,
+		ResetBelowOffset = -80, -- studs below MapOrigin.Y
+		ResetRadius = 420, -- studs from MapOrigin
+		CheckIntervalSeconds = 0.5,
 	},
 }

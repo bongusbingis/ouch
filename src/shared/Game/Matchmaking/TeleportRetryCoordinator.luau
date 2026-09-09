@@ -275,13 +275,14 @@ function TeleportRetryCoordinator:_teleport(players: { Player }): (boolean, any?
 		if self._destroyed or #players == 0 then
 			return
 		end
-		local originalData = (options :: TeleportOptions):GetTeleportData()
+		local teleportOptions = options :: TeleportOptions
+		local originalData = teleportOptions:GetTeleportData()
 		assert(originalData == nil or typeof(originalData) == "table", "teleport data must be a table")
 		local data = if originalData == nil then {} else table.clone(originalData)
 		data[ATTEMPT_DATA_KEY] = attemptId
-		(options :: TeleportOptions):SetTeleportData(data)
+		teleportOptions:SetTeleportData(data)
 		dispatched = true
-		self._teleportService:TeleportAsync(firstState.placeId, players, options :: TeleportOptions)
+		self._teleportService:TeleportAsync(firstState.placeId, players, teleportOptions)
 	end)
 	if options then
 		options:Destroy()
@@ -297,7 +298,12 @@ function TeleportRetryCoordinator:_teleport(players: { Player }): (boolean, any?
 	return success, teleportError
 end
 
-function TeleportRetryCoordinator:_handleFailure(player: Player, result: Enum.TeleportResult, placeId: number, attemptId: any)
+function TeleportRetryCoordinator:_handleFailure(
+	player: Player,
+	result: Enum.TeleportResult,
+	placeId: number,
+	attemptId: any
+)
 	local state = self._states[player.UserId]
 	if self._destroyed or state == nil or not state.active or state.pendingRetry or state.placeId ~= placeId then
 		return
@@ -362,9 +368,9 @@ function TeleportRetryCoordinator:Prepare(
 	local batch: Batch = {
 		userIds = {},
 		retryAt = 0,
-			retryRevision = 0,
-			noticeAt = Workspace:GetServerTimeNow() + Loading.TeleportRecoveryNoticeSeconds,
-			noticeRevision = 0,
+		retryRevision = 0,
+		noticeAt = Workspace:GetServerTimeNow() + Loading.TeleportRecoveryNoticeSeconds,
+		noticeRevision = 0,
 	}
 	for _, player in players do
 		if player.Parent == self._players and not self:IsTracked(player) then
@@ -397,7 +403,13 @@ function TeleportRetryCoordinator:StartPrepared(players: { Player }): (boolean, 
 	local pending = {}
 	for _, player in players do
 		local state = self._states[player.UserId]
-		if state and state.active and not state.pendingRetry and not state.dispatched and player.Parent == self._players then
+		if
+			state
+			and state.active
+			and not state.pendingRetry
+			and not state.dispatched
+			and player.Parent == self._players
+		then
 			table.insert(pending, player)
 		end
 	end

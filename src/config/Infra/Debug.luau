@@ -51,6 +51,9 @@ return {
 	-- the lobby to spawn onto the baseplate with stationary respawning dummies,
 	-- both weapons, and the arena overlay menu, so equipped cosmetics can be
 	-- iterated on without entering the arena. Gated to Studio and never runs live.
+	-- Studio-only: back profiles with the in-memory ProfileStore mock so play sessions
+	-- never touch the real DataStore or fight its session lock. Must be false at ship.
+	MockProfiles = true,
 	LobbyCombatTest = true,
 
 	-- Tap-corner gesture that lets a dev/tester end the active match solo and

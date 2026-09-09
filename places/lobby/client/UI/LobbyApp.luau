@@ -10,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UI = Shared:WaitForChild("UI")
@@ -629,6 +630,11 @@ local function LobbyContent(props)
 			return Rect.new(position, position + host.AbsoluteSize)
 		end)
 		characterRenderer.current = renderer
+		local emoteConnection = Network.on("EmotePlayed", function(userId, emoteId)
+			if type(userId) == "number" and type(emoteId) == "string" then
+				renderer:PlayEmote(userId, emoteId)
+			end
+		end)
 		local disconnectNames = renderer:SubscribeUsernames(function()
 			updateUsernames(nil)
 		end)
@@ -642,6 +648,7 @@ local function LobbyContent(props)
 		end)
 		return function()
 			characterRenderer.current = nil
+			emoteConnection:Disconnect()
 			disconnectNames()
 			disconnect()
 			renderer:destroy()
@@ -668,6 +675,19 @@ local function LobbyContent(props)
 			)
 		end
 	end, { currentPage, inventoryTab, equipped.BallAssets, equipped.HammerAssets })
+
+	local emoteWheelBlocked = not lobbyVisible
+		or currentPage ~= "SplashScreen"
+		or effectPreview.active
+		or notifications.request ~= nil
+		or showDailyRewardModal
+		or partyMembersOpen
+		or joinOpen
+		or economyMenu.selectedShopCardId ~= nil
+		or economyMenu.crateReveal ~= nil
+	React.useEffect(function()
+		Players.LocalPlayer:SetAttribute("EmoteWheelBlocked", emoteWheelBlocked)
+	end, { emoteWheelBlocked })
 
 	React.useEffect(function()
 		local connection = UserInputService.InputBegan:Connect(function(input, processed)
@@ -805,6 +825,9 @@ local function LobbyContent(props)
 					})
 				elseif pageName == "Inventory" then
 					return c(InventoryPage, {
+						OnLockedSlot = function()
+							setCurrentPage("Shop")
+						end,
 						Data = economyData,
 						Position = position,
 						SelectedTab = inventoryTab,

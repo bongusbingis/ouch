@@ -25,6 +25,18 @@ T.describe("Rotation", function()
 		T.expect(Rotation.angleAt(1, 90)):toBeNear(math.rad(90), 1e-6)
 		T.expect(Rotation.angleAt(1, 0)):toBeNear(0, 1e-6)
 	end)
+
+	T.it("rocks about zero at phase zero and time zero", function()
+		T.expect(Rotation.rockAt(0, 0.5, 4, 0)):toBeNear(0, 1e-6)
+	end)
+
+	T.it("rocks to its full amplitude a quarter period in", function()
+		T.expect(Rotation.rockAt(1, 0.5, 4, 0)):toBeNear(0.5, 1e-6)
+	end)
+
+	T.it("flips sign three quarters of the way through the period", function()
+		T.expect(Rotation.rockAt(3, 0.5, 4, 0)):toBeNear(-0.5, 1e-6)
+	end)
 end)
 
 return true

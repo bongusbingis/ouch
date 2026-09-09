@@ -7,14 +7,13 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local Colors =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation")).Colors
-local VictoryRig = require(script.Parent.Parent.Parent.Services.VictoryRig)
+local EmoteRig = require(script.Parent.Parent.Parent.Services.EmoteRig)
 local PreviewScheduler = require(script.Parent.Parent.Parent.Services.PreviewScheduler)
 local c = React.createElement
 
 return React.memo(function(props)
 	local viewportRef, cameraRef, worldRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
 	local elapsed, setElapsed = React.useBinding(0)
-	local style = VictoryRig.style(props.EmoteId)
 	React.useEffect(function()
 		local viewport, camera, world = viewportRef.current, cameraRef.current, worldRef.current
 		if not viewport or not camera or not world then
@@ -33,11 +32,13 @@ return React.memo(function(props)
 		local resize = viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(frameCamera)
 		local display, unregister = nil, nil
 		local preparation = task.defer(function()
-			display = VictoryRig.create(world, props.ColorId, props.CostumeId)
+			display = EmoteRig.create(world, props.ColorId, props.CostumeId)
+			if props.EmoteId then
+				display.playEmote(props.EmoteId)
+			end
 			local time = 0
 			local function update(dt)
 				time += dt
-				display.pose(style, time, props.Static == true or GuiService.ReducedMotionEnabled)
 				setElapsed(if props.Static or GuiService.ReducedMotionEnabled then 0 else time)
 			end
 			update(0)
@@ -63,17 +64,17 @@ return React.memo(function(props)
 	end, { props.EmoteId, props.ColorId, props.CostumeId, props.Static })
 	local z = props.ZIndex or 3
 	local confetti = {}
-	for index = 1, style.ConfettiCount do
+	for index = 1, 14 do
 		local seed = index * 0.61803398875 % 1
 		confetti["Piece" .. index] = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = ({ Colors[style.Accent], Colors.Yellow, Colors.White })[index % 3 + 1],
+			BackgroundColor3 = ({ Colors.Cyan, Colors.Yellow, Colors.White })[index % 3 + 1],
 			BackgroundTransparency = elapsed:map(function(t)
 				return if t == 0 then 1 else 0.08
 			end),
 			BorderSizePixel = 0,
 			Position = elapsed:map(function(t)
-				local phase = (t / style.Duration + seed) % 1
+				local phase = (t / 3.2 + seed) % 1
 				return UDim2.fromScale(0.08 + seed * 0.84 + math.sin(t * 2 + index) * 0.035, phase)
 			end),
 			Rotation = elapsed:map(function(t)
