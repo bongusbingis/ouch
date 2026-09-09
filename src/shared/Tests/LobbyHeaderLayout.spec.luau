@@ -4,7 +4,7 @@ local T = require(script.Parent.TestKit)
 local Layout = require(script.Parent.Parent.UI.Models.LobbyHeaderLayout)
 
 local function expectControlsInside(layout, width: number)
-	for _, rect in { layout.nav, layout.party } do
+	for _, rect in { layout.nav, layout.party, layout.logo } do
 		T.expect(rect.position.X >= 0):toBeTruthy()
 		T.expect(rect.position.X + rect.size.X <= width):toBeTruthy()
 		T.expect(rect.position.Y >= 0):toBeTruthy()
@@ -17,8 +17,8 @@ end
 T.describe("Lobby header composition", function()
 	T.it("uses available phone width for the readable logo without expanding the camera reservation", function()
 		local layout = Layout.resolve(Vector2.new(750, 344), 4)
+		T.expect(layout.logo.size.Y):toEqual(64)
 		T.expect(layout.logo.size.X):toEqual(220)
-		T.expect(layout.logo.size.Y):toEqual(100)
 		T.expect(layout.height):toEqual(72)
 		T.expect(layout.stacked):toBeFalsy()
 		expectControlsInside(layout, 750)

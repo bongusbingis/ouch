@@ -7,6 +7,28 @@ local characterBody = {
 
 return {
 	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1 },
+	LobbyArtwork = {
+		Logo = {
+			Image = "rbxassetid://78333957912633",
+			Offset = Vector2.new(91, 114),
+			Size = Vector2.new(813, 379),
+		},
+		Action = {
+			Cyan = "rbxassetid://136021539696619",
+			Pink = "rbxassetid://94748581468730",
+			CyanSlice = Rect.new(198, 228, 842, 469),
+			PinkSlice = Rect.new(198, 228, 841, 468),
+			SliceScale = 0.075,
+			CornerPx = 14,
+			ShadowPx = 2.4,
+			TextOffsetY = 3,
+			PaddingPx = 16,
+			MinPaddingPx = 10,
+			WidthPaddingScale = 0.1,
+			IconPx = 22,
+			IconGapPx = 10,
+		},
+	},
 	ProgressionStyle = {
 		White = Color3.new(1, 1, 1),
 		Ink = Color3.fromRGB(30, 32, 36),
@@ -317,13 +339,16 @@ return {
 			DesktopLogoSizePx = Vector2.new(220, 110),
 			ActionsGapPx = 8,
 			ActionTextPx = 26,
+			PrimaryActionTextPx = 38,
+			ActionHeightPx = 52,
+			PrimaryActionHeightPx = 68,
+			ShortActionTextPx = 22,
 			ShortActionsHeightPx = 56,
 			ShortActionButtonHeightPx = 48,
 			ShortActionsBottomPx = 8,
 			ShortLogoTopPx = 78,
 			PortraitActionsHeightPx = 146,
 			SecondaryActionHeightPx = 56,
-			PrimaryActionHeightPx = 70,
 			ProgressPanels = {
 				DailyMinHeightPx = 140,
 				EdgePaddingPx = 24,

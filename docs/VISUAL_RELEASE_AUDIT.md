@@ -10,7 +10,25 @@ Preserve approved static arena art/layout, existing React roots, state ownership
 
 ## Changes and evidence
 
-### Current responsive and color-role refinement
+### Current action-button and logo refinement
+
+The owner accepts the surrounding comparison composition and requested a bounded correction to Join/Invite/Play sizing, text, color, matching sliced corners and the padded OUCH logo. Play must remain predominantly larger than the other two actions. This pass is implemented, runtime-verified in Studio and visually reviewed; owner acceptance of these new fixes is still pending.
+
+Open `.review/visual-release/comparison/index.html`. **Previous review** now means the accepted `9bc2b2d` composition with dark secondary buttons; **Updated** shows these fixes. The camera framing, progression treatment and surrounding header composition remain the accepted baseline.
+
+- Join/Invite reuse the authored cyan face and Play reuses its authored pink face. All three now render actual sliced images, with `SliceScale = 0.075` and asset-specific slice boundaries. The two source textures differ by one pixel in each dimension; the adjusted right/bottom boundaries preserve matching corners, approximately 14px, and the same border/shadow treatment across tested sizes. The previous Play slice setting had no effect because the image was empty.
+- Play remains wider and taller: desktop 373x68 versus 328x52 secondary actions; landscape phone 190x56 versus 99x48; small phone 138x56 versus 71x48. Its label is larger. Join/Invite share one fitted text scale, use dark ink on cyan, and shorten to JOIN/INVITE in horizontal rows. Padding adapts to button width; the smallest tested secondary labels remain 16px. Play's text and square arrow center as one measured group, with optical vertical adjustment and allowance for the face's shadow.
+- The existing logo's 1023x682 texture contains visible artwork in an 809x375 region (alpha threshold 8). `ImageRectOffset`/`ImageRectSize` select that region with a 2px guard; `Fit` preserves its proportions inside a header-bounded image box. The measured texture and alpha bounds are recorded in `button-logo-refinement/artwork-measurements.json`. No replacement raster or upload was needed. Roblox documents the image rectangle and slice properties in the [ImageLabel reference](https://create.roblox.com/docs/reference/engine/classes/ImageLabel).
+
+Evidence under `.review/visual-release/button-logo-refinement/`: `final-2-0.png` desktop 1246x841, `final-5-0.png` iPhone 17 Pro landscape 874x402, `final-8-0.png` intermediate 1280x720, and `final-11-0.png` small landscape phone 568x320. `final.result.json` includes live button dimensions, text bounds/sizes, slice values and assertions for fitted text, readable labels and primary-button hierarchy. `tested-source.json` records exact equality between the captured Studio client modules and repository source. Comparison images are unchanged JPEG copies despite the raw MCP filenames ending in `.png`.
+
+Validation: **745 headless tests, 0 failures** (`tests.txt`); **12 shipped responsive specs, 0 failures in Studio**; shared and lobby Selene have no errors or warnings; changed files pass StyLua and whitespace checks. The header regression now also checks the logo box remains inside the header at narrow, reflowed and desktop widths. These are local mock/emulator checks, not physical-device or full gameplay-journey acceptance.
+
+Gemini `gemini-15d6cf5a-612f-47d9-bd3e-2d6d7853389d` **APPROVED** all four final captures with no findings. The preceding request `gemini-4bf71b5e-c7a5-48e7-88ba-e46ffb7618f8` returned `ServerError`; the final bounded retry used the corrected JPEG MIME type and revised intermediate labels. No cause beyond the reported server error is established. Native browser verification was paused when Computer Use detected owner input; all comparison links and unchanged image copies were checked locally.
+
+Cleanup: device simulation stopped; both Studio places are in Edit; the lobby's temporary mock toggle is off and PlayerData matches the repository source exactly (`cleanup.json`). Existing release storage configuration is restored. No pushes, publishing or uploads occurred. The wider Phase I findings below remain open; next owner review can use the updated comparison.
+
+### Previous responsive and color-role refinement
 
 Open `.review/visual-release/comparison/index.html`: **Previous review / Updated** compares the owner's last reviewed yellow treatment against this pass. Original cyan baselines remain separately linked. Raw numeric suffixes are MCP request IDs and image-block indices, not scores or revision numbers.
 

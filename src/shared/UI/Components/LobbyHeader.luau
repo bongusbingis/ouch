@@ -106,7 +106,9 @@ return function(props)
 				BackgroundTransparency = 1,
 				Position = UDim2.fromOffset(layout.logo.position.X, layout.logo.position.Y),
 				Size = UDim2.fromOffset(layout.logo.size.X, layout.logo.size.Y),
-				Image = "rbxassetid://78333957912633",
+				Image = UIConfig.LobbyArtwork.Logo.Image,
+				ImageRectOffset = UIConfig.LobbyArtwork.Logo.Offset,
+				ImageRectSize = UIConfig.LobbyArtwork.Logo.Size,
 				ScaleType = Enum.ScaleType.Fit,
 			}),
 			PageTabs = c("Frame", {

@@ -3,6 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
@@ -12,10 +13,64 @@ local PartyStatus = require(script.Parent.PartyStatus)
 local QuestsPanel = require(script.Parent.QuestsPanel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local SeasonStatusCard = require(script.Parent.SeasonStatusCard)
 
 local c = React.createElement
+local artwork = UIConfig.LobbyArtwork.Action
+
+local function actionText(
+	text: string,
+	size: Vector2,
+	maximum: number,
+	primary: boolean,
+	preferredScale: number,
+	fittingText: string?
+)
+	local iconWidth = if primary then artwork.IconPx else 0
+	local iconGap = if primary then artwork.IconGapPx else 0
+	local padding = math.clamp(size.X * artwork.WidthPaddingScale, artwork.MinPaddingPx, artwork.PaddingPx)
+	local inner = size - Vector2.new(padding * 2 + iconWidth + iconGap, artwork.PaddingPx)
+	local textSize = TextMetrics.fittingSize(
+		fittingText or text,
+		Enum.Font.LuckiestGuy,
+		inner,
+		1,
+		math.round(maximum * preferredScale),
+		false
+	)
+	local textWidth = TextService:GetTextSize(text, textSize, Enum.Font.LuckiestGuy, Vector2.new(100000, 100000)).X
+	return c("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, -artwork.ShadowPx / 2, 0.5, -artwork.ShadowPx / 2),
+		Size = UDim2.fromOffset(textWidth + iconWidth + iconGap, size.Y - artwork.PaddingPx),
+	}, {
+		Label = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(0, artwork.TextOffsetY),
+			Size = UDim2.new(0, textWidth, 1, 0),
+			Font = Enum.Font.LuckiestGuy,
+			Text = text,
+			TextSize = textSize,
+			TextColor3 = if primary then UIConfig.ProgressionStyle.White else UIConfig.ProgressionStyle.Ink,
+			ZIndex = 2,
+		}),
+		Icon = if primary
+			then c("ImageLabel", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.fromScale(1, 0.5),
+				Size = UDim2.fromOffset(iconWidth, iconWidth),
+				Image = if text == "PLAY" then "rbxassetid://8517323790" else "rbxassetid://103344771690872",
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 2,
+			})
+			else nil,
+	})
+end
 
 local function buttonText(text: string, compact: boolean?)
 	return c(ResponsiveText, {
@@ -64,6 +119,8 @@ export type Props = {
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local preferred = usePreferredTextSize()
+	local preferredScale = UIConfig.Text.PreferredScale[preferred.Name] or 1
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local progressPanels = ResponsiveLayout.splashPanels(
 		safeArea.size,
@@ -78,6 +135,19 @@ return function(props: Props)
 	local tabbed = progressPanels.tabbed == true
 	local selectedProgress, setSelectedProgress = React.useState("DAILY")
 	local actionWidth = math.min(worldWindow.size.X, 600)
+	local actions = UIConfig.Layout.Splash
+	local secondarySize = if short
+		then Vector2.new(actionWidth * 0.26 - 8, actions.ShortActionButtonHeightPx)
+		else if portrait
+			then Vector2.new(safeArea.size.X * 0.9 * 0.45, actions.SecondaryActionHeightPx)
+			else Vector2.new(progressPanels.season.size.X * 0.88, actions.ActionHeightPx)
+	local primarySize = if short
+		then Vector2.new(actionWidth * 0.48 - 8, actions.ShortActionsHeightPx)
+		else if portrait
+			then Vector2.new(safeArea.size.X * 0.9 * 0.96, actions.PrimaryActionHeightPx)
+			else Vector2.new(progressPanels.season.size.X, actions.PrimaryActionHeightPx)
+	local secondaryTextSize = if short then actions.ShortActionTextPx else actions.ActionTextPx
+	local secondaryFittingText = if short then "INVITE" else "INVITE FRIENDS"
 	local tabHeight = 44
 	local tabContentHeight = if stack then math.max(1, stack.size.Y - tabHeight - 12) else 0
 	local gap = UIConfig.Layout.Splash.ProgressPanels.GapPx
@@ -200,7 +270,10 @@ return function(props: Props)
 				then UDim2.fromOffset(actionWidth, UIConfig.Layout.Splash.ShortActionsHeightPx)
 				else if portrait
 					then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
-					else UDim2.fromOffset(progressPanels.season.size.X, 212),
+					else UDim2.fromOffset(
+						progressPanels.season.size.X,
+						24 + actions.ActionHeightPx * 2 + actions.PrimaryActionHeightPx + actions.ActionsGapPx * 3
+					),
 		}, {
 			Status = if not short and not portrait
 				then c("Frame", {
@@ -225,93 +298,73 @@ return function(props: Props)
 				PaddingRight = UDim.new(0, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
-				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Ink, Radius = UDim.new(0, 10) }),
-				SelectionRadius = UDim.new(0, 10),
+				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Native = {
 					BackgroundTransparency = 1,
-					Image = "",
+					Image = artwork.Cyan,
+					ScaleType = Enum.ScaleType.Slice,
+					SliceCenter = artwork.CyanSlice,
+					SliceScale = artwork.SliceScale,
 					LayoutOrder = 1,
 					Position = if portrait then UDim2.fromScale(0.025, 0) else UDim2.fromScale(0.343431, 0.675873),
-					Size = if short
-						then UDim2.new(0.26, -8, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
-						else if portrait
-							then UDim2.new(0.45, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
-							else UDim2.new(0.88, 0, 0, 48),
+					Size = UDim2.fromOffset(secondarySize.X, secondarySize.Y),
 				},
 				OnActivated = props.OnInvite,
 			}, {
 
-				TextLabel = buttonText(if tabbed then "INVITE" else "INVITE FRIENDS"),
+				Content = actionText(
+					if short then "INVITE" else "INVITE FRIENDS",
+					secondarySize,
+					secondaryTextSize,
+					false,
+					preferredScale,
+					secondaryFittingText
+				),
 			}),
 			JoinWithCode = c(AnimatedButton, {
-				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Ink, Radius = UDim.new(0, 10) }),
-				SelectionRadius = UDim.new(0, 10),
+				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Native = {
 					BackgroundTransparency = 1,
-					Image = "",
+					Image = artwork.Cyan,
+					ScaleType = Enum.ScaleType.Slice,
+					SliceCenter = artwork.CyanSlice,
+					SliceScale = artwork.SliceScale,
 					Position = if portrait then UDim2.fromScale(0.525, 0) else UDim2.fromScale(0.343431, 0.533477),
-					Size = if short
-						then UDim2.new(0.26, -8, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
-						else if portrait
-							then UDim2.new(0.45, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
-							else UDim2.new(0.88, 0, 0, 48),
+					Size = UDim2.fromOffset(secondarySize.X, secondarySize.Y),
 				},
 				OnActivated = props.OnJoinCode,
 			}, {
 
-				TextLabel = buttonText(if tabbed then "JOIN" else "JOIN PARTY"),
+				Content = actionText(
+					if short then "JOIN" else "JOIN PARTY",
+					secondarySize,
+					secondaryTextSize,
+					false,
+					preferredScale,
+					secondaryFittingText
+				),
 			}),
 			PlayButton = c(AnimatedButton, {
 				ButtonRef = props.PlayButtonRef,
-				Visual = c(ButtonSurface, {
-					Color = if props.PlayEnabled then UIConfig.ProgressionStyle.Pink else UIConfig.ProgressionStyle.Ink,
-				}),
+				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Enabled = props.PlayEnabled,
 				Style = "Primary",
 				Native = {
 					AutoButtonColor = props.PlayEnabled,
 					BackgroundTransparency = 1,
-					Image = "",
+					Image = artwork.Pink,
 					ImageColor3 = if props.PlayEnabled then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
 					LayoutOrder = 2,
 					AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.zero,
 					Position = if portrait then UDim2.fromScale(0.5, 1) else UDim2.fromScale(-0.0570855, 0.787143),
 					ScaleType = Enum.ScaleType.Slice,
-					Size = if short
-						then UDim2.new(0.48, -8, 0, UIConfig.Layout.Splash.ShortActionsHeightPx)
-						else if portrait
-							then UDim2.new(0.96, 0, 0, UIConfig.Layout.Splash.PrimaryActionHeightPx)
-							else UDim2.new(1, 0, 0, 68),
-					SliceCenter = Rect.new(198, 228, 841, 468),
-					SliceScale = 0.2,
+					Size = UDim2.fromOffset(primarySize.X, primarySize.Y),
+					SliceCenter = artwork.PinkSlice,
+					SliceScale = artwork.SliceScale,
 				},
 				OnActivated = props.OnPlay,
 			}, {
-				TextLabel = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.LuckiestGuy,
-					MaxTextSize = 42,
-					Native = {
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.42, 0.52),
-						Size = UDim2.new(0.64, -12, 1, -12),
-						Text = props.PlayText,
-						TextColor3 = Color3.new(1, 1, 1),
-						ZIndex = 2,
-					},
-				}),
-				ImageLabel = c("ImageLabel", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Image = if props.PlayText == "PLAY"
-						then "rbxassetid://8517323790"
-						else "rbxassetid://103344771690872",
-					LayoutOrder = 2,
-					Position = UDim2.fromScale(0.82, 0.5),
-					Size = UDim2.fromOffset(if short then 22 else 30, if short then 22 else 30),
-					ScaleType = Enum.ScaleType.Fit,
-				}),
+				Content = actionText(props.PlayText, primarySize, actions.PrimaryActionTextPx, true, preferredScale),
 			}),
 		}),
 		BottomMiddle = if (short and props.ShowMatchmakingActivity) or portrait
