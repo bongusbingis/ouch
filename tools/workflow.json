@@ -1,15 +1,15 @@
 {
-    "schema_version":  1,
-    "figma_file_url":  "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
-    "gemini_model":  "gemini-3.7-flash",
-    "review_timeout_seconds":  900,
-    "claude_effort": "medium",
-    "review_packet_max_bytes":  250000,
-    "preferred_icon_prefixes":  [
-                                    "material-symbols",
-                                    "ph"
-                                ],
-    "canonical_icons":  {
-
-                        }
+  "schema_version": 1,
+  "figma_file_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
+  "gemini_model": "gemini-3.7-flash",
+  "review_timeout_seconds": 900,
+  "visual_release_review": ".review/visual-release/final-review",
+  "visual_release_acceptance": ".review/visual-release/owner-acceptance.json",
+  "claude_effort": "max",
+  "review_packet_max_bytes": 250000,
+  "preferred_icon_prefixes": [
+    "material-symbols",
+    "ph"
+  ],
+  "canonical_icons": {}
 }

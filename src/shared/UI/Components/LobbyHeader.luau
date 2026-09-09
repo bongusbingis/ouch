@@ -10,6 +10,7 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ButtonSurface = require(script.Parent.ButtonSurface)
 local Layout = require(script.Parent.Parent.Models.LobbyHeaderLayout)
+local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local useHeaderInsets = require(script.Parent.Parent.Hooks.useHeaderInsets)
 
@@ -19,6 +20,9 @@ return function(props)
 	local insets = useHeaderInsets()
 	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local layout = Layout.resolve(safe.size, #props.Tabs)
+	local logo = UIConfig.LobbyArtwork.Logo
+	local logoSize = TextMetrics.fitAspect(layout.logo.size, logo.Size.X / logo.Size.Y)
+	local logoTop = layout.logo.position.Y + layout.logo.size.Y / 2 - logo.OpticalCenterY / logo.Size.Y * logoSize.Y
 	local buttons = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
@@ -104,8 +108,8 @@ return function(props)
 		}, {
 			Logo = c("ImageLabel", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(layout.logo.position.X, layout.logo.position.Y),
-				Size = UDim2.fromOffset(layout.logo.size.X, layout.logo.size.Y),
+				Position = UDim2.fromOffset(layout.logo.position.X, logoTop),
+				Size = UDim2.fromOffset(logoSize.X, logoSize.Y),
 				Image = UIConfig.LobbyArtwork.Logo.Image,
 				ImageRectOffset = UIConfig.LobbyArtwork.Logo.Offset,
 				ImageRectSize = UIConfig.LobbyArtwork.Logo.Size,

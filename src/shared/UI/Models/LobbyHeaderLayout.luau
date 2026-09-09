@@ -29,7 +29,7 @@ function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?)
 		navLeft = math.max(edge, (width - navWidth) / 2)
 	end
 	local accessoryHeight = if stacked then 60 else height
-	local logoHeight = accessoryHeight - 8
+	local logoHeight = math.min(accessoryHeight - 8, navHeight + 8)
 	local logoSize = Vector2.new(logoWidth, logoHeight)
 	return {
 		height = height,

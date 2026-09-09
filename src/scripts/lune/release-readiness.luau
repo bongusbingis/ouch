@@ -17,6 +17,18 @@ local function check(ok: boolean, message: string)
 		table.insert(failures, message)
 	end
 end
+local workflow = serde.decode("json", fs.readFile("tools/workflow.json"))
+local python = if fs.isFile(".agent-venv/Scripts/python.exe") then ".agent-venv/Scripts/python.exe" else "python"
+local visual = process.exec(python, {
+	"tools/visual_review.py",
+	"--review",
+	workflow.visual_release_review,
+	"--release",
+	"--acceptance",
+	workflow.visual_release_acceptance,
+})
+print(visual.stdout)
+check(visual.ok, "Current complete visual evidence and owner sign-off are present")
 check(fs.isFile("wally.lock"), "Wally dependency lock is present")
 local now = os.time()
 local active = nil

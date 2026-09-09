@@ -25,9 +25,9 @@ Run commands from `C:\Users\jackc\Desktop\ouch` in native PowerShell. Explicit v
 4. Gemini text and image tests:
 
    ```powershell
-   .\.agent-venv\Scripts\python.exe tools\reviewer.py gemini --task "Text smoke test: assess chunky filled icons for our toy-like game. Return the required structure."
+   .\.agent-venv\Scripts\python.exe tools\reviewer.py gemini --smoke-test --task "Text smoke test: assess chunky filled icons for our toy-like game. Return the required structure."
    .\.agent-venv\Scripts\python.exe tools\assetctl.py demo --prepare-only
-   .\.agent-venv\Scripts\python.exe tools\reviewer.py gemini --task "Image smoke test: describe the disposable demo fixture and assess readability. This is not production UI." --image .review\approval-demo.png
+   .\.agent-venv\Scripts\python.exe tools\reviewer.py gemini --smoke-test --task "Image smoke test: describe the disposable demo fixture and assess readability. This is not production UI." --image .review\approval-demo.png
    ```
 
 5. Icon search and acquisition:
@@ -98,3 +98,15 @@ For a local Kenney pack:
 ```
 
 Use the actual extracted pack file names. The index checks CC0 evidence and hashes; raw packs stay ignored.
+
+## Visual milestones and local release readiness
+
+Follow [VISUAL_REVIEW.md](VISUAL_REVIEW.md), including named peer comparisons and before/after cases. See `tools/visual-packet.example.json` for the required packet shape; replace its example paths and observations with actual evidence.
+
+```powershell
+.\.agent-venv\Scripts\python.exe tools\reviewer.py gemini --visual-packet .review\visual-release\packet.json --task "Inspect the requested changes against their named peers and actual surrounding UI."
+.\.agent-venv\Scripts\python.exe tools\visual_review.py --review .review\gemini-REVIEW-ID
+lune run src/scripts/lune/release-readiness.luau
+```
+
+The first command saves a structured advisory result, never release approval. The second rejects incomplete/contradictory results and stale sources, policy or evidence. Full local release readiness additionally requires a release-purpose review and the owner's actual final visual acceptance at the paths in `tools/workflow.json`. Leave those absent while the visual phase is unfinished. Existing place CI and upload approval behavior are unchanged.

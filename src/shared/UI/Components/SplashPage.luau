@@ -55,7 +55,7 @@ local function actionText(
 			Font = Enum.Font.LuckiestGuy,
 			Text = text,
 			TextSize = textSize,
-			TextColor3 = if primary then UIConfig.ProgressionStyle.White else UIConfig.ProgressionStyle.Ink,
+			TextColor3 = UIConfig.ProgressionStyle.White,
 			ZIndex = 2,
 		}),
 		Icon = if primary

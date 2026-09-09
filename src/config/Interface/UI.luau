@@ -12,6 +12,7 @@ return {
 			Image = "rbxassetid://78333957912633",
 			Offset = Vector2.new(91, 114),
 			Size = Vector2.new(813, 379),
+			OpticalCenterY = 203.08,
 		},
 		Action = {
 			Cyan = "rbxassetid://136021539696619",
