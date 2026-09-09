@@ -45,6 +45,7 @@ local ShopPage = require(Components:WaitForChild("ShopPage"))
 local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytics"))
 local SplashPage = require(Components:WaitForChild("SplashPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
+local LobbyHeaderLayout = require(UI.Models.LobbyHeaderLayout)
 local GameVersion = require(Components:WaitForChild("GameVersion"))
 local DeviceClass = require(Shared:WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass"))
 
@@ -311,12 +312,7 @@ local function LobbyContent(props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local shortPages = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
-	local compactHome = ResponsiveLayout.splashPanels(
-		safeArea.size,
-		UIConfig.Layout.Splash.ProgressPanels,
-		UIConfig.Layout.PortraitMaxAspect,
-		UIConfig.Layout.ShortLandscapeMaxHeightPx
-	).progressStack ~= nil
+	local headerLayout = LobbyHeaderLayout.resolve(safeArea.size)
 	local partyClient = props.PartyClient
 	local onboardingClient = props.OnboardingClient
 	local rootRef = React.useRef(nil)
@@ -657,10 +653,10 @@ local function LobbyContent(props)
 		if renderer then
 			renderer:SetCompactParty(shortPages and currentPage == "SplashScreen")
 		end
-		if not compactHome or currentPage ~= "SplashScreen" or not lobbyVisible or loadingVisible then
+		if currentPage ~= "SplashScreen" or not lobbyVisible or loadingVisible then
 			setPartyMembersOpen(false)
 		end
-	end, { shortPages, compactHome, currentPage, lobbyVisible, loadingVisible })
+	end, { shortPages, currentPage, lobbyVisible, loadingVisible })
 
 	React.useEffect(function()
 		local renderer = characterRenderer.current
@@ -857,29 +853,33 @@ local function LobbyContent(props)
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 			}, {
-				TopBar = c(TopBar, { CurrentPage = currentPage, OnNavigate = setCurrentPage }),
+				TopBar = c(TopBar, {
+					CurrentPage = currentPage,
+					OnNavigate = setCurrentPage,
+					LobbyHeader = true,
+					HeaderVisible = lobbyVisible and not effectPreview.active,
+				}),
 				PartyCode = c(PageTransition, {
 					Active = currentPage == "SplashScreen",
-					Onscreen = if compactHome
-						then UDim2.new(1, -8, 0, 14)
-						else UDim2.fromScale(if portrait then 0.74 else 0.5, 0.115),
-					Offscreen = if compactHome
-						then UDim2.new(1, -8, -1, 0)
-						else UDim2.fromScale(if portrait then 0.74 else 0.5, -1),
+					Onscreen = UDim2.fromOffset(
+						safeArea.position.X + headerLayout.party.position.X + headerLayout.party.size.X,
+						safeArea.position.Y + headerLayout.party.position.Y
+					),
+					Offscreen = UDim2.new(1, -8, -1, 0),
 					Render = function(position)
 						return c(PartyCode, {
-							Compact = compactHome,
+							Compact = true,
+							Size = UDim2.fromOffset(headerLayout.party.size.X, headerLayout.party.size.Y),
+							Label = headerLayout.partyLabel,
 							Position = position,
 							CodeText = LobbyViewModel.formatPartyCode(
 								if snapshot then snapshot.joinCode else nil,
 								codeVisible
 							),
 							CodeVisible = codeVisible,
-							OnOpen = if compactHome
-								then function()
-									setPartyMembersOpen(true)
-								end
-								else nil,
+							OnOpen = function()
+								setPartyMembersOpen(true)
+							end,
 							OnToggle = function()
 								setCodeVisible(function(value)
 									return not value
@@ -895,7 +895,7 @@ local function LobbyContent(props)
 				ZIndex = 100,
 			}, {
 				PartyMembers = c(PartyMembersModal, {
-					Open = partyMembersOpen and compactHome and currentPage == "SplashScreen",
+					Open = partyMembersOpen and currentPage == "SplashScreen",
 					FocusEnabled = notifications.request == nil,
 					Members = partyMembers,
 					LocalUserId = Players.LocalPlayer.UserId,

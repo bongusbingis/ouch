@@ -59,7 +59,7 @@ export type Props = {
 local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 	local day = dayProps.Day
 	local claimed = day.claimed and not day.available
-	local bgColor = if claimed then CLAIMED_COLOR elseif day.available then AVAILABLE_GLOW else Palette.PanelRaised
+	local bgColor = if claimed then CLAIMED_COLOR elseif day.available then AVAILABLE_GLOW else Palette.White
 
 	return c("Frame", {
 		BackgroundColor3 = bgColor,
@@ -73,7 +73,7 @@ local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://168702841",
-				ImageColor3 = Palette.White,
+				ImageColor3 = Palette.Ink,
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(0.82, 0.9),
 				ScaleType = Enum.ScaleType.Fit,
@@ -87,9 +87,7 @@ local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 					Position = UDim2.fromScale(0.5, 0.5),
 					Size = UDim2.fromScale(0.9, 0.8),
 					Text = tostring(day.day),
-					TextColor3 = Palette.White,
-					TextStrokeColor3 = Palette.Ink,
-					TextStrokeTransparency = 0.35,
+					TextColor3 = Palette.Ink,
 				},
 			}),
 	})
@@ -239,15 +237,9 @@ return function(props: Props)
 					Size = UDim2.new(1, -86, 0.17, 0),
 					Text = "DAILY REWARDS",
 					TextXAlignment = Enum.TextXAlignment.Left,
-					TextColor3 = Palette.White,
+					TextColor3 = Palette.Ink,
 					ZIndex = 2,
 				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = Palette.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
 			}),
 			DayStrip = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -257,7 +249,7 @@ return function(props: Props)
 			}, miniDays),
 			RewardArea = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Palette.PanelRaised,
+				BackgroundColor3 = Palette.White,
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0.5, 0.48),
 				Size = UDim2.fromScale(0.7, 0.25),
@@ -268,8 +260,8 @@ return function(props: Props)
 					then c(BonksLabel, {
 						Amount = currentReward.amount or 0,
 						MaxTextSize = 54,
-						TextColor = Palette.White,
-						TextStroke = 0.045,
+						TextColor = Palette.Ink,
+						TextStroke = 0,
 						IconSize = UDim2.fromScale(0.25, 0.8),
 					})
 					else nil,
@@ -285,14 +277,9 @@ return function(props: Props)
 					Position = UDim2.fromScale(0.5, 0.63),
 					Size = UDim2.fromScale(0.8, 0.08),
 					Text = props.ErrorText or streakText,
-					TextColor3 = Palette.White,
+					TextColor3 = Palette.Ink,
 					ZIndex = 2,
 				},
-			}, {
-				Outline = c(
-					"UIStroke",
-					{ Color = Palette.Ink, Thickness = 0.045, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
-				),
 			}),
 			CloseButton = c(AnimatedButton, {
 				ButtonRef = actionRef,

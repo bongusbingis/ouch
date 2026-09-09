@@ -19,6 +19,8 @@ export type Props = {
 	OnToggle: () -> (),
 	OnOpen: (() -> ())?,
 	Compact: boolean?,
+	Size: UDim2?,
+	Label: string?,
 	Position: any?,
 }
 
@@ -36,7 +38,7 @@ return function(props: Props)
 				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
 				Position = props.Position or UDim2.new(1, -8, 0, 14),
-				Size = UDim2.fromOffset(
+				Size = props.Size or UDim2.fromOffset(
 					UIConfig.Layout.PartyCode.LandscapeWidthPx * 0.7,
 					UIConfig.Interaction.MinTargetPx
 				),
@@ -50,19 +52,13 @@ return function(props: Props)
 					Position = UDim2.fromOffset(10, 3),
 					Size = UDim2.new(1, -20, 1, -6),
 					Font = Enum.Font.LuckiestGuy,
-					Text = if props.OnOpen
+					Text = props.Label or if props.OnOpen
 						then "PARTY CODE"
 						elseif props.CodeVisible then string.gsub(props.CodeText, "^PARTY CODE:%s*", "")
 						else "PARTY CODE",
-					TextColor3 = UIConfig.ProgressionStyle.White,
+					TextColor3 = UIConfig.ProgressionStyle.Ink,
 					ZIndex = 2,
 				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
 			}),
 		})
 	end

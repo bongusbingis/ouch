@@ -1,5 +1,7 @@
 --!strict
 
+local LobbyHeaderLayout = require(script.Parent.LobbyHeaderLayout)
+
 local ResponsiveLayout = {}
 
 export type PanelVariant = {
@@ -69,6 +71,7 @@ export type SplashPanelLayout = {
 	season: SplashPanelRect,
 	quests: SplashPanelRect,
 	progressStack: SplashPanelRect?,
+	tabbed: boolean?,
 }
 
 function ResponsiveLayout.isPortrait(size: Vector2, maxAspect: number): boolean
@@ -178,13 +181,15 @@ function ResponsiveLayout.splashPanels(
 		return ResponsiveLayout.panelSize(available, spec, portraitMaxAspect, shortLandscapeMaxHeight)
 	end
 	local dailySize = landscapeSize(config.Daily)
-	dailySize = Vector2.new(dailySize.X, math.max(dailySize.Y, config.DailyMinHeightPx or 1))
+	dailySize = Vector2.new(dailySize.X, math.max(config.Landscape.DailyHeightPx, config.DailyMinHeightPx or 1))
 	local seasonSize = landscapeSize(config.Season)
+	seasonSize = Vector2.new(seasonSize.X, config.Landscape.SeasonHeightPx)
 	local questsSize = landscapeSize(config.Quests)
 	local edge = math.min(config.EdgePaddingPx, math.floor(available.X * 0.03))
 	local short = shortLandscapeMaxHeight ~= nil and available.Y <= shortLandscapeMaxHeight
 	local column = config.Landscape
-	local columnTop = math.floor(available.Y * column.SeasonTopScale)
+	local headerHeight = LobbyHeaderLayout.resolve(available).height
+	local columnTop = math.max(math.floor(available.Y * column.SeasonTopScale), headerHeight + 8)
 	local columnMinimum = column.SeasonHeightPx + column.DailyHeightPx + column.QuestsMinHeightPx + config.GapPx * 2
 	local stack = short or available.Y - columnTop - (column.ActionsReservePx or 0) < columnMinimum
 	if not stack then
@@ -208,21 +213,21 @@ function ResponsiveLayout.splashPanels(
 			},
 		}
 	end
-	local seasonTop =
-		math.max(math.floor(available.Y * config.Landscape.SeasonTopScale), config.Landscape.ShortTopPx or 0)
+	local seasonTop = math.max(columnTop, config.Landscape.ShortTopPx or 0)
 	local questsTop =
 		math.max(math.floor(available.Y * config.Landscape.QuestsTopScale), seasonTop + seasonSize.Y + config.GapPx)
-	local bottom = available.Y - (config.Landscape.ShortBottomPx or 0)
+	local tabbed = short
+		or available.Y - seasonTop - (config.Landscape.ShortBottomPx or 0) < columnMinimum + config.GapPx
+	local bottom = available.Y - (if tabbed then 12 else (config.Landscape.ShortBottomPx or 0))
+	local columnWidth = math.max(seasonSize.X, questsSize.X, math.min(math.floor(available.X * 0.38), 300))
 	local questsBottom = bottom
 	questsSize = Vector2.new(questsSize.X, math.min(questsSize.Y, math.max(44, questsBottom - questsTop)))
 	return {
 		portrait = false,
+		tabbed = tabbed,
 		progressStack = {
-			position = Vector2.new(available.X - edge - math.max(seasonSize.X, questsSize.X) - config.GapPx, seasonTop),
-			size = Vector2.new(
-				math.max(seasonSize.X, questsSize.X) + config.GapPx * 2,
-				math.max(1, bottom - seasonTop)
-			),
+			position = Vector2.new(available.X - edge - columnWidth - config.GapPx, seasonTop),
+			size = Vector2.new(columnWidth + config.GapPx * 2, math.max(1, bottom - seasonTop)),
 		},
 		daily = {
 			position = Vector2.new(
@@ -284,7 +289,7 @@ function ResponsiveLayout.splashWorldWindow(available: Vector2, layout: any): Sa
 	)
 	local edge = layout.Splash.ProgressPanels.GapPx
 	if panels.progressStack then
-		local top = layout.TopBar.ShortHeightPx + 8
+		local top = LobbyHeaderLayout.resolve(available).height + 8
 		return {
 			position = Vector2.new(edge, top),
 			size = Vector2.new(

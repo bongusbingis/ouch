@@ -17,17 +17,17 @@ local SeasonStatusCard = require(script.Parent.SeasonStatusCard)
 
 local c = React.createElement
 
-local function buttonText(text: string)
+local function buttonText(text: string, compact: boolean?)
 	return c(ResponsiveText, {
 		MeasurementFont = Enum.Font.LuckiestGuy,
-		MinTextSize = 16,
-		MaxTextSize = UIConfig.Layout.Splash.ActionTextPx,
+		MinTextSize = if compact then 12 else 16,
+		MaxTextSize = if compact then 14 else UIConfig.Layout.Splash.ActionTextPx,
 		Native = {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.new(1, -16, 1, -8),
+			Size = UDim2.new(1, if compact then -8 else -16, 1, -8),
 			Text = text,
 			TextColor3 = Color3.new(1, 1, 1),
 			ZIndex = 2,
@@ -75,6 +75,11 @@ return function(props: Props)
 	local compactProgressPanels = progressPanels.portrait or short
 	local worldWindow = ResponsiveLayout.splashWorldWindow(safeArea.size, UIConfig.Layout)
 	local stack = progressPanels.progressStack
+	local tabbed = progressPanels.tabbed == true
+	local selectedProgress, setSelectedProgress = React.useState("DAILY")
+	local actionWidth = math.min(worldWindow.size.X, 600)
+	local tabHeight = 44
+	local tabContentHeight = if stack then math.max(1, stack.size.Y - tabHeight - 12) else 0
 	local gap = UIConfig.Layout.Splash.ProgressPanels.GapPx
 	local seasonStatus = c(SeasonStatusCard, {
 		Compact = compactProgressPanels or progressPanels.season.size.Y < UIConfig.Layout.SeasonDetailedMinHeightPx,
@@ -95,14 +100,24 @@ return function(props: Props)
 	local quests = c(QuestsPanel, {
 		Short = short,
 		Compact = compactProgressPanels,
-		Expanded = stack ~= nil,
+		Expanded = false,
 		Native = {
 			LayoutOrder = 3,
 			Position = if stack
 				then nil
 				else UDim2.fromOffset(progressPanels.quests.position.X, progressPanels.quests.position.Y),
 			Size = if stack
-				then UDim2.new(1, -gap * 2, 0, 0)
+				then UDim2.new(
+					1,
+					-gap * 2,
+					0,
+					if tabbed
+						then tabContentHeight
+						else math.max(
+							44,
+							stack.size.Y - progressPanels.season.size.Y - progressPanels.daily.size.Y - gap * 3.5
+						)
+				)
 				else UDim2.fromOffset(progressPanels.quests.size.X, progressPanels.quests.size.Y),
 		},
 		State = props.QuestState,
@@ -110,19 +125,49 @@ return function(props: Props)
 		PendingClaims = props.PendingClaims,
 	})
 	local dailyRewards = c(DailyRewardsPanel, {
-		Compact = compactProgressPanels or progressPanels.daily.size.X < UIConfig.Layout.DailyCell.MinWidthPx * 7,
+		Compact = (if stack then stack.size.X - gap * 2 else progressPanels.daily.size.X)
+			< UIConfig.Layout.DailyCell.FullWeekMinWidthPx,
+		Summary = tabbed and tabContentHeight < UIConfig.Layout.Splash.ProgressPanels.DailyMinHeightPx,
 		Native = {
 			LayoutOrder = 2,
 			Position = if stack
 				then nil
 				else UDim2.fromOffset(progressPanels.daily.position.X, progressPanels.daily.position.Y),
 			Size = if stack
-				then UDim2.new(1, -gap * 2, 0, progressPanels.daily.size.Y)
+				then UDim2.new(
+					1,
+					-gap * 2,
+					0,
+					if tabbed
+						then math.min(tabContentHeight, progressPanels.daily.size.Y)
+						else progressPanels.daily.size.Y
+				)
 				else UDim2.fromOffset(progressPanels.daily.size.X, progressPanels.daily.size.Y),
 		},
 		State = props.DailyReward,
 		OnClaim = props.OnViewDailyReward,
 	})
+	local progressTabs = {}
+	for index, title in { "SEASON", "DAILY", "QUESTS" } do
+		progressTabs[title] = c(AnimatedButton, {
+			Visual = c(ButtonSurface, {
+				Color = if selectedProgress == title
+					then UIConfig.ProgressionStyle.Pink
+					else UIConfig.ProgressionStyle.Ink,
+				Radius = UDim.new(0, 8),
+			}),
+			SelectionRadius = UDim.new(0, 8),
+			Native = {
+				BackgroundTransparency = 1,
+				Position = UDim2.new((index - 1) / 3, if index == 1 then 0 else 3, 0, 0),
+				Size = UDim2.new(1 / 3, -6, 1, 0),
+			},
+			OnActivated = function()
+				setSelectedProgress(title)
+			end,
+		}, { Label = buttonText(title, true) })
+	end
+
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Position = props.Position or UDim2.fromScale(0, 0),
@@ -139,13 +184,20 @@ return function(props: Props)
 			Size = UDim2.fromOffset(worldWindow.size.X, worldWindow.size.Y),
 		}),
 		BottomRight = c("Frame", {
-			AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 1),
+			AnchorPoint = if short
+				then Vector2.new(0, 1)
+				else if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 			BackgroundTransparency = 1,
 			Position = if short
-				then UDim2.new(1, -12, 1, -UIConfig.Layout.Splash.ShortActionsBottomPx)
+				then UDim2.new(
+					0,
+					worldWindow.position.X + (worldWindow.size.X - actionWidth) / 2,
+					1,
+					-UIConfig.Layout.Splash.ShortActionsBottomPx
+				)
 				else if portrait then UDim2.fromScale(0.5, 0.98) else UDim2.new(1, -24, 1, -24),
 			Size = if short
-				then UDim2.new(1, -24, 0, UIConfig.Layout.Splash.ShortActionsHeightPx)
+				then UDim2.fromOffset(actionWidth, UIConfig.Layout.Splash.ShortActionsHeightPx)
 				else if portrait
 					then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
 					else UDim2.fromOffset(progressPanels.season.size.X, 212),
@@ -164,7 +216,7 @@ return function(props: Props)
 					HorizontalAlignment = if portrait
 						then Enum.HorizontalAlignment.Center
 						else Enum.HorizontalAlignment.Right,
-					Padding = if short then UDim.new(0.02, 0) else UDim.new(0, UIConfig.Layout.Splash.ActionsGapPx),
+					Padding = if short then UDim.new(0, 12) else UDim.new(0, UIConfig.Layout.Splash.ActionsGapPx),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					VerticalAlignment = if short then Enum.VerticalAlignment.Center else Enum.VerticalAlignment.Bottom,
 				}),
@@ -173,7 +225,7 @@ return function(props: Props)
 				PaddingRight = UDim.new(0, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
-				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Cyan, Radius = UDim.new(0, 10) }),
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Ink, Radius = UDim.new(0, 10) }),
 				SelectionRadius = UDim.new(0, 10),
 				Native = {
 					BackgroundTransparency = 1,
@@ -181,7 +233,7 @@ return function(props: Props)
 					LayoutOrder = 1,
 					Position = if portrait then UDim2.fromScale(0.025, 0) else UDim2.fromScale(0.343431, 0.675873),
 					Size = if short
-						then UDim2.new(0.26, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
+						then UDim2.new(0.26, -8, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
 						else if portrait
 							then UDim2.new(0.45, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
 							else UDim2.new(0.88, 0, 0, 48),
@@ -189,17 +241,17 @@ return function(props: Props)
 				OnActivated = props.OnInvite,
 			}, {
 
-				TextLabel = buttonText("INVITE FRIENDS"),
+				TextLabel = buttonText(if tabbed then "INVITE" else "INVITE FRIENDS"),
 			}),
 			JoinWithCode = c(AnimatedButton, {
-				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Cyan, Radius = UDim.new(0, 10) }),
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Ink, Radius = UDim.new(0, 10) }),
 				SelectionRadius = UDim.new(0, 10),
 				Native = {
 					BackgroundTransparency = 1,
 					Image = "",
 					Position = if portrait then UDim2.fromScale(0.525, 0) else UDim2.fromScale(0.343431, 0.533477),
 					Size = if short
-						then UDim2.new(0.26, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
+						then UDim2.new(0.26, -8, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
 						else if portrait
 							then UDim2.new(0.45, 0, 0, UIConfig.Layout.Splash.SecondaryActionHeightPx)
 							else UDim2.new(0.88, 0, 0, 48),
@@ -207,23 +259,26 @@ return function(props: Props)
 				OnActivated = props.OnJoinCode,
 			}, {
 
-				TextLabel = buttonText("JOIN PARTY"),
+				TextLabel = buttonText(if tabbed then "JOIN" else "JOIN PARTY"),
 			}),
 			PlayButton = c(AnimatedButton, {
 				ButtonRef = props.PlayButtonRef,
+				Visual = c(ButtonSurface, {
+					Color = if props.PlayEnabled then UIConfig.ProgressionStyle.Pink else UIConfig.ProgressionStyle.Ink,
+				}),
 				Enabled = props.PlayEnabled,
 				Style = "Primary",
 				Native = {
 					AutoButtonColor = props.PlayEnabled,
 					BackgroundTransparency = 1,
-					Image = "rbxassetid://94748581468730",
+					Image = "",
 					ImageColor3 = if props.PlayEnabled then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
 					LayoutOrder = 2,
 					AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.zero,
 					Position = if portrait then UDim2.fromScale(0.5, 1) else UDim2.fromScale(-0.0570855, 0.787143),
 					ScaleType = Enum.ScaleType.Slice,
 					Size = if short
-						then UDim2.new(0.44, 0, 0, UIConfig.Layout.Splash.ShortActionButtonHeightPx)
+						then UDim2.new(0.48, -8, 0, UIConfig.Layout.Splash.ShortActionsHeightPx)
 						else if portrait
 							then UDim2.new(0.96, 0, 0, UIConfig.Layout.Splash.PrimaryActionHeightPx)
 							else UDim2.new(1, 0, 0, 68),
@@ -239,8 +294,8 @@ return function(props: Props)
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
 						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.453406, 0.599863),
-						Size = UDim2.fromScale(0.481093, 0.6712),
+						Position = UDim2.fromScale(0.42, 0.52),
+						Size = UDim2.new(0.64, -12, 1, -12),
 						Text = props.PlayText,
 						TextColor3 = Color3.new(1, 1, 1),
 						ZIndex = 2,
@@ -253,8 +308,9 @@ return function(props: Props)
 						then "rbxassetid://8517323790"
 						else "rbxassetid://103344771690872",
 					LayoutOrder = 2,
-					Position = UDim2.fromScale(if props.PlayText == "PLAY" then 0.686431 else 0.765, 0.52),
-					Size = UDim2.fromScale(0.100552, 0.421535),
+					Position = UDim2.fromScale(0.82, 0.5),
+					Size = UDim2.fromOffset(if short then 22 else 30, if short then 22 else 30),
+					ScaleType = Enum.ScaleType.Fit,
 				}),
 			}),
 		}),
@@ -275,51 +331,36 @@ return function(props: Props)
 				}),
 			})
 			else nil,
-		Logo = c("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://78333957912633",
-			Position = if short
-				then UDim2.fromOffset(8, 10)
-				else if portrait
-					then UDim2.fromScale(0.05, 0.09)
-					else UDim2.fromOffset(
-						UIConfig.Layout.Splash.ProgressPanels.EdgePaddingPx,
-						progressPanels.season.position.Y
-					),
-			Size = if short
-				then UDim2.fromOffset(112, 48)
-				else if portrait
-					then UDim2.fromScale(0.42, 0.14)
-					else UDim2.fromOffset(
-						UIConfig.Layout.Splash.DesktopLogoSizePx.X,
-						UIConfig.Layout.Splash.DesktopLogoSizePx.Y
-					),
-			ScaleType = Enum.ScaleType.Fit,
-		}, {
-			uIAspectRatioConstraint = if short or portrait
-				then c("UIAspectRatioConstraint", {
-					AspectRatio = 1.55,
-				})
-				else nil,
-		}),
 		DailyRewards = if stack then nil else dailyRewards,
 		SeasonStatus = if stack then nil else seasonStatus,
 		Quests = if stack then nil else quests,
-		ProgressStack = if stack
-			then c("ScrollingFrame", {
-				Active = true,
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ProgressStack = if stack and tabbed
+			then c("Frame", {
 				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				CanvasSize = UDim2.new(),
-				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
 				Position = UDim2.fromOffset(stack.position.X, stack.position.Y),
 				Size = UDim2.fromOffset(stack.size.X, stack.size.Y),
-				ScrollBarImageColor3 = UIConfig.ProgressionStyle.White,
-				ScrollBarImageTransparency = 0,
-				ScrollBarThickness = 5,
-				ScrollingDirection = Enum.ScrollingDirection.Y,
-				Selectable = false,
+			}, {
+				Tabs = c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(gap, 0),
+					Size = UDim2.new(1, -gap * 2, 0, tabHeight),
+				}, progressTabs),
+				Content = c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(0, tabHeight + 8),
+					Size = UDim2.new(1, 0, 1, -tabHeight - 8),
+				}, {
+					Layout = c("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center }),
+					Panel = if selectedProgress == "SEASON"
+						then seasonStatus
+						elseif selectedProgress == "DAILY" then dailyRewards
+						else quests,
+				}),
+			})
+			elseif stack then c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(stack.position.X, stack.position.Y),
+				Size = UDim2.fromOffset(stack.size.X, stack.size.Y),
 			}, {
 				Layout = c("UIListLayout", {
 					HorizontalAlignment = Enum.HorizontalAlignment.Center,

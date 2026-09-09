@@ -73,7 +73,7 @@ local function QuestRow(rowProps: {
 	local progressFraction = math.clamp(quest.progress / math.max(quest.goal, 1), 0, 1)
 
 	return c("Frame", {
-		BackgroundColor3 = Palette.PanelRaised,
+		BackgroundColor3 = Palette.White,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		LayoutOrder = rowProps.Order,
@@ -81,7 +81,7 @@ local function QuestRow(rowProps: {
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
 		Stroke = c("UIStroke", {
-			Color = if completed then Palette.White else Palette.Muted,
+			Color = if completed then Palette.Claimed else Palette.Muted,
 			Thickness = 1,
 			Transparency = if completed and not quest.claimed then 0 else 0.8,
 		}),
@@ -106,10 +106,10 @@ local function QuestRow(rowProps: {
 						then `{quest.title} ({quest.progress}/{quest.goal})`
 						else quest.title,
 					TextWrapped = true,
-					TextColor3 = Palette.White,
+					TextColor3 = Palette.Ink,
 					TextXAlignment = Enum.TextXAlignment.Left,
 				},
-			}, { Outline = textStroke(0.035) }),
+			}),
 			ProgressBar = c("Frame", {
 				Visible = not short,
 				BackgroundColor3 = Palette.Track,
@@ -137,10 +137,10 @@ local function QuestRow(rowProps: {
 					Position = UDim2.new(0, 0, 1, -20),
 					Size = UDim2.new(1, 0, 0, 18),
 					Text = `{quest.progress}/{quest.goal}`,
-					TextColor3 = Palette.White,
+					TextColor3 = Palette.Ink,
 					TextXAlignment = Enum.TextXAlignment.Right,
 				},
-			}, { Outline = textStroke(0.035) }),
+			}),
 		}),
 		RightSection = c("Frame", {
 			AnchorPoint = Vector2.new(1, 0.5),
@@ -178,15 +178,15 @@ local function QuestRow(rowProps: {
 						Position = if compact then UDim2.new(1, -44, 0.5, 0) else UDim2.fromScale(0.5, 0.72),
 						Size = if compact then UDim2.fromOffset(88, 24) else UDim2.fromScale(0.94, 0.38),
 						Text = "CLAIMED",
-						TextColor3 = Palette.White,
+						TextColor3 = Palette.Ink,
 					},
-				}, { Outline = textStroke(0.045) })
+				})
 				else nil,
 			RewardPreview = if quest.reward.kind == "Bonks"
 				then c(BonksLabel, {
 					Amount = quest.reward.amount or 0,
-					TextColor = Palette.White,
-					TextStroke = 0.035,
+					TextColor = Palette.Ink,
+					TextStroke = 0,
 					MaxTextSize = 20,
 					Native = {
 						AnchorPoint = if compact then Vector2.new(0, 0.5) else Vector2.new(0.5, 0.5),
@@ -204,6 +204,39 @@ end
 
 return function(props: Props)
 	local state = props.State
+	local listRef = React.useRef(nil)
+	local scrollHint, setScrollHint = React.useState(nil :: string?)
+	local scrollAvailable = state ~= nil and props.Expanded ~= true
+	React.useEffect(function()
+		if not scrollAvailable then
+			setScrollHint(nil)
+			return
+		end
+		local list = listRef.current
+		if not list then
+			return
+		end
+		local function updateHint()
+			local window = list.AbsoluteWindowSize.Y
+			local overflow = list.AbsoluteCanvasSize.Y - window
+			setScrollHint(
+				if window <= 0 or overflow <= 1
+					then nil
+					elseif overflow - list.CanvasPosition.Y > 1 then "SCROLL ↓"
+					else "SCROLL ↑"
+			)
+		end
+		local connections = {}
+		for _, property in { "AbsoluteCanvasSize", "AbsoluteWindowSize", "CanvasPosition" } do
+			table.insert(connections, list:GetPropertyChangedSignal(property):Connect(updateHint))
+		end
+		updateHint()
+		return function()
+			for _, connection in connections do
+				connection:Disconnect()
+			end
+		end
+	end, { scrollAvailable })
 	if state == nil then
 		return nil
 	end
@@ -233,11 +266,11 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				Size = UDim2.new(1, -16, 0, 60),
 				Text = "NO QUESTS AVAILABLE YET",
-				TextColor3 = Palette.White,
+				TextColor3 = Palette.Ink,
 				Font = UIConfig.Text.BodyFont,
 				TextWrapped = true,
 			},
-		}, { Outline = textStroke(0.035) })
+		})
 	end
 	for index, quest in state.quests do
 		questRows[`Quest{index}`] = c(QuestRow, {
@@ -286,13 +319,27 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				Position = UDim2.fromOffset(18, 8),
-				Size = UDim2.new(1, -36, 0, if short then 28 else 36),
-				Text = "DAILY QUESTS",
+				Size = UDim2.new(1, if scrollHint then -132 else -36, 0, if short then 28 else 36),
+				Text = if short and scrollHint then "QUESTS" else "DAILY QUESTS",
 				TextColor3 = Palette.White,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = 2,
 			},
 		}, { Outline = textStroke(0.045) }),
+		ScrollHint = if scrollHint
+			then c("TextLabel", {
+				AnchorPoint = Vector2.new(1, 0),
+				BackgroundTransparency = 1,
+				Position = UDim2.new(1, -16, 0, 8),
+				Size = UDim2.fromOffset(88, if short then 28 else 36),
+				Font = UIConfig.Text.BodyFont,
+				Text = scrollHint,
+				TextSize = 14,
+				TextColor3 = Palette.White,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				ZIndex = 2,
+			})
+			else nil,
 		QuestList = if expanded
 			then c("Frame", {
 				BorderSizePixel = 0,
@@ -301,6 +348,8 @@ return function(props: Props)
 				Size = UDim2.new(1, -16, 0, listHeight),
 			}, questRows)
 			else c("ScrollingFrame", {
+				Active = true,
+				ref = listRef,
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				CanvasSize = UDim2.new(),
 				BorderSizePixel = 0,

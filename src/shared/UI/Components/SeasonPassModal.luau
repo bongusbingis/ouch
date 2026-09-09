@@ -37,13 +37,13 @@ local function label(text, position, size, maximum, color, heading, alignment)
 			Font = if heading then Enum.Font.LuckiestGuy else UI.Text.BodyFont,
 			TextColor3 = color or colors.White,
 			TextStrokeColor3 = colors.Ink,
-			TextStrokeTransparency = if heading then 1 else 0.35,
+			TextStrokeTransparency = if heading or color == colors.Ink then 1 else 0.35,
 			TextWrapped = true,
 			TextXAlignment = alignment or Enum.TextXAlignment.Left,
 			ZIndex = 105,
 		},
 	}, {
-		Outline = if heading
+		Outline = if heading and color ~= colors.Ink
 			then c("UIStroke", {
 				Color = colors.Ink,
 				Thickness = 0.045,
@@ -196,10 +196,11 @@ return function(props)
 				UDim2.fromOffset(16, 8),
 				UDim2.new(1, -140, 0, if compact then 27 else 40),
 				if compact then 25 else 36,
-				nil,
+				colors.Ink,
 				true
 			),
 			Back = c(PriceButton, {
+				Color = colors.Ink,
 				ButtonRef = closeRef,
 				Text = if compact and previewOpen then "REWARDS" else "BACK",
 				TextSize = 20,
@@ -226,7 +227,7 @@ return function(props)
 				UDim2.fromOffset(16, if compact then 35 else 50),
 				UDim2.new(1, -148, 0, 20),
 				if compact then 14 else 19,
-				colors.White,
+				colors.Ink,
 				false
 			),
 			Progress = c("Frame", {
@@ -257,14 +258,14 @@ return function(props)
 						UDim2.fromScale(0, 0.35),
 						UDim2.fromScale(1, 0.3),
 						if compact then 22 else 30,
-						colors.White,
+						colors.Ink,
 						true,
 						Enum.TextXAlignment.Center
 					)
 					else nil,
 				Preview = if previewVisible
 					then c("Frame", {
-						BackgroundColor3 = colors.PanelRaised,
+						BackgroundColor3 = colors.White,
 						BorderSizePixel = 0,
 						Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
 						ZIndex = 103,
@@ -275,7 +276,7 @@ return function(props)
 							UDim2.new(if compact then 0.4 else 0, 12, 0, 8),
 							UDim2.new(if compact then 0.6 else 1, -24, 0, 24),
 							20,
-							colors.White,
+							colors.Ink,
 							true
 						),
 						Art = c("Frame", {
@@ -290,8 +291,8 @@ return function(props)
 								PlaceholderBonks = if selected.kind == "Bonks" then selected.amount else nil,
 								ColorId = (props.Equipped or {}).CharacterColor,
 								CostumeId = (props.Equipped or {}).CostumeAssets,
-								TextColor = colors.White,
-								TextStroke = 0.045,
+								TextColor = colors.Ink,
+								TextStroke = 0,
 								ZIndex = 104,
 							}),
 						}),
@@ -300,7 +301,7 @@ return function(props)
 							if compact then UDim2.new(0.4, 12, 0, 35) else UDim2.new(0, 12, 1, -82),
 							if compact then UDim2.new(0.6, -24, 0.5, -24) else UDim2.new(1, -24, 0, 40),
 							if compact then 23 else 28,
-							colors.White,
+							colors.Ink,
 							true
 						),
 						Kind = label(
@@ -308,7 +309,7 @@ return function(props)
 							if compact then UDim2.new(0.4, 12, 0.5, -2) else UDim2.new(0, 12, 1, -104),
 							if compact then UDim2.new(0.6, -24, 0, 18) else UDim2.new(1, -24, 0, 18),
 							13,
-							colors.White,
+							colors.Ink,
 							false
 						),
 						Requirement = label(
@@ -318,7 +319,7 @@ return function(props)
 							if compact then UDim2.new(0.4, 12, 0.5, 22) else UDim2.new(0, 12, 1, -42),
 							if compact then UDim2.new(0.6, -24, 0.5, -28) else UDim2.new(1, -24, 0, 36),
 							17,
-							colors.White,
+							colors.Ink,
 							false
 						),
 					})
@@ -365,7 +366,7 @@ return function(props)
 					UDim2.fromOffset(0, if compact then -4 else 0),
 					UDim2.new(1, 0, 0, if compact then 18 else 22),
 					if compact then 14 else 18,
-					colors.White,
+					colors.Ink,
 					false
 				),
 				Premium = if showPremium

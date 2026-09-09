@@ -26,7 +26,7 @@ local SPLASH_PANELS = {
 	GapPx = 10,
 	Landscape = {
 		SeasonHeightPx = 88,
-		DailyHeightPx = 116,
+		DailyHeightPx = 140,
 		QuestsMinHeightPx = 116,
 		DailyBottomScale = 0.9,
 		SeasonTopScale = 0.145,
@@ -70,7 +70,7 @@ end
 
 local function landscapePanels()
 	local config = table.clone(SPLASH_PANELS)
-	config.DailyMinHeightPx = 116
+	config.DailyMinHeightPx = 140
 	config.Landscape = table.clone(config.Landscape)
 	config.Landscape.ActionsReservePx = 252
 	config.Landscape.ShortTopPx = 80
@@ -115,7 +115,7 @@ T.describe("Inset coordinate conversion", function()
 end)
 
 T.describe("Responsive UI layout", function()
-	T.it("keeps home progression clear of actions across fixed and scroll compositions", function()
+	T.it("keeps home progression clear of actions across fixed and fallback compositions", function()
 		local config = landscapePanels()
 		for _, size in
 			{
@@ -131,7 +131,7 @@ T.describe("Responsive UI layout", function()
 			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 			if layout.progressStack then
 				local stack = layout.progressStack
-				T.expect(stack.position.Y + stack.size.Y <= size.Y - 70):toBeTruthy()
+				T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - (if layout.tabbed then 12 else 78))
 				T.expect(stack.size.Y >= 100):toBeTruthy()
 			else
 				T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252):toBeTruthy()
@@ -153,14 +153,17 @@ T.describe("Responsive UI layout", function()
 				T.expect(layout[name].position.Y):toEqual(original[name].position.Y)
 				T.expect(layout[name].size.Y):toEqual(original[name].size.Y)
 			end
-			T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 70):toBeTruthy()
+			T.expect(layout.tabbed):toBeTruthy()
+			local stack = assert(layout.progressStack)
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
 		end
 		local size = Vector2.new(820, 501)
 		local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 		local original = ResponsiveLayout.splashPanels(size, unreserved, 1, 500)
 		T.expect(original.progressStack):toBeNil()
 		local stack = assert(layout.progressStack)
-		T.expect(stack.position.Y + stack.size.Y <= size.Y - 70):toBeTruthy()
+		T.expect(layout.tabbed):toBeTruthy()
+		T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
 	end)
 
 	T.it("keeps desktop rewards aligned and uses the available column for scrollable quests", function()
@@ -193,7 +196,7 @@ T.describe("Responsive UI layout", function()
 		T.expect(portrait.Y):toEqual(633)
 	end)
 
-	T.it("reserves a whole short quest row between season progress and lobby actions", function()
+	T.it("reserves readable quest content when phone categories occupy the right column", function()
 		local config = table.clone(SPLASH_PANELS)
 		config.Landscape = table.clone(config.Landscape)
 		config.Landscape.ShortTopPx = 80
@@ -204,7 +207,10 @@ T.describe("Responsive UI layout", function()
 		config.Quests.ShortHeightScale = 0.4
 		local layout = ResponsiveLayout.splashPanels(Vector2.new(666, 316), config, 1, 500)
 		T.expect(layout.quests.size.Y >= 120):toBeTruthy()
-		T.expect(layout.quests.position.Y + layout.quests.size.Y <= 254):toBeTruthy()
+		T.expect(layout.tabbed):toBeTruthy()
+		local stack = assert(layout.progressStack)
+		T.expect(stack.position.Y + stack.size.Y):toEqual(304)
+		T.expect(stack.size.Y - 44 - 12 >= 140):toBeTruthy()
 		T.expect(overlaps(layout.season.position, layout.season.size, layout.quests.position, layout.quests.size))
 			:toEqual(false)
 	end)
@@ -311,21 +317,60 @@ T.describe("Responsive UI layout", function()
 end)
 
 T.describe("Phone progression readability", function()
-	T.it("gives the short progression stack the action-safe column with room to discover quests", function()
+	T.it("fits category targets and a readable daily card on narrow landscape phones", function()
+		for _, size in { Vector2.new(750, 304), Vector2.new(600, 302) } do
+			local config = landscapePanels()
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(layout.progressStack)
+			T.expect(layout.tabbed):toBeTruthy()
+			T.expect((stack.size.X - config.GapPx * 2) / 3 - 6 >= 44):toBeTruthy()
+			T.expect(stack.size.Y - 44 - 12 >= config.DailyMinHeightPx):toBeTruthy()
+			T.expect(stack.size.Y - 44 - 12 >= 138):toBeTruthy()
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
+		end
+	end)
+	T.it("keeps every category visible when an intermediate home has room for a vertical column", function()
+		local config = landscapePanels()
+		for _, size in { Vector2.new(1158, 600), Vector2.new(1158, 662), Vector2.new(1158, 719) } do
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(layout.progressStack)
+			T.expect(layout.tabbed):toBeFalsy()
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - config.Landscape.ShortBottomPx)
+			-- Two card gaps plus the column's top/bottom padding must also fit.
+			local questContentBudget = stack.size.Y - layout.season.size.Y - layout.daily.size.Y - config.GapPx * 3.5
+			T.expect(layout.season.size.Y >= 88):toBeTruthy()
+			T.expect(layout.daily.size.Y >= config.DailyMinHeightPx):toBeTruthy()
+			T.expect(questContentBudget >= config.Landscape.QuestsMinHeightPx):toBeTruthy()
+		end
+	end)
+	T.it("returns to fixed desktop cards only when all cards and actions fit", function()
+		local config = landscapePanels()
+		local intermediate = ResponsiveLayout.splashPanels(Vector2.new(1158, 719), config, 1, 500)
+		local stack = assert(intermediate.progressStack)
+		T.expect(intermediate.tabbed):toBeFalsy()
+		T.expect(stack.position.Y + stack.size.Y):toEqual(719 - 78)
+		local desktop = ResponsiveLayout.splashPanels(Vector2.new(1158, 725), config, 1, 500)
+		T.expect(desktop.progressStack):toBeNil()
+		T.expect(desktop.daily.size.Y >= 140):toBeTruthy()
+		T.expect(desktop.quests.size.Y >= config.Landscape.QuestsMinHeightPx):toBeTruthy()
+		T.expect(desktop.quests.position.Y + desktop.quests.size.Y <= 725 - config.Landscape.ActionsReservePx)
+			:toBeTruthy()
+	end)
+	T.it("uses the phone right column to its bottom margin independently of left-side actions", function()
 		local config = landscapePanels()
 		for _, size in { Vector2.new(666, 258), Vector2.new(666, 316), Vector2.new(750, 303), Vector2.new(820, 500) } do
 			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 			local stack = assert(layout.progressStack)
 			T.expect(stack.position.Y):toEqual(layout.season.position.Y)
-			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - config.Landscape.ShortBottomPx)
-			T.expect(size.Y - 64 - (stack.position.Y + stack.size.Y) >= config.GapPx):toBeTruthy()
+			T.expect(layout.tabbed):toBeTruthy()
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
 			T.expect(stack.position.X >= 0 and stack.position.X + stack.size.X <= size.X):toEqual(true)
 			T.expect(stack.size.X - config.GapPx * 2 >= layout.season.size.X):toEqual(true)
-			T.expect(stack.size.Y >= layout.season.size.Y + config.GapPx * 1.5 + 36):toEqual(true)
+			T.expect(stack.size.Y - 44 - 12 >= 44):toEqual(true)
 		end
 	end)
 	T.it("leaves roomy desktop and portrait progression unstacked", function()
-		for _, size in { Vector2.new(820, 692), Vector2.new(1158, 725), Vector2.new(390, 844) } do
+		for _, size in { Vector2.new(820, 725), Vector2.new(1158, 725), Vector2.new(390, 844) } do
 			T.expect(ResponsiveLayout.splashPanels(size, landscapePanels(), 1, 500).progressStack):toBeNil()
 		end
 	end)

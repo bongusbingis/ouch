@@ -48,19 +48,12 @@ local function label(text, position, size, maximum, heading)
 			Size = size,
 			Font = if heading then Enum.Font.LuckiestGuy else Config.Text.BodyFont,
 			Text = text,
-			TextColor3 = Palette.White,
+			TextColor3 = Palette.Ink,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextStrokeColor3 = Palette.Ink,
-			TextStrokeTransparency = if heading then 1 else 0.25,
+			TextStrokeTransparency = 1,
 			ZIndex = 4,
 		},
-	}, {
-		Outline = if heading
-			then c(
-				"UIStroke",
-				{ Color = Palette.Ink, Thickness = 0.045, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
-			)
-			else nil,
 	})
 end
 
@@ -145,7 +138,7 @@ return function(props: Props)
 			elseif localMember then "YOU"
 			else nil
 		rows[tostring(member.userId)] = c(Surface, {
-			Color = Palette.PanelRaised,
+			Color = Palette.White,
 			Shadow = false,
 			Native = { LayoutOrder = index, Size = UDim2.new(1, 0, 0, layout.RowHeightPx) },
 		}, {
@@ -216,6 +209,7 @@ return function(props: Props)
 				true
 			),
 			Back = c(PriceButton, {
+				Color = Palette.Ink,
 				ButtonRef = backRef,
 				Text = "BACK",
 				TextSize = 22,
@@ -237,6 +231,8 @@ return function(props: Props)
 				TextSize = 18,
 				Compact = true,
 				Color = Palette.Yellow,
+				TextColor = Palette.Ink,
+				TextStroke = 0,
 				Enabled = props.CodeAvailable,
 				AnchorPoint = Vector2.new(1, 0),
 				Position = UDim2.new(1, -margin, 0, codeTop),

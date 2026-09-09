@@ -325,12 +325,12 @@ return {
 			SecondaryActionHeightPx = 56,
 			PrimaryActionHeightPx = 70,
 			ProgressPanels = {
-				DailyMinHeightPx = 116,
+				DailyMinHeightPx = 140,
 				EdgePaddingPx = 24,
 				GapPx = 10,
 				Landscape = {
 					SeasonHeightPx = 88,
-					DailyHeightPx = 116,
+					DailyHeightPx = 140,
 					QuestsMinHeightPx = 116,
 					ActionsReservePx = 252,
 					DailyBottomScale = 0.9,
@@ -383,7 +383,10 @@ return {
 		SeasonCompactClaimWidthPx = 70,
 		SeasonDetailedMinHeightPx = 132,
 		QuestRow = { ShortHeightPx = 80, CompactHeightPx = 138, CompactInfoHeightPx = 82 },
-		DailyCell = { MinWidthPx = 52 },
+		DailyCell = {
+			FullWeekMinWidthPx = 352,
+			MinWidthPx = 52,
+		},
 		PartyCode = {
 			PortraitHeightPx = 118,
 			LandscapeWidthPx = 210,

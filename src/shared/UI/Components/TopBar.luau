@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local LobbyHeader = require(script.Parent.LobbyHeader)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
@@ -85,6 +86,8 @@ export type Props = {
 	CurrentPage: string,
 	OnNavigate: (string) -> (),
 	Tabs: { TabDefinition }?,
+	LobbyHeader: boolean?,
+	HeaderVisible: boolean?,
 }
 
 return function(props: Props)
@@ -92,6 +95,14 @@ return function(props: Props)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local definitions = props.Tabs or DEFINITIONS
+	if props.LobbyHeader then
+		return c(LobbyHeader, {
+			CurrentPage = props.CurrentPage,
+			OnNavigate = props.OnNavigate,
+			Tabs = definitions,
+			Visible = props.HeaderVisible,
+		})
+	end
 	local gap = if portrait then UIConfig.Layout.TopBar.PortraitGapScale else UIConfig.Layout.TopBar.LandscapeGapScale
 	local buttonWidth = math.max((1 - gap * math.max(#definitions - 1, 0)) / math.max(#definitions, 1), 0)
 	local buttons = {
