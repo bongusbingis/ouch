@@ -23,6 +23,7 @@
 # Agent tooling
 .agent-venv/
 .review/
+/prod-finished/
 .agent-cache/
 asset-library/kenney/raw/
 

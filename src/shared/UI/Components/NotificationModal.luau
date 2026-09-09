@@ -16,6 +16,8 @@ local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
+local modalSurface = require(script.Parent.ModalSurface)
+
 local c = React.createElement
 local Palette = UIConfig.ProgressionStyle
 
@@ -37,7 +39,13 @@ export type Props = {
 	FocusEnabled: boolean?,
 }
 
-local function notificationButton(definition: ButtonDefinition, order: number, onChoose: (any) -> (), buttonRef: any?)
+local function notificationButton(
+	definition: ButtonDefinition,
+	order: number,
+	onChoose: (any) -> (),
+	buttonRef: any?,
+	width: number
+)
 	local red = definition.Color == "Red"
 	return c(ShopPriceButton, {
 		ButtonRef = buttonRef,
@@ -47,7 +55,7 @@ local function notificationButton(definition: ButtonDefinition, order: number, o
 		TextSize = 24,
 		LayoutOrder = order,
 		AnchorPoint = Vector2.zero,
-		Size = UDim2.fromScale(0.335, 1),
+		Size = UDim2.fromScale(width, 1),
 		OnActivated = function()
 			onChoose(definition.Value)
 		end,
@@ -110,11 +118,16 @@ return function(props: Props)
 		}),
 	}
 	for index, definition in request.Buttons do
-		buttons[`Button{index}`] =
-			notificationButton(definition, index + 1, props.OnChoose, if index == 1 then firstButtonRef else nil)
+		buttons[`Button{index}`] = notificationButton(
+			definition,
+			index + 1,
+			props.OnChoose,
+			if index == 1 then firstButtonRef else nil,
+			(1 - 0.03 * (math.max(#request.Buttons, 2) - 1)) / math.max(#request.Buttons, 2)
+		)
 	end
 
-	return c("TextButton", {
+	return modalSurface({
 		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,

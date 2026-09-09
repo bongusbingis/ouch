@@ -37,6 +37,36 @@ return {
 	ElimZone = {
 		VerticalPadding = 2,
 	},
+	Fan = {
+		-- Exact authored bases; the static course layout remains unchanged.
+		EnabledNames = {
+			["propeller_trampoline_1_001.001"] = true,
+			["propeller_trampoline_1_001.002"] = true,
+			["propeller_trampoline_1_001.003"] = true,
+			["propeller_trampoline_1_001.004"] = true,
+		},
+		BladeDegreesPerSecond = 300,
+		LaunchSpeed = 65,
+		FloatFactor = 0.65,
+		RadiusScale = 0.7, -- central opening, relative to the base's half-width
+		EntryHeight = 6, -- root height above the grate that can begin a launch
+		ColumnHeight = 18,
+		BottomTolerance = 0.5,
+		MaxLiftSeconds = 0.45,
+		RetriggerCooldown = 0.75,
+		GuardSeconds = 3, -- covers the residual arc after leaving the airflow
+	},
+	Spinner = {
+		-- Prove the representative authored paddle before enabling the other five.
+		EnabledNames = { ["obstacle_6_001.002"] = true },
+		DegreesPerSecond = 100,
+		KnockbackSpeed = 42,
+		UpwardSpeed = 16,
+		ShoveSeconds = 0.15,
+		OutwardBias = 0.3,
+		RetriggerCooldown = 1,
+		GuardSeconds = 0.8,
+	},
 	Rotating = {
 		DegreesPerSecond = 1, -- per-assembly override: numeric "RotationSpeed" attribute on Origin
 		CarryHeight = 16,

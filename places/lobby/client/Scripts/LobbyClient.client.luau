@@ -100,7 +100,7 @@ local teleportPresentation = TeleportPresentationClient.start(function()
 	partyClient:setTeleportPresentationReady()
 end)
 local background = PartyBackgroundController.start()
-local container = ReactRoot.create("LobbyRoot", Enum.ScreenInsets.CoreUISafeInsets)
+local container = ReactRoot.create("LobbyRoot", Enum.ScreenInsets.CoreUISafeInsets, 0, true)
 local root = ReactRoblox.createRoot(container)
 -- Same surface the arena gives the combat HUD: no screen insets so the reticle
 -- sits on the true centre, and its own root so lobby UI never reorders it.
@@ -176,7 +176,7 @@ if combatTestEnabled then
 			Place = "Lobby",
 		})
 	end
-	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500)
+	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500, true)
 	menuRoot = ReactRoblox.createRoot(menuContainer)
 	menuRoot:render(React.createElement(LobbyCombatMenu))
 end

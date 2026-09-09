@@ -65,6 +65,11 @@ local SHOP_ERRORS = {
 	invalid_crate = "That crate is unavailable.",
 	crate_roll_failed = "The crate could not be opened. You were not charged.",
 	invalid_quantity = "That open quantity is unavailable.",
+	crate_price_changed = "That crate price changed. Please check the refreshed price before opening.",
+	crate_recovery_unavailable = "Crate purchases are unavailable on this server. Please rejoin to refresh the shop.",
+	crate_request_mismatch = "That crate request could not be verified. Please refresh the shop.",
+	crate_request_stale = "That crate request has already finished. Please check your Backpack.",
+	crate_request_gap = "The shop needs to refresh before another crate can be opened.",
 	rate_limited = "You are opening crates too quickly. Try again in a moment.",
 	purchase_failed = "The purchase could not be completed.",
 	request_timed_out = "Still waiting on your purchase. Check your Backpack before trying again.",
@@ -196,6 +201,7 @@ function EconomyMenuController.use(options: Options): Controller
 		return {
 			crateId = crateReveal.crateId,
 			count = crateReveal.count,
+			unitPrice = unit,
 			total = total,
 			affordable = balance >= total,
 			label = if crateReveal.count > 1
@@ -277,13 +283,43 @@ function EconomyMenuController.use(options: Options): Controller
 
 	local shopError = React.useCallback(function(reason: string?)
 		closePreview()
+		if reason == "crate_recovery_required" then
+			local generation = lifecycleGeneration.current
+			local function showRecovery()
+				notifications.confirm({
+					title = "CHECK YOUR CRATE",
+					description = "Your crate result has not arrived yet. Check the existing purchase without buying another crate, or keep playing and check later.",
+					confirmText = "CHECK MY CRATE",
+					cancelText = "KEEP PLAYING",
+				}, function(check)
+					if not check or not mounted.current or generation ~= lifecycleGeneration.current then
+						return
+					end
+					local ok, retryReason = shopClient.retryCrateOpen()
+					if ok or not mounted.current or generation ~= lifecycleGeneration.current then
+						return
+					end
+					if retryReason == "crate_recovery_required" then
+						showRecovery()
+					else
+						notifications.notify({
+							title = "SHOP",
+							description = SHOP_ERRORS[retryReason] or "Your crate is still being checked.",
+							buttonText = "OK",
+						})
+					end
+				end)
+			end
+			showRecovery()
+			return
+		end
 		UIAnalytics.report("PurchaseFailed", { reason = reason or "purchase_failed" })
 		notifications.notify({
 			title = "SHOP",
 			description = SHOP_ERRORS[reason or "purchase_failed"] or "THE PURCHASE COULD NOT BE COMPLETED.",
 			buttonText = "OK",
 		})
-	end, { notifications.notify, closePreview })
+	end, { notifications.notify, notifications.confirm, closePreview, shopClient })
 
 	local runShopAction = React.useCallback(function(action, onSuccess)
 		if not mounted.current then
@@ -453,7 +489,7 @@ function EconomyMenuController.use(options: Options): Controller
 		end
 		shopClient.clearReveal()
 		runShopAction(function()
-			return shopClient.openCrate(`Crate:{replay.crateId}`, replay.crateId, replay.count)
+			return shopClient.openCrate(`Crate:{replay.crateId}`, replay.crateId, replay.count, replay.unitPrice)
 		end, nil)
 	end, { crateReplay, runShopAction, shopClient })
 
@@ -464,7 +500,7 @@ function EconomyMenuController.use(options: Options): Controller
 		end
 		runShopAction(function()
 			if card.kind == "Crate" and card.crateId then
-				return shopClient.openCrate(card.id, card.crateId, count)
+				return shopClient.openCrate(card.id, card.crateId, count, card.bonksPrice)
 			end
 			return shopClient.purchaseCosmetic(card.id, card.itemId)
 		end, nil)

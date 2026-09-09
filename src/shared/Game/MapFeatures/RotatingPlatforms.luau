@@ -14,6 +14,13 @@ local RotatingPlatforms = {}
 
 local FOLDER_NAME = "Rotating"
 
+type LocalRotor = {
+	part: BasePart,
+	relativeCenter: CFrame,
+	centerToPart: CFrame,
+	degreesPerSecond: number,
+}
+
 export type Platform = {
 	origin: BasePart,
 	assembly: Model,
@@ -23,6 +30,7 @@ export type Platform = {
 	pivotToBounds: CFrame,
 	reach: number,
 	appliedAngle: number?,
+	localRotors: { LocalRotor },
 }
 
 local platforms: { Platform } = {}
@@ -51,9 +59,17 @@ local function step()
 	local now = Workspace:GetServerTimeNow()
 	for _, platform in platforms do
 		local angle = Rotation.angleAt(now, platform.degreesPerSecond)
+		local pose = platform.origin.CFrame * CFrame.Angles(0, angle, 0) * platform.relativePivot
 		if platform.appliedAngle == nil or math.abs(angle - platform.appliedAngle) >= MINIMUM_TURN_RADIANS then
 			platform.appliedAngle = angle
-			platform.assembly:PivotTo(platform.origin.CFrame * CFrame.Angles(0, angle, 0) * platform.relativePivot)
+			platform.assembly:PivotTo(pose)
+		end
+		-- One server mover composes the ring with its fan blades and paddles.
+		for _, rotor in platform.localRotors do
+			if rotor.part:IsDescendantOf(platform.assembly) then
+				local localAngle = Rotation.angleAt(now, rotor.degreesPerSecond)
+				rotor.part.CFrame = pose * rotor.relativeCenter * CFrame.Angles(0, localAngle, 0) * rotor.centerToPart
+			end
 		end
 	end
 end
@@ -61,6 +77,33 @@ end
 local function build(origin: BasePart, assembly: Model): Platform
 	local pivot = assembly:GetPivot()
 	local boundsCFrame, boundsSize = assembly:GetBoundingBox()
+	local localRotors: { LocalRotor } = {}
+	local function addRotor(part: BasePart, degreesPerSecond: number)
+		-- Imported pivot orientations are arbitrary; use only the authored center
+		-- so the local rotation stays around world up within the moving ring.
+		local center = CFrame.new(part.CFrame:PointToWorldSpace(part.PivotOffset.Position))
+		table.insert(localRotors, {
+			part = part,
+			relativeCenter = pivot:ToObjectSpace(center),
+			centerToPart = center:ToObjectSpace(part.CFrame),
+			degreesPerSecond = degreesPerSecond,
+		})
+	end
+	for _, base in assembly:GetDescendants() do
+		if not base:IsA("BasePart") then
+			continue
+		end
+		if MapFeatures.Spinner.EnabledNames[base.Name] then
+			addRotor(base, MapFeatures.Spinner.DegreesPerSecond)
+		end
+		if MapFeatures.Fan.EnabledNames[base.Name] then
+			for _, blade in base:GetChildren() do
+				if blade:IsA("BasePart") and blade.Name:find("propeller_trampoline_2_", 1, true) == 1 then
+					addRotor(blade, MapFeatures.Fan.BladeDegreesPerSecond)
+				end
+			end
+		end
+	end
 
 	return {
 		origin = origin,
@@ -70,6 +113,7 @@ local function build(origin: BasePart, assembly: Model): Platform
 		boundsSize = boundsSize,
 		pivotToBounds = pivot:Inverse() * boundsCFrame,
 		reach = (boundsCFrame.Position - origin.Position).Magnitude + boundsSize.Magnitude / 2,
+		localRotors = localRotors,
 	}
 end
 

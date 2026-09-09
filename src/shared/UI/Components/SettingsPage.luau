@@ -3,6 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
@@ -12,6 +13,8 @@ local SettingsRegistry = require(Game:WaitForChild("Settings"):WaitForChild("Set
 local SettingsStore = require(Game:WaitForChild("Settings"):WaitForChild("SettingsStore"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local SettingRow = require(script.Parent.Settings.SettingRow)
+local AssetCredits = require(script.Parent.Settings.AssetCredits)
+local ActionButton = require(script.Parent.Shop.ShopPriceButton)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
@@ -36,6 +39,30 @@ return function(props: Props)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local compact = not short and panelSize.X * 0.93 * 0.95 < UIConfig.Layout.CompactMaxWidthPx
 	local revision, setRevision = React.useState(0)
+	local creditsOpen, setCreditsOpen = React.useState(false)
+	local scrollRef = React.useRef(nil)
+	local creditsButtonRef = React.useRef(nil)
+	local creditsBackRef = React.useRef(nil)
+	local settingsScroll = React.useRef(Vector2.zero)
+	local restoreFocus = React.useRef(false)
+
+	local function showCredits(open: boolean)
+		if open and scrollRef.current then
+			settingsScroll.current = scrollRef.current.CanvasPosition
+		end
+		restoreFocus.current = GuiService.SelectedObject ~= nil
+		setCreditsOpen(open)
+	end
+
+	React.useEffect(function()
+		if scrollRef.current then
+			scrollRef.current.CanvasPosition = if creditsOpen then Vector2.zero else settingsScroll.current
+		end
+		if restoreFocus.current then
+			GuiService.SelectedObject = if creditsOpen then creditsBackRef.current else creditsButtonRef.current
+			restoreFocus.current = false
+		end
+	end, { creditsOpen })
 
 	React.useEffect(function()
 		return SettingsStore.subscribe(function(_id)
@@ -146,6 +173,30 @@ return function(props: Props)
 		end
 	end
 
+	content.AssetCredits = c(ActionButton, {
+		ButtonRef = creditsButtonRef,
+		AnchorPoint = Vector2.zero,
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, 0, 0, 44),
+		LayoutOrder = layoutOrder + 1,
+		Text = "ASSET CREDITS",
+		TextSize = 22,
+		Compact = true,
+		OnActivated = function()
+			showCredits(true)
+		end,
+	})
+	local creditsContent = {
+		Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }),
+		Padding = c("UIPadding", {
+			PaddingLeft = UDim.new(0, 8),
+			PaddingRight = UDim.new(0, 16),
+			PaddingTop = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 24),
+		}),
+		Credits = c(AssetCredits),
+	}
+
 	return c("ImageLabel", {
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://136021539696619",
@@ -164,9 +215,13 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.291804, 0.0540634),
-				Size = UDim2.fromScale(0.398251, 0.0898091),
-				Text = "SETTINGS",
+				Position = if creditsOpen and short
+					then UDim2.new(0.12, 0, 0, 4)
+					else UDim2.fromScale(if creditsOpen then 0.12 else 0.291804, 0.0540634),
+				Size = if creditsOpen and short
+					then UDim2.new(0.76, 0, 0, 28)
+					else UDim2.fromScale(if creditsOpen then 0.76 else 0.398251, 0.0898091),
+				Text = if creditsOpen then "ASSET CREDITS" else "SETTINGS",
 				TextColor3 = Color3.new(1, 1, 1),
 				ZIndex = 5,
 			},
@@ -178,6 +233,7 @@ return function(props: Props)
 			Size = UDim2.fromScale(0.93, 0.78),
 		}, {
 			Content = c("ScrollingFrame", {
+				ref = scrollRef,
 				Active = true,
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
@@ -189,23 +245,39 @@ return function(props: Props)
 				ScrollBarImageColor3 = Color3.new(1, 1, 1),
 				ScrollBarImageTransparency = 0.1,
 				ScrollBarThickness = if compact then 5 else 7,
-				Selectable = false,
-				Size = UDim2.new(0.95, 0, 1, -38),
+				Selectable = creditsOpen,
+				Size = UDim2.new(0.95, 0, 1, if creditsOpen then -54 else -38),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
-			}, content),
-			SaveStatus = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.FredokaOne,
-				MaxTextSize = 16,
-				Native = {
-					BackgroundTransparency = 1,
-					Font = Enum.Font.FredokaOne,
-					Position = UDim2.new(0.025, 0, 1, -34),
-					Size = UDim2.new(0.95, 0, 0, 30),
-					Text = saveStatus,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 5,
-				},
-			}),
+			}, if creditsOpen then creditsContent else content),
+			CreditsBack = if creditsOpen
+				then c(ActionButton, {
+					ButtonRef = creditsBackRef,
+					AnchorPoint = Vector2.new(0, 1),
+					Position = UDim2.fromScale(0.025, 1),
+					Size = UDim2.new(0.95, 0, 0, 44),
+					Text = "BACK TO SETTINGS",
+					TextSize = 22,
+					Compact = true,
+					OnActivated = function()
+						showCredits(false)
+					end,
+				})
+				else nil,
+			SaveStatus = if not creditsOpen
+				then c(ResponsiveText, {
+					MeasurementFont = Enum.Font.FredokaOne,
+					MaxTextSize = 16,
+					Native = {
+						BackgroundTransparency = 1,
+						Font = Enum.Font.FredokaOne,
+						Position = UDim2.new(0.025, 0, 1, -34),
+						Size = UDim2.new(0.95, 0, 0, 30),
+						Text = saveStatus,
+						TextColor3 = Color3.new(1, 1, 1),
+						ZIndex = 5,
+					},
+				})
+				else nil,
 		}),
 	})
 end

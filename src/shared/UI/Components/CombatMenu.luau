@@ -35,6 +35,8 @@ local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local useSafeArea = require(UI.Hooks.useSafeArea)
 local ResponsiveLayout = require(UI.Models.ResponsiveLayout)
+local modalSurface = require(script.Parent.ModalSurface)
+
 local c = React.createElement
 
 local BACK_ACTION = "CloseCombatMenuLayer"
@@ -468,7 +470,8 @@ local function CombatMenuContent(props)
 		Size = UDim2.fromScale(1, 1),
 	}, {
 		Overlay = if present
-			then c("Frame", {
+			then modalSurface({
+				ClassName = "Frame",
 				Active = true,
 				BackgroundColor3 = Color3.fromRGB(17, 24, 28),
 				BackgroundTransparency = styles.BackdropTransparency,
@@ -481,6 +484,7 @@ local function CombatMenuContent(props)
 				ZIndex = 2,
 			}, {
 				Views = c("Frame", {
+					ClipsDescendants = true,
 					BackgroundTransparency = 1,
 					Size = UDim2.fromScale(1, 1),
 					ZIndex = 3,

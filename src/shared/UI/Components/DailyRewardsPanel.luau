@@ -17,7 +17,7 @@ local Surface = require(script.Parent.Arena.Surface)
 local c = React.createElement
 
 local DARK = Palette.Ink
-local AVAILABLE_COLOR = Palette.Yellow
+local AVAILABLE_COLOR = Palette.Pink
 local CLAIMED_SURFACE = Palette.Claimed
 local LOCKED_SURFACE = Palette.White
 
@@ -51,8 +51,8 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 	local available = day.available
 	local claimed = day.claimed and not available
 	local backgroundColor = if claimed then CLAIMED_SURFACE elseif available then AVAILABLE_COLOR else LOCKED_SURFACE
-	local foregroundColor = Palette.Ink
-	local rewardColor = Palette.Ink
+	local foregroundColor = if available or claimed then Palette.White else Palette.Ink
+	local rewardColor = foregroundColor
 	local strokeColor = if available then AVAILABLE_COLOR else Palette.White
 
 	return c("Frame", {
@@ -82,7 +82,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					Image = "rbxassetid://168702841",
-					ImageColor3 = Palette.Ink,
+					ImageColor3 = Palette.White,
 					Position = UDim2.fromScale(0.5, 0.23),
 					Size = UDim2.fromScale(0.82, 0.52),
 					ScaleType = Enum.ScaleType.Fit,
@@ -100,7 +100,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 						Text = if compact and available then "NOW" else `DAY {day.day}`,
 						TextColor3 = foregroundColor,
 						TextStrokeColor3 = DARK,
-						TextStrokeTransparency = 1,
+						TextStrokeTransparency = if available or claimed then 0.15 else 1,
 					},
 				}),
 			Reward = if day.reward.kind == "Bonks"
@@ -113,7 +113,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					},
 					IconSize = UDim2.fromScale(0.2, 0.78),
 					TextColor = rewardColor,
-					TextStroke = 0,
+					TextStroke = if available or claimed then 0.035 else 0,
 				})
 				else nil,
 			Status = if not compact and (claimed or available)
@@ -128,9 +128,9 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 						Position = UDim2.fromScale(0.5, 0.94),
 						Size = UDim2.fromScale(0.9, 0.18),
 						Text = if claimed then "CLAIMED" else "TODAY",
-						TextColor3 = Palette.Ink,
+						TextColor3 = Palette.White,
 						TextStrokeColor3 = DARK,
-						TextStrokeTransparency = 1,
+						TextStrokeTransparency = 0.15,
 					},
 				})
 				else nil,
@@ -226,7 +226,7 @@ return function(props: Props)
 
 	return c(Surface, { Native = native, Color = Palette.Panel, Radius = 10 }, {
 		HeaderBand = c("Frame", {
-			BackgroundColor3 = Palette.Yellow,
+			BackgroundColor3 = Palette.Claimed,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(8, 8),
 			Size = UDim2.new(1, -16, 0, headerHeight),
@@ -256,10 +256,10 @@ return function(props: Props)
 						else UDim2.new(1, if props.OnClaim then -claimWidth - 16 else 0, 1, -16),
 					Text = "DAILY REWARDS",
 					TextWrapped = compact,
-					TextColor3 = Palette.Ink,
+					TextColor3 = Palette.White,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextStrokeColor3 = DARK,
-					TextStrokeTransparency = 1,
+					TextStrokeTransparency = 0.15,
 					ZIndex = 2,
 				},
 			}),
@@ -271,7 +271,7 @@ return function(props: Props)
 					Font = UIConfig.Text.BodyFont,
 					Text = hint,
 					TextSize = 14,
-					TextColor3 = Palette.Ink,
+					TextColor3 = Palette.White,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					ZIndex = 2,
 				})
@@ -307,7 +307,7 @@ return function(props: Props)
 						Font = UIConfig.Text.BodyFont,
 						Size = UDim2.new(1, 0, 0, 32),
 						Text = summaryText,
-						TextColor3 = Palette.Ink,
+						TextColor3 = Palette.White,
 						TextXAlignment = Enum.TextXAlignment.Left,
 					},
 				}),

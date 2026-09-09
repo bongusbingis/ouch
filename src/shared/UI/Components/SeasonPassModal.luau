@@ -20,6 +20,8 @@ local PriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
 local Rewards = require(script.Parent.SeasonRewardsPanel)
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
+local modalSurface = require(script.Parent.ModalSurface)
+
 local c = React.createElement
 local colors = UI.ProgressionStyle
 
@@ -165,7 +167,7 @@ return function(props)
 		then { { itemId = selected.itemId, category = definition.Category, definition = definition } }
 		else {}
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 100 }, {
-		Dim = c("TextButton", {
+		Dim = modalSurface({
 			Text = "",
 			AutoButtonColor = false,
 			Selectable = false,

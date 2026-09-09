@@ -16,7 +16,7 @@ Run commands from `C:\Users\jackc\Desktop\ouch` in native PowerShell. Explicit v
    .\.agent-venv\Scripts\python.exe tools\install_asset_gate.py
    ```
 
-3. Claude subscription test (medium effort; 900-second deadline; optional `--timeout 1200` for a longer review):
+3. Claude subscription test (max effort; 900-second default deadline; `--timeout` may bound an individual review):
 
    ```powershell
    .\.agent-venv\Scripts\python.exe tools\reviewer.py claude --task "Smoke test: assess only this rule: uncertain uploads without a durable operation ID must never automatically retry. Return the required review structure."
@@ -56,9 +56,9 @@ Run commands from `C:\Users\jackc\Desktop\ouch` in native PowerShell. Explicit v
 
    The script starts a new demo request, waits for durable persistence, terminates only its own child gate, checks state/hash, and optionally reopens the same request. Do not decide the popup while the forced-exit test is running. Evidence lives at `.review/interruption-test.json`. Offline tests mock GUI/transport; the integration script exercises the actual installed process.
 
-8. Exact Figma smoke-test prompt:
+8. Figma direct-control inspection prompt (no MCP):
 
-   > Use authenticated Figma MCP to inspect https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled and its existing components/tokens first. Create one clearly named disposable workflow-test rectangle in free space, return its ID, inspect it, then remove only that node and verify the original canvas is restored. Persist the result. Do not create a production design system in this smoke test.
+   > Use the open authenticated Figma browser through direct browser/Computer Use to inspect https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled and its existing components/tokens. Do not use or configure Figma MCP. Record the observed file/page and canonical components needed for this task. Preserve existing work; do not repeat disposable mutation tests when inspection establishes the needed access.
 
 9. Exact Blender Computer Use smoke-test prompt:
 
@@ -86,7 +86,7 @@ Run commands from `C:\Users\jackc\Desktop\ouch` in native PowerShell. Explicit v
     .\.agent-venv\Scripts\python.exe tools\assetctl.py reconcile
     ```
 
-    Inspect the request state before `resume`. Restore work from Git, canonical Figma, saved `.blend` files, Studio source, external gate state, and Credential Manager. See RECOVERY.md for uncertain uploads.
+    Inspect the request state before `resume`. Restore work from Git, canonical Figma, saved `.blend` files, Studio source and external gate state. See ASSET_PIPELINE.md for uncertain uploads. Do not restore the owner's deleted recovery/instruction files or retrieve credentials as a recovery shortcut.
 
 13. Remaining manual/integration work is tracked in BOOTSTRAP_STATUS.md and tools/integration-status.json. No new secrets were requested or printed. A local native GUI cannot enforce an adversarial human-only boundary against arbitrary same-user code; see ASSET_PIPELINE.md before treating this as a security product.
 
@@ -109,4 +109,4 @@ Follow [VISUAL_REVIEW.md](VISUAL_REVIEW.md), including named peer comparisons an
 lune run src/scripts/lune/release-readiness.luau
 ```
 
-The first command saves a structured advisory result, never release approval. The second rejects incomplete/contradictory results and stale sources, policy or evidence. Full local release readiness additionally requires a release-purpose review and the owner's actual final visual acceptance at the paths in `tools/workflow.json`. Leave those absent while the visual phase is unfinished. Existing place CI and upload approval behavior are unchanged.
+The first command saves a structured advisory result, never release approval. The second rejects incomplete/contradictory results and stale sources, policy or evidence. Full local release readiness additionally requires a release-purpose review and the owner's actual final visual acceptance at the paths in `tools/workflow.json`. The prior lobby visual checkpoint is approved; it does not manufacture the full release-purpose records. See PRODUCTION_READINESS_SPEC.md for current scope and remaining gates. Existing place CI and upload approval behavior are unchanged.

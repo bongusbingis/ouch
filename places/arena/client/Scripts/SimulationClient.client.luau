@@ -38,6 +38,7 @@ local connections = {}
 local combatPresenters = {}
 local damagePresenters = {}
 local DeathEffects
+local FanAirflow
 
 ConfigReplication.startClient(LiveConfig.loadModules("arena"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
@@ -84,6 +85,14 @@ local systems = {
 	{ name = "GameAudio", parent = Presentation, combat = true },
 	{ name = "PlayerHighlights", parent = Presentation, method = "start" },
 	{ name = "JumpPadVisuals", parent = Presentation, method = "start" },
+	{
+		name = "FanAirflow",
+		parent = Presentation,
+		method = "start",
+		onLoaded = function(module)
+			FanAirflow = module
+		end,
+	},
 	{ name = "RotatingPlatforms", parent = MapFeatures, method = "load" },
 	{ name = "PlatformRider", parent = Movement, method = "start" },
 	{ name = "DebugVisuals", parent = DebugModules, method = "start", combat = true },
@@ -188,6 +197,9 @@ table.insert(
 
 script.Destroying:Connect(function()
 	Combat.setInputEnabled(false)
+	if FanAirflow then
+		FanAirflow.stop()
+	end
 	if matchStateConnection then
 		matchStateConnection:Disconnect()
 	end

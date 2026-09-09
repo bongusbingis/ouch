@@ -463,6 +463,7 @@ return function(props: Props)
 
 	return c("CanvasGroup", {
 		ref = holderRef,
+		Visible = model.visible,
 		Active = model.visible and model.deviceClass == "Touch",
 		AnchorPoint = Vector2.new(0.5, 1),
 		BackgroundTransparency = 1,

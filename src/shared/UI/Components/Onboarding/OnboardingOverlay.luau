@@ -81,6 +81,67 @@ local function skipAction(): any
 	return boundAction("OnboardingSkip")
 end
 
+-- An action can exist before its label resolves for the current input device.
+-- Keep the shortcut readable until either native text or artwork is available.
+local function SkipGlyph(props: { action: any, fallback: string, textSize: number })
+	local labelRef = React.useRef(nil)
+	local resolved, setResolved = React.useState(false)
+	React.useEffect(function()
+		local label = labelRef.current
+		if label == nil then
+			return
+		end
+		local function refresh()
+			setResolved(
+				string.find(label.ResolvedText, "%S") ~= nil
+					or label.ResolvedImageContent.SourceType ~= Enum.ContentSourceType.None
+			)
+		end
+		local textChanged = label:GetPropertyChangedSignal("ResolvedText"):Connect(refresh)
+		local imageChanged = label:GetPropertyChangedSignal("ResolvedImageContent"):Connect(refresh)
+		refresh()
+		return function()
+			textChanged:Disconnect()
+			imageChanged:Disconnect()
+		end
+	end, { props.action or false })
+	return c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.24, 0.5),
+		Size = UDim2.fromScale(0.28, 0.62),
+		ZIndex = 64,
+	}, {
+		NativeGlyph = c("InputActionLabel", {
+			ref = labelRef,
+			BackgroundTransparency = 1,
+			FontFace = BODY_FONT,
+			ImageColor3 = Color3.new(1, 1, 1),
+			InputAction = props.action,
+			Size = UDim2.fromScale(1, 1),
+			TextColor3 = Color3.new(1, 1, 1),
+			TextSize = props.textSize,
+			ZIndex = 64,
+		}),
+		Fallback = if not resolved
+			then c(ResponsiveText, {
+				MeasurementFont = Enum.Font.Highway,
+				MaxTextSize = 21,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = BODY_FONT,
+					Position = UDim2.fromScale(0.5, 0.53),
+					Size = UDim2.fromScale(0.86, 0.81),
+					Text = props.fallback,
+					TextColor3 = Color3.new(1, 1, 1),
+					ZIndex = 64,
+				},
+			}, { Stroke = textStroke(0.06) })
+			else nil,
+	})
+end
+
 -- A compact, device-accurate control prompt shown inline on the panel for mouse
 -- and gamepad players in place of a floating gesture diagram: the bound Throw
 -- glyph beside the verb for the current cue.
@@ -410,50 +471,51 @@ return function(props: Props)
 				}, { Stroke = textStroke(0.05) }),
 			})
 			else if not celebrating
-				then c("ImageLabel", {
-					AnchorPoint = Vector2.new(1, 0),
-					BackgroundTransparency = 1,
-					Image = BUTTON_IMAGE,
-					ImageTransparency = 0.12,
-					Position = UDim2.fromScale(0.98, 0.035),
-					ScaleType = Enum.ScaleType.Slice,
-					Size = UDim2.fromScale(0.125, 0.075),
-					SliceCenter = BUTTON_SLICE,
-					SliceScale = 0.12,
-					ZIndex = 63,
+				then c(AnimatedButton, {
+					OnActivated = props.OnSkip,
+					Native = {
+						AnchorPoint = Vector2.new(1, 0),
+						BackgroundTransparency = 1,
+						Image = BUTTON_IMAGE,
+						ImageTransparency = 0.12,
+						Position = if viewport.X < 600
+							then UDim2.fromScale(0.98, 0.31)
+							else UDim2.fromScale(0.98, 0.035),
+						ScaleType = Enum.ScaleType.Slice,
+						Size = UDim2.fromScale(0.125, 0.075),
+						SliceCenter = BUTTON_SLICE,
+						SliceScale = 0.12,
+						ZIndex = 63,
+					},
 				}, {
 					Aspect = c("UIAspectRatioConstraint", { AspectRatio = 3.35 }),
 					Sizer = c("UISizeConstraint", {
-						MinSize = Vector2.new(116, 35),
+						MinSize = Vector2.new(
+							UIConfig.Interaction.MinTargetPx * 3.35,
+							UIConfig.Interaction.MinTargetPx
+						),
 						MaxSize = Vector2.new(210, 63),
 					}),
-					Glyph = if action
-						then c("InputActionLabel", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundTransparency = 1,
-							FontFace = BODY_FONT,
-							ImageColor3 = Color3.new(1, 1, 1),
-							InputAction = action,
-							Position = UDim2.fromScale(0.24, 0.5),
-							Size = UDim2.fromScale(0.28, 0.62),
-							TextColor3 = Color3.new(1, 1, 1),
-							TextSize = glyphTextSize,
-							ZIndex = 64,
-						})
-						else c(ResponsiveText, {
+					Glyph = c(SkipGlyph, {
+						action = action,
+						fallback = if snapshot.deviceClass == "Gamepad" then "B" else "X",
+						textSize = glyphTextSize,
+					}),
+					PointerHint = if snapshot.deviceClass == "Mouse"
+						then c(ResponsiveText, {
 							MeasurementFont = Enum.Font.Highway,
-							MaxTextSize = 21,
+							MaxTextSize = 16,
 							Native = {
-								AnchorPoint = Vector2.new(0.5, 0.5),
 								BackgroundTransparency = 1,
 								FontFace = BODY_FONT,
-								Position = UDim2.fromScale(0.24, 0.52),
-								Size = UDim2.fromScale(0.24, 0.5),
-								Text = if snapshot.deviceClass == "Gamepad" then "B" else "X",
+								Position = UDim2.fromScale(0, 1.12),
+								Size = UDim2.new(1, 0, 0, 22),
+								Text = "HOLD ALT FOR CURSOR",
 								TextColor3 = Color3.new(1, 1, 1),
 								ZIndex = 64,
 							},
-						}, { Stroke = textStroke(0.06) }),
+						}, { Stroke = textStroke(0.06) })
+						else nil,
 					Label = c(ResponsiveText, {
 						MeasurementFont = Enum.Font.LuckiestGuy,
 						MaxTextSize = 23,

@@ -14,6 +14,8 @@ local ScrollFrame = require(UI.Components.ScrollFrame)
 local Selection = require(UI.Services.Selection)
 local useSafeArea = require(UI.Hooks.useSafeArea)
 
+local modalSurface = require(ReplicatedStorage.Shared.UI.Components.ModalSurface)
+
 local c = React.createElement
 local Palette = Config.ProgressionStyle
 
@@ -174,7 +176,7 @@ return function(props: Props)
 	if #props.Members == 0 then
 		rows.Empty = label("Loading party…", UDim2.new(), UDim2.new(1, 0, 0, layout.RowHeightPx), 21, false)
 	end
-	return c("TextButton", {
+	return modalSurface({
 		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,

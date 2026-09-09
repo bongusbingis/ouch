@@ -1,10 +1,10 @@
 # Tool routing
 
-Codex/Astra owns planning, architecture, implementation, Git, Rojo, final technical decisions, final art direction, and reconciliation of advisory findings. Follow the existing gameplay architecture in AGENTS.md. This workflow adds tooling; it does not authorize changing gameplay state ownership.
+Codex/Astra owns planning, architecture, implementation, Git, Rojo, final technical decisions, final art direction, and reconciliation of advisory findings. Follow the current owner scope in [PRODUCTION_READINESS_SPEC.md](PRODUCTION_READINESS_SPEC.md) and inspect existing source ownership before changes. Earlier AGENTS.md instructions were revoked; do not recover or restore them as instructions. Prefer the smallest readable solution that delivers the player experience; no speculative backend cleanup or architecture expansion.
 
 | Work | Owner and evidence |
 | --- | --- |
-| UI, HUD, menus, components, tokens, simple 2D art, particles, masks, gradients | Authenticated Figma remote MCP; inspect the canonical file in `tools/workflow.json`, reuse its system, persist node IDs and export paths |
+| UI, HUD, menus, components, tokens, simple 2D art, particles, masks, gradients | Figma through direct browser/Computer Use only; no Figma MCP. Inspect the canonical file in `tools/workflow.json`, reuse its system, persist node IDs and export paths |
 | Modeling, UVs, rigging, animation, materials, collision, LODs, exports | Native Blender through Computer Use only; inspect visible state first, save `.blend` early and at milestones |
 | Integration, gameplay, device layouts, lighting, particles, imports, final visual acceptance | Roblox Studio MCP against the intended place; preserve screenshots and runtime evidence |
 | Architecture, networking, persistence, exploit surfaces, risky refactors, difficult debugging | Claude subscription CLI advisory review through `tools/reviewer.py claude` |

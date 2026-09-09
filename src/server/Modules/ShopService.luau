@@ -14,6 +14,9 @@ local ShopRotation = require(Economy:WaitForChild("ShopRotation"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local DirectPurchase = require(Economy:WaitForChild("DirectPurchase"))
 local CosmeticsLogic = require(Economy:WaitForChild("CosmeticsLogic"))
+local WriteThroughProxy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
+)
 local PlayerData = require(script.Parent.PlayerData)
 local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
 
@@ -117,11 +120,21 @@ function ShopService.stateFor(player: Player): any
 	local bundle = if bundleId then Bundles.Catalog[bundleId] else nil
 
 	local featured = FeaturedRotation.select(Shop.Featured, now)
+	local lastOpen = data and data.Crates and data.Crates.LastBonksOpen
 
 	return {
 		serverNow = now,
 		paidRandomAllowed = allowed,
 		paidRandomReason = policyReason,
+		bonksOpen = if data
+			then {
+				version = 1,
+				nextSequence = if lastOpen then lastOpen.sequence + 1 else 1,
+				unrevealed = if lastOpen and not lastOpen.revealed
+					then WriteThroughProxy.snapshot(lastOpen.result)
+					else nil,
+			}
+			else nil,
 		offers = offers,
 		offersExpireAt = FeaturedRotation.nextRotationAt(Shop.Rotation.RotationSeconds, now),
 		featured = if featured then { kind = featured.kind, id = featured.id } else nil,

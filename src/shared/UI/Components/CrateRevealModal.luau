@@ -28,6 +28,8 @@ local CosmeticsLogic = require(
 )
 local AnimatedButton = require(script.Parent.AnimatedButton)
 
+local modalSurface = require(script.Parent.ModalSurface)
+
 local c = React.createElement
 
 -- Rarity drives the whole pacing of the reveal: a Common resolves almost
@@ -420,7 +422,7 @@ return function(props)
 		then `{formatNumber(reveal.totalRefund)} BONKS REFUNDED FROM DUPLICATES`
 		else nil
 
-	return c("TextButton", {
+	return modalSurface({
 		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,

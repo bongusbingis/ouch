@@ -231,6 +231,31 @@ function Data.get(player)
 	return entry and entry.Data
 end
 
+-- CrateService prepares these values on detached tables. Apply the wallet,
+-- ownership, pity and receipt payload without yielding, before replication.
+-- Profile.Data and Replica.Data share this root; a failed FireClient must not
+-- turn an already-applied crate into a retryable grant.
+function Data.commitCrateOpen(player, expectedData, draft): boolean
+	local entry = Data._profiles[player.UserId]
+	if entry == nil or entry.Data ~= expectedData or not entry.Profile:IsActive() then
+		return false
+	end
+	local values = {
+		Bonks = draft.Bonks,
+		Cosmetics = draft.Cosmetics,
+		Crates = draft.Crates,
+		ReceiptWork = draft.ReceiptWork,
+	}
+	for key, value in values do
+		entry.Profile.Data[key] = value
+	end
+	local ok, err = pcall(entry.Replica.SetValues, entry.Replica, {}, values)
+	if not ok then
+		warn(`[Data] Crate committed but replication failed for user {player.UserId}: {err}`)
+	end
+	return true
+end
+
 function Data.isLoaded(player)
 	return Data._loaded[player.UserId] == true
 end

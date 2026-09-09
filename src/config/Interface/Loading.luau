@@ -9,6 +9,7 @@ return {
 	TeleportRetryAttempts = 5,
 	TeleportRetryDelaySeconds = 1,
 	TeleportFloodedDelaySeconds = 15,
+	TeleportRecoveryNoticeSeconds = 30,
 	LateVoteMinimumSeconds = 5,
 	LateVoteMaximumExtensionSeconds = 10,
 	TipDelaySeconds = 2.5,

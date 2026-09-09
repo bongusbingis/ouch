@@ -24,7 +24,7 @@ return function()
 			GuiService:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets)
 	end)
 	if ok and typeof(full) == "Rect" and typeof(core) == "Rect" then
-		return { viewport = full.Max - full.Min, coreOffset = core.Min - full.Min }
+		return { viewport = full.Max - full.Min, coreOffset = core.Min - full.Min, coreSize = core.Max - core.Min }
 	end
-	return { viewport = viewport, coreOffset = Vector2.zero }
+	return { viewport = viewport, coreOffset = Vector2.zero, coreSize = viewport }
 end

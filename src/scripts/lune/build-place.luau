@@ -41,14 +41,22 @@ if not fs.isDir(directory) then
 	fs.writeDir(directory)
 end
 local function physicalDirectory(path: string): string
-	local result = process.exec("pwd", { "-P" }, { cwd = path })
+	-- Python is already part of the Windows workflow; realpath also resolves
+	-- directory junctions, so the authored-place guard keeps its physical meaning.
+	local windows = process.env.OS == "Windows_NT"
+	local result = if windows
+		then process.exec("python", { "-c", "import os; print(os.path.realpath('.'))" }, { cwd = path })
+		else process.exec("pwd", { "-P" }, { cwd = path })
 	assert(result.ok, `[build-place] cannot resolve directory {path}: {result.stderr}`)
-	return string.gsub(result.stdout, "%s+$", "")
+	return (string.gsub(string.gsub(result.stdout, "%s+$", ""), "\\", "/"))
 end
 directory = physicalDirectory(directory)
 local authoredDirectory = physicalDirectory("places")
+local comparedDirectory = if process.env.OS == "Windows_NT" then string.lower(directory) else directory
+local comparedAuthored = if process.env.OS == "Windows_NT" then string.lower(authoredDirectory) else authoredDirectory
 assert(
-	directory ~= authoredDirectory and string.sub(directory, 1, #authoredDirectory + 1) ~= authoredDirectory .. "/",
+	comparedDirectory ~= comparedAuthored
+		and string.sub(comparedDirectory, 1, #comparedAuthored + 1) ~= comparedAuthored .. "/",
 	"[build-place] output directory must be outside places/"
 )
 for _, name in { "build.rbxl", "dist.rbxl", "manifest.json" } do

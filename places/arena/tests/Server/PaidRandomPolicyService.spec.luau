@@ -1,4 +1,4 @@
--- Description: In-place spec that paid random crate offers are blocked and cached for restricted players while earned-currency crates stay available.
+-- Description: Paid-random policy remains authoritative for pooled Bonks even when current offers are hidden.
 
 --!nonstrict
 
@@ -64,19 +64,45 @@ return function()
 			expect(calls).to.equal(1)
 		end)
 
-		it("leaves earned-Bonks crates available when paid offers are preview-only", function()
+		it("keeps restrictions when current paid offers are preview-only", function()
 			local removing = signal()
 			PaidRandomPolicyService.start({
 				players = { PlayerRemoving = removing },
 				policyService = {
 					GetPolicyInfoForPlayerAsync = function()
-						error("must not query")
+						return { ArePaidRandomItemsRestricted = true }
 					end,
 				},
 				products = { Catalog = { Bonks500 = { CatalogStatus = "Preview", Type = "Bonks" } } },
 			})
 			local allowed = PaidRandomPolicyService.canReceivePaidRandom({ Name = "EarnedOnly" })
-			expect(allowed).to.equal(true)
+			expect(allowed).to.equal(false)
+		end)
+
+		it("treats malformed policy as unavailable and bounds repeated failures", function()
+			local calls, now = 0, 0
+			PaidRandomPolicyService.start({
+				players = { PlayerRemoving = signal() },
+				clock = function()
+					return now
+				end,
+				policyService = {
+					GetPolicyInfoForPlayerAsync = function()
+						calls += 1
+						return {}
+					end,
+				},
+			})
+			local player = { Name = "Unavailable" }
+			for _ = 1, 10 do
+				local allowed, reason = PaidRandomPolicyService.canReceivePaidRandom(player)
+				expect(allowed).to.equal(false)
+				expect(reason).to.equal("policy_unavailable")
+			end
+			expect(calls).to.equal(1)
+			now = 6
+			PaidRandomPolicyService.canReceivePaidRandom(player)
+			expect(calls).to.equal(2)
 		end)
 	end)
 end

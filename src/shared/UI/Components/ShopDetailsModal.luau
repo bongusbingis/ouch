@@ -29,6 +29,8 @@ local CosmeticsLogic = require(
 local Selection = require(script.Parent.Parent.Services.Selection)
 local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local ScrollFrame = require(script.Parent.ScrollFrame)
+local modalSurface = require(script.Parent.ModalSurface)
+
 local c = React.createElement
 local colors = UIConfig.ProgressionStyle
 
@@ -482,7 +484,7 @@ local function ItemDetails(props)
 		})
 	end
 
-	return c("TextButton", {
+	return modalSurface({
 		AutoButtonColor = false,
 		Selectable = false,
 		Text = "",

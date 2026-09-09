@@ -845,6 +845,7 @@ local function LobbyContent(props)
 			Visible = lobbyVisible and not effectPreview.active,
 		}, {
 			Views = c("Frame", {
+				ClipsDescendants = true,
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 2,

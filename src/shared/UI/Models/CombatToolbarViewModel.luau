@@ -48,7 +48,7 @@ export type Layout = {
 	bottomGap: number,
 }
 
-local ORDER = { "Dodgeball", "Hammer" }
+local ORDER = { "Hammer", "Dodgeball" }
 
 local function binding(deviceClass: string, weapon: string): (string?, Enum.KeyCode?)
 	if deviceClass == "Touch" then

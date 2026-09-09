@@ -98,6 +98,45 @@ return function()
 			expect(guarded(player)).to.equal("guarded")
 		end)
 
+		it("applies known action budgets and shares unknown actions in the default bucket", function()
+			local first = freshPlayer()
+			local second = freshPlayer()
+			local handler = Network.withActionRateLimits({
+				default = { limit = 1 },
+				JoinByCode = { limit = 1 },
+				StartMatchmaking = { limit = 1 },
+			}, function(_player, action)
+				return action
+			end, "PartyRequest")
+
+			expect(handler(first, "JoinByCode")).to.equal("JoinByCode")
+			local _, joinReason = handler(first, "JoinByCode")
+			expect(joinReason).to.equal("rate_limited")
+			-- A known action has its own bucket, including when another action is full.
+			expect(handler(first, "StartMatchmaking")).to.equal("StartMatchmaking")
+			-- Non-string and unknown actions share one bounded default bucket.
+			expect(handler(first, "UnrecognizedAction")).to.equal("UnrecognizedAction")
+			local _, malformedReason = handler(first, 42)
+			expect(malformedReason).to.equal("rate_limited")
+			-- The same known action has an independent budget per player.
+			expect(handler(second, "JoinByCode")).to.equal("JoinByCode")
+		end)
+
+		simulationIt("uses a configured action window", function()
+			local player = freshPlayer()
+			local handler = Network.withActionRateLimits({
+				default = { limit = 1, window = 0.05 },
+			}, function(_player, action)
+				return action
+			end, "PartyRequest")
+
+			expect(handler(player, "AnyAction")).to.equal("AnyAction")
+			local _, reason = handler(player, "AnotherAction")
+			expect(reason).to.equal("rate_limited")
+			task.wait(0.06)
+			expect(handler(player, 42)).to.equal(42)
+		end)
+
 		it("tracks rate limits per player", function()
 			local first = freshPlayer()
 			local second = freshPlayer()
@@ -161,6 +200,33 @@ return function()
 			expect(accepted).to.equal(nil)
 			expect(deniedReason).to.equal("rate_limited")
 			expect(validated).to.equal(1)
+		end)
+
+		it("runs action limiting after validation", function()
+			local player = freshPlayer()
+			local actions = 0
+			local composed = Network.withRateLimit(
+				3,
+				Network.withValidation(
+					function(_player, action)
+						return typeof(action) == "string"
+					end,
+					Network.withActionRateLimits({
+						default = { limit = 1 },
+					}, function(_player, action)
+						actions += 1
+						return action
+					end, "PartyRequest"),
+					"PartyRequest"
+				)
+			)
+
+			local _, invalidReason = composed(player, 42)
+			expect(invalidReason).to.equal("invalid_args")
+			expect(composed(player, "valid")).to.equal("valid")
+			local _, actionReason = composed(player, "second")
+			expect(actionReason).to.equal("rate_limited")
+			expect(actions).to.equal(1)
 		end)
 	end)
 end

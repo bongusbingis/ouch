@@ -6,11 +6,15 @@ local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local JumpPads = require(script.Parent.JumpPads)
 local ElimZones = require(script.Parent.ElimZones)
 local FoamPits = require(script.Parent.FoamPits)
+local FanUpdraft = require(script.Parent.FanUpdraft)
+local SpinnerBump = require(script.Parent.SpinnerBump)
 
 local kits: { MapFeatureKit.MapFeatureKit } = {
 	ElimZones,
 	JumpPads,
 	FoamPits,
+	FanUpdraft,
+	SpinnerBump,
 }
 
 local MapFeatureRegistry = {}

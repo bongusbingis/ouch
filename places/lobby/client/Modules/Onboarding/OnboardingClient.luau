@@ -25,7 +25,9 @@ local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
-local AimDirector = require(script.Parent.Parent:WaitForChild("Input"):WaitForChild("AimDirector"))
+local DeviceClass = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass")
+)
 local GameAudio = require(script.Parent.Parent:WaitForChild("Presentation"):WaitForChild("GameAudio"))
 local ThrowUXClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ThrowUXClient"))
 
@@ -69,6 +71,11 @@ local state: Snapshot = {
 }
 
 local lastAttemptAt = os.clock()
+local CURSOR_REASON = "OnboardingPointer"
+
+local function releasePointer()
+	Combat.releaseCursor(CURSOR_REASON)
+end
 
 local function playCue(name: string)
 	local ok, err = pcall(GameAudio.play, name)
@@ -80,10 +87,6 @@ end
 -- The same vocabulary the rest of combat uses (Config.AimAssist keys, the
 -- DeviceClass attribute, the sim's release device). A second naming scheme here
 -- would silently mismatch every hint the moment either side changed.
-local function deviceClass(): string
-	return AimDirector.deviceClass()
-end
-
 local function publish(changes: { [string]: any })
 	local next = table.clone(state)
 	for key, value in changes do
@@ -110,6 +113,9 @@ local function reportAttempt(escalated: boolean?)
 end
 
 function OnboardingClient.skip()
+	if not state.active or state.celebrating then
+		return
+	end
 	Network.fireServer("OnboardingAction", "Skip")
 end
 
@@ -159,6 +165,7 @@ local function onServerState(packet: any)
 	end
 	local wasActive = state.active
 	if packet.active ~= true then
+		releasePointer()
 		publish({
 			active = false,
 			resolved = true,
@@ -183,6 +190,9 @@ local function onServerState(packet: any)
 
 	local changedStep = packet.step ~= state.step
 	local entering = not state.active
+	if packet.step == "Celebration" then
+		releasePointer()
+	end
 	lastAttemptAt = os.clock()
 
 	publish({
@@ -254,14 +264,35 @@ function OnboardingClient.start()
 		end)
 	)
 	table.insert(
-		connections,
-		UserInputService.LastInputTypeChanged:Connect(function()
-			local device = deviceClass()
+		disposers,
+		DeviceClass.observe(function(device)
+			if device ~= "Mouse" then
+				releasePointer()
+			end
 			if device ~= state.deviceClass then
 				publish({ deviceClass = device })
 			end
 		end)
 	)
+	-- Aiming owns the locked cursor during lessons. Holding Alt temporarily
+	-- hands it to the visible controls without changing the combat camera mode.
+	table.insert(
+		connections,
+		UserInputService.InputBegan:Connect(function(input, processed)
+			if input.KeyCode == Enum.KeyCode.LeftAlt and not processed and state.active and not state.celebrating then
+				Combat.requestCursor(CURSOR_REASON)
+			end
+		end)
+	)
+	table.insert(
+		connections,
+		UserInputService.InputEnded:Connect(function(input)
+			if input.KeyCode == Enum.KeyCode.LeftAlt then
+				releasePointer()
+			end
+		end)
+	)
+	table.insert(connections, UserInputService.WindowFocusReleased:Connect(releasePointer))
 
 	local accumulator = 0
 	heartbeat = RunService.Heartbeat:Connect(function(dt: number)
@@ -272,8 +303,6 @@ function OnboardingClient.start()
 		accumulator = 0
 		tickHints()
 	end)
-
-	publish({ deviceClass = deviceClass() })
 
 	task.spawn(function()
 		local ok, result = pcall(Network.call, "OnboardingReady")
@@ -290,6 +319,7 @@ function OnboardingClient.start()
 end
 
 function OnboardingClient.destroy()
+	releasePointer()
 	for _, connection in connections do
 		if typeof(connection) == "RBXScriptConnection" then
 			connection:Disconnect()

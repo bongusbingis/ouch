@@ -3,6 +3,7 @@
 --!strict
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local Workspace = game:GetService("Workspace")
@@ -20,6 +21,8 @@ type Batch = {
 	userIds: { number },
 	retryAt: number,
 	retryRevision: number,
+	noticeAt: number,
+	noticeRevision: number,
 }
 
 type State = {
@@ -28,6 +31,9 @@ type State = {
 	pendingRetry: boolean,
 	attempt: number,
 	generation: number,
+	attemptId: string?,
+	dispatched: boolean,
+	failureReason: string?,
 	placeId: number,
 	optionsFactory: OptionsFactory,
 	preflight: Preflight?,
@@ -36,6 +42,7 @@ type State = {
 
 local TeleportRetryCoordinator = {}
 TeleportRetryCoordinator.__index = TeleportRetryCoordinator
+local ATTEMPT_DATA_KEY = "_ouchTeleportAttempt"
 
 local RETRYABLE_RESULTS = {
 	Failure = true,
@@ -58,13 +65,18 @@ function TeleportRetryCoordinator.new(direction: Direction, dependencies: any?)
 		_failureHandler = nil :: FailureHandler?,
 		_statusHandler = nil :: StatusHandler?,
 		_destroyed = false,
+		_warnedUnmatchedFailure = false,
 		_connections = {} :: { RBXScriptConnection },
 	}, TeleportRetryCoordinator)
 
 	table.insert(
 		self._connections,
-		self._teleportService.TeleportInitFailed:Connect(function(player, result, _message, placeId)
-			self:_handleFailure(player, result, placeId)
+		self._teleportService.TeleportInitFailed:Connect(function(player, result, _message, placeId, options)
+			local ok, data = pcall(function()
+				return options:GetTeleportData()
+			end)
+			local attemptId = if ok and typeof(data) == "table" then data[ATTEMPT_DATA_KEY] else nil
+			self:_handleFailure(player, result, placeId, attemptId)
 		end)
 	)
 	table.insert(
@@ -90,11 +102,20 @@ function TeleportRetryCoordinator:_sendStatus(player: Player, stateName: string,
 		return
 	end
 	local state = self._states[player.UserId]
+	local canRecover = state ~= nil and state.failed and self:_batchCanRecover(state.batch)
+	local delayed = state ~= nil and Workspace:GetServerTimeNow() >= state.batch.noticeAt
+	if stateName == "Attempting" and delayed then
+		stateName = "Delayed"
+	end
 	local packet: { [string]: any } = {
 		direction = self._direction,
 		state = stateName,
 		attempt = if state then state.attempt else 0,
 		maxAttempts = Loading.TeleportRetryAttempts,
+		canRetry = canRecover,
+		canStay = canRecover,
+		waitingForParty = state ~= nil and state.failed and not canRecover,
+		recoveryAvailable = delayed,
 	}
 	if extra then
 		for key, value in extra do
@@ -121,7 +142,46 @@ end
 
 function TeleportRetryCoordinator:CanRetry(player: Player): boolean
 	local state = self._states[player.UserId]
-	return state ~= nil and state.failed
+	return state ~= nil and state.failed and self:_batchCanRecover(state.batch)
+end
+
+function TeleportRetryCoordinator:_batchCanRecover(batch: Batch): boolean
+	for _, userId in batch.userIds do
+		local state = self._states[userId]
+		if state and state.batch == batch and self._players:GetPlayerByUserId(userId) and not state.failed then
+			return false
+		end
+	end
+	return true
+end
+
+function TeleportRetryCoordinator:_refreshRecovery(batch: Batch)
+	for _, userId in batch.userIds do
+		local state = self._states[userId]
+		local player = self._players:GetPlayerByUserId(userId)
+		if state and state.batch == batch and state.failed and player then
+			self:_sendStatus(player, "Failed", { reason = state.failureReason })
+		end
+	end
+end
+
+function TeleportRetryCoordinator:_scheduleNotice(batch: Batch)
+	batch.noticeRevision += 1
+	local revision = batch.noticeRevision
+	task.delay(math.max(batch.noticeAt - Workspace:GetServerTimeNow(), 0), function()
+		if self._destroyed or batch.noticeRevision ~= revision then
+			return
+		end
+		for _, userId in batch.userIds do
+			local state = self._states[userId]
+			local player = self._players:GetPlayerByUserId(userId)
+			if state and state.batch == batch and state.active and player then
+				-- Elapsed time does not establish platform failure or cancel a teleport.
+				self:_sendStatus(player, "Delayed", { reason = "teleport_delayed" })
+			end
+		end
+		self:_refreshRecovery(batch)
+	end)
 end
 
 function TeleportRetryCoordinator:Clear(player: Player)
@@ -130,6 +190,7 @@ function TeleportRetryCoordinator:Clear(player: Player)
 		state.active = false
 		state.generation += 1
 		self._states[player.UserId] = nil
+		self:_refreshRecovery(state.batch)
 	end
 end
 
@@ -141,11 +202,15 @@ function TeleportRetryCoordinator:_fail(player: Player, reason: string)
 	state.active = false
 	state.failed = true
 	state.pendingRetry = false
+	state.dispatched = false
+	state.attemptId = nil
+	state.failureReason = reason
 	state.generation += 1
 	self:_sendStatus(player, "Failed", { reason = reason })
 	if self._failureHandler then
 		self._failureHandler(player, reason)
 	end
+	self:_refreshRecovery(state.batch)
 end
 
 function TeleportRetryCoordinator:_teleport(players: { Player }): (boolean, any?)
@@ -157,33 +222,65 @@ function TeleportRetryCoordinator:_teleport(players: { Player }): (boolean, any?
 	if firstState == nil then
 		return false, "cancelled"
 	end
+	local attemptId = HttpService:GenerateGUID(false)
+	local captured = {}
+	for _, player in players do
+		local state = self._states[player.UserId]
+		if state and state.batch == firstState.batch and state.active and not state.dispatched then
+			state.attemptId = attemptId
+			state.dispatched = true
+			captured[player.UserId] = state
+		end
+	end
+	local function currentPlayers()
+		local current = {}
+		for _, player in players do
+			local state = captured[player.UserId]
+			if
+				state
+				and self._states[player.UserId] == state
+				and state.attemptId == attemptId
+				and state.active
+				and player.Parent == self._players
+			then
+				table.insert(current, player)
+			end
+		end
+		return current
+	end
+	players = currentPlayers()
+	if #players == 0 then
+		return false, "cancelled"
+	end
 	if firstState.preflight then
 		local ok, accepted, reason = pcall(firstState.preflight, players)
 		if not ok or not accepted then
 			local failure = if ok then reason or "not_ready" else "preflight_failed"
-			for _, player in players do
-				if self._states[player.UserId] and self._states[player.UserId].batch == firstState.batch then
-					self:_fail(player, failure)
-				end
+			for _, player in currentPlayers() do
+				self:_fail(player, failure)
 			end
 			return false, failure
 		end
 	end
-	local remaining = {}
-	for _, player in players do
-		local current = self._states[player.UserId]
-		if current and current.batch == firstState.batch and current.active and player.Parent == self._players then
-			table.insert(remaining, player)
-		end
-	end
-	players = remaining
+	players = currentPlayers()
 	if self._destroyed or #players == 0 then
 		return false, "cancelled"
 	end
 
 	local options: TeleportOptions? = nil
+	local dispatched = false
 	local success, teleportError = pcall(function()
 		options = firstState.optionsFactory(players)
+		players = currentPlayers()
+		if self._destroyed or #players == 0 then
+			return
+		end
+		local originalData = (options :: TeleportOptions):GetTeleportData()
+		assert(originalData == nil or typeof(originalData) == "table", "teleport data must be a table")
+		local data = if originalData == nil then {} else table.clone(originalData)
+		data[ATTEMPT_DATA_KEY] = attemptId
+		(options :: TeleportOptions):SetTeleportData(data)
+		dispatched = true
 		self._teleportService:TeleportAsync(firstState.placeId, players, options :: TeleportOptions)
 	end)
 	if options then
@@ -192,15 +289,24 @@ function TeleportRetryCoordinator:_teleport(players: { Player }): (boolean, any?
 
 	if not success then
 		for _, player in players do
-			self:_handleFailure(player, Enum.TeleportResult.Failure, firstState.placeId)
+			self:_handleFailure(player, Enum.TeleportResult.Failure, firstState.placeId, attemptId)
 		end
+	elseif not dispatched then
+		return false, "cancelled"
 	end
 	return success, teleportError
 end
 
-function TeleportRetryCoordinator:_handleFailure(player: Player, result: Enum.TeleportResult, placeId: number)
+function TeleportRetryCoordinator:_handleFailure(player: Player, result: Enum.TeleportResult, placeId: number, attemptId: any)
 	local state = self._states[player.UserId]
 	if self._destroyed or state == nil or not state.active or state.pendingRetry or state.placeId ~= placeId then
+		return
+	end
+	if typeof(attemptId) ~= "string" or state.attemptId ~= attemptId or not state.dispatched then
+		if not self._warnedUnmatchedFailure then
+			self._warnedUnmatchedFailure = true
+			warn("[TeleportRetryCoordinator] ignored failure without matching current attempt data")
+		end
 		return
 	end
 
@@ -211,6 +317,8 @@ function TeleportRetryCoordinator:_handleFailure(player: Player, result: Enum.Te
 
 	state.attempt += 1
 	state.pendingRetry = true
+	state.dispatched = false
+	state.attemptId = nil
 	state.generation += 1
 	local delaySeconds = if result == Enum.TeleportResult.Flooded
 		then Loading.TeleportFloodedDelaySeconds
@@ -254,7 +362,9 @@ function TeleportRetryCoordinator:Prepare(
 	local batch: Batch = {
 		userIds = {},
 		retryAt = 0,
-		retryRevision = 0,
+			retryRevision = 0,
+			noticeAt = Workspace:GetServerTimeNow() + Loading.TeleportRecoveryNoticeSeconds,
+			noticeRevision = 0,
 	}
 	for _, player in players do
 		if player.Parent == self._players and not self:IsTracked(player) then
@@ -264,6 +374,9 @@ function TeleportRetryCoordinator:Prepare(
 				pendingRetry = false,
 				attempt = 1,
 				generation = 1,
+				attemptId = nil,
+				dispatched = false,
+				failureReason = nil,
 				placeId = placeId,
 				optionsFactory = optionsFactory,
 				preflight = preflight,
@@ -274,6 +387,9 @@ function TeleportRetryCoordinator:Prepare(
 			self:_sendStatus(player, "Attempting")
 		end
 	end
+	if #pending > 0 then
+		self:_scheduleNotice(batch)
+	end
 	return pending
 end
 
@@ -281,7 +397,7 @@ function TeleportRetryCoordinator:StartPrepared(players: { Player }): (boolean, 
 	local pending = {}
 	for _, player in players do
 		local state = self._states[player.UserId]
-		if state and state.active and not state.pendingRetry and player.Parent == self._players then
+		if state and state.active and not state.pendingRetry and not state.dispatched and player.Parent == self._players then
 			table.insert(pending, player)
 		end
 	end
@@ -302,12 +418,14 @@ end
 
 function TeleportRetryCoordinator:Retry(player: Player): boolean
 	local state = self._states[player.UserId]
-	if state == nil or not state.failed or player.Parent ~= self._players then
+	if state == nil or not self:CanRetry(player) or player.Parent ~= self._players then
 		return false
 	end
 	local batch = state.batch
 	batch.retryRevision += 1
 	batch.retryAt = 0
+	batch.noticeAt = Workspace:GetServerTimeNow() + Loading.TeleportRecoveryNoticeSeconds
+	self:_scheduleNotice(batch)
 	local retryPlayers = {}
 	for _, userId in batch.userIds do
 		local current = self._states[userId]
@@ -316,6 +434,9 @@ function TeleportRetryCoordinator:Retry(player: Player): boolean
 			current.active = true
 			current.failed = false
 			current.pendingRetry = false
+			current.dispatched = false
+			current.attemptId = nil
+			current.failureReason = nil
 			current.attempt = 1
 			current.generation += 1
 			self:_sendStatus(retryPlayer, "Attempting")
@@ -328,7 +449,7 @@ end
 
 function TeleportRetryCoordinator:Stay(player: Player): boolean
 	local state = self._states[player.UserId]
-	if state == nil or not state.failed then
+	if state == nil or not self:CanRetry(player) then
 		return false
 	end
 	local batch = state.batch

@@ -1,5 +1,7 @@
 # Visual and release audit - responsive lobby checkpoint
 
+Current continuation: [PRODUCTION_READINESS_SPEC.md](PRODUCTION_READINESS_SPEC.md), prepared 9 September for the owner's September 12 / 30–50k+ CCU target. This file retains historical evidence. UI/UX, gameplay gap-filling, arena interactions and emote/content creation remain in scope after visual approval. Figma now uses direct browser/Computer Use only; earlier Figma MCP references describe history, not current routing.
+
 Owner request: 8 September 2026. Phase I direction checkpoint; **not release-ready**. Owner performs all place deployment and Git pushes. No uploads, publishing, purchases, billing changes, live-data resets, or deployments performed.
 
 ## Approval boundaries

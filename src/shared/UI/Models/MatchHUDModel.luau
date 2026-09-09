@@ -46,8 +46,6 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 		respawn = if seconds > 0 then `BACK IN {seconds}…` else "RESPAWNING…"
 	elseif snapshot.opponentDeadline then
 		respawn = `WAITING FOR OPPONENTS • {math.max(math.ceil(snapshot.opponentDeadline - now), 0)}s`
-	elseif snapshot.spawnProtected and snapshot.phase ~= "Starting" then
-		respawn = "SPAWN SHIELD • ATTACKING ENDS IT"
 	end
 	local entries = MatchHUDModel.standings(snapshot.players or {})
 	local placement = nil
