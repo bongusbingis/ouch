@@ -260,12 +260,10 @@ function PartyCharacterRenderer:_layoutNametags()
 	table.sort(characters, function(a, b)
 		return a.slot < b.slot
 	end)
-	local envelope = UIConfig.Layout.WorldFraming.CharacterBody
-	local bodyFrame = CFrame.new((envelope.Minimum + envelope.Maximum) / 2)
-	local bodySize = envelope.Maximum - envelope.Minimum
 	for _, character in characters do
 		if character.rig.Parent then
-			local bounds = projectedBody(camera, character.rig:GetPivot() * bodyFrame, bodySize)
+			local bodyFrame, bodySize = character.rig:GetBoundingBox()
+			local bounds = projectedBody(camera, bodyFrame, bodySize)
 			if bounds then
 				bodies[character] = bounds
 				table.insert(occupied, bounds)
@@ -306,13 +304,20 @@ function PartyCharacterRenderer:_layoutNametags()
 			if bounds then
 				local placement = safe
 				local body = bodies[character]
+				local preferred = if body
+					then Vector2.new(
+						(body.Min.X + body.Max.X - bounds.Min.X - bounds.Max.X) / 2,
+						body.Min.Y - config.GapPx - 1 - bounds.Max.Y
+					)
+					else Vector2.zero
+				local anchoredBounds = Rect.new(bounds.Min + preferred, bounds.Max + preferred)
 				if self._compactParty and body then
 					local crownBottom = math.min(safe.Max.Y, body.Min.Y - config.GapPx)
 					if crownBottom - safe.Min.Y >= bounds.Max.Y - bounds.Min.Y then
 						placement = Rect.new(safe.Min, Vector2.new(safe.Max.X, crownBottom))
 					end
 				end
-				offset = nameOffset(bounds, occupied, placement, config.GapPx)
+				offset = preferred + nameOffset(anchoredBounds, occupied, placement, config.GapPx)
 				table.insert(occupied, Rect.new(bounds.Min + offset, bounds.Max + offset))
 			end
 		end
@@ -582,6 +587,7 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	rootPart.Anchored = true
 	nametag.Active = false
+	nametag.ResetOnSpawn = false
 	nametag.Adornee = spawn
 	nametag.Parent = self._playerGui
 	usernameLabel.Active = false

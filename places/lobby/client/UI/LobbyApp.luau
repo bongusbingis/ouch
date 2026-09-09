@@ -73,7 +73,7 @@ local PAGE_POSITIONS = {
 }
 
 local PAGE_BACKGROUND_COLORS = {
-	SplashScreen = Color3.fromRGB(102, 232, 255),
+	SplashScreen = Color3.fromRGB(255, 211, 64),
 	Inventory = Color3.fromRGB(232, 225, 7),
 	Shop = Color3.fromRGB(142, 31, 232),
 }
@@ -129,6 +129,7 @@ local function partyBounds(
 	party: Instance,
 	inventory: boolean,
 	inventoryWeapons: boolean,
+	partyCount: number,
 	reference: CFrame
 ): (Vector3, Vector3, { Vector3 }, Vector3)
 	local config = UIConfig.Layout.WorldFraming
@@ -141,7 +142,7 @@ local function partyBounds(
 	local minimum, maximum = Vector3.one * math.huge, Vector3.one * -math.huge
 	local points = {}
 	local inventoryTarget: Vector3? = nil
-	for index = 1, if inventory then 1 else MatchmakingConfig.PartyMaxPlayers do
+	for index = 1, if inventory then 1 else partyCount do
 		local spawn = spawns:WaitForChild(`Player{index}`)
 		assert(spawn:IsA("BasePart"), `[LobbyApp] Views.Party.Players.Player{index} must be a BasePart`)
 		local center = spawn.Position + Vector3.new(0, config.NameHeadroomStuds / 2, 0)
@@ -169,6 +170,7 @@ end
 local function useWorldTransition(
 	currentPage: string,
 	inventoryWeapons: boolean,
+	partyCount: number,
 	enabled: boolean,
 	worldWindows: any,
 	rootRef: any
@@ -209,7 +211,7 @@ local function useWorldTransition(
 		local framedPage = currentPage == "SplashScreen" or currentPage == "Inventory"
 		if framedPage then
 			local minimum, maximum, points, viewTarget =
-				partyBounds(party, currentPage == "Inventory", inventoryWeapons, target.CFrame)
+				partyBounds(party, currentPage == "Inventory", inventoryWeapons, partyCount, target.CFrame)
 			framing.current =
 				{ page = currentPage, minimum = minimum, maximum = maximum, points = points, viewTarget = viewTarget }
 		else
@@ -244,7 +246,7 @@ local function useWorldTransition(
 				transitionRevision.current += 1
 			end
 		end
-	end, { currentPage, inventoryWeapons, reducedMotion, enabled })
+	end, { currentPage, inventoryWeapons, partyCount, reducedMotion, enabled })
 
 	React.useEffect(function()
 		if not enabled then
@@ -309,6 +311,12 @@ local function LobbyContent(props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local shortPages = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local compactHome = ResponsiveLayout.splashPanels(
+		safeArea.size,
+		UIConfig.Layout.Splash.ProgressPanels,
+		UIConfig.Layout.PortraitMaxAspect,
+		UIConfig.Layout.ShortLandscapeMaxHeightPx
+	).progressStack ~= nil
 	local partyClient = props.PartyClient
 	local onboardingClient = props.OnboardingClient
 	local rootRef = React.useRef(nil)
@@ -398,6 +406,17 @@ local function LobbyContent(props)
 	local economyData = economyMenu.economyData
 	local inventoryTab = economyMenu.inventoryTab
 	local snapshot, requestBusy = useParty(partyClient, notifications)
+	local partyCount = 1
+	local framedUserIds = { [Players.LocalPlayer.UserId] = true }
+	for _, member in if snapshot then snapshot.members else {} do
+		if partyCount >= MatchmakingConfig.PartyMaxPlayers then
+			break
+		end
+		if not framedUserIds[member.userId] then
+			framedUserIds[member.userId] = true
+			partyCount += 1
+		end
+	end
 	local teleportStatus = partyClient:getTeleportStatus()
 	local presentation = LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy)
 	React.useEffect(function()
@@ -473,6 +492,7 @@ local function LobbyContent(props)
 	useWorldTransition(
 		currentPage,
 		skinPreviewState.current.active,
+		if currentPage == "SplashScreen" then partyCount else 1,
 		props.CameraEnabled ~= false and not onboardingActive and not testActive,
 		worldWindows,
 		rootRef
@@ -637,10 +657,10 @@ local function LobbyContent(props)
 		if renderer then
 			renderer:SetCompactParty(shortPages and currentPage == "SplashScreen")
 		end
-		if not shortPages or currentPage ~= "SplashScreen" or not lobbyVisible or loadingVisible then
+		if not compactHome or currentPage ~= "SplashScreen" or not lobbyVisible or loadingVisible then
 			setPartyMembersOpen(false)
 		end
-	end, { shortPages, currentPage, lobbyVisible, loadingVisible })
+	end, { shortPages, compactHome, currentPage, lobbyVisible, loadingVisible })
 
 	React.useEffect(function()
 		local renderer = characterRenderer.current
@@ -840,21 +860,22 @@ local function LobbyContent(props)
 				TopBar = c(TopBar, { CurrentPage = currentPage, OnNavigate = setCurrentPage }),
 				PartyCode = c(PageTransition, {
 					Active = currentPage == "SplashScreen",
-					Onscreen = if shortPages
+					Onscreen = if compactHome
 						then UDim2.new(1, -8, 0, 14)
 						else UDim2.fromScale(if portrait then 0.74 else 0.5, 0.115),
-					Offscreen = if shortPages
+					Offscreen = if compactHome
 						then UDim2.new(1, -8, -1, 0)
 						else UDim2.fromScale(if portrait then 0.74 else 0.5, -1),
 					Render = function(position)
 						return c(PartyCode, {
+							Compact = compactHome,
 							Position = position,
 							CodeText = LobbyViewModel.formatPartyCode(
 								if snapshot then snapshot.joinCode else nil,
 								codeVisible
 							),
 							CodeVisible = codeVisible,
-							OnOpen = if shortPages
+							OnOpen = if compactHome
 								then function()
 									setPartyMembersOpen(true)
 								end
@@ -874,7 +895,7 @@ local function LobbyContent(props)
 				ZIndex = 100,
 			}, {
 				PartyMembers = c(PartyMembersModal, {
-					Open = partyMembersOpen and shortPages and currentPage == "SplashScreen",
+					Open = partyMembersOpen and compactHome and currentPage == "SplashScreen",
 					FocusEnabled = notifications.request == nil,
 					Members = partyMembers,
 					LocalUserId = Players.LocalPlayer.UserId,

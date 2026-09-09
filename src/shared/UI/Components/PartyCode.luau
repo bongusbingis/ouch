@@ -18,13 +18,15 @@ export type Props = {
 	CodeVisible: boolean,
 	OnToggle: () -> (),
 	OnOpen: (() -> ())?,
+	Compact: boolean?,
 	Position: any?,
 }
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
-	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local short = props.Compact == true
+		or (not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx)
 	if short then
 		return c(AnimatedButton, {
 			OnActivated = props.OnOpen or props.OnToggle,

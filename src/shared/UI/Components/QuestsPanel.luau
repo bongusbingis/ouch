@@ -211,7 +211,7 @@ return function(props: Props)
 	local compact = props.Compact == true
 	local short = props.Short == true
 	local expanded = props.Expanded == true
-	local listHeight = if #state.quests == 0 then 76 else #state.quests * (rowHeight(compact, false) + 8) + 8
+	local listHeight = if #state.quests == 0 then 76 else #state.quests * (rowHeight(compact, short) + 8) + 8
 	local questRows = {
 		Layout = c("UIListLayout", {
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,

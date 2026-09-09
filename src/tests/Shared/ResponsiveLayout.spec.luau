@@ -82,11 +82,10 @@ return function()
 				expect(world.size.X >= 320 and world.size.Y >= 80).to.equal(true)
 			end
 		end)
-		it("frames the desktop party in a tall column between the daily and progression cards", function()
+		it("gives the desktop party the left composition beside one progression column", function()
 			for _, size in
 				{
-					Vector2.new(820, 501),
-					Vector2.new(1158, 520),
+					Vector2.new(820, 692),
 					Vector2.new(1158, 725),
 					Vector2.new(1158, 1100),
 					Vector2.new(1366, 709),
@@ -101,13 +100,35 @@ return function()
 					Config.Layout.ShortLandscapeMaxHeightPx
 				)
 				local gap = Config.Layout.Splash.ProgressPanels.GapPx
-				expect(world.position.X >= panels.daily.position.X + panels.daily.size.X + gap).to.equal(true)
-				for _, panel in { panels.season, panels.quests } do
+				expect(panels.progressStack == nil).to.equal(true)
+				for _, panel in { panels.season, panels.daily, panels.quests } do
 					expect(world.position.X + world.size.X <= panel.position.X - gap).to.equal(true)
+					expect(panel.position.X == panels.season.position.X).to.equal(true)
+					expect(panel.size.X == panels.season.size.X).to.equal(true)
 				end
 				expect(world.position.Y >= 0 and world.position.Y + world.size.Y <= size.Y - gap).to.equal(true)
 				expect(world.position.X >= 0 and world.position.X + world.size.X <= size.X).to.equal(true)
-				expect(world.size.X >= 200 and world.size.Y >= size.Y * 0.7).to.equal(true)
+				expect(world.size.X >= size.X * 0.6 and world.size.Y >= size.Y * 0.6).to.equal(true)
+				expect(panels.daily.position.Y >= panels.season.position.Y + panels.season.size.Y + gap).to.equal(true)
+				expect(panels.quests.position.Y >= panels.daily.position.Y + panels.daily.size.Y + gap).to.equal(true)
+				expect(panels.quests.size.Y >= Config.Layout.Splash.ProgressPanels.Landscape.QuestsMinHeightPx).to.equal(
+					true
+				)
+			end
+		end)
+		it("uses the home scroll composition before fixed cards would collide with actions", function()
+			for _, size in { Vector2.new(820, 501), Vector2.new(1158, 520), Vector2.new(1246, 691) } do
+				local panels = Layout.splashPanels(
+					size,
+					Config.Layout.Splash.ProgressPanels,
+					Config.Layout.PortraitMaxAspect,
+					Config.Layout.ShortLandscapeMaxHeightPx
+				)
+				local stack = assert(panels.progressStack)
+				local world = Layout.splashWorldWindow(size, Config.Layout)
+				expect(world.position.X + world.size.X < stack.position.X).to.equal(true)
+				expect(stack.position.Y + stack.size.Y <= size.Y - 70).to.equal(true)
+				expect(world.position.Y + world.size.Y <= size.Y - 70).to.equal(true)
 			end
 		end)
 		it("keeps the short progression viewport clear of actions while exposing the next section", function()
@@ -121,15 +142,17 @@ return function()
 				)
 				local stack = assert(panels.progressStack)
 				expect(stack.position.Y + stack.size.Y <= size.Y - config.Landscape.ShortBottomPx).to.equal(true)
+				local actionsTop = size.Y
+					- Config.Layout.Splash.ShortActionsHeightPx
+					- Config.Layout.Splash.ShortActionsBottomPx
+				expect(actionsTop - (stack.position.Y + stack.size.Y) >= config.GapPx).to.equal(true)
 				expect(stack.size.Y >= panels.season.size.Y + config.GapPx * 1.5 + 36).to.equal(true)
 				expect(panels.season.size.Y >= Config.Interaction.MinTargetPx).to.equal(true)
 				expect(Config.Layout.QuestRow.CompactHeightPx >= Config.Interaction.MinTargetPx + 82).to.equal(true)
 			end
 		end)
 		it("keeps progression panels clear of the desktop action stack and its spacing", function()
-			for _, size in
-				{ Vector2.new(820, 501), Vector2.new(1158, 520), Vector2.new(1158, 725), Vector2.new(1920, 1080) }
-			do
+			for _, size in { Vector2.new(820, 692), Vector2.new(1158, 725), Vector2.new(1920, 1080) } do
 				local panels = Layout.splashPanels(
 					size,
 					Config.Layout.Splash.ProgressPanels,
@@ -159,8 +182,8 @@ return function()
 					Config.Layout.ShortLandscapeMaxHeightPx
 				)
 				local limit = size.Y - Config.Layout.Splash.ProgressPanels.Landscape.ShortBottomPx
-				expect(panels.daily.position.Y + panels.daily.size.Y <= limit).to.equal(true)
-				expect(panels.quests.position.Y + panels.quests.size.Y <= limit).to.equal(true)
+				local stack = assert(panels.progressStack)
+				expect(stack.position.Y + stack.size.Y <= limit).to.equal(true)
 				local infoWidth = (panels.season.size.X - 20) * 0.75
 					- Config.Layout.SeasonCompactClaimWidthPx
 					- Config.Layout.InventoryContentGapPx

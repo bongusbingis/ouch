@@ -70,7 +70,7 @@ return {
 			CharacterWidthStuds = 6,
 			CharacterHeightStuds = 6,
 			CharacterDepthStuds = 4,
-			NameHeadroomStuds = 3,
+			NameHeadroomStuds = 1.5,
 			InventoryBody = {
 				Minimum = characterBody.Minimum,
 				Maximum = characterBody.Maximum + Vector3.new(0, 1.5, 0),
@@ -314,6 +314,7 @@ return {
 			LandscapeGapScale = 0.05,
 		},
 		Splash = {
+			DesktopLogoSizePx = Vector2.new(220, 110),
 			ActionsGapPx = 8,
 			ActionTextPx = 26,
 			ShortActionsHeightPx = 56,
@@ -328,11 +329,14 @@ return {
 				EdgePaddingPx = 24,
 				GapPx = 10,
 				Landscape = {
+					SeasonHeightPx = 88,
+					DailyHeightPx = 116,
+					QuestsMinHeightPx = 116,
 					ActionsReservePx = 252,
 					DailyBottomScale = 0.9,
 					SeasonTopScale = 0.145,
 					ShortTopPx = 80,
-					ShortBottomPx = 70,
+					ShortBottomPx = 78,
 					QuestsTopScale = 0.31,
 				},
 				Portrait = {

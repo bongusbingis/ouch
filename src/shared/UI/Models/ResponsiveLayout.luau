@@ -34,6 +34,9 @@ export type SplashPanelConfig = {
 	EdgePaddingPx: number,
 	GapPx: number,
 	Landscape: {
+		SeasonHeightPx: number,
+		DailyHeightPx: number,
+		QuestsMinHeightPx: number,
 		ActionsReservePx: number?,
 		DailyBottomScale: number,
 		SeasonTopScale: number,
@@ -180,29 +183,47 @@ function ResponsiveLayout.splashPanels(
 	local questsSize = landscapeSize(config.Quests)
 	local edge = math.min(config.EdgePaddingPx, math.floor(available.X * 0.03))
 	local short = shortLandscapeMaxHeight ~= nil and available.Y <= shortLandscapeMaxHeight
-	local seasonTop = math.max(
-		math.floor(available.Y * config.Landscape.SeasonTopScale),
-		if short then config.Landscape.ShortTopPx or 0 else 0
-	)
+	local column = config.Landscape
+	local columnTop = math.floor(available.Y * column.SeasonTopScale)
+	local columnMinimum = column.SeasonHeightPx + column.DailyHeightPx + column.QuestsMinHeightPx + config.GapPx * 2
+	local stack = short or available.Y - columnTop - (column.ActionsReservePx or 0) < columnMinimum
+	if not stack then
+		local width = math.min(math.floor(available.X * config.Season.WidthScale), config.Season.MaxSize.X)
+		local left = available.X - edge - width
+		local dailyTop = columnTop + column.SeasonHeightPx + config.GapPx
+		local questsTop = dailyTop + column.DailyHeightPx + config.GapPx
+		return {
+			portrait = false,
+			season = {
+				position = Vector2.new(left, columnTop),
+				size = Vector2.new(width, column.SeasonHeightPx),
+			},
+			daily = {
+				position = Vector2.new(left, dailyTop),
+				size = Vector2.new(width, column.DailyHeightPx),
+			},
+			quests = {
+				position = Vector2.new(left, questsTop),
+				size = Vector2.new(width, available.Y - (column.ActionsReservePx or 0) - questsTop),
+			},
+		}
+	end
+	local seasonTop =
+		math.max(math.floor(available.Y * config.Landscape.SeasonTopScale), config.Landscape.ShortTopPx or 0)
 	local questsTop =
 		math.max(math.floor(available.Y * config.Landscape.QuestsTopScale), seasonTop + seasonSize.Y + config.GapPx)
-	local bottom = if short then available.Y - (config.Landscape.ShortBottomPx or 0) else available.Y
-	local questsBottom = if short then bottom else available.Y - (config.Landscape.ActionsReservePx or 0)
+	local bottom = available.Y - (config.Landscape.ShortBottomPx or 0)
+	local questsBottom = bottom
 	questsSize = Vector2.new(questsSize.X, math.min(questsSize.Y, math.max(44, questsBottom - questsTop)))
 	return {
 		portrait = false,
-		progressStack = if short
-			then {
-				position = Vector2.new(
-					available.X - edge - math.max(seasonSize.X, questsSize.X) - config.GapPx,
-					seasonTop
-				),
-				size = Vector2.new(
-					math.max(seasonSize.X, questsSize.X) + config.GapPx * 2,
-					math.max(1, bottom - seasonTop)
-				),
-			}
-			else nil,
+		progressStack = {
+			position = Vector2.new(available.X - edge - math.max(seasonSize.X, questsSize.X) - config.GapPx, seasonTop),
+			size = Vector2.new(
+				math.max(seasonSize.X, questsSize.X) + config.GapPx * 2,
+				math.max(1, bottom - seasonTop)
+			),
+		},
 		daily = {
 			position = Vector2.new(
 				edge,
@@ -268,12 +289,14 @@ function ResponsiveLayout.splashWorldWindow(available: Vector2, layout: any): Sa
 			position = Vector2.new(edge, top),
 			size = Vector2.new(
 				math.max(1, panels.progressStack.position.X - edge * 2),
-				math.max(1, available.Y - top - 96)
+				math.max(1, available.Y - top - 70)
 			),
 		}
 	end
-	local left = if panels.portrait then edge else panels.daily.position.X + panels.daily.size.X + edge
-	local top = math.floor(available.Y * (if panels.portrait then 0.38 else 0.25))
+	local left = edge
+	local top = if panels.portrait
+		then math.floor(available.Y * 0.38)
+		else panels.season.position.Y + layout.Splash.DesktopLogoSizePx.Y + edge
 	local right = math.min(panels.season.position.X, panels.quests.position.X) - edge
 	local bottom = if panels.portrait then panels.daily.position.Y - edge else available.Y - edge
 	return {

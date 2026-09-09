@@ -65,15 +65,14 @@ export type Props = {
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
-	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local progressPanels = ResponsiveLayout.splashPanels(
 		safeArea.size,
 		UIConfig.Layout.Splash.ProgressPanels,
 		UIConfig.Layout.PortraitMaxAspect,
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
-	local compactProgressPanels = progressPanels.portrait
-		or safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local short = progressPanels.progressStack ~= nil
+	local compactProgressPanels = progressPanels.portrait or short
 	local worldWindow = ResponsiveLayout.splashWorldWindow(safeArea.size, UIConfig.Layout)
 	local stack = progressPanels.progressStack
 	local gap = UIConfig.Layout.Splash.ProgressPanels.GapPx
@@ -174,7 +173,7 @@ return function(props: Props)
 				PaddingRight = UDim.new(0, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
-				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Yellow, Radius = UDim.new(0, 10) }),
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Cyan, Radius = UDim.new(0, 10) }),
 				SelectionRadius = UDim.new(0, 10),
 				Native = {
 					BackgroundTransparency = 1,
@@ -259,7 +258,7 @@ return function(props: Props)
 				}),
 			}),
 		}),
-		BottomMiddle = if short or portrait
+		BottomMiddle = if (short and props.ShowMatchmakingActivity) or portrait
 			then c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
@@ -281,14 +280,27 @@ return function(props: Props)
 			Image = "rbxassetid://78333957912633",
 			Position = if short
 				then UDim2.fromOffset(8, 10)
-				else if portrait then UDim2.fromScale(0.05, 0.09) else UDim2.fromScale(0, 0.1),
+				else if portrait
+					then UDim2.fromScale(0.05, 0.09)
+					else UDim2.fromOffset(
+						UIConfig.Layout.Splash.ProgressPanels.EdgePaddingPx,
+						progressPanels.season.position.Y
+					),
 			Size = if short
 				then UDim2.fromOffset(112, 48)
-				else if portrait then UDim2.fromScale(0.42, 0.14) else UDim2.fromScale(0.321542, 0.301659),
+				else if portrait
+					then UDim2.fromScale(0.42, 0.14)
+					else UDim2.fromOffset(
+						UIConfig.Layout.Splash.DesktopLogoSizePx.X,
+						UIConfig.Layout.Splash.DesktopLogoSizePx.Y
+					),
+			ScaleType = Enum.ScaleType.Fit,
 		}, {
-			uIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 1.55,
-			}),
+			uIAspectRatioConstraint = if short or portrait
+				then c("UIAspectRatioConstraint", {
+					AspectRatio = 1.55,
+				})
+				else nil,
 		}),
 		DailyRewards = if stack then nil else dailyRewards,
 		SeasonStatus = if stack then nil else seasonStatus,
