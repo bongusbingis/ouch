@@ -144,6 +144,36 @@ local function effectPreview(props: Props)
 	local definition = props.Definition or {}
 	local accent = definition.PreviewColor or InventoryConfig.RarityColors[definition.Rarity] or palette.Yellow
 	local z = props.ZIndex + 1
+	if definition.Icon and definition.Icon ~= "" then
+		return c("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = props.ZIndex,
+		}, {
+			Tile = c("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = palette.Ink,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromScale(0.72, 0.84),
+				ZIndex = props.ZIndex,
+			}, {
+				Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
+				Outline = c("UIStroke", { Color = accent, Thickness = 2, Transparency = 0.2 }),
+				Glyph = c("ImageLabel", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					Image = definition.Icon,
+					ImageColor3 = palette.White,
+					Position = UDim2.fromScale(0.5, 0.5),
+					ScaleType = Enum.ScaleType.Fit,
+					Size = UDim2.fromScale(0.66, 0.66),
+					ZIndex = z,
+				}),
+			}),
+		})
+	end
 	local symbol = {
 		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
 		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),

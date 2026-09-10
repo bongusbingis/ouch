@@ -60,6 +60,9 @@ export type ItemDef = {
 	Equippable: boolean?,
 	EffectId: string?,
 	Thumbnail: string,
+	-- Iconify glyph (white on the rarity tile) for effects and sounds; set once
+	-- the upload is approved, absent items fall back to the drawn glyph.
+	Icon: string?,
 	SplatColor: Color3?,
 	AlwaysAvailable: boolean?,
 	ShopEligible: boolean?,
