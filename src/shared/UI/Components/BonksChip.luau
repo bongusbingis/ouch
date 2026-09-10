@@ -38,7 +38,7 @@ return function(props: Props)
 	local width = 12 + textSize + UIConfig.Button.GapPx + math.ceil(textWidth) + 14
 	return c(Surface, {
 		Color = Palette.Claimed,
-		Radius = math.floor(height / 2),
+		Radius = UIConfig.Radius.Control,
 		Shadow = false,
 		StrokeTransparency = 0.55,
 		Native = {

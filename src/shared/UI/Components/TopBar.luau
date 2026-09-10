@@ -132,8 +132,8 @@ return function(props: Props)
 					buttonWidth,
 					if definition.ButtonSize then definition.ButtonSize.Y.Scale else 0.75
 				),
-				SliceCenter = Rect.new(224, 202, 770, 474),
-				SliceScale = 0.2,
+				SliceCenter = UIConfig.LobbyArtwork.Action.CyanSlice,
+				SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 				ZIndex = definition.ZIndex,
 			},
 			OnActivated = function()

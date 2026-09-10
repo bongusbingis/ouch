@@ -139,7 +139,7 @@ return function(props)
 				props.OnSelectEntry(entry, true)
 			end,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
 			Outline = c("UIStroke", {
 				Color = if chosen then Colors.Pink else if entry.claimable then Colors.Yellow else Colors.White,
 				Thickness = if chosen then 3 else 2,
@@ -205,7 +205,7 @@ return function(props)
 					Size = if compact then UDim2.new(1, -62, 1, -34) else UDim2.new(1, -12, 0, 34),
 					ZIndex = 106,
 				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+					Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
 					Name = label(
 						if definition then definition.DisplayName else "BONKS",
 						UDim2.fromOffset(5, 2),

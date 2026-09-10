@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local GameModeVoteViewModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
 
 local c = React.createElement
@@ -42,7 +43,9 @@ return function(props: Props)
 
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
 		Position = props.Position or UDim2.fromScale(0.5, 0.895087),
 		Size = props.Size or UDim2.fromScale(0.6, 0.027),
 	}, {
@@ -54,9 +57,10 @@ return function(props: Props)
 		}),
 		InnerBar = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundColor3 = Color3.fromRGB(26, 194, 230),
+			BackgroundColor3 = UIConfig.ProgressionStyle.Cyan,
+			BorderSizePixel = 0,
 			Image = "rbxassetid://10051822476",
-			ImageColor3 = Color3.fromRGB(124, 242, 255),
+			ImageColor3 = UIConfig.ProgressionStyle.Track,
 			Position = UDim2.fromScale(0, 0.5),
 			ResampleMode = Enum.ResamplerMode.Pixelated,
 			ScaleType = Enum.ScaleType.Tile,
@@ -79,7 +83,7 @@ return function(props: Props)
 			PaddingTop = UDim.new(0.05, 0),
 		}),
 		UIStroke = c("UIStroke", {
-			Color = Color3.fromRGB(99, 99, 99),
+			Color = UIConfig.ProgressionStyle.White,
 			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			Thickness = STROKE_THICKNESS,
 		}),

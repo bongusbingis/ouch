@@ -86,7 +86,7 @@ local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 		LayoutOrder = dayProps.Order,
 		Size = UDim2.new(1 / 7, -36 / 7, 1, 0),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 7) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		Outline = c(
 			"UIStroke",
 			{ Color = Palette.White, Thickness = 1.5, Transparency = if day.available then 0 else 0.45 }
@@ -223,7 +223,7 @@ return function(props: Props)
 	}, {
 		Panel = c(Surface, {
 			Color = Palette.Panel,
-			Radius = artwork.CornerPx,
+			Radius = UIConfig.Radius.Panel,
 			Native = {
 				Active = true,
 				ZIndex = 121,
@@ -272,7 +272,7 @@ return function(props: Props)
 			}, miniDays),
 			RewardArea = c(Surface, {
 				Color = Palette.Claimed,
-				Radius = 10,
+				Radius = UIConfig.Radius.Control,
 				Shadow = false,
 				StrokeTransparency = 0.55,
 				Native = {

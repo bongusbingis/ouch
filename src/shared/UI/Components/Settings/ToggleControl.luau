@@ -95,7 +95,7 @@ return function(props: Props)
 		Position = props.Position,
 		Size = props.Size or UDim2.fromScale(1, 1),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		Outline = c("UIStroke", { Color = palette.White, Thickness = 1, Transparency = 0.65 }),
 		Highlight = c("Frame", {
 			BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,

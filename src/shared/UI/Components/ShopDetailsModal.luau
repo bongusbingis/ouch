@@ -258,7 +258,7 @@ local function ItemDetails(props)
 					ZIndex = 104,
 				},
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 				Name = label(
 					item.definition.DisplayName
 						.. (
@@ -528,7 +528,7 @@ local function ItemDetails(props)
 					Size = if portrait then UDim2.new(1, 0, 0, previewHeight) else UDim2.fromScale(0.32, 1),
 					ZIndex = 103,
 				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+					Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 					Art = c("Frame", {
 						BackgroundTransparency = 1,
 						Size = if portrait
@@ -620,7 +620,7 @@ local function ItemDetails(props)
 						Size = UDim2.new(listWidth, 0, 1, -listTop),
 						ZIndex = 103,
 					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+						Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 						OddsHeading = if not short
 							then label(
 								"NEXT OPEN ODDS",

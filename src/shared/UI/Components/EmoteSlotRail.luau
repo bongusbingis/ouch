@@ -57,7 +57,7 @@ local function Chip(props: {
 		SelectionRadius = UDim.new(0, 10),
 		OnActivated = props.OnActivated,
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
 		Outline = c("UIStroke", {
 			Color = if props.Selected then Palette.Yellow else WHITE,
 			Thickness = if props.Selected then UI.Interaction.FocusStrokePx else UI.Button.StrokePx,

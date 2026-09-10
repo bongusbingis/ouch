@@ -146,7 +146,7 @@ return function(props: Props)
 			else nil
 		rows[tostring(member.userId)] = c(Surface, {
 			Color = Palette.Claimed,
-			Radius = 8,
+			Radius = Config.Radius.Tile,
 			StrokeTransparency = 0.6,
 			Shadow = false,
 			Native = { LayoutOrder = index, Size = UDim2.new(1, -4, 0, layout.RowHeightPx) },
@@ -234,7 +234,7 @@ return function(props: Props)
 			}),
 			Code = c(Surface, {
 				Color = Palette.Claimed,
-				Radius = 8,
+				Radius = Config.Radius.Control,
 				Shadow = false,
 				StrokeTransparency = 0.6,
 				Native = {

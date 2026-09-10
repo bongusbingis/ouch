@@ -71,7 +71,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 			Rotation = if available and not compact then -3 else 0,
 			Size = UDim2.fromScale(0.92, if available then 0.96 else 0.88),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			Stroke = c("UIStroke", {
 				Color = strokeColor,
 				Thickness = if available then 3 else 1,
@@ -235,14 +235,14 @@ return function(props: Props)
 		end
 	end
 
-	return c(Surface, { Native = native, Color = Palette.Panel, Radius = 10 }, {
+	return c(Surface, { Native = native, Color = Palette.Panel, Radius = UIConfig.Radius.Panel }, {
 		HeaderBand = c("Frame", {
 			BackgroundColor3 = Palette.Claimed,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(8, 8),
 			Size = UDim2.new(1, -16, 0, headerHeight),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		Header = c("Frame", {
 			ZIndex = 2,

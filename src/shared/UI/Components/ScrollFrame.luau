@@ -38,6 +38,6 @@ return function(props)
 		Thickness = UI.Interaction.FocusStrokePx,
 		Transparency = if focused then 0 else 1,
 	})
-	children.FocusCorner = c("UICorner", { CornerRadius = UDim.new(0, 8) })
+	children.FocusCorner = c("UICorner", { CornerRadius = UDim.new(0, UI.Interaction.FocusCornerPx) })
 	return c("ScrollingFrame", native, children)
 end

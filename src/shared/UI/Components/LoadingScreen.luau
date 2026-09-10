@@ -66,7 +66,7 @@ local function actionButton(action: LoadingAction, layoutOrder: number, actionCo
 			ScaleType = Enum.ScaleType.Slice,
 			Size = if actionCount == 1 then UDim2.fromScale(0.46, 1) else UDim2.fromScale(0.42, 1),
 			SliceCenter = Rect.new(198, 228, 841, 468),
-			SliceScale = 0.14,
+			SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 			ZIndex = 105,
 		},
 		OnActivated = action.OnActivated,
@@ -274,7 +274,7 @@ return function(props: Props)
 				ScaleType = Enum.ScaleType.Slice,
 				Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 				SliceCenter = Rect.new(31, 41, 978, 620),
-				SliceScale = 0.35,
+				SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 				ZIndex = 102,
 			}, {
 				Title = c(ResponsiveText, {

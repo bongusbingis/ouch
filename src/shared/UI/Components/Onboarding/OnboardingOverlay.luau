@@ -183,7 +183,7 @@ local function ControlHint(props: { verb: string, fallback: string })
 				LayoutOrder = 1,
 				Size = UDim2.fromScale(0.19, 0.86),
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0.28, 0) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 				Stroke = c("UIStroke", {
 					Color = INK,
 					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
@@ -315,7 +315,7 @@ return function(props: Props)
 			ScaleType = Enum.ScaleType.Slice,
 			Size = UDim2.fromScale(0.34, 0.13),
 			SliceCenter = PANEL_SLICE,
-			SliceScale = 0.35,
+			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 			ZIndex = 61,
 		}, {
 			Scale = c("UIScale", { Scale = styles.Scale }),
@@ -405,7 +405,7 @@ return function(props: Props)
 							ScaleType = Enum.ScaleType.Slice,
 							Size = UDim2.fromScale(0.31, 1),
 							SliceCenter = BUTTON_SLICE,
-							SliceScale = 0.1,
+							SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 							ZIndex = 62,
 						}, {
 							Pop = c("UIScale", {
@@ -445,7 +445,7 @@ return function(props: Props)
 					ScaleType = Enum.ScaleType.Slice,
 					Size = UDim2.fromScale(0.11, 0.075),
 					SliceCenter = BUTTON_SLICE,
-					SliceScale = 0.12,
+					SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 					ZIndex = 63,
 				},
 				OnActivated = props.OnSkip,
@@ -484,7 +484,7 @@ return function(props: Props)
 						ScaleType = Enum.ScaleType.Slice,
 						Size = UDim2.fromScale(0.125, 0.075),
 						SliceCenter = BUTTON_SLICE,
-						SliceScale = 0.12,
+						SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 						ZIndex = 63,
 					},
 				}, {

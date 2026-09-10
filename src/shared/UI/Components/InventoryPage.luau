@@ -135,7 +135,7 @@ local function Card(props)
 			Position = UDim2.fromOffset(2, 2),
 			Size = UDim2.new(1, -4, 1, -4),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			Texture = c("ImageLabel", {
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://6794188517",
@@ -152,7 +152,7 @@ local function Card(props)
 			Size = UDim2.new(1, -inset * 2, 0, nameHeight),
 			ZIndex = 6,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			ItemName = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MaxTextSize = 17,
@@ -446,7 +446,7 @@ return function(props: Props)
 					then UDim2.new(1, -inventoryLayout.ShortRailGapPx, 0, UIConfig.Interaction.MinTargetPx)
 					else UDim2.fromScale(0.181575, 1),
 				SliceCenter = Rect.new(198, 228, 841, 468),
-				SliceScale = 0.1,
+				SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 			},
 			OnActivated = function()
 				props.OnTabChanged(definition.Id)

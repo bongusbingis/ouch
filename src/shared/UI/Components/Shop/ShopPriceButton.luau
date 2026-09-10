@@ -40,7 +40,7 @@ return function(props)
 	local top = if stacked then UDim2.fromOffset(10, 3) else UDim2.fromOffset(10, 2)
 	local extent = if stacked then UDim2.new(1, -20, 0.5, -3) else UDim2.new(1, -20, 1, -4)
 	return c(AnimatedButton, {
-		SelectionRadius = if props.Compact then UDim.new(0, 8) else UDim.new(1, 0),
+		SelectionRadius = UDim.new(0, UI.Radius.Control),
 		ButtonRef = props.ButtonRef,
 		EntranceDelay = props.EntranceDelay,
 		Enabled = enabled,
@@ -48,7 +48,6 @@ return function(props)
 		OnActivated = props.OnActivated,
 		Visual = c(ButtonSurface, {
 			Enabled = enabled,
-			Radius = if props.Compact then UDim.new(0, 8) else nil,
 			Color = props.Color or (if props.Red then UI.ProgressionStyle.Pink else UI.ProgressionStyle.Cyan),
 		}),
 		Native = {

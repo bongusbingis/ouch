@@ -78,7 +78,7 @@ return function(props: Props)
 		end
 	end
 
-	return c(Surface, { Native = native, Color = Palette.Panel, Radius = 10 }, {
+	return c(Surface, { Native = native, Color = Palette.Panel, Radius = UIConfig.Radius.Panel }, {
 		HeaderBand = c("Frame", {
 			BackgroundColor3 = Palette.Pink,
 			BorderSizePixel = 0,
@@ -86,7 +86,7 @@ return function(props: Props)
 			Size = UDim2.new(1, -8, 0, 32),
 			Visible = not compact,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		Title = if not compact
 			then c(ResponsiveText, {
@@ -116,7 +116,7 @@ return function(props: Props)
 			Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
 			Size = UDim2.new(1, -20, 1, if compact then -12 else -48),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			TierBadge = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundColor3 = TIER_BADGE_COLOR,
@@ -124,7 +124,7 @@ return function(props: Props)
 				Position = UDim2.fromScale(0.02, 0.5),
 				Size = UDim2.fromScale(if compact then 0.17 else 0.21, 0.84),
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0.14, 0) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 				Stroke = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
 				TierWord = c(ResponsiveText, {
 					MeasurementFont = UIConfig.Text.BodyFont,

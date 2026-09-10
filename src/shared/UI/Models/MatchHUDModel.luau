@@ -26,6 +26,51 @@ function MatchHUDModel.standings(players: { any }): { any }
 	return entries
 end
 
+-- The standings strip shows the top `limit` rows and, when the local player sits
+-- below the cut, their own row appended so the strip always answers "where am
+-- I" without showing the whole match.
+function MatchHUDModel.strip(entries: { any }, limit: number): { any }
+	local rows = {}
+	local localShown = false
+	for index, entry in entries do
+		if index > limit then
+			break
+		end
+		table.insert(rows, entry)
+		localShown = localShown or entry.isLocal == true
+	end
+	if not localShown then
+		for index, entry in entries do
+			if index > limit and entry.isLocal then
+				table.insert(rows, entry)
+				break
+			end
+		end
+	end
+	return rows
+end
+
+-- Team scoreboards read as two columns; a crowded free-for-all splits in two
+-- as well so twenty rows never scroll.
+function MatchHUDModel.columns(entries: { any }, teamMode: boolean, singleColumnMaxRows: number): { { any } }
+	if teamMode then
+		local red, blue = {}, {}
+		for _, entry in entries do
+			table.insert(if entry.teamId == "Red" then red else blue, entry)
+		end
+		return { red, blue }
+	end
+	if #entries <= singleColumnMaxRows then
+		return { entries }
+	end
+	local half = math.ceil(#entries / 2)
+	local first, second = {}, {}
+	for index, entry in entries do
+		table.insert(if index <= half then first else second, entry)
+	end
+	return { first, second }
+end
+
 function MatchHUDModel.build(snapshot: any, now: number): any
 	local remaining = math.max(math.ceil(snapshot.timeRemaining or 0), 0)
 	local target = snapshot.scoreTarget or 0

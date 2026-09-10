@@ -1,5 +1,7 @@
--- Description: One selectable game mode card on the vote ballot, showing its art, name, live vote count, and selection state.
-
+-- Name: GameModeCard.luau
+-- Author: Jack C.
+-- Description: One selectable game mode card on the vote ballot: a page-panel card carrying the mode name, its one-line pitch, a static key-art well with the live vote count, and the VOTE action; when the mode has no key art yet the well shows a labelled per-mode placeholder instead of live 3D.
+-- Created: 2026-09-10
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,23 +10,29 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ButtonSurface = require(script.Parent.ButtonSurface)
-local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local Well = require(script.Parent.Well)
 local GameModeVoteViewModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
 
 local c = React.createElement
+local Palette = UIConfig.ProgressionStyle
+local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
 local REFERENCE_VIEWPORT = Vector2.new(1890, 1200)
 local MODES_HOLDER_BOUNDS = TextMetrics.scaleBounds(REFERENCE_VIEWPORT, Vector2.new(0.944456, 0.562031))
 local CARD_BOUNDS =
 	TextMetrics.fitAspect(TextMetrics.scaleBounds(MODES_HOLDER_BOUNDS, Vector2.new(0.345678, 0.931169)), 0.87)
 local TITLE_BOUNDS = TextMetrics.scaleBounds(CARD_BOUNDS, Vector2.new(0.967519, 0.104411)) - Vector2.new(2, 2)
-local THUMBNAIL_BOUNDS =
-	TextMetrics.fitAspect(TextMetrics.scaleBounds(CARD_BOUNDS, Vector2.new(0.822196, 0.661131)), 1.7)
-local VOTE_COUNT_BOUNDS = TextMetrics.scaleBounds(THUMBNAIL_BOUNDS, Vector2.new(0.613327, 0.160588)) - Vector2.new(2, 2)
-local VOTE_COUNT_STROKE = TextMetrics.scaledTextStroke(3.8, "000", UIConfig.Text.BodyFont, VOTE_COUNT_BOUNDS)
-local CHECKMARK_SCALE = Vector2.new(100 / CARD_BOUNDS.X, 100 / CARD_BOUNDS.Y)
 local titleStrokes: { [string]: number } = {}
+
+-- Until a mode has key art its well shows a flat, mode-tinted field with the
+-- mode's short name, so the two cards read as different at a glance and the
+-- stub is obviously a stub.
+local PLACEHOLDER: { [string]: { Colors: { Color3 }, Label: string } } = {
+	FFA = { Colors = { Palette.Cyan }, Label = "FFA" },
+	TDM = { Colors = { Palette.Pink, Palette.Cyan }, Label = "TDM" },
+	Infection = { Colors = { Palette.Green }, Label = "INFECTION" },
+}
 
 local function titleStroke(title: string): number
 	local thickness = titleStrokes[title]
@@ -33,6 +41,14 @@ local function titleStroke(title: string): number
 		titleStrokes[title] = thickness
 	end
 	return thickness
+end
+
+local function inkStroke(thickness: number?)
+	return c("UIStroke", {
+		Color = Palette.Ink,
+		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+		Thickness = thickness or 0.045,
+	})
 end
 
 export type Mode = {
@@ -54,10 +70,46 @@ export type Props = {
 	Compact: boolean?,
 }
 
+local function placeholder(modeId: string, zIndex: number)
+	local spec = PLACEHOLDER[modeId] or { Colors = { Palette.Disabled }, Label = string.upper(modeId) }
+	local fields = {}
+	local count = #spec.Colors
+	for index, color in spec.Colors do
+		fields[`Field{index}`] = c("Frame", {
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Position = UDim2.fromScale((index - 1) / count, 0),
+			Size = UDim2.fromScale(1 / count, 1),
+			ZIndex = zIndex,
+		})
+	end
+	fields.Label = c("TextLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		FontFace = DISPLAY_FONT,
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.9, 0.38),
+		Text = spec.Label,
+		TextColor3 = Palette.White,
+		TextScaled = true,
+		ZIndex = zIndex + 1,
+	}, { Outline = inkStroke(0.06) })
+	return c("Frame", {
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = zIndex,
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
+		Fields = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = zIndex }, fields),
+	})
+end
+
 return function(props: Props)
 	local mode = props.Mode
 	local portrait = props.Portrait == true
 	local compact = props.Compact == true and not portrait
+	local z = 2
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		LayoutOrder = mode.SortOrder,
@@ -68,11 +120,12 @@ return function(props: Props)
 	}, {
 		Background = c("ImageLabel", {
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://136021539696619",
+			Image = UIConfig.Layout.PageSurface.Image,
 			ScaleType = Enum.ScaleType.Slice,
 			Size = UDim2.fromScale(1, 1),
-			SliceCenter = Rect.new(224, 202, 770, 474),
-			SliceScale = 0.2,
+			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
+			ZIndex = 1,
 		}),
 		UIAspectRatioConstraint = if portrait
 			then nil
@@ -84,107 +137,102 @@ return function(props: Props)
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
-				FontFace = Font.new(
-					"rbxasset://fonts/families/LuckiestGuy.json",
-					Enum.FontWeight.Bold,
-					Enum.FontStyle.Normal
-				),
+				FontFace = DISPLAY_FONT,
 				Position = if compact
 					then UDim2.new(0.5, 0, 0, 8)
-					else UDim2.fromScale(0.499634, if portrait then 0.035 else 0.0521707),
+					else UDim2.fromScale(0.5, if portrait then 0.035 else 0.05),
 				Size = if compact
 					then UDim2.new(0.88, 0, 0, 24)
 					else UDim2.fromScale(if portrait then 0.9 else 0.88, if portrait then 0.18 else 0.104411),
 				Text = mode.Title,
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 2,
+				TextColor3 = Palette.White,
+				ZIndex = z,
 			},
-		}, {
-			UIStroke = c("UIStroke", {
-				Color = UIConfig.ProgressionStyle.Ink,
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = titleStroke(mode.Title),
-			}),
-		}),
-		Line = c("Frame", {
+		}, { UIStroke = inkStroke(titleStroke(mode.Title)) }),
+		Description = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
+			BackgroundColor3 = Palette.PanelRaised,
 			BorderSizePixel = 0,
 			Position = if compact
-				then UDim2.new(0.5, 0, 0, 37)
-				else UDim2.fromScale(0.5, if portrait then 0.22 else 0.147617),
-			Size = if portrait or compact then UDim2.new(0.88, 0, 0, 2) else UDim2.fromScale(0.817, 0.008),
-			ZIndex = 2,
-		}),
-		Thumbnail = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, if compact then 0 else 0.5),
-			BackgroundColor3 = UIConfig.ProgressionStyle.PanelRaised,
-			Image = mode.ThumbnailId,
-			Position = if compact
-				then UDim2.new(0.5, 0, 0, 80)
-				else UDim2.fromScale(if portrait then 0.23 else 0.496345, if portrait then 0.58 else 0.57),
+				then UDim2.new(0.5, 0, 0, 40)
+				else UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.31 else 0.175),
 			Size = if compact
-				then UDim2.new(0.84, 0, 1, -144)
-				else UDim2.fromScale(if portrait then 0.38 else 0.822196, if portrait then 0.58 else 0.661131),
-			ZIndex = 2,
+				then UDim2.new(0.86, 0, 0, 32)
+				else UDim2.fromScale(if portrait then 0.5 else 0.85, if portrait then 0.28 else 0.16),
+			ZIndex = z,
 		}, {
-			Art = if mode.ThumbnailId == ""
-				then c("Frame", {
-					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0, 0.1),
-					Size = UDim2.fromScale(1, 0.9),
-					ZIndex = 3,
-				}, {
-					First = c(CelebrationAvatar, {
-						Static = true,
-						ColorId = if mode.Id == "TDM" then "CharacterColorRed" else nil,
-						Native = { Position = UDim2.fromScale(0.04, 0), Size = UDim2.fromScale(0.6, 1) },
-						ZIndex = 3,
-					}),
-					Second = c(CelebrationAvatar, {
-						Static = true,
-						ColorId = "CharacterColorBlue",
-						Native = { Position = UDim2.fromScale(0.43, 0.05), Size = UDim2.fromScale(0.53, 0.9) },
-						ZIndex = 3,
-					}),
-				})
-				else nil,
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 1.7,
-				AspectType = Enum.AspectType.FitWithinMaxSize,
-			}),
-			UICorner = c("UICorner"),
-			UIStroke = c("UIStroke", {
-				Color = Color3.new(1, 1, 1),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.02,
-			}),
-			VoteCount = c(ResponsiveText, {
-				HostName = "VoteCount",
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
+			TextLabel = c(ResponsiveText, {
 				MeasurementFont = UIConfig.Text.BodyFont,
-				MaxTextSize = 22,
+				Wrapped = true,
 				Native = {
-					AnchorPoint = Vector2.zero,
+					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					Font = UIConfig.Text.BodyFont,
-					Position = UDim2.fromOffset(8, if compact then 2 else 6),
-					Size = UDim2.new(1, -16, 0, if compact then 18 else 24),
-					Text = GameModeVoteViewModel.formatVoteCount(mode.VoteCount),
-					TextColor3 = Color3.new(1, 1, 1),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					ZIndex = 3,
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromScale(0.9, 0.86),
+					Text = if compact
+						then string.match(mode.Description, "^[^.]+[.]?") or mode.Description
+						else mode.Description,
+					TextColor3 = Palette.White,
+					TextWrapped = true,
+					ZIndex = z + 1,
 				},
+			}, { Stroke = inkStroke(0.03) }),
+		}),
+		Thumbnail = c(Well, {
+			AspectRatio = 1.7,
+			Native = {
+				AnchorPoint = Vector2.new(0.5, if compact then 0 else 0.5),
+				Position = if compact
+					then UDim2.new(0.5, 0, 0, 80)
+					else UDim2.fromScale(if portrait then 0.23 else 0.5, if portrait then 0.58 else 0.57),
+				Size = if compact
+					then UDim2.new(0.86, 0, 1, -144)
+					else UDim2.fromScale(if portrait then 0.38 else 0.85, if portrait then 0.58 else 0.46),
+				ZIndex = z,
+			},
+		}, {
+			Inset = c("Frame", {
+				BackgroundTransparency = 1,
+				ClipsDescendants = true,
+				Position = UDim2.fromOffset(6, 6),
+				Size = UDim2.new(1, -12, 1, -12),
+				ZIndex = z + 1,
 			}, {
-				UIStroke = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = VOTE_COUNT_STROKE,
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
+				Placeholder = placeholder(mode.Id, z + 1),
+				Art = c("ImageLabel", {
+					BackgroundTransparency = 1,
+					Image = mode.ThumbnailId,
+					ScaleType = Enum.ScaleType.Crop,
+					Size = UDim2.fromScale(1, 1),
+					ZIndex = z + 3,
+				}),
+				VoteCount = c("Frame", {
+					BackgroundColor3 = Palette.Ink,
+					BackgroundTransparency = 0.15,
+					BorderSizePixel = 0,
+					Position = UDim2.fromOffset(8, 8),
+					Size = UDim2.fromOffset(if compact then 84 else 104, if compact then 24 else 28),
+					ZIndex = z + 4,
+				}, {
+					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+					Text = c("TextLabel", {
+						BackgroundTransparency = 1,
+						FontFace = DISPLAY_FONT,
+						Position = UDim2.fromOffset(0, 1),
+						Size = UDim2.fromScale(1, 1),
+						Text = GameModeVoteViewModel.formatVoteCount(mode.VoteCount),
+						TextColor3 = Palette.White,
+						TextSize = if compact then 14 else 16,
+						ZIndex = z + 5,
+					}),
 				}),
 			}),
 		}),
 		VoteButton = c(AnimatedButton, {
-			SelectionRadius = UDim.new(1, 0),
+			SelectionRadius = UDim.new(0, UIConfig.Radius.Control),
 			ButtonRef = props.ButtonRef,
 			Enabled = props.Enabled,
 			EntranceDelay = (mode.SortOrder - 1) * 0.025,
@@ -194,15 +242,15 @@ return function(props: Props)
 				Image = "",
 				LayoutOrder = 2,
 				Position = if compact
-					then UDim2.new(0.5, 0, 1, -8)
-					else UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.92 else 0.95),
+					then UDim2.new(0.5, 0, 1, -10)
+					else UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.92 else 0.94),
 				Size = if compact
-					then UDim2.new(0.84, 0, 0, UIConfig.Interaction.MinTargetPx)
-					else if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.fromScale(0.651625, 0.156114),
-				ZIndex = 2,
+					then UDim2.new(0.86, 0, 0, UIConfig.Interaction.MinTargetPx)
+					else if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.fromScale(0.6, 0.14),
+				ZIndex = z,
 			},
 			Visual = c(ButtonSurface, {
-				Color = if mode.Selected then UIConfig.ProgressionStyle.Pink else UIConfig.ProgressionStyle.Cyan,
+				Color = if mode.Selected then Palette.Pink else Palette.Cyan,
 				Enabled = props.Enabled,
 			}),
 			OnActivated = function()
@@ -215,77 +263,15 @@ return function(props: Props)
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					FontFace = DISPLAY_FONT,
 					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromScale(0.736491, 0.6712),
+					Size = UDim2.fromScale(0.8, 0.66),
 					Text = if mode.Selected then "VOTED" else "VOTE",
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 3,
+					TextColor3 = Palette.White,
+					ZIndex = z + 1,
 				},
-			}, {
-				Stroke = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = UIConfig.Button.StrokePx,
-				}),
-			}),
-			UIAspectRatioConstraint = if compact
-				then nil
-				else c("UIAspectRatioConstraint", {
-					AspectRatio = 3.48,
-				}),
-		}),
-		Description = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = UIConfig.ProgressionStyle.PanelRaised,
-			BorderSizePixel = 0,
-			Position = if compact
-				then UDim2.new(0.5, 0, 0, 43)
-				else UDim2.fromScale(if portrait then 0.72 else 0.496873, if portrait then 0.31 else 0.17),
-			Size = if compact
-				then UDim2.new(0.86, 0, 0, 32)
-				else UDim2.fromScale(if portrait then 0.5 else 0.850373, if portrait then 0.28 else 0.18),
-			ZIndex = 2,
-		}, {
-			UICorner = c("UICorner", {
-				BottomLeftRadius = UDim.new(0.25, 0),
-				BottomRightRadius = UDim.new(0.25, 0),
-				TopLeftRadius = UDim.new(0.25, 0),
-				TopRightRadius = UDim.new(0.25, 0),
-			}),
-			TextLabel = c(ResponsiveText, {
-				MeasurementFont = UIConfig.Text.BodyFont,
-				Wrapped = true,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
-					Position = UDim2.fromScale(0.5, 0.511),
-					Size = UDim2.fromScale(0.927564, 0.9),
-					Text = if props.Compact
-						then string.match(mode.Description, "^[^.]+[.]?") or mode.Description
-						else mode.Description,
-					TextColor3 = Color3.new(1, 1, 1),
-					TextWrapped = true,
-					ZIndex = 3,
-				},
-			}, {
-				Stroke = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = UIConfig.Button.StrokePx,
-				}),
-			}),
-		}),
-		Checkmark = c("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://72382658",
-			Position = UDim2.fromScale(if portrait then 0.85 else 0.863158, if portrait then -0.06 else -0.0652306),
-			Size = if portrait then UDim2.fromOffset(52, 52) else UDim2.fromScale(CHECKMARK_SCALE.X, CHECKMARK_SCALE.Y),
-			Visible = mode.Selected,
-			ZIndex = 6,
-		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-				AspectRatio = 1,
-			}),
+			}, { Stroke = inkStroke() }),
+			UIAspectRatioConstraint = if compact then nil else c("UIAspectRatioConstraint", { AspectRatio = 3.48 }),
 		}),
 	})
 end

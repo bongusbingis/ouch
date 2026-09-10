@@ -24,14 +24,14 @@ return function(props)
 	return c("Frame", native, {
 		Shadow = if shadow > 0
 			then c("Frame", {
-				BackgroundColor3 = Config.Colors.Ink,
+				BackgroundColor3 = Config.Colors.Shadow,
 				BorderSizePixel = 0,
 				Position = UDim2.fromOffset(shadow, shadow),
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 1,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, radius) }),
-				Stroke = c("UIStroke", { Color = Config.Colors.Ink, Thickness = Config.Surface.StrokePx }),
+				Stroke = c("UIStroke", { Color = Config.Colors.Shadow, Thickness = Config.Surface.StrokePx }),
 			})
 			else nil,
 		Face = c("Frame", {

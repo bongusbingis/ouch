@@ -177,7 +177,7 @@ local function Tile(props: {
 			Size = UDim2.new(1, -16, 0, bandPx),
 			ZIndex = z + 2,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			Outline = if props.Selected then c("UIStroke", { Color = colors.Yellow, Thickness = 2 }) else nil,
 			ItemName = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,

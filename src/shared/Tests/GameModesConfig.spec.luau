@@ -13,10 +13,10 @@ T.describe("GameModes config", function()
 		T.expect(not GameModes.Modes.Infection.Enabled):toBeTruthy()
 	end)
 
-	T.it("keeps thumbnails as explicit empty configuration stubs", function()
-		T.expect(GameModes.Modes.FFA.ThumbnailId):toEqual("")
-		T.expect(GameModes.Modes.TDM.ThumbnailId):toEqual("")
-		T.expect(GameModes.Modes.Infection.ThumbnailId):toEqual("")
+	T.it("keeps thumbnails on the shared stub id until key art lands", function()
+		for _, definition in GameModes.Modes do
+			T.expect(definition.ThumbnailId):toEqual("rbxassetid://123456789")
+		end
 	end)
 end)
 

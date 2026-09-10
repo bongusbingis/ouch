@@ -50,7 +50,7 @@ return function(props: Props)
 				ZIndex = 5,
 			},
 		}, {
-			UICorner = c("UICorner", { CornerRadius = UDim.new(0.16, 0) }),
+			UICorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 		})
 	else
 		children.UIGridLayout = c("UIGridLayout", {

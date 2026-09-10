@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="328" viewBox="0 0 520 328">
+  <g id="well-9slice">
+    <rect id="Shadow" x="8" y="8" width="512" height="320" rx="24" fill="#000000"/>
+    <rect id="Outline" x="0" y="0" width="512" height="320" rx="24" fill="#FFFFFF"/>
+    <rect id="Face" x="4" y="4" width="504" height="312" rx="20" fill="#1185CC"/>
+  </g>
+</svg>

@@ -10,6 +10,8 @@ local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local QuestsConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Quests"))
 local Palette = UIConfig.ProgressionStyle
 local Surface = require(script.Parent.Arena.Surface)
 
@@ -25,6 +27,18 @@ local function textStroke(thickness: number)
 		Thickness = thickness,
 		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 	})
+end
+
+-- Each quest carries the icon of what it tracks; the id comes from the
+-- definition so the public quest projection stays exactly what the server
+-- sends today.
+local function questIcon(questId: string): string?
+	for _, definition in QuestsConfig.Definitions do
+		if definition.id == questId then
+			return (definition :: any).Icon
+		end
+	end
+	return nil
 end
 
 local function rowHeight(compact: boolean, short: boolean): number
@@ -71,6 +85,9 @@ local function QuestRow(rowProps: {
 	local short = rowProps.Short == true
 	local completed = quest.progress >= quest.goal
 	local progressFraction = math.clamp(quest.progress / math.max(quest.goal, 1), 0, 1)
+	local icon = questIcon(quest.questId)
+	local tile = if icon then (if short then 32 else 40) else 0
+	local infoLeft = 10 + (if icon then tile + 10 else 0)
 
 	return c("Frame", {
 		BackgroundColor3 = Palette.Claimed,
@@ -79,18 +96,38 @@ local function QuestRow(rowProps: {
 		LayoutOrder = rowProps.Order,
 		Size = UDim2.new(1, -8, 0, rowHeight(compact, short)),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		Stroke = c("UIStroke", {
 			Color = if completed then Palette.Yellow else Palette.White,
-			Thickness = 1,
-			Transparency = if completed and not quest.claimed then 0 else 0.65,
+			Thickness = UIConfig.Well.StrokePx,
+			Transparency = if completed and not quest.claimed then 0 else 0.7,
 		}),
+		IconTile = if icon
+			then c("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = Palette.Ink,
+				BorderSizePixel = 0,
+				Position = UDim2.new(0, 10, if compact then 0 else 0.5, if compact then 8 + tile / 2 else 0),
+				Size = UDim2.fromOffset(tile, tile),
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
+				Glyph = c("ImageLabel", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					Image = icon,
+					ImageColor3 = if completed then Palette.Yellow else Palette.White,
+					Position = UDim2.fromScale(0.5, 0.5),
+					ScaleType = Enum.ScaleType.Fit,
+					Size = UDim2.fromScale(0.68, 0.68),
+				}),
+			})
+			else nil,
 		QuestInfo = c("Frame", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(10, 0),
+			Position = UDim2.fromOffset(infoLeft, 0),
 			Size = if compact
-				then UDim2.new(1, -20, 0, if short then 34 else UIConfig.Layout.QuestRow.CompactInfoHeightPx)
-				else UDim2.new(1, -114, 1, 0),
+				then UDim2.new(1, -infoLeft - 10, 0, if short then 34 else UIConfig.Layout.QuestRow.CompactInfoHeightPx)
+				else UDim2.new(1, -infoLeft - 104, 1, 0),
 		}, {
 			Title = c(ResponsiveText, {
 				Wrapped = true,
@@ -301,14 +338,14 @@ return function(props: Props)
 		native.Size = UDim2.new(native.Size.X.Scale, native.Size.X.Offset, 0, listHeight + if short then 40 else 52)
 	end
 
-	return c(Surface, { Native = native, Color = Palette.Panel, Radius = 10 }, {
+	return c(Surface, { Native = native, Color = Palette.Panel, Radius = UIConfig.Radius.Panel }, {
 		HeaderBand = c("Frame", {
-			BackgroundColor3 = Palette.Pink,
+			BackgroundColor3 = Palette.Claimed,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(8, 8),
 			Size = UDim2.new(1, -16, 0, if short then 28 else 36),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		Title = c(ResponsiveText, {
 			HostName = "Title",

@@ -82,7 +82,7 @@ return React.memo(function(props: Props)
 		LayoutOrder = props.LayoutOrder,
 		Size = UDim2.new(1, 0, 0, props.Height),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		Outline = c("UIStroke", {
 			Color = UIConfig.ProgressionStyle.White,
 			Thickness = 1,

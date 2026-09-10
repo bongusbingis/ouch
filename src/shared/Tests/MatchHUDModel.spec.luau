@@ -59,4 +59,44 @@ T.describe("MatchHUDModel", function()
 	end)
 end)
 
+T.describe("MatchHUDModel standings", function()
+	local function players(scores: { number }, localIndex: number)
+		local list = {}
+		for index, score in scores do
+			table.insert(
+				list,
+				{ userId = index, displayName = `P{index}`, score = score, isLocal = index == localIndex, alive = true }
+			)
+		end
+		return Model.standings(list)
+	end
+	T.it("shows the top rows plus the local player when they sit below the cut", function()
+		local rows = Model.strip(players({ 9, 7, 5, 3, 1 }, 5), 3)
+		T.expect(#rows):toEqual(4)
+		T.expect(rows[4].isLocal):toEqual(true)
+		T.expect(rows[4].placement):toEqual(5)
+	end)
+	T.it("does not duplicate a local player already inside the cut", function()
+		local rows = Model.strip(players({ 9, 7, 5, 3, 1 }, 2), 3)
+		T.expect(#rows):toEqual(3)
+		T.expect(rows[2].isLocal):toEqual(true)
+	end)
+	T.it("shows everyone when the match is smaller than the cut", function()
+		T.expect(#Model.strip(players({ 2, 1 }, 1), 3)):toEqual(2)
+	end)
+	T.it("splits team boards by team and long free-for-alls in half", function()
+		local entries = players({ 5, 4, 3, 2 }, 1)
+		entries[1].teamId, entries[2].teamId, entries[3].teamId, entries[4].teamId = "Red", "Blue", "Red", "Blue"
+		local columns = Model.columns(entries, true, 8)
+		T.expect(#columns):toEqual(2)
+		T.expect(#columns[1]):toEqual(2)
+		T.expect(columns[1][1].teamId):toEqual("Red")
+		T.expect(#Model.columns(players({ 1, 1, 1 }, 1), false, 8)):toEqual(1)
+		local halves = Model.columns(players({ 9, 8, 7, 6, 5, 4, 3, 2, 1 }, 1), false, 8)
+		T.expect(#halves):toEqual(2)
+		T.expect(#halves[1]):toEqual(5)
+		T.expect(#halves[2]):toEqual(4)
+	end)
+end)
+
 return true

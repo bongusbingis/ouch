@@ -60,7 +60,7 @@ return function(props)
 			ZIndex = props.ZIndex or 6,
 		},
 	}, {
-		UICorner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+		UICorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		UIPadding = c("UIPadding", {
 			PaddingLeft = UDim.new(0, 6),
 			PaddingRight = UDim.new(0, 6),

@@ -284,7 +284,7 @@ local function ActionSlot(props: {
 			else nil,
 		[React.Event.InputEnded] = endPress,
 	}, {
-		SlotCorner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+		SlotCorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		SlotOutline = c("UIStroke", {
 			Color = WHITE,
 			Thickness = 2,
@@ -296,7 +296,7 @@ local function ActionSlot(props: {
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 54,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		MutedWash = c("Frame", {
 			BackgroundColor3 = Palette.White,
@@ -305,7 +305,7 @@ local function ActionSlot(props: {
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 55,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		Content = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -483,7 +483,7 @@ return function(props: Props)
 			Size = UDim2.new(1, -BAR_INSET_X, 1, -BAR_INSET_Y),
 			ZIndex = 50,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 		}),
 		Bar = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -494,7 +494,7 @@ return function(props: Props)
 			Size = UDim2.new(1, -BAR_INSET_X, 1, -BAR_INSET_Y),
 			ZIndex = 51,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 			Stroke = textStroke(WHITE, 0.018, 0.08),
 			Gradient = c("UIGradient", {
 				Color = ColorSequence.new(BAR_TOP, BAR_BOTTOM),

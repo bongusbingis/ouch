@@ -146,7 +146,7 @@ if postMatchOk then
 end
 local emoteContainer = ReactRoot.create("ArenaEmoteRoot", Enum.ScreenInsets.CoreUISafeInsets, 800, true)
 local emoteRoot = ReactRoblox.createRoot(emoteContainer)
-emoteRoot:render(c(EmoteWheel, { EmptySlotsAssignable = false }))
+emoteRoot:render(c(EmoteWheel, { EmptySlotsAssignable = false, TouchButtonPlacement = "BesideToolbar" }))
 EmoteWheelController.start({
 	onPlay = function(emoteId)
 		Network.fireServer("PlayEmote", emoteId)

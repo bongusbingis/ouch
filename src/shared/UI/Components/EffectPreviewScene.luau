@@ -160,7 +160,7 @@ return function(props: Props)
 					SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 				}, {
 					Constraint = c("UISizeConstraint", { MaxSize = Vector2.new(560, controlsHeight) }),
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+					Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 					Outline = c("UIStroke", { Color = colors.White, Thickness = 2 }),
 					Message = if message
 						then textLabel(message, UDim2.fromOffset(14, 6), UDim2.new(1, -28, 0, 40), 17, false)

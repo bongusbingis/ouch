@@ -5,7 +5,6 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
@@ -14,7 +13,6 @@ local Presentation =
 local Model = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("MatchHUDModel")
 )
-local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)
 local listeners: { (any) -> () } = {}
@@ -95,13 +93,10 @@ local function update()
 	end
 end
 
+-- The board is a hold-to-view overlay: it never asks for the cursor, so the
+-- player keeps moving and aiming while they glance at it.
 local function setOpen(open: boolean)
 	scoreboardOpen = open and available
-	if scoreboardOpen then
-		Combat.requestCursor(action)
-	else
-		Combat.releaseCursor(action)
-	end
 	update()
 end
 
@@ -140,7 +135,9 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 				return Enum.ContextActionResult.Pass
 			end
 			if inputState == Enum.UserInputState.Begin then
-				MatchHUDClient.toggleScoreboard()
+				setOpen(true)
+			elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
+				setOpen(false)
 			end
 			return Enum.ContextActionResult.Sink
 		end, false, Enum.ContextActionPriority.High.Value + 2, Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect)

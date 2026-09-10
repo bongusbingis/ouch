@@ -53,7 +53,7 @@ return function()
 	local scale = UIConfig.Text.PreferredScale[preferred.Name] or 1
 	local entries = {
 		Layout = c("UIListLayout", { Padding = UDim.new(0, 18), SortOrder = Enum.SortOrder.LayoutOrder }),
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		Padding = c("UIPadding", {
 			PaddingLeft = UDim.new(0, 12),
 			PaddingRight = UDim.new(0, 12),

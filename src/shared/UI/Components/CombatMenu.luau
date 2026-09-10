@@ -145,8 +145,8 @@ local function MenuToggle(props)
 			Position = styles.Position,
 			ScaleType = Enum.ScaleType.Slice,
 			Size = UDim2.fromScale(0.105, 0.078),
-			SliceCenter = Rect.new(224, 202, 770, 474),
-			SliceScale = 0.12,
+			SliceCenter = UIConfig.LobbyArtwork.Action.CyanSlice,
+			SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 			Visible = props.Available or props.Open,
 			ZIndex = 80,
 		},
@@ -189,7 +189,7 @@ local function MenuToggle(props)
 			Size = UDim2.fromScale(toggleLayout.KeycapWidthScale, 0.54),
 			ZIndex = 82,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0.22, 0) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 			Stroke = c("UIStroke", {
 				Color = Color3.new(1, 1, 1),
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,

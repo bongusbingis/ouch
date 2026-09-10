@@ -19,8 +19,8 @@ return {
 			Pink = "rbxassetid://94748581468730",
 			CyanSlice = Rect.new(198, 228, 842, 469),
 			PinkSlice = Rect.new(198, 228, 841, 468),
-			SliceScale = 0.075,
-			CornerPx = 14,
+			SliceScale = 0.09,
+			CornerPx = 12,
 			ShadowPx = 2.4,
 			TextOffsetY = 3,
 			PaddingPx = 16,
@@ -45,7 +45,13 @@ return {
 		Pink = Color3.fromRGB(239, 18, 111),
 		Yellow = Color3.fromRGB(255, 220, 62),
 		Green = Color3.fromRGB(154, 233, 91),
+		Shadow = Color3.new(0, 0, 0),
 	},
+	-- One radius scale: panels and modals, then every control and inner
+	-- container, then tiles nested inside a container. Pills only for chips
+	-- and bars no taller than PillMaxPx.
+	Radius = { Panel = 16, Control = 12, Tile = 8, PillMaxPx = 32 },
+	Well = { StrokePx = 2, ShadowPx = 4, InsetPx = 12 },
 	Text = {
 		BodyFont = Enum.Font.BuilderSansBold,
 		DefaultFont = Font.new(
@@ -82,6 +88,13 @@ return {
 		PageSurface = {
 			Image = "rbxassetid://124751224634629",
 			SliceCenter = Rect.new(31, 41, 978, 620),
+			SliceScale = 0.5,
+		},
+		-- The inner-container 9-slice from Figma; an empty Image makes Well draw
+		-- the same construction natively until the upload is approved.
+		WellSurface = {
+			Image = "",
+			SliceCenter = Rect.new(32, 32, 480, 288),
 			SliceScale = 0.5,
 		},
 		PagePosition = UDim2.fromScale(0.5, 0.56),
@@ -253,8 +266,6 @@ return {
 			EmptyHeightPx = 54,
 			Tracks = 12,
 			SpanSteps = { 4, 8, 12 },
-			MainSizeScale = Vector2.new(0.93, 0.82),
-			ContentSizeScale = Vector2.new(0.95, 0.93),
 			CardClasses = {
 				-- Premium passes: artwork over the name and the price, like the rest of
 				-- the storefront. There are more of them than fit above the fold at

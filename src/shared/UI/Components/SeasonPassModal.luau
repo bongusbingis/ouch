@@ -280,7 +280,7 @@ return function(props)
 						Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
 						ZIndex = 103,
 					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+						Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Control) }),
 						Outline = c("UIStroke", { Color = colors.White, Thickness = 1, Transparency = 0.6 }),
 						Track = label(
 							`{string.upper(selected.track)} • TIER {selected.tier}`,

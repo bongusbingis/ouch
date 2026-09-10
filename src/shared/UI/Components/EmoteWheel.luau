@@ -4,6 +4,7 @@
 -- Created: 2026-09-09
 --!strict
 
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 
@@ -16,6 +17,7 @@ local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelCon
 local ModalSurface = require(script.Parent.ModalSurface)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useViewportSize = require(script.Parent.Parent.Hooks.useViewportSize)
+local CombatToolbarViewModel = require(script.Parent.Parent.Models.CombatToolbarViewModel)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local Config = ReplicatedStorage:WaitForChild("Config")
 local UI = require(Config:WaitForChild("Interface"):WaitForChild("UI"))
@@ -326,9 +328,27 @@ export type Props = {
 	ShowTouchButton: boolean?,
 	TouchButtonPosition: UDim2?,
 	TouchButtonAnchor: Vector2?,
+	-- "BesideToolbar" parks the button just left of the combat toolbar, in the
+	-- utility row at the bottom centre where neither thumb is steering or aiming.
+	TouchButtonPlacement: ("Default" | "BesideToolbar")?,
 	EmptySlotsAssignable: boolean?,
 	ZIndex: number?,
 }
+
+local function bottomSafeInset(viewport: Vector2): number
+	local ok, area = pcall(GuiService.GetInsetArea, GuiService, Enum.ScreenInsets.DeviceSafeInsets)
+	if not ok or typeof(area) ~= "Rect" then
+		return 0
+	end
+	return math.max(viewport.Y - (area :: Rect).Max.Y, 0)
+end
+
+local function touchButtonPlacement(viewport: Vector2): (UDim2, Vector2)
+	local toolbar = CombatToolbarViewModel.layout(viewport, "Touch")
+	local px = WheelConfig.TouchButtonPx
+	local bottom = toolbar.bottomGap + bottomSafeInset(viewport)
+	return UDim2.new(0.5, -toolbar.width / 2 - 12 - px, 1, -bottom - toolbar.height / 2 - px / 2), Vector2.zero
+end
 
 return function(props: Props)
 	local snapshot = EmoteWheelController.useSnapshot()
@@ -377,12 +397,16 @@ return function(props: Props)
 		and snapshot.deviceClass == "Touch"
 		and not snapshot.open
 		and not blocked
+	local touchPosition, touchAnchor = props.TouchButtonPosition, props.TouchButtonAnchor
+	if props.TouchButtonPlacement == "BesideToolbar" then
+		touchPosition, touchAnchor = touchButtonPlacement(viewport)
+	end
 	return c(React.Fragment, nil, {
 		Button = c(TouchButton, {
 			Visible = touchVisible,
 			BottomPx = WheelConfig.TouchButtonBottomPx,
-			Position = props.TouchButtonPosition,
-			AnchorPoint = props.TouchButtonAnchor,
+			Position = touchPosition,
+			AnchorPoint = touchAnchor,
 			ZIndex = z,
 		}),
 		Surface = if snapshot.open

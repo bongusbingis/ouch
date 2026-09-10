@@ -9,10 +9,10 @@ local c = React.createElement
 return function(props)
 	local enabled = props.Enabled ~= false
 	local color = if enabled then props.Color or UI.ProgressionStyle.Cyan else UI.ProgressionStyle.Disabled
-	local corner = props.Radius or UDim.new(0.5, 0)
+	local corner = props.Radius or UDim.new(0, UI.Radius.Control)
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, {
 		Shadow = c("Frame", {
-			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundColor3 = UI.ProgressionStyle.Shadow,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(UI.Button.ShadowPx, UI.Button.ShadowPx),
 			Size = UDim2.fromScale(1, 1),

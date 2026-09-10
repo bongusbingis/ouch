@@ -263,10 +263,12 @@ function EmoteWheelController.start(newOptions: Options)
 	table.insert(
 		connections,
 		UserInputService.LastInputTypeChanged:Connect(function(inputType)
-			local class = deviceClassFor(inputType)
-			if inputType == Enum.UserInputType.MouseMovement and snapshot.deviceClass == "Keyboard" then
+			-- Pointer motion says nothing about how the player is playing; only a
+			-- press, key, touch or gamepad input may switch the device class.
+			if inputType == Enum.UserInputType.MouseMovement or inputType == Enum.UserInputType.MouseWheel then
 				return
 			end
+			local class = deviceClassFor(inputType)
 			if class ~= snapshot.deviceClass then
 				snapshot.deviceClass = class
 				emit()
