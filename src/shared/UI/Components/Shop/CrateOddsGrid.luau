@@ -57,7 +57,7 @@ local function Tile(props: {
 })
 	local outcome = props.Outcome
 	local z = props.ZIndex
-	local bandPx = if props.Short then 26 else 30
+	local bandPx = if props.Short then 32 else 36
 	local rarityColor = InventoryConfig.RarityColors[outcome.rarity] or colors.Cyan
 	local preview = outcome.preview
 	return c(AnimatedButton, {
@@ -69,7 +69,7 @@ local function Tile(props: {
 			LayoutOrder = props.LayoutOrder,
 			ScaleType = Enum.ScaleType.Slice,
 			SliceCenter = Rect.new(107, 27, 126, 128),
-			Size = UDim2.fromOffset(props.TilePx, props.TilePx + bandPx),
+			Size = UDim2.fromOffset(props.TilePx, if props.Short then 92 else props.TilePx + bandPx),
 			ZIndex = z,
 		},
 		OnActivated = props.OnActivated,
@@ -80,8 +80,8 @@ local function Tile(props: {
 			BorderSizePixel = 0,
 			Image = "rbxassetid://80477338860845",
 			ImageColor3 = rarityColor,
-			Position = UDim2.fromScale(0.49, 0.496),
-			Size = UDim2.fromScale(0.96, 0.955),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, -4, 1, -4),
 			ZIndex = z,
 		}, {
 			Texture = c("ImageLabel", {
@@ -95,7 +95,7 @@ local function Tile(props: {
 		Preview = c("Frame", {
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(0, 6),
-			Size = UDim2.new(1, 0, 1, -bandPx - 10),
+			Size = UDim2.new(1, 0, 1, -bandPx - 18),
 			ZIndex = z + 1,
 		}, {
 			Content = if preview
@@ -112,10 +112,10 @@ local function Tile(props: {
 		Chance = c("Frame", {
 			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundColor3 = colors.Ink,
-			BackgroundTransparency = 0.15,
+			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(8, 8),
-			Size = UDim2.fromOffset(0, if props.Short then 18 else 20),
+			Size = UDim2.fromOffset(0, 24),
 			ZIndex = z + 3,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -123,59 +123,73 @@ local function Tile(props: {
 			Text = c("TextLabel", {
 				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 1,
-				FontFace = DISPLAY_FONT,
+				FontFace = BODY_FONT,
 				Size = UDim2.fromScale(0, 1),
 				Text = tostring(outcome.percent) .. "%",
 				TextColor3 = colors.Yellow,
-				TextSize = if props.Short then 12 else 14,
+				TextSize = UIConfig.Text.CaptionMinPx,
 				ZIndex = z + 4,
 			}),
 		}),
 		Owned = if outcome.owned
 			then c("Frame", {
-				AnchorPoint = Vector2.new(1, 0),
-				AutomaticSize = Enum.AutomaticSize.X,
+				AnchorPoint = Vector2.new(1, if props.Short then 0 else 1),
+				AutomaticSize = if props.Short then Enum.AutomaticSize.None else Enum.AutomaticSize.X,
 				BackgroundColor3 = colors.Yellow,
 				BorderSizePixel = 0,
-				Position = UDim2.new(1, -8, 0, 8),
-				Size = UDim2.fromOffset(0, if props.Short then 18 else 20),
+				Position = if props.Short then UDim2.new(1, -8, 0, 8) else UDim2.new(1, -8, 1, -bandPx - 12),
+				Size = if props.Short then UDim2.fromOffset(24, 24) else UDim2.fromOffset(0, 22),
 				ZIndex = z + 3,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
-				Text = c("TextLabel", {
-					AutomaticSize = Enum.AutomaticSize.X,
-					BackgroundTransparency = 1,
-					FontFace = DISPLAY_FONT,
-					Size = UDim2.fromScale(0, 1),
-					Text = "OWNED",
-					TextColor3 = colors.Ink,
-					TextSize = if props.Short then 11 else 12,
-					ZIndex = z + 4,
-				}),
+				Padding = if not props.Short
+					then c("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) })
+					else nil,
+				Check = if props.Short
+					then c("ImageLabel", {
+						BackgroundTransparency = 1,
+						Image = "rbxassetid://168702841",
+						ImageColor3 = colors.Ink,
+						Position = UDim2.fromOffset(4, 4),
+						Size = UDim2.fromOffset(16, 16),
+						ZIndex = z + 4,
+					})
+					else nil,
+				Text = if not props.Short
+					then c("TextLabel", {
+						AutomaticSize = Enum.AutomaticSize.X,
+						BackgroundTransparency = 1,
+						FontFace = BODY_FONT,
+						Size = UDim2.fromScale(0, 1),
+						Text = "OWNED",
+						TextColor3 = colors.Ink,
+						TextSize = UIConfig.Text.CaptionMinPx,
+						ZIndex = z + 4,
+					})
+					else nil,
 			})
 			else nil,
 		NameBand = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = if props.Selected then colors.Ink else colors.Cyan,
+			BackgroundColor3 = colors.Ink,
 			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, 0, 1, -5),
-			Size = UDim2.new(1, -12, 0, bandPx),
+			Position = UDim2.new(0.5, 0, 1, -8),
+			Size = UDim2.new(1, -16, 0, bandPx),
 			ZIndex = z + 2,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
 			Outline = if props.Selected then c("UIStroke", { Color = colors.Yellow, Thickness = 2 }) else nil,
 			ItemName = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = if props.Short then 14 else 16,
-				MinTextSize = 11,
+				MaxTextSize = 17,
+				MinTextSize = 14,
 				Wrapped = true,
 				Truncate = true,
 				Native = {
 					BackgroundTransparency = 1,
 					FontFace = DISPLAY_FONT,
-					Position = UDim2.fromOffset(4, 1),
-					Size = UDim2.new(1, -8, 1, -2),
+					Position = UDim2.fromOffset(4, 4),
+					Size = UDim2.new(1, -8, 1, -4),
 					Text = tileName(outcome),
 					TextColor3 = if props.Selected then colors.Yellow else WHITE,
 					TextWrapped = true,
@@ -192,15 +206,10 @@ local function Tile(props: {
 	})
 end
 
-local function sectionSummary(first: any, short: boolean): string
+local function sectionSummary(first: any): string
 	local chance = tostring(first.percent) .. "%"
-	local base = if first.basePercent and first.basePercent ~= first.percent
-		then `  (BASE {first.basePercent}%)`
-		else ""
-	if short then
-		return `{chance} EACH{base}  •  DUPES PAY {formatNumber(first.bonksRefund or 0)}`
-	end
-	return `{chance} EACH{base}  •  DUPLICATES PAY {formatNumber(first.bonksRefund or 0)} BONKS`
+	local base = if first.basePercent and first.basePercent ~= first.percent then ` (base {first.basePercent}%)` else ""
+	return `{chance} each{base}  •  Duplicates: {formatNumber(first.bonksRefund or 0)} Bonks`
 end
 
 return function(props: Props)
@@ -217,13 +226,12 @@ return function(props: Props)
 		end
 		table.insert(bucket, outcome)
 	end
-	local headerPx = if props.Short then 22 else 26
 	for _, group in groups do
 		local rarityColor = InventoryConfig.RarityColors[group.rarity] or colors.Cyan
 		local tiles = {
 			Grid = c("UIGridLayout", {
 				CellPadding = UDim2.fromOffset(props.GapPx, props.GapPx),
-				CellSize = UDim2.fromOffset(props.TilePx, props.TilePx + (if props.Short then 26 else 30)),
+				CellSize = UDim2.fromOffset(props.TilePx, if props.Short then 92 else props.TilePx + 36),
 				FillDirectionMaxCells = props.Columns,
 				HorizontalAlignment = Enum.HorizontalAlignment.Left,
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -246,18 +254,27 @@ return function(props: Props)
 		end
 		order += 1
 		sections["Header" .. group.rarity] = c("Frame", {
+			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = order,
-			Size = UDim2.new(1, 0, 0, headerPx),
+			Size = UDim2.fromScale(1, 0),
 			ZIndex = props.ZIndex,
 		}, {
+			Layout = c(
+				"UIListLayout",
+				{ SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, if props.Short then 0 else 2) }
+			),
+			Padding = if not props.Short
+				then c("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 6) })
+				else nil,
 			Name = c("TextLabel", {
+				LayoutOrder = 1,
 				BackgroundTransparency = 1,
 				FontFace = DISPLAY_FONT,
-				Size = UDim2.fromScale(0.4, 1),
+				Size = UDim2.new(1, 0, 0, if props.Short then 22 else 26),
 				Text = string.upper(group.rarity),
 				TextColor3 = rarityColor,
-				TextSize = if props.Short then 16 else 19,
+				TextSize = 20,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = props.ZIndex + 1,
 			}, {
@@ -268,22 +285,17 @@ return function(props: Props)
 				}),
 			}),
 			Summary = c("TextLabel", {
-				AnchorPoint = Vector2.new(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				LayoutOrder = 2,
 				BackgroundTransparency = 1,
 				FontFace = BODY_FONT,
-				Position = UDim2.new(1, -4, 0, 0),
-				Size = UDim2.fromScale(0.6, 1),
-				Text = sectionSummary(group.outcomes[1], props.Short),
+				Size = UDim2.new(1, -4, 0, 20),
+				Text = sectionSummary(group.outcomes[1]),
 				TextColor3 = WHITE,
-				TextSize = if props.Short then 12 else 14,
-				TextXAlignment = Enum.TextXAlignment.Right,
+				TextSize = 16,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = props.ZIndex + 1,
-			}, {
-				Outline = c("UIStroke", {
-					Color = colors.Ink,
-					Thickness = 0.035,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
 			}),
 		})
 		order += 1

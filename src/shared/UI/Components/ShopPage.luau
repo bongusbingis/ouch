@@ -7,6 +7,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ActivityDots = require(script.Parent.ActivityDots)
 local BonksLabel = require(script.Parent.BonksLabel)
+local PageTitle = require(script.Parent.PageTitle)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopSection = require(script.Parent.Shop.ShopSection)
@@ -20,6 +21,20 @@ local ShopUI = UIConfig.Layout.Shop
 
 local function styleFor(sectionId: string): any
 	return ShopUI.Sections[sectionId] or ShopUI.DefaultSection
+end
+
+local function classFor(entry, unit: number, shortHeight: number?): any
+	local class = ShopUI.CardClasses[entry.style.Class]
+	if shortHeight then
+		class = table.clone(class)
+		class.Layout = "Split"
+		class.ArtScale = 0.32
+		class.MinPx = math.max(class.MinPx, ShopUI.ShortCardWidthPx)
+		class.MaxPx = ShopLayout.spanWidth(unit, entry.span or entry.style.Span, ShopUI.GapPx)
+		class.MinHeightPx = shortHeight
+		class.MaxHeightPx = shortHeight
+	end
+	return class
 end
 
 -- A limited-time offer becomes a one-card block so the promotional row shares
@@ -38,12 +53,12 @@ end
 -- A block with more cards than one row of its span can hold keeps that row where
 -- the composition wants it and hands the remainder to a second block further
 -- down, so the cards stay full size instead of being flattened to fit.
-local function withOverflow(entry, unit: number): (any, any?)
+local function withOverflow(entry, unit: number, shortHeight: number?): (any, any?)
 	local overflow = entry.style.Overflow
 	if overflow == nil then
 		return entry, nil
 	end
-	local class = ShopUI.CardClasses[entry.style.Class]
+	local class = classFor(entry, unit, shortHeight)
 	local width = ShopLayout.spanWidth(unit, entry.style.Span, ShopUI.GapPx)
 	local grid = ShopLayout.grid(width, #entry.cards, class, ShopUI.CardGapPx, entry.style.MaxColumns)
 	local featured, rest = ShopLayout.splitFirstRow(entry.cards, grid.columns)
@@ -66,7 +81,7 @@ end
 -- Blocks come from the configured reading order, not from the view model's own,
 -- so a section it gains later still lands somewhere (the trailing "Rest" entry)
 -- and one it stops emitting simply disappears.
-local function orderedEntries(model, unit: number): { any }
+local function orderedEntries(model, unit: number, shortHeight: number?): { any }
 	local order = {}
 	local byId = {}
 	for _, section in model.sections do
@@ -77,7 +92,7 @@ local function orderedEntries(model, unit: number): { any }
 			countdownAt = section.countdownAt,
 			cards = section.cards,
 			style = style,
-		}, unit)
+		}, unit, shortHeight)
 		table.insert(order, entry)
 		byId[entry.id] = entry
 		if overflow then
@@ -129,31 +144,40 @@ local function resolveSpans(entries, unit: number): ()
 	end
 end
 
-local function measure(entries, unit: number, shortHeight: number?): ()
-	for _, entry in entries do
-		local class = ShopUI.CardClasses[entry.style.Class]
-		if shortHeight then
-			class = table.clone(class)
-			class.Layout = "Split"
-			class.ArtScale = 0.32
-			class.MinPx = math.max(class.MinPx, ShopUI.ShortCardWidthPx)
-			class.MaxPx = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
-			class.MinHeightPx = shortHeight
-			class.MaxHeightPx = shortHeight
-		end
-		entry.class = class
-		entry.width = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
-		entry.grid = ShopLayout.grid(entry.width, #entry.cards, class, ShopUI.CardGapPx, entry.style.MaxColumns)
-		entry.height = ShopLayout.sectionHeight(entry.grid, ShopUI.HeaderHeightPx, ShopUI.EmptyHeightPx)
-	end
+local function measure(entry, unit: number, shortHeight: number?): ()
+	entry.class = classFor(entry, unit, shortHeight)
+	entry.width = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
+	entry.grid = ShopLayout.grid(entry.width, #entry.cards, entry.class, ShopUI.CardGapPx, entry.style.MaxColumns)
+	entry.height = ShopLayout.sectionHeight(entry.grid, ShopUI.HeaderHeightPx, ShopUI.EmptyHeightPx)
+	local occupied = math.min(entry.grid.columns, #entry.cards)
+	entry.unusedWidth = if occupied == 0
+		then 0
+		else entry.width - occupied * entry.grid.cardWidth - (occupied - 1) * ShopUI.CardGapPx
 end
 
 local function renderBlocks(model, contentWidth: number, handlers, shortHeight: number?): ({ [string]: any }, number)
 	local unit = ShopLayout.trackUnit(contentWidth, ShopUI.Tracks, ShopUI.GapPx)
-	local entries = orderedEntries(model, unit)
+	local entries = orderedEntries(model, unit, shortHeight)
 	resolveSpans(entries, unit)
-	measure(entries, unit, shortHeight)
-	local placements, bottom = ShopLayout.place(entries, ShopUI.Tracks, ShopUI.GapPx)
+	for _, entry in entries do
+		measure(entry, unit, shortHeight)
+		-- Full-width sections retain the pass row and the phone composition.
+		-- Secondary sections can use a narrower configured track span when it
+		-- avoids the empty space beneath a shorter neighbouring offer.
+		if entry.span < ShopUI.Tracks then
+			local alternatives = {}
+			for _, span in ShopUI.SpanSteps do
+				if span < entry.span and ShopLayout.spanWidth(unit, span, ShopUI.GapPx) >= entry.class.MinPx then
+					local alternative = table.clone(entry)
+					alternative.span = span
+					measure(alternative, unit, shortHeight)
+					table.insert(alternatives, alternative)
+				end
+			end
+			entry.alternatives = alternatives
+		end
+	end
+	local placements, bottom = ShopLayout.compact(entries, ShopUI.Tracks, ShopUI.GapPx)
 	local children = {}
 	for order, placement in placements do
 		local entry = placement.block
@@ -266,24 +290,21 @@ return function(props: Props)
 	return c("ImageLabel", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Image = "rbxassetid://124751224634629",
+		Image = UIConfig.Layout.PageSurface.Image,
 		LayoutOrder = 5,
 		Position = props.Position or UIConfig.Layout.PagePosition,
 		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(31, 41, 978, 620),
-		SliceScale = 0.5,
+		SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+		SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 	}, {
-		Title = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 62,
+		Title = c(PageTitle, {
+			Text = "SHOP",
+			TextSize = if short then 26 else 42,
 			Native = {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.291804, 0.0540634),
-				Size = if short then UDim2.new(0.398251, 0, 0, 24) else UDim2.fromScale(0.398251, 0.0898091),
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Text = "SHOP",
-				TextColor3 = Color3.new(1, 1, 1),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = if short then UDim2.new(0.5, 0, 0, 8) else UDim2.fromScale(0.5, 0.045),
+				Size = if short then UDim2.new(0.48, 0, 0, 30) else UDim2.new(0.48, 0, 0, 54),
 				ZIndex = 5,
 			},
 		}),

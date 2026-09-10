@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+local SectionHeader = require(script.Parent.Parent.SectionHeader)
 local ShopCard = require(script.Parent.ShopCard)
 local ShopCountdown = require(script.Parent.ShopCountdown)
 
@@ -30,6 +31,7 @@ return function(props: Props)
 	local section = props.Section
 	local grid = props.Grid
 	local countdownAt = section.countdownAt
+	local countdownWidth = if props.Width < 250 then 86 else 98
 	local children = {}
 	if #section.cards == 0 then
 		children.Empty = c(ResponsiveText, {
@@ -37,11 +39,11 @@ return function(props: Props)
 			MeasurementFont = UIConfig.Text.BodyFont,
 			MaxTextSize = 20,
 			Native = {
-				BackgroundColor3 = UIConfig.ProgressionStyle.PanelRaised,
+				BackgroundColor3 = UIConfig.ProgressionStyle.Claimed,
 				BackgroundTransparency = 0,
 				Font = UIConfig.Text.BodyFont,
 				Size = UDim2.fromScale(1, 1),
-				Text = "NEW ITEMS ARE ON THE WAY!",
+				Text = "NO OFFERS AVAILABLE",
 				TextColor3 = Color3.new(1, 1, 1),
 				TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
 				TextStrokeTransparency = 0.35,
@@ -61,6 +63,7 @@ return function(props: Props)
 			children[card.id] = c(ShopCard, {
 				Card = card,
 				CardHeight = grid.cardHeight,
+				CardWidth = grid.cardWidth,
 				Class = props.Class,
 				LayoutOrder = index,
 				OnActivated = props.OnCardActivated,
@@ -76,39 +79,23 @@ return function(props: Props)
 	}, {
 		-- A section label, not a second page title: it names the block and gets
 		-- out of the way of the cards underneath it.
-		Header = c("Frame", {
-			BackgroundTransparency = 1,
+		Header = c(SectionHeader, {
+			Text = section.title,
+			TextSize = ShopUI.HeaderTextSize,
+			HeightPx = ShopUI.HeaderHeightPx,
 			LayoutOrder = 1,
-			Size = UDim2.new(1, 0, 0, ShopUI.HeaderHeightPx),
-		}, {
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = ShopUI.HeaderTextSize,
-				Native = {
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Size = UDim2.new(if countdownAt then 0.62 else 1, 0, 0, ShopUI.HeaderHeightPx - 6),
-					Text = section.title,
-					TextColor3 = Color3.new(1, 1, 1),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					ZIndex = 5,
-				},
-			}, {
-				UIStroke = c("UIStroke", {
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = 0.06,
-				}),
-			}),
-			Countdown = if countdownAt
+			ZIndex = 5,
+			Accessory = if countdownAt
 				then c(ShopCountdown, {
 					ExpiresAt = countdownAt,
-					MaxTextSize = ShopUI.HeaderTextSize - 4,
-					Position = UDim2.fromScale(0.64, 0),
-					Size = UDim2.new(0.36, 0, 0, ShopUI.HeaderHeightPx - 6),
+					MaxTextSize = 18,
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.fromScale(1, 0.5),
+					Size = UDim2.fromOffset(countdownWidth, 26),
 					OnExpired = props.OnExpired,
 				})
 				else nil,
+			AccessoryWidthPx = countdownWidth,
 		}),
 		Content = c("Frame", {
 			BackgroundTransparency = 1,

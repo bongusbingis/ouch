@@ -16,6 +16,8 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local ActivityDots = require(script.Parent.ActivityDots)
 local InventoryPreview = require(script.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local PageTitle = require(script.Parent.PageTitle)
+local SectionHeader = require(script.Parent.SectionHeader)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
@@ -70,6 +72,8 @@ end
 
 local function Card(props)
 	local entry: InventoryModel.Entry = props.Entry
+	local inset = 8
+	local nameHeight = 36
 	return c(AnimatedButton, {
 		Style = "Card",
 		Native = {
@@ -110,9 +114,11 @@ local function Card(props)
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 				Outline = c("UIStroke", { Color = UIConfig.ProgressionStyle.Ink, Thickness = 2 }),
 				Text = c("TextLabel", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Size = UDim2.fromScale(1, 1),
+					Font = Enum.Font.BuilderSansBold,
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromScale(0.72, 0.72),
 					Text = tostring(props.SlotIndex),
 					TextColor3 = UIConfig.ProgressionStyle.Ink,
 					TextScaled = true,
@@ -121,15 +127,15 @@ local function Card(props)
 			})
 			else nil,
 		Background = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
+			BackgroundColor3 = cardColor(entry),
 			BorderSizePixel = 0,
+			ClipsDescendants = true,
 			Image = "rbxassetid://80477338860845",
 			ImageColor3 = cardColor(entry),
-			Position = UDim2.fromScale(0.49, 0.496),
-			Size = UDim2.fromScale(0.96, 0.955),
+			Position = UDim2.fromOffset(2, 2),
+			Size = UDim2.new(1, -4, 1, -4),
 		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
 			Texture = c("ImageLabel", {
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://6794188517",
@@ -139,24 +145,22 @@ local function Card(props)
 		}),
 		NameBand = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = if props.Equipped
-				then UIConfig.ProgressionStyle.Claimed
-				else UIConfig.ProgressionStyle.Cyan,
+			BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
 			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, 0, 1, -5),
-			Size = UDim2.new(1, -12, 0, 36),
+			Position = UDim2.new(0.5, 0, 1, -inset),
+			Size = UDim2.new(1, -inset * 2, 0, nameHeight),
 			ZIndex = 6,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
 			ItemName = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MaxTextSize = 17,
-				MinTextSize = 12,
+				MinTextSize = 14,
 				Wrapped = true,
 				Native = {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(4, 2),
+					Position = UDim2.fromOffset(4, 4),
 					Size = UDim2.new(1, -8, 1, -4),
 					Font = Enum.Font.LuckiestGuy,
 					Text = string.upper(shortName(entry)),
@@ -174,7 +178,8 @@ local function Card(props)
 		}),
 		Preview = c("Frame", {
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 1, -36),
+			Position = UDim2.fromOffset(inset, inset),
+			Size = UDim2.new(1, -inset * 2, 1, -nameHeight - inset * 2),
 			ZIndex = 5,
 		}, {
 			Content = c(InventoryPreview, {
@@ -222,41 +227,15 @@ local function Section(props)
 	end
 
 	return {
-		Header = c("Frame", {
-			BackgroundTransparency = 1,
+		Header = c(SectionHeader, {
+			Text = props.Title,
+			HeightPx = props.HeaderHeight,
 			LayoutOrder = props.LayoutOrder,
-			Size = UDim2.new(1, 0, 0, props.HeaderHeight),
-		}, {
-			Frame = c("Frame", {
-				BackgroundColor3 = Color3.new(1, 1, 1),
-				BorderColor3 = Color3.new(),
-				BorderSizePixel = 0,
-				Position = UDim2.new(0, 0, 1, -4),
-				Size = UDim2.new(1, 0, 0, 3),
-				ZIndex = 4,
-			}),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 32,
-				Truncate = true,
-				Native = {
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Size = UDim2.new(1, 0, 1, -8),
-					Text = props.Title,
-					TextColor3 = Color3.new(1, 1, 1),
-					TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-					TextStrokeTransparency = 0.15,
-					TextXAlignment = Enum.TextXAlignment.Left,
-				},
-			}),
 		}),
 		Content = c("Frame", {
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = props.LayoutOrder + 1,
-			Position = UDim2.fromScale(0.225777, 0.0863153),
 			Size = UDim2.fromScale(1, 0),
 		}, cardChildren),
 		Spacer = c("Frame", {
@@ -411,6 +390,7 @@ return function(props: Props)
 		categoryChildren.EmoteSlotRail = c(EmoteSlotRail, {
 			LayoutOrder = -3,
 			Compact = short,
+			ContentWidth = cardWidth,
 			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
 			SelectedSlot = selectedSlot,
 			OnSelectSlot = setSelectedSlot,
@@ -496,7 +476,7 @@ return function(props: Props)
 	return c("ImageLabel", {
 		BackgroundTransparency = 1,
 		ClipsDescendants = false,
-		Image = "rbxassetid://124751224634629",
+		Image = UIConfig.Layout.PageSurface.Image,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = props.Position or (if composition
 			then UDim2.fromOffset(
@@ -506,8 +486,8 @@ return function(props: Props)
 			else UIConfig.Layout.PagePosition),
 		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
 		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(31, 41, 978, 620),
-		SliceScale = 0.5,
+		SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+		SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 	}, {
 		WorldWindow = if composition
 			then c("Frame", {
@@ -523,49 +503,34 @@ return function(props: Props)
 				Size = UDim2.fromOffset(composition.world.size.X, composition.world.size.Y),
 			})
 			else nil,
-		Title = c(ResponsiveText, {
-			HostName = "Title",
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 62,
-			Truncate = true,
+		Title = c(PageTitle, {
+			Text = "BACKPACK",
+			TextSize = if short then 26 else 42,
 			Native = {
-				BackgroundTransparency = 1,
-				BorderColor3 = Color3.new(),
-				BorderSizePixel = 0,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+				AnchorPoint = Vector2.new(0.5, 0),
 				LayoutOrder = 3,
-				Position = if short
-					then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, 4)
-					else UDim2.fromScale(0.12, 0.0540634),
-				Size = if short
-					then UDim2.new(
-						1,
-						-UIConfig.Layout.InventoryContentGapPx * 2,
-						0,
-						inventoryLayout.ShortHeaderHeightPx
-					)
-					else UDim2.fromScale(0.76, 0.0898091),
-				Text = "BACKPACK",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-				TextStrokeTransparency = 0.15,
+				Position = if short then UDim2.new(0.5, 0, 0, 8) else UDim2.fromScale(0.5, 0.045),
+				Size = UDim2.new(0.76, 0, 0, if short then 30 else 54),
 			},
 		}),
-		Main = c("ImageLabel", {
+		Main = c("Frame", {
 			AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
+			BackgroundColor3 = UIConfig.ProgressionStyle.Claimed,
+			BorderSizePixel = 0,
 			LayoutOrder = 3,
 			Position = if short
 				then UDim2.fromOffset(inventoryLayout.ShortContentLeftPx, contentTop)
 				else UDim2.new(0.498913, 0, 0, (contentTop + contentBottom) / 2),
-			ScaleType = Enum.ScaleType.Slice,
 			Size = if short
 				then UDim2.fromOffset(contentWidth, math.max(contentBottom - contentTop, 0))
 				else UDim2.new(0.930013, 0, 0, math.max(contentBottom - contentTop, 0)),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
 		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+			Outline = c("UIStroke", {
+				Color = UIConfig.ProgressionStyle.White,
+				Thickness = 1,
+				Transparency = 0.65,
+			}),
 			CategoriesHolder = if props.Data and #sections > 0
 				then c("ScrollingFrame", {
 					ref = categoriesRef,
@@ -615,17 +580,6 @@ return function(props: Props)
 						},
 					}),
 				}),
-		}),
-		Frame = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.499408, 0, 0, contentTop - 4),
-			Size = if short
-				then UDim2.new(1, -UIConfig.Layout.InventoryContentGapPx * 2, 0, 2)
-				else UDim2.fromScale(0.888649, 0.003),
-			ZIndex = 4,
 		}),
 		Tabs = c(if short then "ScrollingFrame" else "Frame", {
 			Active = short,

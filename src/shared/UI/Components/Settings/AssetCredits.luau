@@ -20,7 +20,7 @@ local function CreditText(props)
 				local bounds = TextService:GetTextSize(
 					props.Text,
 					props.TextSize,
-					Enum.Font.Highway,
+					Enum.Font.BuilderSans,
 					Vector2.new(label.AbsoluteSize.X, 100000)
 				)
 				setHeight(math.ceil(bounds.Y) + 4)
@@ -35,11 +35,11 @@ local function CreditText(props)
 	return c("TextLabel", {
 		ref = ref,
 		BackgroundTransparency = 1,
-		Font = Enum.Font.Highway,
+		Font = Enum.Font.BuilderSans,
 		LayoutOrder = props.LayoutOrder,
 		Size = UDim2.new(1, 0, 0, height),
 		Text = props.Text,
-		TextColor3 = UIConfig.ProgressionStyle.Ink,
+		TextColor3 = UIConfig.ProgressionStyle.White,
 		TextSize = props.TextSize,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -53,6 +53,13 @@ return function()
 	local scale = UIConfig.Text.PreferredScale[preferred.Name] or 1
 	local entries = {
 		Layout = c("UIListLayout", { Padding = UDim.new(0, 18), SortOrder = Enum.SortOrder.LayoutOrder }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		Padding = c("UIPadding", {
+			PaddingLeft = UDim.new(0, 12),
+			PaddingRight = UDim.new(0, 12),
+			PaddingTop = UDim.new(0, 12),
+			PaddingBottom = UDim.new(0, 12),
+		}),
 	}
 	for index, credit in Credits do
 		entries[tostring(index)] = c(CreditText, {
@@ -63,7 +70,8 @@ return function()
 	end
 	return c("Frame", {
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = UIConfig.ProgressionStyle.Claimed:Lerp(UIConfig.ProgressionStyle.Ink, 0.14),
+		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 0),
 	}, entries)
 end

@@ -5,6 +5,7 @@
 local formatNumber = require(script.Parent.Parent.Parent.Models.NumberText)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local InventoryConfig =
@@ -15,7 +16,6 @@ local BonksLabel = require(script.Parent.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.ShopPriceButton)
 local ShopPreview = require(script.Parent.ShopPreview)
-local ShopLayout = require(script.Parent.Parent.Parent.Models.ShopLayout)
 
 local c = React.createElement
 local Palette = UIConfig.ProgressionStyle
@@ -34,6 +34,8 @@ local CATEGORY_COLORS = {
 local BACKGROUND_HEIGHT_SCALE = 0.955
 local BACKGROUND_PADDING_SCALE = 0.03
 local BAND_GAP = 3
+local INFO_PADDING_PX = 8
+local MIN_NAME_TEXT_SIZE = 16
 -- Artwork never gives up more than this share of a stacked card; the supporting
 -- line is what goes first when the card is short.
 local MIN_ART_SHARE = 0.34
@@ -48,7 +50,7 @@ end
 
 local function bandColor(card): Color3
 	local hue, saturation, value = colorFor(card):ToHSV()
-	return Color3.fromHSV(hue, math.min(saturation * 1.15, 1), math.max(value * 0.82, 0.65))
+	return Color3.fromHSV(hue, math.min(saturation * 1.1, 1), math.max(value * 0.62, 0.32))
 end
 
 -- A crate opens its odds sheet, so that is what its button says -- unless the
@@ -103,6 +105,15 @@ local function hasArtwork(card): boolean
 	return (card.thumbnail ~= nil and card.thumbnail ~= "") or #card.previewItems > 0
 end
 
+local function infoGeometry(class, card): (number, number)
+	if class.Layout ~= "Split" then
+		return 0.03, 0.94
+	end
+	local art = if hasArtwork(card) then class.ArtScale else 0
+	local left = if art > 0 then 0.03 + art + 0.03 else 0.04
+	return left, 0.96 - left
+end
+
 type Bands = {
 	action: number,
 	name: number,
@@ -115,20 +126,33 @@ type Bands = {
 -- of it, because a class that has squared up on a narrow column no longer has
 -- the proportions a scale offset assumed. The supporting line is included only
 -- when what remains still leaves the artwork room to read.
-local function bands(class, card, height: number): Bands
+local function bands(class, card, height: number, width: number): Bands
 	local inner = innerHeight(height)
 	local action = math.clamp(math.floor(height * class.ActionScale), class.ActionMinPx, class.ActionMaxPx)
-	local name = if class.Layout == "Split" then 40 else 42
+	local _, infoWidth = infoGeometry(class, card)
+	local nameWidth = math.max(width * 0.96 * infoWidth - INFO_PADDING_PX * 2 - 2, 1)
+	local measuredName = TextService:GetTextSize(
+		string.upper(card.displayName),
+		MIN_NAME_TEXT_SIZE,
+		Enum.Font.LuckiestGuy,
+		Vector2.new(nameWidth, 100000)
+	)
+	-- Long pass names can need a third line in a narrow card. Reserve that
+	-- height before dividing the artwork and copy, keeping the text floor.
+	local name = math.min(
+		math.max(if class.Layout == "Split" then 40 else 42, math.ceil(measuredName.Y) + 4),
+		inner - action - BAND_GAP - INFO_PADDING_PX * 2
+	)
 	local hint = 22
-	local budget = if class.Layout == "Split"
-		then math.floor(inner * 0.84)
-		else inner - math.floor(inner * MIN_ART_SHARE) - 5
+	local budget = inner
+		- INFO_PADDING_PX * 2
+		- (if class.Layout == "Split" then 0 else math.floor(inner * MIN_ART_SHARE) + 5)
 	-- Whether a class carries the supporting line is a property of the class, not
 	-- of the width it happens to be rendered at, so the same offer never says one
 	-- thing on a laptop and another on a desktop. The fit check is only a guard.
 	local wanted = class.ShowHint == true and card.hintText ~= nil and card.hintText ~= ""
 	local showHint = wanted and name + BAND_GAP + hint + BAND_GAP + action <= budget
-	local info = action + BAND_GAP + name + (if showHint then hint + 2 else 0) + 12
+	local info = action + BAND_GAP + name + (if showHint then hint + BAND_GAP else 0) + INFO_PADDING_PX * 2
 	return {
 		action = action,
 		name = name,
@@ -150,8 +174,8 @@ local function nameLabel(card, class, native, alignment: Enum.TextXAlignment): a
 	return c(ResponsiveText, {
 		HostName = "Name",
 		MeasurementFont = Enum.Font.LuckiestGuy,
-		MinTextSize = 15,
-		MaxTextSize = 21,
+		MinTextSize = MIN_NAME_TEXT_SIZE,
+		MaxTextSize = math.min(class.NameTextSize, 26),
 		Wrapped = true,
 		Native = merged,
 	}, {
@@ -176,6 +200,7 @@ local function hintLabel(card, native, alignment: Enum.TextXAlignment): any
 	return c(ResponsiveText, {
 		HostName = "SupportingText",
 		MeasurementFont = UIConfig.Text.BodyFont,
+		MinTextSize = 16,
 		MaxTextSize = 18,
 		Native = merged,
 	})
@@ -185,19 +210,18 @@ local function badgeLabel(card): any
 	return c(ResponsiveText, {
 		HostName = "Badge",
 		MeasurementFont = UIConfig.Text.BodyFont,
+		MinTextSize = 14,
 		MaxTextSize = 16,
 		Native = {
 			AnchorPoint = Vector2.new(0, 0),
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = bandColor(card),
-			BackgroundTransparency = 0,
+			BackgroundColor3 = Palette.Ink,
+			BackgroundTransparency = 0.12,
 			Font = UIConfig.Text.BodyFont,
-			Position = UDim2.new(0.05, 0, 0, 4),
-			Size = UDim2.fromOffset(0, 16),
+			Position = UDim2.fromOffset(8, 2),
+			Size = UDim2.fromOffset(0, 24),
 			Text = string.upper(card.badge),
 			TextColor3 = Color3.new(1, 1, 1),
-			TextStrokeColor3 = Palette.Ink,
-			TextStrokeTransparency = 0.35,
 			ZIndex = 8,
 		},
 	}, {
@@ -237,20 +261,6 @@ local function artwork(card, position: UDim2, size: UDim2): any
 	})
 end
 
-local function infoBackdrop(card, anchor: Vector2, position: UDim2, size: UDim2): any
-	return c("Frame", {
-		AnchorPoint = anchor,
-		BackgroundColor3 = bandColor(card),
-		BackgroundTransparency = 0,
-		BorderSizePixel = 0,
-		Position = position,
-		Size = size,
-		ZIndex = 6,
-	}, {
-		UICorner = c("UICorner", { CornerRadius = UDim.new(0.16, 0) }),
-	})
-end
-
 local function priceButton(card, band: Bands, enabled: boolean, native, onActivated, layoutOrder): any
 	local text, bonks = actionContent(card, band.hint > 0)
 	local merged = table.clone(native)
@@ -260,7 +270,7 @@ local function priceButton(card, band: Bands, enabled: boolean, native, onActiva
 	merged.BonksAmount = bonks
 	merged.OnActivated = onActivated
 	merged.Compact = true
-	merged.TextSize = 20
+	merged.TextSize = 22
 	merged.Color = if card.owned then Palette.Claimed else Palette.Cyan
 	return c(ShopPriceButton, merged)
 end
@@ -303,6 +313,7 @@ local function priceLine(card, native, alignment: Enum.TextXAlignment): any
 			else c(ResponsiveText, {
 				HostName = "Was",
 				MeasurementFont = UIConfig.Text.BodyFont,
+				MinTextSize = 14,
 				MaxTextSize = 16,
 				Native = {
 					BackgroundTransparency = 1,
@@ -320,36 +331,51 @@ local function priceLine(card, native, alignment: Enum.TextXAlignment): any
 	})
 end
 
+local function infoPanel(card, class, band: Bands, enabled: boolean, native, alignment, onActivated, layoutOrder)
+	local merged = table.clone(native)
+	merged.BackgroundColor3 = bandColor(card)
+	merged.BorderSizePixel = 0
+	merged.ZIndex = 6
+	return c("Frame", merged, {
+		UICorner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		UIPadding = c("UIPadding", {
+			PaddingTop = UDim.new(0, INFO_PADDING_PX),
+			PaddingBottom = UDim.new(0, INFO_PADDING_PX),
+			PaddingLeft = UDim.new(0, INFO_PADDING_PX),
+			PaddingRight = UDim.new(0, INFO_PADDING_PX),
+		}),
+		UIListLayout = c("UIListLayout", {
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0, BAND_GAP),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}),
+		Name = nameLabel(card, class, {
+			LayoutOrder = 1,
+			Size = UDim2.new(1, 0, 0, band.name),
+		}, alignment),
+		SupportingText = if band.hint > 0
+			then (if pricedHint(card) then priceLine else hintLabel)(card, {
+				LayoutOrder = 2,
+				Size = UDim2.new(1, 0, 0, band.hint),
+			}, alignment)
+			else nil,
+		Action = priceButton(card, band, enabled, {
+			AnchorPoint = Vector2.new(0, 0),
+			LayoutOrder = 3,
+			Size = UDim2.new(1, 0, 0, band.action),
+		}, onActivated, layoutOrder),
+	})
+end
+
 local function stackContent(card, class, band: Bands, enabled: boolean, onActivated, layoutOrder)
 	return {
 		Artwork = artwork(card, UDim2.new(0.06, 0, 0, 3), UDim2.new(0.88, 0, 0, band.art)),
-		InfoBackdrop = infoBackdrop(
-			card,
-			Vector2.new(0.5, 1),
-			UDim2.new(0.5, 0, 1, -1),
-			UDim2.new(0.94, 0, 0, band.info)
-		),
-		Name = nameLabel(card, class, {
+		Info = infoPanel(card, class, band, enabled, {
 			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(
-				0.5,
-				0,
-				1,
-				-(8 + band.action + BAND_GAP + (if band.hint > 0 then band.hint + 2 else 0))
-			),
-			Size = UDim2.new(0.88, 0, 0, band.name),
-		}, Enum.TextXAlignment.Center),
-		SupportingText = if band.hint > 0
-			then (if pricedHint(card) then priceLine else hintLabel)(card, {
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, -(8 + band.action + BAND_GAP)),
-				Size = UDim2.new(0.86, 0, 0, band.hint),
-			}, Enum.TextXAlignment.Center)
-			else nil,
-		Action = priceButton(card, band, enabled, {
-			Position = UDim2.new(0.5, 0, 1, -8),
-			Size = UDim2.new(0.86, 0, 0, band.action),
-		}, onActivated, layoutOrder),
+			Position = UDim2.new(0.5, 0, 1, -1),
+			Size = UDim2.new(0.94, 0, 0, band.info),
+		}, Enum.TextXAlignment.Center, onActivated, layoutOrder),
 	}
 end
 
@@ -358,46 +384,14 @@ end
 -- than reserving a box for a placeholder no one can read at this height.
 local function splitContent(card, class, band: Bands, enabled: boolean, onActivated, layoutOrder)
 	local art = if hasArtwork(card) then class.ArtScale else 0
-	local infoX = if art > 0 then 0.03 + art + 0.03 else 0.04
-	local infoWidth = 0.96 - infoX
+	local infoX, infoWidth = infoGeometry(class, card)
 	return {
 		Artwork = if art > 0 then artwork(card, UDim2.fromScale(0.03, 0.08), UDim2.fromScale(art, 0.84)) else nil,
-		InfoBackdrop = infoBackdrop(
-			card,
-			Vector2.new(0, 0.5),
-			UDim2.fromScale(infoX, 0.5),
-			UDim2.fromScale(infoWidth, 0.88)
-		),
-		Info = c("Frame", {
+		Info = infoPanel(card, class, band, enabled, {
 			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(infoX + 0.03, 0.5),
-			Size = UDim2.fromScale(infoWidth - 0.06, 0.84),
-			ZIndex = 7,
-		}, {
-			UIListLayout = c("UIListLayout", {
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
-				Padding = UDim.new(0, BAND_GAP),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-			}),
-			Name = nameLabel(card, class, {
-				LayoutOrder = 1,
-				Size = UDim2.new(1, 0, 0, band.name),
-			}, Enum.TextXAlignment.Left),
-			SupportingText = if band.hint > 0
-				then (if pricedHint(card) then priceLine else hintLabel)(card, {
-					LayoutOrder = 2,
-					Size = UDim2.new(1, 0, 0, band.hint),
-				}, Enum.TextXAlignment.Left)
-				else nil,
-			Action = priceButton(card, band, enabled, {
-				AnchorPoint = Vector2.new(0, 0),
-				LayoutOrder = 3,
-				Position = UDim2.fromScale(0, 0),
-				Size = UDim2.new(1, 0, 0, band.action),
-			}, onActivated, layoutOrder),
-		}),
+			Position = UDim2.fromScale(infoX, 0.5),
+			Size = UDim2.new(infoWidth, 0, 0, band.info),
+		}, Enum.TextXAlignment.Left, onActivated, layoutOrder),
 	}
 end
 
@@ -405,6 +399,7 @@ export type Props = {
 	Card: any,
 	Class: any,
 	CardHeight: number,
+	CardWidth: number,
 	LayoutOrder: number?,
 	OnActivated: (any) -> (),
 }
@@ -414,13 +409,14 @@ return React.memo(function(props: Props)
 	local class = props.Class
 	local stacked = class.Layout ~= "Split"
 	local enabled = true
-	local band = bands(class, card, props.CardHeight)
+	local band = bands(class, card, props.CardHeight, props.CardWidth)
 	local onActivated = function()
 		props.OnActivated(card)
 	end
 	local background = if stacked
 		then stackContent(card, class, band, enabled, onActivated, props.LayoutOrder)
 		else splitContent(card, class, band, enabled, onActivated, props.LayoutOrder)
+	background.Badge = if card.badge and stacked and hasArtwork(card) then badgeLabel(card) else nil
 	background.UIPadding = c("UIPadding", {
 		PaddingBottom = UDim.new(BACKGROUND_PADDING_SCALE, 0),
 		PaddingTop = UDim.new(BACKGROUND_PADDING_SCALE, 0),
@@ -452,11 +448,6 @@ return React.memo(function(props: Props)
 		SliceCenter = Rect.new(107, 27, 126, 128),
 		ZIndex = 4,
 	}, {
-		-- The badge pill only earns its place over real artwork: an offer with
-		-- none already fills that space with the same word, and the shallow
-		-- composition is named by its section header instead.
-		Badge = if card.badge and stacked and hasArtwork(card) then badgeLabel(card) else nil,
-
 		Background = c("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,

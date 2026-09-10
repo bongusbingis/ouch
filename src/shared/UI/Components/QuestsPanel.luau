@@ -73,7 +73,7 @@ local function QuestRow(rowProps: {
 	local progressFraction = math.clamp(quest.progress / math.max(quest.goal, 1), 0, 1)
 
 	return c("Frame", {
-		BackgroundColor3 = Palette.White,
+		BackgroundColor3 = Palette.Claimed,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		LayoutOrder = rowProps.Order,
@@ -81,9 +81,9 @@ local function QuestRow(rowProps: {
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
 		Stroke = c("UIStroke", {
-			Color = if completed then Palette.Claimed else Palette.Muted,
+			Color = if completed then Palette.Yellow else Palette.White,
 			Thickness = 1,
-			Transparency = if completed and not quest.claimed then 0 else 0.8,
+			Transparency = if completed and not quest.claimed then 0 else 0.65,
 		}),
 		QuestInfo = c("Frame", {
 			BackgroundTransparency = 1,
@@ -106,20 +106,21 @@ local function QuestRow(rowProps: {
 						then `{quest.title} ({quest.progress}/{quest.goal})`
 						else quest.title,
 					TextWrapped = true,
-					TextColor3 = Palette.Ink,
+					TextColor3 = Palette.White,
 					TextXAlignment = Enum.TextXAlignment.Left,
 				},
 			}),
 			ProgressBar = c("Frame", {
 				Visible = not short,
-				BackgroundColor3 = Palette.Track,
+				BackgroundColor3 = Palette.Ink,
+				BackgroundTransparency = 0.55,
 				BorderSizePixel = 0,
 				Position = UDim2.new(0, 0, 1, -30),
 				Size = UDim2.new(1, 0, 0, 8),
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 				Fill = c("Frame", {
-					BackgroundColor3 = if completed then Palette.Claimed else PROGRESS_FILL_COLOR,
+					BackgroundColor3 = if completed then Palette.Yellow else PROGRESS_FILL_COLOR,
 					BorderSizePixel = 0,
 					Size = UDim2.fromScale(progressFraction, 1),
 				}, {
@@ -128,8 +129,8 @@ local function QuestRow(rowProps: {
 			}),
 			ProgressLabel = c(ResponsiveText, {
 				MeasurementFont = UIConfig.Text.BodyFont,
-				MinTextSize = 10,
-				MaxTextSize = 15,
+				MinTextSize = 14,
+				MaxTextSize = 16,
 				Native = {
 					BackgroundTransparency = 1,
 					Font = UIConfig.Text.BodyFont,
@@ -137,7 +138,7 @@ local function QuestRow(rowProps: {
 					Position = UDim2.new(0, 0, 1, -20),
 					Size = UDim2.new(1, 0, 0, 18),
 					Text = `{quest.progress}/{quest.goal}`,
-					TextColor3 = Palette.Ink,
+					TextColor3 = Palette.White,
 					TextXAlignment = Enum.TextXAlignment.Right,
 				},
 			}),
@@ -178,15 +179,15 @@ local function QuestRow(rowProps: {
 						Position = if compact then UDim2.new(1, -44, 0.5, 0) else UDim2.fromScale(0.5, 0.72),
 						Size = if compact then UDim2.fromOffset(88, 24) else UDim2.fromScale(0.94, 0.38),
 						Text = "CLAIMED",
-						TextColor3 = Palette.Ink,
+						TextColor3 = Palette.White,
 					},
 				})
 				else nil,
 			RewardPreview = if quest.reward.kind == "Bonks"
 				then c(BonksLabel, {
 					Amount = quest.reward.amount or 0,
-					TextColor = Palette.Ink,
-					TextStroke = 0,
+					TextColor = Palette.Yellow,
+					TextStroke = 0.045,
 					MaxTextSize = 20,
 					Native = {
 						AnchorPoint = if compact then Vector2.new(0, 0.5) else Vector2.new(0.5, 0.5),
@@ -266,7 +267,7 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				Size = UDim2.new(1, -16, 0, 60),
 				Text = "NO QUESTS AVAILABLE YET",
-				TextColor3 = Palette.Ink,
+				TextColor3 = Palette.White,
 				Font = UIConfig.Text.BodyFont,
 				TextWrapped = true,
 			},
@@ -334,7 +335,7 @@ return function(props: Props)
 				Size = UDim2.fromOffset(88, if short then 28 else 36),
 				Font = UIConfig.Text.BodyFont,
 				Text = scrollHint,
-				TextSize = 14,
+				TextSize = UIConfig.Text.CaptionMinPx,
 				TextColor3 = Palette.White,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = 2,

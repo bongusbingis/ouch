@@ -131,7 +131,8 @@ T.describe("Responsive UI layout", function()
 			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 			if layout.progressStack then
 				local stack = layout.progressStack
-				T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - (if layout.tabbed then 12 else 78))
+				-- Non-short stacks share the action dock's 24 px bottom margin so the column and PLAY end together.
+				T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - (if layout.tabbed then 12 else 24))
 				T.expect(stack.size.Y >= 100):toBeTruthy()
 			else
 				T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252):toBeTruthy()
@@ -335,7 +336,7 @@ T.describe("Phone progression readability", function()
 			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 			local stack = assert(layout.progressStack)
 			T.expect(layout.tabbed):toBeFalsy()
-			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - config.Landscape.ShortBottomPx)
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 24)
 			-- Two card gaps plus the column's top/bottom padding must also fit.
 			local questContentBudget = stack.size.Y - layout.season.size.Y - layout.daily.size.Y - config.GapPx * 3.5
 			T.expect(layout.season.size.Y >= 88):toBeTruthy()
@@ -348,7 +349,7 @@ T.describe("Phone progression readability", function()
 		local intermediate = ResponsiveLayout.splashPanels(Vector2.new(1158, 719), config, 1, 500)
 		local stack = assert(intermediate.progressStack)
 		T.expect(intermediate.tabbed):toBeFalsy()
-		T.expect(stack.position.Y + stack.size.Y):toEqual(719 - 78)
+		T.expect(stack.position.Y + stack.size.Y):toEqual(719 - 24)
 		local desktop = ResponsiveLayout.splashPanels(Vector2.new(1158, 725), config, 1, 500)
 		T.expect(desktop.progressStack):toBeNil()
 		T.expect(desktop.daily.size.Y >= 140):toBeTruthy()

@@ -151,24 +151,19 @@ return function(props: Props)
 		Value = c(ResponsiveText, {
 			MeasurementFont = UIConfig.Text.BodyFont,
 			MaxTextSize = 20,
+			MinTextSize = 16,
 			Native = {
-				AnchorPoint = Vector2.new(1, 0.5),
+				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
 				Font = UIConfig.Text.BodyFont,
-				Position = UDim2.fromScale(1, 0.16),
-				Size = UDim2.fromScale(0.24, 0.4),
+				Position = UDim2.fromScale(1, 0),
+				Size = UDim2.new(1, 0, 0, UIConfig.Layout.SettingsControls.SliderLabelHeightPx),
 				Text = displayText,
 				TextColor3 = palette.White,
 				TextTransparency = if enabled then 0 else 0.3,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = 5,
 			},
-		}, {
-			Outline = c("UIStroke", {
-				Color = palette.Ink,
-				Thickness = 0.035,
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			}),
 		}),
 		HitTarget = c("Frame", {
 			ref = trackRef,
@@ -231,7 +226,7 @@ return function(props: Props)
 			}),
 			Track = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
-				BackgroundColor3 = palette.Track,
+				BackgroundColor3 = palette.Surface,
 				BackgroundTransparency = if enabled then 0 else 0.3,
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0, 0.5),
@@ -239,6 +234,7 @@ return function(props: Props)
 				ZIndex = 4,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Outline = c("UIStroke", { Color = palette.White, Thickness = 1, Transparency = 0.65 }),
 				Fill = c("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
 					BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,

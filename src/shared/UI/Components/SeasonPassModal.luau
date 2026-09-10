@@ -16,6 +16,7 @@ local Selection = require(script.Parent.Parent.Services.Selection)
 local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local PageTitle = require(script.Parent.PageTitle)
 local PriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
 local Rewards = require(script.Parent.SeasonRewardsPanel)
@@ -29,7 +30,7 @@ local function label(text, position, size, maximum, color, heading, alignment)
 	return c(ResponsiveText, {
 		MeasurementFont = if heading then Enum.Font.LuckiestGuy else UI.Text.BodyFont,
 		MaxTextSize = maximum,
-		MinTextSize = 12,
+		MinTextSize = if heading then 12 else 14,
 		Wrapped = true,
 		Native = {
 			BackgroundTransparency = 1,
@@ -150,7 +151,11 @@ return function(props)
 		and card.robuxPrice ~= nil
 		and card.productId ~= nil
 		and not card.pending
-	local bodyTop = if compact then 68 else 100
+	local inset = if compact then 12 else 16
+	local titleHeight = if compact then 24 else 40
+	local progressTop = inset + titleHeight + (if compact then 1 else 4)
+	local progressBarTop = progressTop + (if compact then 22 else 24)
+	local bodyTop = progressBarTop + (if compact then 13 else 17)
 	local footerHeight = if compact then 78 else 98
 	local bodyHeight = math.max(64, height - bodyTop - footerHeight - (if compact then 8 else 16))
 	local previewVisible = selected ~= nil and (not compact or previewOpen)
@@ -193,20 +198,23 @@ return function(props)
 			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		}, {
-			Title = label(
-				if ready then string.upper(state.displayName) else "SEASON REWARDS",
-				UDim2.fromOffset(16, 8),
-				UDim2.new(1, -140, 0, if compact then 27 else 40),
-				if compact then 25 else 36,
-				colors.Ink,
-				true
-			),
+			Title = c(PageTitle, {
+				Text = if ready then string.upper(state.displayName) else "SEASON REWARDS",
+				TextSize = if compact then 25 else 36,
+				Alignment = Enum.TextXAlignment.Left,
+				Native = {
+					Position = UDim2.fromOffset(inset, inset + 2),
+					Size = UDim2.new(1, -148, 0, titleHeight),
+					ZIndex = 105,
+				},
+			}),
 			Back = c(PriceButton, {
 				Color = colors.Ink,
 				ButtonRef = closeRef,
 				Text = if compact and previewOpen then "REWARDS" else "BACK",
 				TextSize = 20,
-				Position = UDim2.new(1, -62, 0, 52),
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -inset, 0, inset),
 				Size = UDim2.fromOffset(104, 44),
 				Compact = true,
 				ZIndex = 106,
@@ -226,18 +234,18 @@ return function(props)
 						else if complete
 							then "ALL TIERS EARNED!"
 							else `TIER {tier}  •  {formatNumber(math.max(target - xp, 0))} XP TO TIER {tier + 1}`,
-				UDim2.fromOffset(16, if compact then 35 else 50),
+				UDim2.fromOffset(inset, progressTop),
 				UDim2.new(1, -148, 0, 20),
 				if compact then 14 else 19,
-				colors.Ink,
+				colors.White,
 				false
 			),
 			Progress = c("Frame", {
-				BackgroundColor3 = colors.Track,
+				BackgroundColor3 = colors.Claimed,
 				Visible = seasonActive,
 				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(16, if compact then 59 else 78),
-				Size = UDim2.new(1, -152, 0, 5),
+				Position = UDim2.fromOffset(inset, progressBarTop),
+				Size = UDim2.new(1, -148, 0, 5),
 				ZIndex = 103,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -260,25 +268,26 @@ return function(props)
 						UDim2.fromScale(0, 0.35),
 						UDim2.fromScale(1, 0.3),
 						if compact then 22 else 30,
-						colors.Ink,
+						colors.White,
 						true,
 						Enum.TextXAlignment.Center
 					)
 					else nil,
 				Preview = if previewVisible
 					then c("Frame", {
-						BackgroundColor3 = colors.White,
+						BackgroundColor3 = colors.Claimed,
 						BorderSizePixel = 0,
 						Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
 						ZIndex = 103,
 					}, {
 						Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+						Outline = c("UIStroke", { Color = colors.White, Thickness = 1, Transparency = 0.6 }),
 						Track = label(
 							`{string.upper(selected.track)} • TIER {selected.tier}`,
 							UDim2.new(if compact then 0.4 else 0, 12, 0, 8),
 							UDim2.new(if compact then 0.6 else 1, -24, 0, 24),
 							20,
-							colors.Ink,
+							colors.White,
 							true
 						),
 						Art = c("Frame", {
@@ -293,35 +302,37 @@ return function(props)
 								PlaceholderBonks = if selected.kind == "Bonks" then selected.amount else nil,
 								ColorId = (props.Equipped or {}).CharacterColor,
 								CostumeId = (props.Equipped or {}).CostumeAssets,
-								TextColor = colors.Ink,
-								TextStroke = 0,
+								TextColor = colors.White,
+								TextStroke = 0.045,
 								ZIndex = 104,
 							}),
 						}),
 						Name = label(
 							name,
-							if compact then UDim2.new(0.4, 12, 0, 35) else UDim2.new(0, 12, 1, -82),
-							if compact then UDim2.new(0.6, -24, 0.5, -24) else UDim2.new(1, -24, 0, 40),
+							if compact then UDim2.new(0.4, 12, 0, 34) else UDim2.new(0, 12, 1, -82),
+							if compact then UDim2.new(0.6, -24, 0, 26) else UDim2.new(1, -24, 0, 40),
 							if compact then 23 else 28,
-							colors.Ink,
+							colors.White,
 							true
 						),
-						Kind = label(
-							if definition then ItemLabels[definition.Category] or "COSMETIC" else "BONKS",
-							if compact then UDim2.new(0.4, 12, 0.5, -2) else UDim2.new(0, 12, 1, -104),
-							if compact then UDim2.new(0.6, -24, 0, 18) else UDim2.new(1, -24, 0, 18),
-							13,
-							colors.Ink,
-							false
-						),
+						Kind = if not compact
+							then label(
+								if definition then ItemLabels[definition.Category] or "COSMETIC" else "BONKS",
+								UDim2.new(0, 12, 1, -104),
+								UDim2.new(1, -24, 0, 20),
+								14,
+								colors.White,
+								false
+							)
+							else nil,
 						Requirement = label(
 							if not seasonActive and not selected.claimed
 								then unavailableText
 								else Model.requirement(selected),
-							if compact then UDim2.new(0.4, 12, 0.5, 22) else UDim2.new(0, 12, 1, -42),
-							if compact then UDim2.new(0.6, -24, 0.5, -28) else UDim2.new(1, -24, 0, 36),
+							if compact then UDim2.new(0.4, 12, 0, 62) else UDim2.new(0, 12, 1, -42),
+							if compact then UDim2.new(0.6, -24, 1, -66) else UDim2.new(1, -24, 0, 36),
 							17,
-							colors.Ink,
+							colors.White,
 							false
 						),
 					})
@@ -361,14 +372,14 @@ return function(props)
 					if loading
 						then ""
 						else if not seasonActive
-							then "This season isn't active. Check back for the next one!"
+							then ""
 							else if premiumOwned
-								then "PREMIUM UNLOCKED • Earn XP to collect both reward tracks."
-								else "Earn XP to unlock free rewards. Get Premium for the extra reward track.",
+								then "PREMIUM UNLOCKED"
+								else "Premium includes the extra reward track.",
 					UDim2.fromOffset(0, if compact then -4 else 0),
 					UDim2.new(1, 0, 0, if compact then 18 else 22),
 					if compact then 14 else 18,
-					colors.Ink,
+					colors.White,
 					false
 				),
 				Premium = if showPremium
@@ -396,7 +407,7 @@ return function(props)
 							then "LOADING REWARDS…"
 							else if not seasonActive
 								then unavailableText
-								else if claimable > 0 then "CLAIM ALL READY" else "NO REWARDS READY",
+								else if claimable > 0 then "CLAIM ALL" else "NOTHING TO CLAIM",
 					TextSize = if compact then 19 else 25,
 					Compact = true,
 					Enabled = claimable > 0 and not props.ClaimPending,

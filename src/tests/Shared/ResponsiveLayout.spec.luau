@@ -30,11 +30,11 @@ return function()
 			local stack = assert(intermediate.progressStack)
 			expect(intermediate.tabbed).to.equal(false)
 			expect(stack.position.Y + stack.size.Y).to.equal(719 - config.Landscape.ShortBottomPx)
-			local desktop = Layout.splashPanels(Vector2.new(1158, 725), config, 1, 500)
+			local desktop = Layout.splashPanels(Vector2.new(1158, 841), config, 1, 500)
 			expect(desktop.progressStack == nil).to.equal(true)
 			expect(desktop.daily.size.Y >= 140).to.equal(true)
 			expect(desktop.quests.size.Y >= config.Landscape.QuestsMinHeightPx).to.equal(true)
-			expect(desktop.quests.position.Y + desktop.quests.size.Y <= 725 - config.Landscape.ActionsReservePx).to.equal(
+			expect(desktop.quests.position.Y + desktop.quests.size.Y <= 841 - config.Landscape.ActionsReservePx).to.equal(
 				true
 			)
 		end)
@@ -140,8 +140,10 @@ return function()
 				{
 					Vector2.new(820, 725),
 					Vector2.new(1158, 725),
+					Vector2.new(1024, 841),
+					Vector2.new(1152, 841),
 					Vector2.new(1158, 1100),
-					Vector2.new(1366, 725),
+					Vector2.new(1366, 841),
 					Vector2.new(1920, 1022),
 				}
 			do
@@ -209,7 +211,15 @@ return function()
 			end
 		end)
 		it("keeps progression panels clear of the desktop action stack and its spacing", function()
-			for _, size in { Vector2.new(820, 725), Vector2.new(1158, 725), Vector2.new(1920, 1080) } do
+			for _, size in
+				{
+					Vector2.new(820, 725),
+					Vector2.new(1158, 725),
+					Vector2.new(1024, 841),
+					Vector2.new(1152, 841),
+					Vector2.new(1920, 1080),
+				}
+			do
 				local panels = Layout.splashPanels(
 					size,
 					Config.Layout.Splash.ProgressPanels,
@@ -225,6 +235,24 @@ return function()
 							+ Config.Layout.Splash.ProgressPanels.GapPx
 				).to.equal(true)
 				expect(panels.quests.size.Y >= Config.Interaction.MinTargetPx).to.equal(true)
+			end
+		end)
+		it("keeps desktop Play prominent while reserving the party preview above its dock", function()
+			local actions = Config.Layout.Splash
+			local dockHeight = actions.DesktopStatusHeightPx
+				+ actions.ActionHeightPx * 2
+				+ actions.DesktopPrimaryActionHeightPx
+				+ actions.ActionsGapPx * 3
+			expect(actions.DesktopPrimaryActionHeightPx > actions.PrimaryActionHeightPx).to.equal(true)
+			expect(actions.DesktopPrimaryActionTextPx > actions.PrimaryActionTextPx).to.equal(true)
+			for _, size in { Vector2.new(1152, 783), Vector2.new(1366, 710), Vector2.new(1366, 768) } do
+				local panels = Layout.splashPanels(size, actions.ProgressPanels, 1, 500)
+				local stack = assert(panels.progressStack)
+				local world = Layout.splashWorldWindow(size, Config.Layout)
+				expect(stack.size.X - actions.ProgressPanels.GapPx * 2 >= 360).to.equal(true)
+				expect(world.position.X + world.size.X < stack.position.X).to.equal(true)
+				expect(world.position.Y + world.size.Y + 12 <= size.Y - 24 - dockHeight).to.equal(true)
+				expect(world.size.X >= 500 and world.size.Y >= 250).to.equal(true)
 			end
 		end)
 

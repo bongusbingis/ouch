@@ -33,7 +33,7 @@ local function label(text, position, size, maximum, color, alignment, font)
 			ZIndex = 107,
 		},
 	}, {
-		Outline = if color ~= Colors.Ink
+		Outline = if font == Enum.Font.LuckiestGuy
 			then c("UIStroke", {
 				Color = Colors.Ink,
 				Thickness = 0.045,
@@ -89,9 +89,9 @@ return function(props)
 			Text = string.upper(name),
 			TextSize = 18,
 			Compact = true,
-			Color = if track == name then Colors.Pink else Colors.Cyan,
-			TextColor = if track == name then Colors.White else Colors.Ink,
-			TextStroke = if track == name then 0.055 else 0,
+			Color = if track == name then Colors.Pink else Colors.Ink,
+			TextColor = Colors.White,
+			TextStroke = 0.055,
 			Position = UDim2.new((index - 0.5) / 2, 0, 0, 44),
 			Size = UDim2.new(0.5, -8, 0, 44),
 			ZIndex = 105,
@@ -129,7 +129,7 @@ return function(props)
 			ButtonRef = if chosen then selectedRef else nil,
 			OnSelectionGained = Selection.scrollIntoView,
 			Native = {
-				BackgroundColor3 = if entry.claimed then Colors.Claimed else Colors.White,
+				BackgroundColor3 = Colors.Claimed,
 				BorderSizePixel = 0,
 				Size = if compact then UDim2.new(0, 146, 1, -8) else UDim2.fromOffset(cardWidth, 176),
 				LayoutOrder = index,
@@ -143,14 +143,14 @@ return function(props)
 			Outline = c("UIStroke", {
 				Color = if chosen then Colors.Pink else if entry.claimable then Colors.Yellow else Colors.White,
 				Thickness = if chosen then 3 else 2,
-				Transparency = 0,
+				Transparency = if chosen or entry.claimable then 0 else 0.6,
 			}),
 			Tier = label(
 				`TIER {entry.tier}`,
 				UDim2.fromOffset(9, 6),
 				UDim2.new(0.48, -9, 0, 18),
 				14,
-				Colors.Ink,
+				Colors.White,
 				Enum.TextXAlignment.Left,
 				UI.Text.BodyFont
 			),
@@ -159,7 +159,7 @@ return function(props)
 				UDim2.new(0.48, 0, 0, 6),
 				UDim2.new(0.52, -9, 0, 18),
 				12,
-				Colors.Ink,
+				if entry.claimable then Colors.Yellow else Colors.White,
 				Enum.TextXAlignment.Right,
 				UI.Text.BodyFont
 			),
@@ -180,8 +180,8 @@ return function(props)
 					then c(BonksLabel, {
 						Amount = entry.amount,
 						MaxTextSize = 34,
-						TextColor = Colors.Ink,
-						TextStroke = 0,
+						TextColor = Colors.White,
+						TextStroke = 0.045,
 						Native = { Size = UDim2.fromScale(1, 1), ZIndex = 107 },
 					})
 					else c(ShopPreview, {
@@ -191,17 +191,15 @@ return function(props)
 							}
 							else {},
 						PlaceholderBonks = if entry.kind == "Bonks" then entry.amount else nil,
-						TextColor = Colors.Ink,
-						TextStroke = 0,
+						TextColor = Colors.White,
+						TextStroke = 0.045,
 						ZIndex = 106,
 					}),
 			}),
 			NameBand = if compact and entry.kind == "Bonks"
 				then nil
 				else c("Frame", {
-					BackgroundColor3 = if chosen
-						then Colors.Pink
-						else if entry.claimed then Colors.Claimed else Colors.Cyan,
+					BackgroundColor3 = if chosen then Colors.Pink else Colors.Ink,
 					BorderSizePixel = 0,
 					Position = if compact then UDim2.fromOffset(56, 28) else UDim2.new(0, 6, 1, -40),
 					Size = if compact then UDim2.new(1, -62, 1, -34) else UDim2.new(1, -12, 0, 34),
@@ -213,7 +211,7 @@ return function(props)
 						UDim2.fromOffset(5, 2),
 						UDim2.new(1, -10, 1, -4),
 						if compact then 15 else 17,
-						if chosen then Colors.White else Colors.Ink
+						Colors.White
 					),
 				}),
 		})

@@ -12,7 +12,6 @@ local InventoryConfig =
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
 local CharacterAppearance = require(CosmeticsModules:WaitForChild("CharacterAppearance"))
-local ResponsiveText = require(script.Parent.ResponsiveText)
 local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local PreviewScheduler = require(script.Parent.Parent.Services.PreviewScheduler)
 
@@ -91,50 +90,149 @@ export type Props = {
 	TextStroke: number?,
 }
 
-local function previewStroke(thickness: number?)
-	return if thickness
-		then c("UIStroke", {
-			Color = UI.ProgressionStyle.Ink,
-			Thickness = thickness,
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-		})
-		else nil
+-- Effect cards cannot render the live effect, so each one gets a flat badge from a
+-- small family of shapes keyed by the effect, tinted with the item's colour. The
+-- shapes are circles and pills only: rotated GuiObjects escape ClipsDescendants and
+-- would paint over the page when a card scrolls half out of the Backpack list.
+local EFFECT_FAMILIES = {
+	{ "Confetti", "confetti" },
+	{ "Party", "confetti" },
+	{ "Royal", "confetti" },
+	{ "Star", "sparkle" },
+	{ "Prism", "sparkle" },
+	{ "Sugar", "sparkle" },
+	{ "Candy", "sparkle" },
+	{ "Foam", "bubbles" },
+	{ "Bubble", "bubbles" },
+	{ "Jelly", "bubbles" },
+	{ "Splash", "bubbles" },
+}
+
+local function effectFamily(effectId: string?): string
+	for _, entry in EFFECT_FAMILIES do
+		if effectId and string.find(effectId, entry[1]) then
+			return entry[2]
+		end
+	end
+	return "burst"
+end
+
+local function dot(
+	symbol,
+	name: string,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	color: Color3,
+	z: number,
+	transparency: number?
+)
+	symbol[name] = c("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = color,
+		BackgroundTransparency = transparency or 0,
+		BorderSizePixel = 0,
+		Position = UDim2.fromScale(x, y),
+		Size = UDim2.fromScale(w, h),
+		ZIndex = z,
+	}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 end
 
 local function effectPreview(props: Props)
+	local palette = UI.ProgressionStyle
+	local definition = props.Definition or {}
+	local accent = definition.PreviewColor or InventoryConfig.RarityColors[definition.Rarity] or palette.Yellow
+	local z = props.ZIndex + 1
+	local symbol = {
+		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		Outline = c("UIStroke", { Color = accent, Thickness = 2, Transparency = 0.2 }),
+	}
+	local family = if props.Category == "ElimEffectAssets" then "wave" else effectFamily(definition.EffectId)
+	if family == "wave" then
+		for index, height in { 0.18, 0.38, 0.62, 0.8, 0.52, 0.3, 0.14 } do
+			dot(
+				symbol,
+				`Wave{index}`,
+				0.2 + (index - 1) * 0.1,
+				0.5,
+				0.055,
+				height * 0.75,
+				if index == 4 then accent else palette.White,
+				z
+			)
+		end
+	elseif family == "sparkle" then
+		dot(symbol, "Beam1", 0.5, 0.5, 0.1, 0.62, palette.White, z)
+		dot(symbol, "Beam2", 0.5, 0.5, 0.62, 0.1, palette.White, z)
+		dot(symbol, "Core", 0.5, 0.5, 0.22, 0.22, accent, z + 1)
+		for index, offset in { { 0.26, 0.26 }, { 0.74, 0.26 }, { 0.26, 0.74 }, { 0.74, 0.74 } } do
+			dot(symbol, `Spark{index}`, offset[1], offset[2], 0.09, 0.09, accent, z)
+		end
+	elseif family == "bubbles" then
+		dot(symbol, "Big", 0.4, 0.56, 0.36, 0.36, palette.White, z, 0.15)
+		dot(symbol, "Mid", 0.7, 0.36, 0.24, 0.24, accent, z)
+		dot(symbol, "Small", 0.66, 0.7, 0.14, 0.14, palette.White, z, 0.1)
+		dot(symbol, "Shine", 0.34, 0.48, 0.08, 0.08, accent, z + 1)
+	elseif family == "confetti" then
+		local pieces = {
+			{ 0.3, 0.28, true },
+			{ 0.52, 0.2, false },
+			{ 0.72, 0.34, true },
+			{ 0.24, 0.52, false },
+			{ 0.5, 0.5, true },
+			{ 0.76, 0.58, false },
+			{ 0.36, 0.74, true },
+			{ 0.6, 0.78, false },
+		}
+		for index, piece in pieces do
+			local tall = index % 2 == 0
+			dot(
+				symbol,
+				`Piece{index}`,
+				piece[1],
+				piece[2],
+				if tall then 0.08 else 0.16,
+				if tall then 0.16 else 0.08,
+				if piece[3] then accent else palette.White,
+				z
+			)
+		end
+	else
+		dot(symbol, "Core", 0.5, 0.5, 0.32, 0.32, accent, z + 1)
+		dot(symbol, "Hot", 0.5, 0.5, 0.12, 0.12, palette.White, z + 2)
+		for index = 1, 8 do
+			local angle = (index - 1) / 8 * math.pi * 2 + math.pi / 8
+			local major = index % 2 == 1
+			local side = if major then 0.11 else 0.07
+			local radius = if major then 0.4 else 0.33
+			dot(
+				symbol,
+				`Ray{index}`,
+				0.5 + math.cos(angle) * radius,
+				0.5 + math.sin(angle) * radius,
+				side,
+				side,
+				if major then palette.White else accent,
+				z
+			)
+		end
+	end
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = props.ZIndex,
 	}, {
-		Symbol = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.SourceSansBold,
-			MaxTextSize = 76,
-			Native = {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.15, 0.1),
-				Size = UDim2.fromScale(0.7, 0.52),
-				Font = Enum.Font.SourceSansBold,
-				Text = if props.Category == "ElimEffectAssets" then "SFX" else "★",
-				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
-				ZIndex = props.ZIndex,
-			},
-		}, { Outline = previewStroke(props.TextStroke) }),
-		Caption = c(ResponsiveText, {
-			Wrapped = true,
-			MeasurementFont = UI.Text.BodyFont,
-			MaxTextSize = 18,
-			Native = {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.1, 0.62),
-				Size = UDim2.fromScale(0.8, 0.26),
-				Font = UI.Text.BodyFont,
-				Text = if props.Category == "ElimEffectAssets" then "ELIMINATION SOUND" else "IMPACT EFFECT",
-				TextWrapped = true,
-				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
-				ZIndex = props.ZIndex,
-			},
-		}, { Outline = previewStroke(props.TextStroke) }),
+		Symbol = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = palette.Surface,
+			BackgroundTransparency = 0.08,
+			BorderSizePixel = 0,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.72, 0.84),
+			ZIndex = props.ZIndex,
+		}, symbol),
 	})
 end
 

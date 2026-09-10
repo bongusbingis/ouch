@@ -9,7 +9,9 @@ local Config = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("In
 local DeviceClass = require(UI.Parent:WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass"))
 local Surface = require(UI.Components.Arena.Surface)
 local PriceButton = require(UI.Components.Shop.ShopPriceButton)
+local ModalClose = require(UI.Components.ModalClose)
 local ResponsiveText = require(UI.Components.ResponsiveText)
+local PageTitle = require(UI.Components.PageTitle)
 local ScrollFrame = require(UI.Components.ScrollFrame)
 local Selection = require(UI.Services.Selection)
 local useSafeArea = require(UI.Hooks.useSafeArea)
@@ -39,21 +41,21 @@ export type Props = {
 	OnClose: () -> (),
 }
 
-local function label(text, position, size, maximum, heading)
+local function label(text, position, size, maximum, muted)
 	return c(ResponsiveText, {
-		MeasurementFont = if heading then Enum.Font.LuckiestGuy else Config.Text.BodyFont,
+		MeasurementFont = Config.Text.BodyFont,
+		MinTextSize = 14,
 		MaxTextSize = maximum,
-		Wrapped = not heading,
+		Wrapped = true,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
-			Font = if heading then Enum.Font.LuckiestGuy else Config.Text.BodyFont,
+			Font = Config.Text.BodyFont,
 			Text = text,
-			TextColor3 = Palette.Ink,
+			TextColor3 = if muted then Palette.Muted else Palette.White,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextStrokeColor3 = Palette.Ink,
-			TextStrokeTransparency = 1,
+			TextWrapped = true,
 			ZIndex = 4,
 		},
 	})
@@ -66,9 +68,10 @@ return function(props: Props)
 	local target = Config.Interaction.MinTargetPx
 	local width = math.min(layout.MaxWidthPx, math.max(safeArea.size.X - margin * 2, 1))
 	local codeTop = margin + target + gap
-	local listTop = codeTop + target + gap
+	local codeHeight = target + gap * 2
+	local listTop = codeTop + codeHeight + gap
 	local rowCount = math.max(#props.Members, 1)
-	local contentHeight = rowCount * layout.RowHeightPx + (rowCount - 1) * gap + gap * 1.5
+	local contentHeight = rowCount * layout.RowHeightPx + (rowCount - 1) * gap + 4
 	local height =
 		math.min(layout.MaxHeightPx, math.max(safeArea.size.Y - margin * 2, 1), listTop + contentHeight + margin)
 	local backRef = React.useRef(nil)
@@ -121,38 +124,48 @@ return function(props: Props)
 		return nil
 	end
 	local rows = {
-		Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, gap) }),
+		Layout = c("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, gap),
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		}),
 		Padding = c("UIPadding", {
-			PaddingTop = UDim.new(0, gap / 2),
-			PaddingBottom = UDim.new(0, gap),
-			PaddingLeft = UDim.new(0, gap / 2),
-			PaddingRight = UDim.new(0, gap),
+			PaddingTop = UDim.new(0, 2),
+			PaddingBottom = UDim.new(0, 2),
 		}),
 	}
 	for index, member in props.Members do
 		local localMember = member.userId == props.LocalUserId
 		local leader = member.userId == props.LeaderUserId
 		local removable = props.LocalUserId == props.LeaderUserId and not localMember
-		local nameWidth = if removable then -layout.ActionWidthPx - gap * 3 else -gap * 2
+		local nameWidth = if removable then -layout.ActionWidthPx - 32 else -24
 		local status = if localMember and leader
 			then "YOU · PARTY LEADER"
 			elseif leader then "PARTY LEADER"
 			elseif localMember then "YOU"
 			else nil
 		rows[tostring(member.userId)] = c(Surface, {
-			Color = Palette.White,
+			Color = Palette.Claimed,
+			Radius = 8,
+			StrokeTransparency = 0.6,
 			Shadow = false,
-			Native = { LayoutOrder = index, Size = UDim2.new(1, 0, 0, layout.RowHeightPx) },
+			Native = { LayoutOrder = index, Size = UDim2.new(1, -4, 0, layout.RowHeightPx) },
 		}, {
 			Name = label(
 				member.username or "Loading…",
-				UDim2.fromOffset(gap, if status then 4 else 0),
-				UDim2.new(1, nameWidth, 0, if status then 30 else layout.RowHeightPx),
+				UDim2.fromOffset(12, if status then 6 else 0),
+				UDim2.new(1, nameWidth, 0, if status then 28 else layout.RowHeightPx),
 				21,
 				false
 			),
 			Status = if status
-				then label(status, UDim2.fromOffset(gap, 33), UDim2.new(1, nameWidth, 0, 18), 13, true)
+				then label(
+					status,
+					UDim2.fromOffset(12, 32),
+					UDim2.new(1, nameWidth, 0, 24),
+					Config.Text.CaptionMinPx,
+					true
+				)
 				else nil,
 			Remove = if removable
 				then c(PriceButton, {
@@ -203,43 +216,55 @@ return function(props: Props)
 				ZIndex = 111,
 			},
 		}, {
-			Title = label(
-				"YOUR PARTY",
-				UDim2.fromOffset(margin, margin),
-				UDim2.new(1, -margin * 2 - layout.ActionWidthPx - gap, 0, target),
-				32,
-				true
-			),
-			Back = c(PriceButton, {
-				Color = Palette.Ink,
-				ButtonRef = backRef,
-				Text = "BACK",
-				TextSize = 22,
-				Compact = true,
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -margin, 0, margin),
-				Size = UDim2.fromOffset(layout.ActionWidthPx, target),
-				OnActivated = props.OnClose,
+			Title = c(PageTitle, {
+				Text = "YOUR PARTY",
+				TextSize = 32,
+				Alignment = Enum.TextXAlignment.Left,
+				Native = {
+					Position = UDim2.fromOffset(margin, margin + 2),
+					Size = UDim2.new(1, -margin * 2 - layout.ActionWidthPx - gap, 0, target),
+				},
 			}),
-			Code = label(
-				props.CodeText,
-				UDim2.fromOffset(margin, codeTop),
-				UDim2.new(1, -margin * 2 - layout.ActionWidthPx - gap, 0, target),
-				25,
-				true
-			),
-			ToggleCode = c(PriceButton, {
-				Text = if props.CodeVisible then "HIDE CODE" else "SHOW CODE",
-				TextSize = 18,
-				Compact = true,
-				Color = Palette.Yellow,
-				TextColor = Palette.Ink,
-				TextStroke = 0,
-				Enabled = props.CodeAvailable,
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -margin, 0, codeTop),
-				Size = UDim2.fromOffset(layout.ActionWidthPx, target),
-				OnActivated = props.OnToggleCode,
+			Back = c(ModalClose, {
+				ButtonRef = backRef,
+				Position = UDim2.new(1, -margin, 0, margin),
+				SizePx = target,
+				OnActivated = props.OnClose,
+				ZIndex = 112,
+			}),
+			Code = c(Surface, {
+				Color = Palette.Claimed,
+				Radius = 8,
+				Shadow = false,
+				StrokeTransparency = 0.6,
+				Native = {
+					Position = UDim2.fromOffset(margin, codeTop),
+					Size = UDim2.new(1, -margin * 2, 0, codeHeight),
+				},
+			}, {
+				Label = c(PageTitle, {
+					Text = props.CodeText,
+					TextSize = 22,
+					Alignment = Enum.TextXAlignment.Left,
+					Native = {
+						Position = UDim2.fromOffset(12, gap),
+						Size = UDim2.new(1, -layout.ActionWidthPx - 32, 0, target),
+						ZIndex = 113,
+					},
+				}),
+				ToggleCode = c(PriceButton, {
+					Text = if props.CodeVisible then "HIDE CODE" else "SHOW CODE",
+					TextSize = 18,
+					Compact = true,
+					Color = Palette.Yellow,
+					TextColor = Palette.Ink,
+					TextStroke = 0,
+					Enabled = props.CodeAvailable,
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.new(1, -gap, 0, gap),
+					Size = UDim2.fromOffset(layout.ActionWidthPx, target),
+					OnActivated = props.OnToggleCode,
+				}),
 			}),
 			Members = c(ScrollFrame, {
 				Active = true,
@@ -251,8 +276,8 @@ return function(props: Props)
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				ScrollBarImageColor3 = Palette.White,
 				ScrollBarThickness = 4,
-				Position = UDim2.fromOffset(margin, listTop),
-				Size = UDim2.new(1, -margin * 2, 0, math.max(height - listTop - margin, 1)),
+				Position = UDim2.fromOffset(margin - 2, listTop),
+				Size = UDim2.new(1, -margin * 2 + 4, 0, math.max(height - listTop - margin, 1)),
 			}, rows),
 		}),
 	})

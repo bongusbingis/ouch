@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local SectionHeader = require(script.Parent.SectionHeader)
 local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
 local Config = ReplicatedStorage:WaitForChild("Config")
 local UI = require(Config:WaitForChild("Interface"):WaitForChild("UI"))
@@ -17,11 +18,11 @@ local Emotes = require(Config:WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local c = React.createElement
 local Palette = UI.ProgressionStyle
 local WHITE = Color3.new(1, 1, 1)
-local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
 
 export type Props = {
 	LayoutOrder: number,
 	Compact: boolean,
+	ContentWidth: number,
 	HeaderHeight: number,
 	SelectedSlot: number?,
 	OnSelectSlot: (number?) -> (),
@@ -34,21 +35,24 @@ local function Chip(props: {
 	Locked: boolean,
 	Selected: boolean,
 	Compact: boolean,
+	Width: UDim,
+	Narrow: boolean,
 	OnActivated: () -> (),
 })
 	local clip = if props.EmoteId then Emotes.Clips[props.EmoteId] else nil
-	local label = if props.Locked then "SHOWTIME" elseif clip then string.upper(clip.DisplayName) else "EMPTY"
-	local fill = if props.Locked then Palette.Disabled elseif clip then Palette.Cyan else Palette.Surface
-	local ink = if props.Locked then Palette.Muted elseif clip then WHITE else Palette.Muted
-	local height = if props.Compact then 40 else UI.Interaction.MinTargetPx
+	local label = if props.Locked then "Showtime" elseif clip then clip.DisplayName else "Empty"
+	local fill = if props.Selected then Palette.Pink elseif props.Locked then Palette.Surface else Palette.Claimed
+	local ink = if props.Locked then Palette.Muted else WHITE
+	local height = UI.Interaction.MinTargetPx
+	local numberSize = if props.Narrow then 22 else 30
 	return c(AnimatedButton, {
 		Style = "Standard",
 		Native = {
 			BackgroundColor3 = fill,
-			BackgroundTransparency = if clip or props.Locked then 0 else 0.35,
+			BackgroundTransparency = if props.Locked then 0.35 else 0,
 			BorderSizePixel = 0,
 			LayoutOrder = props.Index,
-			Size = UDim2.new(0.235, 0, 0, height),
+			Size = UDim2.new(props.Width, UDim.new(0, height)),
 		},
 		SelectionRadius = UDim.new(0, 10),
 		OnActivated = props.OnActivated,
@@ -57,64 +61,68 @@ local function Chip(props: {
 		Outline = c("UIStroke", {
 			Color = if props.Selected then Palette.Yellow else WHITE,
 			Thickness = if props.Selected then UI.Interaction.FocusStrokePx else UI.Button.StrokePx,
-			Transparency = if props.Selected then 0 elseif clip then 0.15 else 0.55,
+			Transparency = if props.Selected then 0 elseif clip then 0.2 else 0.6,
 		}),
 		Number = c("Frame", {
 			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundColor3 = if props.Locked then Palette.Surface else Palette.Ink,
-			BackgroundTransparency = if props.Locked then 0.4 else 0.15,
+			BackgroundColor3 = Palette.Ink,
+			BackgroundTransparency = if props.Locked then 0.5 else 0,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0, 6, 0.5, 0),
-			Size = UDim2.fromOffset(height - 14, height - 14),
+			Size = UDim2.fromOffset(numberSize, numberSize),
 			ZIndex = 3,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 			Text = c("TextLabel", {
 				BackgroundTransparency = 1,
-				FontFace = DISPLAY_FONT,
+				Font = Enum.Font.BuilderSansBold,
 				Size = UDim2.fromScale(1, 1),
 				Text = tostring(props.Index),
 				TextColor3 = if props.Selected then Palette.Yellow else WHITE,
-				TextSize = math.max(height - 26, 12),
+				TextSize = if props.Narrow then 16 else 20,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Center,
 				ZIndex = 4,
 			}),
 		}),
 		Label = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = if props.Compact then 12 else 13,
-			MinTextSize = 10,
+			MeasurementFont = Enum.Font.BuilderSansBold,
+			MaxTextSize = UI.Text.CaptionMinPx,
+			MinTextSize = 14,
 			Wrapped = true,
 			Truncate = true,
 			Native = {
 				BackgroundTransparency = 1,
-				FontFace = DISPLAY_FONT,
-				Position = UDim2.fromOffset(height - 2, 0),
-				Size = UDim2.new(1, -(height + 2), 1, 0),
+				Font = Enum.Font.BuilderSansBold,
+				Position = UDim2.fromOffset(numberSize + 12, 0),
+				Size = UDim2.new(1, -(numberSize + 18), 1, 0),
 				Text = label,
 				TextColor3 = ink,
-				TextTransparency = if clip or props.Locked then 0 else 0.25,
 				TextWrapped = true,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Center,
 				ZIndex = 3,
 			},
-		}, {
-			Outline = c("UIStroke", {
-				Color = Palette.Ink,
-				Thickness = if clip then 1.2 else 0,
-				Transparency = 0.35,
-			}),
 		}),
 	})
 end
 
 return function(props: Props)
 	local wheel = EmoteWheelController.useSnapshot()
+	local gap = UI.Layout.Inventory.CardGapPx
+	local columns = if props.ContentWidth >= 4 * 120 + gap * 3
+		then 4
+		elseif props.ContentWidth >= 2 * 104 + gap then 2
+		else 1
+	local chipWidth = (props.ContentWidth - gap * (columns - 1)) / columns
+	local narrow = props.ContentWidth < 360
+	local subtitle = if props.SelectedSlot then "CHOOSE AN EMOTE" else ""
+	local extraHeaderHeight = if narrow and props.SelectedSlot then 22 else 0
 	local chips = {
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Left,
-			Padding = UDim.new(0.02, 0),
+			Padding = UDim.new(0, gap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Top,
 			Wraps = true,
@@ -129,6 +137,8 @@ return function(props: Props)
 			Locked = locked,
 			Selected = props.SelectedSlot == index,
 			Compact = props.Compact,
+			Width = UDim.new(1 / columns, -math.ceil(gap * (columns - 1) / columns)),
+			Narrow = chipWidth < 120,
 			OnActivated = function()
 				if locked then
 					if props.OnLockedSlot then
@@ -140,56 +150,29 @@ return function(props: Props)
 			end,
 		})
 	end
-	local subtitle = if props.SelectedSlot
-		then `TAP AN EMOTE FOR SLOT {props.SelectedSlot}`
-		elseif wheel.capacity < Emotes.MaxSlots then "TAP AN EMOTE TO FILL A SLOT. SHOWTIME UNLOCKS 5-8"
-		else "TAP AN EMOTE TO FILL A SLOT. TAP AGAIN TO REMOVE"
 	return c(React.Fragment, nil, {
-		Header = c("Frame", {
-			BackgroundTransparency = 1,
+		Header = c(SectionHeader, {
+			Text = "YOUR WHEEL",
+			HeightPx = props.HeaderHeight + extraHeaderHeight,
 			LayoutOrder = props.LayoutOrder,
-			Size = UDim2.new(1, 0, 0, props.HeaderHeight),
-		}, {
-			Frame = c("Frame", {
-				BackgroundColor3 = WHITE,
-				BorderSizePixel = 0,
-				Position = UDim2.new(0, 0, 1, -4),
-				Size = UDim2.new(1, 0, 0, 3),
-				ZIndex = 4,
-			}),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 32,
-				Truncate = true,
-				Native = {
+			Accessory = if subtitle ~= ""
+				then c("TextLabel", {
 					BackgroundTransparency = 1,
-					FontFace = DISPLAY_FONT,
-					Size = UDim2.new(0.5, 0, 1, -8),
-					Text = "YOUR WHEEL",
-					TextColor3 = WHITE,
-					TextStrokeColor3 = Palette.Ink,
-					TextStrokeTransparency = 0.15,
-					TextXAlignment = Enum.TextXAlignment.Left,
-				},
-			}),
-			Subtitle = c(ResponsiveText, {
-				HostName = "Subtitle",
-				MeasurementFont = UI.Text.BodyFont,
-				MaxTextSize = 14,
-				MinTextSize = 10,
-				Truncate = true,
-				Native = {
-					AnchorPoint = Vector2.new(1, 1),
-					BackgroundTransparency = 1,
-					FontFace = UI.Text.DefaultFont,
-					Position = UDim2.new(1, 0, 1, -10),
-					Size = UDim2.new(0.5, 0, 0, 18),
+					Font = UI.Text.BodyFont,
+					Size = UDim2.fromScale(1, 1),
 					Text = subtitle,
-					TextColor3 = Palette.Muted,
+					TextColor3 = Palette.Yellow,
+					TextSize = UI.Text.CaptionMinPx,
 					TextXAlignment = Enum.TextXAlignment.Right,
-				},
-			}),
+				}, {
+					Outline = c("UIStroke", {
+						Color = Palette.Ink,
+						Thickness = 0.035,
+						StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+					}),
+				})
+				else nil,
+			AccessoryWidthPx = if narrow then 0 else 180,
 		}),
 		Content = c("Frame", {
 			AutomaticSize = Enum.AutomaticSize.Y,

@@ -6,6 +6,7 @@ local formatNumber = require(script.Parent.Parent.Models.NumberText)
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local TextService = game:GetService("TextService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ReactSpring = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react-spring"))
@@ -14,8 +15,11 @@ local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local PageTitle = require(script.Parent.PageTitle)
+local ModalClose = require(script.Parent.ModalClose)
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
@@ -77,6 +81,7 @@ end
 
 local function ItemDetails(props)
 	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local preferredTextSize = usePreferredTextSize()
 	local portrait = ResponsiveLayout.isPortrait(safe.size, UIConfig.Layout.PortraitMaxAspect)
 	local size = ResponsiveLayout.panelSize(
 		safe.size,
@@ -291,28 +296,55 @@ local function ItemDetails(props)
 	local columns = if portrait then math.min(2, math.max(1, slots)) else math.max(1, slots)
 	local rows = math.max(1, math.ceil(slots / columns))
 	local buttonHeight = if short then 52 else if portrait then 60 else 68
-	local summaryHeight = if hasBonks or statusText ~= "" then 26 else 0
+	local inset = if short then 12 else 16
+	local veryShort = short and size.Y < 270
 	local guarantee = if isCrate then guaranteeText(card) else ""
-	local guaranteeHeight = if guarantee ~= "" then 23 else 0
-	local ruleHeight = if isCrate and not short then 20 else 0
-	local footerCopyHeight = summaryHeight + guaranteeHeight + ruleHeight + 4
+	local footerGuarantee = guarantee ~= "" and (not short or compactEffect or veryShort)
+	local statusWidth, sharedFooterHeight = 0, 26
+	local shareFooter = false
+	if veryShort and footerGuarantee and statusText ~= "" then
+		local textSize = math.round(14 * (UIConfig.Text.PreferredScale[preferredTextSize.Name] or 1))
+		local statusBounds =
+			TextService:GetTextSize(statusText, textSize, UIConfig.Text.BodyFont, Vector2.new(100000, 100000))
+		local guaranteeBounds =
+			TextService:GetTextSize(guarantee, textSize, UIConfig.Text.BodyFont, Vector2.new(100000, 100000))
+		statusWidth = math.ceil(statusBounds.X) + 8
+		shareFooter = statusWidth + 12 + guaranteeBounds.X + 8 <= size.X - inset * 2
+		sharedFooterHeight = math.max(26, math.ceil(math.max(statusBounds.Y, guaranteeBounds.Y)) + 4)
+	end
+	local summaryHeight = if statusText ~= "" or (hasBonks and not short)
+		then (if shareFooter then sharedFooterHeight else 26)
+		else 0
+	local guaranteeHeight = if footerGuarantee and not shareFooter
+		then (if short then 24 else if size.X < 620 then 44 else 28)
+		else 0
+	local footerCopyHeight = summaryHeight + guaranteeHeight + (if short then 2 else 8)
 	local actionHeight = if slots > 0 then rows * (buttonHeight + 6) else 0
 	local footerHeight = actionHeight + footerCopyHeight
-	local inset = if short then 12 else 16
-	local balanceWidth = if short then 214 else 252
+	local balanceWidth = if size.X < 620 then 120 else 252
 	local actionWidth = math.min(size.X - inset * 2, columns * (UIConfig.Layout.ShopDetailsActionMaxWidthPx + 8))
-	local bodyTop = if short then 52 else 64
+	local bodyTop = inset + 44 + (if short then 6 else 12)
 	local bodyHeight = size.Y - bodyTop - footerHeight - inset
+	local previewContentHeight = if veryShort
+		then math.max(bodyHeight, if compactEffect then 96 else 88)
+		else bodyHeight
+	local scrollPreview = previewContentHeight > bodyHeight
 	local previewHeight = if portrait then math.min(132, math.max(104, bodyHeight * 0.31)) else bodyHeight
 	local listTop = if portrait then previewHeight + 8 else 0
 	local listX = if portrait then 0 else 0.35
 	local listWidth = if portrait then 1 else 0.65
 	local nameHeight = if short then 36 else 52
-	local previewFooter = if isEffect then 56 else if short or (not isCrate and not isEmoteCollection) then 8 else 34
-	local artHeight = math.max(44, bodyHeight - nameHeight - previewFooter - 16)
+	local previewFooter = if isEffect
+		then 56
+		else if short
+				and not footerGuarantee
+				and guarantee ~= ""
+			then 52
+			else if short or (not isCrate and not isEmoteCollection) then 8 else 34
+	local artHeight = math.max(if veryShort then 32 else 44, previewContentHeight - nameHeight - previewFooter - 16)
 	local gridGap = 8
-	local gridListPx = (size.X - inset * 2) * listWidth - 12
-	local gridMinTile = if short then 96 else 112
+	local gridListPx = (size.X - inset * 2) * listWidth - 26
+	local gridMinTile = if short then 112 else 124
 	local gridColumns = math.clamp(math.floor((gridListPx + gridGap) / (gridMinTile + gridGap)), 2, 6)
 	local gridTile = math.floor((gridListPx - (gridColumns - 1) * gridGap) / gridColumns)
 	local contents = {
@@ -320,10 +352,11 @@ local function ItemDetails(props)
 			"UIListLayout",
 			{ Padding = UDim.new(0, if short then 4 else 6), SortOrder = Enum.SortOrder.LayoutOrder }
 		),
-		Padding = c(
-			"UIPadding",
-			{ PaddingTop = UDim.new(0, 3), PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 8) }
-		),
+		Padding = c("UIPadding", {
+			PaddingTop = UDim.new(0, if short then 0 else 3),
+			PaddingLeft = UDim.new(0, 4),
+			PaddingRight = UDim.new(0, 4),
+		}),
 		Grid = if isCrate
 			then c(CrateOddsGrid, {
 				Odds = card.odds or {},
@@ -446,33 +479,51 @@ local function ItemDetails(props)
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		}, {
 			Scale = c("UIScale", { Scale = styles.Scale }),
-			Title = label(
-				string.upper(card.displayName) .. (if isCrate then " CRATE" else ""),
-				UDim2.fromOffset(inset, 10),
-				UDim2.new(1, -112, 0, 40),
-				38,
-				nil,
-				true
-			),
-			Close = c(ShopPriceButton, {
+			Title = c(PageTitle, {
+				Text = string.upper(card.displayName) .. (if isCrate then " CRATE" else ""),
+				TextSize = if short then 28 else 38,
+				Alignment = Enum.TextXAlignment.Left,
+				Native = {
+					Position = UDim2.fromOffset(inset, inset + 2),
+					Size = UDim2.new(1, -inset * 2 - 100 - (if short and hasBonks then 112 else 0), 0, 44),
+					ZIndex = 105,
+				},
+			}),
+			Close = c(ModalClose, {
 				ButtonRef = closeRef,
-				Text = "BACK",
-				Enabled = true,
-				Position = UDim2.new(1, -48, 0, 53),
-				Size = UDim2.fromOffset(80, 44),
+				Position = UDim2.new(1, -inset, 0, inset),
 				OnActivated = props.OnClose,
 				ZIndex = 106,
 			}),
+			ShortBalance = if short and hasBonks
+				then c(BonksLabel, {
+					Amount = balance,
+					MaxTextSize = 21,
+					TextColor = colors.Yellow,
+					TextStroke = 0.045,
+					Alignment = Enum.HorizontalAlignment.Right,
+					Native = {
+						AnchorPoint = Vector2.new(1, 0),
+						Position = UDim2.new(1, -inset - 104, 0, inset),
+						Size = UDim2.fromOffset(108, 44),
+						ZIndex = 105,
+					},
+				})
+				else nil,
 			Body = c("Frame", {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromOffset(inset, bodyTop),
 				Size = UDim2.new(1, -inset * 2, 0, bodyHeight),
 				ZIndex = 103,
 			}, {
-				Preview = c("Frame", {
-					BackgroundColor3 = colors.PanelRaised,
+				Preview = c(if scrollPreview then ScrollFrame else "Frame", {
+					BackgroundColor3 = colors.Claimed,
 					BackgroundTransparency = 0,
 					BorderSizePixel = 0,
+					CanvasSize = if scrollPreview then UDim2.fromOffset(0, previewContentHeight) else nil,
+					ScrollingDirection = if scrollPreview then Enum.ScrollingDirection.Y else nil,
+					ScrollBarThickness = if scrollPreview then 3 else nil,
+					ScrollBarImageColor3 = if scrollPreview then colors.White else nil,
 					Size = if portrait then UDim2.new(1, 0, 0, previewHeight) else UDim2.fromScale(0.32, 1),
 					ZIndex = 103,
 				}, {
@@ -482,7 +533,7 @@ local function ItemDetails(props)
 						Size = if portrait
 							then UDim2.fromScale(0.4, 1)
 							else if compactEffect
-								then UDim2.new(0.36, 0, 1, -56)
+								then UDim2.new(0.36, 0, 0, previewContentHeight - 56)
 								else UDim2.new(1, 0, 0, artHeight),
 						ZIndex = 103,
 					}, {
@@ -497,7 +548,11 @@ local function ItemDetails(props)
 						}),
 					}),
 					Name = label(
-						if selected then selected.displayName else card.displayName,
+						if short
+								and isCrate
+								and not selected
+							then "NEXT OPEN ODDS"
+							else if selected then selected.displayName else card.displayName,
 						if portrait
 							then UDim2.new(0.43, 0, 0, 8)
 							else if compactEffect
@@ -506,19 +561,35 @@ local function ItemDetails(props)
 						if portrait
 							then UDim2.new(0.53, 0, 0, previewHeight - previewFooter - 16)
 							else if compactEffect
-								then UDim2.new(0.64, -16, 1, -64)
+								then UDim2.new(0.64, -16, 0, previewContentHeight - 64)
 								else UDim2.new(1, -20, 0, nameHeight),
-						22,
+						if short and isCrate then 18 else 22,
 						nil,
-						false,
+						true,
 						nil,
 						true
 					),
+					Guarantee = if short
+							and not footerGuarantee
+							and guarantee ~= ""
+						then label(
+							guarantee,
+							UDim2.new(0, 10, 1, -48),
+							UDim2.new(1, -20, 0, 44),
+							14,
+							colors.Yellow,
+							false,
+							nil,
+							true
+						)
+						else nil,
 					Play = if isEffect and props.OnPreviewEffect
 						then c(ShopPriceButton, {
 							Text = if preview.category == "ElimEffectAssets" then "PLAY SOUND" else "PLAY EFFECT",
 							Enabled = true,
-							Position = if portrait then UDim2.new(0.7, 0, 1, -4) else UDim2.new(0.5, 0, 1, -8),
+							Position = if portrait
+								then UDim2.new(0.7, 0, 1, -4)
+								else UDim2.new(0.5, 0, 0, previewContentHeight - 8),
 							Size = if portrait then UDim2.new(0.55, -8, 0, 44) else UDim2.new(1, -16, 0, 48),
 							OnActivated = function()
 								props.OnPreviewEffect(preview)
@@ -534,35 +605,38 @@ local function ItemDetails(props)
 							if isCrate then "TAP A REWARD FOR A CLOSER LOOK" else "CHOOSE IN BACKPACK → EMOTES",
 							if portrait then UDim2.new(0.43, 0, 1, -27) else UDim2.new(0, 10, 1, -32),
 							if portrait then UDim2.new(0.53, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
-							15,
+							UIConfig.Text.CaptionMinPx,
 							colors.White,
 							false
 						),
 				}),
 				Contents = if isCrate
 					then c("Frame", {
-						BackgroundTransparency = 1,
+						BackgroundTransparency = 0,
+						BackgroundColor3 = colors.Claimed,
+						BorderSizePixel = 0,
 						Position = UDim2.new(listX, 0, 0, listTop),
 						Size = UDim2.new(listWidth, 0, 1, -listTop),
 						ZIndex = 103,
 					}, {
-						Heading = label("REWARDS", UDim2.fromOffset(3, 0), UDim2.new(0.52, 0, 0, 26), 22, nil, true),
-						OddsHeading = label(
-							"NEXT OPEN ODDS",
-							UDim2.fromScale(0.52, 0),
-							UDim2.new(0.48, -8, 0, 26),
-							15,
-							colors.White,
-							false,
-							Enum.TextXAlignment.Right
-						),
+						Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+						OddsHeading = if not short
+							then label(
+								"NEXT OPEN ODDS",
+								UDim2.fromOffset(12, 6),
+								UDim2.new(1, -24, 0, if short then 24 else 30),
+								if short then 19 else 22,
+								colors.White,
+								true
+							)
+							else nil,
 						List = c(ScrollFrame, {
 							AutomaticCanvasSize = Enum.AutomaticSize.Y,
 							CanvasSize = UDim2.new(),
 							BackgroundTransparency = 1,
 							BorderSizePixel = 0,
-							Position = UDim2.fromOffset(0, 28),
-							Size = UDim2.new(1, 0, 1, -28),
+							Position = UDim2.fromOffset(8, if short then 8 else 40),
+							Size = UDim2.new(1, -16, 1, if short then -16 else -48),
 							ScrollBarThickness = 4,
 							ScrollBarImageColor3 = colors.White,
 							ZIndex = 103,
@@ -587,7 +661,7 @@ local function ItemDetails(props)
 								then "IN YOUR BACKPACK"
 								else if card.definition.Contents
 									then "THE OUTFIT"
-									else if #card.previewItems > 0 then "WHAT’S INSIDE" else "THE GOODS",
+									else if #card.previewItems > 0 then "WHAT’S INSIDE" else "DETAILS",
 							UDim2.fromOffset(0, 0),
 							UDim2.new(1, -8, 0, if short then 24 else 32),
 							if short then 20 else 26,
@@ -643,30 +717,33 @@ local function ItemDetails(props)
 					then label(
 						statusText,
 						UDim2.fromOffset(0, 0),
-						UDim2.new(1, if hasBonks then -balanceWidth - 12 else 0, 0, summaryHeight),
-						if short then 15 else 18,
+						if shareFooter
+							then UDim2.fromOffset(statusWidth, summaryHeight)
+							else UDim2.new(
+								1,
+								if hasBonks and not short then -balanceWidth - 12 else 0,
+								0,
+								summaryHeight
+							),
+						if shareFooter then 14 else if short then 15 else 18,
 						colors.White,
 						false
 					)
 					else nil,
-				Guarantee = if guarantee ~= ""
+				Guarantee = if footerGuarantee
 					then label(
 						guarantee,
-						UDim2.fromOffset(0, summaryHeight),
-						UDim2.new(1, 0, 0, guaranteeHeight),
-						17,
+						if shareFooter
+							then UDim2.fromOffset(statusWidth + 12, 0)
+							else UDim2.fromOffset(0, summaryHeight),
+						if shareFooter
+							then UDim2.new(1, -statusWidth - 12, 0, summaryHeight)
+							else UDim2.new(1, 0, 0, guaranteeHeight),
+						if veryShort then 14 else 18,
 						colors.Yellow,
-						false
-					)
-					else nil,
-				Rule = if ruleHeight > 0
-					then label(
-						"Duplicate items give Bonks. Guarantees update after every open.",
-						UDim2.fromOffset(0, summaryHeight + guaranteeHeight),
-						UDim2.new(1, 0, 0, ruleHeight),
-						14,
-						colors.White,
-						false
+						false,
+						nil,
+						true
 					)
 					else nil,
 				Buttons = c("Frame", {
@@ -677,6 +754,8 @@ local function ItemDetails(props)
 					ZIndex = 104,
 				}, buttons),
 				BalanceTitle = if hasBonks
+						and not short
+						and balanceWidth > 132
 					then label(
 						if short then "BONKS" else "YOUR BONKS",
 						UDim2.new(1, -balanceWidth, 0, 0),
@@ -686,7 +765,7 @@ local function ItemDetails(props)
 						true
 					)
 					else nil,
-				Balance = if hasBonks
+				Balance = if hasBonks and not short
 					then c(BonksLabel, {
 						Amount = balance,
 						MaxTextSize = 21,
@@ -696,7 +775,7 @@ local function ItemDetails(props)
 						Native = {
 							AnchorPoint = Vector2.new(1, 0),
 							Position = UDim2.fromScale(1, 0),
-							Size = UDim2.fromOffset(132, summaryHeight),
+							Size = UDim2.fromOffset(math.min(balanceWidth, 132), summaryHeight),
 							ZIndex = 104,
 						},
 					})

@@ -51,7 +51,7 @@ return function(props: Props)
 
 	local function cell(index: number)
 		return c(AnimatedButton, {
-			SelectionRadius = UDim.new(1, 0),
+			SelectionRadius = UDim.new(0, 8),
 			Enabled = enabled,
 			Native = {
 				BackgroundTransparency = 1,
@@ -71,7 +71,7 @@ return function(props: Props)
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.5),
+					Position = UDim2.new(0.5, 0, 0.5, 2),
 					Size = UDim2.fromScale(0.86, 0.7),
 					Text = props.Labels[index],
 					TextColor3 = palette.White,
@@ -88,14 +88,15 @@ return function(props: Props)
 
 	return c("Frame", {
 		AnchorPoint = props.AnchorPoint,
-		BackgroundColor3 = palette.Track,
+		BackgroundColor3 = palette.Panel,
 		BackgroundTransparency = if enabled then 0 else 0.3,
 		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Position = props.Position,
 		Size = props.Size or UDim2.fromScale(1, 1),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		Outline = c("UIStroke", { Color = palette.White, Thickness = 1, Transparency = 0.65 }),
 		Highlight = c("Frame", {
 			BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,
 			BorderSizePixel = 0,
@@ -105,7 +106,7 @@ return function(props: Props)
 			Size = UDim2.new(0.5, -8, 1, -8),
 			ZIndex = 3,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
 			Stroke = c("UIStroke", {
 				Color = if enabled then palette.White else palette.Muted,
 				Thickness = UIConfig.Button.StrokePx,

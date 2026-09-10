@@ -128,24 +128,26 @@ return function(props: Props)
 		UIConfig.Layout.PortraitMaxAspect,
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
-	local short = progressPanels.progressStack ~= nil
-	local compactProgressPanels = progressPanels.portrait or short
+	local short = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local compactProgressPanels = progressPanels.portrait or progressPanels.progressStack ~= nil
 	local worldWindow = ResponsiveLayout.splashWorldWindow(safeArea.size, UIConfig.Layout)
 	local stack = progressPanels.progressStack
 	local tabbed = progressPanels.tabbed == true
 	local selectedProgress, setSelectedProgress = React.useState("DAILY")
-	local actionWidth = math.min(worldWindow.size.X, 600)
+	local actionWidth = if stack
+		then math.min(worldWindow.size.X, if short then 600 else 500)
+		else progressPanels.season.size.X
 	local actions = UIConfig.Layout.Splash
 	local secondarySize = if short
 		then Vector2.new(actionWidth * 0.26 - 8, actions.ShortActionButtonHeightPx)
 		else if portrait
 			then Vector2.new(safeArea.size.X * 0.9 * 0.45, actions.SecondaryActionHeightPx)
-			else Vector2.new(progressPanels.season.size.X * 0.88, actions.ActionHeightPx)
+			else Vector2.new(actionWidth, actions.ActionHeightPx)
 	local primarySize = if short
 		then Vector2.new(actionWidth * 0.48 - 8, actions.ShortActionsHeightPx)
 		else if portrait
 			then Vector2.new(safeArea.size.X * 0.9 * 0.96, actions.PrimaryActionHeightPx)
-			else Vector2.new(progressPanels.season.size.X, actions.PrimaryActionHeightPx)
+			else Vector2.new(actionWidth, actions.DesktopPrimaryActionHeightPx)
 	local secondaryTextSize = if short then actions.ShortActionTextPx else actions.ActionTextPx
 	local secondaryFittingText = if short then "INVITE" else "INVITE FRIENDS"
 	local tabHeight = 44
@@ -169,7 +171,7 @@ return function(props: Props)
 	})
 	local quests = c(QuestsPanel, {
 		Short = short,
-		Compact = compactProgressPanels,
+		Compact = portrait or short,
 		Expanded = false,
 		Native = {
 			LayoutOrder = 3,
@@ -254,16 +256,16 @@ return function(props: Props)
 			Size = UDim2.fromOffset(worldWindow.size.X, worldWindow.size.Y),
 		}),
 		BottomRight = c("Frame", {
-			AnchorPoint = if short
-				then Vector2.new(0, 1)
+			AnchorPoint = if stack
+				then Vector2.new(0.5, 1)
 				else if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 1),
 			BackgroundTransparency = 1,
-			Position = if short
+			Position = if stack
 				then UDim2.new(
 					0,
-					worldWindow.position.X + (worldWindow.size.X - actionWidth) / 2,
+					worldWindow.position.X + worldWindow.size.X / 2,
 					1,
-					-UIConfig.Layout.Splash.ShortActionsBottomPx
+					if short then -actions.ShortActionsBottomPx else -24
 				)
 				else if portrait then UDim2.fromScale(0.5, 0.98) else UDim2.new(1, -24, 1, -24),
 			Size = if short
@@ -271,24 +273,25 @@ return function(props: Props)
 				else if portrait
 					then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
 					else UDim2.fromOffset(
-						progressPanels.season.size.X,
-						24 + actions.ActionHeightPx * 2 + actions.PrimaryActionHeightPx + actions.ActionsGapPx * 3
+						actionWidth,
+						actions.DesktopStatusHeightPx
+							+ actions.ActionHeightPx * 2
+							+ primarySize.Y
+							+ actions.ActionsGapPx * 3
 					),
 		}, {
 			Status = if not short and not portrait
 				then c("Frame", {
 					BackgroundTransparency = 1,
 					LayoutOrder = -1,
-					Size = UDim2.new(1, 0, 0, 24),
+					Size = UDim2.new(1, 0, 0, actions.DesktopStatusHeightPx),
 				}, { Label = c(PartyStatus, { Text = props.PartyState, Active = props.ShowMatchmakingActivity }) })
 				else nil,
 			UIListLayout = if portrait
 				then nil
 				else c("UIListLayout", {
 					FillDirection = if short then Enum.FillDirection.Horizontal else Enum.FillDirection.Vertical,
-					HorizontalAlignment = if portrait
-						then Enum.HorizontalAlignment.Center
-						else Enum.HorizontalAlignment.Right,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
 					Padding = if short then UDim.new(0, 12) else UDim.new(0, UIConfig.Layout.Splash.ActionsGapPx),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					VerticalAlignment = if short then Enum.VerticalAlignment.Center else Enum.VerticalAlignment.Bottom,
@@ -364,7 +367,13 @@ return function(props: Props)
 				},
 				OnActivated = props.OnPlay,
 			}, {
-				Content = actionText(props.PlayText, primarySize, actions.PrimaryActionTextPx, true, preferredScale),
+				Content = actionText(
+					props.PlayText,
+					primarySize,
+					if portrait or short then actions.PrimaryActionTextPx else actions.DesktopPrimaryActionTextPx,
+					true,
+					preferredScale
+				),
 			}),
 		}),
 		BottomMiddle = if (short and props.ShowMatchmakingActivity) or portrait

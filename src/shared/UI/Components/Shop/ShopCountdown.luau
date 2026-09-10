@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local useExternalStore = require(script.Parent.Parent.Parent.Hooks.useExternalStore)
 local ShopClock = require(script.Parent.Parent.Parent.Services.ShopClock)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
@@ -21,7 +22,7 @@ local function formatRemaining(seconds: number): string
 		return `{days}D {hours}H`
 	end
 	if hours > 0 then
-		return string.format("%02d:%02d:%02d", hours, minutes, secs)
+		return `{hours}H {minutes}M`
 	end
 	return string.format("%02d:%02d", minutes, secs)
 end
@@ -42,22 +43,27 @@ return function(props)
 	end, { expired, props.ExpiresAt, props.OnExpired })
 	return c(ResponsiveText, {
 		HostName = props.HostName or "Countdown",
-		MeasurementFont = Enum.Font.SourceSansBold,
-		MaxTextSize = props.MaxTextSize or 28,
+		MeasurementFont = UIConfig.Text.BodyFont,
+		MinTextSize = 15,
+		MaxTextSize = props.MaxTextSize or 18,
 		Native = {
 			AnchorPoint = props.AnchorPoint,
-			BackgroundTransparency = 1,
-			FontFace = Font.new(
-				"rbxasset://fonts/families/SourceSansPro.json",
-				Enum.FontWeight.Bold,
-				Enum.FontStyle.Normal
-			),
+			BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
+			BackgroundTransparency = 0.12,
+			BorderSizePixel = 0,
+			Font = UIConfig.Text.BodyFont,
 			Position = props.Position,
 			Size = props.Size or UDim2.fromScale(0.3, 1),
-			Text = if expired then "REFRESHING" else formatRemaining(props.ExpiresAt - now),
+			Text = if expired then "UPDATING" else formatRemaining(props.ExpiresAt - now),
 			TextColor3 = props.TextColor3 or Color3.new(1, 1, 1),
-			TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Right,
+			TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Center,
 			ZIndex = props.ZIndex or 6,
 		},
+	}, {
+		UICorner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+		UIPadding = c("UIPadding", {
+			PaddingLeft = UDim.new(0, 6),
+			PaddingRight = UDim.new(0, 6),
+		}),
 	})
 end

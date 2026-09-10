@@ -108,26 +108,37 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					Amount = day.reward.amount or 0,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromScale(0.5, if compact then 0.7 else 0.57),
-						Size = UDim2.fromScale(0.94, if compact then 0.48 else 0.35),
+						Position = UDim2.fromScale(0.5, if compact then 0.7 else 0.52),
+						Size = UDim2.fromScale(0.94, if compact then 0.48 else 0.3),
 					},
 					IconSize = UDim2.fromScale(0.2, 0.78),
 					TextColor = rewardColor,
 					TextStroke = if available or claimed then 0.035 else 0,
 				})
 				else nil,
-			Status = if not compact and (claimed or available)
+			Claimed = if not compact and claimed
+				then c("ImageLabel", {
+					AnchorPoint = Vector2.new(0.5, 1),
+					BackgroundTransparency = 1,
+					Position = UDim2.new(0.5, 0, 1, -2),
+					Size = UDim2.fromOffset(12, 12),
+					Image = "rbxassetid://168702841",
+					ImageColor3 = Palette.White,
+					ScaleType = Enum.ScaleType.Fit,
+				})
+				else nil,
+			Status = if not compact and available
 				then c(ResponsiveText, {
 					MeasurementFont = UIConfig.Text.BodyFont,
-					MinTextSize = 10,
-					MaxTextSize = 15,
+					MinTextSize = 11,
+					MaxTextSize = 12,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 1),
 						BackgroundTransparency = 1,
 						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
-						Position = UDim2.fromScale(0.5, 0.94),
-						Size = UDim2.fromScale(0.9, 0.18),
-						Text = if claimed then "CLAIMED" else "TODAY",
+						Position = UDim2.new(0.5, 0, 1, -2),
+						Size = UDim2.new(0.9, 0, 0, 14),
+						Text = "TODAY",
 						TextColor3 = Palette.White,
 						TextStrokeColor3 = DARK,
 						TextStrokeTransparency = 0.15,

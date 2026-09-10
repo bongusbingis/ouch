@@ -36,6 +36,7 @@ export type SplashPanelConfig = {
 	EdgePaddingPx: number,
 	GapPx: number,
 	Landscape: {
+		MinWidthPx: number?,
 		SeasonHeightPx: number,
 		DailyHeightPx: number,
 		QuestsMinHeightPx: number,
@@ -193,7 +194,11 @@ function ResponsiveLayout.splashPanels(
 	local columnMinimum = column.SeasonHeightPx + column.DailyHeightPx + column.QuestsMinHeightPx + config.GapPx * 2
 	local stack = short or available.Y - columnTop - (column.ActionsReservePx or 0) < columnMinimum
 	if not stack then
-		local width = math.min(math.floor(available.X * config.Season.WidthScale), config.Season.MaxSize.X)
+		local width = math.min(
+			math.max(math.floor(available.X * config.Season.WidthScale), column.MinWidthPx or 1),
+			config.Season.MaxSize.X,
+			math.floor(available.X * 0.48)
+		)
 		local left = available.X - edge - width
 		local dailyTop = columnTop + column.SeasonHeightPx + config.GapPx
 		local questsTop = dailyTop + column.DailyHeightPx + config.GapPx
@@ -218,8 +223,14 @@ function ResponsiveLayout.splashPanels(
 		math.max(math.floor(available.Y * config.Landscape.QuestsTopScale), seasonTop + seasonSize.Y + config.GapPx)
 	local tabbed = short
 		or available.Y - seasonTop - (config.Landscape.ShortBottomPx or 0) < columnMinimum + config.GapPx
-	local bottom = available.Y - (if tabbed then 12 else (config.Landscape.ShortBottomPx or 0))
-	local columnWidth = math.max(seasonSize.X, questsSize.X, math.min(math.floor(available.X * 0.38), 300))
+	local bottom = available.Y - (if tabbed then 12 elseif short then (config.Landscape.ShortBottomPx or 0) else 24)
+	local columnWidth = if short
+		then math.max(seasonSize.X, questsSize.X, math.min(math.floor(available.X * 0.38), 300))
+		else math.min(
+			math.max(math.floor(available.X * config.Season.WidthScale), column.MinWidthPx or 1),
+			config.Season.MaxSize.X,
+			math.floor(available.X * 0.48)
+		)
 	local questsBottom = bottom
 	questsSize = Vector2.new(questsSize.X, math.min(questsSize.Y, math.max(44, questsBottom - questsTop)))
 	return {
@@ -290,11 +301,14 @@ function ResponsiveLayout.splashWorldWindow(available: Vector2, layout: any): Sa
 	local edge = layout.Splash.ProgressPanels.GapPx
 	if panels.progressStack then
 		local top = LobbyHeaderLayout.resolve(available).height + 8
+		local actionsReserve = if available.Y <= layout.ShortLandscapeMaxHeightPx
+			then 70
+			else layout.Splash.ProgressPanels.Landscape.ActionsReservePx
 		return {
 			position = Vector2.new(edge, top),
 			size = Vector2.new(
 				math.max(1, panels.progressStack.position.X - edge * 2),
-				math.max(1, available.Y - top - 70)
+				math.max(1, available.Y - top - actionsReserve)
 			),
 		}
 	end

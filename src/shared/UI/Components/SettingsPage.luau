@@ -12,6 +12,8 @@ local Game = Shared:WaitForChild("Game")
 local SettingsRegistry = require(Game:WaitForChild("Settings"):WaitForChild("SettingsRegistry"))
 local SettingsStore = require(Game:WaitForChild("Settings"):WaitForChild("SettingsStore"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local PageTitle = require(script.Parent.PageTitle)
+local SectionHeader = require(script.Parent.SectionHeader)
 local SettingRow = require(script.Parent.Settings.SettingRow)
 local AssetCredits = require(script.Parent.Settings.AssetCredits)
 local ActionButton = require(script.Parent.Shop.ShopPriceButton)
@@ -38,6 +40,7 @@ return function(props: Props)
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local compact = not short and panelSize.X * 0.93 * 0.95 < UIConfig.Layout.CompactMaxWidthPx
+	local contentTop = math.max(panelSize.Y * 0.185, if short then 44 else 0)
 	local revision, setRevision = React.useState(0)
 	local creditsOpen, setCreditsOpen = React.useState(false)
 	local scrollRef = React.useRef(nil)
@@ -99,7 +102,7 @@ return function(props: Props)
 
 	local content: { [string]: any } = {
 		UIListLayout = c("UIListLayout", {
-			Padding = UDim.new(0, if compact then 10 else 6),
+			Padding = UDim.new(0, 10),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 		UIPadding = c("UIPadding", {
@@ -123,31 +126,12 @@ return function(props: Props)
 	local layoutOrder = 0
 	for _, category in categoryOrder do
 		layoutOrder += 1
-		content[`Category{category}`] = c("Frame", {
-			BackgroundTransparency = 1,
+		content[`Category{category}`] = c(SectionHeader, {
+			Text = category,
+			HeightPx = if short then 30 else 38,
+			TextSize = if short then 20 else 24,
 			LayoutOrder = layoutOrder,
-			Size = UDim2.new(1, 0, 0, if short then 24 else 34),
-		}, {
-			Label = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 22,
-				Native = {
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0, 0),
-					Size = UDim2.fromScale(1, 1),
-					Text = category,
-					TextColor3 = UIConfig.ProgressionStyle.White,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					ZIndex = 5,
-				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
+			ZIndex = 5,
 		})
 		for _, definition in byCategory[category] do
 			layoutOrder += 1
@@ -199,38 +183,30 @@ return function(props: Props)
 
 	return c("ImageLabel", {
 		BackgroundTransparency = 1,
-		Image = "rbxassetid://136021539696619",
+		Image = UIConfig.Layout.PageSurface.Image,
 		LayoutOrder = 5,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = props.Position or UIConfig.Layout.PagePosition,
 		ScaleType = Enum.ScaleType.Slice,
 		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-		SliceCenter = Rect.new(224, 202, 770, 474),
-		SliceScale = 0.06,
+		SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+		SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 	}, {
-		Title = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 62,
+		Title = c(PageTitle, {
+			Text = if creditsOpen then "ASSET CREDITS" else "SETTINGS",
+			TextSize = if short then 26 else 42,
 			Native = {
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = if creditsOpen and short
-					then UDim2.new(0.12, 0, 0, 4)
-					else UDim2.fromScale(if creditsOpen then 0.12 else 0.291804, 0.0540634),
-				Size = if creditsOpen and short
-					then UDim2.new(0.76, 0, 0, 28)
-					else UDim2.fromScale(if creditsOpen then 0.76 else 0.398251, 0.0898091),
-				Text = if creditsOpen then "ASSET CREDITS" else "SETTINGS",
-				TextColor3 = Color3.new(1, 1, 1),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = if short then UDim2.new(0.5, 0, 0, 8) else UDim2.fromScale(0.5, 0.045),
+				Size = UDim2.new(0.76, 0, 0, if short then 30 else 54),
 				ZIndex = 5,
 			},
 		}),
 		Main = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.575),
-			Size = UDim2.fromScale(0.93, 0.78),
+			Position = UDim2.new(0.5, 0, 0, contentTop),
+			Size = UDim2.new(0.93, 0, 0, math.max(panelSize.Y * 0.965 - contentTop, 0)),
 		}, {
 			Content = c("ScrollingFrame", {
 				ref = scrollRef,
@@ -246,7 +222,7 @@ return function(props: Props)
 				ScrollBarImageTransparency = 0.1,
 				ScrollBarThickness = if compact then 5 else 7,
 				Selectable = creditsOpen,
-				Size = UDim2.new(0.95, 0, 1, if creditsOpen then -54 else -38),
+				Size = UDim2.new(0.95, 0, 1, if creditsOpen then -54 elseif saveStatus ~= "" then -38 else 0),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 			}, if creditsOpen then creditsContent else content),
 			CreditsBack = if creditsOpen
@@ -263,13 +239,14 @@ return function(props: Props)
 					end,
 				})
 				else nil,
-			SaveStatus = if not creditsOpen
+			SaveStatus = if not creditsOpen and saveStatus ~= ""
 				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.FredokaOne,
+					MeasurementFont = UIConfig.Text.BodyFont,
 					MaxTextSize = 16,
+					MinTextSize = 14,
 					Native = {
 						BackgroundTransparency = 1,
-						Font = Enum.Font.FredokaOne,
+						Font = UIConfig.Text.BodyFont,
 						Position = UDim2.new(0.025, 0, 1, -34),
 						Size = UDim2.new(0.95, 0, 0, 30),
 						Text = saveStatus,

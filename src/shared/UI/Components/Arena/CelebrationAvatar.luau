@@ -77,11 +77,10 @@ return React.memo(function(props)
 				local phase = (t / 3.2 + seed) % 1
 				return UDim2.fromScale(0.08 + seed * 0.84 + math.sin(t * 2 + index) * 0.035, phase)
 			end),
-			Rotation = elapsed:map(function(t)
-				return index * 37 + t * (if index % 2 == 0 then 90 else -75)
-			end),
-			Size = UDim2.fromOffset(if index % 2 == 0 then 5 else 7, 3),
+			Size = UDim2.fromOffset(if index % 2 == 0 then 4 else 6, if index % 2 == 0 then 4 else 6),
 			ZIndex = z + 1,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 		})
 	end
 	local native = table.clone(props.Native or {})

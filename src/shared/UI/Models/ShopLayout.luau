@@ -1,4 +1,4 @@
--- Description: Pure layout model for the storefront dashboard: the card grid a block fills its span with, and the track-based packer that places each block at the earliest position its span will fit so a taller neighbour never leaves a hole beneath a shorter one.
+-- Description: Card sizing and content-aware packing for the storefront's track-based dashboard.
 
 --!strict
 
@@ -120,44 +120,91 @@ function ShopLayout.resolveSpan(
 	return tracks
 end
 
--- Places each block at the lowest position its span will fit, over the track
--- lines already established by the blocks before it. This is what stops a
--- taller neighbour from leaving a hole: a block whose span fits under the
--- shorter of two adjacent blocks starts there rather than waiting for the
--- taller one to finish. Blocks are never reordered -- each one only chooses
--- where it goes -- and candidate positions are limited to the left edge and the
--- right edges of blocks already placed, so every block lines up with one of its
--- neighbours instead of floating at an arbitrary offset. Ties on height go to
--- the position that buries the least empty space, then to the leftmost.
-function ShopLayout.place(blocks: { Block }, tracks: number, gap: number): ({ Placement }, number)
-	local heights = table.create(tracks, 0)
+-- Keep the occupied rectangles, rather than only their highest point per
+-- track: a wide section can bridge an empty space that a later narrow section
+-- still fits. Candidate positions share an existing section's track edge.
+local function fit(block: Block, placements: { Placement }, tracks: number, gap: number): Placement
+	local span = math.clamp(block.span, 1, tracks)
 	local starts: { [number]: boolean } = { [0] = true }
+	local ordered = table.clone(placements)
+	table.sort(ordered, function(a, b)
+		return a.y < b.y
+	end)
+	for _, other in ordered do
+		starts[other.index] = true
+		starts[other.index + other.span] = true
+	end
+	local bestIndex, bestY, bestWaste = 0, math.huge, math.huge
+	for index = 0, tracks - span do
+		if not starts[index] then
+			continue
+		end
+		local top = 0
+		for _, other in ordered do
+			local sharedTracks = index < other.index + other.span and other.index < index + span
+			if sharedTracks and top < other.y + other.block.height + gap and top + block.height + gap > other.y then
+				top = other.y + other.block.height + gap
+			end
+		end
+		local waste = 0
+		for track = index, index + span - 1 do
+			local support = 0
+			for _, other in ordered do
+				local edge = other.y + other.block.height + gap
+				if other.index <= track and track < other.index + other.span and edge <= top then
+					support = math.max(support, edge)
+				end
+			end
+			waste += top - support
+		end
+		if top < bestY or (top == bestY and waste < bestWaste) then
+			bestIndex, bestY, bestWaste = index, top, waste
+		end
+	end
+	return { block = block, index = bestIndex, span = span, y = bestY }
+end
+
+function ShopLayout.place(blocks: { Block }, tracks: number, gap: number): ({ Placement }, number)
 	local placements = {}
 	local bottom = 0
 	for _, block in blocks do
-		local span = math.clamp(block.span, 1, tracks)
-		local bestIndex, bestY, bestWaste = 0, math.huge, math.huge
-		for index = 0, tracks - span do
-			if starts[index] then
-				local top = 0
-				for track = index + 1, index + span do
-					top = math.max(top, heights[track])
-				end
-				local waste = 0
-				for track = index + 1, index + span do
-					waste += top - heights[track]
-				end
-				if top < bestY or (top == bestY and waste < bestWaste) then
-					bestIndex, bestY, bestWaste = index, top, waste
-				end
+		local placement = fit(block, placements, tracks, gap)
+		table.insert(placements, placement)
+		bottom = math.max(bottom, placement.y + block.height)
+	end
+	return placements, bottom
+end
+
+-- Establish the configured composition first, including the smaller section
+-- that follows a wide one in the data but sits beside it visually. Then allow
+-- content-sized alternatives to fill the shorter columns. A narrower block is
+-- used when it finishes earlier, or removes unused card columns at the same
+-- height. An offer cannot steal its neighbour's top-row position or turn a
+-- compact currency row into a much longer column.
+function ShopLayout.compact(blocks: { Block }, tracks: number, gap: number): ({ Placement }, number)
+	local baseline = ShopLayout.place(blocks, tracks, gap)
+	table.sort(baseline, function(a, b)
+		return if a.y == b.y then a.index < b.index else a.y < b.y
+	end)
+	local placements = {}
+	local bottom = 0
+	for _, original in baseline do
+		local selected = fit(original.block, placements, tracks, gap)
+		for _, alternative in original.block.alternatives or {} do
+			local candidate = fit(alternative, placements, tracks, gap)
+			local selectedBottom = selected.y + selected.block.height
+			local candidateBottom = candidate.y + candidate.block.height
+			local lessUnused = candidate.y == selected.y
+				and (candidate.block.unusedWidth or 0) < (selected.block.unusedWidth or 0)
+			if
+				candidateBottom < selectedBottom
+				or (candidateBottom == selectedBottom and (candidate.y < selected.y or lessUnused))
+			then
+				selected = candidate
 			end
 		end
-		table.insert(placements, { block = block, index = bestIndex, span = span, y = bestY })
-		for track = bestIndex + 1, bestIndex + span do
-			heights[track] = bestY + block.height + gap
-		end
-		starts[bestIndex + span] = true
-		bottom = math.max(bottom, bestY + block.height)
+		table.insert(placements, selected)
+		bottom = math.max(bottom, selected.y + selected.block.height)
 	end
 	return placements, bottom
 end
