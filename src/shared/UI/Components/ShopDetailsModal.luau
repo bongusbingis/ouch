@@ -10,8 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ReactSpring = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react-spring"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local InventoryConfig =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local ShopConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
@@ -22,6 +20,7 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
+local CrateOddsGrid = require(script.Parent.Shop.CrateOddsGrid)
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CosmeticsLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
@@ -311,6 +310,11 @@ local function ItemDetails(props)
 	local nameHeight = if short then 36 else 52
 	local previewFooter = if isEffect then 56 else if short or (not isCrate and not isEmoteCollection) then 8 else 34
 	local artHeight = math.max(44, bodyHeight - nameHeight - previewFooter - 16)
+	local gridGap = 8
+	local gridListPx = (size.X - inset * 2) * listWidth - 12
+	local gridMinTile = if short then 96 else 112
+	local gridColumns = math.clamp(math.floor((gridListPx + gridGap) / (gridMinTile + gridGap)), 2, 6)
+	local gridTile = math.floor((gridListPx - (gridColumns - 1) * gridGap) / gridColumns)
 	local contents = {
 		Layout = c(
 			"UIListLayout",
@@ -320,91 +324,21 @@ local function ItemDetails(props)
 			"UIPadding",
 			{ PaddingTop = UDim.new(0, 3), PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 8) }
 		),
-	}
-	local lastRarity = nil
-	for index, outcome in card.odds or {} do
-		local rarityColor = InventoryConfig.RarityColors[outcome.rarity] or colors.Cyan
-		if lastRarity ~= outcome.rarity then
-			contents["Rarity" .. outcome.rarity] = c("Frame", {
-				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, if short then 18 else 24),
-				LayoutOrder = index * 2,
-			}, {
-				Name = label(
-					string.upper(outcome.rarity),
-					UDim2.fromOffset(4, 0),
-					UDim2.fromScale(1, 1),
-					19,
-					rarityColor,
-					true
-				),
-			})
-			lastRarity = outcome.rarity
-		end
-		local chosen = selectedId == outcome.itemId
-		local refund = if outcome.owned
-			then `OWNED  •  +{formatNumber(outcome.bonksRefund or 0)} Bonks`
-			else `Duplicate: +{formatNumber(outcome.bonksRefund or 0)} Bonks`
-		contents[outcome.itemId] = c(AnimatedButton, {
-			Enabled = true,
-			OnActivated = function()
-				setSelectedId(outcome.itemId)
-			end,
-			Native = {
-				BackgroundColor3 = if chosen then colors.Pink else colors.PanelRaised,
-				BackgroundTransparency = 0,
-				BorderSizePixel = 0,
-				Size = UDim2.new(1, 0, 0, if short then 44 else 50),
-				LayoutOrder = index * 2 + 1,
+		Grid = if isCrate
+			then c(CrateOddsGrid, {
+				Odds = card.odds or {},
+				SelectedId = selectedId,
+				OnSelect = setSelectedId,
+				TilePx = gridTile,
+				Columns = gridColumns,
+				GapPx = gridGap,
+				Short = short,
+				ColorId = (props.Equipped or {}).CharacterColor,
+				CostumeId = (props.Equipped or {}).CostumeAssets,
 				ZIndex = 104,
-			},
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 8) }),
-			Accent = c("Frame", {
-				BackgroundColor3 = rarityColor,
-				BorderSizePixel = 0,
-				Size = UDim2.new(0, 4, 1, -12),
-				Position = UDim2.fromOffset(0, 6),
-				ZIndex = 105,
-			}),
-			Name = label(
-				outcome.displayName,
-				UDim2.fromOffset(12, 3),
-				UDim2.new(1, -94, 0, if short then 20 else 24),
-				20,
-				nil,
-				false
-			),
-			Refund = label(
-				refund,
-				UDim2.fromOffset(12, if short then 23 else 27),
-				UDim2.new(1, -94, 0, 18),
-				14,
-				colors.White,
-				false
-			),
-			Chance = label(
-				tostring(outcome.percent) .. "%",
-				UDim2.new(1, -80, 0, 3),
-				UDim2.fromOffset(70, 24),
-				21,
-				colors.Yellow,
-				false,
-				Enum.TextXAlignment.Right
-			),
-			BaseChance = if outcome.basePercent and outcome.basePercent ~= outcome.percent
-				then label(
-					"Base " .. outcome.basePercent .. "%",
-					UDim2.new(1, -80, 0, if short then 23 else 27),
-					UDim2.fromOffset(70, 18),
-					13,
-					colors.White,
-					false,
-					Enum.TextXAlignment.Right
-				)
-				else nil,
-		})
-	end
+			})
+			else nil,
+	}
 
 	local buttons = {}
 	local function position(index)
@@ -597,7 +531,7 @@ local function ItemDetails(props)
 							or (not isCrate and not isEmoteCollection)
 						then nil
 						else label(
-							if isCrate then "PICK A REWARD TO PREVIEW" else "CHOOSE IN BACKPACK → EMOTES",
+							if isCrate then "TAP A REWARD FOR A CLOSER LOOK" else "CHOOSE IN BACKPACK → EMOTES",
 							if portrait then UDim2.new(0.43, 0, 1, -27) else UDim2.new(0, 10, 1, -32),
 							if portrait then UDim2.new(0.53, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
 							15,

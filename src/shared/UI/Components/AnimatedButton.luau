@@ -33,6 +33,7 @@ export type Props = {
 	Native: { [any]: any },
 	Enabled: boolean?,
 	Style: "Standard" | "Primary" | "Card"?,
+	HoverRotation: boolean?,
 	OnActivated: (() -> ())?,
 	OnSelectionGained: ((GuiButton) -> ())?,
 	ButtonRef: any?,
@@ -56,7 +57,12 @@ return function(props: Props)
 	local scale = if not entered
 		then 0.82
 		else if not enabled then 1 else if pressing then preset.pressed else if hovering then preset.hover else 1
-	local rotation = if enabled and hovering and not pressing then preset.rotation else 0
+	local rotation = if enabled
+			and hovering
+			and not pressing
+			and props.HoverRotation ~= false
+		then preset.rotation
+		else 0
 	local styles = ReactSpring.useSpring({
 		Scale = scale,
 		Rotation = rotation,

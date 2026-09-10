@@ -1,0 +1,299 @@
+-- Name: CrateOddsGrid.luau
+-- Author: Jack C.
+-- Description: Crate odds presented as rarity-sectioned grids of Backpack-style reward tiles, each showing a live preview, its next-open chance and an OWNED tag, so every reward is visible without tapping through a list.
+-- Created: 2026-09-09
+--!strict
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local InventoryConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
+local formatNumber = require(script.Parent.Parent.Parent.Models.NumberText)
+local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
+local InventoryPreview = require(script.Parent.Parent.InventoryPreview)
+local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+
+local c = React.createElement
+local colors = UIConfig.ProgressionStyle
+local WHITE = Color3.new(1, 1, 1)
+local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local BODY_FONT = Font.fromEnum(UIConfig.Text.BodyFont)
+
+export type Props = {
+	Odds: { any },
+	SelectedId: string?,
+	OnSelect: (string) -> (),
+	TilePx: number,
+	Columns: number,
+	GapPx: number,
+	Short: boolean,
+	ColorId: string?,
+	CostumeId: string?,
+	ZIndex: number,
+}
+
+local function tileName(outcome: any): string
+	local name = string.gsub(outcome.displayName, "^Default%s+", "")
+	local category = if outcome.preview then outcome.preview.category else nil
+	local suffix = if category == "BallAssets" then " Ball" elseif category == "HammerAssets" then " Hammer" else nil
+	if suffix ~= nil and string.sub(name, -#suffix) == suffix and #name > #suffix then
+		name = string.sub(name, 1, #name - #suffix)
+	end
+	return string.upper(name)
+end
+
+local function Tile(props: {
+	Outcome: any,
+	Selected: boolean,
+	TilePx: number,
+	Short: boolean,
+	ColorId: string?,
+	CostumeId: string?,
+	ZIndex: number,
+	LayoutOrder: number,
+	OnActivated: () -> (),
+})
+	local outcome = props.Outcome
+	local z = props.ZIndex
+	local bandPx = if props.Short then 26 else 30
+	local rarityColor = InventoryConfig.RarityColors[outcome.rarity] or colors.Cyan
+	local preview = outcome.preview
+	return c(AnimatedButton, {
+		Style = "Card",
+		HoverRotation = false,
+		Native = {
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://123285423801571",
+			LayoutOrder = props.LayoutOrder,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = Rect.new(107, 27, 126, 128),
+			Size = UDim2.fromOffset(props.TilePx, props.TilePx + bandPx),
+			ZIndex = z,
+		},
+		OnActivated = props.OnActivated,
+	}, {
+		Background = c("ImageLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = WHITE,
+			BorderSizePixel = 0,
+			Image = "rbxassetid://80477338860845",
+			ImageColor3 = rarityColor,
+			Position = UDim2.fromScale(0.49, 0.496),
+			Size = UDim2.fromScale(0.96, 0.955),
+			ZIndex = z,
+		}, {
+			Texture = c("ImageLabel", {
+				BackgroundTransparency = 1,
+				Image = "rbxassetid://6794188517",
+				ImageTransparency = 0.92,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = z,
+			}),
+		}),
+		Preview = c("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(0, 6),
+			Size = UDim2.new(1, 0, 1, -bandPx - 10),
+			ZIndex = z + 1,
+		}, {
+			Content = if preview
+				then c(InventoryPreview, {
+					ItemId = preview.itemId,
+					Category = preview.category,
+					Definition = preview.definition,
+					ColorId = props.ColorId,
+					CostumeId = props.CostumeId,
+					ZIndex = z + 1,
+				})
+				else nil,
+		}),
+		Chance = c("Frame", {
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = colors.Ink,
+			BackgroundTransparency = 0.15,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(8, 8),
+			Size = UDim2.fromOffset(0, if props.Short then 18 else 20),
+			ZIndex = z + 3,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
+			Text = c("TextLabel", {
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 1,
+				FontFace = DISPLAY_FONT,
+				Size = UDim2.fromScale(0, 1),
+				Text = tostring(outcome.percent) .. "%",
+				TextColor3 = colors.Yellow,
+				TextSize = if props.Short then 12 else 14,
+				ZIndex = z + 4,
+			}),
+		}),
+		Owned = if outcome.owned
+			then c("Frame", {
+				AnchorPoint = Vector2.new(1, 0),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundColor3 = colors.Yellow,
+				BorderSizePixel = 0,
+				Position = UDim2.new(1, -8, 0, 8),
+				Size = UDim2.fromOffset(0, if props.Short then 18 else 20),
+				ZIndex = z + 3,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
+				Text = c("TextLabel", {
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundTransparency = 1,
+					FontFace = DISPLAY_FONT,
+					Size = UDim2.fromScale(0, 1),
+					Text = "OWNED",
+					TextColor3 = colors.Ink,
+					TextSize = if props.Short then 11 else 12,
+					ZIndex = z + 4,
+				}),
+			})
+			else nil,
+		NameBand = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			BackgroundColor3 = if props.Selected then colors.Ink else colors.Cyan,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 1, -5),
+			Size = UDim2.new(1, -12, 0, bandPx),
+			ZIndex = z + 2,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
+			Outline = if props.Selected then c("UIStroke", { Color = colors.Yellow, Thickness = 2 }) else nil,
+			ItemName = c(ResponsiveText, {
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MaxTextSize = if props.Short then 14 else 16,
+				MinTextSize = 11,
+				Wrapped = true,
+				Truncate = true,
+				Native = {
+					BackgroundTransparency = 1,
+					FontFace = DISPLAY_FONT,
+					Position = UDim2.fromOffset(4, 1),
+					Size = UDim2.new(1, -8, 1, -2),
+					Text = tileName(outcome),
+					TextColor3 = if props.Selected then colors.Yellow else WHITE,
+					TextWrapped = true,
+					ZIndex = z + 3,
+				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = colors.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
+			}),
+		}),
+	})
+end
+
+local function sectionSummary(first: any, short: boolean): string
+	local chance = tostring(first.percent) .. "%"
+	local base = if first.basePercent and first.basePercent ~= first.percent
+		then `  (BASE {first.basePercent}%)`
+		else ""
+	if short then
+		return `{chance} EACH{base}  •  DUPES PAY {formatNumber(first.bonksRefund or 0)}`
+	end
+	return `{chance} EACH{base}  •  DUPLICATES PAY {formatNumber(first.bonksRefund or 0)} BONKS`
+end
+
+return function(props: Props)
+	local sections = {}
+	local order = 0
+	local groups: { { rarity: string, outcomes: { any } } } = {}
+	local byRarity: { [string]: { any } } = {}
+	for _, outcome in props.Odds do
+		local bucket = byRarity[outcome.rarity]
+		if bucket == nil then
+			bucket = {}
+			byRarity[outcome.rarity] = bucket
+			table.insert(groups, { rarity = outcome.rarity, outcomes = bucket })
+		end
+		table.insert(bucket, outcome)
+	end
+	local headerPx = if props.Short then 22 else 26
+	for _, group in groups do
+		local rarityColor = InventoryConfig.RarityColors[group.rarity] or colors.Cyan
+		local tiles = {
+			Grid = c("UIGridLayout", {
+				CellPadding = UDim2.fromOffset(props.GapPx, props.GapPx),
+				CellSize = UDim2.fromOffset(props.TilePx, props.TilePx + (if props.Short then 26 else 30)),
+				FillDirectionMaxCells = props.Columns,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		}
+		for index, outcome in group.outcomes do
+			tiles[outcome.itemId] = c(Tile, {
+				Outcome = outcome,
+				Selected = props.SelectedId == outcome.itemId,
+				TilePx = props.TilePx,
+				Short = props.Short,
+				ColorId = props.ColorId,
+				CostumeId = props.CostumeId,
+				ZIndex = props.ZIndex,
+				LayoutOrder = index,
+				OnActivated = function()
+					props.OnSelect(outcome.itemId)
+				end,
+			})
+		end
+		order += 1
+		sections["Header" .. group.rarity] = c("Frame", {
+			BackgroundTransparency = 1,
+			LayoutOrder = order,
+			Size = UDim2.new(1, 0, 0, headerPx),
+			ZIndex = props.ZIndex,
+		}, {
+			Name = c("TextLabel", {
+				BackgroundTransparency = 1,
+				FontFace = DISPLAY_FONT,
+				Size = UDim2.fromScale(0.4, 1),
+				Text = string.upper(group.rarity),
+				TextColor3 = rarityColor,
+				TextSize = if props.Short then 16 else 19,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = props.ZIndex + 1,
+			}, {
+				Outline = c("UIStroke", {
+					Color = colors.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
+			}),
+			Summary = c("TextLabel", {
+				AnchorPoint = Vector2.new(1, 0),
+				BackgroundTransparency = 1,
+				FontFace = BODY_FONT,
+				Position = UDim2.new(1, -4, 0, 0),
+				Size = UDim2.fromScale(0.6, 1),
+				Text = sectionSummary(group.outcomes[1], props.Short),
+				TextColor3 = WHITE,
+				TextSize = if props.Short then 12 else 14,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				ZIndex = props.ZIndex + 1,
+			}, {
+				Outline = c("UIStroke", {
+					Color = colors.Ink,
+					Thickness = 0.035,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
+			}),
+		})
+		order += 1
+		sections["Tiles" .. group.rarity] = c("Frame", {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			LayoutOrder = order,
+			Size = UDim2.fromScale(1, 0),
+			ZIndex = props.ZIndex,
+		}, tiles)
+	end
+	return c(React.Fragment, nil, sections)
+end
