@@ -174,7 +174,7 @@ combatRoot:render(React.createElement(React.Fragment, nil, {
 }))
 local emoteContainer = ReactRoot.create("LobbyEmoteRoot", Enum.ScreenInsets.CoreUISafeInsets, 800, true)
 local emoteRoot = ReactRoblox.createRoot(emoteContainer)
-emoteRoot:render(React.createElement(EmoteWheel))
+emoteRoot:render(React.createElement(EmoteWheel, { ShowTouchButton = false }))
 EmoteWheelController.start({
 	onPlay = function(emoteId)
 		Network.fireServer("PlayEmote", emoteId)

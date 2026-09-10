@@ -3,25 +3,27 @@
 
 local LobbyHeaderLayout = {}
 
-function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?)
+function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?, includeEmote: boolean?)
 	local count = math.max(tabCount or 4, 1)
 	local width = math.max(available.X, 1)
 	local compact = available.Y <= 500 or width < 860
 	local edge = if compact then 6 else 20
-	local gap = if compact then 6 else 12
+	local gap = if compact then 6 else 16
 	local buttonWidth = if width < 594 then 66 else if compact then 74 else 90
 	local navWidth = buttonWidth * count + gap * (count - 1)
 	local partyWidth = if width < 660 then 88 else if compact then 128 else 154
-	local logoWidth = math.clamp(width - edge * 2 - navWidth - partyWidth - gap * 2, 168, 220)
+	local emoteWidth = if includeEmote then 44 else 0
+	local rightCluster = partyWidth + (if includeEmote then gap + emoteWidth else 0)
+	local logoWidth = math.clamp(width - edge * 2 - navWidth - rightCluster - gap * 2, 168, 220)
 	local height = if compact then 72 else 88
 	local navHeight = if compact then 56 else 64
-	local required = edge * 2 + logoWidth + navWidth + partyWidth + gap * 2
+	local required = edge * 2 + logoWidth + navWidth + rightCluster + gap * 2
 	local stacked = required > width
 	local navTop = (height - navHeight) / 2
 	local navLeft = math.clamp(
 		(width - navWidth) / 2,
 		edge + logoWidth + gap,
-		math.max(edge + logoWidth + gap, width - edge - partyWidth - gap - navWidth)
+		math.max(edge + logoWidth + gap, width - edge - rightCluster - gap - navWidth)
 	)
 	if stacked then
 		height = 124
@@ -47,6 +49,12 @@ function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?)
 			size = Vector2.new(partyWidth, 44),
 		},
 		partyLabel = if partyWidth < 120 then "PARTY" else "PARTY CODE",
+		emote = if includeEmote
+			then {
+				position = Vector2.new(width - edge - partyWidth - gap - emoteWidth, (accessoryHeight - 44) / 2),
+				size = Vector2.new(emoteWidth, 44),
+			}
+			else nil,
 	}
 end
 

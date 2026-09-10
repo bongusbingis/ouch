@@ -8,6 +8,7 @@ local React = require(Packages:WaitForChild("react"))
 local ReactRoblox = require(Packages:WaitForChild("react-roblox"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
 local ButtonSurface = require(script.Parent.ButtonSurface)
 local Layout = require(script.Parent.Parent.Models.LobbyHeaderLayout)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
@@ -19,7 +20,10 @@ local c = React.createElement
 return function(props)
 	local insets = useHeaderInsets()
 	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
-	local layout = Layout.resolve(safe.size, #props.Tabs)
+	local wheel = EmoteWheelController.useSnapshot()
+	local wheelBlocked = EmoteWheelController.useBlocked()
+	local touch = wheel.deviceClass == "Touch"
+	local layout = Layout.resolve(safe.size, #props.Tabs, touch)
 	local logo = UIConfig.LobbyArtwork.Logo
 	local logoSize = TextMetrics.fitAspect(layout.logo.size, logo.Size.X / logo.Size.Y)
 	local logoTop = layout.logo.position.Y + layout.logo.size.Y / 2 - logo.OpticalCenterY / logo.Size.Y * logoSize.Y
@@ -67,13 +71,19 @@ return function(props)
 			Label = c("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.new(0, 2, 1, -4),
+				Position = UDim2.new(0, 2, 1, -6),
 				Size = UDim2.new(1, -4, 0, 18),
-				Font = UIConfig.Text.BodyFont,
+				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 				Text = tab.Label,
-				TextSize = if layout.buttonWidth < 74 then 12 else if layout.compact then 13 else 15,
+				TextSize = if layout.buttonWidth < 74 then 12 else if layout.compact then 14 else 16,
 				TextColor3 = if enabled then UIConfig.ProgressionStyle.White else UIConfig.ProgressionStyle.Muted,
 				ZIndex = 2,
+			}, {
+				Outline = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 		})
 	end
@@ -121,6 +131,61 @@ return function(props)
 				Size = UDim2.fromOffset(layout.nav.size.X, layout.nav.size.Y),
 				SelectionGroup = true,
 			}, buttons),
+			Emote = if layout.emote and not wheelBlocked
+				then c(AnimatedButton, {
+					Enabled = true,
+					Visual = c(ButtonSurface, {
+						Enabled = true,
+						Color = UIConfig.ProgressionStyle.Cyan,
+						Radius = UDim.new(0, 12),
+					}),
+					SelectionRadius = UDim.new(0, 12),
+					OnActivated = function()
+						EmoteWheelController.openTouch()
+					end,
+					Native = {
+						BackgroundTransparency = 1,
+						Image = "",
+						Position = UDim2.fromOffset(layout.emote.position.X, layout.emote.position.Y),
+						Size = UDim2.fromOffset(layout.emote.size.X, layout.emote.size.Y),
+					},
+				}, {
+					Dots = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 2 }, {
+						TopLeft = c("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundColor3 = UIConfig.ProgressionStyle.White,
+							BorderSizePixel = 0,
+							Position = UDim2.fromScale(0.36, 0.36),
+							Size = UDim2.fromOffset(9, 9),
+							ZIndex = 3,
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+						TopRight = c("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundColor3 = UIConfig.ProgressionStyle.White,
+							BorderSizePixel = 0,
+							Position = UDim2.fromScale(0.64, 0.36),
+							Size = UDim2.fromOffset(9, 9),
+							ZIndex = 3,
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+						BottomLeft = c("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundColor3 = UIConfig.ProgressionStyle.White,
+							BorderSizePixel = 0,
+							Position = UDim2.fromScale(0.36, 0.64),
+							Size = UDim2.fromOffset(9, 9),
+							ZIndex = 3,
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+						BottomRight = c("Frame", {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundColor3 = UIConfig.ProgressionStyle.White,
+							BorderSizePixel = 0,
+							Position = UDim2.fromScale(0.64, 0.64),
+							Size = UDim2.fromOffset(9, 9),
+							ZIndex = 3,
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+					}),
+				})
+				else nil,
 		}),
 	})
 end

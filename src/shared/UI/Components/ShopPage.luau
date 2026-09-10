@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ActivityDots = require(script.Parent.ActivityDots)
-local BonksLabel = require(script.Parent.BonksLabel)
+local BonksChip = require(script.Parent.BonksChip)
 local PageTitle = require(script.Parent.PageTitle)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
@@ -268,9 +268,11 @@ return function(props: Props)
 
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local headerBand = if short then 44 else 72
+	local bottomPad = if short then 8 else 18
 	local shortHeight = if short
 		then math.clamp(
-			math.floor(panelSize.Y * ShopUI.MainSizeScale.Y * ShopUI.ContentSizeScale.Y) - ShopUI.HeaderHeightPx - 6,
+			math.floor((panelSize.Y - headerBand - bottomPad) * ShopUI.ContentSizeScale.Y) - ShopUI.HeaderHeightPx - 6,
 			128,
 			ShopUI.ShortCardHeightPx
 		)
@@ -303,8 +305,8 @@ return function(props: Props)
 			TextSize = if short then 26 else 42,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
-				Position = if short then UDim2.new(0.5, 0, 0, 8) else UDim2.fromScale(0.5, 0.045),
-				Size = if short then UDim2.new(0.48, 0, 0, 30) else UDim2.new(0.48, 0, 0, 54),
+				Position = UDim2.new(0.5, 0, 0, if short then 8 else 14),
+				Size = UDim2.new(0.48, 0, 0, if short then 30 else 48),
 				ZIndex = 5,
 			},
 		}),
@@ -318,26 +320,19 @@ return function(props: Props)
 				},
 			})
 			else nil,
-		Bonks = c(BonksLabel, {
+		Bonks = c(BonksChip, {
 			Amount = model.bonks,
-			MaxTextSize = 30,
-			TextColor = Color3.fromRGB(255, 220, 62),
-			TextStroke = 0.05,
-			Alignment = Enum.HorizontalAlignment.Right,
-			Native = {
-				AnchorPoint = Vector2.new(1, 0.5),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.954, 0.1),
-				Size = if short then UDim2.new(0.245, 0, 0, 22) else UDim2.fromScale(0.245, 0.078),
-				ZIndex = 5,
-			},
+			HeightPx = if short then 32 else 40,
+			TextSize = if short then 18 else 22,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1 - (1 - ShopUI.MainSizeScale.X) / 2, 0, 0, headerBand / 2),
+			ZIndex = 5,
 		}),
 		Main = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.555),
-			Size = UDim2.fromScale(ShopUI.MainSizeScale.X, ShopUI.MainSizeScale.Y),
+			Position = UDim2.new(0.5, 0, 0, headerBand),
+			Size = UDim2.new(ShopUI.MainSizeScale.X, 0, 1, -headerBand - bottomPad),
 		}, {
 			Content = c("ScrollingFrame", {
 				Active = true,

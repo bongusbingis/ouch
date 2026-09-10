@@ -15,6 +15,7 @@ local Input = require(Config:WaitForChild("Interface"):WaitForChild("Input"))
 local Emotes = require(Config:WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local EmoteWheelModel = require(script.Parent.Parent.Models.EmoteWheelModel)
 local UIFeedback = require(script.Parent.UIFeedback)
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local useExternalStore = require(script.Parent.Parent.Hooks.useExternalStore)
 
 local EmoteWheelController = {}
@@ -103,7 +104,7 @@ end
 local function layout()
 	local camera = Workspace.CurrentCamera
 	local size = if camera then camera.ViewportSize else Vector2.new(1280, 720)
-	return EmoteWheelModel.layout(size, snapshot.capacity)
+	return EmoteWheelModel.layout(size, snapshot.capacity, EmoteWheelModel.captionReserve(size))
 end
 
 local function setSelected(index: number?)
@@ -317,6 +318,25 @@ end
 
 function EmoteWheelController.useSnapshot(): Snapshot
 	return useExternalStore(EmoteWheelController.getSnapshot, EmoteWheelController.subscribe)
+end
+
+-- Hosts block the wheel through the EmoteWheelBlocked player attribute; UI that
+-- opens the wheel follows it so nothing invites a tap the wheel would refuse.
+function EmoteWheelController.useBlocked(): boolean
+	local player = Players.LocalPlayer
+	local blocked, setBlocked = React.useState(player ~= nil and player:GetAttribute("EmoteWheelBlocked") == true)
+	React.useEffect(function()
+		if player == nil then
+			return nil
+		end
+		local connection = player:GetAttributeChangedSignal("EmoteWheelBlocked"):Connect(function()
+			setBlocked(player:GetAttribute("EmoteWheelBlocked") == true)
+		end)
+		return function()
+			connection:Disconnect()
+		end
+	end, {})
+	return blocked
 end
 
 return EmoteWheelController

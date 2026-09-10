@@ -41,10 +41,16 @@ function EmoteWheelModel.capacity(value: any): number
 	return math.clamp(capacity, 1, Emotes.MaxSlots)
 end
 
-function EmoteWheelModel.layout(viewport: Vector2, capacity: number): Layout
+-- Short landscape screens keep the name and hint inside the hollow centre, so
+-- the caption reserve below the ring only applies to taller viewports.
+function EmoteWheelModel.captionReserve(viewport: Vector2): number
+	return if viewport.Y <= settings().ShortViewportMaxPx then 0 else settings().CaptionReservePx
+end
+
+function EmoteWheelModel.layout(viewport: Vector2, capacity: number, captionReservePx: number?): Layout
 	local cfg = settings()
 	local widthBudget = viewport.X - 2 * cfg.EdgeMarginPx
-	local heightBudget = viewport.Y - 2 * cfg.EdgeMarginPx - cfg.CaptionReservePx
+	local heightBudget = viewport.Y - 2 * cfg.EdgeMarginPx - (captionReservePx or cfg.CaptionReservePx)
 	local diameter = math.clamp(viewport.Y * cfg.DiameterScale, cfg.MinDiameterPx, cfg.MaxDiameterPx)
 	diameter = math.max(math.min(diameter, widthBudget, heightBudget), 120)
 	local radius = diameter / 2

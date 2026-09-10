@@ -10,6 +10,7 @@ return {
 	MaxDiameterPx = 460,
 	EdgeMarginPx = 20,
 	CaptionReservePx = 96,
+	ShortViewportMaxPx = 500,
 	DeadZoneFraction = 0.26,
 	HoleFraction = 0.6,
 	RingSegments = 64,

@@ -232,7 +232,13 @@ local function Wedge(props: {
 	})
 end
 
-local function TouchButton(props: { Visible: boolean, BottomPx: number, ZIndex: number })
+local function TouchButton(props: {
+	Visible: boolean,
+	BottomPx: number,
+	Position: UDim2?,
+	AnchorPoint: Vector2?,
+	ZIndex: number,
+})
 	local ref = React.useRef(nil)
 	local pressing, setPressing = React.useState(false)
 	local reducedMotion = useReducedMotion()
@@ -281,12 +287,12 @@ local function TouchButton(props: { Visible: boolean, BottomPx: number, ZIndex: 
 	return c("ImageButton", {
 		ref = ref,
 		Active = props.Visible,
-		AnchorPoint = Vector2.new(1, 1),
 		AutoButtonColor = false,
 		BackgroundColor3 = Palette.Ink,
 		BackgroundTransparency = 0.35,
 		BorderSizePixel = 0,
-		Position = UDim2.new(1, -16, 1, -props.BottomPx),
+		AnchorPoint = props.AnchorPoint or Vector2.new(1, 1),
+		Position = props.Position or UDim2.new(1, -16, 1, -props.BottomPx),
 		Size = styles.Scale:map(function(scale: number)
 			local side = math.round(px * scale)
 			return UDim2.fromOffset(side, side)
@@ -318,6 +324,8 @@ end
 
 export type Props = {
 	ShowTouchButton: boolean?,
+	TouchButtonPosition: UDim2?,
+	TouchButtonAnchor: Vector2?,
 	EmptySlotsAssignable: boolean?,
 	ZIndex: number?,
 }
@@ -329,7 +337,8 @@ return function(props: Props)
 	local preferred = usePreferredTextSize()
 	local textScale = UI.Text.PreferredScale[preferred.Name] or 1
 	local z = props.ZIndex or 900
-	local layout = EmoteWheelModel.layout(viewport, snapshot.capacity)
+	local short = viewport.Y <= WheelConfig.ShortViewportMaxPx
+	local layout = EmoteWheelModel.layout(viewport, snapshot.capacity, EmoteWheelModel.captionReserve(viewport))
 	local geo = geometry(layout)
 	local sectors = EmoteWheelModel.sectors(snapshot.slots, snapshot.capacity)
 	local styles = ReactSpring.useSpring({
@@ -363,9 +372,19 @@ return function(props: Props)
 			ZIndex = z + 5,
 		})
 	end
-	local touchVisible = props.ShowTouchButton ~= false and snapshot.deviceClass == "Touch" and not snapshot.open
+	local blocked = EmoteWheelController.useBlocked()
+	local touchVisible = props.ShowTouchButton ~= false
+		and snapshot.deviceClass == "Touch"
+		and not snapshot.open
+		and not blocked
 	return c(React.Fragment, nil, {
-		Button = c(TouchButton, { Visible = touchVisible, BottomPx = WheelConfig.TouchButtonBottomPx, ZIndex = z }),
+		Button = c(TouchButton, {
+			Visible = touchVisible,
+			BottomPx = WheelConfig.TouchButtonBottomPx,
+			Position = props.TouchButtonPosition,
+			AnchorPoint = props.TouchButtonAnchor,
+			ZIndex = z,
+		}),
 		Surface = if snapshot.open
 			then ModalSurface({
 				ClassName = "TextButton",
@@ -427,14 +446,17 @@ return function(props: Props)
 						wedges
 					),
 					Name = c("TextLabel", {
-						AnchorPoint = Vector2.new(0.5, 0),
+						AnchorPoint = if short then Vector2.new(0.5, 1) else Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
 						FontFace = DISPLAY_FONT,
-						Position = UDim2.new(0.5, 0, 1, 14),
-						Size = UDim2.new(1.8, 0, 0, 44),
+						Position = if short then UDim2.new(0.5, 0, 0.5, 4) else UDim2.new(0.5, 0, 1, 14),
+						Size = if short
+							then UDim2.fromOffset(math.round(geo.inner * 2) - 16, 52)
+							else UDim2.new(1.8, 0, 0, 44),
 						Text = nameText,
 						TextColor3 = nameColor,
-						TextSize = math.round(WheelConfig.NameTextPx * textScale),
+						TextSize = math.round((if short then 22 else WheelConfig.NameTextPx) * textScale),
+						TextWrapped = short,
 						ZIndex = z + 6,
 					}, {
 						Stroke = c("UIStroke", { Color = Palette.Ink, Thickness = 3, Transparency = 0.1 }),
@@ -443,11 +465,14 @@ return function(props: Props)
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
 						FontFace = UI.Text.DefaultFont,
-						Position = UDim2.new(0.5, 0, 1, 60),
-						Size = UDim2.new(1.8, 0, 0, 22),
+						Position = if short then UDim2.new(0.5, 0, 0.5, 8) else UDim2.new(0.5, 0, 1, 60),
+						Size = if short
+							then UDim2.fromOffset(math.round(geo.inner * 2) - 24, 40)
+							else UDim2.new(1.8, 0, 0, 22),
 						Text = hint,
 						TextColor3 = WHITE,
-						TextSize = math.max(math.round((layout.labelTextPx - 3) * textScale), 11),
+						TextSize = math.max(math.round((layout.labelTextPx - 3) * textScale), UI.Text.CaptionMinPx),
+						TextWrapped = short,
 						TextTransparency = 0.2,
 						ZIndex = z + 6,
 					}, {

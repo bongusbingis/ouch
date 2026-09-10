@@ -47,6 +47,7 @@ local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytic
 local SplashPage = require(Components:WaitForChild("SplashPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
 local LobbyHeaderLayout = require(UI.Models.LobbyHeaderLayout)
+local EmoteWheelController = require(UI.Services.EmoteWheelController)
 local GameVersion = require(Components:WaitForChild("GameVersion"))
 local DeviceClass = require(Shared:WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass"))
 
@@ -313,7 +314,8 @@ local function LobbyContent(props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local shortPages = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
-	local headerLayout = LobbyHeaderLayout.resolve(safeArea.size)
+	local wheelSnapshot = EmoteWheelController.useSnapshot()
+	local headerLayout = LobbyHeaderLayout.resolve(safeArea.size, nil, wheelSnapshot.deviceClass == "Touch")
 	local partyClient = props.PartyClient
 	local onboardingClient = props.OnboardingClient
 	local rootRef = React.useRef(nil)

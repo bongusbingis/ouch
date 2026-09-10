@@ -20,6 +20,7 @@ local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local PageTitle = require(script.Parent.PageTitle)
 local ModalClose = require(script.Parent.ModalClose)
+local BonksChip = require(script.Parent.BonksChip)
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
@@ -753,31 +754,14 @@ local function ItemDetails(props)
 					Size = UDim2.fromOffset(actionWidth, actionHeight),
 					ZIndex = 104,
 				}, buttons),
-				BalanceTitle = if hasBonks
-						and not short
-						and balanceWidth > 132
-					then label(
-						if short then "BONKS" else "YOUR BONKS",
-						UDim2.new(1, -balanceWidth, 0, 0),
-						UDim2.fromOffset(balanceWidth - 132, summaryHeight),
-						16,
-						colors.White,
-						true
-					)
-					else nil,
 				Balance = if hasBonks and not short
-					then c(BonksLabel, {
+					then c(BonksChip, {
 						Amount = balance,
-						MaxTextSize = 21,
-						TextColor = colors.White,
-						TextStroke = 0.045,
-						Alignment = Enum.HorizontalAlignment.Right,
-						Native = {
-							AnchorPoint = Vector2.new(1, 0),
-							Position = UDim2.fromScale(1, 0),
-							Size = UDim2.fromOffset(math.min(balanceWidth, 132), summaryHeight),
-							ZIndex = 104,
-						},
+						HeightPx = 34,
+						TextSize = 20,
+						AnchorPoint = Vector2.new(1, 0),
+						Position = UDim2.new(1, 0, 0, 6),
+						ZIndex = 104,
 					})
 					else nil,
 			}),
