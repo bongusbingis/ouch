@@ -94,6 +94,9 @@ local function ItemDetails(props)
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
 	local card = props.Card
+	if card and card.owned and #card.previewItems == 1 then
+		size = Vector2.new(math.min(size.X, 940), math.min(size.Y, 560))
+	end
 	local selectedId, setSelectedId = React.useState(nil)
 	local firstRef, robuxRef, closeRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
 	local inventoryRef = React.useRef(nil)
@@ -115,11 +118,7 @@ local function ItemDetails(props)
 		local panel = panelRef.current
 		return function()
 			local selected = GuiService.SelectedObject
-			if
-				DeviceClass.current() == "Gamepad"
-				and (selected == nil or (panel and selected:IsDescendantOf(panel)))
-				and Selection.isSelectable(previous)
-			then
+			if (selected == nil or (panel and selected:IsDescendantOf(panel))) and Selection.isSelectable(previous) then
 				GuiService.SelectedObject = previous
 			end
 		end
@@ -132,7 +131,7 @@ local function ItemDetails(props)
 		local queued = false
 		local function focus()
 			queued = false
-			if not active or DeviceClass.current() ~= "Gamepad" then
+			if not active or (DeviceClass.current() ~= "Gamepad" and GuiService.SelectedObject == nil) then
 				return
 			end
 			local selected = GuiService.SelectedObject
@@ -179,6 +178,7 @@ local function ItemDetails(props)
 				scheduleFocus()
 			end
 		end)
+		scheduleFocus()
 		return function()
 			active = false
 			connection:Disconnect()
@@ -300,8 +300,8 @@ local function ItemDetails(props)
 		+ (if hasInventory then 1 else 0)
 	local columns = if portrait then math.min(2, math.max(1, slots)) else math.max(1, slots)
 	local rows = math.max(1, math.ceil(slots / columns))
-	local buttonHeight = if short then 52 else if portrait then 60 else 68
-	local inset = if short then 12 else 16
+	local buttonHeight = if short then 52 else 60
+	local inset = if short or portrait then UIConfig.Spacing.CompactInsetPx else UIConfig.Spacing.PageInsetPx
 	local veryShort = short and size.Y < 270
 	local guarantee = if isCrate then guaranteeText(card) else ""
 	local footerGuarantee = guarantee ~= "" and (not short or compactEffect or veryShort)
@@ -317,19 +317,20 @@ local function ItemDetails(props)
 		shareFooter = statusWidth + 12 + guaranteeBounds.X + 8 <= size.X - inset * 2
 		sharedFooterHeight = math.max(26, math.ceil(math.max(statusBounds.Y, guaranteeBounds.Y)) + 4)
 	end
-	local summaryHeight = if statusText ~= "" or (hasBonks and not short)
+	local balanceWithGuarantee = not short and not portrait and statusText == "" and footerGuarantee
+	local summaryHeight = if statusText ~= "" or (hasBonks and not short and not balanceWithGuarantee)
 		then (if shareFooter then sharedFooterHeight else 26)
 		else 0
 	local guaranteeHeight = if footerGuarantee and not shareFooter
-		then (if short then 24 else if size.X < 620 then 44 else 28)
+		then (if balanceWithGuarantee then 40 elseif short then 24 else if size.X < 620 then 44 else 28)
 		else 0
-	local footerCopyHeight = summaryHeight + guaranteeHeight + (if short then 2 else 8)
-	local actionHeight = if slots > 0 then rows * (buttonHeight + 6) else 0
+	local footerCopyHeight = summaryHeight + guaranteeHeight + 8
+	local actionHeight = if slots > 0 then rows * (buttonHeight + UIConfig.Spacing.ControlGapPx) else 0
 	local footerHeight = actionHeight + footerCopyHeight
 	local balanceWidth = if size.X < 620 then 120 else 252
 	local actionWidth = math.min(size.X - inset * 2, columns * (UIConfig.Layout.ShopDetailsActionMaxWidthPx + 8))
 	local bodyTop = inset + 44 + (if short then 6 else 12)
-	local bodyHeight = size.Y - bodyTop - footerHeight - inset
+	local bodyHeight = size.Y - bodyTop - footerHeight - inset - (if short then 0 else 8)
 	local previewContentHeight = if veryShort
 		then math.max(bodyHeight, if compactEffect then 96 else 88)
 		else bodyHeight
@@ -346,12 +347,16 @@ local function ItemDetails(props)
 				and guarantee ~= ""
 			then 52
 			else if short or (not isCrate and not isEmoteCollection) then 8 else 34
-	local artHeight = math.max(if veryShort then 32 else 44, previewContentHeight - nameHeight - previewFooter - 16)
-	local gridGap = 8
+	local artHeight = math.min(
+		if short or portrait then math.huge else 280,
+		math.max(if veryShort then 32 else 44, previewContentHeight - nameHeight - previewFooter - 16)
+	)
+	local gridGap = if short then 8 else UIConfig.Spacing.ControlGapPx
 	local gridListPx = (size.X - inset * 2) * listWidth - 26
 	local gridMinTile = if short then 112 else 124
 	local gridColumns = math.clamp(math.floor((gridListPx + gridGap) / (gridMinTile + gridGap)), 2, 6)
-	local gridTile = math.floor((gridListPx - (gridColumns - 1) * gridGap) / gridColumns)
+	local gridTile =
+		math.min(if portrait then 124 else 136, math.floor((gridListPx - (gridColumns - 1) * gridGap) / gridColumns))
 	local contents = {
 		Layout = c(
 			"UIListLayout",
@@ -382,7 +387,12 @@ local function ItemDetails(props)
 	local function position(index)
 		local column = (index - 1) % columns
 		local row = math.floor((index - 1) / columns)
-		return UDim2.new((column + 0.5) / columns, 0, 0, row * (buttonHeight + 6) + buttonHeight)
+		return UDim2.new(
+			(column + 0.5) / columns,
+			0,
+			0,
+			row * (buttonHeight + UIConfig.Spacing.ControlGapPx) + buttonHeight
+		)
 	end
 	for index, quantity in quantities do
 		local amount = card.bonksPrice * quantity
@@ -564,9 +574,9 @@ local function ItemDetails(props)
 						if portrait
 							then UDim2.new(0.53, 0, 0, previewHeight - previewFooter - 16)
 							else if compactEffect
-								then UDim2.new(0.64, -16, 0, previewContentHeight - 64)
+								then UDim2.new(0.64, -24, 0, previewContentHeight - 76)
 								else UDim2.new(1, -20, 0, nameHeight),
-						if short and isCrate then 18 else 22,
+						if short then 18 else 22,
 						nil,
 						true,
 						nil,
@@ -591,9 +601,9 @@ local function ItemDetails(props)
 							Text = if preview.category == "ElimEffectAssets" then "PLAY SOUND" else "PLAY EFFECT",
 							Enabled = true,
 							Position = if portrait
-								then UDim2.new(0.7, 0, 1, -4)
-								else UDim2.new(0.5, 0, 0, previewContentHeight - 8),
-							Size = if portrait then UDim2.new(0.55, -8, 0, 44) else UDim2.new(1, -16, 0, 48),
+								then UDim2.new(0.7, 0, 1, -12)
+								else UDim2.new(0.5, 0, 0, previewContentHeight - 16),
+							Size = if portrait then UDim2.new(0.55, -24, 0, 44) else UDim2.new(1, -32, 0, 48),
 							OnActivated = function()
 								props.OnPreviewEffect(preview)
 							end,
@@ -683,8 +693,9 @@ local function ItemDetails(props)
 							true,
 							2
 						),
-						CItems = if #listedItems > 0
-							then c("Frame", {
+						CItems = if card.owned and #listedItems == 1
+							then nil
+							elseif #listedItems > 0 then c("Frame", {
 								BackgroundTransparency = 1,
 								BorderSizePixel = 0,
 								Size = UDim2.fromScale(1, 0),
@@ -739,7 +750,12 @@ local function ItemDetails(props)
 							else UDim2.fromOffset(0, summaryHeight),
 						if shareFooter
 							then UDim2.new(1, -statusWidth - 12, 0, summaryHeight)
-							else UDim2.new(1, 0, 0, guaranteeHeight),
+							else UDim2.new(
+								1,
+								if balanceWithGuarantee then -balanceWidth - 12 else 0,
+								0,
+								guaranteeHeight
+							),
 						if veryShort then 14 else 18,
 						colors.Yellow,
 						false,

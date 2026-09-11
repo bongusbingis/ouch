@@ -42,7 +42,8 @@ return function(props: Props)
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local compact = not short and panelSize.X * 0.93 * 0.95 < UIConfig.Layout.CompactMaxWidthPx
-	local contentTop = math.max(panelSize.Y * 0.185, if short then 44 else 0)
+	local inset = if short or compact then UIConfig.Spacing.CompactInsetPx else UIConfig.Spacing.PageInsetPx
+	local contentTop = if short then 48 else 96
 	local revision, setRevision = React.useState(0)
 	local creditsOpen, setCreditsOpen = React.useState(false)
 	local scrollRef = React.useRef(nil)
@@ -104,13 +105,13 @@ return function(props: Props)
 
 	local content: { [string]: any } = {
 		UIListLayout = c("UIListLayout", {
-			Padding = UDim.new(0, 10),
+			Padding = UDim.new(0, 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 		UIPadding = c("UIPadding", {
 			PaddingBottom = UDim.new(0, 24),
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 16),
+			PaddingLeft = UDim.new(0, 4),
+			PaddingRight = UDim.new(0, 12),
 			PaddingTop = UDim.new(0, 4),
 		}),
 	}
@@ -140,8 +141,8 @@ return function(props: Props)
 			Padding = c("UIPadding", {
 				PaddingTop = UDim.new(0, 8),
 				PaddingBottom = UDim.new(0, 8),
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
+				PaddingLeft = UDim.new(0, UIConfig.Spacing.ContentInsetPx),
+				PaddingRight = UDim.new(0, UIConfig.Spacing.PageInsetPx),
 			}),
 		}
 		local categoryHeight = 16
@@ -173,6 +174,12 @@ return function(props: Props)
 			{ Native = { LayoutOrder = layoutOrder, Size = UDim2.new(1, 0, 0, categoryHeight - 8) } },
 			categoryRows
 		)
+		layoutOrder += 1
+		content[`Gap{category}`] = c("Frame", {
+			BackgroundTransparency = 1,
+			LayoutOrder = layoutOrder,
+			Size = UDim2.new(1, 0, 0, 8),
+		})
 	end
 
 	content.AssetCredits = c(ActionButton, {
@@ -215,7 +222,7 @@ return function(props: Props)
 			TextSize = if short then 26 else 42,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
-				Position = if short then UDim2.new(0.5, 0, 0, 8) else UDim2.fromScale(0.5, 0.045),
+				Position = UDim2.new(0.5, 0, 0, if short then 8 else 24),
 				Size = UDim2.new(0.76, 0, 0, if short then 30 else 54),
 				ZIndex = 5,
 			},
@@ -224,7 +231,7 @@ return function(props: Props)
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
 			Position = UDim2.new(0.5, 0, 0, contentTop),
-			Size = UDim2.new(0.93, 0, 0, math.max(panelSize.Y * 0.965 - contentTop, 0)),
+			Size = UDim2.new(1, -inset * 2, 0, math.max(panelSize.Y - inset - contentTop, 0)),
 		}, {
 			Content = c("ScrollingFrame", {
 				ref = scrollRef,
@@ -234,13 +241,13 @@ return function(props: Props)
 				BorderSizePixel = 0,
 				CanvasSize = UDim2.fromOffset(0, 0),
 				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
-				Position = UDim2.fromScale(0.025, 0),
+				Position = UDim2.fromOffset(0, 0),
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				ScrollBarImageColor3 = Color3.new(1, 1, 1),
 				ScrollBarImageTransparency = 0.1,
 				ScrollBarThickness = if compact then 5 else 7,
 				Selectable = creditsOpen,
-				Size = UDim2.new(0.95, 0, 1, if creditsOpen then -54 elseif saveStatus ~= "" then -38 else 0),
+				Size = UDim2.new(1, 0, 1, if creditsOpen then -56 elseif saveStatus ~= "" then -38 else 0),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 			}, if creditsOpen then creditsContent else content),
 			CreditsBack = if creditsOpen

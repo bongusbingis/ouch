@@ -134,7 +134,7 @@ return function(props: Props)
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 46,
+			MaxTextSize = 34,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
 				BackgroundTransparency = 1,
@@ -152,6 +152,7 @@ return function(props: Props)
 		}, { UIStroke = inkStroke(titleStroke(mode.Title)) }),
 		Description = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),
+			BackgroundTransparency = 1,
 			BackgroundColor3 = Palette.PanelRaised,
 			BorderSizePixel = 0,
 			Position = if compact
@@ -165,6 +166,7 @@ return function(props: Props)
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = UIConfig.Text.BodyFont,
+				MaxTextSize = 20,
 				Wrapped = true,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
@@ -244,11 +246,11 @@ return function(props: Props)
 				Image = "",
 				LayoutOrder = 2,
 				Position = if compact
-					then UDim2.new(0.5, 0, 1, -10)
-					else UDim2.fromScale(if portrait then 0.72 else 0.5, if portrait then 0.92 else 0.94),
+					then UDim2.new(0.5, 0, 1, -12)
+					else UDim2.new(if portrait then 0.72 else 0.5, 0, 1, if portrait then -20 else -24),
 				Size = if compact
 					then UDim2.new(0.86, 0, 0, UIConfig.Interaction.MinTargetPx)
-					else if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.fromScale(0.6, 0.14),
+					else if portrait then UDim2.new(0.42, 0, 0, 48) else UDim2.new(0.6, 0, 0, 52),
 				ZIndex = z,
 			},
 			Visual = c(ButtonSurface, {
@@ -263,9 +265,9 @@ return function(props: Props)
 				then c(Icon, {
 					Name = "Check",
 					Native = {
-						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.new(0, 8, 0.5, 0),
-						Size = UDim2.fromOffset(22, 22),
+						AnchorPoint = Vector2.new(1, 0.5),
+						Position = UDim2.new(0.5, -42, 0.5, 0),
+						Size = UDim2.fromOffset(24, 24),
 						ZIndex = z + 2,
 					},
 				})
@@ -277,14 +279,13 @@ return function(props: Props)
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = DISPLAY_FONT,
-					Position = UDim2.fromScale(if mode.Selected then 0.58 else 0.5, 0.5),
+					Position = UDim2.fromScale(if mode.Selected then 0.55 else 0.5, 0.5),
 					Size = UDim2.fromScale(if mode.Selected then 0.66 else 0.8, 0.66),
 					Text = if mode.Selected then "VOTED" else "VOTE",
 					TextColor3 = Palette.White,
 					ZIndex = z + 1,
 				},
 			}, { Stroke = inkStroke() }),
-			UIAspectRatioConstraint = if compact then nil else c("UIAspectRatioConstraint", { AspectRatio = 3.48 }),
 		}),
 	})
 end

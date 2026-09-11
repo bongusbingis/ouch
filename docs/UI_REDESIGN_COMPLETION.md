@@ -2,6 +2,8 @@
 
 The seven-item redesign is implemented, including the work left dormant by Fable. The two Figma panels and both licensed icon atlases were approved by the owner through the installed asset gate, moderated, and integrated under group **291738800**. This is an implementation and verification record, not a release approval.
 
+The owner's subsequent clutter/spacing feedback is handled in [UI_SPACING_AUDIT.md](UI_SPACING_AUDIT.md), with repeated desktop/mobile review loops, a new screenshot gallery and 775 passing tests. That follow-up supersedes this record's earlier layout captures where the same component changed; approved asset provenance remains unchanged. Independent visual review is still unavailable and no release approval is claimed.
+
 The approved plan remains `.review/production/2026-09-10-redesign/plan.md`. The live style reference is [DESIGN_TOKENS.md](DESIGN_TOKENS.md). Original Figma sources and provenance remain under `assets/source/figma/`. The low-fidelity seven-item mock is `completion/approved-layout-mocks.png` under the evidence directory below.
 
 ## Delivered scope

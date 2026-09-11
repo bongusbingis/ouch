@@ -264,12 +264,7 @@ return function(props: Props)
 	local inventoryLayout = UIConfig.Layout.Inventory
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
-	local contentTop = if short
-		then inventoryLayout.ShortContentTopPx
-		else math.max(
-			panelSize.Y * 0.2902715,
-			panelSize.Y * 0.198 + UIConfig.Interaction.MinTargetPx + UIConfig.Layout.InventoryContentGapPx
-		)
+	local contentTop = if short then inventoryLayout.ShortContentTopPx else 148
 	local contentBottom = if short then panelSize.Y - inventoryLayout.ShortContentBottomPx else panelSize.Y * 0.9684105
 	local railGap = inventoryLayout.ShortRailGapPx
 	local railPadding = railGap
@@ -511,7 +506,7 @@ return function(props: Props)
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0),
 				LayoutOrder = 3,
-				Position = if short then UDim2.new(0.5, 0, 0, 8) else UDim2.fromScale(0.5, 0.045),
+				Position = UDim2.new(0.5, 0, 0, if short then 8 else 24),
 				Size = UDim2.new(0.76, 0, 0, if short then 30 else 54),
 			},
 		}),
@@ -537,17 +532,12 @@ return function(props: Props)
 					BorderSizePixel = 0,
 					CanvasSize = UDim2.fromOffset(0, 0),
 					Position = if short
-						then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, 0)
+						then UDim2.fromOffset(UIConfig.Spacing.CompactInsetPx, UIConfig.Spacing.CompactInsetPx)
 						else UDim2.fromScale(0.0341613, 0.0426996),
 					ScrollBarImageColor3 = UIConfig.ProgressionStyle.White,
 					ScrollBarThickness = if short then inventoryLayout.ShortRailGapPx else nil,
 					Size = if short
-						then UDim2.new(
-							1,
-							-UIConfig.Layout.InventoryContentGapPx * 2,
-							1,
-							-inventoryLayout.ShortRailGapPx
-						)
+						then UDim2.new(1, -UIConfig.Spacing.CompactInsetPx * 2, 1, -UIConfig.Spacing.CompactInsetPx * 2)
 						else UDim2.fromScale(0.94076, 0.907841),
 				}, categoryChildren)
 				else c("Frame", {
@@ -590,7 +580,7 @@ return function(props: Props)
 			ScrollBarImageColor3 = if short then UIConfig.ProgressionStyle.White else nil,
 			Position = if short
 				then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, contentTop)
-				else UDim2.fromScale(0.499792, 0.198),
+				else UDim2.new(0.5, 0, 0, 84),
 			Size = if short
 				then UDim2.fromOffset(inventoryLayout.ShortRailWidthPx, railHeight)
 				else UDim2.new(0.866389, 0, 0, UIConfig.Interaction.MinTargetPx),

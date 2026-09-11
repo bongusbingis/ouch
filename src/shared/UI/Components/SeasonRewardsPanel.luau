@@ -93,7 +93,7 @@ return function(props)
 			TextColor = Colors.White,
 			TextStroke = 0.055,
 			Position = UDim2.new((index - 0.5) / 2, 0, 0, 44),
-			Size = UDim2.new(0.5, -8, 0, 44),
+			Size = UDim2.new(0.5, -UI.Spacing.ControlGapPx, 0, 44),
 			ZIndex = 105,
 			OnActivated = function()
 				setTrack(name)

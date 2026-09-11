@@ -68,14 +68,18 @@ end
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local layout = Config.Layout.PartyCode.Members
-	local margin, gap = layout.MarginPx, layout.GapPx
+	local short = safeArea.size.Y <= Config.Layout.ShortLandscapeMaxHeightPx
+	local margin = if short then Config.Spacing.CompactInsetPx else Config.Spacing.PageInsetPx
+	local gap = Config.Spacing.ControlGapPx
 	local target = Config.Interaction.MinTargetPx
+	local rowHeight = if short then 52 else layout.RowHeightPx
+	local codeInset = if short then 8 else gap
 	local width = math.min(layout.MaxWidthPx, math.max(safeArea.size.X - margin * 2, 1))
 	local codeTop = margin + target + gap
-	local codeHeight = target + gap * 2
+	local codeHeight = target + codeInset * 2
 	local listTop = codeTop + codeHeight + gap
 	local rowCount = math.max(#props.Members, 1)
-	local contentHeight = rowCount * layout.RowHeightPx + (rowCount - 1) * gap + 4
+	local contentHeight = rowCount * rowHeight + (rowCount - 1) * gap + 28
 	local height =
 		math.min(layout.MaxHeightPx, math.max(safeArea.size.Y - margin * 2, 1), listTop + contentHeight + margin)
 	local backRef = React.useRef(nil)
@@ -151,22 +155,22 @@ return function(props: Props)
 		rows[tostring(member.userId)] = c(Surface, {
 			Color = Palette.Claimed,
 			Radius = Config.Radius.Tile,
-			StrokeTransparency = 0.6,
+			StrokeTransparency = 1,
 			Shadow = false,
-			Native = { LayoutOrder = index, Size = UDim2.new(1, -4, 0, layout.RowHeightPx) },
+			Native = { LayoutOrder = index, Size = UDim2.new(1, -4, 0, rowHeight) },
 		}, {
 			Name = label(
 				member.username or "Loading…",
-				UDim2.fromOffset(12, if status then 6 else 0),
-				UDim2.new(1, nameWidth, 0, if status then 28 else layout.RowHeightPx),
+				UDim2.fromOffset(12, if status then (if short then 2 else 6) else 0),
+				UDim2.new(1, nameWidth, 0, if status then 28 else rowHeight),
 				21,
 				false
 			),
 			Status = if status
 				then label(
 					status,
-					UDim2.fromOffset(12, 32),
-					UDim2.new(1, nameWidth, 0, 24),
+					UDim2.fromOffset(12, if short then 28 else 32),
+					UDim2.new(1, nameWidth, 0, if short then 20 else 24),
 					Config.Text.CaptionMinPx,
 					true
 				)
@@ -191,7 +195,7 @@ return function(props: Props)
 		})
 	end
 	if #props.Members == 0 then
-		rows.Empty = label("Loading party…", UDim2.new(), UDim2.new(1, 0, 0, layout.RowHeightPx), 21, false)
+		rows.Empty = label("Loading party…", UDim2.new(), UDim2.new(1, 0, 0, rowHeight), 21, false)
 	end
 	return modalSurface({
 		ref = modalRef,
@@ -249,7 +253,7 @@ return function(props: Props)
 					TextSize = 22,
 					Alignment = Enum.TextXAlignment.Left,
 					Native = {
-						Position = UDim2.fromOffset(12, gap),
+						Position = UDim2.fromOffset(12, codeInset),
 						Size = UDim2.new(1, -layout.ActionWidthPx - 32, 0, target),
 						ZIndex = 113,
 					},
@@ -263,12 +267,13 @@ return function(props: Props)
 					TextStroke = 0,
 					Enabled = props.CodeAvailable,
 					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -gap, 0, gap),
+					Position = UDim2.new(1, -gap, 0, codeInset),
 					Size = UDim2.fromOffset(layout.ActionWidthPx, target),
 					OnActivated = props.OnToggleCode,
 				}),
 			}),
 			Members = c(WellScroll, {
+				InsetPx = Config.Spacing.CompactInsetPx,
 				Native = {
 					Active = true,
 					Selectable = not props.CanRemove,
@@ -277,8 +282,8 @@ return function(props: Props)
 					ScrollingDirection = Enum.ScrollingDirection.Y,
 					ScrollBarImageColor3 = Palette.White,
 					ScrollBarThickness = 4,
-					Position = UDim2.fromOffset(margin - 2, listTop),
-					Size = UDim2.new(1, -margin * 2 + 4, 0, math.max(height - listTop - margin, 1)),
+					Position = UDim2.fromOffset(margin, listTop),
+					Size = UDim2.new(1, -margin * 2, 0, math.max(height - listTop - margin, 1)),
 				},
 			}, rows),
 		}),

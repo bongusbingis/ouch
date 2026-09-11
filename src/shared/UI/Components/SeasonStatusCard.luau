@@ -12,7 +12,6 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
-local Surface = require(script.Parent.Arena.Surface)
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 local Well = require(script.Parent.Well)
@@ -80,16 +79,7 @@ return function(props: Props)
 		end
 	end
 
-	return c(Surface, { Native = native, Color = Palette.Panel, Radius = UIConfig.Radius.Panel }, {
-		HeaderBand = c("Frame", {
-			BackgroundColor3 = Palette.Pink,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(4, 4),
-			Size = UDim2.new(1, -8, 0, 32),
-			Visible = not compact,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		}),
+	return c(Well, { Native = native }, {
 		Title = if not compact
 			then c(ResponsiveText, {
 				HostName = "Title",
@@ -110,12 +100,11 @@ return function(props: Props)
 				},
 			})
 			else nil,
-		Content = c(Well, {
-			Native = {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
-				Size = UDim2.new(1, -20, 1, if compact then -12 else -48),
-			},
+		Content = c("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
+			Size = UDim2.new(1, -24, 1, if compact then -24 else -60),
 		}, {
 			TierBadge = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -125,7 +114,6 @@ return function(props: Props)
 				Size = UDim2.fromScale(if compact then 0.17 else 0.21, 0.84),
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-				Stroke = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }),
 				TierWord = c(ResponsiveText, {
 					MeasurementFont = UIConfig.Text.BodyFont,
 					MinTextSize = if compact then 8 else 10,
@@ -166,7 +154,7 @@ return function(props: Props)
 					Color = Palette.Pink,
 					Compact = true,
 					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.new(1, -2, 0.5, 0),
+					Position = UDim2.new(1, -4, 0.5, 0),
 					Size = UDim2.fromOffset(claimWidth, UIConfig.Interaction.MinTargetPx),
 					Text = if props.OnViewRewards
 						then (if compact then "VIEW" else "REWARDS")

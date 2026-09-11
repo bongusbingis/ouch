@@ -370,9 +370,26 @@ T.describe("Phone progression readability", function()
 			T.expect(stack.size.Y - 44 - 12 >= 44):toEqual(true)
 		end
 	end)
-	T.it("leaves roomy desktop and portrait progression unstacked", function()
-		for _, size in { Vector2.new(820, 725), Vector2.new(1158, 725), Vector2.new(390, 844) } do
+	T.it("leaves roomy desktop progression unstacked", function()
+		for _, size in { Vector2.new(820, 725), Vector2.new(1158, 725) } do
 			T.expect(ResponsiveLayout.splashPanels(size, landscapePanels(), 1, 500).progressStack):toBeNil()
+		end
+	end)
+	T.it("reserves a real portrait world window above the progression tabs and action dock", function()
+		for _, size in { Vector2.new(375, 586), Vector2.new(390, 844), Vector2.new(440, 802) } do
+			local config = landscapePanels()
+			local panels = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(panels.progressStack)
+			local world = ResponsiveLayout.splashWorldWindow(size, {
+				Splash = { ProgressPanels = config },
+				PortraitMaxAspect = 1,
+				ShortLandscapeMaxHeightPx = 500,
+			})
+			T.expect(panels.tabbed):toBeTruthy()
+			T.expect(world.size.X > 1 and world.size.Y > 1):toBeTruthy()
+			T.expect(world.position.Y + world.size.Y < stack.position.Y):toBeTruthy()
+			T.expect(stack.position.Y + stack.size.Y < size.Y - 24 - SPLASH_ACTIONS_HEIGHT_PX):toBeTruthy()
+			T.expect(stack.size.Y - 56 >= 140):toBeTruthy()
 		end
 	end)
 	T.it("reserves a full quest title and readable daily amounts in portrait", function()

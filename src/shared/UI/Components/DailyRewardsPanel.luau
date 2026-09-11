@@ -12,9 +12,9 @@ local NumberText = require(script.Parent.Parent.Models.NumberText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
-local Surface = require(script.Parent.Arena.Surface)
+local Well = require(script.Parent.Well)
 
-local WellScroll = require(script.Parent.WellScroll)
+local ScrollFrame = require(script.Parent.ScrollFrame)
 
 local c = React.createElement
 
@@ -70,23 +70,23 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 			BackgroundTransparency = if claimed or available then 0 else 0.08,
 			BorderSizePixel = 0,
 			Position = UDim2.fromScale(0.5, 0.5),
-			Rotation = if available and not compact then -3 else 0,
-			Size = UDim2.fromScale(0.92, if available then 0.96 else 0.88),
+			Size = UDim2.fromScale(0.92, 0.88),
 		}, {
+			SizeLimit = c("UISizeConstraint", { MaxSize = Vector2.new(100000, 64) }),
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			Stroke = c("UIStroke", {
 				Color = strokeColor,
 				Thickness = if available then 3 else 1,
 				Transparency = if claimed or available then 0 else 0.35,
 			}),
-			DayNumber = if compact and claimed
+			DayNumber = if claimed
 				then c("ImageLabel", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					Image = "rbxassetid://168702841",
 					ImageColor3 = Palette.White,
-					Position = UDim2.fromScale(0.5, 0.23),
-					Size = UDim2.fromScale(0.82, 0.52),
+					Position = UDim2.fromScale(0.5, 0.27),
+					Size = UDim2.fromScale(0.82, 0.34),
 					ScaleType = Enum.ScaleType.Fit,
 				})
 				else c(ResponsiveText, {
@@ -97,9 +97,9 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
 						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.5, if compact then 0.05 else 0.08),
-						Size = UDim2.fromScale(0.9, if compact then 0.38 else 0.24),
-						Text = if compact and available then "NOW" else `DAY {day.day}`,
+						Position = UDim2.fromScale(0.5, 0.1),
+						Size = UDim2.fromScale(0.9, 0.34),
+						Text = if available then "TODAY" else `DAY {day.day}`,
 						TextColor3 = foregroundColor,
 						TextStrokeColor3 = DARK,
 						TextStrokeTransparency = if available or claimed then 0.15 else 1,
@@ -110,41 +110,12 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					Amount = day.reward.amount or 0,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromScale(0.5, if compact then 0.7 else 0.52),
-						Size = UDim2.fromScale(0.94, if compact then 0.48 else 0.3),
+						Position = UDim2.fromScale(0.5, 0.7),
+						Size = UDim2.fromScale(0.94, 0.38),
 					},
 					IconSize = UDim2.fromScale(0.2, 0.78),
 					TextColor = rewardColor,
 					TextStroke = if available or claimed then 0.035 else 0,
-				})
-				else nil,
-			Claimed = if not compact and claimed
-				then c("ImageLabel", {
-					AnchorPoint = Vector2.new(0.5, 1),
-					BackgroundTransparency = 1,
-					Position = UDim2.new(0.5, 0, 1, -2),
-					Size = UDim2.fromOffset(12, 12),
-					Image = "rbxassetid://168702841",
-					ImageColor3 = Palette.White,
-					ScaleType = Enum.ScaleType.Fit,
-				})
-				else nil,
-			Status = if not compact and available
-				then c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
-					MinTextSize = 11,
-					MaxTextSize = 12,
-					Native = {
-						AnchorPoint = Vector2.new(0.5, 1),
-						BackgroundTransparency = 1,
-						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
-						Position = UDim2.new(0.5, 0, 1, -2),
-						Size = UDim2.new(0.9, 0, 0, 14),
-						Text = "TODAY",
-						TextColor3 = Palette.White,
-						TextStrokeColor3 = DARK,
-						TextStrokeTransparency = 0.15,
-					},
 				})
 				else nil,
 		}),
@@ -192,7 +163,7 @@ return function(props: Props)
 
 	local compact = props.Compact == true
 	local hint = if scrollAvailable then scrollHint else nil
-	local headerHeight = 60
+	local headerHeight = 48
 	local claimWidth = if compact then 72 else 88
 	local summaryText = "VIEW DAILY REWARDS"
 	if props.Summary then
@@ -237,15 +208,7 @@ return function(props: Props)
 		end
 	end
 
-	return c(Surface, { Native = native, Color = Palette.Panel, Radius = UIConfig.Radius.Panel }, {
-		HeaderBand = c("Frame", {
-			BackgroundColor3 = Palette.Claimed,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(8, 8),
-			Size = UDim2.new(1, -16, 0, headerHeight),
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		}),
+	return c(Well, { Native = native }, {
 		Header = c("Frame", {
 			ZIndex = 2,
 			AnchorPoint = Vector2.new(0.5, 0),
@@ -295,7 +258,7 @@ return function(props: Props)
 					Color = if state.canClaim then Palette.Pink else Palette.Cyan,
 					Compact = true,
 					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.new(1, -4, 0.5, -2),
+					Position = UDim2.new(1, -4, 0.5, 2),
 					Size = UDim2.fromOffset(claimWidth, UIConfig.Interaction.MinTargetPx),
 					Text = if state.canClaim then "CLAIM" else "VIEW",
 					TextSize = if compact then 16 else 20,
@@ -327,20 +290,20 @@ return function(props: Props)
 			})
 			else nil,
 		DaysGrid = if not props.Summary
-			then c(WellScroll, {
-				Native = {
-					ref = gridRef,
-					Active = true,
-					ClipsDescendants = true,
-					AutomaticCanvasSize = Enum.AutomaticSize.X,
-					CanvasSize = UDim2.new(),
-					ScrollingDirection = Enum.ScrollingDirection.X,
-					ScrollBarThickness = if compact then 3 else 0,
-					ScrollBarImageColor3 = Palette.White,
-					AnchorPoint = Vector2.new(0.5, 0),
-					Position = UDim2.new(0.5, 0, 0, headerHeight + 16),
-					Size = UDim2.new(1, -20, 1, -headerHeight - 24),
-				},
+			then c(ScrollFrame, {
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ScrollRef = gridRef,
+				Active = true,
+				ClipsDescendants = true,
+				AutomaticCanvasSize = Enum.AutomaticSize.X,
+				CanvasSize = UDim2.new(),
+				ScrollingDirection = Enum.ScrollingDirection.X,
+				ScrollBarThickness = if compact then 3 else 0,
+				ScrollBarImageColor3 = Palette.White,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, headerHeight + 12),
+				Size = UDim2.new(1, -32, 1, -headerHeight - 28),
 			}, dayCells)
 			else nil,
 	})

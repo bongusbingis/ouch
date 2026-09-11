@@ -54,6 +54,8 @@ return {
 	-- and bars no taller than PillMaxPx.
 	Radius = { Panel = 16, Control = 12, Tile = 8, PillMaxPx = 32 },
 	Well = { StrokePx = 2, ShadowPx = 4, InsetPx = 12 },
+	-- Visible space between artwork, content and neighboring controls.
+	Spacing = { PageInsetPx = 24, CompactInsetPx = 12, ContentInsetPx = 16, ControlGapPx = 12, SectionGapPx = 24 },
 	Text = {
 		BodyFont = Enum.Font.BuilderSansBold,
 		DefaultFont = Font.new(
@@ -425,7 +427,7 @@ return {
 		},
 		SettingsControls = {
 			ShortRowHeightPx = 80,
-			RowHeight = { Compact = { Plain = 104, Description = 140 }, Wide = { Plain = 88, Description = 104 } },
+			RowHeight = { Compact = { Plain = 104, Description = 140 }, Wide = { Plain = 76, Description = 88 } },
 			SliderLabelHeightPx = 24,
 			LabelControlGapPx = 8,
 		},
@@ -446,7 +448,7 @@ return {
 			CodeHeightPx = 58,
 			Members = {
 				MaxWidthPx = 620,
-				MaxHeightPx = 420,
+				MaxHeightPx = 720,
 				MarginPx = 16,
 				GapPx = 8,
 				RowHeightPx = 64,

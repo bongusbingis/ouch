@@ -160,8 +160,18 @@ function ResponsiveLayout.splashPanels(
 			contentHeight - seasonHeight - 1
 		)
 		local questsHeight = math.max(contentHeight - seasonHeight - dailyHeight, 1)
+		local stackHeight = math.min(292, math.max(196, available.Y * 0.36))
+		local stackBottom = available.Y - 186
 		return {
 			portrait = true,
+			tabbed = true,
+			progressStack = {
+				position = Vector2.new(
+					left,
+					math.max(LobbyHeaderLayout.resolve(available).height + 12, stackBottom - stackHeight)
+				),
+				size = Vector2.new(width, stackHeight),
+			},
 			season = {
 				position = Vector2.new(left, top),
 				size = Vector2.new(width, seasonHeight),
@@ -299,6 +309,13 @@ function ResponsiveLayout.splashWorldWindow(available: Vector2, layout: any): Sa
 		layout.ShortLandscapeMaxHeightPx
 	)
 	local edge = layout.Splash.ProgressPanels.GapPx
+	if panels.portrait and panels.progressStack then
+		local top = LobbyHeaderLayout.resolve(available).height + 12
+		return {
+			position = Vector2.new(edge, top),
+			size = Vector2.new(available.X - edge * 2, math.max(1, panels.progressStack.position.Y - top - 12)),
+		}
+	end
 	if panels.progressStack then
 		local top = LobbyHeaderLayout.resolve(available).height + 8
 		local actionsReserve = if available.Y <= layout.ShortLandscapeMaxHeightPx

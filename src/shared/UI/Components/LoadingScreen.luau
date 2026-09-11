@@ -87,20 +87,22 @@ local function actionButton(action: LoadingAction, layoutOrder: number, actionCo
 		}, {
 			UIStroke = textStroke(0.05),
 		}),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint", {
-			AspectRatio = 3.1,
-		}),
 	})
 end
 
 return function(props: Props)
 	local safeArea = useSafeArea(props.ParentScreenInsets or Enum.ScreenInsets.CoreUISafeInsets)
+	local hasActions = props.PrimaryAction ~= nil or props.SecondaryAction ~= nil
+	local short = safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local panelSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.Loading,
 		UIConfig.Layout.PortraitMaxAspect,
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
+	if short and hasActions then
+		panelSize = Vector2.new(math.min(safeArea.size.X * 0.86, 720), math.min(200, safeArea.size.Y * 0.7))
+	end
 	local reducedMotion = useReducedMotion()
 	local present, setPresent = React.useState(props.Visible)
 	local rootRef = React.useRef(nil)
@@ -110,7 +112,6 @@ return function(props: Props)
 	local previousSelection = React.useRef(nil)
 	local onPresentedRef = React.useRef(props.OnPresented)
 	onPresentedRef.current = props.OnPresented
-	local hasActions = props.PrimaryAction ~= nil or props.SecondaryAction ~= nil
 	local styles, api = ReactSpring.useSpring(function()
 		return {
 			Transparency = if props.Visible then 0 else 1,
@@ -254,7 +255,7 @@ return function(props: Props)
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				Image = LOGO_IMAGE,
-				Position = UDim2.fromScale(0.5, 0.19),
+				Position = UDim2.fromScale(0.5, if short and hasActions then 0.11 else 0.19),
 				Size = UDim2.fromScale(0.23, 0.23),
 				ZIndex = 101,
 			}, {
@@ -280,12 +281,15 @@ return function(props: Props)
 				Title = c(ResponsiveText, {
 					HostName = "Title",
 					MeasurementFont = Enum.Font.LuckiestGuy,
-					MaxTextSize = 62,
+					MaxTextSize = if short then 36 else 62,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
 						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.5, if props.Detail then 0.3 else 0.43),
+						Position = UDim2.fromScale(
+							0.5,
+							if short and hasActions then 0.2 else if props.Detail then 0.3 else 0.43
+						),
 						Size = UDim2.fromScale(0.82, 0.25),
 						Text = props.Title,
 						TextColor3 = Color3.new(1, 1, 1),
@@ -298,7 +302,7 @@ return function(props: Props)
 					then c(ResponsiveText, {
 						HostName = "Detail",
 						MeasurementFont = Enum.Font.Highway,
-						MaxTextSize = 38,
+						MaxTextSize = if short then 22 else 38,
 						Native = {
 							AnchorPoint = Vector2.new(0.5, 0.5),
 							BackgroundTransparency = 1,
@@ -307,7 +311,12 @@ return function(props: Props)
 								Enum.FontWeight.Bold,
 								Enum.FontStyle.Normal
 							),
-							Position = UDim2.fromScale(0.5, if props.Static then 0.61 else 0.51),
+							Position = UDim2.fromScale(
+								0.5,
+								if short and hasActions
+									then 0.43
+									else if props.Static and not hasActions then 0.61 else 0.51
+							),
 							Size = UDim2.fromScale(0.84, 0.18),
 							Text = props.Detail,
 							TextColor3 = Color3.new(1, 1, 1),
@@ -361,10 +370,10 @@ return function(props: Props)
 					else nil,
 				Actions = if hasActions
 					then c("Frame", {
-						AnchorPoint = Vector2.new(0.5, 0.5),
+						AnchorPoint = Vector2.new(0.5, 1),
 						BackgroundTransparency = 1,
-						Position = UDim2.fromScale(0.5, 0.76),
-						Size = UDim2.fromScale(0.82, 0.22),
+						Position = UDim2.new(0.5, 0, 1, -UIConfig.Spacing.PageInsetPx),
+						Size = UDim2.new(0.82, 0, 0, math.max(52, panelSize.Y * 0.22)),
 						ZIndex = 104,
 					}, actionChildren)
 					else nil,
@@ -382,7 +391,7 @@ return function(props: Props)
 							Enum.FontWeight.Bold,
 							Enum.FontStyle.Normal
 						),
-						Position = UDim2.fromScale(0.5, 0.84),
+						Position = UDim2.fromScale(0.5, if short and hasActions then 0.95 else 0.84),
 						Size = UDim2.fromScale(0.78, 0.07),
 						Text = props.Tip,
 						TextColor3 = Color3.new(1, 1, 1),

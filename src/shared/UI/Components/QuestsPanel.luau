@@ -13,10 +13,10 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local QuestsConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Quests"))
 local Palette = UIConfig.ProgressionStyle
-local Surface = require(script.Parent.Arena.Surface)
+local Well = require(script.Parent.Well)
 
 local Icon = require(script.Parent.Icon)
-local WellScroll = require(script.Parent.WellScroll)
+local ScrollFrame = require(script.Parent.ScrollFrame)
 
 local c = React.createElement
 
@@ -47,7 +47,7 @@ end
 local function rowHeight(compact: boolean, short: boolean): number
 	return if short
 		then UIConfig.Layout.QuestRow.ShortHeightPx
-		else if compact then UIConfig.Layout.QuestRow.CompactHeightPx else 86
+		else if compact then UIConfig.Layout.QuestRow.CompactHeightPx else 80
 end
 
 export type PublicQuest = {
@@ -89,22 +89,24 @@ local function QuestRow(rowProps: {
 	local completed = quest.progress >= quest.goal
 	local progressFraction = math.clamp(quest.progress / math.max(quest.goal, 1), 0, 1)
 	local icon = questIcon(quest.questId)
-	local tile = if icon then (if short then 32 else 40) else 0
+	local tile = if icon then 32 else 0
 	local infoLeft = 10 + (if icon then tile + 10 else 0)
 
 	return c("Frame", {
-		BackgroundColor3 = Palette.Claimed,
-		BackgroundTransparency = 0,
+		BackgroundColor3 = Palette.Ink,
+		BackgroundTransparency = 0.9,
 		BorderSizePixel = 0,
 		LayoutOrder = rowProps.Order,
 		Size = UDim2.new(1, -8, 0, rowHeight(compact, short)),
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		Stroke = c("UIStroke", {
-			Color = if completed then Palette.Yellow else Palette.White,
-			Thickness = UIConfig.Well.StrokePx,
-			Transparency = if completed and not quest.claimed then 0 else 0.7,
-		}),
+		Stroke = if completed and not quest.claimed
+			then c("UIStroke", {
+				Color = if completed then Palette.Yellow else Palette.White,
+				Thickness = UIConfig.Well.StrokePx,
+				Transparency = if completed and not quest.claimed then 0 else 0.7,
+			})
+			else nil,
 		IconTile = if icon
 			then c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -196,7 +198,7 @@ local function QuestRow(rowProps: {
 					Enabled = rowProps.OnClaim ~= nil and not rowProps.Pending,
 					Color = CLAIM_BUTTON_COLOR,
 					Compact = true,
-					Text = if rowProps.Pending then "CLAIMING…" else "CLAIM",
+					Text = if rowProps.Pending then "WAIT…" else "CLAIM",
 					TextSize = 20,
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = if compact then UDim2.new(1, -44, 0.5, 0) else UDim2.new(0.5, 0, 1, -24),
@@ -343,15 +345,7 @@ return function(props: Props)
 		native.Size = UDim2.new(native.Size.X.Scale, native.Size.X.Offset, 0, listHeight + if short then 40 else 52)
 	end
 
-	return c(Surface, { Native = native, Color = Palette.Panel, Radius = UIConfig.Radius.Panel }, {
-		HeaderBand = c("Frame", {
-			BackgroundColor3 = Palette.Claimed,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(8, 8),
-			Size = UDim2.new(1, -16, 0, if short then 28 else 36),
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		}),
+	return c(Well, { Native = native }, {
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
@@ -390,19 +384,19 @@ return function(props: Props)
 				Position = UDim2.fromOffset(8, if short then 40 else 52),
 				Size = UDim2.new(1, -16, 0, listHeight),
 			}, questRows)
-			else c(WellScroll, {
-				Native = {
-					Active = true,
-					ref = listRef,
-					AutomaticCanvasSize = Enum.AutomaticSize.Y,
-					CanvasSize = UDim2.new(),
-					ScrollBarThickness = 4,
-					ScrollBarImageColor3 = Palette.White,
-					ScrollingDirection = Enum.ScrollingDirection.Y,
-					AnchorPoint = Vector2.new(0.5, 1),
-					Position = UDim2.new(0.5, 0, 1, -8),
-					Size = UDim2.new(1, -16, 1, if short then -48 else -60),
-				},
+			else c(ScrollFrame, {
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Active = true,
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				CanvasSize = UDim2.new(),
+				ScrollBarThickness = 4,
+				ScrollBarImageColor3 = Palette.White,
+				ScrollingDirection = Enum.ScrollingDirection.Y,
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(0.5, 0, 1, -16),
+				Size = UDim2.new(1, -32, 1, if short then -60 else -68),
+				ScrollRef = listRef,
 			}, questRows),
 	})
 end

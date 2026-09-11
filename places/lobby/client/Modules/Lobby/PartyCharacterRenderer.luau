@@ -277,10 +277,6 @@ function PartyCharacterRenderer:_layoutNametags()
 		if not character.nametag.Enabled or not character.nametag.Parent then
 			continue
 		end
-		if self._compactParty and not character.crownLabel.Visible then
-			character.nametag.StudsOffset = self._nametagStudsOffset
-			continue
-		end
 		local children = { character.usernameLabel, character.crownLabel, character.kickButton }
 		local origin, size, depth =
 			projectedNametag(camera, character.nametag, self._spawns[character.slot], self._nametagStudsOffset)
@@ -305,7 +301,6 @@ function PartyCharacterRenderer:_layoutNametags()
 		if inWindow and depth > 0 and size.X > 1 and size.Y > 1 then
 			local bounds = nametagBounds(children, positions, origin, size)
 			if bounds then
-				local placement = safe
 				local body = bodies[character]
 				local preferred = if body
 					then Vector2.new(
@@ -314,13 +309,7 @@ function PartyCharacterRenderer:_layoutNametags()
 					)
 					else Vector2.zero
 				local anchoredBounds = Rect.new(bounds.Min + preferred, bounds.Max + preferred)
-				if self._compactParty and body then
-					local crownBottom = math.min(safe.Max.Y, body.Min.Y - config.GapPx)
-					if crownBottom - safe.Min.Y >= bounds.Max.Y - bounds.Min.Y then
-						placement = Rect.new(safe.Min, Vector2.new(safe.Max.X, crownBottom))
-					end
-				end
-				offset = preferred + nameOffset(anchoredBounds, occupied, placement, config.GapPx)
+				offset = preferred + nameOffset(anchoredBounds, occupied, safe, config.GapPx)
 				table.insert(occupied, Rect.new(bounds.Min + offset, bounds.Max + offset))
 			end
 		end
@@ -361,6 +350,8 @@ function PartyCharacterRenderer:_updateNametagPresentation()
 	local localLeader = localCharacter and localCharacter.crownLabel.Visible
 	for _, character in self._characters do
 		local canKick = not self._compactParty and localLeader and not character.crownLabel.Visible
+		-- Compact layouts show names and leadership in the party modal at readable sizes.
+		character.nametag.Enabled = not self._compactParty
 		character.usernameLabel.Visible = not self._compactParty
 		character.kickButton.Visible = canKick == true
 		character.kickButton.Active = canKick == true

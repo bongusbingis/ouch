@@ -267,7 +267,7 @@ local function ActionSlot(props: {
 		Image = "",
 		LayoutOrder = props.LayoutOrder,
 		Selectable = false,
-		Size = UDim2.new(0.5, -6, 1, -8),
+		Size = UDim2.new(0.5, -12, 1, -16),
 		ZIndex = 54,
 		[React.Event.Activated] = if slot.interactive
 			then function()
@@ -415,6 +415,30 @@ return function(props: Props)
 		config = Motion.Modal,
 		immediate = reducedMotion,
 	})
+	React.useEffect(function()
+		if not model.visible then
+			return
+		end
+		local active = true
+		task.defer(function()
+			local holder = holderRef.current
+			if not active or not holder then
+				return
+			end
+			-- CanvasGroup visibility can leave static ViewportFrames with a stale render.
+			-- Rebind once when returning from a menu; keep the existing models and cameras.
+			for _, child in holder:GetDescendants() do
+				if child:IsA("ViewportFrame") and child.CurrentCamera then
+					local camera = child.CurrentCamera
+					child.CurrentCamera = nil
+					child.CurrentCamera = camera
+				end
+			end
+		end)
+		return function()
+			active = false
+		end
+	end, { model.visible })
 
 	React.useEffect(function()
 		local holder: GuiObject? = holderRef.current
@@ -446,7 +470,7 @@ return function(props: Props)
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 6),
+			Padding = UDim.new(0, 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),

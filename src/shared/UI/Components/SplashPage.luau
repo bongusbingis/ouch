@@ -154,14 +154,20 @@ return function(props: Props)
 	local tabContentHeight = if stack then math.max(1, stack.size.Y - tabHeight - 12) else 0
 	local gap = UIConfig.Layout.Splash.ProgressPanels.GapPx
 	local seasonStatus = c(SeasonStatusCard, {
-		Compact = compactProgressPanels or progressPanels.season.size.Y < UIConfig.Layout.SeasonDetailedMinHeightPx,
+		Compact = not portrait
+			and (compactProgressPanels or progressPanels.season.size.Y < UIConfig.Layout.SeasonDetailedMinHeightPx),
 		Native = {
 			LayoutOrder = 1,
 			Position = if stack
 				then nil
 				else UDim2.fromOffset(progressPanels.season.position.X, progressPanels.season.position.Y),
 			Size = if stack
-				then UDim2.new(1, -gap * 2, 0, progressPanels.season.size.Y)
+				then UDim2.new(
+					1,
+					-gap * 2,
+					0,
+					if portrait and tabbed then tabContentHeight else progressPanels.season.size.Y
+				)
 				else UDim2.fromOffset(progressPanels.season.size.X, progressPanels.season.size.Y),
 		},
 		State = props.SeasonState,
@@ -171,7 +177,7 @@ return function(props: Props)
 	})
 	local quests = c(QuestsPanel, {
 		Short = short,
-		Compact = portrait or short,
+		Compact = short,
 		Expanded = false,
 		Native = {
 			LayoutOrder = 3,
@@ -211,7 +217,9 @@ return function(props: Props)
 					-gap * 2,
 					0,
 					if tabbed
-						then math.min(tabContentHeight, progressPanels.daily.size.Y)
+						then (if portrait
+							then tabContentHeight
+							else math.min(tabContentHeight, progressPanels.daily.size.Y))
 						else progressPanels.daily.size.Y
 				)
 				else UDim2.fromOffset(progressPanels.daily.size.X, progressPanels.daily.size.Y),

@@ -102,6 +102,9 @@ return function(props)
 	local layout = Config.Scoreboard
 	local short = safe.size.Y < Config.Results.ShortHeightPx
 	local rowHeight = if short then layout.ShortRowPx else layout.RowPx
+	local inset = if short then UI.Spacing.CompactInsetPx else UI.Spacing.PageInsetPx
+	local headerHeight = if short then layout.HeaderPx else 80
+	local footerHeight = if short then layout.FooterPx else 44
 	-- A narrow (portrait) safe area cannot fit two readable columns, so a
 	-- free-for-all stays in one column there however long it is.
 	local narrow = safe.size.X < layout.TwoColumnMinWidthPx
@@ -123,7 +126,7 @@ return function(props)
 		listHeight += layout.ColumnGapPx
 	end
 	local width = math.min(safe.size.X * (if short or narrow then 0.94 else layout.WidthScale), layout.MaxWidthPx)
-	local height = math.min(safe.size.Y * layout.HeightScale, layout.HeaderPx + listHeight + layout.FooterPx + 20)
+	local height = math.min(safe.size.Y * layout.HeightScale, headerHeight + listHeight + footerHeight + 24)
 	local touch = UserInputService.TouchEnabled
 	local z = 81
 	local columnChildren = {
@@ -204,7 +207,11 @@ return function(props)
 				Title = true,
 				Size = if short then 24 else 30,
 				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -140, 0, 34), ZIndex = z + 2 },
+				Native = {
+					Position = UDim2.fromOffset(inset, if short then 8 else 16),
+					Size = UDim2.new(1, -140, 0, 34),
+					ZIndex = z + 2,
+				},
 			}),
 			Mode = c(Label, {
 				Text = view.title .. "  •  " .. view.clock .. (if view.target > 0
@@ -214,7 +221,7 @@ return function(props)
 				Size = if short then 13 else 16,
 				Align = Enum.TextXAlignment.Left,
 				Native = {
-					Position = UDim2.fromOffset(16, if short then 32 else 38),
+					Position = UDim2.fromOffset(inset, if short then 32 else 50),
 					Size = UDim2.new(1, -140, 0, 20),
 					ZIndex = z + 2,
 				},
@@ -236,9 +243,10 @@ return function(props)
 					Native = { Position = UDim2.new(1, -116, 0, 12), Size = UDim2.fromOffset(100, 20), ZIndex = z + 2 },
 				}),
 			Columns = c(WellScroll, {
+				InsetPx = if short then 8 else UI.Spacing.CompactInsetPx,
 				Native = {
-					Position = UDim2.fromOffset(16, layout.HeaderPx),
-					Size = UDim2.new(1, -32, 1, -layout.HeaderPx - layout.FooterPx),
+					Position = UDim2.fromOffset(inset, headerHeight),
+					Size = UDim2.new(1, -inset * 2, 1, -headerHeight - footerHeight),
 					CanvasSize = UDim2.fromOffset(0, listHeight),
 					ScrollingDirection = Enum.ScrollingDirection.Y,
 					ScrollBarThickness = 4,
@@ -253,7 +261,7 @@ return function(props)
 				Size = UI.Text.CaptionMinPx,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
-					Position = UDim2.new(0.5, 0, 1, -8),
+					Position = UDim2.new(0.5, 0, 1, if short then -8 else -16),
 					Size = UDim2.new(1, -32, 0, 18),
 					ZIndex = z + 2,
 				},

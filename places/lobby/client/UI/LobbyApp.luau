@@ -323,12 +323,12 @@ local function LobbyContent(props)
 	local inventoryWorldRef = React.useRef(nil)
 	local inventoryComposition = ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout)
 	local splashWorld = ResponsiveLayout.splashWorldWindow(safeArea.size, UIConfig.Layout)
-	local worldWindows = if portrait
-		then {}
-		else {
-			SplashScreen = { ref = splashWorldRef, position = safeArea.position + splashWorld.position },
-			Inventory = { ref = inventoryWorldRef, position = safeArea.position + inventoryComposition.world.position },
-		}
+	local worldWindows = {
+		SplashScreen = { ref = splashWorldRef, position = safeArea.position + splashWorld.position },
+		Inventory = if portrait
+			then nil
+			else { ref = inventoryWorldRef, position = safeArea.position + inventoryComposition.world.position },
+	}
 	local presented = React.useRef(false)
 	local playButtonRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)
@@ -640,7 +640,7 @@ local function LobbyContent(props)
 		local disconnectNames = renderer:SubscribeUsernames(function()
 			updateUsernames(nil)
 		end)
-		renderer:SetCompactParty(shortPages and currentPage == "SplashScreen")
+		renderer:SetCompactParty((shortPages or portrait) and currentPage == "SplashScreen")
 		local preview = skinPreviewState.current
 		renderer:SetSkinsPreview(preview.active, preview.ballItemId, preview.hammerItemId)
 		local disconnect = partyClient:subscribe(function(nextSnapshot)
@@ -660,7 +660,7 @@ local function LobbyContent(props)
 	React.useEffect(function()
 		local renderer = characterRenderer.current
 		if renderer then
-			renderer:SetCompactParty(shortPages and currentPage == "SplashScreen")
+			renderer:SetCompactParty((shortPages or portrait) and currentPage == "SplashScreen")
 		end
 		if currentPage ~= "SplashScreen" or not lobbyVisible or loadingVisible then
 			setPartyMembersOpen(false)

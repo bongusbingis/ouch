@@ -65,7 +65,7 @@ local function DigitBox(props)
 		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Position = UDim2.fromScale(0.409565, 0.0598802),
-		Size = UDim2.fromScale(0.8, 0.8),
+		Size = UDim2.new(0.95 / 6, -8, 1, 0),
 	}, {
 		EntranceScale = c("UIScale", { Scale = styles.Scale }),
 		UIAspectRatioConstraint = c("UIAspectRatioConstraint"),
@@ -365,7 +365,7 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				LayoutOrder = 4,
 				Position = UDim2.fromScale(0.500703, 0.109386),
-				Size = UDim2.fromScale(0.0492974, 0.781228),
+				Size = UDim2.fromScale(0.05, 1),
 				Text = "-",
 				Font = Enum.Font.LuckiestGuy,
 				TextColor3 = Palette.White,
@@ -380,8 +380,7 @@ return function(props: Props)
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			HorizontalFlex = Enum.UIFlexAlignment.Fill,
-			Padding = UDim.new(0.01, 0),
+			Padding = UDim.new(0, 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -475,7 +474,7 @@ return function(props: Props)
 						BorderColor3 = Color3.new(),
 						BorderSizePixel = 0,
 						Position = UDim2.fromScale(0.5, 0.202036),
-						Size = UDim2.fromScale(0.8, 0.015),
+						Size = UDim2.new(0.8, 0, 0, 2),
 					}),
 					EntryBox = c(Well, {
 						Native = {
@@ -485,8 +484,16 @@ return function(props: Props)
 					}, {
 						Holder = c("Frame", {
 							BackgroundTransparency = 1,
-							Position = UDim2.fromScale(0.0137874, -0.0459255),
-							Size = UDim2.fromScale(0.962774, 1.04593),
+							Position = UDim2.fromOffset(
+								UIConfig.Spacing.CompactInsetPx,
+								UIConfig.Spacing.CompactInsetPx
+							),
+							Size = UDim2.new(
+								1,
+								-UIConfig.Spacing.CompactInsetPx * 2,
+								1,
+								-UIConfig.Spacing.CompactInsetPx * 2
+							),
 						}, digits),
 						InputCapture = c("TextBox", {
 							ref = inputRef,

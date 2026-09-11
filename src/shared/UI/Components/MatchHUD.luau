@@ -56,13 +56,13 @@ return function(props)
 				then c("Frame", {
 					BackgroundTransparency = 1,
 					Position = UDim2.fromOffset(12, 28),
-					Size = UDim2.new(1, -108, 1, -31),
+					Size = UDim2.new(1, -116, 1, -40),
 				}, {
 					Red = c(Surface, {
 						Color = colors.Claimed,
 						Radius = UIConfig.Radius.Tile,
 						Shadow = false,
-						Native = { Size = UDim2.fromScale(0.42, 1) },
+						Native = { Size = UDim2.new(0.5, -6, 1, 0) },
 					}, {
 						Fill = c("Frame", {
 							BackgroundColor3 = colors.Pink,
@@ -84,7 +84,7 @@ return function(props)
 						Color = colors.Claimed,
 						Radius = UIConfig.Radius.Tile,
 						Shadow = false,
-						Native = { Position = UDim2.fromScale(0.46, 0), Size = UDim2.fromScale(0.54, 1) },
+						Native = { Position = UDim2.new(0.5, 6, 0, 0), Size = UDim2.new(0.5, -6, 1, 0) },
 					}, {
 						Fill = c("Frame", {
 							BackgroundColor3 = colors.Cyan,

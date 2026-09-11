@@ -161,7 +161,7 @@ return function(props: Props)
 			Title = c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 54,
+				MaxTextSize = 44,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
@@ -185,7 +185,7 @@ return function(props: Props)
 				BorderColor3 = Color3.new(),
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0.5, 0.265),
-				Size = UDim2.fromScale(0.8, 0.015),
+				Size = UDim2.new(0.8, 0, 0, 2),
 			}),
 			Description = c(ResponsiveText, {
 				HostName = "Description",
@@ -212,7 +212,7 @@ return function(props: Props)
 			Buttons = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0.5, 0, 1, -20),
+				Position = UDim2.new(0.5, 0, 1, -UIConfig.Spacing.PageInsetPx - 4),
 				Size = UDim2.new(0.86, 0, 0, 54),
 			}, buttons),
 		}),

@@ -61,6 +61,7 @@ end
 return function(props)
 	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local compact = safe.size.Y < 500 or safe.size.X < 760
+	local short = safe.size.Y < 500
 	local width = math.min(safe.size.X - 24, 1240)
 	local height = math.min(safe.size.Y - 16, 820)
 	local card = props.Card
@@ -153,12 +154,12 @@ return function(props)
 		and card.robuxPrice ~= nil
 		and card.productId ~= nil
 		and not card.pending
-	local inset = if compact then 12 else 16
+	local inset = if compact then UI.Spacing.CompactInsetPx else UI.Spacing.PageInsetPx
 	local titleHeight = if compact then 24 else 40
 	local progressTop = inset + titleHeight + (if compact then 1 else 4)
 	local progressBarTop = progressTop + (if compact then 22 else 24)
 	local bodyTop = progressBarTop + (if compact then 13 else 17)
-	local footerHeight = if compact then 78 else 98
+	local footerHeight = if compact then 90 else 110
 	local bodyHeight = math.max(64, height - bodyTop - footerHeight - (if compact then 8 else 16))
 	local previewVisible = selected ~= nil and (not compact or previewOpen)
 	local tier = if ready then state.tier or 0 else 0
@@ -260,8 +261,8 @@ return function(props)
 			}),
 			Body = c("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(16, bodyTop),
-				Size = UDim2.new(1, -32, 0, bodyHeight),
+				Position = UDim2.fromOffset(inset, bodyTop),
+				Size = UDim2.new(1, -inset * 2, 0, bodyHeight),
 				ZIndex = 103,
 			}, {
 				Status = if not loading and not ready
@@ -345,8 +346,8 @@ return function(props)
 						ZIndex = 103,
 					}, {
 						Rewards = c(Rewards, {
-							Compact = compact,
-							Width = (width - 32) * (if compact then 1 else 0.66),
+							Compact = short,
+							Width = (width - inset * 2) * (if compact then 1 else 0.66),
 							State = if ready then state else nil,
 							SeasonId = card.definition.SeasonId,
 							ShowProgress = false,
@@ -364,8 +365,8 @@ return function(props)
 			}),
 			Footer = c("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0, 16, 1, -footerHeight),
-				Size = UDim2.new(1, -32, 0, footerHeight - 8),
+				Position = UDim2.new(0, inset, 1, -footerHeight),
+				Size = UDim2.new(1, -inset * 2, 0, footerHeight - inset),
 				ZIndex = 103,
 			}, {
 				Explanation = label(
@@ -376,7 +377,7 @@ return function(props)
 							else if premiumOwned
 								then "PREMIUM UNLOCKED"
 								else "Premium includes the extra reward track.",
-					UDim2.fromOffset(0, if compact then -4 else 0),
+					UDim2.fromOffset(0, 0),
 					UDim2.new(1, 0, 0, if compact then 18 else 22),
 					if compact then 14 else 18,
 					colors.White,

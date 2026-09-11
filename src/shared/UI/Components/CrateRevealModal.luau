@@ -196,6 +196,9 @@ return function(props)
 	local results = if reveal then reveal.results else nil
 	local count = if results then #results else 0
 	local isBulk = count > 1
+	if not isBulk and not portrait then
+		panelSize = Vector2.new(math.min(panelSize.X, 820), math.min(panelSize.Y, 440))
+	end
 	local headline = if results
 		then (if selectedIndex then results[selectedIndex] else nil) or (if isBulk
 			then bestEntry(results)
@@ -364,6 +367,8 @@ return function(props)
 	local actionHeight = if short then 44 else 54
 	local bodyTop = if short then 56 else 76
 	local bodyHeight = math.max(44, panelSize.Y - bodyTop - actionHeight - inset * 2)
+	local singleArtSize =
+		math.min(240, panelSize.X * (if portrait then 0.68 else 0.44), bodyHeight * (if portrait then 0.64 else 1))
 	local preview = headline.preview
 	local owned = preview ~= nil and CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, preview.itemId)
 	local equipped = preview ~= nil and (props.Equipped or {})[preview.category] == preview.itemId
@@ -412,7 +417,7 @@ return function(props)
 			ButtonRef = if action.focus then buttonRef else nil,
 			Enabled = action.enabled,
 			Position = UDim2.fromScale((index - 0.5) / #actions, 1),
-			Size = UDim2.new(1 / #actions, -6, 0, actionHeight),
+			Size = UDim2.new(1 / #actions, -UIConfig.Spacing.ControlGapPx, 0, actionHeight),
 			Text = action.text,
 			SubBonks = action.bonks,
 			OnActivated = action.run,
@@ -535,13 +540,14 @@ return function(props)
 					end,
 					Native = {
 						BackgroundTransparency = 1,
-						Position = UDim2.new(if portrait then 0.16 else 0.04, 0, 0, bodyTop),
-						Size = UDim2.new(
-							if portrait then 0.68 else 0.44,
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.new(
+							if portrait then 0.5 else 0.26,
 							0,
 							0,
-							bodyHeight * (if portrait then 0.64 else 1)
+							bodyTop + bodyHeight * (if portrait then 0.32 else 0.5)
 						),
+						Size = UDim2.fromOffset(singleArtSize, singleArtSize),
 						Visible = revealedCount >= 1,
 						ZIndex = 113,
 					},
@@ -604,13 +610,22 @@ return function(props)
 						if isBulk or portrait then 0.5 else 0.73,
 						0,
 						0,
-						bodyTop + (if isBulk then bodyHeight - 40 else bodyHeight * (if portrait then 0.64 else 0.18))
+						bodyTop
+							+ (
+								if isBulk
+									then bodyHeight - 40
+									elseif not short and not portrait then bodyHeight / 2 - 50
+									else bodyHeight * (if portrait then 0.64 else 0.18)
+							)
 					),
 					Size = UDim2.new(
 						if isBulk or portrait then 0.9 else 0.44,
 						0,
 						0,
-						if isBulk then 22 else bodyHeight * (if portrait then 0.22 else 0.44)
+						if isBulk
+							then 22
+							elseif not short and not portrait then 76
+							else bodyHeight * (if portrait then 0.22 else 0.44)
 					),
 					Text = if settled then string.upper(headline.displayName) else "",
 					TextColor3 = Color3.new(1, 1, 1),
@@ -638,13 +653,22 @@ return function(props)
 						if isBulk or portrait then 0.5 else 0.73,
 						0,
 						0,
-						bodyTop + (if isBulk then bodyHeight - 18 else bodyHeight * (if portrait then 0.86 else 0.66))
+						bodyTop
+							+ (
+								if isBulk
+									then bodyHeight - 18
+									elseif not short and not portrait then bodyHeight / 2 + 34
+									else bodyHeight * (if portrait then 0.86 else 0.66)
+							)
 					),
 					Size = UDim2.new(
 						if isBulk or portrait then 0.88 else 0.44,
 						0,
 						0,
-						if isBulk then 18 else bodyHeight * (if portrait then 0.14 else 0.25)
+						if isBulk
+							then 18
+							elseif not short and not portrait then 28
+							else bodyHeight * (if portrait then 0.14 else 0.25)
 					),
 					Text = if not settled
 						then ""
