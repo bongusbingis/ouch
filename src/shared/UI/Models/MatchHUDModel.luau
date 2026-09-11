@@ -51,7 +51,7 @@ function MatchHUDModel.strip(entries: { any }, limit: number): { any }
 end
 
 -- Team scoreboards read as two columns; a crowded free-for-all splits in two
--- as well so twenty rows never scroll.
+-- as well to keep twenty-player desktop boards compact. Narrow views can scroll.
 function MatchHUDModel.columns(entries: { any }, teamMode: boolean, singleColumnMaxRows: number): { { any } }
 	if teamMode then
 		local red, blue = {}, {}

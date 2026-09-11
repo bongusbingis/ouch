@@ -30,6 +30,8 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 
 local modalSurface = require(script.Parent.ModalSurface)
 
+local ModalClose = require(script.Parent.ModalClose)
+
 local c = React.createElement
 
 -- Rarity drives the whole pacing of the reveal: a Common resolves almost
@@ -129,7 +131,7 @@ local function gridCell(entry: any, index: number, revealedCount: number, zIndex
 			ZIndex = zIndex,
 		},
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		Stroke = c("UIStroke", {
 			Color = if selected then Color3.new(1, 1, 1) else color,
 			Thickness = if selected then 3 else if shown then 2 else 0,
@@ -447,35 +449,22 @@ return function(props)
 			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
-			ImageColor3 = if building then Color3.fromRGB(214, 220, 226) else color,
+			Image = UIConfig.Layout.PageSurface.Image,
+			ImageColor3 = UIConfig.ProgressionStyle.White,
 			Position = shakeStyles.Offset:map(function(offset: number)
 				return UDim2.fromScale(0.5 + offset, 0.53 + offset * 0.6)
 			end),
 			ScaleType = Enum.ScaleType.Slice,
 			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
+			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 			ZIndex = 112,
 		}, {
-			Close = c(AnimatedButton, {
+			Close = c(ModalClose, {
 				OnActivated = props.OnClose,
-				Native = {
-					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -4, 0, 4),
-					Size = UDim2.fromOffset(44, 44),
-					BackgroundTransparency = 1,
-					ZIndex = 118,
-				},
-			}, {
-				Label = c("TextLabel", {
-					Size = UDim2.fromScale(1, 1),
-					BackgroundTransparency = 1,
-					Text = "×",
-					TextSize = 32,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 118,
-				}),
+				Position = UDim2.new(1, -12, 0, 12),
+				SizePx = 44,
+				ZIndex = 118,
 			}),
 			Burst = if phase == "Burst" or phase == "Item"
 				then c("Frame", {
@@ -494,7 +483,7 @@ return function(props)
 				Visible = phase == "Burst",
 				ZIndex = 117,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0.06, 0) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Panel) }),
 			}),
 			Title = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
@@ -509,6 +498,12 @@ return function(props)
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 114,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			Pity = if not building
 				then c(ResponsiveText, {
@@ -621,6 +616,12 @@ return function(props)
 					TextColor3 = Color3.new(1, 1, 1),
 					ZIndex = 114,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = UIConfig.ProgressionStyle.Ink,
+					Thickness = 0.045,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			Subtitle = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.SourceSansBold,

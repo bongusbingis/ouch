@@ -5,6 +5,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Icon = require(script.Parent.Icon)
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
@@ -70,7 +71,7 @@ export type Props = {
 	Compact: boolean?,
 }
 
-local function placeholder(modeId: string, zIndex: number)
+local function placeholder(modeId: string, zIndex: number, compact: boolean, portrait: boolean)
 	local spec = PLACEHOLDER[modeId] or { Colors = { Palette.Disabled }, Label = string.upper(modeId) }
 	local fields = {}
 	local count = #spec.Colors
@@ -87,8 +88,8 @@ local function placeholder(modeId: string, zIndex: number)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		FontFace = DISPLAY_FONT,
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.9, 0.38),
+		Position = UDim2.fromScale(if compact then 0.76 else 0.5, if portrait then 0.76 else 0.5),
+		Size = UDim2.fromScale(if compact then 0.4 else 0.9, if compact then 0.65 else 0.38),
 		Text = spec.Label,
 		TextColor3 = Palette.White,
 		TextScaled = true,
@@ -181,7 +182,7 @@ return function(props: Props)
 			}, { Stroke = inkStroke(0.03) }),
 		}),
 		Thumbnail = c(Well, {
-			AspectRatio = 1.7,
+			AspectRatio = if compact then nil else 1.7,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, if compact then 0 else 0.5),
 				Position = if compact
@@ -201,7 +202,7 @@ return function(props: Props)
 				ZIndex = z + 1,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-				Placeholder = placeholder(mode.Id, z + 1),
+				Placeholder = placeholder(mode.Id, z + 1, compact, portrait),
 				Art = c("ImageLabel", {
 					BackgroundTransparency = 1,
 					Image = mode.ThumbnailId,
@@ -213,8 +214,9 @@ return function(props: Props)
 					BackgroundColor3 = Palette.Ink,
 					BackgroundTransparency = 0.15,
 					BorderSizePixel = 0,
-					Position = UDim2.fromOffset(8, 8),
-					Size = UDim2.fromOffset(if compact then 84 else 104, if compact then 24 else 28),
+					AnchorPoint = if compact then Vector2.new(0, 0.5) else Vector2.zero,
+					Position = if compact then UDim2.new(0, 4, 0.5, 0) else UDim2.fromOffset(8, 8),
+					Size = UDim2.fromOffset(if compact then 72 else 104, if compact then 24 else 28),
 					ZIndex = z + 4,
 				}, {
 					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -257,6 +259,17 @@ return function(props: Props)
 				props.OnVote(mode.Id)
 			end,
 		}, {
+			Check = if mode.Selected
+				then c(Icon, {
+					Name = "Check",
+					Native = {
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 8, 0.5, 0),
+						Size = UDim2.fromOffset(22, 22),
+						ZIndex = z + 2,
+					},
+				})
+				else nil,
 			TextLabel = c(ResponsiveText, {
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MaxTextSize = 32,
@@ -264,8 +277,8 @@ return function(props: Props)
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					FontFace = DISPLAY_FONT,
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromScale(0.8, 0.66),
+					Position = UDim2.fromScale(if mode.Selected then 0.58 else 0.5, 0.5),
+					Size = UDim2.fromScale(if mode.Selected then 0.66 else 0.8, 0.66),
 					Text = if mode.Selected then "VOTED" else "VOTE",
 					TextColor3 = Palette.White,
 					ZIndex = z + 1,

@@ -17,6 +17,8 @@ local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)
 local listeners: { (any) -> () } = {}
 local connection: RBXScriptConnection? = nil
+local focusConnection: RBXScriptConnection? = nil
+local textFocusConnection: RBXScriptConnection? = nil
 local scoreboardOpen = false
 local available = false
 local action = "ArenaScoreboard"
@@ -131,16 +133,25 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 			end
 		end)
 		ContextActionService:BindActionAtPriority(action, function(_, inputState)
+			-- A release must close the board even if chat gained focus while held.
+			if inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
+				setOpen(false)
+				return if available then Enum.ContextActionResult.Sink else Enum.ContextActionResult.Pass
+			end
 			if not available or UserInputService:GetFocusedTextBox() then
 				return Enum.ContextActionResult.Pass
 			end
 			if inputState == Enum.UserInputState.Begin then
 				setOpen(true)
-			elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
-				setOpen(false)
 			end
 			return Enum.ContextActionResult.Sink
 		end, false, Enum.ContextActionPriority.High.Value + 2, Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect)
+		focusConnection = UserInputService.WindowFocusReleased:Connect(function()
+			setOpen(false)
+		end)
+		textFocusConnection = UserInputService.TextBoxFocused:Connect(function()
+			setOpen(false)
+		end)
 	end
 	update()
 	callback(snapshot)
@@ -152,6 +163,14 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 		if #listeners == 0 and connection then
 			connection:Disconnect()
 			connection = nil
+			if focusConnection then
+				focusConnection:Disconnect()
+				focusConnection = nil
+			end
+			if textFocusConnection then
+				textFocusConnection:Disconnect()
+				textFocusConnection = nil
+			end
 			ContextActionService:UnbindAction(action)
 			MatchHUDClient.setAvailable(false)
 		end

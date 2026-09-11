@@ -376,16 +376,18 @@ return function(props: Props)
 				),
 			}),
 		}),
-		BottomMiddle = if (short and props.ShowMatchmakingActivity) or portrait
+		BottomMiddle = if (short or portrait) and props.ShowMatchmakingActivity
 			then c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
 				Position = if short
 					then UDim2.new(0, worldWindow.position.X + worldWindow.size.X / 2, 1, -70)
-					else if portrait then UDim2.fromScale(0.5, 0.72) else UDim2.fromScale(0.445346, 1),
+					else if portrait and stack
+						then UDim2.fromOffset(safeArea.size.X / 2, stack.position.Y + stack.size.Y + 32)
+						else UDim2.fromScale(0.445346, 1),
 				Size = if short
 					then UDim2.fromOffset(worldWindow.size.X, 24)
-					else if portrait then UDim2.fromScale(0.9, 0.18) else UDim2.fromScale(0.409947, 0.564113),
+					else if portrait then UDim2.new(0.9, 0, 0, 24) else UDim2.fromScale(0.409947, 0.564113),
 			}, {
 				PartyStatus = c(PartyStatus, {
 					Text = props.PartyState,

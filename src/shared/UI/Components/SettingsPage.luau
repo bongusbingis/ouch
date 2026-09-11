@@ -20,6 +20,8 @@ local ActionButton = require(script.Parent.Shop.ShopPriceButton)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
+local Well = require(script.Parent.Well)
+
 local c = React.createElement
 
 local ROW_HEIGHT = UIConfig.Layout.SettingsControls.RowHeight
@@ -133,6 +135,16 @@ return function(props: Props)
 			LayoutOrder = layoutOrder,
 			ZIndex = 5,
 		})
+		local categoryRows = {
+			Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }),
+			Padding = c("UIPadding", {
+				PaddingTop = UDim.new(0, 8),
+				PaddingBottom = UDim.new(0, 8),
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+			}),
+		}
+		local categoryHeight = 16
 		for _, definition in byCategory[category] do
 			layoutOrder += 1
 			local hasDescription = definition.Description ~= nil and definition.Description ~= ""
@@ -146,7 +158,8 @@ return function(props: Props)
 			if short then
 				rowHeight = UIConfig.Layout.SettingsControls.ShortRowHeightPx
 			end
-			content[definition.Id] = c(SettingRow, {
+			categoryHeight += rowHeight + 8
+			categoryRows[definition.Id] = c(SettingRow, {
 				Definition = definition,
 				Value = SettingsStore.get(definition.Id),
 				Compact = compact,
@@ -155,6 +168,11 @@ return function(props: Props)
 				OnChange = handleChange,
 			})
 		end
+		content[`Well{category}`] = c(
+			Well,
+			{ Native = { LayoutOrder = layoutOrder, Size = UDim2.new(1, 0, 0, categoryHeight - 8) } },
+			categoryRows
+		)
 	end
 
 	content.AssetCredits = c(ActionButton, {

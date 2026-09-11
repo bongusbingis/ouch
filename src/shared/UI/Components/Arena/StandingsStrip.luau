@@ -11,8 +11,10 @@ local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interf
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local MatchHUDModel = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
+local Icon = require(script.Parent.Parent.Icon)
 
 local c = React.createElement
+local Well = require(script.Parent.Parent.Well)
 local colors = Config.Colors
 local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
 
@@ -52,7 +54,7 @@ return function(props: Props)
 	local short = props.Short
 	local rowHeight = if short then layout.ShortRowPx else layout.RowPx
 	local width = if short then layout.ShortWidthPx else layout.WidthPx
-	local limit = if short then 2 else layout.Limit
+	local limit = if short then 1 else layout.Limit
 	local rows = MatchHUDModel.strip(view.entries, limit)
 	local z = props.ZIndex or 10
 	if #rows == 0 then
@@ -92,6 +94,7 @@ return function(props: Props)
 				}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }) })
 				else nil,
 			Rank = c("TextLabel", {
+				Visible = not leader,
 				BackgroundTransparency = 1,
 				FontFace = DISPLAY_FONT,
 				Position = UDim2.fromOffset(8, 1),
@@ -102,6 +105,17 @@ return function(props: Props)
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = z + 2,
 			}, { Outline = stroke(0.045) }),
+			Crown = if leader
+				then c(Icon, {
+					Name = "Crown",
+					Color = colors.Yellow,
+					Native = {
+						Position = UDim2.fromOffset(6, 1),
+						Size = UDim2.fromOffset(24, rowHeight - 2),
+						ZIndex = z + 2,
+					},
+				})
+				else nil,
 			Name = c("TextLabel", {
 				BackgroundTransparency = 1,
 				Font = UI.Text.BodyFont,
@@ -133,8 +147,7 @@ return function(props: Props)
 		Active = props.OnActivated ~= nil,
 		AutoButtonColor = false,
 		AnchorPoint = props.AnchorPoint or Vector2.new(1, 0),
-		BackgroundColor3 = colors.Ink,
-		BackgroundTransparency = 0.35,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Position = props.Position,
 		Selectable = false,
@@ -143,8 +156,8 @@ return function(props: Props)
 		ZIndex = z,
 		[React.Event.Activated] = props.OnActivated,
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Control) }),
-		Outline = c("UIStroke", { Color = colors.White, Thickness = UI.Well.StrokePx, Transparency = 0.5 }),
-		Rows = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = z + 1 }, children),
+		Well = c(Well, { Native = { Size = UDim2.fromScale(1, 1), ZIndex = z } }, {
+			Rows = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = z + 1 }, children),
+		}),
 	})
 end

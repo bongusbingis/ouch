@@ -1,5 +1,7 @@
 --!strict
 
+local RedesignArtwork = require(script.Parent.RedesignArtwork)
+
 local characterBody = {
 	Minimum = Vector3.new(-2.25, -3, -2.25),
 	Maximum = Vector3.new(2.25, 4.5, 2.25),
@@ -86,14 +88,14 @@ return {
 	Layout = {
 		SectionHeader = { TextPx = 24, HeightPx = 38, UnderlinePx = 2, UnderlineGapPx = 4, BottomGapPx = 10 },
 		PageSurface = {
-			Image = "rbxassetid://124751224634629",
-			SliceCenter = Rect.new(31, 41, 978, 620),
+			Image = if RedesignArtwork.Page ~= "" then RedesignArtwork.Page else "rbxassetid://124751224634629",
+			SliceCenter = if RedesignArtwork.Page ~= "" then Rect.new(40, 40, 984, 600) else Rect.new(31, 41, 978, 620),
 			SliceScale = 0.5,
 		},
 		-- The inner-container 9-slice from Figma; an empty Image makes Well draw
 		-- the same construction natively until the upload is approved.
 		WellSurface = {
-			Image = "",
+			Image = RedesignArtwork.Well,
 			SliceCenter = Rect.new(32, 32, 480, 288),
 			SliceScale = 0.5,
 		},

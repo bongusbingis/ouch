@@ -25,6 +25,8 @@ local EmoteSlotRail = require(script.Parent.EmoteSlotRail)
 local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
 local Network = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Network"))
 
+local Well = require(script.Parent.Well)
+
 local c = React.createElement
 
 export type Props = {
@@ -513,24 +515,18 @@ return function(props: Props)
 				Size = UDim2.new(0.76, 0, 0, if short then 30 else 54),
 			},
 		}),
-		Main = c("Frame", {
-			AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0.5),
-			BackgroundColor3 = UIConfig.ProgressionStyle.Claimed,
-			BorderSizePixel = 0,
-			LayoutOrder = 3,
-			Position = if short
-				then UDim2.fromOffset(inventoryLayout.ShortContentLeftPx, contentTop)
-				else UDim2.new(0.498913, 0, 0, (contentTop + contentBottom) / 2),
-			Size = if short
-				then UDim2.fromOffset(contentWidth, math.max(contentBottom - contentTop, 0))
-				else UDim2.new(0.930013, 0, 0, math.max(contentBottom - contentTop, 0)),
+		Main = c(Well, {
+			Native = {
+				AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0.5),
+				LayoutOrder = 3,
+				Position = if short
+					then UDim2.fromOffset(inventoryLayout.ShortContentLeftPx, contentTop)
+					else UDim2.new(0.498913, 0, 0, (contentTop + contentBottom) / 2),
+				Size = if short
+					then UDim2.fromOffset(contentWidth, math.max(contentBottom - contentTop, 0))
+					else UDim2.new(0.930013, 0, 0, math.max(contentBottom - contentTop, 0)),
+			},
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
-			Outline = c("UIStroke", {
-				Color = UIConfig.ProgressionStyle.White,
-				Thickness = 1,
-				Transparency = 0.65,
-			}),
 			CategoriesHolder = if props.Data and #sections > 0
 				then c("ScrollingFrame", {
 					ref = categoriesRef,

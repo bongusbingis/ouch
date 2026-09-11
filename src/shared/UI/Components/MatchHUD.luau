@@ -59,29 +59,47 @@ return function(props)
 					Size = UDim2.new(1, -108, 1, -31),
 				}, {
 					Red = c(Surface, {
-						Color = colors.Pink,
+						Color = colors.Claimed,
 						Radius = UIConfig.Radius.Tile,
 						Shadow = false,
 						Native = { Size = UDim2.fromScale(0.42, 1) },
 					}, {
+						Fill = c("Frame", {
+							BackgroundColor3 = colors.Pink,
+							BorderSizePixel = 0,
+							Size = UDim2.fromScale(
+								if view.target > 0 then math.clamp(view.redScore / view.target, 0, 1) else 0,
+								1
+							),
+							ZIndex = 1,
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }) }),
 						Text = c(Label, {
 							Text = `RED  {view.redScore}`,
 							Title = true,
 							Size = 27,
-							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0) },
+							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0), ZIndex = 2 },
 						}),
 					}),
 					Blue = c(Surface, {
-						Color = colors.Cyan,
+						Color = colors.Claimed,
 						Radius = UIConfig.Radius.Tile,
 						Shadow = false,
 						Native = { Position = UDim2.fromScale(0.46, 0), Size = UDim2.fromScale(0.54, 1) },
 					}, {
+						Fill = c("Frame", {
+							BackgroundColor3 = colors.Cyan,
+							BorderSizePixel = 0,
+							Size = UDim2.fromScale(
+								if view.target > 0 then math.clamp(view.blueScore / view.target, 0, 1) else 0,
+								1
+							),
+							ZIndex = 1,
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }) }),
 						Text = c(Label, {
 							Text = `BLUE  {view.blueScore}`,
 							Title = true,
 							Size = 27,
-							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0) },
+							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0), ZIndex = 2 },
 						}),
 					}),
 				})

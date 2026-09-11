@@ -18,6 +18,7 @@ local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local JoinCodeLayout = require(script.Parent.Parent.Models.JoinCodeLayout)
 local ScrollFrame = require(script.Parent.ScrollFrame)
+local Well = require(script.Parent.Well)
 
 local modalSurface = require(script.Parent.ModalSurface)
 
@@ -69,10 +70,7 @@ local function DigitBox(props)
 		EntranceScale = c("UIScale", { Scale = styles.Scale }),
 		UIAspectRatioConstraint = c("UIAspectRatioConstraint"),
 		UICorner = c("UICorner", {
-			BottomLeftRadius = UDim.new(0, 20),
-			BottomRightRadius = UDim.new(0, 20),
-			TopLeftRadius = UDim.new(0, 20),
-			TopRightRadius = UDim.new(0, 20),
+			CornerRadius = UDim.new(0, UIConfig.Radius.Tile),
 		}),
 		UIStroke = c("UIStroke", {
 			Color = Palette.White,
@@ -415,7 +413,7 @@ return function(props: Props)
 			ZIndex = 101,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
+			Image = UIConfig.Layout.PageSurface.Image,
 			Position = if layout.position
 				then UDim2.fromOffset(layout.position.X, layout.position.Y)
 				else UDim2.fromScale(0.5, 0.534555),
@@ -427,8 +425,8 @@ return function(props: Props)
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
+			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 			Visible = true,
 		}, {
 			ModalScale = c("UIScale", { Scale = modalStyles.Scale }),
@@ -479,14 +477,11 @@ return function(props: Props)
 						Position = UDim2.fromScale(0.5, 0.202036),
 						Size = UDim2.fromScale(0.8, 0.015),
 					}),
-					EntryBox = c("ImageLabel", {
-						BackgroundTransparency = 1,
-						Image = "rbxassetid://130293277730649",
-						Position = UDim2.fromScale(0.05, JoinCodeLayout.EntryTop),
-						ScaleType = Enum.ScaleType.Slice,
-						Size = UDim2.fromScale(0.9, 0.34441),
-						SliceCenter = Rect.new(61, 58, 958, 139),
-						SliceScale = 0.5,
+					EntryBox = c(Well, {
+						Native = {
+							Position = UDim2.fromScale(0.05, JoinCodeLayout.EntryTop),
+							Size = UDim2.fromScale(0.9, 0.34441),
+						},
 					}, {
 						Holder = c("Frame", {
 							BackgroundTransparency = 1,

@@ -15,6 +15,8 @@ local Palette = UIConfig.ProgressionStyle
 local Surface = require(script.Parent.Arena.Surface)
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
+local Well = require(script.Parent.Well)
+
 local c = React.createElement
 
 local DARK = Palette.Ink
@@ -108,15 +110,13 @@ return function(props: Props)
 				},
 			})
 			else nil,
-		Content = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Palette.Claimed,
-			BackgroundTransparency = 0,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
-			Size = UDim2.new(1, -20, 1, if compact then -12 else -48),
+		Content = c(Well, {
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
+				Size = UDim2.new(1, -20, 1, if compact then -12 else -48),
+			},
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			TierBadge = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundColor3 = TIER_BADGE_COLOR,

@@ -53,7 +53,7 @@ return {
 	-- iterated on without entering the arena. Gated to Studio and never runs live.
 	-- Studio-only: back profiles with the in-memory ProfileStore mock so play sessions
 	-- never touch the real DataStore or fight its session lock. Must be false at ship.
-	MockProfiles = true,
+	MockProfiles = false,
 	LobbyCombatTest = true,
 
 	-- Tap-corner gesture that lets a dev/tester end the active match solo and

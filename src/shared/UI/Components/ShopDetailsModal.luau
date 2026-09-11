@@ -35,6 +35,9 @@ local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local ScrollFrame = require(script.Parent.ScrollFrame)
 local modalSurface = require(script.Parent.ModalSurface)
 
+local Well = require(script.Parent.Well)
+local WellScroll = require(script.Parent.WellScroll)
+
 local c = React.createElement
 local colors = UIConfig.ProgressionStyle
 
@@ -147,7 +150,8 @@ local function ItemDetails(props)
 			local ownRoot = if panel then panel:FindFirstAncestorWhichIsA("ScreenGui") else nil
 			local selectedRoot = if selected then selected:FindFirstAncestorWhichIsA("ScreenGui") else nil
 			if
-				ownRoot and (not ownRoot.Enabled or (selectedRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder))
+				ownRoot
+				and (not ownRoot.Enabled or (selectedRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder))
 			then
 				return
 			end
@@ -468,10 +472,10 @@ local function ItemDetails(props)
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(size.X, size.Y),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
+			Image = UIConfig.Layout.PageSurface.Image,
 			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
+			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 			ZIndex = 102,
 			SelectionGroup = true,
 			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
@@ -517,18 +521,16 @@ local function ItemDetails(props)
 				Size = UDim2.new(1, -inset * 2, 0, bodyHeight),
 				ZIndex = 103,
 			}, {
-				Preview = c(if scrollPreview then ScrollFrame else "Frame", {
-					BackgroundColor3 = colors.Claimed,
-					BackgroundTransparency = 0,
-					BorderSizePixel = 0,
-					CanvasSize = if scrollPreview then UDim2.fromOffset(0, previewContentHeight) else nil,
-					ScrollingDirection = if scrollPreview then Enum.ScrollingDirection.Y else nil,
-					ScrollBarThickness = if scrollPreview then 3 else nil,
-					ScrollBarImageColor3 = if scrollPreview then colors.White else nil,
-					Size = if portrait then UDim2.new(1, 0, 0, previewHeight) else UDim2.fromScale(0.32, 1),
-					ZIndex = 103,
+				Preview = c(if scrollPreview then WellScroll else Well, {
+					Native = {
+						CanvasSize = if scrollPreview then UDim2.fromOffset(0, previewContentHeight) else nil,
+						ScrollingDirection = if scrollPreview then Enum.ScrollingDirection.Y else nil,
+						ScrollBarThickness = if scrollPreview then 3 else nil,
+						ScrollBarImageColor3 = if scrollPreview then colors.White else nil,
+						Size = if portrait then UDim2.new(1, 0, 0, previewHeight) else UDim2.fromScale(0.32, 1),
+						ZIndex = 103,
+					},
 				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 					Art = c("Frame", {
 						BackgroundTransparency = 1,
 						Size = if portrait
@@ -612,15 +614,13 @@ local function ItemDetails(props)
 						),
 				}),
 				Contents = if isCrate
-					then c("Frame", {
-						BackgroundTransparency = 0,
-						BackgroundColor3 = colors.Claimed,
-						BorderSizePixel = 0,
-						Position = UDim2.new(listX, 0, 0, listTop),
-						Size = UDim2.new(listWidth, 0, 1, -listTop),
-						ZIndex = 103,
+					then c(Well, {
+						Native = {
+							Position = UDim2.new(listX, 0, 0, listTop),
+							Size = UDim2.new(listWidth, 0, 1, -listTop),
+							ZIndex = 103,
+						},
 					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 						OddsHeading = if not short
 							then label(
 								"NEXT OPEN ODDS",

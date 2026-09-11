@@ -78,16 +78,11 @@ return React.memo(function(props: Props)
 
 	return c("Frame", {
 		BackgroundColor3 = UIConfig.ProgressionStyle.Claimed,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Size = UDim2.new(1, 0, 0, props.Height),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		Outline = c("UIStroke", {
-			Color = UIConfig.ProgressionStyle.White,
-			Thickness = 1,
-			Transparency = 0.65,
-		}),
 		Padding = c("UIPadding", {
 			PaddingLeft = UDim.new(0, 12),
 			PaddingRight = UDim.new(0, 12),

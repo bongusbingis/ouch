@@ -18,6 +18,10 @@ local useSafeArea = require(UI.Hooks.useSafeArea)
 
 local modalSurface = require(ReplicatedStorage.Shared.UI.Components.ModalSurface)
 
+local Well = require(ReplicatedStorage.Shared.UI.Components.Well)
+
+local WellScroll = require(ReplicatedStorage.Shared.UI.Components.WellScroll)
+
 local c = React.createElement
 local Palette = Config.ProgressionStyle
 
@@ -232,11 +236,9 @@ return function(props: Props)
 				OnActivated = props.OnClose,
 				ZIndex = 112,
 			}),
-			Code = c(Surface, {
+			Code = c(Well, {
 				Color = Palette.Claimed,
 				Radius = Config.Radius.Control,
-				Shadow = false,
-				StrokeTransparency = 0.6,
 				Native = {
 					Position = UDim2.fromOffset(margin, codeTop),
 					Size = UDim2.new(1, -margin * 2, 0, codeHeight),
@@ -266,18 +268,18 @@ return function(props: Props)
 					OnActivated = props.OnToggleCode,
 				}),
 			}),
-			Members = c(ScrollFrame, {
-				Active = true,
-				Selectable = not props.CanRemove,
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				CanvasSize = UDim2.new(),
-				ScrollingDirection = Enum.ScrollingDirection.Y,
-				ScrollBarImageColor3 = Palette.White,
-				ScrollBarThickness = 4,
-				Position = UDim2.fromOffset(margin - 2, listTop),
-				Size = UDim2.new(1, -margin * 2 + 4, 0, math.max(height - listTop - margin, 1)),
+			Members = c(WellScroll, {
+				Native = {
+					Active = true,
+					Selectable = not props.CanRemove,
+					AutomaticCanvasSize = Enum.AutomaticSize.Y,
+					CanvasSize = UDim2.new(),
+					ScrollingDirection = Enum.ScrollingDirection.Y,
+					ScrollBarImageColor3 = Palette.White,
+					ScrollBarThickness = 4,
+					Position = UDim2.fromOffset(margin - 2, listTop),
+					Size = UDim2.new(1, -margin * 2 + 4, 0, math.max(height - listTop - margin, 1)),
+				},
 			}, rows),
 		}),
 	})

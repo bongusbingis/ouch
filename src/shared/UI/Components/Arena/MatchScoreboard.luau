@@ -14,6 +14,7 @@ local Config =
 local Surface = require(script.Parent.Surface)
 local Label = require(script.Parent.Label)
 local ModalClose = require(script.Parent.Parent.ModalClose)
+local WellScroll = require(script.Parent.Parent.WellScroll)
 local MatchHUDModel = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
 local useSafeArea = require(script.Parent.Parent.Parent.Hooks.useSafeArea)
 
@@ -55,7 +56,7 @@ local function row(entry, index: number, height: number, teamMode: boolean, z: n
 			BackgroundTransparency = 1,
 			Font = UI.Text.BodyFont,
 			Position = UDim2.fromOffset(if teamMode then 12 else 40, 0),
-			Size = UDim2.new(1, -(if teamMode then 12 else 40) - 120, 1, 0),
+			Size = UDim2.new(1, -(if teamMode then 12 else 40) - (if entry.alive then 60 else 166), 1, 0),
 			Text = entry.displayName .. (if entry.isLocal then " (YOU)" else ""),
 			TextColor3 = colors.White,
 			TextSize = textSize,
@@ -104,6 +105,7 @@ return function(props)
 	-- A narrow (portrait) safe area cannot fit two readable columns, so a
 	-- free-for-all stays in one column there however long it is.
 	local narrow = safe.size.X < layout.TwoColumnMinWidthPx
+	local stackTeams = narrow and view.teamMode
 	local columns =
 		MatchHUDModel.columns(view.entries, view.teamMode, if narrow then math.huge else layout.SingleColumnMaxRows)
 	local longest = 0
@@ -113,13 +115,20 @@ return function(props)
 	longest = math.max(longest, 1)
 	local columnHeader = if view.teamMode then rowHeight + 6 else 0
 	local listHeight = columnHeader + longest * rowHeight + (longest - 1) * layout.RowGapPx
-	local width = math.min(safe.size.X * layout.WidthScale, layout.MaxWidthPx)
-	local height = math.min(safe.size.Y * layout.HeightScale, layout.HeaderPx + listHeight + layout.FooterPx + 16)
-	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	if stackTeams then
+		listHeight = 0
+		for _, column in columns do
+			listHeight += columnHeader + #column * (rowHeight + layout.RowGapPx)
+		end
+		listHeight += layout.ColumnGapPx
+	end
+	local width = math.min(safe.size.X * (if short or narrow then 0.94 else layout.WidthScale), layout.MaxWidthPx)
+	local height = math.min(safe.size.Y * layout.HeightScale, layout.HeaderPx + listHeight + layout.FooterPx + 20)
+	local touch = UserInputService.TouchEnabled
 	local z = 81
 	local columnChildren = {
 		Layout = c("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
+			FillDirection = if stackTeams then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
 			Padding = UDim.new(0, layout.ColumnGapPx),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
@@ -155,7 +164,9 @@ return function(props)
 		columnChildren[`Column{columnIndex}`] = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = columnIndex,
-			Size = UDim2.new(1 / #columns, -(layout.ColumnGapPx * (#columns - 1)) / #columns, 1, 0),
+			Size = if stackTeams
+				then UDim2.new(1, 0, 0, columnHeader + #column * (rowHeight + layout.RowGapPx))
+				else UDim2.new(1 / #columns, -(layout.ColumnGapPx * (#columns - 1)) / #columns, 0, listHeight),
 			ZIndex = z + 2,
 		}, rows)
 	end
@@ -180,7 +191,7 @@ return function(props)
 			else nil,
 		Panel = c(Surface, {
 			Color = colors.Panel,
-			Transparency = 0.06,
+			Transparency = 0,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, safe.position.Y + safe.size.Y / 2),
@@ -211,7 +222,7 @@ return function(props)
 			Close = if touch
 				then c(ModalClose, {
 					Position = UDim2.new(1, -12, 0, 12),
-					SizePx = 40,
+					SizePx = UI.Interaction.MinTargetPx,
 					OnActivated = props.OnClose,
 					ZIndex = z + 3,
 				})
@@ -224,11 +235,17 @@ return function(props)
 					Align = Enum.TextXAlignment.Right,
 					Native = { Position = UDim2.new(1, -116, 0, 12), Size = UDim2.fromOffset(100, 20), ZIndex = z + 2 },
 				}),
-			Columns = c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(16, layout.HeaderPx),
-				Size = UDim2.new(1, -32, 1, -layout.HeaderPx - layout.FooterPx),
-				ZIndex = z + 2,
+			Columns = c(WellScroll, {
+				Native = {
+					Position = UDim2.fromOffset(16, layout.HeaderPx),
+					Size = UDim2.new(1, -32, 1, -layout.HeaderPx - layout.FooterPx),
+					CanvasSize = UDim2.fromOffset(0, listHeight),
+					ScrollingDirection = Enum.ScrollingDirection.Y,
+					ScrollBarThickness = 4,
+					ScrollBarImageColor3 = colors.White,
+					Selectable = false,
+					ZIndex = z + 2,
+				},
 			}, columnChildren),
 			Footer = c(Label, {
 				Text = if view.teamMode then "TEAM ELIMINATIONS" else "ELIMINATIONS",

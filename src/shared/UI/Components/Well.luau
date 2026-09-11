@@ -41,23 +41,19 @@ return function(props: Props)
 			AspectType = Enum.AspectType.FitWithinMaxSize,
 		})
 		else nil
-	if artwork.Image ~= "" and color == Palette.Claimed and props.StrokeTransparency == nil and shadow > 0 then
+	if
+		artwork.Image ~= ""
+		and radius == UIConfig.Radius.Control
+		and color == Palette.Claimed
+		and props.StrokeTransparency == nil
+		and shadow > 0
+	then
 		content.Aspect = aspect
-		return c("ImageLabel", {
-			AnchorPoint = native.AnchorPoint,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Image = artwork.Image,
-			LayoutOrder = native.LayoutOrder,
-			Position = native.Position,
-			ScaleType = Enum.ScaleType.Slice,
-			Size = native.Size,
-			SliceCenter = artwork.SliceCenter,
-			SliceScale = artwork.SliceScale,
-			Visible = native.Visible,
-			ZIndex = z,
-			ref = native.ref,
-		}, content)
+		native.Image = artwork.Image
+		native.ScaleType = Enum.ScaleType.Slice
+		native.SliceCenter = artwork.SliceCenter
+		native.SliceScale = artwork.SliceScale
+		return c("ImageLabel", native, content)
 	end
 	content.Corner = c("UICorner", { CornerRadius = UDim.new(0, radius) })
 	content.Outline = c("UIStroke", {

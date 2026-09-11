@@ -23,6 +23,8 @@ local Rewards = require(script.Parent.SeasonRewardsPanel)
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
 local modalSurface = require(script.Parent.ModalSurface)
 
+local Well = require(script.Parent.Well)
+
 local c = React.createElement
 local colors = UI.ProgressionStyle
 
@@ -186,10 +188,10 @@ return function(props)
 			Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, safe.position.Y + safe.size.Y / 2),
 			Size = UDim2.fromOffset(width, height),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
+			Image = UI.Layout.PageSurface.Image,
 			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
+			SliceCenter = UI.Layout.PageSurface.SliceCenter,
+			SliceScale = UI.Layout.PageSurface.SliceScale,
 			BorderSizePixel = 0,
 			ZIndex = 102,
 			SelectionGroup = true,
@@ -274,14 +276,12 @@ return function(props)
 					)
 					else nil,
 				Preview = if previewVisible
-					then c("Frame", {
-						BackgroundColor3 = colors.Claimed,
-						BorderSizePixel = 0,
-						Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
-						ZIndex = 103,
+					then c(Well, {
+						Native = {
+							Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
+							ZIndex = 103,
+						},
 					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Control) }),
-						Outline = c("UIStroke", { Color = colors.White, Thickness = 1, Transparency = 0.6 }),
 						Track = label(
 							`{string.upper(selected.track)} • TIER {selected.tier}`,
 							UDim2.new(if compact then 0.4 else 0, 12, 0, 8),

@@ -24,6 +24,8 @@ local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 
 local modalSurface = require(script.Parent.ModalSurface)
 
+local Well = require(script.Parent.Well)
+
 local c = React.createElement
 
 local Surface = require(script.Parent.Arena.Surface)
@@ -270,11 +272,9 @@ return function(props: Props)
 				Position = UDim2.fromOffset(padding, dayY),
 				Size = UDim2.fromOffset(innerWidth, dayHeight),
 			}, miniDays),
-			RewardArea = c(Surface, {
+			RewardArea = c(Well, {
 				Color = Palette.Claimed,
 				Radius = UIConfig.Radius.Control,
-				Shadow = false,
-				StrokeTransparency = 0.55,
 				Native = {
 					Position = UDim2.fromOffset(padding, rewardY),
 					Size = UDim2.fromOffset(innerWidth, rewardHeight),

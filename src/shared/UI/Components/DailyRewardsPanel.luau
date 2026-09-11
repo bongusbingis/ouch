@@ -14,6 +14,8 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local Palette = UIConfig.ProgressionStyle
 local Surface = require(script.Parent.Arena.Surface)
 
+local WellScroll = require(script.Parent.WellScroll)
+
 local c = React.createElement
 
 local DARK = Palette.Ink
@@ -325,20 +327,20 @@ return function(props: Props)
 			})
 			else nil,
 		DaysGrid = if not props.Summary
-			then c("ScrollingFrame", {
-				ref = gridRef,
-				Active = true,
-				ClipsDescendants = true,
-				AutomaticCanvasSize = Enum.AutomaticSize.X,
-				CanvasSize = UDim2.new(),
-				ScrollingDirection = Enum.ScrollingDirection.X,
-				ScrollBarThickness = if compact then 3 else 0,
-				ScrollBarImageColor3 = Palette.White,
-				BorderSizePixel = 0,
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundTransparency = 1,
-				Position = UDim2.new(0.5, 0, 0, headerHeight + 16),
-				Size = UDim2.new(1, -20, 1, -headerHeight - 24),
+			then c(WellScroll, {
+				Native = {
+					ref = gridRef,
+					Active = true,
+					ClipsDescendants = true,
+					AutomaticCanvasSize = Enum.AutomaticSize.X,
+					CanvasSize = UDim2.new(),
+					ScrollingDirection = Enum.ScrollingDirection.X,
+					ScrollBarThickness = if compact then 3 else 0,
+					ScrollBarImageColor3 = Palette.White,
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.new(0.5, 0, 0, headerHeight + 16),
+					Size = UDim2.new(1, -20, 1, -headerHeight - 24),
+				},
 			}, dayCells)
 			else nil,
 	})
