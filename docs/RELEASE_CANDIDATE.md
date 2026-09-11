@@ -134,6 +134,8 @@ Census `r08/arena-census.md`. Six paddles enabled; `obstacle_14` discs spin as Y
 
 ### UI/UX redesign pass (owner brief, Fable 5.1, 2026-09-10)
 
+**Continuation status:** the historical open items below are superseded by [UI_REDESIGN_COMPLETION.md](UI_REDESIGN_COMPLETION.md). The owner selected group 291738800 and approved all four uploads; both Figma panels and the 22-icon atlases are now live in the source. Wells, shared modal slices, reward icons, small-screen standings/scoreboard and portrait reflow were completed and checked in Studio. Final checks: 774 game tests and 50 workflow tests pass; Selene has no errors. Gemini returned service errors for the lobby review, so no new visual acceptance or release readiness is claimed. Portrait stress checks were performed while preserving the shipped LandscapeSensor setting.
+
 Plan and token reference: `.review/production/2026-09-10-redesign/plan.md`, `docs/DESIGN_TOKENS.md` (single source of stylistic truth). Evidence: `.review/production/2026-09-10-redesign/` (`before-*`, `after-*`, `phone-*`, `assets/asset-sheet-window.png` with the measured construction of the shipped artwork, `refs/` leaderboard references). Commit `c050233` plus this one.
 
 - **Tokens.** `UIConfig.Radius = { Panel 16, Control 12, Tile 8, PillMaxPx 32 }`, `ProgressionStyle.Shadow` (black), `Well = { StrokePx 2, ShadowPx 4, InsetPx 12 }`, action slice `SliceScale 0.09` (measured 12 px corner), every native corner and slice scale in the UI now reads a token (22 files normalised mechanically, one line each). Arena `Surface` shadows are black and default to the panel radius.
