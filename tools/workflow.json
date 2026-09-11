@@ -11,5 +11,292 @@
     "material-symbols",
     "ph"
   ],
-  "canonical_icons": {}
+  "canonical_icons": {
+    "Ball": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:baseball-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Bell": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:bell-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Bubbles": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:circles-three-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Candy": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        768,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:cookie-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Celebration": {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "offset": [
+        0,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "material-symbols:celebration-rounded",
+      "asset_id": "rbxassetid://105358867565806"
+    },
+    "Check": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:check-bold",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Cloud": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:cloud-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Confetti": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:confetti-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Controller": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:game-controller-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Crown": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:crown-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Diamond": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        768,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:diamond-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Drop": {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "offset": [
+        384,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "material-symbols:water-drop-rounded",
+      "asset_id": "rbxassetid://105358867565806"
+    },
+    "Explosion": {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "offset": [
+        192,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "material-symbols:explosion-rounded",
+      "asset_id": "rbxassetid://105358867565806"
+    },
+    "Hammer": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:hammer-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Hand": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:hand-grabbing-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "IceCream": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:ice-cream-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Planet": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:planet-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Sparkle": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:sparkle-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Speaker": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:speaker-high-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Star": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:star-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Target": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:target-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    },
+    "Trophy": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        768,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:trophy-fill",
+      "asset_id": "rbxassetid://125312270475689"
+    }
+  }
 }

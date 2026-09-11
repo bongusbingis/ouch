@@ -8,6 +8,18 @@ import gate_runtime as gate
 
 
 class GateFailureTests(WorkflowFixture):
+    def test_api_moderation_spellings_are_normalized_without_assuming_approval(self):
+        for value, expected in [("Approved", "COMPLETE"), ("MODERATION_STATE_APPROVED", "COMPLETE"), ("Rejected", "FAILED"), ("Reviewing", "MODERATION_PENDING"), ("UNKNOWN", "MODERATION_PENDING")]:
+            with self.subTest(value=value):
+                gate.process_operation(self.store, self.record, {"done": True, "response": {"assetId": "123", "moderationResult": {"moderationState": value}}})
+                self.assertEqual(self.record["state"], expected)
+                self.assertEqual(self.record["production_ready"], expected == "COMPLETE")
+
+    def test_approved_moderation_without_asset_id_remains_pending(self):
+        gate.process_operation(self.store, self.record, {"done": True, "response": {"moderationResult": {"moderationState": "Approved"}}})
+        self.assertEqual(self.record["state"], "MODERATION_PENDING")
+        self.assertFalse(self.record["production_ready"])
+
     def test_broken_pending_request_does_not_block_known_operation(self):
         from pathlib import Path
 

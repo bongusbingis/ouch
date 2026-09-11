@@ -1,6 +1,670 @@
 {
-  "assets": {},
+  "assets": {
+    "assets/ui/page-panel-9slice.png": {
+      "asset_id": "131449610091380",
+      "asset_type": "Decal",
+      "binding": "3da826d80d67dc34627d351b4c38f61eb1e250567b63ee95f52ff7351578ed0d",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH page panel R16",
+      "filename": "page-panel-9slice.png",
+      "http_status": 200,
+      "id": "9a415c69-9193-4f80-ab77-aea35c5f343e",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/0aa13c3b-1a8a-40bb-bbfd-6077e38cf33d",
+      "preview_hashes": {},
+      "production_file": "assets/ui/page-panel-9slice.png",
+      "production_ready": true,
+      "proposal_sha256": "8943978c464a75a9046a40466ad8ecdd526b763ff1f32913cdcf27fb69fdbff2",
+      "provenance": {
+        "attribution_required": false,
+        "author": "Jack C. (OUCH! project)",
+        "figma_file_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
+        "figma_node_id": "63-6",
+        "license": "Project-Owned",
+        "license_url": "local:project-owned",
+        "local_export_source": "assets/source/figma/page-panel-9slice.svg",
+        "modifications": [
+          "Authored as vector layers in the canonical Figma file (frame 'Panel / 9-slice', node 63-6) from assets/source/figma/page-panel-9slice.svg",
+          "Exported from Figma as PNG 1x (1032x648) to assets/source/figma/exports/page-panel-9slice.png"
+        ],
+        "provider": "project",
+        "slice": {
+          "center": [
+            40,
+            40,
+            984,
+            600
+          ],
+          "outline_px": 4,
+          "scale": 0.5,
+          "shadow_px": 4,
+          "visible_radius_px": 16
+        },
+        "source_id": "figma:qOQKzOXH6HIc8g1PHWvplh:63-6",
+        "source_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled?node-id=63-6"
+      },
+      "response": {
+        "done": true,
+        "operationId": "0aa13c3b-1a8a-40bb-bbfd-6077e38cf33d",
+        "path": "operations/0aa13c3b-1a8a-40bb-bbfd-6077e38cf33d",
+        "response": {
+          "assetId": "131449610091380",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH page panel R16",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/131449610091380",
+          "revisionCreateTime": "2026-09-10T23:35:31.119894600Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "ea8c619f4cd63d774f63f96b043532e623ce92a6b2380a98b26721c5d373f5fb",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 6159,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          1032,
+          648
+        ],
+        "valid": true
+      }
+    },
+    "assets/ui/redesign-material-symbols.png": {
+      "asset_id": "109049105652853",
+      "asset_type": "Decal",
+      "binding": "e37cc7ef8f0e8f2d19f67fc6d1d6c99665ad440b33e7692211a05a7fe2f4298c",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH UI icons material-symbols",
+      "filename": "redesign-material-symbols.png",
+      "http_status": 200,
+      "id": "4787d362-4574-4602-bfa6-3ed43f5e0745",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/27b40261-f432-4dc2-9593-d2e584382094",
+      "preview_hashes": {},
+      "production_file": "assets/ui/redesign-material-symbols.png",
+      "production_ready": true,
+      "proposal_sha256": "57cd5a922628e2db3848d3cb33965596f8ced3a6ce1ff41f5fabfc8d0a9ae695",
+      "provenance": {
+        "attribution_required": true,
+        "author": "Google",
+        "license": "Apache-2.0",
+        "license_text": "\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.",
+        "license_url": "https://github.com/google/material-design-icons/blob/master/LICENSE",
+        "modifications": [
+          "Packed licensed SVGs into 192px cells; currentColor rendered white with 16px gutters for Roblox tinting."
+        ],
+        "production_file": "assets/ui/redesign-material-symbols.png",
+        "provider": "Iconify",
+        "sha256": "4990778309ca9220caa12331a82a0d2dc5464520506056ca828fc3a0faeab8ce",
+        "source_id": "material-symbols:ouch-redesign-atlas",
+        "source_url": "https://icon-sets.iconify.design/material-symbols/celebration-rounded/",
+        "sources": [
+          {
+            "original_file": "assets/source/external/material-symbols/celebration-rounded.svg",
+            "original_sha256": "2759b82e033dcce75c05ce049e2df93d37a9f54071b2eb88b240e6ed10b38595",
+            "source_id": "material-symbols:celebration-rounded",
+            "source_url": "https://icon-sets.iconify.design/material-symbols/celebration-rounded/"
+          },
+          {
+            "original_file": "assets/source/external/material-symbols/explosion-rounded.svg",
+            "original_sha256": "58a2a5f76710bd06b3b8be41c55500d03481a0e7a7261305f4ff56edb24e9871",
+            "source_id": "material-symbols:explosion-rounded",
+            "source_url": "https://icon-sets.iconify.design/material-symbols/explosion-rounded/"
+          },
+          {
+            "original_file": "assets/source/external/material-symbols/water-drop-rounded.svg",
+            "original_sha256": "a84937984efb8d9f48e48c15a17bf4574fe8721a7fbcf456fbd15960b013c12d",
+            "source_id": "material-symbols:water-drop-rounded",
+            "source_url": "https://icon-sets.iconify.design/material-symbols/water-drop-rounded/"
+          }
+        ]
+      },
+      "response": {
+        "done": true,
+        "operationId": "27b40261-f432-4dc2-9593-d2e584382094",
+        "path": "operations/27b40261-f432-4dc2-9593-d2e584382094",
+        "response": {
+          "assetId": "109049105652853",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH UI icons material-symbols",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/109049105652853",
+          "revisionCreateTime": "2026-09-10T23:35:20.028130400Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "4990778309ca9220caa12331a82a0d2dc5464520506056ca828fc3a0faeab8ce",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 5935,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          576,
+          192
+        ],
+        "valid": true
+      }
+    },
+    "assets/ui/redesign-ph.png": {
+      "asset_id": "130070129394053",
+      "asset_type": "Decal",
+      "binding": "5057924e14a84005958c77e2cb6078eb55f8ff7c7fd3ce7140ae32c159ad1398",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH UI icons ph",
+      "filename": "redesign-ph.png",
+      "http_status": 200,
+      "id": "00c598a3-5842-4f02-9a4c-1316f738d6f0",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/c2cf1ed0-4b75-4bbc-a639-bf0c5d1dd855",
+      "preview_hashes": {},
+      "production_file": "assets/ui/redesign-ph.png",
+      "production_ready": true,
+      "proposal_sha256": "ee5168f6ce6a0e9a1f85638456303b94ecf94e67bd4355e74ce963c3af1f2fe1",
+      "provenance": {
+        "attribution_required": true,
+        "author": "Phosphor Icons",
+        "license": "MIT",
+        "license_text": "MIT License\n\nCopyright (c) 2023 Phosphor Icons\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+        "license_url": "https://github.com/phosphor-icons/core/blob/main/LICENSE",
+        "modifications": [
+          "Packed licensed SVGs into 192px cells; currentColor rendered white with 16px gutters for Roblox tinting."
+        ],
+        "production_file": "assets/ui/redesign-ph.png",
+        "provider": "Iconify",
+        "sha256": "8b0ab07e9c5a35ffe9ca3489035c868543dc8ad246897924044814821de7774e",
+        "source_id": "ph:ouch-redesign-atlas",
+        "source_url": "https://icon-sets.iconify.design/ph/confetti-fill/",
+        "sources": [
+          {
+            "original_file": "assets/source/external/ph/confetti-fill.svg",
+            "original_sha256": "47a1909e24efc8703b3e7d44906301f822b7ae26bda875ced429d3c969e4df75",
+            "source_id": "ph:confetti-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/confetti-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/star-fill.svg",
+            "original_sha256": "90d8c37f733262fb2ff7b24fe7f46b1aa754bb69323761416b9f330be9c60a2d",
+            "source_id": "ph:star-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/star-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/cloud-fill.svg",
+            "original_sha256": "852cab661e73cee2a1e0ce051e16790820c83d7e4bc000c5f65a2ed83b12ef16",
+            "source_id": "ph:cloud-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/cloud-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/crown-fill.svg",
+            "original_sha256": "7b3926ebc4ed31a86ac969fd86082c352b058e0dd6cb7a3aa85436d7088db610",
+            "source_id": "ph:crown-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/crown-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/diamond-fill.svg",
+            "original_sha256": "8570871dcb825eae6250e801fd438a6a9dd05b909453840f342e42ca85a8092b",
+            "source_id": "ph:diamond-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/diamond-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/planet-fill.svg",
+            "original_sha256": "aa7aeba5ffc9a1c4439b59c0136ee86c4d0c3a82fbe9d72ba4f68260463daf05",
+            "source_id": "ph:planet-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/planet-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/sparkle-fill.svg",
+            "original_sha256": "f4ff0e1d4b6257bf1f279d97289845084dbbde279daaae313ee61f392fd4832a",
+            "source_id": "ph:sparkle-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/sparkle-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/ice-cream-fill.svg",
+            "original_sha256": "81e1c20e0e341c7454ca158c07581e350c10c3e2ae49317c788fa8c290337db3",
+            "source_id": "ph:ice-cream-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/ice-cream-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/circles-three-fill.svg",
+            "original_sha256": "8acab06bcbfe55ce990fb12e9e803ece3a554cc17a0c8758443af9c111d59d78",
+            "source_id": "ph:circles-three-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/circles-three-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/cookie-fill.svg",
+            "original_sha256": "4e3e082ec78235d96a885cb3aeada9623620515a5fea7f267363eb802a1f7306",
+            "source_id": "ph:cookie-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/cookie-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/bell-fill.svg",
+            "original_sha256": "e6a92a3e3d375953441826a740be86d7747d4591a9911f7576edc4d1744285ac",
+            "source_id": "ph:bell-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/bell-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/speaker-high-fill.svg",
+            "original_sha256": "50e1f4d2f7b5ed715ee6cd06fedb8b97a78599c017d372325db2afc5cb623b9e",
+            "source_id": "ph:speaker-high-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/speaker-high-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/target-fill.svg",
+            "original_sha256": "fe11bbe9e08c8601a5c89622afdcebae0c4caeb6bea5b25b688c408c9ea5a924",
+            "source_id": "ph:target-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/target-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/hand-grabbing-fill.svg",
+            "original_sha256": "8796dce5dfc27b93c504c0d46880b1bf979bde2f8b58e3106a26ef98ff8f0673",
+            "source_id": "ph:hand-grabbing-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/hand-grabbing-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/trophy-fill.svg",
+            "original_sha256": "9e463955c99bc4bf72b5afed83540a0b3f44217fbfb96cd367e5a5e4ab2b5c54",
+            "source_id": "ph:trophy-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/trophy-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/game-controller-fill.svg",
+            "original_sha256": "8400942841b13310f77b59452a426b2d6b055ffbc9c4e9c1f1a2068e93f28429",
+            "source_id": "ph:game-controller-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/game-controller-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/hammer-fill.svg",
+            "original_sha256": "4714b4e00e90fff669ceace2ba34fb71ab059de4f9c35d546a629c0a21012440",
+            "source_id": "ph:hammer-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/hammer-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/baseball-fill.svg",
+            "original_sha256": "c2aa28aaa31068d1b7c0e346691338872c0ce048b456e3bbc815694c8ed0f7fb",
+            "source_id": "ph:baseball-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/baseball-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/check-bold.svg",
+            "original_sha256": "c7305a0fe3683d3f1ba8fa652fd699d57eb8c9e6da88426149c548f810402a16",
+            "source_id": "ph:check-bold",
+            "source_url": "https://icon-sets.iconify.design/ph/check-bold/"
+          }
+        ]
+      },
+      "response": {
+        "done": true,
+        "operationId": "c2cf1ed0-4b75-4bbc-a639-bf0c5d1dd855",
+        "path": "operations/c2cf1ed0-4b75-4bbc-a639-bf0c5d1dd855",
+        "response": {
+          "assetId": "130070129394053",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH UI icons ph",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/130070129394053",
+          "revisionCreateTime": "2026-09-10T23:35:11.399566800Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "8b0ab07e9c5a35ffe9ca3489035c868543dc8ad246897924044814821de7774e",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 36261,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          960,
+          768
+        ],
+        "valid": true
+      }
+    },
+    "assets/ui/well-9slice.png": {
+      "asset_id": "74795093768394",
+      "asset_type": "Decal",
+      "binding": "3775999cbc4d1fdde01732235608329daffe788809b33da1654a1ba2b95fb9ae",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH inner well R12",
+      "filename": "well-9slice.png",
+      "http_status": 200,
+      "id": "65fe07f9-30e0-4a4e-b53e-482f3373ef9b",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/72226609-a25d-40fa-bf3c-72637a64f0d7",
+      "preview_hashes": {},
+      "production_file": "assets/ui/well-9slice.png",
+      "production_ready": true,
+      "proposal_sha256": "df440ecd4aa7023d018c248da61eedb4c2ce217bff31bc24b481e5ee7a48120d",
+      "provenance": {
+        "attribution_required": false,
+        "author": "Jack C. (OUCH! project)",
+        "figma_file_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
+        "figma_node_id": "63-12",
+        "license": "Project-Owned",
+        "license_url": "local:project-owned",
+        "local_export_source": "assets/source/figma/well-9slice.svg",
+        "modifications": [
+          "Authored as vector layers in the canonical Figma file (frame 'Well / 9-slice', node 63-12) from assets/source/figma/well-9slice.svg",
+          "Exported from Figma as PNG 1x (520x328) to assets/source/figma/exports/well-9slice.png"
+        ],
+        "provider": "project",
+        "slice": {
+          "center": [
+            32,
+            32,
+            480,
+            288
+          ],
+          "outline_px": 2,
+          "scale": 0.5,
+          "shadow_px": 4,
+          "visible_radius_px": 12
+        },
+        "source_id": "figma:qOQKzOXH6HIc8g1PHWvplh:63-12",
+        "source_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled?node-id=63-12"
+      },
+      "response": {
+        "done": true,
+        "operationId": "72226609-a25d-40fa-bf3c-72637a64f0d7",
+        "path": "operations/72226609-a25d-40fa-bf3c-72637a64f0d7",
+        "response": {
+          "assetId": "74795093768394",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH inner well R12",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/74795093768394",
+          "revisionCreateTime": "2026-09-10T23:35:36.967354800Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "7050d5d5a4976a5a02d1c7bd80d2df95cc44fecafc71941c0b3fa6028aeb9551",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 3158,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          520,
+          328
+        ],
+        "valid": true
+      }
+    }
+  },
   "requests": {
+    "00c598a3-5842-4f02-9a4c-1316f738d6f0": {
+      "asset_id": "130070129394053",
+      "asset_type": "Decal",
+      "binding": "5057924e14a84005958c77e2cb6078eb55f8ff7c7fd3ce7140ae32c159ad1398",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH UI icons ph",
+      "filename": "redesign-ph.png",
+      "http_status": 200,
+      "id": "00c598a3-5842-4f02-9a4c-1316f738d6f0",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/c2cf1ed0-4b75-4bbc-a639-bf0c5d1dd855",
+      "preview_hashes": {},
+      "production_file": "assets/ui/redesign-ph.png",
+      "production_ready": true,
+      "proposal_sha256": "ee5168f6ce6a0e9a1f85638456303b94ecf94e67bd4355e74ce963c3af1f2fe1",
+      "provenance": {
+        "attribution_required": true,
+        "author": "Phosphor Icons",
+        "license": "MIT",
+        "license_text": "MIT License\n\nCopyright (c) 2023 Phosphor Icons\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+        "license_url": "https://github.com/phosphor-icons/core/blob/main/LICENSE",
+        "modifications": [
+          "Packed licensed SVGs into 192px cells; currentColor rendered white with 16px gutters for Roblox tinting."
+        ],
+        "production_file": "assets/ui/redesign-ph.png",
+        "provider": "Iconify",
+        "sha256": "8b0ab07e9c5a35ffe9ca3489035c868543dc8ad246897924044814821de7774e",
+        "source_id": "ph:ouch-redesign-atlas",
+        "source_url": "https://icon-sets.iconify.design/ph/confetti-fill/",
+        "sources": [
+          {
+            "original_file": "assets/source/external/ph/confetti-fill.svg",
+            "original_sha256": "47a1909e24efc8703b3e7d44906301f822b7ae26bda875ced429d3c969e4df75",
+            "source_id": "ph:confetti-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/confetti-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/star-fill.svg",
+            "original_sha256": "90d8c37f733262fb2ff7b24fe7f46b1aa754bb69323761416b9f330be9c60a2d",
+            "source_id": "ph:star-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/star-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/cloud-fill.svg",
+            "original_sha256": "852cab661e73cee2a1e0ce051e16790820c83d7e4bc000c5f65a2ed83b12ef16",
+            "source_id": "ph:cloud-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/cloud-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/crown-fill.svg",
+            "original_sha256": "7b3926ebc4ed31a86ac969fd86082c352b058e0dd6cb7a3aa85436d7088db610",
+            "source_id": "ph:crown-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/crown-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/diamond-fill.svg",
+            "original_sha256": "8570871dcb825eae6250e801fd438a6a9dd05b909453840f342e42ca85a8092b",
+            "source_id": "ph:diamond-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/diamond-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/planet-fill.svg",
+            "original_sha256": "aa7aeba5ffc9a1c4439b59c0136ee86c4d0c3a82fbe9d72ba4f68260463daf05",
+            "source_id": "ph:planet-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/planet-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/sparkle-fill.svg",
+            "original_sha256": "f4ff0e1d4b6257bf1f279d97289845084dbbde279daaae313ee61f392fd4832a",
+            "source_id": "ph:sparkle-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/sparkle-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/ice-cream-fill.svg",
+            "original_sha256": "81e1c20e0e341c7454ca158c07581e350c10c3e2ae49317c788fa8c290337db3",
+            "source_id": "ph:ice-cream-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/ice-cream-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/circles-three-fill.svg",
+            "original_sha256": "8acab06bcbfe55ce990fb12e9e803ece3a554cc17a0c8758443af9c111d59d78",
+            "source_id": "ph:circles-three-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/circles-three-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/cookie-fill.svg",
+            "original_sha256": "4e3e082ec78235d96a885cb3aeada9623620515a5fea7f267363eb802a1f7306",
+            "source_id": "ph:cookie-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/cookie-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/bell-fill.svg",
+            "original_sha256": "e6a92a3e3d375953441826a740be86d7747d4591a9911f7576edc4d1744285ac",
+            "source_id": "ph:bell-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/bell-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/speaker-high-fill.svg",
+            "original_sha256": "50e1f4d2f7b5ed715ee6cd06fedb8b97a78599c017d372325db2afc5cb623b9e",
+            "source_id": "ph:speaker-high-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/speaker-high-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/target-fill.svg",
+            "original_sha256": "fe11bbe9e08c8601a5c89622afdcebae0c4caeb6bea5b25b688c408c9ea5a924",
+            "source_id": "ph:target-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/target-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/hand-grabbing-fill.svg",
+            "original_sha256": "8796dce5dfc27b93c504c0d46880b1bf979bde2f8b58e3106a26ef98ff8f0673",
+            "source_id": "ph:hand-grabbing-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/hand-grabbing-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/trophy-fill.svg",
+            "original_sha256": "9e463955c99bc4bf72b5afed83540a0b3f44217fbfb96cd367e5a5e4ab2b5c54",
+            "source_id": "ph:trophy-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/trophy-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/game-controller-fill.svg",
+            "original_sha256": "8400942841b13310f77b59452a426b2d6b055ffbc9c4e9c1f1a2068e93f28429",
+            "source_id": "ph:game-controller-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/game-controller-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/hammer-fill.svg",
+            "original_sha256": "4714b4e00e90fff669ceace2ba34fb71ab059de4f9c35d546a629c0a21012440",
+            "source_id": "ph:hammer-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/hammer-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/baseball-fill.svg",
+            "original_sha256": "c2aa28aaa31068d1b7c0e346691338872c0ce048b456e3bbc815694c8ed0f7fb",
+            "source_id": "ph:baseball-fill",
+            "source_url": "https://icon-sets.iconify.design/ph/baseball-fill/"
+          },
+          {
+            "original_file": "assets/source/external/ph/check-bold.svg",
+            "original_sha256": "c7305a0fe3683d3f1ba8fa652fd699d57eb8c9e6da88426149c548f810402a16",
+            "source_id": "ph:check-bold",
+            "source_url": "https://icon-sets.iconify.design/ph/check-bold/"
+          }
+        ]
+      },
+      "response": {
+        "done": true,
+        "operationId": "c2cf1ed0-4b75-4bbc-a639-bf0c5d1dd855",
+        "path": "operations/c2cf1ed0-4b75-4bbc-a639-bf0c5d1dd855",
+        "response": {
+          "assetId": "130070129394053",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH UI icons ph",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/130070129394053",
+          "revisionCreateTime": "2026-09-10T23:35:11.399566800Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "8b0ab07e9c5a35ffe9ca3489035c868543dc8ad246897924044814821de7774e",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 36261,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          960,
+          768
+        ],
+        "valid": true
+      }
+    },
     "3e6df78c-0a09-48ec-b651-00e11837c754": {
       "asset_type": "Decal",
       "binding": "e0f6778b99f704104dffe7fa8023f8090786bb7ee673fc6f8e0b2e02097980b6",
@@ -47,12 +711,289 @@
         "valid": true
       }
     },
+    "4787d362-4574-4602-bfa6-3ed43f5e0745": {
+      "asset_id": "109049105652853",
+      "asset_type": "Decal",
+      "binding": "e37cc7ef8f0e8f2d19f67fc6d1d6c99665ad440b33e7692211a05a7fe2f4298c",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH UI icons material-symbols",
+      "filename": "redesign-material-symbols.png",
+      "http_status": 200,
+      "id": "4787d362-4574-4602-bfa6-3ed43f5e0745",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/27b40261-f432-4dc2-9593-d2e584382094",
+      "preview_hashes": {},
+      "production_file": "assets/ui/redesign-material-symbols.png",
+      "production_ready": true,
+      "proposal_sha256": "57cd5a922628e2db3848d3cb33965596f8ced3a6ce1ff41f5fabfc8d0a9ae695",
+      "provenance": {
+        "attribution_required": true,
+        "author": "Google",
+        "license": "Apache-2.0",
+        "license_text": "\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.",
+        "license_url": "https://github.com/google/material-design-icons/blob/master/LICENSE",
+        "modifications": [
+          "Packed licensed SVGs into 192px cells; currentColor rendered white with 16px gutters for Roblox tinting."
+        ],
+        "production_file": "assets/ui/redesign-material-symbols.png",
+        "provider": "Iconify",
+        "sha256": "4990778309ca9220caa12331a82a0d2dc5464520506056ca828fc3a0faeab8ce",
+        "source_id": "material-symbols:ouch-redesign-atlas",
+        "source_url": "https://icon-sets.iconify.design/material-symbols/celebration-rounded/",
+        "sources": [
+          {
+            "original_file": "assets/source/external/material-symbols/celebration-rounded.svg",
+            "original_sha256": "2759b82e033dcce75c05ce049e2df93d37a9f54071b2eb88b240e6ed10b38595",
+            "source_id": "material-symbols:celebration-rounded",
+            "source_url": "https://icon-sets.iconify.design/material-symbols/celebration-rounded/"
+          },
+          {
+            "original_file": "assets/source/external/material-symbols/explosion-rounded.svg",
+            "original_sha256": "58a2a5f76710bd06b3b8be41c55500d03481a0e7a7261305f4ff56edb24e9871",
+            "source_id": "material-symbols:explosion-rounded",
+            "source_url": "https://icon-sets.iconify.design/material-symbols/explosion-rounded/"
+          },
+          {
+            "original_file": "assets/source/external/material-symbols/water-drop-rounded.svg",
+            "original_sha256": "a84937984efb8d9f48e48c15a17bf4574fe8721a7fbcf456fbd15960b013c12d",
+            "source_id": "material-symbols:water-drop-rounded",
+            "source_url": "https://icon-sets.iconify.design/material-symbols/water-drop-rounded/"
+          }
+        ]
+      },
+      "response": {
+        "done": true,
+        "operationId": "27b40261-f432-4dc2-9593-d2e584382094",
+        "path": "operations/27b40261-f432-4dc2-9593-d2e584382094",
+        "response": {
+          "assetId": "109049105652853",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH UI icons material-symbols",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/109049105652853",
+          "revisionCreateTime": "2026-09-10T23:35:20.028130400Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "4990778309ca9220caa12331a82a0d2dc5464520506056ca828fc3a0faeab8ce",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 5935,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          576,
+          192
+        ],
+        "valid": true
+      }
+    },
+    "65fe07f9-30e0-4a4e-b53e-482f3373ef9b": {
+      "asset_id": "74795093768394",
+      "asset_type": "Decal",
+      "binding": "3775999cbc4d1fdde01732235608329daffe788809b33da1654a1ba2b95fb9ae",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH inner well R12",
+      "filename": "well-9slice.png",
+      "http_status": 200,
+      "id": "65fe07f9-30e0-4a4e-b53e-482f3373ef9b",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/72226609-a25d-40fa-bf3c-72637a64f0d7",
+      "preview_hashes": {},
+      "production_file": "assets/ui/well-9slice.png",
+      "production_ready": true,
+      "proposal_sha256": "df440ecd4aa7023d018c248da61eedb4c2ce217bff31bc24b481e5ee7a48120d",
+      "provenance": {
+        "attribution_required": false,
+        "author": "Jack C. (OUCH! project)",
+        "figma_file_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
+        "figma_node_id": "63-12",
+        "license": "Project-Owned",
+        "license_url": "local:project-owned",
+        "local_export_source": "assets/source/figma/well-9slice.svg",
+        "modifications": [
+          "Authored as vector layers in the canonical Figma file (frame 'Well / 9-slice', node 63-12) from assets/source/figma/well-9slice.svg",
+          "Exported from Figma as PNG 1x (520x328) to assets/source/figma/exports/well-9slice.png"
+        ],
+        "provider": "project",
+        "slice": {
+          "center": [
+            32,
+            32,
+            480,
+            288
+          ],
+          "outline_px": 2,
+          "scale": 0.5,
+          "shadow_px": 4,
+          "visible_radius_px": 12
+        },
+        "source_id": "figma:qOQKzOXH6HIc8g1PHWvplh:63-12",
+        "source_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled?node-id=63-12"
+      },
+      "response": {
+        "done": true,
+        "operationId": "72226609-a25d-40fa-bf3c-72637a64f0d7",
+        "path": "operations/72226609-a25d-40fa-bf3c-72637a64f0d7",
+        "response": {
+          "assetId": "74795093768394",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH inner well R12",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/74795093768394",
+          "revisionCreateTime": "2026-09-10T23:35:36.967354800Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "7050d5d5a4976a5a02d1c7bd80d2df95cc44fecafc71941c0b3fa6028aeb9551",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 3158,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          520,
+          328
+        ],
+        "valid": true
+      }
+    },
     "6ce2a8e6-8e59-4ad6-936a-13f97acddd25": {
       "demo": true,
       "production_file": ".review/approval-demo.png",
       "sequence": 0,
       "sha256": "fde233a3c1863e9a33116448c0158fa61306d71218eee42fa3e1b1dd91fe04b2",
       "state": "PREPARED"
+    },
+    "9a415c69-9193-4f80-ab77-aea35c5f343e": {
+      "asset_id": "131449610091380",
+      "asset_type": "Decal",
+      "binding": "3da826d80d67dc34627d351b4c38f61eb1e250567b63ee95f52ff7351578ed0d",
+      "creator": "group:291738800",
+      "demo": false,
+      "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+      "display_name": "OUCH page panel R16",
+      "filename": "page-panel-9slice.png",
+      "http_status": 200,
+      "id": "9a415c69-9193-4f80-ab77-aea35c5f343e",
+      "model_evidence": null,
+      "moderation_state": "MODERATION_STATE_APPROVED",
+      "operation": "operations/0aa13c3b-1a8a-40bb-bbfd-6077e38cf33d",
+      "preview_hashes": {},
+      "production_file": "assets/ui/page-panel-9slice.png",
+      "production_ready": true,
+      "proposal_sha256": "8943978c464a75a9046a40466ad8ecdd526b763ff1f32913cdcf27fb69fdbff2",
+      "provenance": {
+        "attribution_required": false,
+        "author": "Jack C. (OUCH! project)",
+        "figma_file_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled",
+        "figma_node_id": "63-6",
+        "license": "Project-Owned",
+        "license_url": "local:project-owned",
+        "local_export_source": "assets/source/figma/page-panel-9slice.svg",
+        "modifications": [
+          "Authored as vector layers in the canonical Figma file (frame 'Panel / 9-slice', node 63-6) from assets/source/figma/page-panel-9slice.svg",
+          "Exported from Figma as PNG 1x (1032x648) to assets/source/figma/exports/page-panel-9slice.png"
+        ],
+        "provider": "project",
+        "slice": {
+          "center": [
+            40,
+            40,
+            984,
+            600
+          ],
+          "outline_px": 4,
+          "scale": 0.5,
+          "shadow_px": 4,
+          "visible_radius_px": 16
+        },
+        "source_id": "figma:qOQKzOXH6HIc8g1PHWvplh:63-6",
+        "source_url": "https://www.figma.com/design/qOQKzOXH6HIc8g1PHWvplh/Untitled?node-id=63-6"
+      },
+      "response": {
+        "done": true,
+        "operationId": "0aa13c3b-1a8a-40bb-bbfd-6077e38cf33d",
+        "path": "operations/0aa13c3b-1a8a-40bb-bbfd-6077e38cf33d",
+        "response": {
+          "assetId": "131449610091380",
+          "assetType": "Decal",
+          "creationContext": {
+            "creator": {
+              "groupId": "291738800"
+            }
+          },
+          "description": "OUCH UI redesign. Source artwork and full license notices retained in the project.",
+          "displayName": "OUCH page panel R16",
+          "moderationResult": {
+            "moderationState": "Approved"
+          },
+          "path": "assets/131449610091380",
+          "revisionCreateTime": "2026-09-10T23:35:31.119894600Z",
+          "revisionId": "1",
+          "state": "Active"
+        }
+      },
+      "revision": "1",
+      "sequence": 7,
+      "sha256": "ea8c619f4cd63d774f63f96b043532e623ce92a6b2380a98b26721c5d373f5fb",
+      "source": null,
+      "state": "COMPLETE",
+      "target_asset_id": null,
+      "validation": {
+        "bytes": 6159,
+        "checks": [
+          "supported format",
+          "size limit",
+          "decoded image and dimensions"
+        ],
+        "content_type": "image/png",
+        "dimensions": [
+          1032,
+          648
+        ],
+        "valid": true
+      }
     },
     "fc03789d-225e-4b5f-abed-40945c5b29b9": {
       "asset_type": "Decal",

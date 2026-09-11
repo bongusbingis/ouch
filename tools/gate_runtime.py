@@ -155,6 +155,13 @@ def process_operation(store, record, response):
         record["asset_id"] = str(asset.get("assetId", ""))
         record["revision"] = asset.get("revisionId")
         moderation = asset.get("moderationResult", {}).get("moderationState", "UNKNOWN")
+        # Assets v1 returns PascalCase states; retain support for the legacy
+        # enum spelling without treating missing or unfamiliar states as ready.
+        moderation = {
+            "Approved": "MODERATION_STATE_APPROVED",
+            "Rejected": "MODERATION_STATE_REJECTED",
+            "Reviewing": "MODERATION_STATE_REVIEWING",
+        }.get(moderation, moderation)
         record["moderation_state"] = moderation
         record["state"] = "COMPLETE" if moderation == "MODERATION_STATE_APPROVED" and record["asset_id"] else "MODERATION_PENDING"
         if "REJECTED" in moderation:
