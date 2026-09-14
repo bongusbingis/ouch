@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local React = require(ReplicatedStorage.Packages.react)
+local T = require(script.Parent.Parent.Tokens)
 
 return function(scale: number, rotation: number, pressing: boolean, reducedMotion: boolean)
 	local driver = React.useRef(nil)
@@ -31,7 +32,7 @@ return function(scale: number, rotation: number, pressing: boolean, reducedMotio
 		local tween = TweenService:Create(
 			source,
 			TweenInfo.new(
-				if pressing then 0.1 else 0.38,
+				if pressing then T.Motion.Press else T.Motion.TabSwitch,
 				if pressing then Enum.EasingStyle.Back else Enum.EasingStyle.Elastic,
 				Enum.EasingDirection.Out
 			),

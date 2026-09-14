@@ -1,332 +1,179 @@
--- Name: CrateOddsGrid.luau
--- Author: Jack C.
--- Description: Crate odds presented as rarity-sectioned grids of Backpack-style reward tiles, each showing a live preview, its next-open chance and an OWNED tag, so every reward is visible without tapping through a list.
--- Created: 2026-09-09
 --!strict
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local InventoryConfig =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
-local formatNumber = require(script.Parent.Parent.Parent.Models.NumberText)
-local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
-local OuchButton = require(script.Parent.Parent.OuchButton)
-local InventoryPreview = require(script.Parent.Parent.InventoryPreview)
-local ResponsiveText = require(script.Parent.Parent.OuchText)
-
-local c = React.createElement
-local colors = UIConfig.ProgressionStyle
-local WHITE = Color3.new(1, 1, 1)
-local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
-local BODY_FONT = Font.fromEnum(UIConfig.Text.BodyFont)
-
-export type Props = {
-	Odds: { any },
-	SelectedId: string?,
-	OnSelect: (string) -> (),
-	TilePx: number,
-	Columns: number,
-	GapPx: number,
-	Short: boolean,
-	ColorId: string?,
-	CostumeId: string?,
-	ZIndex: number,
-}
-
-local function tileName(outcome: any): string
-	local name = string.gsub(outcome.displayName, "^Default%s+", "")
-	local category = if outcome.preview then outcome.preview.category else nil
-	local suffix = if category == "BallAssets" then " Ball" elseif category == "HammerAssets" then " Hammer" else nil
-	if suffix ~= nil and string.sub(name, -#suffix) == suffix and #name > #suffix then
-		name = string.sub(name, 1, #name - #suffix)
-	end
-	return string.upper(name)
-end
-
-local function Tile(props: {
-	Outcome: any,
-	Selected: boolean,
-	TilePx: number,
-	Short: boolean,
-	ColorId: string?,
-	CostumeId: string?,
-	ZIndex: number,
-	LayoutOrder: number,
-	OnActivated: () -> (),
-})
-	local outcome = props.Outcome
-	local z = props.ZIndex
-	local bandPx = if props.Short then 32 else 36
-	local rarityColor = InventoryConfig.RarityColors[outcome.rarity] or colors.Cyan
-	local preview = outcome.preview
-	return c(AnimatedButton, {
-		SelectionRadius = UDim.new(0, UIConfig.Radius.Control),
-		Visual = c(OuchButton, { Color = if props.Selected then colors.Pink else colors.Cyan, ZIndex = z }),
-		Style = "Card",
-		HoverRotation = false,
-		Native = {
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://123285423801571",
-			LayoutOrder = props.LayoutOrder,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = Rect.new(107, 27, 126, 128),
-			Size = UDim2.fromOffset(props.TilePx, if props.Short then 92 else props.TilePx + bandPx),
-			ZIndex = z,
-		},
-		OnActivated = props.OnActivated,
-	}, {
-		Background = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = WHITE,
-			BorderSizePixel = 0,
-			Image = "rbxassetid://80477338860845",
-			ImageColor3 = rarityColor,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.new(1, -4, 1, -4),
-			ZIndex = z - 1,
-		}, {
-			Texture = c("ImageLabel", {
-				BackgroundTransparency = 1,
-				Image = "rbxassetid://6794188517",
-				ImageTransparency = 0.92,
-				Size = UDim2.fromScale(1, 1),
-				ZIndex = z,
-			}),
-		}),
-		Preview = c("Frame", {
-			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(0, 6),
-			Size = UDim2.new(1, 0, 1, -bandPx - 18),
-			ZIndex = z + 1,
-		}, {
-			Content = if preview
-				then c(InventoryPreview, {
-					ItemId = preview.itemId,
-					Category = preview.category,
-					Definition = preview.definition,
-					ColorId = props.ColorId,
-					CostumeId = props.CostumeId,
-					ZIndex = z + 1,
-				})
-				else nil,
-		}),
-		Chance = c("Frame", {
-			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = colors.Pink,
-			BackgroundTransparency = 0,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(8, 8),
-			Size = UDim2.fromOffset(0, 24),
-			ZIndex = z + 3,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
-			Text = c("TextLabel", {
-				AutomaticSize = Enum.AutomaticSize.X,
-				BackgroundTransparency = 1,
-				FontFace = BODY_FONT,
-				Size = UDim2.fromScale(0, 1),
-				Text = tostring(outcome.percent) .. "%",
-				TextColor3 = colors.Yellow,
-				TextSize = UIConfig.Text.CaptionMinPx,
-				ZIndex = z + 4,
-			}, {
-				Outline = c("UIStroke", {
-					Color = colors.Ink,
-					Thickness = UIConfig.Text.OutlineScale,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-		}),
-		Owned = if outcome.owned
-			then c("Frame", {
-				AnchorPoint = Vector2.new(1, if props.Short then 0 else 1),
-				AutomaticSize = if props.Short then Enum.AutomaticSize.None else Enum.AutomaticSize.X,
-				BackgroundColor3 = colors.Yellow,
-				BorderSizePixel = 0,
-				Position = if props.Short then UDim2.new(1, -8, 0, 8) else UDim2.new(1, -8, 1, -bandPx - 12),
-				Size = if props.Short then UDim2.fromOffset(24, 24) else UDim2.fromOffset(0, 22),
-				ZIndex = z + 3,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Padding = if not props.Short
-					then c("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) })
-					else nil,
-				Check = if props.Short
-					then c("ImageLabel", {
-						BackgroundTransparency = 1,
-						Image = "rbxassetid://168702841",
-						ImageColor3 = colors.Ink,
-						Position = UDim2.fromOffset(4, 4),
-						Size = UDim2.fromOffset(16, 16),
-						ZIndex = z + 4,
-					})
-					else nil,
-				Text = if not props.Short
-					then c("TextLabel", {
-						AutomaticSize = Enum.AutomaticSize.X,
-						BackgroundTransparency = 1,
-						FontFace = BODY_FONT,
-						Size = UDim2.fromScale(0, 1),
-						Text = "OWNED",
-						TextColor3 = WHITE,
-						TextSize = UIConfig.Text.CaptionMinPx,
-						ZIndex = z + 4,
-					}, {
-						Outline = c("UIStroke", {
-							Color = colors.Ink,
-							Thickness = UIConfig.Text.OutlineScale,
-							StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-						}),
-					})
-					else nil,
-			})
-			else nil,
-		NameBand = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = colors.Pink,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, 0, 1, -8),
-			Size = UDim2.new(1, -16, 0, bandPx),
-			ZIndex = z + 2,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-			Outline = if props.Selected then c("UIStroke", { Color = colors.Yellow, Thickness = 2 }) else nil,
-			ItemName = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 17,
-				MinTextSize = 14,
-				Wrapped = true,
-				Truncate = true,
-				Native = {
-					BackgroundTransparency = 1,
-					FontFace = DISPLAY_FONT,
-					Position = UDim2.fromOffset(4, 4),
-					Size = UDim2.new(1, -8, 1, -4),
-					Text = tileName(outcome),
-					TextColor3 = if props.Selected then colors.Yellow else WHITE,
-					TextWrapped = true,
-					ZIndex = z + 3,
-				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = colors.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-		}),
+local RS = game:GetService("ReplicatedStorage")
+local React = require(RS.Packages.react)
+local T = require(script.Parent.Parent.Parent.Tokens)
+local Summary = require(script.Parent.Parent.Parent.Models.CrateOddsSummary)
+local number = require(script.Parent.Parent.Parent.Models.NumberText)
+local Button = require(script.Parent.Parent.PuffyButton)
+local Preview = require(script.Parent.ShopPreview)
+local Ribbon = require(script.Parent.Parent.RarityRibbon)
+local c, C = React.createElement, T.Colors
+local function text(value, y, height, color, z)
+	return c("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(8, y),
+		Size = UDim2.new(1, -16, 0, height),
+		Font = T.Type.Label,
+		Text = value,
+		TextSize = T.Type.Minimum,
+		TextColor3 = color or C.Ink,
+		TextWrapped = true,
+		ZIndex = z,
 	})
 end
-
-local function sectionSummary(first: any): string
-	local chance = tostring(first.percent) .. "%"
-	local base = if first.basePercent and first.basePercent ~= first.percent then ` (base {first.basePercent}%)` else ""
-	return `{chance} each{base}  •  Duplicates: {formatNumber(first.bonksRefund or 0)} Bonks`
+local function Tile(props)
+	local entry = props.Entry
+	local tier = T.Rarity[entry.rarity]
+	local z = props.ZIndex
+	local base = if entry.basePercent and entry.basePercent ~= entry.percent
+		then " · BASE " .. tostring(entry.basePercent) .. "%"
+		else ""
+	return c(Button, {
+		OnActivated = props.OnActivated,
+		Style = "Card",
+		Color = C.NeutralTile:Lerp(C.Surface, 0.4),
+		Radius = T.Shape.RadiusCard,
+		Shadow = false,
+		StrokeColor = if props.Selected then C.Yellow else C.Ink,
+		Native = { LayoutOrder = props.Order, Size = UDim2.fromOffset(props.Width, props.Height), ZIndex = z },
+	}, {
+		Chance = c(Ribbon, {
+			Text = tostring(entry.percent) .. "%",
+			Color = if tier then tier.Color else C.WellLine,
+			Native = {
+				Position = UDim2.fromOffset(10, 10),
+				Size = UDim2.new(if entry.owned then 0.52 else 1, if entry.owned then -15 else -20, 0, 26),
+				ZIndex = z + 6,
+			},
+		}),
+		Owned = if entry.owned
+			then c(Ribbon, {
+				Text = "OWNED",
+				Color = C.Yellow,
+				Native = {
+					Position = UDim2.new(0.52, 0, 0, 10),
+					Size = UDim2.new(0.48, -10, 0, 26),
+					ZIndex = z + 6,
+				},
+			})
+			else nil,
+		Preview = c("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(8, 44),
+			Size = UDim2.new(1, -16, 0, props.Height - 144),
+			ZIndex = z + 6,
+		}, {
+			Content = c(Preview, {
+				Items = if entry.preview then { entry.preview } else {},
+				ColorId = props.ColorId,
+				CostumeId = props.CostumeId,
+				ZIndex = z + 6,
+			}),
+		}),
+		Name = c("TextLabel", {
+			BackgroundColor3 = C.Ink,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 8, 1, -96),
+			Size = UDim2.new(1, -16, 0, 52),
+			Font = T.Type.Display,
+			Text = string.upper(entry.displayName),
+			TextSize = T.Type.Minimum,
+			TextColor3 = C.Surface,
+			TextWrapped = true,
+			ZIndex = z + 7,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
+			Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
+		}),
+		Refund = text("DUPE: +" .. number(entry.bonksRefund or 0) .. " BONKS", props.Height - 42, 30, C.Ink, z + 7),
+		Base = if base ~= "" then text("BASE " .. tostring(entry.basePercent) .. "%", 40, 24, C.Ink, z + 8) else nil,
+	})
 end
-
-return function(props: Props)
-	local sections = {}
-	local order = 0
-	local groups: { { rarity: string, outcomes: { any } } } = {}
-	local byRarity: { [string]: { any } } = {}
-	for _, outcome in props.Odds do
-		local bucket = byRarity[outcome.rarity]
-		if bucket == nil then
-			bucket = {}
-			byRarity[outcome.rarity] = bucket
-			table.insert(groups, { rarity = outcome.rarity, outcomes = bucket })
+return function(props)
+	local width = props.Columns * props.TilePx + (props.Columns - 1) * props.GapPx
+	local columns = math.max(1, math.floor((width + T.Shop.CardGap) / (T.Shop.CardMin + T.Shop.CardGap)))
+	local tileWidth = math.floor((width - (columns - 1) * T.Shop.CardGap) / columns)
+	local height = if width < 400 then T.Shop.OddsCompactHeight else T.Shop.CardHeight
+	local groups, byRarity = {}, {}
+	for _, entry in props.Odds do
+		local group = byRarity[entry.rarity]
+		if not group then
+			group = { rarity = entry.rarity, outcomes = {} }
+			byRarity[entry.rarity] = group
+			table.insert(groups, group)
 		end
-		table.insert(bucket, outcome)
+		table.insert(group.outcomes, entry)
 	end
-	for _, group in groups do
-		local rarityColor = InventoryConfig.RarityColors[group.rarity] or colors.Cyan
+	local children = {}
+	for index, group in groups do
+		local chance, base, refund = Summary.shared(group.outcomes)
+		local summary = if chance then tostring(chance) .. "% EACH" else "INDIVIDUAL CHANCES BELOW"
+		if base and base ~= chance then
+			summary ..= " · BASE " .. tostring(base) .. "%"
+		end
+		if refund then
+			summary ..= " · DUPLICATES: " .. number(refund) .. " BONKS"
+		end
+		children["Header" .. group.rarity] = c("Frame", {
+			BackgroundTransparency = 1,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = index * 2 - 1,
+			Size = UDim2.fromScale(1, 0),
+			ZIndex = props.ZIndex,
+		}, {
+			Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }),
+			Ribbon = c(Ribbon, {
+				Rarity = group.rarity,
+				Native = {
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(160, 30),
+					ZIndex = props.ZIndex + 1,
+				},
+			}),
+			Summary = c("TextLabel", {
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, -8, 0, 26),
+				Font = T.Type.Label,
+				Text = summary,
+				TextSize = T.Type.Minimum,
+				TextColor3 = C.Ink,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				LayoutOrder = 2,
+				ZIndex = props.ZIndex + 1,
+			}),
+		})
 		local tiles = {
 			Grid = c("UIGridLayout", {
-				CellPadding = UDim2.fromOffset(props.GapPx, props.GapPx),
-				CellSize = UDim2.fromOffset(props.TilePx, if props.Short then 92 else props.TilePx + 36),
-				FillDirectionMaxCells = props.Columns,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				CellPadding = UDim2.fromOffset(T.Shop.CardGap, T.Shop.CardGap),
+				CellSize = UDim2.fromOffset(tileWidth, height),
+				FillDirectionMaxCells = columns,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
 		}
-		for index, outcome in group.outcomes do
-			tiles[outcome.itemId] = c(Tile, {
-				Outcome = outcome,
-				Selected = props.SelectedId == outcome.itemId,
-				TilePx = props.TilePx,
-				Short = props.Short,
+		for order, entry in group.outcomes do
+			tiles[entry.itemId] = c(Tile, {
+				Entry = entry,
+				Order = order,
+				Width = tileWidth,
+				Height = height,
+				Selected = props.SelectedId == entry.itemId,
 				ColorId = props.ColorId,
 				CostumeId = props.CostumeId,
 				ZIndex = props.ZIndex,
-				LayoutOrder = index,
 				OnActivated = function()
-					props.OnSelect(outcome.itemId)
+					props.OnSelect(entry.itemId)
 				end,
 			})
 		end
-		order += 1
-		sections["Header" .. group.rarity] = c("Frame", {
-			AutomaticSize = Enum.AutomaticSize.Y,
+		children["Tiles" .. group.rarity] = c("Frame", {
 			BackgroundTransparency = 1,
-			LayoutOrder = order,
-			Size = UDim2.fromScale(1, 0),
-			ZIndex = props.ZIndex,
-		}, {
-			Layout = c(
-				"UIListLayout",
-				{ SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, if props.Short then 0 else 2) }
-			),
-			Padding = if not props.Short
-				then c("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 6) })
-				else nil,
-			Name = c("TextLabel", {
-				LayoutOrder = 1,
-				BackgroundTransparency = 1,
-				FontFace = DISPLAY_FONT,
-				Size = UDim2.new(1, 0, 0, if props.Short then 22 else 26),
-				Text = string.upper(group.rarity),
-				TextColor3 = colors.Yellow,
-				TextSize = 20,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				ZIndex = props.ZIndex + 1,
-			}, {
-				Outline = c("UIStroke", {
-					Color = colors.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-			Summary = c("TextLabel", {
-				AutomaticSize = Enum.AutomaticSize.Y,
-				LayoutOrder = 2,
-				BackgroundTransparency = 1,
-				FontFace = BODY_FONT,
-				Size = UDim2.new(1, -4, 0, 20),
-				Text = sectionSummary(group.outcomes[1]),
-				TextColor3 = WHITE,
-				TextSize = 16,
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				ZIndex = props.ZIndex + 1,
-			}, {
-				Outline = c("UIStroke", {
-					Color = colors.Ink,
-					Thickness = UIConfig.Text.OutlineScale,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-		})
-		order += 1
-		sections["Tiles" .. group.rarity] = c("Frame", {
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			LayoutOrder = order,
 			Size = UDim2.fromScale(1, 0),
+			LayoutOrder = index * 2,
 			ZIndex = props.ZIndex,
 		}, tiles)
 	end
-	return c(React.Fragment, nil, sections)
+	return c(React.Fragment, nil, children)
 end

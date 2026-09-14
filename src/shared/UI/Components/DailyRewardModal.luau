@@ -1,6 +1,6 @@
--- Description: Animated modal that presents the daily reward claim: spring entrance, 7-day progress strip, reward display, and a dismiss button.
-
 --!strict
+local T = require(script.Parent.Parent.Tokens)
+-- Description: Animated modal that presents the daily reward claim: spring entrance, 7-day progress strip, reward display, and a dismiss button.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local AnimatedButton = require(script.Parent.PuffyButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
@@ -17,7 +17,7 @@ local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local Palette = UIConfig.ProgressionStyle
+local Palette = require(script.Parent.Parent.EconomyPalette)
 
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
@@ -27,8 +27,9 @@ local modalSurface = require(script.Parent.ModalSurface)
 local Well = require(script.Parent.Well)
 
 local c = React.createElement
+local Title = require(script.Parent.CandyTitle)
 
-local Surface = require(script.Parent.Arena.Surface)
+local Surface = require(script.Parent.CandyPanel)
 local artwork = UIConfig.LobbyArtwork.Action
 
 export type PublicDay = {
@@ -59,22 +60,22 @@ export type Props = {
 
 local function label(text: string, position: UDim2, size: UDim2, maximum: number, left: boolean?)
 	return c(ResponsiveText, {
-		MeasurementFont = Enum.Font.LuckiestGuy,
+		MeasurementFont = Enum.Font.FredokaOne,
 		MaxTextSize = maximum,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
-			Font = Enum.Font.LuckiestGuy,
+			Font = Enum.Font.FredokaOne,
 			Text = text,
-			TextColor3 = Palette.White,
+			TextColor3 = T.Colors.Ink,
 			TextXAlignment = if left then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center,
 			ZIndex = 3,
 		},
 	}, {
 		Outline = c(
 			"UIStroke",
-			{ Color = Palette.Ink, Thickness = 0.045, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
+			{ Color = Palette.Ink, Thickness = 0, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
 		),
 	})
 end
@@ -89,15 +90,12 @@ local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 		Size = UDim2.new(1 / 7, -36 / 7, 1, 0),
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		Outline = c(
-			"UIStroke",
-			{ Color = Palette.White, Thickness = 1.5, Transparency = if day.available then 0 else 0.45 }
-		),
+		Outline = c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Shape.StrokeInner }),
 		Number = if claimed
 			then c("ImageLabel", {
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://168702841",
-				ImageColor3 = Palette.White,
+				ImageColor3 = T.Colors.Ink,
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(0.55, 0.65),
@@ -219,7 +217,7 @@ return function(props: Props)
 		AutoButtonColor = false,
 		Selectable = false,
 		Text = "",
-		BackgroundColor3 = Color3.new(),
+		BackgroundColor3 = T.Colors.Ink,
 		BackgroundTransparency = 0.35,
 		ZIndex = 120,
 	}, {
@@ -244,14 +242,21 @@ return function(props: Props)
 			},
 		}, {
 			ModalScale = c("UIScale", { Scale = styles.Scale }),
-			Title = label(
-				"DAILY REWARDS",
-				UDim2.fromOffset(padding, padding + 2),
-				UDim2.fromOffset(innerWidth - 44 - gap, 40),
-				if compact then 29 else 34,
-				true
-			),
+			Title = c(Title, {
+				Text = "DAILY REWARDS",
+				TextSize = if width < 420 then 24 else 30,
+				Native = {
+					Position = UDim2.fromOffset(padding - 4, padding - 12),
+					Size = UDim2.fromOffset(innerWidth - 54, 52),
+					ZIndex = 10,
+				},
+			}),
 			CloseButton = c(AnimatedButton, {
+				Text = "X",
+				TextSize = 26,
+				TextColor = T.Colors.Ink,
+				Color = T.Colors.Surface,
+				Shadow = false,
 				ButtonRef = actionRef,
 				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Enabled = props.OnClose ~= nil and props.FocusEnabled ~= false,
@@ -273,6 +278,7 @@ return function(props: Props)
 				Size = UDim2.fromOffset(innerWidth, dayHeight),
 			}, miniDays),
 			RewardArea = c(Well, {
+				Candy = true,
 				Color = Palette.Claimed,
 				Radius = UIConfig.Radius.Control,
 				Native = {
@@ -290,13 +296,18 @@ return function(props: Props)
 					then c(BonksLabel, {
 						Amount = currentReward.amount or 0,
 						MaxTextSize = if compact then 52 else 68,
-						TextColor = Palette.White,
-						TextStroke = 0.045,
+						TextColor = T.Colors.Ink,
+						TextStroke = 0,
 						Native = { Position = UDim2.fromOffset(12, 27), Size = UDim2.new(1, -24, 1, -33), ZIndex = 3 },
 					}, { Pop = c("UIScale", { Scale = rewardStyles.Scale }) })
 					else nil,
 			}),
 			ActionButton = c(AnimatedButton, {
+				Text = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM" else "DONE",
+				TextSize = 26,
+				TextColor = T.Colors.Ink,
+				Color = if state.canClaim then T.Colors.Pink else T.Colors.Surface,
+				Shadow = false,
 				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Enabled = enabled and (if state.canClaim then props.OnClaim ~= nil else props.OnClose ~= nil),
 				Style = "Primary",

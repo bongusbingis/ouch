@@ -1,18 +1,18 @@
--- Description: Responsive splash card summarizing the seven-day reward cycle and opening the daily reward modal.
-
 --!strict
+local T = require(script.Parent.Parent.Tokens)
+-- Description: Responsive splash card summarizing the seven-day reward cycle and opening the daily reward modal.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local BonksLabel = require(script.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.OuchText)
+local ResponsiveText = require(script.Parent.ResponsiveText)
 local NumberText = require(script.Parent.Parent.Models.NumberText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local Palette = UIConfig.ProgressionStyle
-local OuchPanel = require(script.Parent.OuchPanel)
+local Palette = require(script.Parent.Parent.EconomyPalette)
+local OuchPanel = require(script.Parent.CandyPanel)
 
 local ScrollFrame = require(script.Parent.ScrollFrame)
 
@@ -53,9 +53,9 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 	local available = day.available
 	local claimed = day.claimed and not available
 	local backgroundColor = if claimed then CLAIMED_SURFACE elseif available then AVAILABLE_COLOR else LOCKED_SURFACE
-	local foregroundColor = if available or claimed then Palette.White else Palette.Ink
+	local foregroundColor = Palette.Ink
 	local rewardColor = foregroundColor
-	local strokeColor = if available then AVAILABLE_COLOR else Palette.White
+	local strokeColor = if available then T.Colors.Yellow else Palette.Ink
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
@@ -76,7 +76,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 			Stroke = c("UIStroke", {
 				Color = strokeColor,
-				Thickness = if available then 3 else 1,
+				Thickness = T.Shape.StrokeInner,
 				Transparency = if claimed or available then 0 else 0.35,
 			}),
 			DayNumber = if claimed
@@ -84,25 +84,25 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					Image = "rbxassetid://168702841",
-					ImageColor3 = Palette.White,
+					ImageColor3 = Palette.Ink,
 					Position = UDim2.fromScale(0.5, 0.27),
 					Size = UDim2.fromScale(0.82, 0.34),
 					ScaleType = Enum.ScaleType.Fit,
 				})
 				else c(ResponsiveText, {
-					MeasurementFont = Enum.Font.LuckiestGuy,
+					MeasurementFont = Enum.Font.FredokaOne,
 					MinTextSize = if compact then 9 else 11,
 					MaxTextSize = if compact then 14 else 20,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+						FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
 						Position = UDim2.fromScale(0.5, 0.1),
 						Size = UDim2.fromScale(0.9, 0.34),
 						Text = if available then "TODAY" else `DAY {day.day}`,
 						TextColor3 = foregroundColor,
 						TextStrokeColor3 = DARK,
-						TextStrokeTransparency = if available or claimed then 0.15 else 1,
+						TextStrokeTransparency = 1,
 					},
 				}),
 			Reward = if day.reward.kind == "Bonks"
@@ -116,7 +116,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					},
 					IconSize = UDim2.fromScale(0.2, 0.78),
 					TextColor = rewardColor,
-					TextStroke = if available or claimed then UIConfig.Text.OutlineScale else 0,
+					TextStroke = 0,
 				})
 				else nil,
 		}),
@@ -219,14 +219,14 @@ return function(props: Props)
 		}, {
 			Title = c(ResponsiveText, {
 				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
+				MeasurementFont = Enum.Font.FredokaOne,
 				MinTextSize = 14,
 				MaxTextSize = if compact then UIConfig.Text.LabelPx else UIConfig.Text.HeaderPx,
 				Wrapped = compact,
 				Native = {
 					AnchorPoint = Vector2.new(0, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
 					Position = if hint then UDim2.fromOffset(0, 20) else UDim2.fromScale(0, 0.5),
 					Size = if hint
 						then UDim2.new(1, if props.OnClaim then -claimWidth - 16 else 0, 0, if compact then 40 else 32)
@@ -238,10 +238,10 @@ return function(props: Props)
 						),
 					Text = "DAILY REWARDS",
 					TextWrapped = compact,
-					TextColor3 = Palette.White,
+					TextColor3 = T.Colors.Ink,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextStrokeColor3 = DARK,
-					TextStrokeTransparency = 0.15,
+					TextStrokeTransparency = 1,
 					ZIndex = 2,
 				},
 			}),
@@ -250,10 +250,10 @@ return function(props: Props)
 					BackgroundTransparency = 1,
 					Position = UDim2.fromOffset(0, 40),
 					Size = UDim2.new(1, if props.OnClaim then -claimWidth - 16 else 0, 0, 14),
-					Font = UIConfig.Text.BodyFont,
+					Font = T.Type.Label,
 					Text = hint,
 					TextSize = 14,
-					TextColor3 = Palette.White,
+					TextColor3 = T.Colors.Ink,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					ZIndex = 2,
 				})
@@ -281,15 +281,15 @@ return function(props: Props)
 				Size = UDim2.new(1, -24, 1, -76),
 			}, {
 				Text = c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
+					MeasurementFont = T.Type.Label,
 					MinTextSize = 14,
 					MaxTextSize = 18,
 					Native = {
 						BackgroundTransparency = 1,
-						Font = UIConfig.Text.BodyFont,
+						Font = T.Type.Label,
 						Size = UDim2.new(1, 0, 0, 32),
 						Text = summaryText,
-						TextColor3 = Palette.White,
+						TextColor3 = T.Colors.Ink,
 						TextXAlignment = Enum.TextXAlignment.Left,
 					},
 				}),
@@ -306,7 +306,7 @@ return function(props: Props)
 				CanvasSize = UDim2.new(),
 				ScrollingDirection = Enum.ScrollingDirection.X,
 				ScrollBarThickness = if compact then 3 else 0,
-				ScrollBarImageColor3 = Palette.White,
+				ScrollBarImageColor3 = Palette.Ink,
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.new(0.5, 0, 0, headerHeight + 12),
 				Size = UDim2.new(1, -32, 1, -headerHeight - 28),

@@ -1,6 +1,7 @@
 -- Fits the lobby's existing navigation, logo and party action inside the usable rectangle.
 --!strict
 
+local T = require(script.Parent.Parent.Tokens)
 local LobbyHeaderLayout = {}
 
 function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?, includeEmote: boolean?)
@@ -9,14 +10,17 @@ function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?, includ
 	local compact = available.Y <= 500 or width < 860
 	local edge = if compact then 6 else 20
 	local gap = if compact then 6 else 16
-	local buttonWidth = if width < 594 then 66 else if compact then 74 else 90
+	local buttonWidth = if width < 594 and available.Y > width
+		then math.floor((width - edge * 2 - gap * (count - 1)) / count)
+		elseif width < 594 then 66
+		else if compact then 74 else T.Layout.NavWidth
 	local navWidth = buttonWidth * count + gap * (count - 1)
 	local partyWidth = if width < 660 then 88 else if compact then 128 else 154
 	local emoteWidth = if includeEmote then 44 else 0
 	local rightCluster = partyWidth + (if includeEmote then gap + emoteWidth else 0)
 	local logoWidth = math.clamp(width - edge * 2 - navWidth - rightCluster - gap * 2, 168, 220)
 	local height = if compact then 72 else 88
-	local navHeight = if compact then 56 else 64
+	local navHeight = if compact then 56 else T.Layout.NavHeight
 	local required = edge * 2 + logoWidth + navWidth + rightCluster + gap * 2
 	local stacked = required > width
 	local navTop = (height - navHeight) / 2

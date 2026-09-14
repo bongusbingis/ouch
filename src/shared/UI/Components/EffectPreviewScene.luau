@@ -1,4 +1,5 @@
 --!strict
+local T = require(script.Parent.Parent.Tokens)
 
 -- Full-scene audition controls. The portal stays visible while the underlying
 -- menu is suspended, preserving its item selection and back stack.
@@ -20,7 +21,9 @@ local PriceButton = require(script.Parent.Shop.ShopPriceButton)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
-local colors = UIConfig.ProgressionStyle
+local CandyPanel = require(script.Parent.CandyPanel)
+local CandyTitle = require(script.Parent.CandyTitle)
+local colors = require(script.Parent.Parent.EconomyPalette)
 
 export type Props = {
 	ItemId: string?,
@@ -31,24 +34,25 @@ export type Props = {
 
 local function textLabel(text: string, position: UDim2, size: UDim2, maximum: number, heading: boolean)
 	return c(ResponsiveText, {
-		MeasurementFont = if heading then Enum.Font.LuckiestGuy else UIConfig.Text.BodyFont,
-		MaxTextSize = maximum,
+		MeasurementFont = if heading then Enum.Font.FredokaOne else T.Type.Label,
+		MaxTextSize = math.max(T.Type.Minimum, maximum),
+		MinTextSize = T.Type.Minimum,
 		Wrapped = true,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
-			Font = if heading then Enum.Font.LuckiestGuy else UIConfig.Text.BodyFont,
+			Font = if heading then Enum.Font.FredokaOne else T.Type.Label,
 			Text = text,
-			TextColor3 = Color3.new(1, 1, 1),
+			TextColor3 = T.Colors.Ink,
 			TextStrokeColor3 = colors.Ink,
-			TextStrokeTransparency = if heading then 1 else 0.35,
+			TextStrokeTransparency = 1,
 		},
 	}, {
 		Outline = if heading
 			then c("UIStroke", {
 				Color = colors.Ink,
-				Thickness = 0.045,
+				Thickness = 0,
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			})
 			else nil,
@@ -125,7 +129,7 @@ return function(props: Props)
 		then snapshot.error
 		elseif not snapshot.ready then "PREPARING PREVIEW…"
 		else nil
-	local controlsHeight = if message then 114 else 68
+	local controlsHeight = if message then 124 else 80
 	return ReactRoblox.createPortal(
 		c("ScreenGui", {
 			ref = screenRef,
@@ -140,14 +144,12 @@ return function(props: Props)
 				Size = UDim2.fromScale(1, 1),
 				Active = true,
 			}, {
-				Title = textLabel(
-					string.upper(title),
-					UDim2.fromScale(0.06, 0.045),
-					UDim2.fromScale(0.88, 0.13),
-					40,
-					true
-				),
-				Controls = c("Frame", {
+				Title = c(CandyTitle, {
+					Text = string.upper(title),
+					TextSize = T.Type.Section,
+					Native = { Position = UDim2.fromScale(0.06, 0.045), Size = UDim2.new(0.88, 0, 0, 60), ZIndex = 5 },
+				}),
+				Controls = c(CandyPanel, {
 					AnchorPoint = Vector2.new(0.5, 1),
 					Position = UDim2.new(0.5, 0, 1, -16),
 					Size = UDim2.new(0.9, 0, 0, controlsHeight),
@@ -161,7 +163,7 @@ return function(props: Props)
 				}, {
 					Constraint = c("UISizeConstraint", { MaxSize = Vector2.new(560, controlsHeight) }),
 					Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
-					Outline = c("UIStroke", { Color = colors.White, Thickness = 2 }),
+
 					Message = if message
 						then textLabel(message, UDim2.fromOffset(14, 6), UDim2.new(1, -28, 0, 40), 17, false)
 						else nil,

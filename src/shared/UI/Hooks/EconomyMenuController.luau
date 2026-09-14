@@ -5,6 +5,7 @@
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CandyMotion = require(script.Parent.Parent.Motion)
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -416,6 +417,9 @@ function EconomyMenuController.use(options: Options): Controller
 				return
 			end
 			setBusySnapshot(table.clone(busySlots.current))
+			if callOk and accepted then
+				CandyMotion.celebrate(entry.category, nextItemId)
+			end
 			if not callOk or not accepted then
 				local errorCode = if callOk then reason else "network_error"
 				closePreview()

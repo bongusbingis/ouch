@@ -16,9 +16,12 @@ local OuchPanel = require(script.Parent.OuchPanel)
 
 local c = React.createElement
 local Palette = UIConfig.ProgressionStyle
+local T = require(script.Parent.Parent.Tokens)
+local CandyPanel = require(script.Parent.CandyPanel)
 
 export type Props = {
 	Ouch: boolean?,
+	Candy: boolean?,
 	Amount: number,
 	HeightPx: number?,
 	TextSize: number?,
@@ -38,9 +41,10 @@ return function(props: Props)
 	local textWidth =
 		TextService:GetTextSize(formatNumber(amount), textSize, Enum.Font.LuckiestGuy, Vector2.new(10000, 100)).X
 	local width = 12 + textSize + UIConfig.Button.GapPx + math.ceil(textWidth) + 14
-	return c(if props.Ouch then OuchPanel else Surface, {
-		Color = if props.Ouch then Palette.Cyan else Palette.Claimed,
+	return c(if props.Candy then CandyPanel elseif props.Ouch then OuchPanel else Surface, {
+		Color = if props.Candy then T.Colors.Surface elseif props.Ouch then Palette.Cyan else Palette.Claimed,
 		Padding = 0,
+		Tilt = 0,
 		Gloss = true,
 		Radius = UIConfig.Radius.Control,
 		Shadow = false,
@@ -60,8 +64,8 @@ return function(props: Props)
 		Amount = c(BonksLabel, {
 			Amount = amount,
 			MaxTextSize = textSize,
-			TextColor = Palette.White,
-			TextStroke = 0.045,
+			TextColor = if props.Candy then T.Colors.Ink else Palette.White,
+			TextStroke = if props.Candy then 0 else 0.045,
 			Alignment = Enum.HorizontalAlignment.Center,
 			Native = {
 				BackgroundTransparency = 1,

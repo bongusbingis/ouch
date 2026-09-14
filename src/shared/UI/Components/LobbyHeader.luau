@@ -8,6 +8,9 @@ local React = require(Packages:WaitForChild("react"))
 local ReactRoblox = require(Packages:WaitForChild("react-roblox"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local PuffyButton = require(script.Parent.PuffyButton)
+local T = require(script.Parent.Parent.Tokens)
+local NavGlyph = require(script.Parent.NavGlyph)
 local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
 local ButtonSurface = require(script.Parent.ButtonSurface)
 local Layout = require(script.Parent.Parent.Models.LobbyHeaderLayout)
@@ -36,16 +39,12 @@ return function(props)
 	}
 	for _, tab in props.Tabs do
 		local enabled = tab.Enabled ~= false
-		buttons[tab.Id] = c(AnimatedButton, {
+		buttons[tab.Id] = c(PuffyButton, {
 			ButtonRef = tab.ButtonRef,
 			Enabled = enabled,
-			Visual = c(ButtonSurface, {
-				Enabled = enabled,
-				Color = if tab.Id == props.CurrentPage
-					then UIConfig.ProgressionStyle.Pink
-					else UIConfig.ProgressionStyle.Cyan,
-				Radius = UDim.new(0, 12),
-			}),
+			Color = if tab.Id == props.CurrentPage then T.Colors.Pink else T.Colors.Cyan,
+			LipColor = if tab.Id == props.CurrentPage then T.Colors.PinkLip else T.Colors.CyanLip,
+			StrokeColor = T.Colors.Surface,
 			SelectionRadius = UDim.new(0, 12),
 			OnSelectionGained = tab.OnSelectionGained,
 			OnActivated = function()
@@ -55,29 +54,30 @@ return function(props)
 				BackgroundTransparency = 1,
 				Image = "",
 				LayoutOrder = tab.LayoutOrder or 0,
+				Rotation = if (tab.LayoutOrder or 0) % 2 == 0 then -T.Shape.TiltTab else T.Shape.TiltTab,
 				Size = UDim2.fromOffset(layout.buttonWidth, layout.nav.size.Y),
 			},
 		}, {
-			Icon = c("ImageLabel", {
-				BackgroundTransparency = 1,
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.new(0.5, 0, 0, 5),
-				Size = UDim2.fromOffset(if layout.compact then 28 else 34, if layout.compact then 28 else 34),
-				Image = tab.Icon,
-				ScaleType = Enum.ScaleType.Fit,
-				ImageTransparency = if enabled then 0 else 0.25,
-				ZIndex = 2,
+			Icon = c(NavGlyph, {
+				Id = tab.Id,
+				Native = {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.new(0.5, 0, 0, 5),
+					Size = UDim2.fromOffset(if layout.compact then 26 else 30, if layout.compact then 26 else 30),
+					ZIndex = 8,
+				},
 			}),
 			Label = c("TextLabel", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(0, 1),
 				Position = UDim2.new(0, 2, 1, -6),
-				Size = UDim2.new(1, -4, 0, 18),
-				FontFace = UIConfig.Text.DefaultFont,
+				Size = UDim2.new(1, -4, 0, 24),
+				Font = if layout.compact then T.Type.CompactLabel else T.Type.Display,
 				Text = tab.Label,
-				TextSize = if layout.buttonWidth < 74 then 12 else if layout.compact then 14 else 16,
+				TextSize = if layout.compact then T.Type.Minimum else T.Type.Body,
 				TextColor3 = if enabled then UIConfig.ProgressionStyle.White else UIConfig.ProgressionStyle.Muted,
-				ZIndex = 2,
+				ZIndex = 8,
 			}, {
 				Outline = c("UIStroke", {
 					Color = UIConfig.ProgressionStyle.Ink,
@@ -102,9 +102,25 @@ return function(props)
 					Band = c("Frame", {
 						Active = false,
 						Selectable = false,
-						BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
+						BackgroundColor3 = T.Colors.Ink,
 						BorderSizePixel = 0,
 						Size = UDim2.new(1, 0, 0, insets.coreOffset.Y + safe.position.Y + layout.height),
+					}, {
+						Pattern = c("ImageLabel", {
+							BackgroundTransparency = 1,
+							Image = T.Texture.Swirl,
+							ImageColor3 = T.Colors.Surface,
+							ImageTransparency = 0.94,
+							ScaleType = Enum.ScaleType.Tile,
+							TileSize = UDim2.fromOffset(240, 240),
+							Size = UDim2.fromScale(1, 1),
+						}),
+						Scallop = c("Frame", {
+							BackgroundColor3 = T.Colors.Ink,
+							BorderSizePixel = 0,
+							Position = UDim2.new(0, 0, 1, -12),
+							Size = UDim2.new(1, 0, 0, 24),
+						}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusPanel) }) }),
 					}),
 				}),
 			}),

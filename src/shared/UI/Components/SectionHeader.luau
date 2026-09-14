@@ -13,8 +13,10 @@ local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredText
 local c = React.createElement
 local Palette = UIConfig.ProgressionStyle
 local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local CandySectionHeader = require(script.Parent.CandySectionHeader)
 
 export type Props = {
+	Candy: boolean?,
 	Text: string,
 	TextSize: number?,
 	HeightPx: number?,
@@ -31,6 +33,9 @@ export type Props = {
 return function(props: Props)
 	local preferred = usePreferredTextSize()
 	local scale = UIConfig.Text.PreferredScale[preferred.Name] or 1
+	if props.Candy then
+		return c(CandySectionHeader, props)
+	end
 	local textSize = math.round((props.TextSize or UIConfig.Layout.SectionHeader.TextPx) * scale)
 	local height = props.HeightPx or UIConfig.Layout.SectionHeader.HeightPx
 	local gap = props.UnderlineGapPx or UIConfig.Layout.SectionHeader.UnderlineGapPx

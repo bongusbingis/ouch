@@ -12,9 +12,11 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local c = React.createElement
 local OuchPanel = require(script.Parent.OuchPanel)
 local Palette = UIConfig.ProgressionStyle
+local T = require(script.Parent.Parent.Tokens)
 
 export type Props = {
 	Ouch: boolean?,
+	Candy: boolean?,
 	Color: Color3?,
 	Radius: number?,
 	Shadow: boolean?,
@@ -29,6 +31,15 @@ return function(props: Props)
 	native.BackgroundTransparency = 1
 	native.BorderSizePixel = 0
 	native.Size = native.Size or UDim2.fromScale(1, 1)
+	if props.Candy then
+		native.BackgroundTransparency = 0
+		native.BackgroundColor3 = T.Colors.Well
+		native.ZIndex = native.ZIndex or 3
+		local content = table.clone(props.children or {})
+		content.Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) })
+		content.Outline = c("UIStroke", { Color = T.Colors.WellLine, Thickness = T.Shape.StrokeInner })
+		return c("Frame", native, content)
+	end
 	local radius = props.Radius or UIConfig.Radius.Control
 	local color = props.Color or Palette.Claimed
 	local shadow = if props.Shadow == false then 0 else UIConfig.Well.ShadowPx

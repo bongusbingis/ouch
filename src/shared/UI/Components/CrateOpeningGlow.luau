@@ -1,10 +1,11 @@
 --!strict
+local T = require(script.Parent.Parent.Tokens)
 -- Candy-colored rings and sparks use native UI only; no artwork is resized or generated.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage.Packages.react)
 local UI = require(ReplicatedStorage.Config.Interface.UI)
 local c = React.createElement
-local colors = UI.ProgressionStyle
+local colors = require(script.Parent.Parent.EconomyPalette)
 
 return function(props)
 	local motion = props.Motion
@@ -23,7 +24,7 @@ return function(props)
 		end),
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-		Glow = c("UIStroke", { Color = colors.Yellow, Thickness = 10, Transparency = 0.7 }),
+		Glow = c("UIStroke", { Color = colors.Ink, Thickness = T.Shape.StrokeCard }),
 		Gloss = c("UIGradient", {
 			Rotation = 90,
 			Color = ColorSequence.new(colors.White, colors.Yellow),
@@ -59,8 +60,8 @@ return function(props)
 			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 			Ring = c("UIStroke", {
 				Color = if index == 1 then colors.Pink else colors.Yellow,
-				Thickness = if index == 1 then 12 else 5,
-				Transparency = (index - 1) * 0.24,
+				Thickness = T.Shape.StrokeCard,
+				Transparency = 0,
 			}, { Gloss = c("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0, 0.65) }) }),
 		})
 	end

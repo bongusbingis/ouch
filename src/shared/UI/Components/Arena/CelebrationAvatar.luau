@@ -13,6 +13,9 @@ local c = React.createElement
 
 return React.memo(function(props)
 	local viewportRef, cameraRef, worldRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
+	local displayRef = React.useRef(nil)
+	local playingRef = React.useRef(props.Playing)
+	playingRef.current = props.Playing
 	local elapsed, setElapsed = React.useBinding(0)
 	React.useEffect(function()
 		local viewport, camera, world = viewportRef.current, cameraRef.current, worldRef.current
@@ -33,13 +36,19 @@ return React.memo(function(props)
 		local display, unregister = nil, nil
 		local preparation = task.defer(function()
 			display = EmoteRig.create(world, props.ColorId, props.CostumeId)
-			if props.EmoteId then
+			if props.Playing ~= nil then
+				display.setOrigin(CFrame.identity)
+			end
+			displayRef.current = display
+			if props.EmoteId and playingRef.current ~= false then
 				display.playEmote(props.EmoteId)
 			end
 			local time = 0
 			local function update(dt)
 				time += dt
-				setElapsed(if props.Static or GuiService.ReducedMotionEnabled then 0 else time)
+				setElapsed(
+					if props.Static or playingRef.current == false or GuiService.ReducedMotionEnabled then 0 else time
+				)
 			end
 			update(0)
 			if not props.Static then
@@ -55,6 +64,7 @@ return React.memo(function(props)
 				unregister()
 			end
 			if display then
+				displayRef.current = nil
 				display.destroy()
 			end
 			if viewport.CurrentCamera == camera then
@@ -62,6 +72,16 @@ return React.memo(function(props)
 			end
 		end
 	end, { props.EmoteId, props.ColorId, props.CostumeId, props.Static })
+	React.useEffect(function()
+		local display = displayRef.current
+		if display and props.EmoteId then
+			if props.Playing == false then
+				display.stopEmote()
+			else
+				display.playEmote(props.EmoteId)
+			end
+		end
+	end, { props.Playing })
 	local z = props.ZIndex or 3
 	local confetti = {}
 	for index = 1, 14 do

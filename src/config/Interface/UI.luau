@@ -143,7 +143,7 @@ return {
 				},
 			},
 			Inventory = {
-				Portrait = { WidthScale = 0.956, HeightScale = 0.75, MaxSize = Vector2.new(480, 720) },
+				Portrait = { WidthScale = 0.956, HeightScale = 0.70, MaxSize = Vector2.new(480, 720) },
 				Landscape = {
 					WidthScale = 0.602436,
 					HeightScale = 0.74763,

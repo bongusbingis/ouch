@@ -11,6 +11,7 @@ local ShopClock = require(script.Parent.Parent.Parent.Services.ShopClock)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 
 local c = React.createElement
+local T = require(script.Parent.Parent.Parent.Tokens)
 
 local function formatRemaining(seconds: number): string
 	local total = math.max(0, math.ceil(seconds))
@@ -44,11 +45,11 @@ return function(props)
 	return c(ResponsiveText, {
 		HostName = props.HostName or "Countdown",
 		MeasurementFont = UIConfig.Text.BodyFont,
-		MinTextSize = 15,
+		MinTextSize = T.Type.Minimum,
 		MaxTextSize = props.MaxTextSize or 18,
 		Native = {
 			AnchorPoint = props.AnchorPoint,
-			BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
+			BackgroundColor3 = T.Colors.Ink,
 			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 			Font = UIConfig.Text.BodyFont,

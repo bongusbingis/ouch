@@ -1,5 +1,6 @@
--- Season progression and premium access are distinct actions using the existing economy controller.
 --!strict
+local T = require(script.Parent.Parent.Tokens)
+-- Season progression and premium access are distinct actions using the existing economy controller.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
@@ -16,33 +17,37 @@ local Selection = require(script.Parent.Parent.Services.Selection)
 local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local ResponsiveText = require(script.Parent.ResponsiveText)
-local PageTitle = require(script.Parent.PageTitle)
+local PageTitle = require(script.Parent.CandyTitle)
 local PriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
 local Rewards = require(script.Parent.SeasonRewardsPanel)
+local Progress = require(script.Parent.CandyProgressBar)
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
 local modalSurface = require(script.Parent.ModalSurface)
 
 local Well = require(script.Parent.Well)
 
 local c = React.createElement
-local colors = UI.ProgressionStyle
+local CandyPanel = require(script.Parent.CandyPanel)
+local colors = require(script.Parent.Parent.EconomyPalette)
 
 local function label(text, position, size, maximum, color, heading, alignment)
 	return c(ResponsiveText, {
-		MeasurementFont = if heading then Enum.Font.LuckiestGuy else UI.Text.BodyFont,
-		MaxTextSize = maximum,
-		MinTextSize = if heading then 12 else 14,
+		MeasurementFont = if heading then Enum.Font.FredokaOne else T.Type.Label,
+		MaxTextSize = math.max(T.Type.Minimum, maximum),
+		MinTextSize = T.Type.Minimum,
 		Wrapped = true,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
 			Text = text,
-			Font = if heading then Enum.Font.LuckiestGuy else UI.Text.BodyFont,
-			TextColor3 = color or colors.White,
+			Font = if heading then Enum.Font.FredokaOne else T.Type.Label,
+			TextColor3 = if color == colors.White or color == colors.Yellow
+				then T.Colors.Ink
+				else color or T.Colors.Ink,
 			TextStrokeColor3 = colors.Ink,
-			TextStrokeTransparency = if heading or color == colors.Ink then 1 else 0.35,
+			TextStrokeTransparency = 1,
 			TextWrapped = true,
 			TextXAlignment = alignment or Enum.TextXAlignment.Left,
 			ZIndex = 105,
@@ -50,8 +55,8 @@ local function label(text, position, size, maximum, color, heading, alignment)
 	}, {
 		Outline = if heading and color ~= colors.Ink
 			then c("UIStroke", {
-				Color = colors.Ink,
-				Thickness = 0.045,
+				Color = T.Colors.Surface,
+				Thickness = 0,
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			})
 			else nil,
@@ -155,10 +160,10 @@ return function(props)
 		and card.productId ~= nil
 		and not card.pending
 	local inset = if compact then UI.Spacing.CompactInsetPx else UI.Spacing.PageInsetPx
-	local titleHeight = if compact then 24 else 40
-	local progressTop = inset + titleHeight + (if compact then 1 else 4)
+	local titleHeight = if compact then 68 else 60
+	local progressTop = inset + titleHeight + 8
 	local progressBarTop = progressTop + (if compact then 22 else 24)
-	local bodyTop = progressBarTop + (if compact then 13 else 17)
+	local bodyTop = progressBarTop + 26
 	local footerHeight = if compact then 90 else 110
 	local bodyHeight = math.max(64, height - bodyTop - footerHeight - (if compact then 8 else 16))
 	local previewVisible = selected ~= nil and (not compact or previewOpen)
@@ -179,12 +184,12 @@ return function(props)
 			Text = "",
 			AutoButtonColor = false,
 			Selectable = false,
-			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundColor3 = T.Colors.Ink,
 			BackgroundTransparency = 0.4,
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 100,
 		}),
-		Panel = c("ImageLabel", {
+		Panel = c(CandyPanel, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, safe.position.Y + safe.size.Y / 2),
 			Size = UDim2.fromOffset(width, height),
@@ -212,7 +217,7 @@ return function(props)
 				},
 			}),
 			Back = c(PriceButton, {
-				Color = colors.Ink,
+				Color = T.Colors.Surface,
 				ButtonRef = closeRef,
 				Text = if compact and previewOpen then "REWARDS" else "BACK",
 				TextSize = 20,
@@ -243,21 +248,14 @@ return function(props)
 				colors.White,
 				false
 			),
-			Progress = c("Frame", {
-				BackgroundColor3 = colors.Claimed,
-				Visible = seasonActive,
-				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(inset, progressBarTop),
-				Size = UDim2.new(1, -148, 0, 5),
-				ZIndex = 103,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Fill = c("Frame", {
-					BackgroundColor3 = colors.Pink,
-					BorderSizePixel = 0,
-					Size = UDim2.fromScale(progress, 1),
-					ZIndex = 104,
-				}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+			Progress = c(Progress, {
+				Progress = progress,
+				Native = {
+					Visible = seasonActive,
+					Position = UDim2.fromOffset(inset, progressBarTop),
+					Size = UDim2.new(1, -148, 0, 14),
+					ZIndex = 103,
+				},
 			}),
 			Body = c("Frame", {
 				BackgroundTransparency = 1,
@@ -278,6 +276,7 @@ return function(props)
 					else nil,
 				Preview = if previewVisible
 					then c(Well, {
+						Candy = true,
 						Native = {
 							Size = UDim2.fromScale(if compact then 1 else 0.32, 1),
 							ZIndex = 103,
@@ -303,8 +302,8 @@ return function(props)
 								PlaceholderBonks = if selected.kind == "Bonks" then selected.amount else nil,
 								ColorId = (props.Equipped or {}).CharacterColor,
 								CostumeId = (props.Equipped or {}).CostumeAssets,
-								TextColor = colors.White,
-								TextStroke = 0.045,
+								TextColor = T.Colors.Ink,
+								TextStroke = 0,
 								ZIndex = 104,
 							}),
 						}),

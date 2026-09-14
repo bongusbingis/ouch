@@ -37,6 +37,8 @@ export type Props = {
 	HoverRotation: boolean?,
 	OnActivated: (() -> ())?,
 	OnSelectionGained: ((GuiButton) -> ())?,
+	OnHoverChanged: ((boolean) -> ())?,
+	OnPointerDown: ((InputObject) -> ())?,
 	ButtonRef: any?,
 	SelectionRadius: UDim?,
 	EntranceDelay: number?,
@@ -79,8 +81,13 @@ return function(props: Props)
 		end
 	end
 	local children = merge(layoutChildren, {
-		SelectionImage = c("Frame", {
-			ref = selectionImageRef,
+		-- Roblox draws SelectionImageObject itself. Keep that template empty and
+		-- draw one border in local hitbox coordinates to avoid a second offset ring.
+		SelectionImage = c(
+			"Frame",
+			{ ref = selectionImageRef, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }
+		),
+		FocusOutline = c("Frame", {
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.fromScale(1, 1),
@@ -199,12 +206,18 @@ return function(props: Props)
 		if enabled and not hovering then
 			setHovering(true)
 			UIFeedback.hover()
+			if props.OnHoverChanged then
+				props.OnHoverChanged(true)
+			end
 		end
 	end
 
 	local function endHover()
 		setHovering(false)
 		setPressing(false)
+		if props.OnHoverChanged then
+			props.OnHoverChanged(false)
+		end
 	end
 
 	return c(
@@ -251,6 +264,9 @@ return function(props: Props)
 								setHovering(input.UserInputType == Enum.UserInputType.MouseButton1)
 							end
 						end
+					end
+					if props.OnPointerDown then
+						props.OnPointerDown(input)
 					end
 					if isPressInput(input) then
 						setPressing(true)

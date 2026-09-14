@@ -6,6 +6,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local T = require(ReplicatedStorage.Shared.UI.Tokens)
+local CandyMotion = require(ReplicatedStorage.Shared.UI.Motion)
+local CandyStage = require(script.Parent.CandyStage)
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
@@ -82,11 +86,60 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 		_usernameRequests = {},
 		_usernameListeners = {},
 		_skinsPreview = nil,
+		_candyStage = CandyStage.new(partyView),
+		_previewAngle = 0,
+		_backpackActive = false,
+		_celebrateAt = -math.huge,
 		_destroyed = false,
 		_generation = 0,
 		_appearanceRevision = 0,
 	}, PartyCharacterRenderer)
 
+	self._disconnectCelebrate = CandyMotion.onCelebrate(function(category, itemId)
+		if self._backpackActive then
+			self._celebrateAt = os.clock()
+			self._candyStage.burst()
+			if category == "EmoteAssets" and itemId then
+				self:PlayEmote(localUserId, itemId)
+				local character = self._characters[localUserId]
+				local track = if character then character.emoteTrack else nil
+				task.delay(T.Stage.EmoteReaction, function()
+					if not self._destroyed and character and character.emoteTrack == track then
+						EmotePlayer.stop(track)
+						character.emoteTrack = nil
+					end
+				end)
+			end
+		end
+	end)
+	local dragX = nil
+	self._dragBegin = UserInputService.InputBegan:Connect(function(input, processed)
+		if not self._backpackActive or processed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+			return
+		end
+		local bounds = if self._getWorldBounds then self._getWorldBounds() else nil
+		local point = UserInputService:GetMouseLocation()
+		if
+			bounds
+			and point.X >= bounds.Min.X
+			and point.X <= bounds.Max.X
+			and point.Y >= bounds.Min.Y
+			and point.Y <= bounds.Max.Y
+		then
+			dragX = point.X
+		end
+	end)
+	self._dragMove = UserInputService.InputChanged:Connect(function(input)
+		if dragX and input.UserInputType == Enum.UserInputType.MouseMovement then
+			self._previewAngle += (input.Position.X - dragX) * 0.012
+			dragX = input.Position.X
+		end
+	end)
+	self._dragEnd = UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragX = nil
+		end
+	end)
 	self:Render({ members = {} })
 	self:_faceLocalCharacterToCamera()
 	self._renderConnection = RunService.RenderStepped:Connect(function()
@@ -377,6 +430,12 @@ function PartyCharacterRenderer:_layoutNametags()
 		end
 		for _, child in children do
 			local position = positions[child.Name]
+			if child == character.crownLabel and self._backpackActive and not GuiService.ReducedMotionEnabled then
+				position += UDim2.fromOffset(
+					0,
+					math.sin(os.clock() * math.pi * 2 / T.Motion.CrownPeriod) * T.Motion.CrownAmplitude
+				)
+			end
 			if child.Position ~= position then
 				child.Position = position
 			end
@@ -498,6 +557,8 @@ function PartyCharacterRenderer:SetSkinsPreview(active, ballItemId, hammerItemId
 	hammer.Parent = self._characterContainer
 	self._skinsPreview = {
 		ball = ball,
+		ballSize = ball.Size,
+		popAt = os.clock(),
 		hammer = hammer,
 		ballItemId = normalizedBallId,
 		hammerItemId = normalizedHammerId,
@@ -525,6 +586,9 @@ function PartyCharacterRenderer:_updateSkinsPreview()
 	preview.hammer.CFrame = CFrame.new(hammerHand.Position)
 		* character.rig:GetPivot().Rotation
 		* preview.hammerGrip:Inverse()
+	local age = os.clock() - preview.popAt
+	local pop = if GuiService.ReducedMotionEnabled then 1 else math.min(age / T.Motion.Stamp, 1)
+	preview.ball.Size = preview.ballSize * (if pop < 1 then math.max(0.15, pop + math.sin(pop * math.pi) * 0.2) else 1)
 	local ballOffset = Combat.Dodgeball.HeldVisualHandOffset
 	preview.ball.CFrame = attachmentCFrame(rightHand, "DodgeballGrip")
 		or rightHand.CFrame * CFrame.new(ballOffset.x, ballOffset.y, ballOffset.z)
@@ -544,7 +608,17 @@ function PartyCharacterRenderer:_faceLocalCharacterToCamera()
 		return
 	end
 
-	character.rig:PivotTo(CFrame.lookAt(spawnPosition, spawnPosition + direction, Vector3.yAxis))
+	local elapsed = os.clock() - self._celebrateAt
+	local hop = if self._backpackActive
+			and not GuiService.ReducedMotionEnabled
+			and elapsed < T.Stage.HopDuration
+		then math.sin(math.pi * elapsed / T.Stage.HopDuration) * T.Stage.Hop
+		else 0
+	character.rig:PivotTo(
+		CFrame.new(0, hop, 0)
+			* CFrame.lookAt(spawnPosition, spawnPosition + direction, Vector3.yAxis)
+			* CFrame.Angles(0, if self._backpackActive then self._previewAngle else 0, 0)
+	)
 end
 
 function PartyCharacterRenderer:_requestUsername(userId)
@@ -664,6 +738,22 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	usernameLabel.Text = self._usernames[userId] or "..."
 	usernameLabel.TextScaled = false
 	usernameLabel.TextWrapped = false
+	usernameLabel.Font = T.Type.Display
+	usernameLabel.TextSize = T.Type.TileLabel
+	usernameLabel.TextColor3 = T.Colors.Surface
+	usernameLabel.BackgroundColor3 = T.Colors.Ink
+	usernameLabel.BackgroundTransparency = 0
+	usernameLabel.Rotation = -T.Shape.TiltTab
+	usernameLabel.Size = UDim2.new(1, 20, 0, 40)
+	local pill = Instance.new("UICorner")
+	pill.CornerRadius = UDim.new(1, 0)
+	pill.Parent = usernameLabel
+	local outline = Instance.new("UIStroke")
+	outline.Name = "CandyStickerOutline"
+	outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	outline.Color = T.Colors.Surface
+	outline.Thickness = T.Shape.StrokeCard
+	outline.Parent = usernameLabel
 	crownLabel.Active = false
 	crownLabel.Selectable = false
 	crownLabel.Visible = false
@@ -777,7 +867,19 @@ function PartyCharacterRenderer:Render(snapshot)
 	self:_updateNametagPresentation()
 end
 
+function PartyCharacterRenderer:SetBackpackActive(value)
+	self._backpackActive = value
+	self._candyStage.setEnabled(value)
+	local background = Workspace.Views.Party.Background
+	background:SetAttribute("CandyBackpackActive", value)
+end
+
 function PartyCharacterRenderer:destroy()
+	self._candyStage.destroy()
+	self._disconnectCelebrate()
+	self._dragBegin:Disconnect()
+	self._dragMove:Disconnect()
+	self._dragEnd:Disconnect()
 	if self._destroyed then
 		return
 	end

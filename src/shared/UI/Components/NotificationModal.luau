@@ -1,15 +1,15 @@
+--!strict
+local T = require(script.Parent.Parent.Tokens)
 -- Description: The shared notification and confirmation modal, rendering a title, message, and action buttons for whatever the notification context has queued.
 
---!strict
-
 local GuiService = game:GetService("GuiService")
+local TextService = game:GetService("TextService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
-local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
@@ -18,8 +18,9 @@ local Selection = require(script.Parent.Parent.Services.Selection)
 
 local modalSurface = require(script.Parent.ModalSurface)
 
+local CandyTitle = require(script.Parent.CandyTitle)
 local c = React.createElement
-local Palette = UIConfig.ProgressionStyle
+local CandyPanel = require(script.Parent.CandyPanel)
 
 export type ButtonDefinition = {
 	Color: "Red" | "Blue",
@@ -44,7 +45,8 @@ local function notificationButton(
 	order: number,
 	onChoose: (any) -> (),
 	buttonRef: any?,
-	width: number
+	columns: number,
+	height: number
 )
 	local red = definition.Color == "Red"
 	return c(ShopPriceButton, {
@@ -55,7 +57,14 @@ local function notificationButton(
 		TextSize = 24,
 		LayoutOrder = order,
 		AnchorPoint = Vector2.zero,
-		Size = UDim2.fromScale(width, 1),
+		Position = UDim2.new(
+			((order - 2) % columns) / columns,
+			0,
+			0,
+			math.floor((order - 2) / columns) * (height + 12)
+		),
+		Size = UDim2.new(1 / columns, -12, 0, height),
+		ZIndex = 136,
 		OnActivated = function()
 			onChoose(definition.Value)
 		end,
@@ -108,22 +117,39 @@ return function(props: Props)
 		return nil
 	end
 
-	local buttons = {
-		UIListLayout = c("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0.03, 0),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-		}),
-	}
+	local inset = T.Layout.Inset
+	local titleSize = if panelSize.X < 500 then 28 else 38
+	local titleHeight = math.max(
+		60,
+		TextService:GetTextSize(
+			request.Title,
+			titleSize,
+			T.Type.Display,
+			Vector2.new(panelSize.X - inset * 2 - 36, 10000)
+		).Y + 20
+	)
+	local descriptionHeight = TextService:GetTextSize(
+		request.Description,
+		T.Type.Body,
+		T.Type.Label,
+		Vector2.new(panelSize.X - inset * 2 - 16, 10000)
+	).Y + 16
+	local columns = math.max(1, math.min(#request.Buttons, math.floor((panelSize.X - inset * 2) / 150)))
+	local buttonHeight = 54
+	local footerHeight = math.ceil(math.max(#request.Buttons, 1) / columns) * (buttonHeight + 12) - 12
+	local desired = titleHeight + descriptionHeight + footerHeight + inset * 3
+	panelSize = Vector2.new(panelSize.X, math.min(safeArea.size.Y - 32, math.max(280, desired)))
+	local bodyTop = inset + titleHeight + 12
+	local bodyHeight = math.max(44, panelSize.Y - bodyTop - footerHeight - inset * 2)
+	local buttons = {}
 	for index, definition in request.Buttons do
 		buttons[`Button{index}`] = notificationButton(
 			definition,
 			index + 1,
 			props.OnChoose,
 			if index == 1 then firstButtonRef else nil,
-			(1 - 0.03 * (math.max(#request.Buttons, 2) - 1)) / math.max(#request.Buttons, 2)
+			columns,
+			buttonHeight
 		)
 	end
 
@@ -131,20 +157,20 @@ return function(props: Props)
 		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.new(),
+		BackgroundColor3 = T.Colors.Ink,
 		BackgroundTransparency = 0.35,
 		Selectable = false,
 		Text = "",
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 130,
 	}, {
-		Panel = c("ImageLabel", {
+		Panel = c(CandyPanel, {
 			Active = true,
 			ZIndex = 131,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Image = UIConfig.Layout.PageSurface.Image,
-			Position = UDim2.fromScale(0.5, 0.57),
+			Position = UDim2.fromScale(0.5, 0.5),
 			Rotation = styles.Rotation,
 			ScaleType = Enum.ScaleType.Slice,
 			SelectionGroup = true,
@@ -158,62 +184,47 @@ return function(props: Props)
 			Visible = true,
 		}, {
 			ModalScale = c("UIScale", { Scale = styles.Scale }),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 44,
+			Title = c(CandyTitle, {
+				Text = request.Title,
+				TextSize = titleSize,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.177439),
-					Size = UDim2.fromScale(0.9, 0.204474),
-					Text = request.Title,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 2,
+					Position = UDim2.fromOffset(inset, inset),
+					Size = UDim2.new(1, -inset * 2, 0, titleHeight),
+					ZIndex = 134,
 				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = Palette.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
 			}),
-			Frame = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundColor3 = Color3.new(1, 1, 1),
-				BorderColor3 = Color3.new(),
+			Description = c("ScrollingFrame", {
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.265),
-				Size = UDim2.new(0.8, 0, 0, 2),
-			}),
-			Description = c(ResponsiveText, {
-				HostName = "Description",
-				Wrapped = true,
-				MaxTextSize = 26,
-				MeasurementFont = UIConfig.Text.BodyFont,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
-					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
-					Position = UDim2.fromScale(0.5, 0.34),
-					Size = UDim2.new(0.9, 0, 0, math.max(30, panelSize.Y * 0.65 - 74)),
-					Text = request.Description,
-					TextWrapped = true,
-					TextStrokeColor3 = Palette.Ink,
-					TextStrokeTransparency = 0.35,
-					TextColor3 = Color3.new(1, 1, 1),
-					TextYAlignment = Enum.TextYAlignment.Top,
-					ZIndex = 2,
-				},
+				Position = UDim2.fromOffset(inset, bodyTop),
+				Size = UDim2.new(1, -inset * 2, 0, bodyHeight),
+				CanvasSize = UDim2.fromOffset(0, descriptionHeight),
+				ScrollBarThickness = 6,
+				ScrollBarImageColor3 = T.Colors.Pink,
+				ScrollingDirection = Enum.ScrollingDirection.Y,
+				Selectable = false,
+				ZIndex = 134,
 			}, {
-				UITextSizeConstraint = c("UITextSizeConstraint", { MaxTextSize = 26 }),
+				Text = c("TextLabel", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(4, 0),
+					Size = UDim2.new(1, -16, 0, descriptionHeight),
+					Font = T.Type.Label,
+					Text = request.Description,
+					TextSize = T.Type.Body,
+					TextColor3 = T.Colors.Ink,
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					ZIndex = 135,
+				}),
 			}),
 			Buttons = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
 				Position = UDim2.new(0.5, 0, 1, -UIConfig.Spacing.PageInsetPx - 4),
-				Size = UDim2.new(0.86, 0, 0, 54),
+				Size = UDim2.new(1, -inset * 2 + 12, 0, footerHeight),
+				ZIndex = 135,
 			}, buttons),
 		}),
 	})

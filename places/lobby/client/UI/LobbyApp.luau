@@ -675,8 +675,12 @@ local function LobbyContent(props)
 		local disconnectNames = renderer:SubscribeUsernames(function()
 			updateUsernames(nil)
 		end)
-		renderer:SetCompactParty((shortPages or portrait) and currentPage == "SplashScreen")
+		renderer:SetCompactParty(
+			((shortPages or portrait) and currentPage == "SplashScreen")
+				or (portrait and (currentPage == "Inventory" or currentPage == "Shop"))
+		)
 		local preview = skinPreviewState.current
+		renderer:SetBackpackActive(currentPage == "Inventory" or currentPage == "Shop")
 		renderer:SetSkinsPreview(preview.active, preview.ballItemId, preview.hammerItemId)
 		local disconnect = partyClient:subscribe(function(nextSnapshot)
 			if nextSnapshot then
@@ -695,16 +699,20 @@ local function LobbyContent(props)
 	React.useEffect(function()
 		local renderer = characterRenderer.current
 		if renderer then
-			renderer:SetCompactParty((shortPages or portrait) and currentPage == "SplashScreen")
+			renderer:SetCompactParty(
+				((shortPages or portrait) and currentPage == "SplashScreen")
+					or (portrait and (currentPage == "Inventory" or currentPage == "Shop"))
+			)
 		end
 		if currentPage ~= "SplashScreen" or not lobbyVisible or loadingVisible then
 			setPartyMembersOpen(false)
 		end
-	end, { shortPages, currentPage, lobbyVisible, loadingVisible })
+	end, { shortPages, portrait, currentPage, lobbyVisible, loadingVisible })
 
 	React.useEffect(function()
 		local renderer = characterRenderer.current
 		if renderer then
+			renderer:SetBackpackActive(currentPage == "Inventory" or currentPage == "Shop")
 			renderer:SetSkinsPreview(
 				currentPage == "Inventory" and inventoryTab == "SKINS",
 				equipped.BallAssets,
@@ -877,6 +885,7 @@ local function LobbyContent(props)
 					return c(SettingsPage, { Position = position, Place = "Lobby" })
 				elseif pageName == "Shop" then
 					return c(ShopPage, {
+						SeasonState = seasonState,
 						Model = economyMenu.shopModel,
 						Position = position,
 						OnCardActivated = economyMenu.activateShopCard,

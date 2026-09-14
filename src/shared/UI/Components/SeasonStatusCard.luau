@@ -1,6 +1,6 @@
--- Description: Responsive splash card showing season tier, XP progress, and the next free reward.
-
 --!strict
+local T = require(script.Parent.Parent.Tokens)
+-- Description: Responsive splash card showing season tier, XP progress, and the next free reward.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -8,14 +8,14 @@ local React = require(Packages:WaitForChild("react"))
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local SeasonClaims = require(script.Parent.Parent.Models.SeasonClaims)
 local BonksLabel = require(script.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.OuchText)
+local ResponsiveText = require(script.Parent.ResponsiveText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local Palette = UIConfig.ProgressionStyle
+local Palette = require(script.Parent.Parent.EconomyPalette)
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
-local OuchPanel = require(script.Parent.OuchPanel)
-local OuchProgressBar = require(script.Parent.OuchProgressBar)
+local OuchPanel = require(script.Parent.CandyPanel)
+local OuchProgressBar = require(script.Parent.CandyProgressBar)
 
 local c = React.createElement
 
@@ -83,25 +83,25 @@ return function(props: Props)
 		return c(OuchPanel, { Native = cardNative(props), Padding = 0 }, {
 			Heading = c(ResponsiveText, {
 				HostName = "Heading",
-				MeasurementFont = Enum.Font.LuckiestGuy,
+				MeasurementFont = Enum.Font.FredokaOne,
 				MinTextSize = 14,
 				MaxTextSize = UIConfig.Text.HeaderPx,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
 					Position = UDim2.new(0.5, 0, 0, if props.Compact then 6 else 10),
 					Size = UDim2.new(1, -24, 0, 30),
 					Text = "SEASON",
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = T.Colors.Ink,
 					TextStrokeColor3 = DARK,
-					TextStrokeTransparency = 0.72,
+					TextStrokeTransparency = 1,
 					ZIndex = 2,
 				},
 			}),
 			Detail = c(ResponsiveText, {
 				HostName = "Detail",
-				MeasurementFont = UIConfig.Text.BodyFont,
+				MeasurementFont = T.Type.Label,
 				MinTextSize = 11,
 				MaxTextSize = 16,
 				Native = {
@@ -114,9 +114,9 @@ return function(props: Props)
 					-- discards season XP while no season is active, so copy claiming
 					-- progress continues would be false.
 					Text = "Between seasons. Tier rewards return with the next one.",
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = T.Colors.Ink,
 					TextStrokeColor3 = DARK,
-					TextStrokeTransparency = 0.72,
+					TextStrokeTransparency = 1,
 					TextWrapped = true,
 					ZIndex = 2,
 				},
@@ -142,19 +142,19 @@ return function(props: Props)
 		Title = if not compact
 			then c(ResponsiveText, {
 				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
+				MeasurementFont = Enum.Font.FredokaOne,
 				MinTextSize = 14,
 				MaxTextSize = UIConfig.Text.HeaderPx,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
 					Position = UDim2.new(0.5, 0, 0, 4),
 					Size = UDim2.new(1, -24, 0, 32),
 					Text = "SEASON PROGRESS",
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = T.Colors.Ink,
 					TextStrokeColor3 = DARK,
-					TextStrokeTransparency = 0.72,
+					TextStrokeTransparency = 1,
 					ZIndex = 2,
 				},
 			})
@@ -174,35 +174,35 @@ return function(props: Props)
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 				TierWord = c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
-					MinTextSize = if compact then 8 else 10,
-					MaxTextSize = if compact then 12 else 16,
+					MeasurementFont = T.Type.Label,
+					MinTextSize = T.Type.Minimum,
+					MaxTextSize = T.Type.Minimum,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
-						Position = UDim2.fromScale(0.5, 0.07),
-						Size = UDim2.fromScale(0.82, 0.28),
+						FontFace = Font.fromEnum(T.Type.Label),
+						Position = UDim2.fromScale(0.5, 0),
+						Size = UDim2.new(0.9, 0, 0, 22),
 						Text = "TIER",
-						TextColor3 = Color3.new(1, 1, 1),
+						TextColor3 = T.Colors.Ink,
 						TextStrokeColor3 = Palette.Ink,
-						TextStrokeTransparency = 0.35,
+						TextStrokeTransparency = 1,
 					},
 				}),
 				TierNumber = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.LuckiestGuy,
+					MeasurementFont = Enum.Font.FredokaOne,
 					MinTextSize = if compact then 10 else 14,
 					MaxTextSize = if compact then 24 else 32,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+						FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
 						Position = UDim2.fromScale(0.5, 0.65),
 						Size = UDim2.fromScale(0.82, 0.48),
 						Text = tostring(tier),
-						TextColor3 = Color3.new(1, 1, 1),
+						TextColor3 = T.Colors.Ink,
 						TextStrokeColor3 = Palette.Ink,
-						TextStrokeTransparency = 0.35,
+						TextStrokeTransparency = 1,
 					},
 				}),
 			}),
@@ -233,16 +233,16 @@ return function(props: Props)
 				),
 			}, {
 				SeasonName = c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
+					MeasurementFont = T.Type.Label,
 					MinTextSize = if compact then 9 else 12,
 					MaxTextSize = if compact then 22 else UIConfig.Text.HeaderPx,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
+						FontFace = Font.fromEnum(T.Type.Label),
 						Position = UDim2.fromScale(0, 0),
 						Size = UDim2.fromScale(1, if compact then 0.42 else 0.24),
 						Text = if compact then "SEASON" else displayName,
-						TextColor3 = Palette.White,
+						TextColor3 = T.Colors.Ink,
 						TextStrokeColor3 = Palette.Ink,
 						TextStrokeTransparency = 1,
 						TextXAlignment = Enum.TextXAlignment.Left,
@@ -258,16 +258,16 @@ return function(props: Props)
 					},
 				}),
 				XPLabel = c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
+					MeasurementFont = T.Type.Label,
 					MinTextSize = 10,
-					MaxTextSize = if compact then 13 else 16,
+					MaxTextSize = T.Type.Minimum,
 					Native = {
 						BackgroundTransparency = 1,
-						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
+						FontFace = Font.fromEnum(T.Type.Label),
 						Position = UDim2.fromScale(0, if compact then 0.68 else 0.5),
-						Size = UDim2.fromScale(1, if compact then 0.3 else 0.18),
+						Size = UDim2.new(1, 0, 0, 20),
 						Text = if isMaxTier then "MAX TIER" else `{xpIntoTier} / {xpForNextTier} XP`,
-						TextColor3 = Palette.White,
+						TextColor3 = T.Colors.Ink,
 						TextStrokeColor3 = Palette.Ink,
 						TextStrokeTransparency = 1,
 						TextXAlignment = Enum.TextXAlignment.Left,
@@ -280,16 +280,16 @@ return function(props: Props)
 						Size = UDim2.fromScale(1, 0.24),
 					}, {
 						NextLabel = c(ResponsiveText, {
-							MeasurementFont = UIConfig.Text.BodyFont,
+							MeasurementFont = T.Type.Label,
 							MinTextSize = 10,
 							MaxTextSize = 15,
 							Native = {
 								BackgroundTransparency = 1,
-								FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
+								FontFace = Font.fromEnum(T.Type.Label),
 								Position = UDim2.fromScale(0, 0),
 								Size = UDim2.fromScale(0.22, 1),
 								Text = "NEXT",
-								TextColor3 = Palette.White,
+								TextColor3 = T.Colors.Ink,
 								TextStrokeColor3 = Palette.Ink,
 								TextStrokeTransparency = 1,
 								TextXAlignment = Enum.TextXAlignment.Left,
@@ -298,7 +298,7 @@ return function(props: Props)
 						RewardLabel = if nextReward.kind == "Bonks"
 							then c(BonksLabel, {
 								Amount = nextReward.amount or 0,
-								TextColor = Palette.Yellow,
+								TextColor = T.Colors.Ink,
 								TextStroke = 0,
 								Native = {
 									Position = UDim2.fromScale(0.2, 0),
@@ -307,18 +307,18 @@ return function(props: Props)
 								IconSize = UDim2.fromScale(0.2, 0.8),
 							})
 							else c(ResponsiveText, {
-								MeasurementFont = UIConfig.Text.BodyFont,
+								MeasurementFont = T.Type.Label,
 								MaxTextSize = 16,
 								Truncate = true,
 								Native = {
 									BackgroundTransparency = 1,
 									Position = UDim2.fromScale(0.22, 0),
 									Size = UDim2.fromScale(0.78, 1),
-									Font = UIConfig.Text.BodyFont,
+									Font = T.Type.Label,
 									Text = if Cosmetics.Items[nextReward.itemId]
 										then Cosmetics.Items[nextReward.itemId].DisplayName
 										else "Cosmetic",
-									TextColor3 = Palette.White,
+									TextColor3 = T.Colors.Ink,
 									TextStrokeColor3 = Palette.Ink,
 									TextStrokeTransparency = 1,
 									TextXAlignment = Enum.TextXAlignment.Left,
