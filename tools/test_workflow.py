@@ -213,5 +213,58 @@ class WorkflowTests(WorkflowFixture):
         self.assertEqual(read_json(self.project / "manifests/assets.json")["assets"]["asset.png"]["asset_id"], "42")
 
 
+class AnimationGateTests(WorkflowFixture):
+    def setUp(self):
+        super().setUp()
+        self.rbxm = b"<roblox!\x89\xff\r\n\x1a\n\x00\x00" + b"\x00" * 16 + b"INST" + b"\x00" * 16 + b"END\x00" + b"\x00" * 12 + b"</roblox>"
+        self.clip = self.project / "assets/animations/locomotion/LocoTest.rbxm"
+        self.clip.parent.mkdir(parents=True)
+        self.clip.write_bytes(self.rbxm)
+        review = self.project / ".review/animations"
+        review.mkdir(parents=True)
+        (review / "LocoTest-sheet.png").write_bytes(self.data)
+        (review / "studio.png").write_bytes(self.data)
+        blend = self.project / "assets/source/blender/test.blend"
+        blend.parent.mkdir(parents=True)
+        blend.write_bytes(b"BLENDER")
+        self.evidence = {"source_blend": "assets/source/blender/test.blend", "sheet": ".review/animations/LocoTest-sheet.png",
+                         "studio": ".review/animations/studio.png", "statistics": {"keyframes": 44, "duration": 0.7, "looped": True, "joints": 16}}
+        self.animation = {**self.proposal, "id": str(uuid.uuid4()), "file": str(self.clip), "production_file": "assets/animations/locomotion/LocoTest.rbxm",
+                          "sha256": digest(self.rbxm), "asset_type": "Animation", "model_evidence": self.evidence}
+
+    def test_animation_validates_with_evidence(self):
+        result = validate_bytes(self.rbxm, "LocoTest.rbxm", "Animation", self.animation)
+        self.assertEqual(result["content_type"], "model/x-rbxm")
+        self.assertEqual(result["model_statistics"]["keyframes"], 44)
+
+    def test_animation_rejects_xml_bad_header_updates_and_missing_evidence(self):
+        with self.assertRaises(ValueError):
+            validate_bytes(self.rbxm, "LocoTest.rbxmx", "Animation", self.animation)
+        with self.assertRaises(ValueError):
+            validate_bytes(b"<roblox xmlns=\"x\">" + b"\x00" * 64, "LocoTest.rbxm", "Animation", self.animation)
+        with self.assertRaises(ValueError):
+            validate_bytes(self.rbxm[:-30], "LocoTest.rbxm", "Animation", self.animation)
+        with self.assertRaises(ValueError):
+            validate_bytes(self.rbxm, "LocoTest.rbxm", "Animation", {**self.animation, "target_asset_id": "5"})
+        for missing in ("sheet", "studio", "statistics", "source_blend"):
+            evidence = dict(self.evidence)
+            evidence.pop(missing)
+            with self.assertRaises(ValueError):
+                validate_bytes(self.rbxm, "LocoTest.rbxm", "Animation", {**self.animation, "model_evidence": evidence})
+        with self.assertRaises(ValueError):
+            validate_bytes(self.rbxm, "LocoTest.rbxm", "Animation", {**self.animation, "model_evidence": {**self.evidence, "statistics": {"keyframes": 1, "duration": 0.7, "looped": True, "joints": 16}}})
+
+    def test_animation_receive_freezes_review_evidence(self):
+        request = self.project / "animation.json"
+        write_json(request, self.animation)
+        record = gate.receive(self.store, request)
+        self.assertEqual(sorted(record["preview_files"]), ["sheet", "studio"])
+        self.assertEqual(record["validation"]["content_type"], "model/x-rbxm")
+        gate.verified_bytes(record)
+        Path(record["preview_files"]["sheet"]).write_bytes(b"tampered")
+        with self.assertRaises(ValueError):
+            gate.verified_bytes(record)
+
+
 if __name__ == "__main__":
     unittest.main()

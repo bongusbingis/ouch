@@ -17,6 +17,9 @@ function FFA.resolveRules(): GameMode.MatchRules
 	return {
 		MinPlayers = m.MinPlayers,
 		ScoreTarget = m.ScoreTarget,
+		ReferencePlayers = m.ReferencePlayers,
+		MinScoreTarget = m.MinScoreTarget,
+		MaxScoreTarget = m.MaxScoreTarget,
 		TimeCapSeconds = m.TimeCapSeconds,
 		ResultsSeconds = PostMatch.ResultsSeconds,
 		IntermissionSeconds = GameModes.VoteDurationSeconds,
@@ -35,10 +38,11 @@ function FFA.onMatchStart(ctx: GameMode.ModeContext)
 	end
 end
 
-function FFA.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, isFirstSpawn: boolean)
-	if isFirstSpawn then
-		ctx.balls.grantHeldBall(player)
-	end
+-- Every spawn, not only the first: a player who respawns emptyhanded in a
+-- dodgeball match has no way back into it but to scavenge, and grantHeldBall
+-- already no-ops for anyone still holding one.
+function FFA.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, _isFirstSpawn: boolean)
+	ctx.balls.grantHeldBall(player)
 end
 
 function FFA.onElim(_ctx: GameMode.ModeContext, _sourceId: string?, _targetId: string?) end

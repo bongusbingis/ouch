@@ -73,7 +73,7 @@ return function(props)
 				AnchorPoint = Vector2.new(0, 1),
 				Position = UDim2.new(0, 2, 1, -6),
 				Size = UDim2.new(1, -4, 0, 18),
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+				FontFace = UIConfig.Text.DefaultFont,
 				Text = tab.Label,
 				TextSize = if layout.buttonWidth < 74 then 12 else if layout.compact then 14 else 16,
 				TextColor3 = if enabled then UIConfig.ProgressionStyle.White else UIConfig.ProgressionStyle.Muted,
@@ -81,7 +81,7 @@ return function(props)
 			}, {
 				Outline = c("UIStroke", {
 					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = 0.045,
+					Thickness = UIConfig.Text.OutlineScale,
 					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 				}),
 			}),

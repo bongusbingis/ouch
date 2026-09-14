@@ -31,6 +31,7 @@ return function(props: Props)
 			OnClose = controller.closePreview,
 		}),
 		ShopDetails = c(ShopDetailsModal, {
+			Visible = controller.crateReveal == nil or controller.inspectingReward,
 			Card = controller.selectedShopCard,
 			BackRef = controller.detailsBackRef,
 			FocusEnabled = props.FocusEnabled ~= false

@@ -3,7 +3,9 @@
 -- Terrain feature tuning. Per-pad override via a "LaunchSpeed" attribute on the pad.
 -- VerticalPadding widens a volume upward so a root just above the part counts as inside.
 return {
-	Spawns = { RootOffsetStuds = 3.5 },
+	-- MaxOriginDistanceStuds catches a spawn marker authored (or accidentally dragged)
+	-- somewhere nowhere near the arena, e.g. parked far below the map instead of removed.
+	Spawns = { RootOffsetStuds = 3.5, MaxOriginDistanceStuds = 600 },
 	-- Squash frequencies/ratios are converted from the prototype's spring constants
 	-- (outer m=1, c=3, k=125; inner m=50, c=5, k=200).
 	JumpPad = {

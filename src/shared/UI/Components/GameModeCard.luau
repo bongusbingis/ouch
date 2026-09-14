@@ -205,13 +205,20 @@ return function(props: Props)
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 				Placeholder = placeholder(mode.Id, z + 1, compact, portrait),
-				Art = c("ImageLabel", {
-					BackgroundTransparency = 1,
-					Image = mode.ThumbnailId,
-					ScaleType = Enum.ScaleType.Crop,
-					Size = UDim2.fromScale(1, 1),
-					ZIndex = z + 3,
-				}),
+				-- Only drawn once a mode has real key art. A failed load renders
+				-- transparent, so an unset id looked harmless, but it still asked
+				-- for a missing asset on every card and left the placeholder
+				-- underneath a layer that claims to be art. ArenaLoadingClient
+				-- already gates the same value this way; this matches it.
+				Art = if mode.ThumbnailId ~= nil and mode.ThumbnailId ~= ""
+					then c("ImageLabel", {
+						BackgroundTransparency = 1,
+						Image = mode.ThumbnailId,
+						ScaleType = Enum.ScaleType.Crop,
+						Size = UDim2.fromScale(1, 1),
+						ZIndex = z + 3,
+					})
+					else nil,
 				VoteCount = c("Frame", {
 					BackgroundColor3 = Palette.Ink,
 					BackgroundTransparency = 0.15,

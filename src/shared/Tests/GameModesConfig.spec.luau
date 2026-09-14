@@ -13,9 +13,13 @@ T.describe("GameModes config", function()
 		T.expect(not GameModes.Modes.Infection.Enabled):toBeTruthy()
 	end)
 
-	T.it("keeps thumbnails on the shared stub id until key art lands", function()
+	-- Empty, not a stand-in asset id: both read paths treat empty as "no art yet"
+	-- and fall back to the authored placeholder, where a stub id made every ballot
+	-- render request an asset that does not exist. When real key art lands, these
+	-- become rbxassetid:// strings and this expectation flips with them.
+	T.it("leaves thumbnails empty until key art lands", function()
 		for _, definition in GameModes.Modes do
-			T.expect(definition.ThumbnailId):toEqual("rbxassetid://123456789")
+			T.expect(definition.ThumbnailId):toEqual("")
 		end
 	end)
 end)

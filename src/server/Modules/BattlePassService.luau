@@ -214,6 +214,12 @@ function BattlePassService.addSeasonXp(player: Player, amount: number, seasonId:
 		return false
 	end
 	local id = seasonId or data.Season.Id
+	-- No active season means season XP is dropped, deliberately: banking it would
+	-- let players pre-farm the next season's track before it opens, and there is
+	-- nowhere to store it that a rollover would not archive away. Career XP
+	-- (Level.Points) and Bonks are unaffected -- only the tier track pauses. The
+	-- splash card says so in its between-seasons state; keep the two in step, and
+	-- do not add copy promising carry-over without changing this.
 	if id == "" then
 		return true
 	end

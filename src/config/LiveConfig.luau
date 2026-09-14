@@ -26,6 +26,7 @@ local moduleDefinitions = {
 	GameModes = { path = { "Config", "Gameplay", "GameModes" }, arena = true, lobby = true },
 	MapFeatures = { path = { "Config", "Gameplay", "MapFeatures" }, arena = true },
 	Modes = { path = { "Config", "Gameplay", "Modes" }, arena = true },
+	Progression = { path = { "Config", "Progression", "Data" }, arena = true },
 	Shop = { path = { "Config", "Economy", "Shop" }, arena = true, lobby = true },
 	Crates = { path = { "Config", "Economy", "Crates" }, arena = true, lobby = true },
 	Matchmaking = { path = { "Shared", "Matchmaking", "Config" }, lobby = true },
@@ -103,6 +104,30 @@ local entries: { Entry } = {
 	{ Key = "Modes.Infection.RespawnSeconds", Type = "number", Minimum = 0, Maximum = 30 },
 	{ Key = "Modes.Infection.SpawnInvulnSeconds", Type = "number", Minimum = 0, Maximum = 10 },
 
+	-- Match award rates: the faucet. These are the dominant term in earned Bonks/h
+	-- and season XP/h, so they are the first thing to reach for when launch pacing
+	-- is wrong in either direction -- too stingy and progression stalls, too generous
+	-- and nothing is worth buying. ProgressionService reads these leaves per award,
+	-- so an override lands on the next award without a restart.
+	--
+	-- MatchComplete and Win keep a minimum of 1: finishing a match must always pay
+	-- something, or a player can complete the loop and see nothing happen. Elim and
+	-- Catch may go to 0, which turns an action reward off without disabling the action.
+	--
+	-- Daily, quest and season grants are deliberately absent. Their reward tables are
+	-- keyed by number (day index, definition index) and ConfigOverrides addresses
+	-- paths by string segment only, so they are not reachable without changing that
+	-- shared pure module. They are also the smaller term -- 1,625 Bonks per weekly
+	-- daily cycle against 600-2,800 earned per hour of play.
+	{ Key = "Progression.ProgressionXP.MatchComplete", Type = "number", Minimum = 1, Maximum = 200 },
+	{ Key = "Progression.ProgressionXP.Win", Type = "number", Minimum = 1, Maximum = 500 },
+	{ Key = "Progression.ProgressionXP.Elim", Type = "number", Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionXP.Catch", Type = "number", Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionBonks.MatchComplete", Type = "number", Minimum = 1, Maximum = 400 },
+	{ Key = "Progression.ProgressionBonks.Win", Type = "number", Minimum = 1, Maximum = 500 },
+	{ Key = "Progression.ProgressionBonks.Elim", Type = "number", Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionBonks.Catch", Type = "number", Minimum = 0, Maximum = 100 },
+
 	-- Shop A/B levers, tested at server granularity: Roblox hands different servers
 	-- different snapshots (GetConfigAsync), so a whole server runs one variant and
 	-- VariantId labels the result on every analytics row. (Per-player splits use the
@@ -120,7 +145,9 @@ local entries: { Entry } = {
 	{ Key = "Shop.Bundle.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },
 	{ Key = "Crates.DodgeballCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 900 },
 	{ Key = "Crates.HammerCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 900 },
-	{ Key = "Crates.EffectsCrate.BonksPrice", Type = "number", Minimum = 500, Maximum = 900 },
+	-- Floored below the weapon crates: the Effects pool is roughly a third of
+	-- theirs, so it saturates into duplicates sooner and is priced to match.
+	{ Key = "Crates.EffectsCrate.BonksPrice", Type = "number", Minimum = 300, Maximum = 900 },
 
 	{ Key = "Matchmaking.PartyMaxPlayers", Type = "number", Minimum = 1, Maximum = 8 },
 	{ Key = "Matchmaking.MatchTargetPlayers", Type = "number", Minimum = 1, Maximum = GameModes.MatchCapacity },

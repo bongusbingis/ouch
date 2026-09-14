@@ -7,7 +7,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
 local ButtonSurface = require(script.Parent.ButtonSurface)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 

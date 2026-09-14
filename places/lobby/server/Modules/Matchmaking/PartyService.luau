@@ -53,6 +53,7 @@ function PartyService.new(
 )
 	local self = setmetatable({
 		_players = if runtime and runtime.players then runtime.players else Players,
+		_lobbyGatherCoordinator = runtime and runtime.lobbyGatherCoordinator,
 		_partyRepository = partyRepository,
 		_queueRepository = queueRepository,
 		_matchRepository = matchRepository,
@@ -187,7 +188,13 @@ function PartyService:_maybeTeleport(party)
 			return
 		end
 
-		local currentPlayers = self:_getLocalPlayers(party.partyId)
+		local currentPlayers = {}
+		for _, player in self:_getLocalPlayers(party.partyId) do
+			-- An in-flight lobby transfer must finish/fail before starting the arena transfer.
+			if not self._lobbyGatherCoordinator or not self._lobbyGatherCoordinator:IsGathering(player) then
+				table.insert(currentPlayers, player)
+			end
+		end
 		if #currentPlayers == 0 then
 			self._teleportDispatching[party.partyId] = nil
 			return
@@ -205,10 +212,30 @@ function PartyService:HandleTeleportPresentationReady(player)
 	end
 end
 
+function PartyService:_maybeGatherLobby(party)
+	if not self._lobbyGatherCoordinator or party.phase ~= "Lobby" or #party.members < 2 then
+		return
+	end
+	for _, player in self:_getLocalPlayers(party.partyId) do
+		task.spawn(function()
+			self._lobbyGatherCoordinator:Consider(player, party.partyId, function()
+				local current = self._cache[party.partyId]
+				return not self._destroyed
+					and self._localPartyByUser[player.UserId] == party.partyId
+					and current ~= nil
+					and current.phase == "Lobby"
+			end, function()
+				return self._teleportCoordinator:IsTeleporting(player)
+			end)
+		end)
+	end
+end
+
 function PartyService:_applyParty(party, reason)
 	local cached = self._cache[party.partyId]
 	if cached and cached.revision >= party.revision then
 		self:_maybeTeleport(party)
+		self:_maybeGatherLobby(cached)
 		return false
 	end
 
@@ -222,6 +249,7 @@ function PartyService:_applyParty(party, reason)
 		end
 	end
 	self:_maybeTeleport(party)
+	self:_maybeGatherLobby(party)
 	return true
 end
 
@@ -649,6 +677,18 @@ end
 function PartyService:_initializePlayerUnlocked(player)
 	if player.Parent ~= self._players then
 		return
+	end
+
+	if self._lobbyGatherCoordinator then
+		local handled, arrivalError = self._lobbyGatherCoordinator:RestoreArrival(player, function(party)
+			self:_attach(player, party, "PartyRestored")
+		end)
+		if handled then
+			if arrivalError then
+				self:_sendError(player, Protocol.Errors.NotReady)
+			end
+			return
+		end
 	end
 
 	local target, requireFriendAccess, returning = self:_resolveArrivalTarget(player)
@@ -1167,6 +1207,13 @@ function PartyService:_dispatchRequest(player, action, payload)
 end
 
 function PartyService:HandleRequest(player, action, payload)
+	if
+		action ~= Protocol.Actions.GetSnapshot
+		and self._lobbyGatherCoordinator
+		and self._lobbyGatherCoordinator:IsGathering(player)
+	then
+		return Protocol.failure(Protocol.Errors.Busy)
+	end
 	if self._busy[player.UserId] then
 		return Protocol.failure(Protocol.Errors.Busy)
 	end
@@ -1346,11 +1393,21 @@ function PartyService:Start()
 		local party = self:_partyForPlayer(player)
 		local inMatchTransition = party
 			and (party.phase == "Claimed" or party.phase == "Assigned" or party.phase == "Teleporting")
-		if not self._teleportCoordinator:IsTeleporting(player) and not inMatchTransition and party then
+		local gathering = self._lobbyGatherCoordinator
+			and self._lobbyGatherCoordinator:IsGathering(player, party and party.partyId)
+		if
+			not gathering
+			and not self._teleportCoordinator:IsTeleporting(player)
+			and not inMatchTransition
+			and party
+		then
 			self:_removeMemberFromParty(player.UserId, party.partyId, "MemberLeft", true)
 		end
 		self:_detachFromLocalParty(player)
 		self._teleportCoordinator:Clear(player)
+		if self._lobbyGatherCoordinator then
+			self._lobbyGatherCoordinator:Clear(player)
+		end
 	end)
 
 	for _, player in self._players:GetPlayers() do
@@ -1386,12 +1443,17 @@ function PartyService:Shutdown()
 	table.clear(self._appearanceConnections)
 	for _, player in self._players:GetPlayers() do
 		local party = self:_partyForPlayer(player)
-		if party and party.phase ~= "Assigned" and party.phase ~= "Teleporting" then
+		local gathering = self._lobbyGatherCoordinator
+			and self._lobbyGatherCoordinator:IsGathering(player, party and party.partyId)
+		if party and not gathering and party.phase ~= "Assigned" and party.phase ~= "Teleporting" then
 			self:_removeMemberFromParty(player.UserId, party.partyId, "ServerClosing", true)
 		end
 	end
 	self._partyBus:Destroy()
 	self._teleportCoordinator:Destroy()
+	if self._lobbyGatherCoordinator then
+		self._lobbyGatherCoordinator:Destroy()
+	end
 end
 
 return PartyService

@@ -3,8 +3,31 @@
 
 local MatchHUDModel = {}
 
+-- Assigned by position in the mode's own team list rather than by team name, so
+-- a mode whose sides are not called Red and Blue still reads as two sides. The
+-- first team keeps Pink and the second Cyan, which is what Red and Blue already
+-- were.
+local TEAM_ACCENTS = { "Pink", "Cyan" }
+
+function MatchHUDModel.teamAccent(index: number): string
+	return TEAM_ACCENTS[(index - 1) % #TEAM_ACCENTS + 1]
+end
+
 function MatchHUDModel.isTeammate(entry: any, teamId: string?): boolean
 	return teamId ~= nil and teamId ~= "" and entry.teamId == teamId and not entry.isLocal and entry.alive == true
+end
+
+function MatchHUDModel.teams(teams: { any }?): { any }
+	local result = {}
+	for index, team in teams or {} do
+		table.insert(result, {
+			id = team.id,
+			label = string.upper(tostring(team.id)),
+			score = team.score or 0,
+			accent = MatchHUDModel.teamAccent(index),
+		})
+	end
+	return result
 end
 
 function MatchHUDModel.standings(players: { any }): { any }
@@ -50,15 +73,21 @@ function MatchHUDModel.strip(entries: { any }, limit: number): { any }
 	return rows
 end
 
--- Team scoreboards read as two columns; a crowded free-for-all splits in two
--- as well to keep twenty-player desktop boards compact. Narrow views can scroll.
-function MatchHUDModel.columns(entries: { any }, teamMode: boolean, singleColumnMaxRows: number): { { any } }
-	if teamMode then
-		local red, blue = {}, {}
-		for _, entry in entries do
-			table.insert(if entry.teamId == "Red" then red else blue, entry)
+-- Team scoreboards get one column per team the mode declares; a crowded
+-- free-for-all splits in two as well to keep twenty-player desktop boards
+-- compact. Narrow views can scroll.
+function MatchHUDModel.columns(entries: { any }, teams: { any }?, singleColumnMaxRows: number): { { any } }
+	if teams ~= nil and #teams > 0 then
+		local columns = {}
+		local positionById = {}
+		for position, team in teams do
+			columns[position] = {}
+			positionById[team.id] = position
 		end
-		return { red, blue }
+		for _, entry in entries do
+			table.insert(columns[positionById[entry.teamId] or 1], entry)
+		end
+		return columns
 	end
 	if #entries <= singleColumnMaxRows then
 		return { entries }
@@ -73,13 +102,41 @@ end
 
 function MatchHUDModel.build(snapshot: any, now: number): any
 	local remaining = math.max(math.ceil(snapshot.timeRemaining or 0), 0)
-	local target = snapshot.scoreTarget or 0
+	local rawTarget = snapshot.scoreTarget or 0
+	-- A mode with no elimination target replicates zero. Infinity is guarded too,
+	-- so a stale attribute cannot reach the objective line as the word "INF".
+	local target = if rawTarget ~= rawTarget or rawTarget == math.huge then 0 else rawTarget
+	local teams = MatchHUDModel.teams(snapshot.teams)
+	local teamMode = #teams > 0
 	local objective = if target > 0 then `FIRST TO {target} ELIMINATIONS` else "SURVIVE UNTIL TIME RUNS OUT"
-	local scores = if snapshot.teamMode
-		then `RED {snapshot.redScore or 0}   •   BLUE {snapshot.blueScore or 0}`
-		else `YOUR ELIMINATIONS  {snapshot.score or 0}`
-	if snapshot.teamMode and snapshot.teamId then
-		scores ..= `   |   YOU: {string.upper(snapshot.teamId)}`
+
+	-- Without an elimination target -- a headcount scoreboard -- the bars read
+	-- against the total on the board instead, so they still fill to one.
+	local teamTotal = 0
+	for _, team in teams do
+		teamTotal += team.score
+	end
+	local teamScoreMax = if target > 0 then target else teamTotal
+
+	-- Rows always carry a player's own eliminations; the column headers carry
+	-- whatever the mode scores by, which is not always the same thing. The legend
+	-- says which, rather than calling a headcount a kill count.
+	local footer = if not teamMode
+		then "ELIMINATIONS"
+		else if target > 0 then "ELIMINATIONS • TEAM TOTAL ABOVE" else "ELIMINATIONS • PLAYERS LEFT ABOVE"
+
+	local scores
+	if teamMode then
+		local parts = {}
+		for _, team in teams do
+			table.insert(parts, `{team.label} {team.score}`)
+		end
+		scores = table.concat(parts, "   •   ")
+		if snapshot.teamId then
+			scores ..= `   |   YOU: {string.upper(snapshot.teamId)}`
+		end
+	else
+		scores = `YOUR ELIMINATIONS  {snapshot.score or 0}`
 	end
 	local respawn = nil
 	if snapshot.rewardsRecovery then
@@ -104,10 +161,10 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 		starting = snapshot.phase == "Starting",
 		entries = entries,
 		placement = placement,
-		teamMode = snapshot.teamMode == true,
+		teamMode = teamMode,
+		teams = teams,
+		teamScoreMax = teamScoreMax,
 		teamId = snapshot.teamId,
-		redScore = snapshot.redScore or 0,
-		blueScore = snapshot.blueScore or 0,
 		score = snapshot.score or 0,
 		remaining = remaining,
 		target = target,
@@ -116,6 +173,7 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 		clock = string.format("%d:%02d", math.floor(remaining / 60), remaining % 60),
 		objective = objective,
 		scores = scores,
+		footer = footer,
 		respawn = respawn,
 	}
 end

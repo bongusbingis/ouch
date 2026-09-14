@@ -153,6 +153,8 @@ function PartyRepository:SetUserParty(userId, partyId)
 		return self._userMap:SetAsync(tostring(userId), {
 			partyId = partyId,
 			jobId = game.JobId,
+			placeId = game.PlaceId,
+			publicServer = game.PrivateServerId == "",
 			refreshedAt = os.time(),
 		}, Config.PresenceLifetime)
 	end)
@@ -161,6 +163,11 @@ function PartyRepository:SetUserParty(userId, partyId)
 end
 
 function PartyRepository:GetUserPartyId(userId)
+	local value, readError = self:GetUserPresence(userId)
+	return value and value.partyId or nil, readError
+end
+
+function PartyRepository:GetUserPresence(userId)
 	local success, value = CloudRetry.call("PartyRepository.GetUserPartyId", function()
 		return self._userMap:GetAsync(tostring(userId))
 	end)
@@ -168,7 +175,7 @@ function PartyRepository:GetUserPartyId(userId)
 		return nil, value
 	end
 
-	return value and value.partyId or nil
+	return value
 end
 
 function PartyRepository:RemoveUserParty(userId, expectedPartyId)

@@ -7,7 +7,7 @@ local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interf
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ButtonSurface = require(script.Parent.Parent.ButtonSurface)
 local BonksLabel = require(script.Parent.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.Parent.OuchText)
 local c = React.createElement
 
 local function label(text, position, size, maximum, color, zIndex, stroke)
@@ -36,7 +36,7 @@ return function(props)
 	local enabled = props.Enabled ~= false
 	local z = props.ZIndex or 8
 	local color = if enabled then props.TextColor or UI.ProgressionStyle.White else UI.ProgressionStyle.White
-	local stroke = if enabled then props.TextStroke or 0.055 else 0.055
+	local stroke = if enabled then props.TextStroke or UI.Text.OutlineScale else UI.Text.OutlineScale
 	local top = if stacked then UDim2.fromOffset(10, 3) else UDim2.fromOffset(10, 2)
 	local extent = if stacked then UDim2.new(1, -20, 0.5, -3) else UDim2.new(1, -20, 1, -4)
 	return c(AnimatedButton, {

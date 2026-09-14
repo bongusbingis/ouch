@@ -8,13 +8,14 @@ local React = require(Packages:WaitForChild("react"))
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local SeasonClaims = require(script.Parent.Parent.Models.SeasonClaims)
 local BonksLabel = require(script.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
-local Well = require(script.Parent.Well)
+local OuchPanel = require(script.Parent.OuchPanel)
+local OuchProgressBar = require(script.Parent.OuchProgressBar)
 
 local c = React.createElement
 
@@ -31,6 +32,25 @@ export type Props = {
 	ShowClaim: boolean?,
 	Native: { [any]: any }?,
 }
+
+-- Both the live card and the between-seasons card fill their slot identically, so
+-- the panel keeps the same footprint either way and the splash layout never shifts.
+local function cardNative(props: Props): { [any]: any }
+	local native: { [any]: any } = {
+		AnchorPoint = Vector2.new(0, 0),
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Palette.Panel,
+		BorderSizePixel = 0,
+		Position = UDim2.fromScale(0, 0),
+		Size = UDim2.fromScale(1, 1),
+	}
+	if props.Native then
+		for key, value in props.Native do
+			native[key] = value
+		end
+	end
+	return native
+end
 
 local function findNextFreeReward(tiers: { any }): any?
 	for _, tier in tiers do
@@ -49,8 +69,59 @@ end
 
 return function(props: Props)
 	local state = props.State
-	if state == nil or state.active == false then
+	-- No season state at all means it has not arrived from the server yet, so the
+	-- slot stays empty rather than claiming a gap that may not exist.
+	if state == nil then
 		return nil
+	end
+	-- A resolved "no active season" is different, and it is a state this game
+	-- genuinely enters: the selector returns nothing between one season's end and
+	-- the next one's start. Rendering nothing there left a hole on the desktop
+	-- splash and a blank panel behind the SEASON tab, which reads as a broken
+	-- screen. Say so instead, and keep the card's own shape so the layout holds.
+	if state.active == false then
+		return c(OuchPanel, { Native = cardNative(props), Padding = 0 }, {
+			Heading = c(ResponsiveText, {
+				HostName = "Heading",
+				MeasurementFont = Enum.Font.LuckiestGuy,
+				MinTextSize = 14,
+				MaxTextSize = UIConfig.Text.HeaderPx,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0),
+					BackgroundTransparency = 1,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					Position = UDim2.new(0.5, 0, 0, if props.Compact then 6 else 10),
+					Size = UDim2.new(1, -24, 0, 30),
+					Text = "SEASON",
+					TextColor3 = Color3.new(1, 1, 1),
+					TextStrokeColor3 = DARK,
+					TextStrokeTransparency = 0.72,
+					ZIndex = 2,
+				},
+			}),
+			Detail = c(ResponsiveText, {
+				HostName = "Detail",
+				MeasurementFont = UIConfig.Text.BodyFont,
+				MinTextSize = 11,
+				MaxTextSize = 16,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					FontFace = UIConfig.Text.DefaultFont,
+					Position = UDim2.new(0.5, 0, 0.5, if props.Compact then 6 else 10),
+					Size = UDim2.new(1, -28, 0, 44),
+					-- Deliberately promises nothing about carry-over: BattlePassService
+					-- discards season XP while no season is active, so copy claiming
+					-- progress continues would be false.
+					Text = "Between seasons. Tier rewards return with the next one.",
+					TextColor3 = Color3.new(1, 1, 1),
+					TextStrokeColor3 = DARK,
+					TextStrokeTransparency = 0.72,
+					TextWrapped = true,
+					ZIndex = 2,
+				},
+			}),
+		})
 	end
 
 	local claimable = if props.ShowClaim == false then 0 else SeasonClaims.count(state)
@@ -65,27 +136,15 @@ return function(props: Props)
 	local isMaxTier = tier >= tierCount
 	local progressFraction = if isMaxTier then 1 else math.clamp(xpIntoTier / xpForNextTier, 0, 1)
 	local nextReward = if state.tiers then findNextFreeReward(state.tiers) else nil
-	local native = {
-		AnchorPoint = Vector2.new(0, 0),
-		BackgroundTransparency = 0,
-		BackgroundColor3 = Palette.Panel,
-		BorderSizePixel = 0,
-		Position = UDim2.fromScale(0, 0),
-		Size = UDim2.fromScale(1, 1),
-	}
-	if props.Native then
-		for key, value in props.Native do
-			native[key] = value
-		end
-	end
+	local native = cardNative(props)
 
-	return c(Well, { Native = native }, {
+	return c(OuchPanel, { Native = native, Padding = 0 }, {
 		Title = if not compact
 			then c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MinTextSize = 14,
-				MaxTextSize = 22,
+				MaxTextSize = UIConfig.Text.HeaderPx,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
@@ -104,7 +163,7 @@ return function(props: Props)
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, 0, 0.5, if compact then 0 else 18),
-			Size = UDim2.new(1, -24, 1, if compact then -24 else -60),
+			Size = UDim2.new(1, -UIConfig.Panel.InsetPx * 2, 1, if compact then -24 else -60),
 		}, {
 			TierBadge = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -176,7 +235,7 @@ return function(props: Props)
 				SeasonName = c(ResponsiveText, {
 					MeasurementFont = UIConfig.Text.BodyFont,
 					MinTextSize = if compact then 9 else 12,
-					MaxTextSize = if compact then 17 else 23,
+					MaxTextSize = if compact then 22 else UIConfig.Text.HeaderPx,
 					Native = {
 						BackgroundTransparency = 1,
 						FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
@@ -190,20 +249,13 @@ return function(props: Props)
 						TextTruncate = Enum.TextTruncate.AtEnd,
 					},
 				}),
-				ProgressBar = c("Frame", {
-					BackgroundColor3 = Palette.Track,
-					BorderSizePixel = 0,
-					Position = UDim2.fromScale(0, if compact then 0.48 else 0.3),
-					Size = UDim2.fromScale(1, if compact then 0.16 else 0.16),
-				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-					Fill = c("Frame", {
-						BackgroundColor3 = PROGRESS_FILL_COLOR,
-						BorderSizePixel = 0,
-						Size = UDim2.fromScale(progressFraction, 1),
-					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-					}),
+				ProgressBar = c(OuchProgressBar, {
+					Progress = progressFraction,
+					Color = PROGRESS_FILL_COLOR,
+					Native = {
+						Position = UDim2.fromScale(0, if compact then 0.48 else 0.3),
+						Size = UDim2.fromScale(1, 0.16),
+					},
 				}),
 				XPLabel = c(ResponsiveText, {
 					MeasurementFont = UIConfig.Text.BodyFont,

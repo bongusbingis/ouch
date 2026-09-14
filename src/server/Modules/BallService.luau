@@ -29,6 +29,17 @@ local recoveryPoints: { BasePart } = {}
 local recoveryThreshold: number? = nil
 local groundSpawnPoints: { BasePart } = {}
 local groundSpawnEnabled = false
+local groundSpawnReadyAt: { [BasePart]: number } = {}
+local random: Random? = nil
+
+local function recoveryIndex(count: number): number
+	local generator = random
+	if generator == nil then
+		generator = Random.new()
+		random = generator
+	end
+	return generator:NextInteger(1, count)
+end
 
 local function ballsFolder(): Folder
 	if folder then
@@ -117,6 +128,66 @@ end
 
 function BallService.clearAll()
 	ballsFolder():ClearAllChildren()
+	table.clear(groundSpawnReadyAt)
+end
+
+local GROUND_SPAWN_POLL_SECONDS = 0.5
+
+-- Replenishment, bounded three ways so a match cannot silently fill with balls:
+-- a point refills at most every SpawnCadence seconds, a point is skipped while a
+-- loose ball already sits within SpawnSearchRadius of it, and the world holds at
+-- most WorldBallCap loose balls in total. Without this the supply only ever fell,
+-- because nothing else puts a ball back into a round in progress.
+local function replenishGroundBalls(now: number)
+	local cfg = Combat.Dodgeball
+	local loose = {}
+	for _, inst in ballsFolder():GetChildren() do
+		local phase = inst:GetAttribute("ph")
+		if inst:IsA("BasePart") and type(phase) == "number" and phase >= 5 then
+			table.insert(loose, inst.Position)
+		end
+	end
+	if #loose >= cfg.WorldBallCap then
+		return
+	end
+
+	for _, point in groundSpawnPoints do
+		if not point:IsA("BasePart") or point.Parent == nil then
+			continue
+		end
+		local readyAt = groundSpawnReadyAt[point]
+		if readyAt ~= nil and now < readyAt then
+			continue
+		end
+		local expected = point.Position + Vector3.new(0, cfg.Radius, 0)
+		local occupied = false
+		for _, position in loose do
+			if (position - expected).Magnitude <= cfg.SpawnSearchRadius then
+				occupied = true
+				break
+			end
+		end
+		if occupied then
+			-- Still stocked, so the cadence has not started running down yet.
+			groundSpawnReadyAt[point] = nil
+			continue
+		end
+		if readyAt == nil then
+			groundSpawnReadyAt[point] = now + cfg.SpawnCadence
+			continue
+		end
+
+		local ball = spawnBall(CFrame.new(expected))
+		ball:SetAttribute("ph", 5)
+		ball:SetAttribute("hb", nil)
+		ball:SetAttribute("ow", nil)
+		ball.Parent = ballsFolder()
+		groundSpawnReadyAt[point] = nil
+		table.insert(loose, expected)
+		if #loose >= cfg.WorldBallCap then
+			return
+		end
+	end
 end
 
 function BallService.start()
@@ -136,11 +207,15 @@ function BallService.start()
 						if type(ph) == "number" and ph >= 5 then
 							local posY = inst.CFrame.Position.Y
 							if posY < recoveryThreshold then
-								local point = recoveryPoints[1]
+								-- Spread over every recovery point rather than always the
+								-- first: a match that loses several balls off the same ledge
+								-- otherwise stacks them all back in one spot.
+								local point = recoveryPoints[recoveryIndex(#recoveryPoints)]
 								if point and point:IsA("BasePart") then
 									local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
 									inst.CFrame = CFrame.new(expected)
 									inst:SetAttribute("er", Combat.Dodgeball.Radius + Combat.Dodgeball.HitForgiveness)
+									inst:SetAttribute("vel", Vector3.zero)
 									inst:SetAttribute("hb", nil)
 									inst:SetAttribute("ow", nil)
 									inst.Parent = ballsFolder()
@@ -157,27 +232,9 @@ function BallService.start()
 	task.spawn(function()
 		while started do
 			if groundSpawnEnabled and #groundSpawnPoints > 0 then
-				for _, point in ipairs(groundSpawnPoints) do
-					if point and point:IsA("BasePart") then
-						local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
-						local occupied = false
-						for _, inst in pairs(ballsFolder():GetChildren()) do
-							if inst:IsA("BasePart") and (inst.CFrame.Position - expected).Magnitude < 0.1 then
-								occupied = true
-								break
-							end
-						end
-						if not occupied then
-							local ball = spawnBall(CFrame.new(expected))
-							ball:SetAttribute("ph", 5)
-							ball:SetAttribute("hb", nil)
-							ball:SetAttribute("ow", nil)
-							ball.Parent = ballsFolder()
-						end
-					end
-				end
+				replenishGroundBalls(os.clock())
 			end
-			task.wait(0.5)
+			task.wait(GROUND_SPAWN_POLL_SECONDS)
 		end
 	end)
 end
@@ -195,11 +252,13 @@ end
 function BallService.startGroundSpawns(points: { BasePart })
 	groundSpawnPoints = points or {}
 	groundSpawnEnabled = true
+	table.clear(groundSpawnReadyAt)
 end
 
 function BallService.stopGroundSpawns()
 	groundSpawnEnabled = false
 	groundSpawnPoints = {}
+	table.clear(groundSpawnReadyAt)
 end
 
 return BallService

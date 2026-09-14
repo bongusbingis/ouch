@@ -12,8 +12,9 @@ local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local formatNumber = require(script.Parent.Parent.Parent.Models.NumberText)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
+local OuchButton = require(script.Parent.Parent.OuchButton)
 local InventoryPreview = require(script.Parent.Parent.InventoryPreview)
-local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.Parent.OuchText)
 
 local c = React.createElement
 local colors = UIConfig.ProgressionStyle
@@ -61,6 +62,8 @@ local function Tile(props: {
 	local rarityColor = InventoryConfig.RarityColors[outcome.rarity] or colors.Cyan
 	local preview = outcome.preview
 	return c(AnimatedButton, {
+		SelectionRadius = UDim.new(0, UIConfig.Radius.Control),
+		Visual = c(OuchButton, { Color = if props.Selected then colors.Pink else colors.Cyan, ZIndex = z }),
 		Style = "Card",
 		HoverRotation = false,
 		Native = {
@@ -82,7 +85,7 @@ local function Tile(props: {
 			ImageColor3 = rarityColor,
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.new(1, -4, 1, -4),
-			ZIndex = z,
+			ZIndex = z - 1,
 		}, {
 			Texture = c("ImageLabel", {
 				BackgroundTransparency = 1,
@@ -111,7 +114,7 @@ local function Tile(props: {
 		}),
 		Chance = c("Frame", {
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = colors.Ink,
+			BackgroundColor3 = colors.Pink,
 			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(8, 8),
@@ -129,6 +132,12 @@ local function Tile(props: {
 				TextColor3 = colors.Yellow,
 				TextSize = UIConfig.Text.CaptionMinPx,
 				ZIndex = z + 4,
+			}, {
+				Outline = c("UIStroke", {
+					Color = colors.Ink,
+					Thickness = UIConfig.Text.OutlineScale,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 		}),
 		Owned = if outcome.owned
@@ -162,16 +171,22 @@ local function Tile(props: {
 						FontFace = BODY_FONT,
 						Size = UDim2.fromScale(0, 1),
 						Text = "OWNED",
-						TextColor3 = colors.Ink,
+						TextColor3 = WHITE,
 						TextSize = UIConfig.Text.CaptionMinPx,
 						ZIndex = z + 4,
+					}, {
+						Outline = c("UIStroke", {
+							Color = colors.Ink,
+							Thickness = UIConfig.Text.OutlineScale,
+							StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+						}),
 					})
 					else nil,
 			})
 			else nil,
 		NameBand = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = colors.Ink,
+			BackgroundColor3 = colors.Pink,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, 0, 1, -8),
 			Size = UDim2.new(1, -16, 0, bandPx),
@@ -273,7 +288,7 @@ return function(props: Props)
 				FontFace = DISPLAY_FONT,
 				Size = UDim2.new(1, 0, 0, if props.Short then 22 else 26),
 				Text = string.upper(group.rarity),
-				TextColor3 = rarityColor,
+				TextColor3 = colors.Yellow,
 				TextSize = 20,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = props.ZIndex + 1,
@@ -296,6 +311,12 @@ return function(props: Props)
 				TextWrapped = true,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = props.ZIndex + 1,
+			}, {
+				Outline = c("UIStroke", {
+					Color = colors.Ink,
+					Thickness = UIConfig.Text.OutlineScale,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 		})
 		order += 1

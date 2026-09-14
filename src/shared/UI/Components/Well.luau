@@ -10,9 +10,11 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local c = React.createElement
+local OuchPanel = require(script.Parent.OuchPanel)
 local Palette = UIConfig.ProgressionStyle
 
 export type Props = {
+	Ouch: boolean?,
 	Color: Color3?,
 	Radius: number?,
 	Shadow: boolean?,
@@ -33,6 +35,20 @@ return function(props: Props)
 	local z = native.ZIndex or 1
 	local artwork = UIConfig.Layout.WellSurface
 	local content = table.clone(props.children or {})
+	if props.Ouch then
+		-- Preserve the authored skin reference and all content bounds under the native face.
+		native.Image = artwork.Image
+		native.ScaleType = Enum.ScaleType.Slice
+		native.SliceCenter = artwork.SliceCenter
+		native.SliceScale = artwork.SliceScale
+		return c(OuchPanel, {
+			Native = native,
+			Padding = 0,
+			Gloss = true,
+			Color = props.Color or Palette.PanelRaised,
+			Radius = radius,
+		}, content)
+	end
 	-- The aspect constraint has to size the whole well (face and shadow), so it
 	-- lives on the outer element rather than among the children.
 	local aspect = if props.AspectRatio

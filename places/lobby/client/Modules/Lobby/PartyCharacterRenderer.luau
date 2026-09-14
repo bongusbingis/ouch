@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
@@ -29,10 +30,16 @@ local HammerGrip = require(
 local EmotePlayer = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("EmotePlayer")
 )
+local PartyBubblePolicy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("PartyBubblePolicy")
+)
 
 local USERNAME_LOOKUP_ATTEMPTS = 3
 local USERNAME_RETRY_DELAY = 1
 local IDLE_PLAYBACK_SPEED = 0.85
+local IDLE_BOUNDS_PADDING = Vector3.new(1, 0.5, 1)
+local BUBBLE_ANCHOR_OFFSET = Vector3.new(0, 1.25, 0)
+local BUBBLE_CAMERA_CLEARANCE = 2
 
 local PartyCharacterRenderer = {}
 PartyCharacterRenderer.__index = PartyCharacterRenderer
@@ -66,6 +73,7 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 		_playerGui = playerGui,
 		_spawns = spawns,
 		_characters = {},
+		_bodyBoundsByCostume = {},
 		_onKick = onKick,
 		_compactParty = false,
 		_usernames = {
@@ -86,7 +94,39 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 		self:_updateSkinsPreview()
 		self:_layoutNametags()
 	end)
+	-- This event contains this viewer's delivered, filtered TextChannel result.
+	-- Never mirror SendingMessage, Player.Chatted, raw remotes, or cross-server party events.
+	self._bubbleConnection = TextChatService.MessageReceived:Connect(function(message)
+		local channels = TextChatService:FindFirstChild("TextChannels")
+		local publicChannel = channels and channels:FindFirstChild("RBXGeneral")
+		local userId = PartyBubblePolicy.senderId(message, publicChannel, self._characters, Players)
+		local character = userId and self._characters[userId]
+		if not self._destroyed and character and character.bubbleAnchor.Parent then
+			TextChatService:DisplayBubble(character.bubbleAnchor, message.Text)
+		end
+	end)
 	return self
+end
+
+function PartyCharacterRenderer:_bodyBounds(costumeId)
+	local key = costumeId or ""
+	local cached = self._bodyBoundsByCostume[key]
+	if cached then
+		return cached
+	end
+	-- Measure a neutral copy once per outfit. Animated bounds can make collision
+	-- placement alternate between opposite sides of the character during idle.
+	local rig = self._characterTemplate:Clone()
+	local appearance = CharacterAppearance.create(rig, { costumeId = costumeId })
+	local frame, size = rig:GetBoundingBox()
+	local bounds = {
+		frame = rig:GetPivot():ToObjectSpace(frame),
+		size = size + IDLE_BOUNDS_PADDING,
+	}
+	appearance.destroy()
+	rig:Destroy()
+	self._bodyBoundsByCostume[key] = bounds
+	return bounds
 end
 
 local function halfExtents(frame, size)
@@ -265,8 +305,14 @@ function PartyCharacterRenderer:_layoutNametags()
 	end)
 	for _, character in characters do
 		if character.rig.Parent then
-			local bodyFrame, bodySize = character.rig:GetBoundingBox()
-			local bounds = projectedBody(camera, bodyFrame, bodySize)
+			local anchor = character.rig:GetPivot().Position + BUBBLE_ANCHOR_OFFSET
+			local towardCamera = camera.CFrame.Position - anchor
+			if towardCamera.Magnitude > BUBBLE_CAMERA_CLEARANCE then
+				anchor += towardCamera.Unit * BUBBLE_CAMERA_CLEARANCE
+			end
+			character.bubbleAnchor.Position = anchor
+			local body = character.bodyBounds
+			local bounds = projectedBody(camera, character.rig:GetPivot() * body.frame, body.size)
 			if bounds then
 				bodies[character] = bounds
 				table.insert(occupied, bounds)
@@ -309,7 +355,15 @@ function PartyCharacterRenderer:_layoutNametags()
 					)
 					else Vector2.zero
 				local anchoredBounds = Rect.new(bounds.Min + preferred, bounds.Max + preferred)
-				offset = preferred + nameOffset(anchoredBounds, occupied, safe, config.GapPx)
+				-- Keep names above their owner when viewport headroom is constrained.
+				-- Only other characters and nameplates should push them sideways.
+				local obstacles = {}
+				for _, obstacle in occupied do
+					if obstacle ~= body then
+						table.insert(obstacles, obstacle)
+					end
+				end
+				offset = preferred + nameOffset(anchoredBounds, obstacles, safe, config.GapPx)
 				table.insert(occupied, Rect.new(bounds.Min + offset, bounds.Max + offset))
 			end
 		end
@@ -555,6 +609,7 @@ function PartyCharacterRenderer:_remove(userId)
 	character.idleTrack:Stop(0)
 	character.idleTrack:Destroy()
 	character.nametag:Destroy()
+	character.bubbleAnchor:Destroy()
 	character.appearance.destroy()
 	character.rig:Destroy()
 end
@@ -583,6 +638,17 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	assert(rightHand:IsA("BasePart"), "[PartyCharacterRenderer] CharacterRig.RightHand must be a BasePart")
 	local spawn = self._spawns[slot]
 	local nametag = self._nametagTemplate:Clone()
+	-- A stationary anchor keeps chat out of the animated head and crown.
+	local bubbleAnchor = Instance.new("Part")
+	bubbleAnchor.Name = ("PartyBubbleAnchor_%d"):format(userId)
+	bubbleAnchor.Size = Vector3.one * 0.1
+	bubbleAnchor.Transparency = 1
+	bubbleAnchor.Anchored = true
+	bubbleAnchor.CanCollide = false
+	bubbleAnchor.CanQuery = false
+	bubbleAnchor.CanTouch = false
+	bubbleAnchor.CFrame = spawn.CFrame * CFrame.new(BUBBLE_ANCHOR_OFFSET)
+	bubbleAnchor.Parent = self._characterContainer
 	local usernameLabel = nametag:WaitForChild("Username")
 	local crownLabel = nametag:WaitForChild("Crown")
 	local kickButton = nametag:WaitForChild("KickButton")
@@ -629,12 +695,14 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 		idleTrack = idleTrack,
 		emoteTrack = nil :: AnimationTrack?,
 		nametag = nametag,
+		bubbleAnchor = bubbleAnchor,
 		usernameLabel = usernameLabel,
 		crownLabel = crownLabel,
 		kickButton = kickButton,
 		leftHand = leftHand,
 		rightHand = rightHand,
 		slot = slot,
+		bodyBounds = self:_bodyBounds(costumeId),
 	}
 	self:_requestUsername(userId)
 end
@@ -699,6 +767,7 @@ function PartyCharacterRenderer:Render(snapshot)
 		if character then
 			self:_move(character, slot)
 			character.appearance.update({ characterColorId = characterColorId, costumeId = costumeId })
+			character.bodyBounds = self:_bodyBounds(costumeId)
 		else
 			self:_spawn(userId, slot, characterColorId, costumeId)
 			character = self._characters[userId]
@@ -715,6 +784,10 @@ function PartyCharacterRenderer:destroy()
 	self._destroyed = true
 	self:_destroySkinsPreview()
 	self._generation += 1
+	if self._bubbleConnection then
+		self._bubbleConnection:Disconnect()
+		self._bubbleConnection = nil
+	end
 	if self._renderConnection then
 		self._renderConnection:Disconnect()
 		self._renderConnection = nil

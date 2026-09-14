@@ -13,6 +13,7 @@ local CosmeticsLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
 )
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
 
 return function()
 	describe("Shop migration and policy projection", function()
@@ -75,6 +76,82 @@ return function()
 			expect(ShopService.stateFor(player).paidRandomReason).to.equal(reason)
 			allowed, reason = true, nil
 			expect(ShopService.stateFor(player).paidRandomAllowed).to.equal(true)
+		end)
+	end)
+
+	describe("Starter offer eligibility", function()
+		local NOW = 2_000_000_000
+		local PASS_KEY = GamePasses.StarterOffer.PassKey
+		local player, data, entitlements
+
+		beforeEach(function()
+			ShopService._resetForTest()
+			player = { UserId = 991144 }
+			data = {
+				Cosmetics = { Owned = {} },
+				Shop = { Bucket = FeaturedRotation.periodIndex(Shop.Rotation.RotationSeconds, NOW), Offers = {} },
+				Onboarding = { FirstJoinAt = NOW - 3600 },
+				Receipts = {},
+			}
+			entitlements = {
+				ready = true,
+				owned = {},
+				isReady = function()
+					return entitlements.ready
+				end,
+				has = function(_, key)
+					return entitlements.owned[key] == true
+				end,
+				ownsAny = function()
+					return next(entitlements.owned) ~= nil
+				end,
+			}
+			ShopService.start({
+				playerData = {
+					get = function()
+						return data
+					end,
+				},
+				network = { handleProtected = function() end },
+				paidRandomPolicy = {
+					canReceivePaidRandom = function()
+						return true, nil
+					end,
+				},
+				entitlements = entitlements,
+				time = function()
+					return NOW
+				end,
+				sweepSeconds = 0,
+			})
+		end)
+		afterEach(ShopService._resetForTest)
+
+		it("offers the starter window to a stamped new player who has bought nothing", function()
+			local offer = ShopService.stateFor(player).starterOffer
+			expect(offer).to.be.ok()
+			expect(offer.passKey).to.equal(PASS_KEY)
+			expect(offer.expiresAt).to.equal(NOW - 3600 + GamePasses.StarterOffer.WindowSeconds)
+		end)
+
+		it("withholds the offer until pass ownership is known", function()
+			entitlements.ready = false
+			expect(ShopService.stateFor(player).starterOffer).to.equal(nil)
+		end)
+
+		it("withholds the offer once the player owns any pass or holds any receipt", function()
+			entitlements.owned = { DoubleXP = true }
+			expect(ShopService.stateFor(player).starterOffer).to.equal(nil)
+			entitlements.owned = {}
+			data.Receipts = { ["12345"] = NOW - 10 }
+			expect(ShopService.stateFor(player).starterOffer).to.equal(nil)
+		end)
+
+		it("withholds the offer from an unstamped profile and after the window closes", function()
+			data.Onboarding.FirstJoinAt = 0
+			expect(ShopService.stateFor(player).starterOffer).to.equal(nil)
+			data.Onboarding.FirstJoinAt = NOW - GamePasses.StarterOffer.WindowSeconds
+			expect(ShopService.stateFor(player).starterOffer).to.equal(nil)
 		end)
 	end)
 end

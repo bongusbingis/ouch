@@ -11,7 +11,7 @@ return function(target: Instance)
 	return mount(
 		target,
 		React.createElement(SplashPage, {
-			PartyState = "READY TO BRAWL?",
+			PartyState = "",
 			ShowMatchmakingActivity = false,
 			PlayText = "PLAY",
 			PlayEnabled = true,

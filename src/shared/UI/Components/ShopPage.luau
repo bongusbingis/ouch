@@ -50,7 +50,8 @@ local function promoEntry(model, card): any
 	return {
 		id = card.id,
 		title = card.badge or string.upper(card.kind),
-		countdownAt = if card.kind == "Bundle" then model.bundleExpireAt else model.featuredExpireAt,
+		countdownAt = card.countdownAt
+			or (if card.kind == "Bundle" then model.bundleExpireAt else model.featuredExpireAt),
 		cards = { card },
 		style = ShopUI.PromoSection,
 	}

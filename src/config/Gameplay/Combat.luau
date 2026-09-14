@@ -109,6 +109,12 @@ return {
 
 		SpawnCadence = 5, -- seconds between world ball spawns per spawn point
 		SpawnSearchRadius = 3, -- spawn suppressed while a Free ball sits within this radius
+		-- Ceiling on loose balls in the world. Replenishment exists so a round
+		-- cannot run dry, not so the floor fills up.
+		WorldBallCap = 10,
+		-- Studs below MapOrigin.Y at which a loose ball counts as lost to the void
+		-- and is returned to a spawn point instead of staying gone for the round.
+		RecoveryBelowOffset = -80,
 	},
 
 	Hammer = {

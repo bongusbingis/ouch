@@ -22,7 +22,7 @@ return function(props)
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
 	scroll.ZIndex = outer.ZIndex
-	return React.createElement(Well, { Native = outer }, {
+	return React.createElement(Well, { Native = outer, Ouch = props.Ouch }, {
 		Content = React.createElement(ScrollFrame, scroll, props.children),
 	})
 end

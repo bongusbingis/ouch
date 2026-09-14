@@ -47,6 +47,7 @@ local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytic
 local SplashPage = require(Components:WaitForChild("SplashPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
 local LobbyHeaderLayout = require(UI.Models.LobbyHeaderLayout)
+local NumberText = require(UI.Models.NumberText)
 local EmoteWheelController = require(UI.Services.EmoteWheelController)
 local GameVersion = require(Components:WaitForChild("GameVersion"))
 local DeviceClass = require(Shared:WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass"))
@@ -404,6 +405,40 @@ local function LobbyContent(props)
 	})
 	local economyData = economyMenu.economyData
 	local inventoryTab = economyMenu.inventoryTab
+
+	-- Training ends by teaching the throw and then saying nothing, so a new player
+	-- reaches the lobby holding a starting wallet they were never told about and no
+	-- reason to believe the shop is for them. This hands them off once: it names the
+	-- balance they already have and opens the storefront if they want it.
+	--
+	-- Fires only on a transition we actually watched inside this session, so a
+	-- returning player (never active) and a resumed profile both stay silent. A
+	-- player who drops during the celebration simply misses a nudge, which costs
+	-- them nothing -- it is direction, not a reward.
+	local trainingSeen = React.useRef(false)
+	local handoffDone = React.useRef(false)
+	React.useEffect(function()
+		if onboardingActive then
+			trainingSeen.current = true
+			return
+		end
+		if not trainingSeen.current or handoffDone.current or not onboardingResolved then
+			return
+		end
+		local bonks = if economyData then economyData.Bonks else nil
+		if bonks == nil then
+			return
+		end
+		handoffDone.current = true
+		notifications.notify({
+			title = "YOU'RE READY",
+			description = `You have {NumberText(bonks)} Bonks to spend. Pick up a new look in the shop, then head back for a match.`,
+			buttonText = "OPEN SHOP",
+		}, function()
+			setCurrentPage("Shop")
+		end)
+	end, { onboardingActive, onboardingResolved, economyData, notifications })
+
 	local snapshot, requestBusy = useParty(partyClient, notifications)
 	local partyCount = 1
 	local framedUserIds = { [Players.LocalPlayer.UserId] = true }

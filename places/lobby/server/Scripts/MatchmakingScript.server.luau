@@ -15,6 +15,7 @@ local MatchRepository = require(matchmaking.MatchRepository)
 local PartyBus = require(matchmaking.PartyBus)
 local PartyRepository = require(matchmaking.PartyRepository)
 local PartyService = require(matchmaking.PartyService)
+local LobbyGatherCoordinator = require(matchmaking.LobbyGatherCoordinator)
 local QueueRepository = require(matchmaking.QueueRepository)
 local TeleportCoordinator = require(matchmaking.TeleportCoordinator)
 local AnalyticsService = require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("AnalyticsService"))
@@ -26,7 +27,9 @@ local partyBus = PartyBus.new()
 local teleportCoordinator = TeleportCoordinator.new(matchRepository)
 local banRepository = BanRepository.new()
 local partyService =
-	PartyService.new(partyRepository, queueRepository, matchRepository, partyBus, teleportCoordinator, banRepository)
+	PartyService.new(partyRepository, queueRepository, matchRepository, partyBus, teleportCoordinator, banRepository, {
+		lobbyGatherCoordinator = LobbyGatherCoordinator.new(partyRepository),
+	})
 local matchmakerService = MatchmakerService.new(
 	partyRepository,
 	queueRepository,

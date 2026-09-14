@@ -12,11 +12,13 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local BonksLabel = require(script.Parent.BonksLabel)
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
 local Surface = require(script.Parent.Arena.Surface)
+local OuchPanel = require(script.Parent.OuchPanel)
 
 local c = React.createElement
 local Palette = UIConfig.ProgressionStyle
 
 export type Props = {
+	Ouch: boolean?,
 	Amount: number,
 	HeightPx: number?,
 	TextSize: number?,
@@ -36,8 +38,10 @@ return function(props: Props)
 	local textWidth =
 		TextService:GetTextSize(formatNumber(amount), textSize, Enum.Font.LuckiestGuy, Vector2.new(10000, 100)).X
 	local width = 12 + textSize + UIConfig.Button.GapPx + math.ceil(textWidth) + 14
-	return c(Surface, {
-		Color = Palette.Claimed,
+	return c(if props.Ouch then OuchPanel else Surface, {
+		Color = if props.Ouch then Palette.Cyan else Palette.Claimed,
+		Padding = 0,
+		Gloss = true,
 		Radius = UIConfig.Radius.Control,
 		Shadow = false,
 		StrokeTransparency = 0.55,

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:\\\\Users\\\\jackc\\\\Desktop\\\\ouch\\\\.agent-venv\\\\Scripts\\\\python.exe\" --version)",
+      "Bash(\"C:\\\\Users\\\\jackc\\\\Desktop\\\\ouch\\\\.agent-venv\\\\Scripts\\\\python.exe\" -m pip install mcp pyautogui mss pillow)",
+      "Bash(claude mcp *)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(python -c ' *)",
+      "Bash(\"C:\\\\Users\\\\jackc\\\\Desktop\\\\ouch\\\\.agent-venv\\\\Scripts\\\\python.exe\" -c \"import mcp; print\\(mcp.__file__\\); print\\(getattr\\(mcp,'__version__','?'\\)\\)\")"
+    ]
+  }
+}

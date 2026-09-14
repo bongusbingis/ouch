@@ -57,12 +57,12 @@ return {
 	-- Visible space between artwork, content and neighboring controls.
 	Spacing = { PageInsetPx = 24, CompactInsetPx = 12, ContentInsetPx = 16, ControlGapPx = 12, SectionGapPx = 24 },
 	Text = {
-		BodyFont = Enum.Font.BuilderSansBold,
-		DefaultFont = Font.new(
-			"rbxasset://fonts/families/ComicNeueAngular.json",
-			Enum.FontWeight.Bold,
-			Enum.FontStyle.Normal
-		),
+		BodyFont = Enum.Font.LuckiestGuy,
+		DefaultFont = Font.fromEnum(Enum.Font.LuckiestGuy),
+		OutlineScale = 0.045,
+		HeaderPx = 26,
+		LabelPx = 22,
+		BodyPx = 18,
 		DefaultMinSize = 12,
 		DefaultMaxSize = 28,
 		CaptionMinPx = 16,
@@ -81,12 +81,16 @@ return {
 		FocusCornerPx = 8,
 	},
 	Button = {
+		BevelPx = 5,
+		BevelDarken = 0.3,
 		StrokePx = 2,
 		ShadowPx = 4,
 		TextPx = 28,
 		PricePx = 25,
 		GapPx = 5,
 	},
+	Panel = { RadiusPx = 22, BevelPx = 5, InsetPx = 20 },
+	Backdrop = { PatternOpacityScale = 0.55 },
 	Layout = {
 		SectionHeader = { TextPx = 24, HeightPx = 38, UnderlinePx = 2, UnderlineGapPx = 4, BottomGapPx = 10 },
 		PageSurface = {
@@ -364,11 +368,11 @@ return {
 			DesktopLogoSizePx = Vector2.new(220, 110),
 			ActionsGapPx = 8,
 			ActionTextPx = 26,
-			PrimaryActionTextPx = 38,
+			PrimaryActionTextPx = 30,
 			ActionHeightPx = 52,
 			PrimaryActionHeightPx = 68,
-			DesktopPrimaryActionHeightPx = 84,
-			DesktopPrimaryActionTextPx = 46,
+			DesktopPrimaryActionHeightPx = 68,
+			DesktopPrimaryActionTextPx = 32,
 			DesktopStatusHeightPx = 28,
 			ShortActionTextPx = 22,
 			ShortActionsHeightPx = 56,

@@ -109,8 +109,11 @@ return function(props)
 	-- free-for-all stays in one column there however long it is.
 	local narrow = safe.size.X < layout.TwoColumnMinWidthPx
 	local stackTeams = narrow and view.teamMode
-	local columns =
-		MatchHUDModel.columns(view.entries, view.teamMode, if narrow then math.huge else layout.SingleColumnMaxRows)
+	local columns = MatchHUDModel.columns(
+		view.entries,
+		if view.teamMode then view.teams else nil,
+		if narrow then math.huge else layout.SingleColumnMaxRows
+	)
 	local longest = 0
 	for _, column in columns do
 		longest = math.max(longest, #column)
@@ -143,10 +146,10 @@ return function(props)
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
 		}
-		if view.teamMode then
-			local red = columnIndex == 1
+		local team = if view.teamMode then view.teams[columnIndex] else nil
+		if team then
 			rows.Header = c("Frame", {
-				BackgroundColor3 = if red then colors.Pink else colors.Cyan,
+				BackgroundColor3 = colors[team.accent],
 				BorderSizePixel = 0,
 				LayoutOrder = 0,
 				Size = UDim2.new(1, 0, 0, rowHeight),
@@ -154,7 +157,7 @@ return function(props)
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
 				Text = c(Label, {
-					Text = `{if red then "RED" else "BLUE"}  {if red then view.redScore else view.blueScore}`,
+					Text = `{team.label}  {team.score}`,
 					Title = true,
 					Size = if short then 16 else 20,
 					Native = { Size = UDim2.fromScale(1, 1), ZIndex = z + 3 },
@@ -256,7 +259,7 @@ return function(props)
 				},
 			}, columnChildren),
 			Footer = c(Label, {
-				Text = if view.teamMode then "TEAM ELIMINATIONS" else "ELIMINATIONS",
+				Text = view.footer,
 				Color = colors.White,
 				Size = UI.Text.CaptionMinPx,
 				Native = {

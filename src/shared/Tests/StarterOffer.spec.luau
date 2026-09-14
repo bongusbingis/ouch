@@ -60,4 +60,56 @@ T.describe("StarterOffer", function()
 	end)
 end)
 
+T.describe("StarterOffer.resolve", function()
+	local PASS = { CatalogStatus = "Active", Id = 1968922292 }
+
+	local function context(overrides)
+		local base = {
+			ready = true,
+			ownsPass = false,
+			ownsAnyPass = false,
+			receipts = {},
+			firstJoinAt = JOINED,
+			now = JOINED + 3600,
+		}
+		for key, value in overrides or {} do
+			base[key] = value
+		end
+		return base
+	end
+
+	T.it("resolves the window for a stamped new player who has bought nothing", function()
+		local resolved = StarterOffer.resolve(CONFIG, PASS, context())
+		T.expect(resolved ~= nil):toBeTruthy()
+		T.expect((resolved :: any).passKey):toEqual(CONFIG.PassKey)
+		T.expect((resolved :: any).expiresAt):toEqual(JOINED + CONFIG.WindowSeconds)
+	end)
+
+	T.it("withholds the offer until pass ownership is known", function()
+		T.expect(StarterOffer.resolve(CONFIG, PASS, context({ ready = false }))):toBeNil()
+	end)
+
+	T.it("withholds the offer from a player who already owns the starter pass", function()
+		T.expect(StarterOffer.resolve(CONFIG, PASS, context({ ownsPass = true }))):toBeNil()
+	end)
+
+	T.it("withholds the offer after any other pass or any receipt", function()
+		T.expect(StarterOffer.resolve(CONFIG, PASS, context({ ownsAnyPass = true }))):toBeNil()
+		T.expect(StarterOffer.resolve(CONFIG, PASS, context({ receipts = { ["12345"] = 1 } }))):toBeNil()
+	end)
+
+	T.it("withholds the offer from an unstamped profile and past the deadline", function()
+		T.expect(StarterOffer.resolve(CONFIG, PASS, context({ firstJoinAt = 0 }))):toBeNil()
+		T.expect(StarterOffer.resolve(CONFIG, PASS, context({ now = JOINED + CONFIG.WindowSeconds }))):toBeNil()
+	end)
+
+	-- A pass that cannot be bought must never be merchandised as an offer: a
+	-- Preview or id-less entry would present a purchase action nobody can complete.
+	T.it("refuses to merchandise a pass that is missing, preview, or unconfigured", function()
+		T.expect(StarterOffer.resolve(CONFIG, nil, context())):toBeNil()
+		T.expect(StarterOffer.resolve(CONFIG, { CatalogStatus = "Preview", Id = 1 }, context())):toBeNil()
+		T.expect(StarterOffer.resolve(CONFIG, { CatalogStatus = "Active", Id = nil }, context())):toBeNil()
+	end)
+end)
+
 return true

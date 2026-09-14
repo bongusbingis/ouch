@@ -3,11 +3,12 @@
 --!strict
 
 local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
-local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local useButtonMotion = require(script.Parent.Parent.Hooks.useButtonMotion)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
@@ -63,12 +64,7 @@ return function(props: Props)
 			and props.HoverRotation ~= false
 		then preset.rotation
 		else 0
-	local styles = ReactSpring.useSpring({
-		Scale = scale,
-		Rotation = rotation,
-		config = Motion.Control,
-		immediate = reducedMotion,
-	})
+	local styles = useButtonMotion(scale, rotation, pressing and enabled, reducedMotion)
 	local visualRotation = styles.Rotation:map(function(value: number)
 		return value + (props.Native.Rotation or 0)
 	end)
@@ -125,7 +121,9 @@ return function(props: Props)
 				ZIndex = props.Native.ZIndex or 1,
 			},
 			merge(visualChildren, {
-				Visual = props.Visual,
+				Visual = if props.Visual
+					then React.cloneElement(props.Visual, { PressDepth = styles.PressDepth })
+					else nil,
 				InteractionScale = c("UIScale", {
 					Scale = styles.Scale,
 				}),
@@ -174,6 +172,29 @@ return function(props: Props)
 			or input.KeyCode == Enum.KeyCode.ButtonA
 	end
 
+	-- Releases outside the hitbox and focus loss must never leave a control sunk.
+	React.useEffect(function()
+		local release = UserInputService.InputEnded:Connect(function(input)
+			if isPressInput(input) then
+				setPressing(false)
+			end
+		end)
+		local blur = UserInputService.WindowFocusReleased:Connect(function()
+			setPressing(false)
+			setHovering(false)
+		end)
+		return function()
+			release:Disconnect()
+			blur:Disconnect()
+		end
+	end, {})
+	React.useEffect(function()
+		if not enabled then
+			setPressing(false)
+			setHovering(false)
+		end
+	end, { enabled })
+
 	local function beginHover()
 		if enabled and not hovering then
 			setHovering(true)
@@ -191,6 +212,7 @@ return function(props: Props)
 		merge(props.Native, {
 			ref = buttonRef,
 			Active = enabled,
+			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			ImageTransparency = 1,

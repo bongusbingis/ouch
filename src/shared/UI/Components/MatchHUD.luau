@@ -15,6 +15,41 @@ local c = React.createElement
 local colors = Config.Colors
 local layout = Config.HUD
 
+-- One panel per team the mode declares, laid out as equal columns. Driven by the
+-- snapshot's team list rather than two named sides, so a mode scored by headcount
+-- reads the same way a kill-count one does.
+local function teamPanels(view): { [string]: any }
+	local panels = {}
+	local count = math.max(#view.teams, 1)
+	local span = 1 / count
+	for index, team in view.teams do
+		local fraction = if view.teamScoreMax > 0 then math.clamp(team.score / view.teamScoreMax, 0, 1) else 0
+		panels[team.id] = c(Surface, {
+			Color = colors.Claimed,
+			Radius = UIConfig.Radius.Tile,
+			Shadow = false,
+			Native = {
+				Position = UDim2.new(span * (index - 1), if index == 1 then 0 else 6, 0, 0),
+				Size = UDim2.new(span, -6, 1, 0),
+			},
+		}, {
+			Fill = c("Frame", {
+				BackgroundColor3 = colors[team.accent],
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(fraction, 1),
+				ZIndex = 1,
+			}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }) }),
+			Text = c(Label, {
+				Text = `{team.label}  {team.score}`,
+				Title = true,
+				Size = 27,
+				Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0), ZIndex = 2 },
+			}),
+		})
+	end
+	return panels
+end
+
 return function(props)
 	local safe = useSafeArea(Enum.ScreenInsets.None)
 	local view = props.Snapshot
@@ -57,52 +92,7 @@ return function(props)
 					BackgroundTransparency = 1,
 					Position = UDim2.fromOffset(12, 28),
 					Size = UDim2.new(1, -116, 1, -40),
-				}, {
-					Red = c(Surface, {
-						Color = colors.Claimed,
-						Radius = UIConfig.Radius.Tile,
-						Shadow = false,
-						Native = { Size = UDim2.new(0.5, -6, 1, 0) },
-					}, {
-						Fill = c("Frame", {
-							BackgroundColor3 = colors.Pink,
-							BorderSizePixel = 0,
-							Size = UDim2.fromScale(
-								if view.target > 0 then math.clamp(view.redScore / view.target, 0, 1) else 0,
-								1
-							),
-							ZIndex = 1,
-						}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }) }),
-						Text = c(Label, {
-							Text = `RED  {view.redScore}`,
-							Title = true,
-							Size = 27,
-							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0), ZIndex = 2 },
-						}),
-					}),
-					Blue = c(Surface, {
-						Color = colors.Claimed,
-						Radius = UIConfig.Radius.Tile,
-						Shadow = false,
-						Native = { Position = UDim2.new(0.5, 6, 0, 0), Size = UDim2.new(0.5, -6, 1, 0) },
-					}, {
-						Fill = c("Frame", {
-							BackgroundColor3 = colors.Cyan,
-							BorderSizePixel = 0,
-							Size = UDim2.fromScale(
-								if view.target > 0 then math.clamp(view.blueScore / view.target, 0, 1) else 0,
-								1
-							),
-							ZIndex = 1,
-						}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }) }),
-						Text = c(Label, {
-							Text = `BLUE  {view.blueScore}`,
-							Title = true,
-							Size = 27,
-							Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0), ZIndex = 2 },
-						}),
-					}),
-				})
+				}, teamPanels(view))
 				else c(Label, {
 					Text = `{view.score} ELIMS` .. (if view.placement then `  •  #{view.placement}` else ""),
 					Title = true,

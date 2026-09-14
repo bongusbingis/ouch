@@ -17,7 +17,8 @@ local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
+local OuchPanel = require(script.Parent.OuchPanel)
 local PageTitle = require(script.Parent.PageTitle)
 local ModalClose = require(script.Parent.ModalClose)
 local BonksChip = require(script.Parent.BonksChip)
@@ -397,6 +398,7 @@ local function ItemDetails(props)
 	for index, quantity in quantities do
 		local amount = card.bonksPrice * quantity
 		buttons["Open" .. quantity] = c(ShopPriceButton, {
+			TextSize = UIConfig.Text.LabelPx,
 			ButtonRef = if index == 1 then firstRef else nil,
 			Red = true,
 			Enabled = card.status == "Active"
@@ -416,6 +418,7 @@ local function ItemDetails(props)
 	end
 	if hasRobux then
 		buttons.Robux = c(ShopPriceButton, {
+			TextSize = UIConfig.Text.LabelPx,
 			ButtonRef = robuxRef,
 			Enabled = card.status == "Active" and not card.pending,
 			Red = true,
@@ -438,6 +441,7 @@ local function ItemDetails(props)
 	if hasEquip and preview then
 		actionIndex += 1
 		buttons.Equip = c(ShopPriceButton, {
+			TextSize = UIConfig.Text.LabelPx,
 			ButtonRef = firstRef,
 			Enabled = previewOwned and not equipped and not (props.BusySlots or {})[preview.category],
 			Position = position(actionIndex),
@@ -454,6 +458,7 @@ local function ItemDetails(props)
 	if hasInventory and preview then
 		actionIndex += 1
 		buttons.Inventory = c(ShopPriceButton, {
+			TextSize = UIConfig.Text.LabelPx,
 			ButtonRef = inventoryRef,
 			Enabled = true,
 			Position = position(actionIndex),
@@ -472,26 +477,31 @@ local function ItemDetails(props)
 		Text = "",
 		Active = true,
 		BackgroundColor3 = Color3.new(),
-		BackgroundTransparency = 0.3,
+		BackgroundTransparency = 0.52,
+		Visible = props.Visible ~= false,
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 101,
 	}, {
-		Panel = c("ImageLabel", {
-			ref = panelRef,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(size.X, size.Y),
-			BackgroundTransparency = 1,
-			Image = UIConfig.Layout.PageSurface.Image,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
-			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
-			ZIndex = 102,
-			SelectionGroup = true,
-			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+		Panel = c(OuchPanel, {
+			Padding = 0,
+			Gloss = true,
+			Native = {
+				ref = panelRef,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(size.X, size.Y),
+				BackgroundTransparency = 1,
+				Image = UIConfig.Layout.PageSurface.Image,
+				ScaleType = Enum.ScaleType.Slice,
+				SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+				SliceScale = UIConfig.Layout.PageSurface.SliceScale,
+				ZIndex = 102,
+				SelectionGroup = true,
+				SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+			},
 		}, {
 			Scale = c("UIScale", { Scale = styles.Scale }),
 			Title = c(PageTitle, {
@@ -532,6 +542,7 @@ local function ItemDetails(props)
 				ZIndex = 103,
 			}, {
 				Preview = c(if scrollPreview then WellScroll else Well, {
+					Ouch = true,
 					Native = {
 						CanvasSize = if scrollPreview then UDim2.fromOffset(0, previewContentHeight) else nil,
 						ScrollingDirection = if scrollPreview then Enum.ScrollingDirection.Y else nil,
@@ -598,6 +609,7 @@ local function ItemDetails(props)
 						else nil,
 					Play = if isEffect and props.OnPreviewEffect
 						then c(ShopPriceButton, {
+							Color = colors.Pink,
 							Text = if preview.category == "ElimEffectAssets" then "PLAY SOUND" else "PLAY EFFECT",
 							Enabled = true,
 							Position = if portrait
@@ -625,6 +637,7 @@ local function ItemDetails(props)
 				}),
 				Contents = if isCrate
 					then c(Well, {
+						Ouch = true,
 						Native = {
 							Position = UDim2.new(listX, 0, 0, listTop),
 							Size = UDim2.new(listWidth, 0, 1, -listTop),
@@ -772,6 +785,7 @@ local function ItemDetails(props)
 				}, buttons),
 				Balance = if hasBonks and not short
 					then c(BonksChip, {
+						Ouch = true,
 						Amount = balance,
 						HeightPx = 34,
 						TextSize = 20,

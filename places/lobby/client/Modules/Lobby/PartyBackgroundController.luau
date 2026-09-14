@@ -10,6 +10,8 @@ local PresentationCamera = require(
 		:WaitForChild("PresentationCamera")
 )
 
+local UIConfig = require(ReplicatedStorage.Config.Interface.UI)
+
 local PartyBackgroundController = {}
 PartyBackgroundController.__index = PartyBackgroundController
 
@@ -33,6 +35,7 @@ function PartyBackgroundController.start()
 			table.insert(textures, {
 				instance = descendant,
 				transparency = descendant.Transparency,
+				mutedTransparency = 1 - (1 - descendant.Transparency) * UIConfig.Backdrop.PatternOpacityScale,
 				offsetU = descendant.OffsetStudsU,
 				offsetV = descendant.OffsetStudsV,
 				travelU = descendant.StudsPerTileU * U_TRAVEL_IN_TILES,
@@ -99,12 +102,17 @@ function PartyBackgroundController:_refreshVisibility()
 	self._background.Transparency = if visible then self._baseTransparency else 1
 	for _, texture in self._textures do
 		if texture.instance.Parent then
-			texture.instance.Transparency = if visible then texture.transparency else 1
+			texture.instance.Transparency = if visible then texture.mutedTransparency else 1
 		end
 	end
 end
 
 function PartyBackgroundController:destroy()
+	for _, texture in self._textures do
+		if texture.instance.Parent then
+			texture.instance.Transparency = texture.transparency
+		end
+	end
 	if self._unsubscribeCamera then
 		self._unsubscribeCamera()
 		self._unsubscribeCamera = nil

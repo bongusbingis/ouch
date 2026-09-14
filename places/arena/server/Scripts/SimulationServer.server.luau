@@ -14,6 +14,7 @@ local ArenaReturnService = require(Modules:WaitForChild("ArenaReturnService"))
 local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local BallService = require(Modules:WaitForChild("BallService"))
+local ArenaService = require(Modules:WaitForChild("ArenaService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
 local ModeVoteService = require(Modules:WaitForChild("ModeVoteService"))
 local MapFeatureService = require(Modules:WaitForChild("MapFeatureService"))
@@ -91,6 +92,12 @@ ArenaReturnService.start()
 PlayerConfigService.start({ schemas = { PlayerAssist } })
 InputSetup.start()
 BallService.start()
+-- Replenishment and void recovery, both keyed off the arena's own spawn geometry.
+-- Without these a match only ever loses balls: every one thrown off the map is
+-- gone for the round, and nothing puts a new one into play.
+local arena = ArenaService.start()
+BallService.startGroundSpawns(arena.ballSpawns)
+BallService.configureRecovery(arena.ballSpawns, arena.origin.Position.Y + Combat.Dodgeball.RecoveryBelowOffset)
 RotatingPlatforms.startMover()
 MapFeatureService.start() -- inspect the anchored features after this frame's mover
 MatchService.start()

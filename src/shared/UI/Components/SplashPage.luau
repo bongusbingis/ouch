@@ -11,7 +11,7 @@ local ButtonSurface = require(script.Parent.ButtonSurface)
 local DailyRewardsPanel = require(script.Parent.DailyRewardsPanel)
 local PartyStatus = require(script.Parent.PartyStatus)
 local QuestsPanel = require(script.Parent.QuestsPanel)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
@@ -57,6 +57,12 @@ local function actionText(
 			TextSize = textSize,
 			TextColor3 = UIConfig.ProgressionStyle.White,
 			ZIndex = 2,
+		}, {
+			Outline = c("UIStroke", {
+				Color = UIConfig.ProgressionStyle.Ink,
+				Thickness = UIConfig.Text.OutlineScale,
+				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+			}),
 		}),
 		Icon = if primary
 			then c("ImageLabel", {
@@ -309,6 +315,7 @@ return function(props: Props)
 				PaddingRight = UDim.new(0, 0),
 			}),
 			InviteFriends = c(AnimatedButton, {
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Cyan }),
 				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Native = {
 					BackgroundTransparency = 1,
@@ -333,6 +340,7 @@ return function(props: Props)
 				),
 			}),
 			JoinWithCode = c(AnimatedButton, {
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Cyan }),
 				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Native = {
 					BackgroundTransparency = 1,
@@ -356,6 +364,7 @@ return function(props: Props)
 				),
 			}),
 			PlayButton = c(AnimatedButton, {
+				Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Pink, Enabled = props.PlayEnabled }),
 				ButtonRef = props.PlayButtonRef,
 				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Enabled = props.PlayEnabled,

@@ -49,7 +49,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 		}
 	elseif snapshot.phase == "Lobby" then
 		return {
-			partyState = if isLeader then "READY TO BRAWL?" else "WAITING FOR PARTY LEADER",
+			partyState = if isLeader then "CLICK PLAY TO ENTER MATCHMAKING" else "WAITING FOR PARTY LEADER",
 			playText = "PLAY",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = false,

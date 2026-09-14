@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local AnimatedButton = require(script.Parent.AnimatedButton)
+local OuchButton = require(script.Parent.OuchButton)
 
 local c = React.createElement
 local artwork = UIConfig.LobbyArtwork.Action
@@ -28,6 +29,7 @@ return function(props: Props)
 	local side = props.SizePx or UIConfig.Interaction.MinTargetPx
 	local z = props.ZIndex or 4
 	return c(AnimatedButton, {
+		Visual = c(OuchButton, { Color = Palette.Pink, Enabled = props.Enabled ~= false and props.OnActivated ~= nil }),
 		ButtonRef = props.ButtonRef,
 		SelectionRadius = UDim.new(0, artwork.CornerPx),
 		Enabled = props.Enabled ~= false and props.OnActivated ~= nil,
@@ -46,7 +48,7 @@ return function(props: Props)
 	}, {
 		Label = c("TextLabel", {
 			BackgroundTransparency = 1,
-			FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+			FontFace = UIConfig.Text.DefaultFont,
 			Position = UDim2.fromOffset(0, 1),
 			Size = UDim2.fromScale(1, 1),
 			Text = "X",
@@ -56,7 +58,7 @@ return function(props: Props)
 		}, {
 			Outline = c("UIStroke", {
 				Color = Palette.Ink,
-				Thickness = 0.045,
+				Thickness = UIConfig.Text.OutlineScale,
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			}),
 		}),

@@ -12,6 +12,8 @@ local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameMode
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ModeVote = require(Game:WaitForChild("Modes"):WaitForChild("ModeVote"))
+local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
+local ScoreTarget = require(Game:WaitForChild("Modes"):WaitForChild("ScoreTarget"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
 local AnalyticsConfig = require(Config:WaitForChild("Infra"):WaitForChild("Analytics"))
@@ -81,6 +83,25 @@ local function configuredOptions(): { string }?
 	return if #available > 0 then available else nil
 end
 
+-- The ballot advertises the target this roster would actually play to, not the
+-- authored reference value. Projected rather than authoritative: the roster can
+-- still move before the match starts, and MatchService resolves it again at the
+-- boundary that counts.
+local function projectedScoreTargets(options: { string }): { [string]: number }
+	local playerCount = #playablePlayers()
+	local targets = {}
+	for _, modeId in options do
+		local candidate = ModeRegistry.get(modeId)
+		if candidate then
+			local target = ScoreTarget.resolve(candidate.resolveRules(), playerCount)
+			if target ~= math.huge then
+				targets[modeId] = target
+			end
+		end
+	end
+	return targets
+end
+
 local function publish()
 	local activeVote = vote
 	local options = if activeVote then table.clone(activeVote.options) else configuredOptions() or {}
@@ -98,6 +119,7 @@ local function publish()
 		durationSeconds = GameModes.VoteDurationSeconds,
 		options = options,
 		voteCounts = counts,
+		scoreTargets = projectedScoreTargets(options),
 		winnerModeId = winnerModeId,
 		revision = revision,
 	})
@@ -254,6 +276,26 @@ local function extendForLateReady()
 	end
 end
 
+-- Nobody left to hear from, so the ballot closes instead of running out its
+-- clock. Everyone has already picked; the remaining seconds are dead air between
+-- two rounds that the whole server sits through.
+local function finishIfEveryoneVoted()
+	local activeVote = vote
+	if activeVote == nil then
+		return
+	end
+	local userIds = {}
+	for _, player in playablePlayers() do
+		table.insert(userIds, player.UserId)
+	end
+	if not ModeVote.allVoted(activeVote, userIds) then
+		return
+	end
+	voteEndsAt = Workspace:GetServerTimeNow()
+	publish()
+	finishVote(deadlineRevision)
+end
+
 local function submitVote(player: Player, modeId: string)
 	local activeVote = vote
 	if activeVote == nil or not ArenaSessionService.isRoundEligible(player) then
@@ -269,6 +311,7 @@ local function submitVote(player: Player, modeId: string)
 	player:SetAttribute(SELECTION_ATTRIBUTE, modeId)
 	publish()
 	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ModeVoteCast, 1, { modeId = modeId })
+	finishIfEveryoneVoted()
 end
 
 function ModeVoteService.start()
@@ -312,6 +355,10 @@ function ModeVoteService.start()
 			end
 		elseif #playablePlayers() == 0 and (activeVote ~= nil or pendingWinner ~= nil) then
 			cancelVote()
+		else
+			-- The player who left the round may have been the last one the ballot
+			-- was still waiting on.
+			finishIfEveryoneVoted()
 		end
 	end)
 	Players.PlayerAdded:Connect(function()
@@ -332,6 +379,8 @@ function ModeVoteService.start()
 		task.defer(function()
 			if #playablePlayers() == 0 and (vote == activeVote or pendingWinner ~= nil) then
 				cancelVote()
+			else
+				finishIfEveryoneVoted()
 			end
 		end)
 	end)

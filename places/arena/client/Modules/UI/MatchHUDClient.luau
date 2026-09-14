@@ -13,6 +13,9 @@ local Presentation =
 local Model = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("MatchHUDModel")
 )
+local ModeRegistry = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
+)
 local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)
 local listeners: { (any) -> () } = {}
@@ -51,6 +54,20 @@ local function update()
 	end
 	local modeId = state:GetAttribute("modeId")
 	local mode = GameModes.Modes[modeId]
+	-- Team identity comes from the mode's own roster, not from two hardcoded
+	-- attribute names: a mode whose sides are Survivors and Infected has to reach
+	-- the HUD as those, and every team-scoped element reads them from here.
+	local teams = nil
+	if state:GetAttribute("scoreScope") == "Team" then
+		local definition = if typeof(modeId) == "string" then ModeRegistry.get(modeId) else nil
+		local teamIds = if definition then definition.teams else nil
+		if teamIds then
+			teams = {}
+			for _, teamId in teamIds do
+				table.insert(teams, { id = teamId, score = state:GetAttribute(`TeamScore_{teamId}`) or 0 })
+			end
+		end
+	end
 	local character = player.Character
 	local players = {}
 	for _, member in Players:GetPlayers() do
@@ -72,9 +89,7 @@ local function update()
 		title = if mode then mode.Title else "MATCH",
 		timeRemaining = state:GetAttribute("timeRemaining"),
 		scoreTarget = state:GetAttribute("scoreTarget"),
-		teamMode = state:GetAttribute("scoreScope") == "Team",
-		redScore = state:GetAttribute("TeamScore_Red"),
-		blueScore = state:GetAttribute("TeamScore_Blue"),
+		teams = teams,
 		score = player:GetAttribute("MatchScore"),
 		teamId = player:GetAttribute("TeamId"),
 		eligible = player:GetAttribute("ArenaRoundEligible"),

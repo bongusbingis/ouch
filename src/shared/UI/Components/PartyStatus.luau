@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ActivityDots = require(script.Parent.ActivityDots)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
 
 local c = React.createElement
 
@@ -32,7 +32,7 @@ return function(props: Props)
 		PartyState = c(ResponsiveText, {
 			HostName = "PartyState",
 			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 24,
+			MaxTextSize = 18,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,

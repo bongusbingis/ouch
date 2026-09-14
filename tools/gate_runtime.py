@@ -10,7 +10,7 @@ import sqlite3
 import sys
 import uuid
 
-from asset_policy import MAX_BYTES, REVIEW_VIEWS, validate_bytes
+from asset_policy import MAX_BYTES, evidence_views, validate_bytes
 from workflow_common import atomic_write, digest, file_lock, read_json, write_json
 
 
@@ -98,11 +98,11 @@ def receive(store, request_file):
     frozen = store.home / "frozen" / (request_id + source.suffix.lower())
     atomic_write(frozen, data)
     previews, hashes = {}, {}
-    if proposal["asset_type"] == "Model":
+    if proposal["asset_type"] in ("Model", "Animation"):
         blend = (project / proposal["model_evidence"]["source_blend"]).resolve()
         if not blend.is_relative_to(project) or blend.suffix.lower() != ".blend" or not blend.is_file():
             raise ValueError("Saved project .blend source required")
-        for view in REVIEW_VIEWS:
+        for view in evidence_views(proposal["asset_type"]):
             evidence = (project / proposal["model_evidence"][view]).resolve()
             if not evidence.is_relative_to(project):
                 raise ValueError("Review evidence outside project")
@@ -208,7 +208,7 @@ def approval_window(store, record):
     notebook = ttk.Notebook(frame)
     notebook.pack(fill="both", expand=True)
     photo_refs = []
-    image_inputs = [("Frozen asset", data)] if record["asset_type"] != "Model" else [(view, Path(path).read_bytes()) for view, path in record["preview_files"].items()]
+    image_inputs = [("Frozen asset", data)] if record["asset_type"] not in ("Model", "Animation") else [(view, Path(path).read_bytes()) for view, path in record["preview_files"].items()]
     for label, content in image_inputs:
         image = Image.open(io.BytesIO(content)).convert("RGBA")
         image.thumbnail((930, 420))

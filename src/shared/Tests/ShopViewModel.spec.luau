@@ -317,4 +317,62 @@ T.describe("Season storefront expiry", function()
 	end)
 end)
 
+T.describe("Starter offer merchandising", function()
+	local NOW = 1_800_000_000
+	local PASS_KEY = GamePasses.StarterOffer.PassKey
+
+	local function withStarter(starterOffer, overrides)
+		local options = {
+			shopState = {
+				serverNow = NOW,
+				paidRandomAllowed = true,
+				offers = {},
+				offersExpireAt = NOW + 100,
+				featured = { kind = "Crate", id = "DodgeballCrate" },
+				featuredExpireAt = NOW + 200,
+				bundle = { bundleId = "StarterOutfitBundle" },
+				bundleExpireAt = NOW + 300,
+				starterOffer = starterOffer,
+			},
+		}
+		for key, value in overrides or {} do
+			options[key] = value
+		end
+		return build(options)
+	end
+
+	T.it("leads the hero row with the starter pass and its own deadline", function()
+		local model = withStarter({ passKey = PASS_KEY, expiresAt = NOW + 50, secondsRemaining = 50 })
+		T.expect(#model.hero > 1):toBeTruthy()
+		T.expect(model.hero[1].id):toEqual(`GamePass:{PASS_KEY}`)
+		T.expect(model.hero[1].badge):toEqual("STARTER OFFER")
+		-- Its own window, not the shared featured/bundle rotation clock.
+		T.expect(model.hero[1].countdownAt):toEqual(NOW + 50)
+	end)
+
+	T.it("leaves the hero row untouched when no offer is active", function()
+		local model = withStarter(nil)
+		for _, card in model.hero do
+			T.expect(card.id == `GamePass:{PASS_KEY}`):toEqual(false)
+		end
+	end)
+
+	T.it("never merchandises a starter pass the player already owns", function()
+		local owned = {}
+		owned[PASS_KEY] = true
+		local model = withStarter(
+			{ passKey = PASS_KEY, expiresAt = NOW + 50, secondsRemaining = 50 },
+			{ ownedPasses = owned }
+		)
+		for _, card in model.hero do
+			T.expect(card.id == `GamePass:{PASS_KEY}`):toEqual(false)
+		end
+	end)
+
+	T.it("ignores an offer naming a pass that is not in the catalog", function()
+		local model = withStarter({ passKey = "NoSuchPass", expiresAt = NOW + 50, secondsRemaining = 50 })
+		T.expect(model.byId["GamePass:NoSuchPass"]):toBeNil()
+	end)
+end)
+
 return true

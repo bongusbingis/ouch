@@ -11,8 +11,15 @@ FORMATS = {
     "Decal": {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".bmp": "image/bmp", ".tga": "image/tga"},
     "Image": {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".bmp": "image/bmp", ".tga": "image/tga"},
     "Model": {".fbx": "model/fbx", ".glb": "model/gltf-binary"},
+    "Animation": {".rbxm": "model/x-rbxm"},
 }
 REVIEW_VIEWS = ("front", "rear", "left", "right", "top", "perspective", "wireframe", "material", "studio")
+ANIMATION_VIEWS = ("sheet", "studio")
+RBXM_MAGIC = b"<roblox!\x89\xff\r\n\x1a\n"
+
+
+def evidence_views(asset_type):
+    return REVIEW_VIEWS if asset_type == "Model" else ANIMATION_VIEWS if asset_type == "Animation" else ()
 POLICY_SOURCE = "https://create.roblox.com/docs/cloud/guides/usage-assets"
 
 
@@ -48,7 +55,7 @@ def check_provenance(record):
 def validate_bytes(data, filename, asset_type, metadata=None):
     suffix = Path(filename).suffix.lower()
     if asset_type not in FORMATS or suffix not in FORMATS[asset_type]:
-        raise ValueError("Unsupported gate format/type; supported: images or self-contained FBX/GLB Model")
+        raise ValueError("Unsupported gate format/type; supported: images, self-contained FBX/GLB Model, or binary .rbxm Animation")
     if not 0 < len(data) <= MAX_BYTES:
         raise ValueError(f"Asset must contain 1..{MAX_BYTES} bytes")
     result = {"valid": True, "bytes": len(data), "content_type": FORMATS[asset_type][suffix], "checks": ["supported format", "size limit"]}
@@ -77,6 +84,12 @@ def validate_bytes(data, filename, asset_type, metadata=None):
         for entry in document.get("buffers", []) + document.get("images", []):
             if "uri" in entry and not entry["uri"].startswith("data:"):
                 raise ValueError("External GLB dependencies are not supported")
+    elif suffix == ".rbxm":
+        if not data.startswith(RBXM_MAGIC) or len(data) < 32 or data[14:16] != b"\x00\x00":
+            raise ValueError("Invalid binary .rbxm header")
+        if b"END\x00" not in data[-64:]:
+            raise ValueError("Truncated .rbxm (missing END chunk)")
+        result["checks"].append("binary rbxm header and END chunk")
     elif not (data.startswith(b"Kaydara FBX Binary  \x00\x1a\x00") or b"FBXHeaderExtension" in data[:4096]):
         raise ValueError("Invalid FBX header")
     if metadata:
@@ -98,4 +111,20 @@ def validate_bytes(data, filename, asset_type, metadata=None):
                 raise ValueError("Model statistics and saved .blend source required")
             result["model_statistics"] = evidence["statistics"]
             result["checks"].append("review evidence declared; human must assess model geometry/materials")
+        elif asset_type == "Animation":
+            evidence = metadata.get("model_evidence") or {}
+            if not all(evidence.get(view) for view in ANIMATION_VIEWS):
+                raise ValueError("Animation needs a Blender contact sheet and a Studio capture as review evidence")
+            statistics = evidence.get("statistics")
+            if not isinstance(statistics, dict) or not evidence.get("source_blend"):
+                raise ValueError("Animation statistics and saved .blend source required")
+            for field in ("keyframes", "duration", "looped", "joints"):
+                if field not in statistics:
+                    raise ValueError(f"Animation statistics missing {field}")
+            if not (isinstance(statistics["keyframes"], int) and statistics["keyframes"] >= 2):
+                raise ValueError("Animation must declare at least two keyframes")
+            if not (isinstance(statistics["duration"], (int, float)) and 0 < statistics["duration"] <= 30):
+                raise ValueError("Animation duration must be within 0..30 seconds")
+            result["model_statistics"] = statistics
+            result["checks"].append("review evidence declared; human must assess motion, timing and rig compatibility")
     return result

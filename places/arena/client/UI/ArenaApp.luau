@@ -135,7 +135,11 @@ return function(props: Props)
 			table.insert(modes, {
 				Id = modeId,
 				Title = definition.Title,
-				Description = GameModeVoteViewModel.description(mode.resolveRules(), mode.scoreScope == "Team"),
+				Description = GameModeVoteViewModel.description(
+					mode.resolveRules(),
+					mode.scoreScope == "Team",
+					vote.scoreTargets[modeId]
+				),
 				ThumbnailId = imageId(definition.ThumbnailId),
 				SortOrder = definition.SortOrder,
 				VoteCount = vote.voteCounts[modeId] or 0,

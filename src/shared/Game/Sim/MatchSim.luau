@@ -115,6 +115,18 @@ function MatchSim.noContest(state: MatchState, rules: MatchRules, events: { Matc
 	return true
 end
 
+-- Used by modes that own their own scoreboard (GameMode.teamScore) instead of
+-- counting eliminations. Emits nothing when the value is unchanged so a
+-- per-frame recompute does not spam the score feed.
+function MatchSim.setScore(state: MatchState, id: string, score: number, events: { MatchEvent }): boolean
+	if state.scores[id] == nil or state.scores[id] == score then
+		return false
+	end
+	state.scores[id] = score
+	table.insert(events, { kind = "ScoreChanged", playerId = id, score = score })
+	return true
+end
+
 function MatchSim.applyElim(
 	state: MatchState,
 	rules: MatchRules,

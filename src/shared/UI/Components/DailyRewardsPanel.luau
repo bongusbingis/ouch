@@ -7,12 +7,12 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local BonksLabel = require(script.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
 local NumberText = require(script.Parent.Parent.Models.NumberText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Palette = UIConfig.ProgressionStyle
-local Well = require(script.Parent.Well)
+local OuchPanel = require(script.Parent.OuchPanel)
 
 local ScrollFrame = require(script.Parent.ScrollFrame)
 
@@ -107,6 +107,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 				}),
 			Reward = if day.reward.kind == "Bonks"
 				then c(BonksLabel, {
+					Framed = true,
 					Amount = day.reward.amount or 0,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0.5),
@@ -115,7 +116,7 @@ local function DayCell(dayProps: { Day: PublicDay, Order: number, Compact: boole
 					},
 					IconSize = UDim2.fromScale(0.2, 0.78),
 					TextColor = rewardColor,
-					TextStroke = if available or claimed then 0.035 else 0,
+					TextStroke = if available or claimed then UIConfig.Text.OutlineScale else 0,
 				})
 				else nil,
 		}),
@@ -208,19 +209,19 @@ return function(props: Props)
 		end
 	end
 
-	return c(Well, { Native = native }, {
+	return c(OuchPanel, { Native = native, Padding = 0 }, {
 		Header = c("Frame", {
 			ZIndex = 2,
 			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundTransparency = 1,
-			Position = UDim2.new(0.5, 0, 0, 8),
-			Size = UDim2.new(1, -32, 0, headerHeight),
+			Position = UDim2.new(0.5, 0, 0, 12),
+			Size = UDim2.new(1, -UIConfig.Panel.InsetPx * 2, 0, headerHeight),
 		}, {
 			Title = c(ResponsiveText, {
 				HostName = "Title",
 				MeasurementFont = Enum.Font.LuckiestGuy,
 				MinTextSize = 14,
-				MaxTextSize = if compact then 16 else 26,
+				MaxTextSize = if compact then UIConfig.Text.LabelPx else UIConfig.Text.HeaderPx,
 				Wrapped = compact,
 				Native = {
 					AnchorPoint = Vector2.new(0, 0.5),
@@ -228,8 +229,13 @@ return function(props: Props)
 					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 					Position = if hint then UDim2.fromOffset(0, 20) else UDim2.fromScale(0, 0.5),
 					Size = if hint
-						then UDim2.new(1, if props.OnClaim then -claimWidth - 16 else 0, 0, 32)
-						else UDim2.new(1, if props.OnClaim then -claimWidth - 16 else 0, 1, -16),
+						then UDim2.new(1, if props.OnClaim then -claimWidth - 16 else 0, 0, if compact then 40 else 32)
+						else UDim2.new(
+							1,
+							if props.OnClaim then -claimWidth - 16 else 0,
+							1,
+							if compact then -8 else -16
+						),
 					Text = "DAILY REWARDS",
 					TextWrapped = compact,
 					TextColor3 = Palette.White,

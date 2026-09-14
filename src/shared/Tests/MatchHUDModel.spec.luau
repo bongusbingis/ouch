@@ -53,9 +53,33 @@ T.describe("MatchHUDModel", function()
 		T.expect(Model.build({ alive = false, respawnAt = 103 }, 104).respawn):toEqual("RESPAWNING…")
 	end)
 	T.it("identifies teams in text and explains round exclusion", function()
-		local view = Model.build({ teamMode = true, redScore = 7, blueScore = 5, teamId = "Blue", eligible = false }, 0)
+		local view = Model.build({
+			teams = { { id = "Red", score = 7 }, { id = "Blue", score = 5 } },
+			scoreTarget = 40,
+			teamId = "Blue",
+			eligible = false,
+		}, 0)
 		T.expect(view.scores):toEqual("RED 7   •   BLUE 5   |   YOU: BLUE")
 		T.expect(view.respawn):toEqual("YOU’LL JOIN THE NEXT ROUND")
+	end)
+	T.it("names whatever sides the mode declares rather than Red and Blue", function()
+		local view = Model.build({
+			teams = { { id = "Survivors", score = 6 }, { id = "Infected", score = 3 } },
+			scoreTarget = 0,
+			teamId = "Survivors",
+		}, 0)
+		T.expect(view.scores):toEqual("SURVIVORS 6   •   INFECTED 3   |   YOU: SURVIVORS")
+		T.expect(view.objective):toEqual("SURVIVE UNTIL TIME RUNS OUT")
+		T.expect(view.footer):toEqual("ELIMINATIONS • PLAYERS LEFT ABOVE")
+		-- Nothing to count up to, so the bars read against the total on the board.
+		T.expect(view.teamScoreMax):toEqual(9)
+		T.expect(view.teams[1].accent):toEqual("Pink")
+		T.expect(view.teams[2].accent):toEqual("Cyan")
+	end)
+	T.it("never renders an infinite score target as the objective", function()
+		local view = Model.build({ scoreTarget = math.huge }, 0)
+		T.expect(view.objective):toEqual("SURVIVE UNTIL TIME RUNS OUT")
+		T.expect(view.target):toEqual(0)
 	end)
 end)
 
@@ -87,12 +111,13 @@ T.describe("MatchHUDModel standings", function()
 	T.it("splits team boards by team and long free-for-alls in half", function()
 		local entries = players({ 5, 4, 3, 2 }, 1)
 		entries[1].teamId, entries[2].teamId, entries[3].teamId, entries[4].teamId = "Red", "Blue", "Red", "Blue"
-		local columns = Model.columns(entries, true, 8)
+		local teams = { { id = "Red" }, { id = "Blue" } }
+		local columns = Model.columns(entries, teams, 8)
 		T.expect(#columns):toEqual(2)
 		T.expect(#columns[1]):toEqual(2)
 		T.expect(columns[1][1].teamId):toEqual("Red")
-		T.expect(#Model.columns(players({ 1, 1, 1 }, 1), false, 8)):toEqual(1)
-		local halves = Model.columns(players({ 9, 8, 7, 6, 5, 4, 3, 2, 1 }, 1), false, 8)
+		T.expect(#Model.columns(players({ 1, 1, 1 }, 1), nil, 8)):toEqual(1)
+		local halves = Model.columns(players({ 9, 8, 7, 6, 5, 4, 3, 2, 1 }, 1), nil, 8)
 		T.expect(#halves):toEqual(2)
 		T.expect(#halves[1]):toEqual(5)
 		T.expect(#halves[2]):toEqual(4)

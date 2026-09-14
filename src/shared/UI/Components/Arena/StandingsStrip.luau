@@ -60,6 +60,10 @@ return function(props: Props)
 	if #rows == 0 then
 		return nil
 	end
+	local accentByTeam = {}
+	for _, team in view.teams or {} do
+		accentByTeam[team.id] = team.accent
+	end
 	local children = {
 		Layout = c("UIListLayout", {
 			Padding = UDim.new(0, 2),
@@ -86,7 +90,7 @@ return function(props: Props)
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
 			Team = if view.teamMode and entry.teamId
 				then c("Frame", {
-					BackgroundColor3 = if entry.teamId == "Red" then colors.Pink else colors.Cyan,
+					BackgroundColor3 = colors[accentByTeam[entry.teamId] or "Cyan"],
 					BorderSizePixel = 0,
 					Position = UDim2.fromOffset(0, 0),
 					Size = UDim2.new(0, 4, 1, 0),

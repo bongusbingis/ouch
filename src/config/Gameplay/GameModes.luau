@@ -1,25 +1,33 @@
 --!strict
 
+-- Description is static merchandising copy and so never names a score target:
+-- the target scales with the roster (Config.Gameplay.Modes), and the ballot
+-- prints the number this lobby would actually play to from the vote snapshot.
+--
+-- ThumbnailId is empty until a mode's key art is authored and uploaded. Empty is
+-- the understood "no art" sentinel on both read paths (GameModeCard draws its
+-- per-mode placeholder instead, ArenaLoadingClient skips the image), which a
+-- stand-in asset id was not: it asked for a missing asset on every ballot render.
 local modes = {
 	FFA = {
 		Enabled = true,
 		Title = "FREE-FOR-ALL",
-		Description = "First to 15 eliminations wins. Everyone is a target.",
-		ThumbnailId = "rbxassetid://123456789",
+		Description = "Race to the elimination target. Everyone is a target.",
+		ThumbnailId = "",
 		SortOrder = 1,
 	},
 	TDM = {
 		Enabled = true,
 		Title = "TEAM DEATHMATCH",
-		Description = "First team to 40 eliminations wins. Work together to win.",
-		ThumbnailId = "rbxassetid://123456789",
+		Description = "Race your team to the elimination target. Work together to win.",
+		ThumbnailId = "",
 		SortOrder = 2,
 	},
 	Infection = {
 		Enabled = false,
 		Title = "INFECTION",
 		Description = "One player starts infected. Survive to the clock, or join them.",
-		ThumbnailId = "rbxassetid://123456789",
+		ThumbnailId = "",
 		SortOrder = 3,
 	},
 }

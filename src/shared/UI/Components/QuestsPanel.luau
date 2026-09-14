@@ -7,13 +7,14 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local BonksLabel = require(script.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local ResponsiveText = require(script.Parent.OuchText)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local QuestsConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Quests"))
 local Palette = UIConfig.ProgressionStyle
-local Well = require(script.Parent.Well)
+local OuchPanel = require(script.Parent.OuchPanel)
+local OuchProgressBar = require(script.Parent.OuchProgressBar)
 
 local Icon = require(script.Parent.Icon)
 local ScrollFrame = require(script.Parent.ScrollFrame)
@@ -154,22 +155,14 @@ local function QuestRow(rowProps: {
 					TextXAlignment = Enum.TextXAlignment.Left,
 				},
 			}),
-			ProgressBar = c("Frame", {
-				Visible = not short,
-				BackgroundColor3 = Palette.Ink,
-				BackgroundTransparency = 0.55,
-				BorderSizePixel = 0,
-				Position = UDim2.new(0, 0, 1, -30),
-				Size = UDim2.new(1, 0, 0, 8),
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Fill = c("Frame", {
-					BackgroundColor3 = if completed then Palette.Yellow else PROGRESS_FILL_COLOR,
-					BorderSizePixel = 0,
-					Size = UDim2.fromScale(progressFraction, 1),
-				}, {
-					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				}),
+			ProgressBar = c(OuchProgressBar, {
+				Progress = progressFraction,
+				Color = if completed then Palette.Yellow else PROGRESS_FILL_COLOR,
+				Native = {
+					Visible = not short,
+					Position = UDim2.new(0, 0, 1, -30),
+					Size = UDim2.new(1, 0, 0, 8),
+				},
 			}),
 			ProgressLabel = c(ResponsiveText, {
 				MeasurementFont = UIConfig.Text.BodyFont,
@@ -229,9 +222,10 @@ local function QuestRow(rowProps: {
 				else nil,
 			RewardPreview = if quest.reward.kind == "Bonks"
 				then c(BonksLabel, {
+					Framed = true,
 					Amount = quest.reward.amount or 0,
 					TextColor = Palette.Yellow,
-					TextStroke = 0.045,
+					TextStroke = UIConfig.Text.OutlineScale,
 					MaxTextSize = 20,
 					Native = {
 						AnchorPoint = if compact then Vector2.new(0, 0.5) else Vector2.new(0.5, 0.5),
@@ -345,7 +339,7 @@ return function(props: Props)
 		native.Size = UDim2.new(native.Size.X.Scale, native.Size.X.Offset, 0, listHeight + if short then 40 else 52)
 	end
 
-	return c(Well, { Native = native }, {
+	return c(OuchPanel, { Native = native, Padding = 0 }, {
 		Title = c(ResponsiveText, {
 			HostName = "Title",
 			MeasurementFont = Enum.Font.LuckiestGuy,
@@ -355,8 +349,8 @@ return function(props: Props)
 				AnchorPoint = Vector2.new(0, 0),
 				BackgroundTransparency = 1,
 				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromOffset(18, 8),
-				Size = UDim2.new(1, if scrollHint then -132 else -36, 0, if short then 28 else 36),
+				Position = UDim2.fromOffset(UIConfig.Panel.InsetPx, 12),
+				Size = UDim2.new(1, if scrollHint then -136 else -40, 0, if short then 28 else 36),
 				Text = if short and scrollHint then "QUESTS" else "DAILY QUESTS",
 				TextColor3 = Palette.White,
 				TextXAlignment = Enum.TextXAlignment.Left,
