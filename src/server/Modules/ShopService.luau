@@ -8,14 +8,20 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
 local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Bundles"))
+local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Economy = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy")
 local ShopRotation = require(Economy:WaitForChild("ShopRotation"))
 local FeaturedRotation = require(Economy:WaitForChild("FeaturedRotation"))
 local DirectPurchase = require(Economy:WaitForChild("DirectPurchase"))
 local CosmeticsLogic = require(Economy:WaitForChild("CosmeticsLogic"))
+local StarterOffer = require(Economy:WaitForChild("StarterOffer"))
+local WriteThroughProxy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
+)
 local PlayerData = require(script.Parent.PlayerData)
 local PaidRandomPolicyService = require(script.Parent.PaidRandomPolicyService)
+local EntitlementService = require(script.Parent.EntitlementService)
 
 local ShopService = {}
 
@@ -29,9 +35,27 @@ local activePlayerData: any = PlayerData
 local activeNetwork: any = Network
 local activeTime: () -> number = os.time
 local activePaidRandomPolicy: any = PaidRandomPolicyService
+local activeEntitlements: any = EntitlementService
 
 local function rotationPool(): { string }
 	return ShopRotation.pool(Cosmetics.Items, Shop.Rotation.Categories)
+end
+
+-- Gathers the inputs the pure resolver needs; the eligibility rules themselves
+-- live in Shared.Game.Economy.StarterOffer so the client never decides its own.
+local function starterOfferFor(player: Player, data: any?, now: number): any?
+	if data == nil then
+		return nil
+	end
+	local config = GamePasses.StarterOffer
+	return StarterOffer.resolve(config, GamePasses.Catalog[config.PassKey], {
+		ready = activeEntitlements.isReady(player),
+		ownsPass = activeEntitlements.has(player, config.PassKey),
+		ownsAnyPass = activeEntitlements.ownsAny(player),
+		receipts = data.Receipts,
+		firstJoinAt = if data.Onboarding then data.Onboarding.FirstJoinAt else nil,
+		now = now,
+	})
 end
 
 function ShopService.ensure(player: Player): any?
@@ -117,11 +141,21 @@ function ShopService.stateFor(player: Player): any
 	local bundle = if bundleId then Bundles.Catalog[bundleId] else nil
 
 	local featured = FeaturedRotation.select(Shop.Featured, now)
+	local lastOpen = data and data.Crates and data.Crates.LastBonksOpen
 
 	return {
 		serverNow = now,
 		paidRandomAllowed = allowed,
 		paidRandomReason = policyReason,
+		bonksOpen = if data
+			then {
+				version = 1,
+				nextSequence = if lastOpen then lastOpen.sequence + 1 else 1,
+				unrevealed = if lastOpen and not lastOpen.revealed
+					then WriteThroughProxy.snapshot(lastOpen.result)
+					else nil,
+			}
+			else nil,
 		offers = offers,
 		offersExpireAt = FeaturedRotation.nextRotationAt(Shop.Rotation.RotationSeconds, now),
 		featured = if featured then { kind = featured.kind, id = featured.id } else nil,
@@ -136,6 +170,7 @@ function ShopService.stateFor(player: Player): any
 			}
 			else nil,
 		bundleExpireAt = FeaturedRotation.nextRotationAt(Shop.Bundle.RotationSeconds, now),
+		starterOffer = starterOfferFor(player, data, now),
 	}
 end
 
@@ -158,6 +193,7 @@ export type StartOptions = {
 	players: any?,
 	playerData: any?,
 	paidRandomPolicy: any?,
+	entitlements: any?,
 	network: any?,
 	time: (() -> number)?,
 	runAsync: ((() -> ()) -> ())?,
@@ -176,6 +212,7 @@ function ShopService.start(options: StartOptions?)
 	activePaidRandomPolicy = if options and options.paidRandomPolicy
 		then options.paidRandomPolicy
 		else PaidRandomPolicyService
+	activeEntitlements = if options and options.entitlements then options.entitlements else EntitlementService
 	local runAsync = if options and options.runAsync then options.runAsync else task.spawn
 	local sweepSeconds = if options and options.sweepSeconds then options.sweepSeconds else SWEEP_SECONDS
 
@@ -204,6 +241,7 @@ function ShopService._resetForTest()
 	activeNetwork = Network
 	activeTime = os.time
 	activePaidRandomPolicy = PaidRandomPolicyService
+	activeEntitlements = EntitlementService
 end
 
 return ShopService

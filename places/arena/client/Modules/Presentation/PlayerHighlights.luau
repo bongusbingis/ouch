@@ -5,6 +5,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local PlayerHighlights = {}
@@ -14,6 +15,10 @@ local config = UI.PlayerHighlight
 local started = false
 local highlights: { [Player]: Highlight } = {}
 local connections: { [Player]: { RBXScriptConnection } } = {}
+local matchState: Folder? = nil
+local matchStateConnection: RBXScriptConnection? = nil
+local matchStateChildAdded: RBXScriptConnection? = nil
+local combatMode = true
 
 local function clear(player: Player)
 	local highlight = highlights[player]
@@ -54,16 +59,54 @@ local function watch(player: Player)
 	end
 	connections[player] = {
 		player.CharacterAdded:Connect(function(character)
-			apply(player, character)
+			if combatMode then
+				apply(player, character)
+			end
 		end),
 		player.CharacterRemoving:Connect(function()
 			clear(player)
 		end),
 	}
 	local character = player.Character
-	if character then
+	if character and combatMode then
 		apply(player, character)
 	end
+end
+
+-- Splashdown and any other non-combat mode has no enemies to spot, so the
+-- enemy outline goes fully dark rather than tinting a race with combat UI.
+local function refreshHighlights()
+	if combatMode then
+		for _, player in Players:GetPlayers() do
+			local character = player.Character
+			if player ~= Players.LocalPlayer and character then
+				apply(player, character)
+			end
+		end
+	else
+		for player in highlights do
+			clear(player)
+		end
+	end
+end
+
+local function updateCombatMode()
+	local modeId = if matchState then matchState:GetAttribute("modeId") else nil
+	local nextCombatMode = GameModes.IsCombat(modeId)
+	if nextCombatMode == combatMode then
+		return
+	end
+	combatMode = nextCombatMode
+	refreshHighlights()
+end
+
+local function attachMatchState(folder: Folder)
+	if matchStateConnection then
+		matchStateConnection:Disconnect()
+	end
+	matchState = folder
+	matchStateConnection = folder:GetAttributeChangedSignal("modeId"):Connect(updateCombatMode)
+	updateCombatMode()
 end
 
 function PlayerHighlights.start()
@@ -71,6 +114,16 @@ function PlayerHighlights.start()
 		return
 	end
 	started = true
+
+	local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
+	if existingMatchState and existingMatchState:IsA("Folder") then
+		attachMatchState(existingMatchState)
+	end
+	matchStateChildAdded = ReplicatedStorage.ChildAdded:Connect(function(child)
+		if child.Name == "MatchState" and child:IsA("Folder") then
+			attachMatchState(child)
+		end
+	end)
 
 	Players.PlayerAdded:Connect(watch)
 	Players.PlayerRemoving:Connect(forget)
@@ -86,6 +139,15 @@ function PlayerHighlights.destroy()
 	for player in highlights do
 		clear(player)
 	end
+	if matchStateConnection then
+		matchStateConnection:Disconnect()
+		matchStateConnection = nil
+	end
+	if matchStateChildAdded then
+		matchStateChildAdded:Disconnect()
+		matchStateChildAdded = nil
+	end
+	matchState = nil
 end
 
 return PlayerHighlights

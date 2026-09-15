@@ -25,7 +25,7 @@ T.describe("Impact effect economy", function()
 		local crate = Crates.EffectsCrate
 		local product = Products.Catalog.EffectsCrateOpen
 		T.expect(crate.CatalogStatus):toEqual("Active")
-		T.expect(crate.BonksPrice):toEqual(500)
+		T.expect(crate.BonksPrice):toEqual(300)
 		T.expect(product.CatalogStatus):toEqual("Active")
 		T.expect(product.CrateId):toEqual("EffectsCrate")
 		T.expect(Products.ById[product.Id]):toEqual(product)

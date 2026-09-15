@@ -37,6 +37,7 @@ local function base(overrides: { [string]: any }?): any
 		resultId = "debug-result",
 		modeId = "TDM",
 		modeName = "Team Deathmatch",
+		scoreLabel = "ELIMS",
 		outcome = "Victory",
 		winnerId = "Blue",
 		interactiveAt = 0,

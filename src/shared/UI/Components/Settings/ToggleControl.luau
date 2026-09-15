@@ -11,11 +11,12 @@ local Motion = require(script.Parent.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Parent.Hooks.useReducedMotion)
 local AnimatedButton = require(script.Parent.Parent.AnimatedButton)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local CandySurface = require(script.Parent.Parent.CandySurface)
+local Tokens = require(script.Parent.Parent.Parent.Tokens)
 
 local c = React.createElement
-
-local palette = UIConfig.ProgressionStyle
+local C = Tokens.Colors
+local SETTINGS = Tokens.Settings
 
 export type Props = {
 	Value: any,
@@ -50,8 +51,9 @@ return function(props: Props)
 	end
 
 	local function cell(index: number)
+		local selected = index == selectedIndex
 		return c(AnimatedButton, {
-			SelectionRadius = UDim.new(1, 0),
+			SelectionRadius = UDim.new(0, SETTINGS.ToggleRadius),
 			Enabled = enabled,
 			Native = {
 				BackgroundTransparency = 1,
@@ -65,39 +67,43 @@ return function(props: Props)
 			end,
 		}, {
 			Label = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
+				MeasurementFont = Tokens.Type.Display,
 				MaxTextSize = 22,
+				MinTextSize = 16,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.5),
+					Font = Tokens.Type.Display,
+					Position = UDim2.new(0.5, 0, 0.5, 2),
 					Size = UDim2.fromScale(0.86, 0.7),
 					Text = props.Labels[index],
-					TextColor3 = palette.White,
+					TextColor3 = if selected then C.Surface else C.InkSoft,
 					ZIndex = 5,
 				},
 			}, {
-				Stroke = c("UIStroke", {
-					Color = palette.Ink,
-					Thickness = UIConfig.Button.StrokePx,
-				}),
+				Stroke = if selected then c("UIStroke", { Color = C.Ink, Thickness = 2 }) else nil,
 			}),
 		})
 	end
 
 	return c("Frame", {
 		AnchorPoint = props.AnchorPoint,
-		BackgroundColor3 = palette.Track,
-		BackgroundTransparency = if enabled then 0 else 0.3,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Position = props.Position,
 		Size = props.Size or UDim2.fromScale(1, 1),
+		ZIndex = 6,
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		Surface = c(CandySurface, {
+			Color = if enabled then C.Surface else C.WellLine,
+			LipColor = C.WellLine,
+			Radius = SETTINGS.ToggleRadius,
+			Shadow = false,
+			ZIndex = 1,
+		}),
 		Highlight = c("Frame", {
-			BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = styles.Alpha:map(function(alpha: number)
 				return UDim2.new(alpha * 0.5, 4, 0, 4)
@@ -105,10 +111,13 @@ return function(props: Props)
 			Size = UDim2.new(0.5, -8, 1, -8),
 			ZIndex = 3,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Stroke = c("UIStroke", {
-				Color = if enabled then palette.White else palette.Muted,
-				Thickness = UIConfig.Button.StrokePx,
+			Surface = c(CandySurface, {
+				Color = if enabled then C.Pink else C.WellLine,
+				LipColor = if enabled then C.PinkLip else C.WellLine,
+				Radius = math.max(SETTINGS.ToggleRadius - 4, 1),
+				Shadow = false,
+				Stroke = false,
+				ZIndex = 3,
 			}),
 		}),
 		OptionA = cell(1),

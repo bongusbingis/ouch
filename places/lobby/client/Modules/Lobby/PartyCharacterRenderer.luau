@@ -4,7 +4,12 @@ local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local T = require(ReplicatedStorage.Shared.UI.Tokens)
+local CandyMotion = require(ReplicatedStorage.Shared.UI.Motion)
+local CandyStage = require(script.Parent.CandyStage)
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
@@ -26,10 +31,19 @@ local CosmeticVisualFactory = require(
 local HammerGrip = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("HammerGrip")
 )
+local EmotePlayer = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics"):WaitForChild("EmotePlayer")
+)
+local PartyBubblePolicy = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("PartyBubblePolicy")
+)
 
 local USERNAME_LOOKUP_ATTEMPTS = 3
 local USERNAME_RETRY_DELAY = 1
 local IDLE_PLAYBACK_SPEED = 0.85
+local IDLE_BOUNDS_PADDING = Vector3.new(1, 0.5, 1)
+local BUBBLE_ANCHOR_OFFSET = Vector3.new(0, 1.25, 0)
+local BUBBLE_CAMERA_CLEARANCE = 2
 
 local PartyCharacterRenderer = {}
 PartyCharacterRenderer.__index = PartyCharacterRenderer
@@ -63,6 +77,7 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 		_playerGui = playerGui,
 		_spawns = spawns,
 		_characters = {},
+		_bodyBoundsByCostume = {},
 		_onKick = onKick,
 		_compactParty = false,
 		_usernames = {
@@ -71,11 +86,60 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 		_usernameRequests = {},
 		_usernameListeners = {},
 		_skinsPreview = nil,
+		_candyStage = CandyStage.new(partyView),
+		_previewAngle = 0,
+		_backpackActive = false,
+		_celebrateAt = -math.huge,
 		_destroyed = false,
 		_generation = 0,
 		_appearanceRevision = 0,
 	}, PartyCharacterRenderer)
 
+	self._disconnectCelebrate = CandyMotion.onCelebrate(function(category, itemId)
+		if self._backpackActive then
+			self._celebrateAt = os.clock()
+			self._candyStage.burst()
+			if category == "EmoteAssets" and itemId then
+				self:PlayEmote(localUserId, itemId)
+				local character = self._characters[localUserId]
+				local track = if character then character.emoteTrack else nil
+				task.delay(T.Stage.EmoteReaction, function()
+					if not self._destroyed and character and character.emoteTrack == track then
+						EmotePlayer.stop(track)
+						character.emoteTrack = nil
+					end
+				end)
+			end
+		end
+	end)
+	local dragX = nil
+	self._dragBegin = UserInputService.InputBegan:Connect(function(input, processed)
+		if not self._backpackActive or processed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+			return
+		end
+		local bounds = if self._getWorldBounds then self._getWorldBounds() else nil
+		local point = UserInputService:GetMouseLocation()
+		if
+			bounds
+			and point.X >= bounds.Min.X
+			and point.X <= bounds.Max.X
+			and point.Y >= bounds.Min.Y
+			and point.Y <= bounds.Max.Y
+		then
+			dragX = point.X
+		end
+	end)
+	self._dragMove = UserInputService.InputChanged:Connect(function(input)
+		if dragX and input.UserInputType == Enum.UserInputType.MouseMovement then
+			self._previewAngle += (input.Position.X - dragX) * 0.012
+			dragX = input.Position.X
+		end
+	end)
+	self._dragEnd = UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragX = nil
+		end
+	end)
 	self:Render({ members = {} })
 	self:_faceLocalCharacterToCamera()
 	self._renderConnection = RunService.RenderStepped:Connect(function()
@@ -83,7 +147,39 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 		self:_updateSkinsPreview()
 		self:_layoutNametags()
 	end)
+	-- This event contains this viewer's delivered, filtered TextChannel result.
+	-- Never mirror SendingMessage, Player.Chatted, raw remotes, or cross-server party events.
+	self._bubbleConnection = TextChatService.MessageReceived:Connect(function(message)
+		local channels = TextChatService:FindFirstChild("TextChannels")
+		local publicChannel = channels and channels:FindFirstChild("RBXGeneral")
+		local userId = PartyBubblePolicy.senderId(message, publicChannel, self._characters, Players)
+		local character = userId and self._characters[userId]
+		if not self._destroyed and character and character.bubbleAnchor.Parent then
+			TextChatService:DisplayBubble(character.bubbleAnchor, message.Text)
+		end
+	end)
 	return self
+end
+
+function PartyCharacterRenderer:_bodyBounds(costumeId)
+	local key = costumeId or ""
+	local cached = self._bodyBoundsByCostume[key]
+	if cached then
+		return cached
+	end
+	-- Measure a neutral copy once per outfit. Animated bounds can make collision
+	-- placement alternate between opposite sides of the character during idle.
+	local rig = self._characterTemplate:Clone()
+	local appearance = CharacterAppearance.create(rig, { costumeId = costumeId })
+	local frame, size = rig:GetBoundingBox()
+	local bounds = {
+		frame = rig:GetPivot():ToObjectSpace(frame),
+		size = size + IDLE_BOUNDS_PADDING,
+	}
+	appearance.destroy()
+	rig:Destroy()
+	self._bodyBoundsByCostume[key] = bounds
+	return bounds
 end
 
 local function halfExtents(frame, size)
@@ -260,12 +356,16 @@ function PartyCharacterRenderer:_layoutNametags()
 	table.sort(characters, function(a, b)
 		return a.slot < b.slot
 	end)
-	local envelope = UIConfig.Layout.WorldFraming.CharacterBody
-	local bodyFrame = CFrame.new((envelope.Minimum + envelope.Maximum) / 2)
-	local bodySize = envelope.Maximum - envelope.Minimum
 	for _, character in characters do
 		if character.rig.Parent then
-			local bounds = projectedBody(camera, character.rig:GetPivot() * bodyFrame, bodySize)
+			local anchor = character.rig:GetPivot().Position + BUBBLE_ANCHOR_OFFSET
+			local towardCamera = camera.CFrame.Position - anchor
+			if towardCamera.Magnitude > BUBBLE_CAMERA_CLEARANCE then
+				anchor += towardCamera.Unit * BUBBLE_CAMERA_CLEARANCE
+			end
+			character.bubbleAnchor.Position = anchor
+			local body = character.bodyBounds
+			local bounds = projectedBody(camera, character.rig:GetPivot() * body.frame, body.size)
 			if bounds then
 				bodies[character] = bounds
 				table.insert(occupied, bounds)
@@ -274,10 +374,6 @@ function PartyCharacterRenderer:_layoutNametags()
 	end
 	for _, character in characters do
 		if not character.nametag.Enabled or not character.nametag.Parent then
-			continue
-		end
-		if self._compactParty and not character.crownLabel.Visible then
-			character.nametag.StudsOffset = self._nametagStudsOffset
 			continue
 		end
 		local children = { character.usernameLabel, character.crownLabel, character.kickButton }
@@ -304,15 +400,23 @@ function PartyCharacterRenderer:_layoutNametags()
 		if inWindow and depth > 0 and size.X > 1 and size.Y > 1 then
 			local bounds = nametagBounds(children, positions, origin, size)
 			if bounds then
-				local placement = safe
 				local body = bodies[character]
-				if self._compactParty and body then
-					local crownBottom = math.min(safe.Max.Y, body.Min.Y - config.GapPx)
-					if crownBottom - safe.Min.Y >= bounds.Max.Y - bounds.Min.Y then
-						placement = Rect.new(safe.Min, Vector2.new(safe.Max.X, crownBottom))
+				local preferred = if body
+					then Vector2.new(
+						(body.Min.X + body.Max.X - bounds.Min.X - bounds.Max.X) / 2,
+						body.Min.Y - config.GapPx - 1 - bounds.Max.Y
+					)
+					else Vector2.zero
+				local anchoredBounds = Rect.new(bounds.Min + preferred, bounds.Max + preferred)
+				-- Keep names above their owner when viewport headroom is constrained.
+				-- Only other characters and nameplates should push them sideways.
+				local obstacles = {}
+				for _, obstacle in occupied do
+					if obstacle ~= body then
+						table.insert(obstacles, obstacle)
 					end
 				end
-				offset = nameOffset(bounds, occupied, placement, config.GapPx)
+				offset = preferred + nameOffset(anchoredBounds, obstacles, safe, config.GapPx)
 				table.insert(occupied, Rect.new(bounds.Min + offset, bounds.Max + offset))
 			end
 		end
@@ -326,6 +430,12 @@ function PartyCharacterRenderer:_layoutNametags()
 		end
 		for _, child in children do
 			local position = positions[child.Name]
+			if child == character.crownLabel and self._backpackActive and not GuiService.ReducedMotionEnabled then
+				position += UDim2.fromOffset(
+					0,
+					math.sin(os.clock() * math.pi * 2 / T.Motion.CrownPeriod) * T.Motion.CrownAmplitude
+				)
+			end
 			if child.Position ~= position then
 				child.Position = position
 			end
@@ -353,6 +463,8 @@ function PartyCharacterRenderer:_updateNametagPresentation()
 	local localLeader = localCharacter and localCharacter.crownLabel.Visible
 	for _, character in self._characters do
 		local canKick = not self._compactParty and localLeader and not character.crownLabel.Visible
+		-- Compact layouts show names and leadership in the party modal at readable sizes.
+		character.nametag.Enabled = not self._compactParty
 		character.usernameLabel.Visible = not self._compactParty
 		character.kickButton.Visible = canKick == true
 		character.kickButton.Active = canKick == true
@@ -445,6 +557,8 @@ function PartyCharacterRenderer:SetSkinsPreview(active, ballItemId, hammerItemId
 	hammer.Parent = self._characterContainer
 	self._skinsPreview = {
 		ball = ball,
+		ballSize = ball.Size,
+		popAt = os.clock(),
 		hammer = hammer,
 		ballItemId = normalizedBallId,
 		hammerItemId = normalizedHammerId,
@@ -472,6 +586,9 @@ function PartyCharacterRenderer:_updateSkinsPreview()
 	preview.hammer.CFrame = CFrame.new(hammerHand.Position)
 		* character.rig:GetPivot().Rotation
 		* preview.hammerGrip:Inverse()
+	local age = os.clock() - preview.popAt
+	local pop = if GuiService.ReducedMotionEnabled then 1 else math.min(age / T.Motion.Stamp, 1)
+	preview.ball.Size = preview.ballSize * (if pop < 1 then math.max(0.15, pop + math.sin(pop * math.pi) * 0.2) else 1)
 	local ballOffset = Combat.Dodgeball.HeldVisualHandOffset
 	preview.ball.CFrame = attachmentCFrame(rightHand, "DodgeballGrip")
 		or rightHand.CFrame * CFrame.new(ballOffset.x, ballOffset.y, ballOffset.z)
@@ -491,7 +608,17 @@ function PartyCharacterRenderer:_faceLocalCharacterToCamera()
 		return
 	end
 
-	character.rig:PivotTo(CFrame.lookAt(spawnPosition, spawnPosition + direction, Vector3.yAxis))
+	local elapsed = os.clock() - self._celebrateAt
+	local hop = if self._backpackActive
+			and not GuiService.ReducedMotionEnabled
+			and elapsed < T.Stage.HopDuration
+		then math.sin(math.pi * elapsed / T.Stage.HopDuration) * T.Stage.Hop
+		else 0
+	character.rig:PivotTo(
+		CFrame.new(0, hop, 0)
+			* CFrame.lookAt(spawnPosition, spawnPosition + direction, Vector3.yAxis)
+			* CFrame.Angles(0, if self._backpackActive then self._previewAngle else 0, 0)
+	)
 end
 
 function PartyCharacterRenderer:_requestUsername(userId)
@@ -537,6 +664,15 @@ function PartyCharacterRenderer:_requestUsername(userId)
 	end)
 end
 
+function PartyCharacterRenderer:PlayEmote(userId, emoteId)
+	local character = self._characters[userId]
+	if character == nil then
+		return
+	end
+	EmotePlayer.stop(character.emoteTrack)
+	character.emoteTrack = EmotePlayer.play(character.animator, emoteId)
+end
+
 function PartyCharacterRenderer:_remove(userId)
 	local character = self._characters[userId]
 	if not character then
@@ -547,6 +683,7 @@ function PartyCharacterRenderer:_remove(userId)
 	character.idleTrack:Stop(0)
 	character.idleTrack:Destroy()
 	character.nametag:Destroy()
+	character.bubbleAnchor:Destroy()
 	character.appearance.destroy()
 	character.rig:Destroy()
 end
@@ -575,6 +712,17 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	assert(rightHand:IsA("BasePart"), "[PartyCharacterRenderer] CharacterRig.RightHand must be a BasePart")
 	local spawn = self._spawns[slot]
 	local nametag = self._nametagTemplate:Clone()
+	-- A stationary anchor keeps chat out of the animated head and crown.
+	local bubbleAnchor = Instance.new("Part")
+	bubbleAnchor.Name = ("PartyBubbleAnchor_%d"):format(userId)
+	bubbleAnchor.Size = Vector3.one * 0.1
+	bubbleAnchor.Transparency = 1
+	bubbleAnchor.Anchored = true
+	bubbleAnchor.CanCollide = false
+	bubbleAnchor.CanQuery = false
+	bubbleAnchor.CanTouch = false
+	bubbleAnchor.CFrame = spawn.CFrame * CFrame.new(BUBBLE_ANCHOR_OFFSET)
+	bubbleAnchor.Parent = self._characterContainer
 	local usernameLabel = nametag:WaitForChild("Username")
 	local crownLabel = nametag:WaitForChild("Crown")
 	local kickButton = nametag:WaitForChild("KickButton")
@@ -582,6 +730,7 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	rootPart.Anchored = true
 	nametag.Active = false
+	nametag.ResetOnSpawn = false
 	nametag.Adornee = spawn
 	nametag.Parent = self._playerGui
 	usernameLabel.Active = false
@@ -589,6 +738,22 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	usernameLabel.Text = self._usernames[userId] or "..."
 	usernameLabel.TextScaled = false
 	usernameLabel.TextWrapped = false
+	usernameLabel.Font = T.Type.Display
+	usernameLabel.TextSize = T.Type.TileLabel
+	usernameLabel.TextColor3 = T.Colors.Surface
+	usernameLabel.BackgroundColor3 = T.Colors.Ink
+	usernameLabel.BackgroundTransparency = 0
+	usernameLabel.Rotation = -T.Shape.TiltTab
+	usernameLabel.Size = UDim2.new(1, 20, 0, 40)
+	local pill = Instance.new("UICorner")
+	pill.CornerRadius = UDim.new(1, 0)
+	pill.Parent = usernameLabel
+	local outline = Instance.new("UIStroke")
+	outline.Name = "CandyStickerOutline"
+	outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	outline.Color = T.Colors.Surface
+	outline.Thickness = T.Shape.StrokeCard
+	outline.Parent = usernameLabel
 	crownLabel.Active = false
 	crownLabel.Selectable = false
 	crownLabel.Visible = false
@@ -616,14 +781,18 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 			{ characterColorId = characterColorId, costumeId = costumeId },
 			{ live = true }
 		),
+		animator = animator,
 		idleTrack = idleTrack,
+		emoteTrack = nil :: AnimationTrack?,
 		nametag = nametag,
+		bubbleAnchor = bubbleAnchor,
 		usernameLabel = usernameLabel,
 		crownLabel = crownLabel,
 		kickButton = kickButton,
 		leftHand = leftHand,
 		rightHand = rightHand,
 		slot = slot,
+		bodyBounds = self:_bodyBounds(costumeId),
 	}
 	self:_requestUsername(userId)
 end
@@ -688,6 +857,7 @@ function PartyCharacterRenderer:Render(snapshot)
 		if character then
 			self:_move(character, slot)
 			character.appearance.update({ characterColorId = characterColorId, costumeId = costumeId })
+			character.bodyBounds = self:_bodyBounds(costumeId)
 		else
 			self:_spawn(userId, slot, characterColorId, costumeId)
 			character = self._characters[userId]
@@ -697,13 +867,29 @@ function PartyCharacterRenderer:Render(snapshot)
 	self:_updateNametagPresentation()
 end
 
+function PartyCharacterRenderer:SetBackpackActive(value)
+	self._backpackActive = value
+	self._candyStage.setEnabled(value)
+	local background = Workspace.Views.Party.Background
+	background:SetAttribute("CandyBackpackActive", value)
+end
+
 function PartyCharacterRenderer:destroy()
+	self._candyStage.destroy()
+	self._disconnectCelebrate()
+	self._dragBegin:Disconnect()
+	self._dragMove:Disconnect()
+	self._dragEnd:Disconnect()
 	if self._destroyed then
 		return
 	end
 	self._destroyed = true
 	self:_destroySkinsPreview()
 	self._generation += 1
+	if self._bubbleConnection then
+		self._bubbleConnection:Disconnect()
+		self._bubbleConnection = nil
+	end
 	if self._renderConnection then
 		self._renderConnection:Disconnect()
 		self._renderConnection = nil

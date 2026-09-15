@@ -1,347 +1,212 @@
--- Description: The storefront page, arranging the view model's sections and limited-time offers into the responsive dashboard rows the shop layout resolves for the measured content width.
-
 --!strict
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local ActivityDots = require(script.Parent.ActivityDots)
-local BonksLabel = require(script.Parent.BonksLabel)
-local ResponsiveText = require(script.Parent.ResponsiveText)
-local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
-local ShopSection = require(script.Parent.Shop.ShopSection)
-local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
-local ShopLayout = require(script.Parent.Parent.Models.ShopLayout)
+-- Measured featured band plus a packed catalog; the season never enters overflow.
+local RS = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local React = require(RS.Packages.react)
+local UI = require(RS.Config.Interface.UI)
+local T = require(script.Parent.Parent.Tokens)
+local Config = require(script.Parent.Parent.Models.CandyShopConfig)
+local Composition = require(script.Parent.Parent.Models.ShopComposition)
+local Layout = require(script.Parent.Parent.Models.ShopLayout)
+local Responsive = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
-
-local c = React.createElement
-
-local ShopUI = UIConfig.Layout.Shop
-
-local function styleFor(sectionId: string): any
-	return ShopUI.Sections[sectionId] or ShopUI.DefaultSection
-end
-
--- A limited-time offer becomes a one-card block so the promotional row shares
--- the storefront's header, countdown and card plumbing rather than a parallel
--- set of its own. Its badge is already the name of the offer.
-local function promoEntry(model, card): any
-	return {
-		id = card.id,
-		title = card.badge or string.upper(card.kind),
-		countdownAt = if card.kind == "Bundle" then model.bundleExpireAt else model.featuredExpireAt,
-		cards = { card },
-		style = ShopUI.PromoSection,
-	}
-end
-
--- A block with more cards than one row of its span can hold keeps that row where
--- the composition wants it and hands the remainder to a second block further
--- down, so the cards stay full size instead of being flattened to fit.
-local function withOverflow(entry, unit: number): (any, any?)
-	local overflow = entry.style.Overflow
-	if overflow == nil then
-		return entry, nil
-	end
-	local class = ShopUI.CardClasses[entry.style.Class]
-	local width = ShopLayout.spanWidth(unit, entry.style.Span, ShopUI.GapPx)
-	local grid = ShopLayout.grid(width, #entry.cards, class, ShopUI.CardGapPx, entry.style.MaxColumns)
-	local featured, rest = ShopLayout.splitFirstRow(entry.cards, grid.columns)
-	if #rest == 0 then
-		return entry, nil
-	end
-	local kept = table.clone(entry)
-	kept.cards = featured
-	return kept,
-		{
-			id = overflow.Id,
-			title = overflow.Title,
-			countdownAt = nil,
-			cards = rest,
-			style = table.clone(entry.style),
-			span = overflow.Span,
-		}
-end
-
--- Blocks come from the configured reading order, not from the view model's own,
--- so a section it gains later still lands somewhere (the trailing "Rest" entry)
--- and one it stops emitting simply disappears.
-local function orderedEntries(model, unit: number): { any }
-	local order = {}
-	local byId = {}
-	for _, section in model.sections do
-		local style = styleFor(section.id)
-		local entry, overflow = withOverflow({
-			id = section.id,
-			title = style.Title or section.title,
-			countdownAt = section.countdownAt,
-			cards = section.cards,
-			style = style,
-		}, unit)
-		table.insert(order, entry)
-		byId[entry.id] = entry
-		if overflow then
-			table.insert(order, overflow)
-			byId[overflow.id] = overflow
-		end
-	end
-
-	local entries = {}
-	for _, token in ShopUI.Order do
-		if token == "Promo" then
-			for _, card in model.hero do
-				table.insert(entries, promoEntry(model, card))
-			end
-		elseif token == "Rest" then
-			for _, entry in order do
-				if not entry.taken then
-					entry.taken = true
-					table.insert(entries, entry)
-				end
-			end
-		else
-			local entry = byId[token]
-			if entry ~= nil and not entry.taken then
-				entry.taken = true
-				table.insert(entries, entry)
-			end
-		end
-	end
-	return entries
-end
-
--- Every block keeps its configured span while one card of its class is still
--- legible at that width. The moment any block would have to be widened, the
--- dashboard cannot tile any more, so the whole storefront becomes a single
--- column rather than a grid with a permanently empty lane down one side.
-local function resolveSpans(entries, unit: number): ()
-	local full = false
+local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local Panel = require(script.Parent.CandyPanel)
+local Title = require(script.Parent.CandyTitle)
+local Well = require(script.Parent.Well)
+local Button = require(script.Parent.PuffyButton)
+local BonksChip = require(script.Parent.BonksChip)
+local Section = require(script.Parent.Shop.ShopSection)
+local c, C, L = React.createElement, T.Colors, T.Shop
+local function blocks(entries, width, offset, props)
+	local unit = Layout.trackUnit(width, Config.Tracks, Config.GapPx)
 	for _, entry in entries do
-		local class = ShopUI.CardClasses[entry.style.Class]
-		local wanted = entry.span or entry.style.Span or ShopUI.Tracks
-		entry.span = ShopLayout.resolveSpan(wanted, ShopUI.SpanSteps, ShopUI.Tracks, unit, ShopUI.GapPx, class.MinPx)
-		full = full or entry.span > wanted
-	end
-	if full then
-		for _, entry in entries do
-			entry.span = ShopUI.Tracks
+		entry.class = Config.CardClasses[entry.style.Class]
+		if props.Short then
+			entry.class = Composition.shortClass(entry.class, L.PromoMin, T.LobbyLandscape.CardHeight)
 		end
-	end
-end
-
-local function measure(entries, unit: number, shortHeight: number?): ()
-	for _, entry in entries do
-		local class = ShopUI.CardClasses[entry.style.Class]
-		if shortHeight then
-			class = table.clone(class)
-			class.Layout = "Split"
-			class.ArtScale = 0.32
-			class.MinPx = math.max(class.MinPx, ShopUI.ShortCardWidthPx)
-			class.MaxPx = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
-			class.MinHeightPx = shortHeight
-			class.MaxHeightPx = shortHeight
+		entry.span = Composition.span(width, entry.style.Span, entry.class.MinPx, Config.GapPx, L.WideMin, L.MediumMin)
+		entry.width = Layout.spanWidth(unit, entry.span, Config.GapPx)
+		if #entry.cards == 1 and (entry.class.Layout == "Split" or entry.cards[1].kind == "SeasonPass") then
+			entry.class = table.clone(entry.class)
+			entry.class.MaxPx = entry.width
 		end
-		entry.class = class
-		entry.width = ShopLayout.spanWidth(unit, entry.span, ShopUI.GapPx)
-		entry.grid = ShopLayout.grid(entry.width, #entry.cards, class, ShopUI.CardGapPx, entry.style.MaxColumns)
-		entry.height = ShopLayout.sectionHeight(entry.grid, ShopUI.HeaderHeightPx, ShopUI.EmptyHeightPx)
+		entry.grid = Layout.grid(entry.width, #entry.cards, entry.class, Config.CardGapPx, entry.style.MaxColumns)
+		local adapted = Composition.adaptiveClass(
+			entry.class,
+			entry.grid.cardWidth,
+			L.CatalogSplitMin,
+			L.CatalogSplitHeight,
+			L.PromoMin,
+			L.CardHeight
+		)
+		if adapted ~= entry.class then
+			entry.class = adapted
+			entry.grid = Layout.grid(entry.width, #entry.cards, adapted, Config.CardGapPx, entry.style.MaxColumns)
+		end
+		entry.headerHeight = Config.HeaderHeight(entry.width, entry.countdownAt, props.Short)
+		entry.height = Layout.sectionHeight(entry.grid, entry.headerHeight, Config.EmptyHeightPx)
 	end
-end
-
-local function renderBlocks(model, contentWidth: number, handlers, shortHeight: number?): ({ [string]: any }, number)
-	local unit = ShopLayout.trackUnit(contentWidth, ShopUI.Tracks, ShopUI.GapPx)
-	local entries = orderedEntries(model, unit)
-	resolveSpans(entries, unit)
-	measure(entries, unit, shortHeight)
-	local placements, bottom = ShopLayout.place(entries, ShopUI.Tracks, ShopUI.GapPx)
-	local children = {}
-	for order, placement in placements do
-		local entry = placement.block
-		children[entry.id] = c(ShopSection, {
-			Section = entry,
-			Class = entry.class,
-			Grid = entry.grid,
-			Position = UDim2.fromOffset(ShopLayout.trackOffset(unit, placement.index), placement.y),
-			Width = entry.width,
-			Height = entry.height,
-			LayoutOrder = order,
-			OnCardActivated = handlers.OnCardActivated,
-			OnExpired = handlers.OnRefresh,
+	local placements, bottom = Layout.compact(entries, Config.Tracks, Config.GapPx)
+	local children, anchors = {}, {}
+	for index, p in placements do
+		local e = p.block
+		anchors[e.id] = p.y + offset
+		children[e.id] = c(Section, {
+			Section = e,
+			Class = e.class,
+			Grid = e.grid,
+			Position = UDim2.fromOffset(Layout.trackOffset(unit, p.index), p.y + offset),
+			Width = e.width,
+			Height = e.height,
+			HeaderHeight = e.headerHeight,
+			LayoutOrder = index,
+			OnCardActivated = props.OnCardActivated,
+			OnExpired = props.OnRefresh,
+			SeasonState = props.SeasonState,
 		})
 	end
-	return children, bottom
+	return children, bottom + offset, anchors
 end
-
-local STATUS_HEIGHT_PX = 130
-
-local function statusRow(model, top: number, onRefresh): any
-	return c("Frame", {
-		BackgroundTransparency = 1,
-		LayoutOrder = 0,
-		Position = UDim2.fromOffset(0, top),
-		Size = UDim2.new(1, 0, 0, STATUS_HEIGHT_PX),
-	}, {
-		Text = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 36,
-			Native = {
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.fromScale(0.1, 0.08),
-				Size = UDim2.fromScale(0.8, 0.42),
-				Text = if model.status == "Error" then "SHOP UNAVAILABLE" else "LOADING SHOP",
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 6,
-			},
-		}),
-		Retry = if model.status == "Error"
-			then c(ShopPriceButton, {
-				Enabled = true,
-				Position = UDim2.fromScale(0.5, 0.94),
-				Size = UDim2.new(0.3, 0, 0, 44),
-				Text = "RETRY",
-				OnActivated = onRefresh,
-			})
-			else nil,
-		Activity = if model.status ~= "Error"
-			then c(ActivityDots, {
-				Active = true,
-				Native = {
-					Position = UDim2.fromScale(0.5, 0.68),
-					Size = UDim2.fromScale(0.1, 0.2),
-					ZIndex = 6,
-				},
-			})
-			else nil,
-	})
-end
-
--- The width the rows are laid out against, before the scroller has been
--- measured: the panel is already known on the first frame, so the dashboard
--- renders at its final proportions instead of reflowing once.
-local function estimateContentWidth(panelWidth: number): number
-	local scrollerWidth = panelWidth * ShopUI.MainSizeScale.X * ShopUI.ContentSizeScale.X
-	return math.max(math.floor(scrollerWidth) - ShopUI.ScrollBarPx - ShopUI.PaddingXPx * 2, 1)
-end
-
-export type Props = {
-	Model: any,
-	Position: UDim2?,
-	OnCardActivated: (any) -> (),
-	OnRefresh: () -> (),
-}
-
-return function(props: Props)
-	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
-	local panelSize = ResponsiveLayout.panelSize(
-		safeArea.size,
-		UIConfig.Layout.Panels.Shop,
-		UIConfig.Layout.PortraitMaxAspect,
-		UIConfig.Layout.ShortLandscapeMaxHeightPx
-	)
-	local model = props.Model
-	local contentWidth, setContentWidth = React.useState(estimateContentWidth(panelSize.X))
-
-	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
-		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
-	local shortHeight = if short
-		then math.clamp(
-			math.floor(panelSize.Y * ShopUI.MainSizeScale.Y * ShopUI.ContentSizeScale.Y) - ShopUI.HeaderHeightPx - 6,
-			128,
-			ShopUI.ShortCardHeightPx
+return function(props)
+	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local portrait = Responsive.isPortrait(safe.size, UI.Layout.PortraitMaxAspect)
+	local size = props.Size
+		or Responsive.panelSize(
+			safe.size,
+			UI.Layout.Panels.Shop,
+			UI.Layout.PortraitMaxAspect,
+			UI.Layout.ShortLandscapeMaxHeightPx
 		)
-		else nil
-	local content, bottom = renderBlocks(model, contentWidth, props, shortHeight)
-	content.UIPadding = c("UIPadding", {
-		PaddingLeft = UDim.new(0, ShopUI.PaddingXPx),
-		PaddingRight = UDim.new(0, ShopUI.PaddingXPx),
-	})
-	-- Blocks are positioned absolutely, so the status strip is placed after them
-	-- rather than relying on a list layout to keep it clear of the storefront.
-	if model.status == "Loading" or model.status == "Idle" or model.status == "Error" then
-		content.Status = statusRow(model, if bottom > 0 then bottom + ShopUI.GapPx else 0, props.OnRefresh)
-		bottom += (if bottom > 0 then ShopUI.GapPx else 0) + STATUS_HEIGHT_PX
+	local short = not portrait and safe.size.Y <= UI.Layout.ShortLandscapeMaxHeightPx
+	local inset = if short then T.LobbyLandscape.PanelInset elseif portrait then L.CompactInset else L.Inset
+	local header = if portrait
+		then L.PortraitHeaderHeight
+		elseif short then T.LobbyLandscape.PanelHeader
+		else L.HeaderHeight
+	local scrollInset = if short then T.LobbyLandscape.ScrollInset else UI.Well.InsetPx
+	local scrollPadding = if short then T.LobbyLandscape.ScrollPadding else Config.PaddingXPx
+	local reduced = useReducedMotion()
+	local scroller = React.useRef(nil)
+	local width, setWidth =
+		React.useState(math.max(1, size.X - inset * 2 - scrollInset * 2 - scrollPadding * 2 - Config.ScrollBarPx))
+	local renderProps = table.clone(props)
+	renderProps.Short = short
+	local featured, catalog = Composition.groups(props.Model, Config)
+	local content, featureBottom = blocks(featured, width, 0, renderProps)
+	local rest, bottom, anchors =
+		blocks(catalog, width, if featureBottom > 0 then featureBottom + Config.GapPx else 0, renderProps)
+	for id, child in rest do
+		content[id] = child
 	end
-
-	return c("ImageLabel", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://124751224634629",
-		LayoutOrder = 5,
-		Position = props.Position or UIConfig.Layout.PagePosition,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(31, 41, 978, 620),
-		SliceScale = 0.5,
-		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+	content.Padding =
+		c("UIPadding", { PaddingLeft = UDim.new(0, scrollPadding), PaddingRight = UDim.new(0, scrollPadding) })
+	local status = props.Model.status
+	if status == "Loading" or status == "Idle" or status == "Error" then
+		content.Status = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(0, bottom + 12),
+			Size = UDim2.new(1, 0, 0, 60),
+			Font = T.Type.Display,
+			Text = if status == "Error" then "SHOP UNAVAILABLE" else "LOADING SHOP…",
+			TextSize = T.Type.Section,
+			TextColor3 = C.Ink,
+			TextWrapped = true,
+			ZIndex = 8,
+		})
+		if status == "Error" then
+			content.Retry = c(Button, {
+				Text = "RETRY",
+				Color = C.Pink,
+				Shadow = false,
+				OnActivated = props.OnRefresh,
+				Native = { Position = UDim2.new(0.25, 0, 0, bottom + 80), Size = UDim2.new(0.5, 0, 0, 48), ZIndex = 8 },
+			})
+		end
+		bottom += 150
+	end
+	local walletY = if portrait then 91 else header / 2
+	local getWidth = if short then T.Layout.MinTarget else 156
+	return c(Panel, {
+		Tilt = if short then 0 else nil,
+		Native = {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = props.Position or UI.Layout.PagePosition,
+			Size = UDim2.fromOffset(size.X, size.Y),
+			LayoutOrder = 5,
+		},
 	}, {
-		Title = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 62,
+		EntranceScale = if props.TransitionScale then c("UIScale", { Scale = props.TransitionScale }) else nil,
+		Title = c(Title, {
+			Tilt = if short then 0 else nil,
+			Text = "SHOP",
+			TextSize = if portrait then 38 elseif short then T.Type.Section else T.Type.Title,
 			Native = {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.291804, 0.0540634),
-				Size = if short then UDim2.new(0.398251, 0, 0, 24) else UDim2.fromScale(0.398251, 0.0898091),
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Text = "SHOP",
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = 5,
+				Position = UDim2.fromOffset(inset, if portrait then 0 elseif short then 2 else -18),
+				Size = UDim2.fromOffset(if short then 150 else 226, if portrait then 60 elseif short then 48 else 76),
+				ZIndex = 8,
 			},
 		}),
-		Refreshing = if model.status == "Refreshing"
-			then c(ActivityDots, {
-				Active = true,
-				Native = {
-					Position = UDim2.fromScale(0.18, 0.09),
-					Size = UDim2.fromScale(0.08, 0.025),
-					ZIndex = 6,
-				},
-			})
-			else nil,
-		Bonks = c(BonksLabel, {
-			Amount = model.bonks,
-			MaxTextSize = 30,
-			TextColor = Color3.fromRGB(255, 220, 62),
-			TextStroke = 0.05,
-			Alignment = Enum.HorizontalAlignment.Right,
+		Bonks = c(BonksChip, {
+			Candy = true,
+			Amount = props.Model.bonks,
+			HeightPx = 44,
+			TextSize = T.Type.TileLabel,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -inset - getWidth - 12, 0, walletY),
+			ZIndex = 8,
+		}),
+		GetBonks = c(Button, {
+			Text = if short then "+" else "+ GET BONKS",
+			TextSize = T.Type.Minimum,
+			Color = C.Pink,
+			Shadow = false,
+			OnActivated = function()
+				if scroller.current and anchors.Bonks then
+					local target = Vector2.new(0, math.max(0, anchors.Bonks - 4))
+					if reduced then
+						scroller.current.CanvasPosition = target
+					else
+						TweenService:Create(
+							scroller.current,
+							TweenInfo.new(T.Motion.Open, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+							{ CanvasPosition = target }
+						):Play()
+					end
+				end
+			end,
 			Native = {
 				AnchorPoint = Vector2.new(1, 0.5),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.954, 0.1),
-				Size = if short then UDim2.new(0.245, 0, 0, 22) else UDim2.fromScale(0.245, 0.078),
-				ZIndex = 5,
+				Position = UDim2.new(1, -inset, 0, walletY),
+				Size = UDim2.fromOffset(getWidth, 44),
+				ZIndex = 8,
 			},
 		}),
-		Main = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.555),
-			Size = UDim2.fromScale(ShopUI.MainSizeScale.X, ShopUI.MainSizeScale.Y),
+		Main = c(Well, {
+			Candy = true,
+			Native = {
+				Position = UDim2.fromOffset(inset, header),
+				Size = UDim2.new(1, -inset * 2, 1, -header - inset),
+				ZIndex = 3,
+			},
 		}, {
 			Content = c("ScrollingFrame", {
+				ref = scroller,
 				Active = true,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				-- The packer already knows the exact extent of what it placed, so
-				-- the canvas is set from that rather than measured back off the
-				-- absolutely positioned blocks.
-				CanvasSize = UDim2.fromOffset(0, bottom + ShopUI.PaddingBottomPx),
+				CanvasSize = UDim2.fromOffset(0, bottom + Config.PaddingBottomPx),
 				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
-				Position = UDim2.fromScale(0.025, 0.05),
+				Position = UDim2.fromOffset(scrollInset, scrollInset),
+				Size = UDim2.new(1, -scrollInset * 2, 1, -scrollInset * 2),
+				ScrollBarImageColor3 = C.Pink,
+				ScrollBarThickness = Config.ScrollBarPx,
 				ScrollingDirection = Enum.ScrollingDirection.Y,
-				ScrollBarImageColor3 = Color3.new(1, 1, 1),
-				ScrollBarImageTransparency = 0.1,
-				ScrollBarThickness = ShopUI.ScrollBarPx,
 				Selectable = false,
-				Size = UDim2.fromScale(ShopUI.ContentSizeScale.X, ShopUI.ContentSizeScale.Y),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
-				-- The scroll bar is inset out of the canvas, so the usable width is
-				-- the frame less the bar and the content padding. Deriving it from
-				-- AbsoluteSize rather than AbsoluteWindowSize keeps the measurement
-				-- independent of whether the bar is currently showing, which the
-				-- laid-out height would otherwise feed back into.
+				ZIndex = 4,
 				[React.Change.AbsoluteSize] = function(instance)
-					setContentWidth(math.max(instance.AbsoluteSize.X - ShopUI.ScrollBarPx - ShopUI.PaddingXPx * 2, 1))
+					setWidth(math.max(1, instance.AbsoluteSize.X - Config.ScrollBarPx - scrollPadding * 2))
 				end,
 			}, content),
 		}),

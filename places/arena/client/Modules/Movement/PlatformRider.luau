@@ -14,6 +14,7 @@ local RiderSupport = require(Features:WaitForChild("RiderSupport"))
 local PlatformRider = {}
 local connection: RBXScriptConnection? = nil
 local ridingPlatform: RotatingPlatforms.Platform? = nil
+local ridingRotor: RotatingPlatforms.LocalRotor? = nil
 local ridingPivot: CFrame? = nil
 local previousRoot: BasePart? = nil
 local previousPosition: Vector3? = nil
@@ -24,22 +25,24 @@ rayParams.RespectCanCollide = true
 
 local function clear()
 	ridingPlatform = nil
+	ridingRotor = nil
 	ridingPivot = nil
 	previousRoot = nil
 	previousPosition = nil
 	airborneSeconds = 0
 end
 
-local function platformFor(hit: RaycastResult?): RotatingPlatforms.Platform?
+local function platformFor(hit: RaycastResult?): (RotatingPlatforms.Platform?, RotatingPlatforms.LocalRotor?)
 	if hit == nil or hit.Normal.Y < MapFeatures.Rotating.MinSupportNormalY then
-		return nil
+		return nil, nil
 	end
 	for _, platform in RotatingPlatforms.all() do
 		if hit.Instance:IsDescendantOf(platform.assembly) then
-			return platform
+			local _, rotor = RotatingPlatforms.rotorFor(hit.Instance)
+			return platform, rotor
 		end
 	end
-	return nil
+	return nil, nil
 end
 
 local function step(dt: number)
@@ -68,17 +71,18 @@ local function step(dt: number)
 	rayParams.FilterDescendantsInstances = { character }
 	local contactDistance = humanoid.HipHeight + root.Size.Y / 2 + config.ContactTolerance
 	local supportHit = Workspace:Raycast(root.Position, Vector3.new(0, -contactDistance, 0), rayParams)
-	local platform = platformFor(supportHit)
+	local platform, rotor = platformFor(supportHit)
 	if platform then
 		airborneSeconds = 0
 	else
 		airborneSeconds += dt
 		local below =
 			Workspace:Raycast(root.Position, Vector3.new(0, -contactDistance - config.CarryHeight, 0), rayParams)
+		local belowPlatform, belowRotor = platformFor(below)
 		if
 			RiderSupport.canRetain({
 				previous = ridingPlatform ~= nil,
-				sameSupport = platformFor(below) == ridingPlatform,
+				sameSupport = belowPlatform == ridingPlatform and belowRotor == ridingRotor,
 				airborne = humanoid.FloorMaterial == Enum.Material.Air
 					or humanoid:GetState() == Enum.HumanoidStateType.Jumping
 					or humanoid:GetState() == Enum.HumanoidStateType.Freefall,
@@ -87,14 +91,17 @@ local function step(dt: number)
 			}, config.MaxAirborneSeconds)
 		then
 			platform = ridingPlatform
+			rotor = ridingRotor
 		end
 	end
 	if platform == nil then
 		clear()
 		return
 	end
-	local pivot = platform.assembly:GetPivot()
-	if ridingPlatform == platform and ridingPivot then
+	local pivot = if rotor
+		then RotatingPlatforms.rotorPoseAt(platform, rotor, Workspace:GetServerTimeNow())
+		else platform.assembly:GetPivot()
+	if ridingPlatform == platform and ridingRotor == rotor and ridingPivot then
 		local current = root.CFrame
 		local carried = pivot:PointToWorldSpace(ridingPivot:PointToObjectSpace(current.Position))
 		local delta = Vector3.new(carried.X - current.X, 0, carried.Z - current.Z)
@@ -107,6 +114,7 @@ local function step(dt: number)
 		end
 	end
 	ridingPlatform = platform
+	ridingRotor = rotor
 	ridingPivot = pivot
 	previousRoot = root
 	previousPosition = root.Position
@@ -130,6 +138,7 @@ function PlatformRider._snapshotForTest()
 	return {
 		started = connection ~= nil,
 		platform = if ridingPlatform then ridingPlatform.assembly:GetFullName() else "",
+		rotor = ridingRotor ~= nil,
 		airborneSeconds = airborneSeconds,
 		root = previousRoot,
 	}

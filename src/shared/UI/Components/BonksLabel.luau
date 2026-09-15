@@ -19,6 +19,7 @@ export type Props = {
 	StackThreshold: number?,
 	StackIconAsset: string?,
 	Alignment: Enum.HorizontalAlignment?,
+	Framed: boolean?,
 	children: { [any]: any }?,
 }
 
@@ -74,14 +75,25 @@ return function(props: Props)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, UI.Button.GapPx),
 	})
-	children.Icon = c("ImageLabel", {
-		BackgroundTransparency = 1,
-		Image = icon,
-		ScaleType = Enum.ScaleType.Fit,
-		LayoutOrder = 1,
-		Size = UDim2.fromOffset(textSize, textSize),
-		ZIndex = native.ZIndex or 1,
-	})
+	children.Icon = c(
+		"ImageLabel",
+		{
+			BackgroundTransparency = if props.Framed then 0.86 else 1,
+			BackgroundColor3 = UI.ProgressionStyle.White,
+			BorderSizePixel = 0,
+			Image = icon,
+			ScaleType = Enum.ScaleType.Fit,
+			LayoutOrder = 1,
+			Size = UDim2.fromOffset(textSize, textSize),
+			ZIndex = native.ZIndex or 1,
+		},
+		if props.Framed
+			then {
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Rim = c("UIStroke", { Color = UI.ProgressionStyle.Ink, Thickness = 1, Transparency = 0.65 }),
+			}
+			else nil
+	)
 	children.Amount = c("TextLabel", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -91,10 +103,12 @@ return function(props: Props)
 		TextSize = textSize,
 		Text = text,
 		TextColor3 = props.TextColor or UI.ProgressionStyle.Yellow,
+		TextYAlignment = Enum.TextYAlignment.Center,
 		ZIndex = native.ZIndex or 1,
 	}, {
 		Stroke = if props.TextStroke
 			then c("UIStroke", {
+				Color = UI.ProgressionStyle.Ink,
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 				Thickness = props.TextStroke,
 			})

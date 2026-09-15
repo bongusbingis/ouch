@@ -5,12 +5,13 @@
 local T = require(script.Parent.TestKit)
 local PostMatchResult = require(script.Parent.Parent.Game.PostMatch.PostMatchResult)
 
-local function global(modeId: string, scope: "Player" | "Team", winnerId: string?)
+local function global(modeId: string, scope: "Player" | "Team", winnerId: string?, scoreLabel: string?)
 	return PostMatchResult.build({
 		resultId = "result-1",
 		modeId = modeId,
 		modeName = if modeId == "FFA" then "Free For All" else "Team Deathmatch",
 		scoreScope = scope,
+		scoreLabel = scoreLabel or "ELIMS",
 		winnerId = winnerId,
 		reason = "TargetReached",
 		interactiveAt = 10,
@@ -40,6 +41,7 @@ T.describe("PostMatchResult", function()
 			modeId = "FFA",
 			modeName = "Free For All",
 			scoreScope = "Player",
+			scoreLabel = "ELIMS",
 			reason = "TimeCap",
 			interactiveAt = 10,
 			endsAt = 20,
@@ -187,6 +189,88 @@ T.describe("PostMatchResult", function()
 		local malformed = table.clone(projected :: any)
 		malformed.personalStats = { { id = "Elims", label = "ELIMINATIONS", value = 0 / 0 } }
 		T.expect(PostMatchResult.parse(malformed)):toBeNil()
+	end)
+
+	T.it("carries either score label from build through forPlayer and parse", function()
+		local elims = global("TDM", "Team", "Blue", "ELIMS")
+		T.expect(elims.scoreLabel):toEqual("ELIMS")
+		local elimsProjected = PostMatchResult.forPlayer(elims, 10, nil, nil)
+		T.expect((elimsProjected :: any).scoreLabel):toEqual("ELIMS")
+
+		local points = global("Splashdown", "Player", "10", "POINTS")
+		T.expect(points.scoreLabel):toEqual("POINTS")
+		local projected = PostMatchResult.forPlayer(points, 10, nil, nil)
+		T.expect((projected :: any).scoreLabel):toEqual("POINTS")
+		local parsed = PostMatchResult.parse(projected)
+		T.expect((parsed :: any).scoreLabel):toEqual("POINTS")
+	end)
+
+	T.it("presents placement-style results for any player-scoped mode, not only FFA", function()
+		local result = global("Splashdown", "Player", "10", "POINTS")
+		local projected = PostMatchResult.forPlayer(result, 10, nil, nil)
+		T.expect(projected.presentation.title):toEqual("1ST PLACE")
+		T.expect(projected.presentation.detail):toEqual("ONE TAKES THE WIN")
+	end)
+
+	T.it("reports a mode's own stat labels in order, ahead of placement, with no highlight", function()
+		local result = PostMatchResult.build({
+			resultId = "race-1",
+			modeId = "Splashdown",
+			modeName = "Splashdown",
+			scoreScope = "Player",
+			scoreLabel = "POINTS",
+			statLabels = {
+				{ id = "BestFinish", label = "BEST FINISH" },
+				{ id = "TotalTime", label = "TOTAL TIME (SEC)" },
+			},
+			winnerId = "10",
+			reason = "RoundsComplete",
+			interactiveAt = 10,
+			endsAt = 18,
+			contestants = {
+				{
+					playerId = "10",
+					userId = 10,
+					username = "One",
+					displayName = "ONE",
+					stats = { BestFinish = 1, TotalTime = 45.2 },
+				},
+				{ playerId = "20", userId = 20, username = "Two", displayName = "TWO", stats = { BestFinish = 3 } },
+			},
+			scores = { ["10"] = 40, ["20"] = 22 },
+		})
+		local projected = PostMatchResult.forPlayer(result, 20, nil, nil)
+		T.expect(#projected.personalStats):toEqual(3)
+		T.expect(projected.personalStats[1].id):toEqual("BestFinish")
+		T.expect(projected.personalStats[1].value):toEqual(3)
+		T.expect(projected.personalStats[1].highlight):toBeNil()
+		T.expect(projected.personalStats[2].id):toEqual("TotalTime")
+		T.expect(projected.personalStats[2].value):toEqual(0)
+		T.expect(projected.personalStats[3].id):toEqual("Placement")
+		T.expect(projected.personalStats[3].highlight):toBeNil()
+
+		local parsed = PostMatchResult.parse(projected)
+		T.expect(#parsed.personalStats):toEqual(3)
+		T.expect(parsed.personalStats[2].value):toEqual(0)
+	end)
+
+	T.it("rejects a parsed contestant whose stats table is malformed", function()
+		local result = global("FFA", "Player", "10")
+		local projected = PostMatchResult.forPlayer(result, 10, nil, nil)
+
+		local negative = table.clone(projected :: any)
+		negative.personalAppearance = table.clone(projected.personalAppearance :: any)
+		negative.personalAppearance.stats = { Bad = -1 }
+		T.expect(PostMatchResult.parse(negative)):toBeNil()
+
+		local tooManyKeys = table.clone(projected :: any)
+		tooManyKeys.personalAppearance = table.clone(projected.personalAppearance :: any)
+		local stats = {}
+		for index = 1, 13 do
+			stats[`Stat{index}`] = index
+		end
+		tooManyKeys.personalAppearance.stats = stats
+		T.expect(PostMatchResult.parse(tooManyKeys)):toBeNil()
 	end)
 end)
 

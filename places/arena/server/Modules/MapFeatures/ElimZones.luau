@@ -17,6 +17,10 @@ local ElimZones = {}
 ElimZones.folderName = "ElimZones"
 
 function ElimZones.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)
+	local character = player.Character
+	if character and character:GetAttribute("minv") == true then
+		return
+	end
 	for _, instance in context.instances do
 		local zone = instance :: BasePart
 		if Volume.contains(zone.CFrame, zone.Size, root.Position, MapFeatures.ElimZone.VerticalPadding) then

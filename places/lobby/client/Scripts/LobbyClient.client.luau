@@ -73,6 +73,16 @@ local OnboardingGestureLayer = require(
 		:WaitForChild("Onboarding")
 		:WaitForChild("OnboardingGestureLayer")
 )
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local EmoteWheel = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Components"):WaitForChild("EmoteWheel")
+)
+local EmoteWheelController = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("EmoteWheelController")
+)
 
 local RunService = game:GetService("RunService")
 local Debug = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
@@ -100,7 +110,7 @@ local teleportPresentation = TeleportPresentationClient.start(function()
 	partyClient:setTeleportPresentationReady()
 end)
 local background = PartyBackgroundController.start()
-local container = ReactRoot.create("LobbyRoot", Enum.ScreenInsets.CoreUISafeInsets)
+local container = ReactRoot.create("LobbyRoot", Enum.ScreenInsets.CoreUISafeInsets, 0, true)
 local root = ReactRoblox.createRoot(container)
 -- Same surface the arena gives the combat HUD: no screen insets so the reticle
 -- sits on the true centre, and its own root so lobby UI never reorders it.
@@ -162,6 +172,19 @@ combatRoot:render(React.createElement(React.Fragment, nil, {
 		OnboardingClient = OnboardingClient,
 	}),
 }))
+local emoteContainer = ReactRoot.create("LobbyEmoteRoot", Enum.ScreenInsets.CoreUISafeInsets, 800, true)
+local emoteRoot = ReactRoblox.createRoot(emoteContainer)
+emoteRoot:render(React.createElement(EmoteWheel, { ShowTouchButton = false }))
+EmoteWheelController.start({
+	onPlay = function(emoteId)
+		Network.fireServer("PlayEmote", emoteId)
+	end,
+	isEnabled = function()
+		return not OnboardingClient.getSnapshot().active
+			and not LobbyCombatTestClient.getSnapshot().active
+			and Players.LocalPlayer:GetAttribute("EmoteWheelBlocked") ~= true
+	end,
+})
 
 -- The arena's overlay menu, mounted only for the Studio test session so a
 -- developer can switch cosmetics mid-session exactly as they would in a match.
@@ -176,7 +199,7 @@ if combatTestEnabled then
 			Place = "Lobby",
 		})
 	end
-	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500)
+	menuContainer = ReactRoot.create("LobbyMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500, true)
 	menuRoot = ReactRoblox.createRoot(menuContainer)
 	menuRoot:render(React.createElement(LobbyCombatMenu))
 end
@@ -188,6 +211,9 @@ script.Destroying:Connect(function()
 	container:Destroy()
 	combatRoot:unmount()
 	combatContainer:Destroy()
+	EmoteWheelController.stop()
+	emoteRoot:unmount()
+	emoteContainer:Destroy()
 	partyClient:destroy()
 	unsubscribeBackground()
 	unsubscribeMovement()

@@ -15,8 +15,13 @@ local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local ToggleControl = require(script.Parent.ToggleControl)
 local SliderControl = require(script.Parent.SliderControl)
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local CandySurface = require(script.Parent.Parent.CandySurface)
+local Tokens = require(script.Parent.Parent.Parent.Tokens)
 
 local c = React.createElement
+local C = Tokens.Colors
+local S = Tokens.Shape
+local SETTINGS = Tokens.Settings
 
 export type Props = {
 	Definition: SettingsRegistry.Definition,
@@ -37,16 +42,16 @@ return React.memo(function(props: Props)
 	local definition = props.Definition
 	local enabled = props.Enabled ~= false
 	local hasDescription = definition.Description ~= nil and definition.Description ~= ""
+	local faceHeight = props.Height - S.LipHeight
+	local verticalInset = if faceHeight < 88 then 8 else 12
+	local innerHeight = faceHeight - verticalInset * 2
 
-	local textWidth = if props.Compact then 1 else 0.56
+	local textWidth = if props.Compact then 1 else 0.54
 	local controlHeight = UIConfig.Interaction.MinTargetPx
 		+ (if definition.Type == "Slider" then UIConfig.Layout.SettingsControls.SliderLabelHeightPx else 0)
 	local textHeight = if props.Compact
-		then math.max(
-			(props.Height - controlHeight - UIConfig.Layout.SettingsControls.LabelControlGapPx) / props.Height,
-			0
-		)
-		else 1
+		then math.max(innerHeight - controlHeight - UIConfig.Layout.SettingsControls.LabelControlGapPx, 0)
+		else innerHeight
 
 	local control
 	if definition.Type == "Toggle" then
@@ -59,8 +64,15 @@ return React.memo(function(props: Props)
 				props.OnChange(definition.Id, value, true)
 			end,
 			AnchorPoint = if props.Compact then Vector2.new(0, 1) else Vector2.new(1, 0.5),
-			Position = if props.Compact then UDim2.fromScale(0, 1) else UDim2.fromScale(1, 0.5),
-			Size = UDim2.new(if props.Compact then 0.62 else 0.34, 0, 0, controlHeight),
+			Position = if props.Compact
+				then UDim2.new(0, SETTINGS.CardInset, 1, -SETTINGS.CardInset - S.LipHeight)
+				else UDim2.new(1, -SETTINGS.CardInset, 0, faceHeight / 2),
+			Size = UDim2.new(
+				if props.Compact then 0.66 else 0.36,
+				if props.Compact then -SETTINGS.CardInset else 0,
+				0,
+				controlHeight
+			),
 		})
 	else
 		control = c(SliderControl, {
@@ -72,66 +84,73 @@ return React.memo(function(props: Props)
 				props.OnChange(definition.Id, value, committed)
 			end,
 			AnchorPoint = if props.Compact then Vector2.new(0, 1) else Vector2.new(1, 0.5),
-			Position = if props.Compact then UDim2.fromScale(0, 1) else UDim2.fromScale(1, 0.5),
-			Size = UDim2.new(if props.Compact then 1 else 0.4, 0, 0, controlHeight),
+			Position = if props.Compact
+				then UDim2.new(0, SETTINGS.CardInset, 1, -SETTINGS.CardInset - S.LipHeight)
+				else UDim2.new(1, -SETTINGS.CardInset, 0, faceHeight / 2),
+			Size = UDim2.new(
+				if props.Compact then 1 else 0.42,
+				if props.Compact then -SETTINGS.CardInset * 2 else 0,
+				0,
+				controlHeight
+			),
 		})
 	end
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Size = UDim2.new(1, 0, 0, props.Height),
 	}, {
+		Surface = c(CandySurface, {
+			Color = C.SurfaceWarm,
+			LipColor = C.WellLine,
+			Radius = S.RadiusCard,
+			Shadow = false,
+			ZIndex = 2,
+		}),
 		Text = c("Frame", {
 			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(textWidth, textHeight),
+			Position = UDim2.fromOffset(SETTINGS.CardInset, verticalInset),
+			Size = UDim2.new(textWidth, -SETTINGS.CardInset * 2, 0, textHeight),
+			ZIndex = 5,
 		}, {
 			Label = c(ResponsiveText, {
-				MeasurementFont = UIConfig.Text.BodyFont,
-				MaxTextSize = 24,
+				MeasurementFont = Tokens.Type.Label,
+				MaxTextSize = 22,
+				MinTextSize = 16,
 				Native = {
 					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
+					Font = Tokens.Type.Label,
 					Position = UDim2.fromScale(0, 0),
-					Size = UDim2.fromScale(1, if hasDescription then 0.52 else 1),
-					Text = string.upper(definition.Label),
-					TextColor3 = if enabled then Color3.new(1, 1, 1) else UIConfig.ProgressionStyle.Surface,
+					Size = if hasDescription then UDim2.new(1, 0, 0, 28) else UDim2.fromScale(1, 1),
+					Text = definition.Label,
+					TextColor3 = if enabled then C.Ink else C.InkSoft,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextYAlignment = Enum.TextYAlignment.Center,
 					ZIndex = 5,
 				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = 0.035,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
 			}),
 			Description = if hasDescription
 				then c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
-					MaxTextSize = 17,
+					MeasurementFont = Enum.Font.BuilderSansBold,
+					MaxTextSize = 18,
+					MinTextSize = 14,
 					Wrapped = true,
 					Native = {
 						BackgroundTransparency = 1,
-						Font = UIConfig.Text.BodyFont,
-						Position = UDim2.fromScale(0, 0.5),
-						Size = UDim2.fromScale(1, 0.46),
+						Font = Enum.Font.BuilderSansBold,
+						Position = UDim2.fromOffset(0, 28),
+						Size = UDim2.new(1, 0, 1, -28),
 						Text = if not enabled and props.DisabledReason
 							then props.DisabledReason
 							else definition.Description,
-						TextColor3 = UIConfig.ProgressionStyle.White,
+						TextColor3 = C.InkSoft,
 						TextWrapped = true,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						TextYAlignment = Enum.TextYAlignment.Top,
 						ZIndex = 5,
 					},
-				}, {
-					Outline = c("UIStroke", {
-						Color = UIConfig.ProgressionStyle.Ink,
-						Thickness = 0.035,
-						StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					}),
 				})
 				else nil,
 		}),

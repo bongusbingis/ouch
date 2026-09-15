@@ -3,16 +3,15 @@
 --!strict
 
 local GuiService = game:GetService("GuiService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Presentation =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Config = Presentation.Results
-local Emotes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Emotes"))
 local Camera = require(script.Parent.PresentationCamera)
-local VictoryRig = require(script.Parent.VictoryRig)
+local EmoteRig = require(script.Parent.EmoteRig)
 local Framing = require(script.Parent.Parent.Models.StageFraming)
+local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Scene = {}
 
 function Scene.create(entries: { any }, viewport: GuiObject)
@@ -25,10 +24,7 @@ function Scene.create(entries: { any }, viewport: GuiObject)
 	local stands = stage:WaitForChild("Stands")
 	local confettiTemplate = stage:WaitForChild("ConfettiPiece")
 	assert(confettiTemplate:IsA("BasePart"), "[PostMatchScene] ConfettiPiece must be a BasePart")
-	local confettiCap = 0
-	for _, style in Emotes.Styles do
-		confettiCap = math.max(confettiCap, style.ConfettiCount)
-	end
+	local confettiCap = 18
 	local rigs = {}
 	local active = true
 	local jobs = {}
@@ -54,16 +50,15 @@ function Scene.create(entries: { any }, viewport: GuiObject)
 			assert(rank:IsA("TextLabel"), "[PostMatchScene] stand Rank must be a TextLabel")
 			rank.Text = tostring(entry.placement)
 			jobs[index] = task.defer(function()
-				local display = VictoryRig.create(stage, entry.colorId, entry.costumeId)
+				local display = EmoteRig.create(stage, entry.colorId, entry.costumeId)
 				if not active then
 					display.destroy()
 					return
 				end
-				display.pose(VictoryRig.style(entry.emoteId), 0, true)
 				local bounds, size = display.model:GetBoundingBox()
 				local bottom = bounds.Position.Y - size.Y / 2
 				local origin = marker.CFrame * CFrame.new(0, -bottom, 0)
-				display.pose(VictoryRig.style(entry.emoteId), 0, true, origin)
+				display.setOrigin(origin)
 				local confetti = {}
 				for i = 1, confettiCap do
 					local piece = confettiTemplate:Clone()
@@ -78,6 +73,16 @@ function Scene.create(entries: { any }, viewport: GuiObject)
 		end
 	end
 	local time, accumulator = 0, 0
+	local emoteConnection = Network.on("EmotePlayed", function(userId, emoteId)
+		if type(userId) ~= "number" or type(emoteId) ~= "string" then
+			return
+		end
+		for _, rig in rigs do
+			if rig.entry.userId == userId then
+				rig.display.playEmote(emoteId)
+			end
+		end
+	end)
 	local lease = Camera.acquire("Results", Camera.Priority.Results, function(camera, dt)
 		local position = viewport.AbsolutePosition
 		local size = viewport.AbsoluteSize
@@ -94,19 +99,15 @@ function Scene.create(entries: { any }, viewport: GuiObject)
 		end
 		accumulator = 0
 		for _, rig in rigs do
-			local player = if rig.entry.userId then Players:GetPlayerByUserId(rig.entry.userId) else nil
-			local emoteId = if player then player:GetAttribute("Equip_EmoteAssets") else rig.entry.emoteId
-			local style = VictoryRig.style(emoteId)
 			local reduced = GuiService.ReducedMotionEnabled
-			rig.display.pose(style, time, reduced, rig.origin)
 			for index, piece in rig.confetti do
-				local visible = not reduced and index <= style.ConfettiCount
+				local visible = not reduced and index <= confettiCap
 				piece.Transparency = if visible then 0 else 1
 				if visible then
 					local seed = index * 0.61803398875 % 1
-					local phase = (time / style.Duration + seed) % 1
+					local phase = (time / 3.2 + seed) % 1
 					piece.Color = ({
-						Presentation.Colors[style.Accent],
+						Presentation.Colors.Cyan,
 						Presentation.Colors.Yellow,
 						Presentation.Colors.White,
 					})[index % 3 + 1]
@@ -126,6 +127,7 @@ function Scene.create(entries: { any }, viewport: GuiObject)
 			return
 		end
 		active = false
+		emoteConnection:Disconnect()
 		for _, job in jobs do
 			if coroutine.status(job) ~= "dead" then
 				task.cancel(job)

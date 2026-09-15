@@ -7,10 +7,31 @@
 -- Version gates re-entry: bumping it does NOT force old players back through
 -- onboarding. Migration is deliberate -- OnboardingState.eligibility only ever
 -- reads Status, never Version, so raising this is safe by default.
-local CURRENT_VERSION = 1
+local CURRENT_VERSION = 2
 
 return {
 	Version = CURRENT_VERSION,
+
+	-- Encounters on the original TutorialArena approach. Asset scale and mover
+	-- attributes match author-splashdown-courses; no new map is generated.
+	Course = {
+		AssetScale = 0.55,
+		CheckpointRadius = 7,
+		CheckpointHeight = 8,
+		RetrySeconds = 0.65,
+		RecoveryGraceSeconds = 0.8,
+		SweeperSpeed = 45,
+		HammerPeriod = 3.2,
+		BumperPositions = { { 150, -6 }, { 137, 6 } },
+		SweeperDistance = 105,
+		HammerDistance = 65,
+		Lessons = {
+			AvoidBumpers = { start = 163, checkpoints = { 125 } },
+			JumpSweepers = { start = 125, checkpoints = { 82 }, jumpAt = 105 },
+			TimeHammer = { start = 82, checkpoints = { 50 } },
+			Practice = { start = 50, checkpoints = { 82, 125, 163 }, jumpAt = 105 },
+		},
+	},
 
 	-- Projected by the server onto a live training dummy, carrying the id of the
 	-- player it belongs to. The client draws its target marker from this, so the
@@ -27,7 +48,7 @@ return {
 	},
 
 	Timing = {
-		IntroSeconds = 1.1,
+		IntroSeconds = 2.4,
 		PromptDelaySeconds = 0.25,
 		SuccessHoldSeconds = 0.7,
 		InactivityHintSeconds = 6,
@@ -152,12 +173,12 @@ return {
 	},
 
 	Analytics = {
-		Funnel = "Onboarding",
+		Funnel = "SplashdownOnboarding",
 		Steps = {
 			Started = { step = 1, name = "Started" },
-			NormalThrow = { step = 2, name = "NormalThrow" },
-			Hammer = { step = 3, name = "Hammer" },
-			ChargedThrow = { step = 4, name = "ChargedThrow" },
+			AvoidBumpers = { step = 2, name = "AvoidBumpers" },
+			JumpSweepers = { step = 3, name = "JumpSweepers" },
+			TimeHammer = { step = 4, name = "TimeHammer" },
 			Practice = { step = 5, name = "Practice" },
 			Completed = { step = 6, name = "Completed" },
 		},

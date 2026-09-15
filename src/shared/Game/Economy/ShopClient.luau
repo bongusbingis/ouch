@@ -28,6 +28,7 @@ export type Snapshot = {
 	reveal: any?,
 	grant: any?,
 	purchaseNotice: boolean?,
+	bonksRecovery: any?,
 }
 
 local ShopClient = {}
@@ -52,6 +53,9 @@ local seenGrants: { [string]: boolean } = {}
 local purchaseBaselines: { [number]: { [string]: boolean } } = {}
 local purchaseFinishedAt: { [string]: number } = {}
 local purchaseNoticeShown: { [string]: boolean } = {}
+local bonksIntent: any = nil
+local nextBonksSequence: number? = nil
+local latestBonksReveal = 0
 
 local state: Snapshot = {
 	status = "Idle",
@@ -99,6 +103,25 @@ local function acceptReveal(payload: any)
 	if openId == "" or seenOpens[openId] then
 		return
 	end
+	if payload.source == "Bonks" and type(payload.sequence) == "number" then
+		if payload.sequence < latestBonksReveal then
+			return
+		end
+		latestBonksReveal = payload.sequence
+		nextBonksSequence = math.max(nextBonksSequence or 1, payload.sequence + 1)
+		if
+			bonksIntent
+			and payload.sequence == bonksIntent.sequence
+			and payload.crateId == bonksIntent.crateId
+			and payload.count == bonksIntent.count
+		then
+			bonksIntent.completed = true
+			local key = `Crate:{bonksIntent.crateId}`
+			bonksIntent = nil
+			setPending(key, false)
+			update({ bonksRecovery = CLEAR })
+		end
+	end
 	seenOpens[openId] = true
 	local completedProductId = nil
 	local completedKey = nil
@@ -120,6 +143,17 @@ local function acceptReveal(payload: any)
 		setPending(completedKey, false)
 	end
 	update({ reveal = payload })
+end
+
+local function acceptShopState(shopState: any)
+	local recovery = shopState.bonksOpen
+	if recovery and recovery.version == 1 and type(recovery.nextSequence) == "number" then
+		nextBonksSequence = math.max(nextBonksSequence or 1, recovery.nextSequence)
+	end
+	update({ status = "Ready", shopState = shopState })
+	if recovery and recovery.version == 1 and recovery.unrevealed then
+		acceptReveal(recovery.unrevealed)
+	end
 end
 
 local function acceptGrant(payload: any)
@@ -271,7 +305,7 @@ function ShopClient.start(options: StartOptions?)
 		connections,
 		Network.on("ShopStateChanged", function(shopState)
 			refreshGeneration += 1
-			update({ status = "Ready", shopState = shopState })
+			acceptShopState(shopState)
 		end)
 	)
 	table.insert(connections, Network.on("CrateOpened", acceptReveal))
@@ -367,7 +401,7 @@ function ShopClient.refresh(): (boolean, string?)
 		update({ status = "Error" })
 		return false, "network_error"
 	end
-	update({ status = "Ready", shopState = result })
+	acceptShopState(result)
 	return true, nil
 end
 
@@ -400,30 +434,110 @@ local function randomPurchaseAllowed(): (boolean, string?)
 	return true, nil
 end
 
-function ShopClient.openCrate(_cardId: string, crateId: string, count: number?): (boolean, string?)
+local function recoverySupported(): boolean
+	local recovery = state.shopState and state.shopState.bonksOpen
+	return recovery ~= nil and recovery.version == 1 and nextBonksSequence ~= nil
+end
+
+local function attemptBonksOpen(intent: any): (boolean, string?)
+	if not recoverySupported() then
+		return false, "crate_recovery_unavailable"
+	end
+	if intent.active then
+		return false, "busy"
+	end
+	intent.active = true
+	local pendingKey = `Crate:{intent.crateId}`
+	setPending(pendingKey, true)
+	local generation = lifecycleGeneration
+	local ok, result, reason =
+		ClientRequest(Network.call, "OpenCrate", intent.crateId, intent.count, intent.sequence, intent.unitPrice)
+	intent.active = false
+	if generation ~= lifecycleGeneration then
+		return false, "stale"
+	end
+	-- An event may finish this intent while its response is lost or still waiting.
+	if intent.completed then
+		return true, nil
+	end
+	if
+		type(result) == "table"
+		and result.source == "Bonks"
+		and result.sequence == intent.sequence
+		and result.crateId == intent.crateId
+		and result.count == intent.count
+	then
+		acceptReveal(result)
+		return true, nil
+	end
+	if bonksIntent == intent then
+		setPending(pendingKey, false)
+	end
+	if
+		not ok
+		or (result ~= nil)
+		or reason == "crate_processing"
+		or reason == "crate_recovery_required"
+		or reason == "no_profile"
+		or reason == "rate_limited"
+		or reason == "invalid_args"
+		or reason == nil
+	then
+		update({ bonksRecovery = { sequence = intent.sequence, crateId = intent.crateId } })
+		return false, "crate_recovery_required"
+	end
+	-- An authoritative rejection proves this request did not create a new open.
+	if bonksIntent == intent then
+		bonksIntent = nil
+		update({ bonksRecovery = CLEAR })
+	end
+	if reason == "crate_price_changed" or reason == "crate_request_stale" or reason == "crate_request_gap" then
+		task.spawn(ShopClient.refresh)
+	end
+	return false, reason or "purchase_failed"
+end
+
+function ShopClient.retryCrateOpen(): (boolean, string?)
+	if bonksIntent == nil then
+		return true, nil
+	end
+	return attemptBonksOpen(bonksIntent)
+end
+
+function ShopClient.openCrate(_cardId: string, crateId: string, count: number?, unitPrice: number?): (boolean, string?)
+	if bonksIntent then
+		return false, if bonksIntent.active then "busy" else "crate_recovery_required"
+	end
+	if not recoverySupported() then
+		return false, "crate_recovery_unavailable"
+	end
 	local allowed, policyReason = randomPurchaseAllowed()
 	if not allowed then
 		return false, policyReason
 	end
-	local pendingKey = `Crate:{crateId}`
-	if state.pending[pendingKey] then
-		return false, "busy"
+	if type(unitPrice) ~= "number" or unitPrice ~= unitPrice or unitPrice <= 0 or unitPrice == math.huge then
+		return false, "crate_price_changed"
 	end
-	setPending(pendingKey, true)
+	local intent = { sequence = nextBonksSequence, crateId = crateId, count = count or 1, unitPrice = unitPrice }
+	bonksIntent = intent
 	local generation = lifecycleGeneration
-	local ok, result, reason = ClientRequest(Network.call, "OpenCrate", crateId, count)
-	if generation ~= lifecycleGeneration then
-		return false, "stale"
+	local ok, reason = attemptBonksOpen(intent)
+	if not ok and reason == "crate_recovery_required" then
+		-- One automatic recovery only, with the same identity and quote. Legacy
+		-- servers never enter this path because they advertise no capability.
+		intent.active = true
+		setPending(`Crate:{intent.crateId}`, true)
+		task.wait(1)
+		if generation ~= lifecycleGeneration then
+			return false, "stale"
+		end
+		intent.active = false
+		if intent.completed then
+			return true, nil
+		end
+		return attemptBonksOpen(intent)
 	end
-	setPending(pendingKey, false)
-	if not ok then
-		return false, if result == "request_timed_out" then "request_timed_out" else "network_error"
-	end
-	if result == nil then
-		return false, reason or "purchase_failed"
-	end
-	acceptReveal(result)
-	return true, nil
+	return ok, reason
 end
 
 function ShopClient.promptProduct(_cardId: string, productId: number): (boolean, string?)
@@ -494,6 +608,10 @@ end
 
 function ShopClient.clearReveal()
 	if state.reveal ~= nil then
+		local reveal = state.reveal
+		if reveal.source == "Bonks" and type(reveal.sequence) == "number" then
+			pcall(Network.fireServer, "AcknowledgeBonksCrate", reveal.sequence)
+		end
 		update({ reveal = CLEAR })
 	end
 end
@@ -533,6 +651,9 @@ function ShopClient.stop()
 	table.clear(purchaseBaselines)
 	table.clear(purchaseFinishedAt)
 	table.clear(purchaseNoticeShown)
+	bonksIntent = nil
+	nextBonksSequence = nil
+	latestBonksReveal = 0
 	started = false
 	state = {
 		status = "Idle",

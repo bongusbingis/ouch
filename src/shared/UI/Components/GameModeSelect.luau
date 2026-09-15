@@ -25,7 +25,7 @@ local REFERENCE_VIEWPORT = Vector2.new(1890, 1200)
 local VOTE_TEXT_BOUNDS = TextMetrics.scaleBounds(REFERENCE_VIEWPORT, Vector2.new(0.967519, 0.0574598))
 	- Vector2.new(2, 2)
 local VOTE_TEXT_STROKE =
-	TextMetrics.scaledTextStroke(3.8, "Vote for a game mode!", UIConfig.Text.BodyFont, VOTE_TEXT_BOUNDS)
+	TextMetrics.scaledTextStroke(3.8, "VOTE FOR A GAME MODE!", Enum.Font.LuckiestGuy, VOTE_TEXT_BOUNDS)
 
 export type Props = {
 	Active: boolean,
@@ -207,20 +207,20 @@ return function(props: Props)
 			}),
 			VoteText = c(ResponsiveText, {
 				HostName = "VoteText",
-				MeasurementFont = UIConfig.Text.BodyFont,
+				MeasurementFont = Enum.Font.LuckiestGuy,
 				MaxTextSize = 54,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
 					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
+					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
 					Position = UDim2.fromScale(0.5, if portrait then 0.225 else if compact then 0.23 else 0.300167),
 					Size = UDim2.fromScale(0.94, if portrait then 0.065 else if compact then 0.075 else 0.0574598),
-					Text = "Vote for a game mode!",
+					Text = "VOTE FOR A GAME MODE!",
 					TextColor3 = Color3.new(1, 1, 1),
 				},
 			}, {
 				UIStroke = c("UIStroke", {
-					Color = Color3.fromRGB(77, 77, 77),
+					Color = UIConfig.ProgressionStyle.Ink,
 					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 					Thickness = VOTE_TEXT_STROKE,
 				}),

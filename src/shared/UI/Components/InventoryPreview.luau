@@ -12,9 +12,12 @@ local InventoryConfig =
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
 local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVisualFactory"))
 local CharacterAppearance = require(CosmeticsModules:WaitForChild("CharacterAppearance"))
-local ResponsiveText = require(script.Parent.ResponsiveText)
 local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local PreviewScheduler = require(script.Parent.Parent.Services.PreviewScheduler)
+local T = require(script.Parent.Parent.Tokens)
+
+local Icon = require(script.Parent.Icon)
+local CandyEffectPreview = require(script.Parent.CandyEffectPreview)
 
 local c = React.createElement
 local function setPivot(object: Model | BasePart, pivot: CFrame)
@@ -81,6 +84,8 @@ local function centerObject(object: Model | BasePart): CFrame
 end
 
 export type Props = {
+	Playing: boolean?,
+	Candy: boolean?,
 	ItemId: string?,
 	Category: string,
 	Definition: any,
@@ -91,50 +96,42 @@ export type Props = {
 	TextStroke: number?,
 }
 
-local function previewStroke(thickness: number?)
-	return if thickness
-		then c("UIStroke", {
-			Color = UI.ProgressionStyle.Ink,
-			Thickness = thickness,
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-		})
-		else nil
-end
-
 local function effectPreview(props: Props)
-	return c("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = props.ZIndex,
-	}, {
-		Symbol = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.SourceSansBold,
-			MaxTextSize = 76,
-			Native = {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.15, 0.1),
-				Size = UDim2.fromScale(0.7, 0.52),
-				Font = Enum.Font.SourceSansBold,
-				Text = if props.Category == "ElimEffectAssets" then "SFX" else "★",
-				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
-				ZIndex = props.ZIndex,
-			},
-		}, { Outline = previewStroke(props.TextStroke) }),
-		Caption = c(ResponsiveText, {
-			Wrapped = true,
-			MeasurementFont = UI.Text.BodyFont,
-			MaxTextSize = 18,
-			Native = {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.1, 0.62),
-				Size = UDim2.fromScale(0.8, 0.26),
-				Font = UI.Text.BodyFont,
-				Text = if props.Category == "ElimEffectAssets" then "ELIMINATION SOUND" else "IMPACT EFFECT",
-				TextWrapped = true,
-				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
-				ZIndex = props.ZIndex,
-			},
-		}, { Outline = previewStroke(props.TextStroke) }),
+	local palette = UI.ProgressionStyle
+	local definition = props.Definition or {}
+	local accent = definition.PreviewColor or InventoryConfig.RarityColors[definition.Rarity] or palette.Yellow
+	local icon = definition.Icon or (if props.Category == "ElimEffectAssets" then "Speaker" else "Explosion")
+	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = props.ZIndex }, {
+		Tile = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = if props.Candy
+				then (if props.Category == "ElimEffectAssets" then T.Colors.Cyan else T.Colors.Grape)
+				else palette.Ink,
+			BorderSizePixel = 0,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.72, 0.84),
+			ZIndex = props.ZIndex,
+		}, {
+			Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
+			Corner = c(
+				"UICorner",
+				{ CornerRadius = if props.Candy then UDim.new(0.4, 0) else UDim.new(0, UI.Radius.Tile) }
+			),
+			Outline = c("UIStroke", {
+				Color = if props.Candy then T.Colors.Ink else accent,
+				Thickness = if props.Candy then T.Shape.StrokeCard else 2,
+				Transparency = 0,
+			}),
+			Glyph = c(Icon, {
+				Name = icon,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromScale(0.82, 0.82),
+					ZIndex = props.ZIndex + 1,
+				},
+			}),
+		}),
 	})
 end
 
@@ -184,7 +181,10 @@ local ViewportPreview = React.memo(function(props: Props)
 				local tangent = math.tan(math.rad(camera.FieldOfView / 2)) * InventoryConfig.ViewportFill
 				local distance = math.max((extent.Y / 2 + math.abs(target.Y)) / tangent, radius / (tangent * aspect))
 					+ radius
-				camera.CFrame = CFrame.lookAt(target + config.CameraOffset.Unit * distance, target)
+				camera.CFrame = CFrame.lookAt(
+					target + config.CameraOffset.Unit * distance * (if props.Candy then 0.76 else 1),
+					target
+				)
 			end
 			frameCamera()
 			resize = viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(frameCamera)
@@ -237,12 +237,18 @@ end)
 
 return React.memo(function(props: Props)
 	if props.Category == "EmoteAssets" then
-		return c(
-			CelebrationAvatar,
-			{ EmoteId = props.ItemId, ColorId = props.ColorId, CostumeId = props.CostumeId, ZIndex = props.ZIndex }
-		)
+		return c(CelebrationAvatar, {
+			EmoteId = props.ItemId,
+			ColorId = props.ColorId,
+			CostumeId = props.CostumeId,
+			ZIndex = props.ZIndex,
+			Playing = props.Playing,
+		})
 	end
 	if props.Category == "ImpactEffectAssets" or props.Category == "ElimEffectAssets" then
+		if props.Candy then
+			return c(CandyEffectPreview, props)
+		end
 		return effectPreview(props)
 	end
 	return c(ViewportPreview, props)

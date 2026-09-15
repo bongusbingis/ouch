@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "purpose": "milestone",
+  "scope": "Replace with the changed component family and affected views",
+  "requirement": "Copy the owner's actual requirement without describing the implementation as improved",
+  "coverage_limits": "List untested devices, interactions and content states; do not imply they passed",
+  "sources": [
+    "src/shared/UI/Components/SplashPage.luau"
+  ],
+  "capture_sources": {
+    "src/shared/UI/Components/SplashPage.luau": "replace with SHA-256 of the source verified in Studio at capture time"
+  },
+  "required_cases": [
+    "desktop-idle",
+    "phone-idle"
+  ],
+  "cases": [
+    {
+      "id": "desktop-idle",
+      "device": "Desktop native viewport",
+      "state": "Idle",
+      "before": ".review/example/desktop-before.jpg",
+      "after": ".review/example/desktop-after.jpg"
+    },
+    {
+      "id": "phone-idle",
+      "device": "Small landscape phone emulator",
+      "state": "Idle",
+      "before": ".review/example/phone-before.jpg",
+      "after": ".review/example/phone-after.jpg"
+    }
+  ],
+  "families": [
+    {
+      "id": "action-controls",
+      "targets": "Name the changed controls",
+      "peers": "Name at least two observed comparable controls, where available",
+      "relationship": "Explain the shared functional/style family and any role differences without assuming the candidate is correct",
+      "reference": "desktop-idle:before",
+      "target_names": [
+        "Join"
+      ],
+      "peer_names": [
+        "Shop",
+        "Backpack"
+      ]
+    }
+  ]
+}

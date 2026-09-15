@@ -14,7 +14,7 @@ local QueuePolicy = require(
 		:WaitForChild("ReturnQueuePolicy")
 )
 
-local function fixture()
+local function fixture(returnQueueId)
 	local players = {}
 	local leader = { UserId = 10, Parent = players }
 	local member = { UserId = 20, Parent = players }
@@ -33,7 +33,7 @@ local function fixture()
 		updatedAt = 1,
 		leaseUntil = math.huge,
 	}
-	local queued = 0
+	local queued = { Arena = 0, Splashdown = 0 }
 	local errors = {}
 	local enqueuesSucceed = true
 	local banned = false
@@ -48,13 +48,20 @@ local function fixture()
 		end
 		return nextRecord
 	end
-	local service = PartyService.new(repository, {
-		Enqueue = function()
-			queued += 1
-			return enqueuesSucceed
-		end,
-		Remove = function() end,
-	}, {}, {}, {}, {
+	local function fakeQueueRepository(queueId)
+		return {
+			Enqueue = function()
+				queued[queueId] += 1
+				return enqueuesSucceed
+			end,
+			Remove = function() end,
+		}
+	end
+	local queueRepositories = {
+		Arena = fakeQueueRepository("Arena"),
+		Splashdown = fakeQueueRepository("Splashdown"),
+	}
+	local service = PartyService.new(repository, queueRepositories, {}, {}, {}, {
 		HasBannedMember = function()
 			return banned
 		end,
@@ -75,6 +82,7 @@ local function fixture()
 		memberUserIds = { 10, 20 },
 		returnMode = "Party",
 		queueOnArrival = true,
+		queueId = returnQueueId,
 	}
 	local restored = service:_restoreReturningParty(leader, payload)
 	service._cache.party = restored
@@ -87,8 +95,8 @@ local function fixture()
 		record = function()
 			return record
 		end,
-		queued = function()
-			return queued
+		queued = function(queueId)
+			return queued[queueId or "Arena"]
 		end,
 		arrive = function()
 			service._localPlayersByParty.party[20] = member
@@ -168,6 +176,17 @@ return function()
 			local f = fixture()
 			PartyModel.returnToLobby(f.record())
 			QueuePolicy.arm(f.record(), f.payload, 1, 20)
+			expect(f.record().returnQueue).to.equal(nil)
+		end)
+		it("arms a queue-carrying return into that queue and enqueues through its own repository", function()
+			local f = fixture("Splashdown")
+			expect(f.record().queueId).to.equal("Splashdown")
+			f.arrive()
+			f.service:_queueReturningParties()
+			expect(f.queued("Splashdown")).to.equal(1)
+			expect(f.queued("Arena")).to.equal(0)
+			expect(f.record().phase).to.equal("Queued")
+			expect(f.record().queueTicket.queueId).to.equal("Splashdown")
 			expect(f.record().returnQueue).to.equal(nil)
 		end)
 	end)

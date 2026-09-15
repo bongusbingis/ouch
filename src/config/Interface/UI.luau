@@ -1,5 +1,7 @@
 --!strict
 
+local RedesignArtwork = require(script.Parent.RedesignArtwork)
+
 local characterBody = {
 	Minimum = Vector3.new(-2.25, -3, -2.25),
 	Maximum = Vector3.new(2.25, 4.5, 2.25),
@@ -7,6 +9,29 @@ local characterBody = {
 
 return {
 	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1 },
+	LobbyArtwork = {
+		Logo = {
+			Image = "rbxassetid://78333957912633",
+			Offset = Vector2.new(91, 114),
+			Size = Vector2.new(813, 379),
+			OpticalCenterY = 203.08,
+		},
+		Action = {
+			Cyan = "rbxassetid://136021539696619",
+			Pink = "rbxassetid://94748581468730",
+			CyanSlice = Rect.new(198, 228, 842, 469),
+			PinkSlice = Rect.new(198, 228, 841, 468),
+			SliceScale = 0.09,
+			CornerPx = 12,
+			ShadowPx = 2.4,
+			TextOffsetY = 3,
+			PaddingPx = 16,
+			MinPaddingPx = 10,
+			WidthPaddingScale = 0.1,
+			IconPx = 22,
+			IconGapPx = 10,
+		},
+	},
 	ProgressionStyle = {
 		White = Color3.new(1, 1, 1),
 		Ink = Color3.fromRGB(30, 32, 36),
@@ -22,16 +47,25 @@ return {
 		Pink = Color3.fromRGB(239, 18, 111),
 		Yellow = Color3.fromRGB(255, 220, 62),
 		Green = Color3.fromRGB(154, 233, 91),
+		Shadow = Color3.new(0, 0, 0),
 	},
+	-- One radius scale: panels and modals, then every control and inner
+	-- container, then tiles nested inside a container. Pills only for chips
+	-- and bars no taller than PillMaxPx.
+	Radius = { Panel = 16, Control = 12, Tile = 8, PillMaxPx = 32 },
+	Well = { StrokePx = 2, ShadowPx = 4, InsetPx = 12 },
+	-- Visible space between artwork, content and neighboring controls.
+	Spacing = { PageInsetPx = 24, CompactInsetPx = 12, ContentInsetPx = 16, ControlGapPx = 12, SectionGapPx = 24 },
 	Text = {
-		BodyFont = Enum.Font.BuilderSansBold,
-		DefaultFont = Font.new(
-			"rbxasset://fonts/families/ComicNeueAngular.json",
-			Enum.FontWeight.Bold,
-			Enum.FontStyle.Normal
-		),
+		BodyFont = Enum.Font.LuckiestGuy,
+		DefaultFont = Font.fromEnum(Enum.Font.LuckiestGuy),
+		OutlineScale = 0.045,
+		HeaderPx = 26,
+		LabelPx = 22,
+		BodyPx = 18,
 		DefaultMinSize = 12,
 		DefaultMaxSize = 28,
+		CaptionMinPx = 16,
 		InputGlyphSize = 20,
 		PreferredScale = {
 			Medium = 1,
@@ -47,13 +81,30 @@ return {
 		FocusCornerPx = 8,
 	},
 	Button = {
+		BevelPx = 5,
+		BevelDarken = 0.3,
 		StrokePx = 2,
 		ShadowPx = 4,
 		TextPx = 28,
 		PricePx = 25,
 		GapPx = 5,
 	},
+	Panel = { RadiusPx = 22, BevelPx = 5, InsetPx = 20 },
+	Backdrop = { PatternOpacityScale = 0.55 },
 	Layout = {
+		SectionHeader = { TextPx = 24, HeightPx = 38, UnderlinePx = 2, UnderlineGapPx = 4, BottomGapPx = 10 },
+		PageSurface = {
+			Image = if RedesignArtwork.Page ~= "" then RedesignArtwork.Page else "rbxassetid://124751224634629",
+			SliceCenter = if RedesignArtwork.Page ~= "" then Rect.new(40, 40, 984, 600) else Rect.new(31, 41, 978, 620),
+			SliceScale = 0.5,
+		},
+		-- The inner-container 9-slice from Figma; an empty Image makes Well draw
+		-- the same construction natively until the upload is approved.
+		WellSurface = {
+			Image = RedesignArtwork.Well,
+			SliceCenter = Rect.new(32, 32, 480, 288),
+			SliceScale = 0.5,
+		},
 		PagePosition = UDim2.fromScale(0.5, 0.56),
 		InventoryPagePosition = UDim2.fromScale(0.32, 0.56),
 		PageOffscreen = UDim2.fromScale(-1, 0.56),
@@ -70,7 +121,7 @@ return {
 			CharacterWidthStuds = 6,
 			CharacterHeightStuds = 6,
 			CharacterDepthStuds = 4,
-			NameHeadroomStuds = 3,
+			NameHeadroomStuds = 1.5,
 			InventoryBody = {
 				Minimum = characterBody.Minimum,
 				Maximum = characterBody.Maximum + Vector3.new(0, 1.5, 0),
@@ -92,7 +143,7 @@ return {
 				},
 			},
 			Inventory = {
-				Portrait = { WidthScale = 0.956, HeightScale = 0.75, MaxSize = Vector2.new(480, 720) },
+				Portrait = { WidthScale = 0.956, HeightScale = 0.70, MaxSize = Vector2.new(480, 720) },
 				Landscape = {
 					WidthScale = 0.602436,
 					HeightScale = 0.74763,
@@ -152,7 +203,8 @@ return {
 					WidthScale = 0.86,
 					HeightScale = 0.78,
 					MaxSize = Vector2.new(1100, 760),
-					ShortHeightScale = 0.92,
+					ShortHeightScale = 0.96,
+					ShortWidthScale = 0.96,
 				},
 			},
 			CrateReveal = {
@@ -180,19 +232,19 @@ return {
 			ShortRailWidthPx = 88,
 			ShortRailGapPx = 4,
 			ShortContentLeftPx = 106,
-			ShortContentTopPx = 32,
+			ShortContentTopPx = 44,
 			ShortContentBottomPx = 10,
 			ShortCardMinPx = 104,
 			ShortPanelWidthScale = 0.58,
 			ShortPanelMinWidthPx = 360,
 			ShortWorldMinWidthPx = 170,
 			ShortCardSizePx = 124,
-			ShortHeaderHeightPx = 24,
+			ShortHeaderHeightPx = 34,
 			CardGapPx = 7,
 			CardMinPx = 132,
 			CardMaxPx = 150,
 			MaxColumns = 6,
-			HeaderHeightPx = 44,
+			HeaderHeightPx = 50,
 			SpacerHeightPx = 22,
 		},
 		GameMode = {
@@ -217,13 +269,11 @@ return {
 			ScrollBarPx = 8,
 			GapPx = 20,
 			CardGapPx = 12,
-			HeaderHeightPx = 26,
+			HeaderHeightPx = 38,
 			HeaderTextSize = 22,
 			EmptyHeightPx = 54,
 			Tracks = 12,
 			SpanSteps = { 4, 8, 12 },
-			MainSizeScale = Vector2.new(0.93, 0.82),
-			ContentSizeScale = Vector2.new(0.95, 0.93),
 			CardClasses = {
 				-- Premium passes: artwork over the name and the price, like the rest of
 				-- the storefront. There are more of them than fit above the fold at
@@ -305,6 +355,7 @@ return {
 			},
 			Order = { "More", "Promo", "Crates", "Bonks", "ForYou", "MorePasses", "Rest" },
 		},
+		EmoteWheel = require(script.Parent.EmoteWheel),
 		TopBar = {
 			ShortHeightPx = 72,
 			ShortWidthScale = 0.7,
@@ -314,25 +365,37 @@ return {
 			LandscapeGapScale = 0.05,
 		},
 		Splash = {
+			DesktopLogoSizePx = Vector2.new(220, 110),
 			ActionsGapPx = 8,
+			QueuePickerHeightPx = 44,
 			ActionTextPx = 26,
+			PrimaryActionTextPx = 30,
+			ActionHeightPx = 52,
+			PrimaryActionHeightPx = 68,
+			DesktopPrimaryActionHeightPx = 68,
+			DesktopPrimaryActionTextPx = 32,
+			DesktopStatusHeightPx = 28,
+			ShortActionTextPx = 22,
 			ShortActionsHeightPx = 56,
 			ShortActionButtonHeightPx = 48,
 			ShortActionsBottomPx = 8,
 			ShortLogoTopPx = 78,
 			PortraitActionsHeightPx = 146,
 			SecondaryActionHeightPx = 56,
-			PrimaryActionHeightPx = 70,
 			ProgressPanels = {
-				DailyMinHeightPx = 116,
+				DailyMinHeightPx = 140,
 				EdgePaddingPx = 24,
 				GapPx = 10,
 				Landscape = {
-					ActionsReservePx = 252,
+					MinWidthPx = 360,
+					SeasonHeightPx = 88,
+					DailyHeightPx = 140,
+					QuestsMinHeightPx = 156,
+					ActionsReservePx = 280,
 					DailyBottomScale = 0.9,
 					SeasonTopScale = 0.145,
 					ShortTopPx = 80,
-					ShortBottomPx = 70,
+					ShortBottomPx = 78,
 					QuestsTopScale = 0.31,
 				},
 				Portrait = {
@@ -369,7 +432,7 @@ return {
 		},
 		SettingsControls = {
 			ShortRowHeightPx = 80,
-			RowHeight = { Compact = { Plain = 104, Description = 132 }, Wide = { Plain = 88, Description = 104 } },
+			RowHeight = { Compact = { Plain = 104, Description = 140 }, Wide = { Plain = 76, Description = 88 } },
 			SliderLabelHeightPx = 24,
 			LabelControlGapPx = 8,
 		},
@@ -379,7 +442,10 @@ return {
 		SeasonCompactClaimWidthPx = 70,
 		SeasonDetailedMinHeightPx = 132,
 		QuestRow = { ShortHeightPx = 80, CompactHeightPx = 138, CompactInfoHeightPx = 82 },
-		DailyCell = { MinWidthPx = 52 },
+		DailyCell = {
+			FullWeekMinWidthPx = 352,
+			MinWidthPx = 52,
+		},
 		PartyCode = {
 			PortraitHeightPx = 118,
 			LandscapeWidthPx = 210,
@@ -387,10 +453,10 @@ return {
 			CodeHeightPx = 58,
 			Members = {
 				MaxWidthPx = 620,
-				MaxHeightPx = 420,
-				MarginPx = 12,
+				MaxHeightPx = 720,
+				MarginPx = 16,
 				GapPx = 8,
-				RowHeightPx = 56,
+				RowHeightPx = 64,
 				ActionWidthPx = 112,
 			},
 		},

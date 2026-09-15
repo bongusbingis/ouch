@@ -23,6 +23,10 @@ export type Snapshot = {
 	maxAttempts: number,
 	retryAt: number?,
 	reason: string?,
+	canRetry: boolean?,
+	canStay: boolean?,
+	waitingForParty: boolean?,
+	recoveryAvailable: boolean?,
 }?
 
 local started = false
@@ -51,6 +55,10 @@ function ArenaTeleportClient.start()
 			maxAttempts = if typeof(packet.maxAttempts) == "number" then packet.maxAttempts else 0,
 			retryAt = if typeof(packet.retryAt) == "number" then packet.retryAt else nil,
 			reason = if typeof(packet.reason) == "string" then packet.reason else nil,
+			canRetry = if typeof(packet.canRetry) == "boolean" then packet.canRetry else nil,
+			canStay = if typeof(packet.canStay) == "boolean" then packet.canStay else nil,
+			waitingForParty = packet.waitingForParty == true,
+			recoveryAvailable = packet.recoveryAvailable == true,
 		})
 	end)
 end

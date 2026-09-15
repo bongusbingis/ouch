@@ -252,7 +252,7 @@ local function ActionSlot(props: {
 		StatusScale = if feedback == "Unlock" then 1.12 else 1,
 		ProgressTransparency = if progressVisible then 0 else 1,
 		Progress = math.clamp(progress, 0, 1),
-		config = if feedback == "Unlock" then Motion.Pop else Motion.Control,
+		config = Motion.Control,
 		immediate = reducedMotion,
 	})
 
@@ -267,7 +267,7 @@ local function ActionSlot(props: {
 		Image = "",
 		LayoutOrder = props.LayoutOrder,
 		Selectable = false,
-		Size = UDim2.new(0.5, -6, 1, -8),
+		Size = UDim2.new(0.5, -12, 1, -16),
 		ZIndex = 54,
 		[React.Event.Activated] = if slot.interactive
 			then function()
@@ -284,7 +284,7 @@ local function ActionSlot(props: {
 			else nil,
 		[React.Event.InputEnded] = endPress,
 	}, {
-		SlotCorner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+		SlotCorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		SlotOutline = c("UIStroke", {
 			Color = WHITE,
 			Thickness = 2,
@@ -296,7 +296,7 @@ local function ActionSlot(props: {
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 54,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		MutedWash = c("Frame", {
 			BackgroundColor3 = Palette.White,
@@ -305,7 +305,7 @@ local function ActionSlot(props: {
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 55,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
 		}),
 		Content = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -415,6 +415,30 @@ return function(props: Props)
 		config = Motion.Modal,
 		immediate = reducedMotion,
 	})
+	React.useEffect(function()
+		if not model.visible then
+			return
+		end
+		local active = true
+		task.defer(function()
+			local holder = holderRef.current
+			if not active or not holder then
+				return
+			end
+			-- CanvasGroup visibility can leave static ViewportFrames with a stale render.
+			-- Rebind once when returning from a menu; keep the existing models and cameras.
+			for _, child in holder:GetDescendants() do
+				if child:IsA("ViewportFrame") and child.CurrentCamera then
+					local camera = child.CurrentCamera
+					child.CurrentCamera = nil
+					child.CurrentCamera = camera
+				end
+			end
+		end)
+		return function()
+			active = false
+		end
+	end, { model.visible })
 
 	React.useEffect(function()
 		local holder: GuiObject? = holderRef.current
@@ -446,7 +470,7 @@ return function(props: Props)
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 6),
+			Padding = UDim.new(0, 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -463,6 +487,7 @@ return function(props: Props)
 
 	return c("CanvasGroup", {
 		ref = holderRef,
+		Visible = model.visible,
 		Active = model.visible and model.deviceClass == "Touch",
 		AnchorPoint = Vector2.new(0.5, 1),
 		BackgroundTransparency = 1,
@@ -482,7 +507,7 @@ return function(props: Props)
 			Size = UDim2.new(1, -BAR_INSET_X, 1, -BAR_INSET_Y),
 			ZIndex = 50,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 		}),
 		Bar = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -493,7 +518,7 @@ return function(props: Props)
 			Size = UDim2.new(1, -BAR_INSET_X, 1, -BAR_INSET_Y),
 			ZIndex = 51,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 			Stroke = textStroke(WHITE, 0.018, 0.08),
 			Gradient = c("UIGradient", {
 				Color = ColorSequence.new(BAR_TOP, BAR_BOTTOM),

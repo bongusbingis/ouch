@@ -36,6 +36,15 @@ return {
 			GamepadLabel = "R1",
 		},
 	},
+	-- Hold to open the radial emote selector; consumed as raw KeyCode data by
+	-- EmoteWheelController, not as an InputAction. B and DPadDown are unbound
+	-- elsewhere: X is OnboardingSkip, 1/2 and L1/R1 equip weapons, R2 throws.
+	EmoteWheel = {
+		Keyboard = Enum.KeyCode.B,
+		KeyboardLabel = "B",
+		Gamepad = Enum.KeyCode.DPadDown,
+		GamepadLabel = "DPad Down",
+	},
 	Actions = {
 		{
 			Name = "OnboardingSkip",

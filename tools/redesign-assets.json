@@ -1,0 +1,314 @@
+{
+  "assets": [
+    {
+      "file": "assets/ui/redesign-ph.png",
+      "name": "OUCH UI icons ph",
+      "provenance": "assets/source/external/redesign-ph.provenance.json",
+      "roblox": {
+        "creator": "group:291738800",
+        "decal_asset_id": "130070129394053",
+        "image_asset_id": "125312270475689",
+        "resolution_method": "Studio InsertService.LoadAsset -> Decal.Texture"
+      }
+    },
+    {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "name": "OUCH UI icons material-symbols",
+      "provenance": "assets/source/external/redesign-material-symbols.provenance.json",
+      "roblox": {
+        "creator": "group:291738800",
+        "decal_asset_id": "109049105652853",
+        "image_asset_id": "105358867565806",
+        "resolution_method": "Studio InsertService.LoadAsset -> Decal.Texture"
+      }
+    },
+    {
+      "file": "assets/ui/page-panel-9slice.png",
+      "name": "OUCH page panel R16",
+      "provenance": "assets/source/figma/page-panel-9slice.provenance.json",
+      "roblox": {
+        "creator": "group:291738800",
+        "decal_asset_id": "131449610091380",
+        "image_asset_id": "125378628790140",
+        "resolution_method": "Studio InsertService.LoadAsset -> Decal.Texture"
+      }
+    },
+    {
+      "file": "assets/ui/well-9slice.png",
+      "name": "OUCH inner well R12",
+      "provenance": "assets/source/figma/well-9slice.provenance.json",
+      "roblox": {
+        "creator": "group:291738800",
+        "decal_asset_id": "74795093768394",
+        "image_asset_id": "138307870774315",
+        "resolution_method": "Studio InsertService.LoadAsset -> Decal.Texture"
+      }
+    }
+  ],
+  "icons": {
+    "Ball": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:baseball-fill"
+    },
+    "Bell": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:bell-fill"
+    },
+    "Bubbles": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:circles-three-fill"
+    },
+    "Candy": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        768,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:cookie-fill"
+    },
+    "Celebration": {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "offset": [
+        0,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "material-symbols:celebration-rounded"
+    },
+    "Check": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:check-bold"
+    },
+    "Cloud": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:cloud-fill"
+    },
+    "Confetti": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:confetti-fill"
+    },
+    "Controller": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:game-controller-fill"
+    },
+    "Crown": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:crown-fill"
+    },
+    "Diamond": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        768,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:diamond-fill"
+    },
+    "Drop": {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "offset": [
+        384,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "material-symbols:water-drop-rounded"
+    },
+    "Explosion": {
+      "file": "assets/ui/redesign-material-symbols.png",
+      "offset": [
+        192,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "material-symbols:explosion-rounded"
+    },
+    "Hammer": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        576
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:hammer-fill"
+    },
+    "Hand": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        576,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:hand-grabbing-fill"
+    },
+    "IceCream": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:ice-cream-fill"
+    },
+    "Planet": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        0,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:planet-fill"
+    },
+    "Sparkle": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        192
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:sparkle-fill"
+    },
+    "Speaker": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:speaker-high-fill"
+    },
+    "Star": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        192,
+        0
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:star-fill"
+    },
+    "Target": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        384,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:target-fill"
+    },
+    "Trophy": {
+      "file": "assets/ui/redesign-ph.png",
+      "offset": [
+        768,
+        384
+      ],
+      "size": [
+        192,
+        192
+      ],
+      "source_id": "ph:trophy-fill"
+    }
+  }
+}

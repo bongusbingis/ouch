@@ -4,6 +4,8 @@
 
 local WriteThroughProxy = {}
 
+local rawByProxy = setmetatable({}, { __mode = "k" }) :: { [any]: any }
+
 export type Writer = {
 	Set: (self: Writer, path: { any }, value: any) -> (),
 }
@@ -23,6 +25,9 @@ local function wrap(data: { [any]: any }, writer: Writer, path: { any }?): { [an
 		__newindex = function(_, key, value)
 			local fullPath = table.clone(path or {})
 			table.insert(fullPath, key)
+			if type(value) == "table" and rawByProxy[value] ~= nil then
+				value = rawByProxy[value]
+			end
 			data[key] = value
 			writer:Set(fullPath, value)
 		end,
@@ -39,6 +44,7 @@ local function wrap(data: { [any]: any }, writer: Writer, path: { any }?): { [an
 			return next, data, nil
 		end,
 	})
+	rawByProxy[proxy] = data
 	return proxy
 end
 

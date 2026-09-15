@@ -93,6 +93,7 @@ function PartyModel.toSnapshot(party)
 		members = members,
 		allowFriendJoins = party.allowFriendJoins,
 		phase = party.phase,
+		queueId = party.queueId or Config.DefaultQueueId,
 		returnQueuePending = party.returnQueue ~= nil,
 		matchId = party.matchId,
 		createdAt = party.createdAt,

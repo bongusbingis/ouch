@@ -103,6 +103,10 @@ function CombatCamera.isActive(): boolean
 	return isActive()
 end
 
+function CombatCamera.refresh()
+	apply()
+end
+
 function CombatCamera.requestCursor(reason: string)
 	if cursorRequests[reason] then
 		return

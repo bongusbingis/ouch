@@ -9,8 +9,16 @@ local SimStateCodec = require(Adapters:WaitForChild("SimStateCodec"))
 local WeaponRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Sim"):WaitForChild("WeaponRegistry")
 )
+local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
 
 local EquippedWeapon = {}
+
+-- A non-combat mode (Splashdown) still has a sim-equipped weapon on every
+-- character; nothing is allowed to show it.
+local function combatMode(): boolean
+	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
+	return matchState == nil or GameModes.IsCombat(matchState:GetAttribute("modeId"))
+end
 
 function EquippedWeapon.forCharacter(character: Model?): string
 	if character == nil then
@@ -31,7 +39,7 @@ function EquippedWeapon.of(player: Player?): string
 end
 
 function EquippedWeapon.isShowing(player: Player?, kind: string): boolean
-	return EquippedWeapon.of(player) == kind
+	return combatMode() and EquippedWeapon.of(player) == kind
 end
 
 return EquippedWeapon

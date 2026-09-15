@@ -20,7 +20,11 @@ local definitions = {
 	PartyRequest = "function",
 	PartyPacket = "event",
 	EquipCosmetic = "function",
+	SetEmoteSlot = "function",
+	PlayEmote = "event",
+	EmotePlayed = "event",
 	OpenCrate = "function",
+	AcknowledgeBonksCrate = "event",
 	PurchaseCosmetic = "function",
 	GetSeasonPassState = "function",
 	ClaimSeasonTier = "function",
@@ -64,17 +68,22 @@ local definitions = {
 	SubmitWeaponEquip = "event",
 	CombatSimEvent = "unreliable",
 	JumpPadImpulse = "unreliable",
+	BumperHit = "unreliable",
+	DoorBroken = "unreliable",
+	SplashdownEvent = "unreliable",
 	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}
+local rejectionLogTimes = {}
 
-local function checkRateLimit(player, name, limit)
+local function checkRateLimit(player, name, limit, windowSeconds)
 	local userId = player.UserId
 	rateLimitCounters[userId] = rateLimitCounters[userId] or {}
 	local counter = rateLimitCounters[userId][name]
 	local now = os.clock()
-	if not counter or now > counter.resetTime then
-		rateLimitCounters[userId][name] = { count = 1, resetTime = now + 1 }
+	local window = windowSeconds or 1
+	if not counter or now >= counter.resetTime then
+		rateLimitCounters[userId][name] = { count = 1, resetTime = now + window }
 		return true
 	end
 	if counter.count >= limit then
@@ -104,6 +113,7 @@ if IS_SERVER then
 
 	game:GetService("Players").PlayerRemoving:Connect(function(player)
 		rateLimitCounters[player.UserId] = nil
+		rejectionLogTimes[player.UserId] = nil
 	end)
 end
 
@@ -111,37 +121,92 @@ local Network = {}
 
 local anonymousBuckets = 0
 
-function Network.withRateLimit(limit, handler, bucket)
+local function warnOnce(player, key, message)
+	local userId = player.UserId
+	rejectionLogTimes[userId] = rejectionLogTimes[userId] or {}
+	local now = os.clock()
+	local lastWarning = rejectionLogTimes[userId][key]
+	if not lastWarning or now >= lastWarning + 5 then
+		rejectionLogTimes[userId][key] = now
+		warn(message)
+	end
+end
+
+function Network.withRateLimit(limit, handler, bucket, windowSeconds)
 	local key = bucket
 	if key == nil then
 		anonymousBuckets += 1
 		key = `anonymous:{anonymousBuckets}`
 	end
 	return function(player, ...)
-		if not checkRateLimit(player, key, limit) then
-			warn(("[Network] Rate limited: %s on %s"):format(player.Name, key))
+		if not checkRateLimit(player, key, limit, windowSeconds) then
+			warnOnce(player, `rate:{key}`, ("[Network] Rate limited: %s on %s"):format(player.Name, key))
 			return nil, "rate_limited"
 		end
 		return handler(player, ...)
 	end
 end
 
-function Network.withValidation(validate, handler)
+function Network.withValidation(validate, handler, bucket)
+	local key = bucket
+	if key == nil then
+		anonymousBuckets += 1
+		key = `anonymous:{anonymousBuckets}`
+	end
 	return function(player, ...)
 		local ok, reason = validate(player, ...)
 		if not ok then
-			warn(("[Network] Validation failed for %s — %s"):format(player.Name, reason or "?"))
+			warnOnce(player, `validation:{key}`, ("[Network] Validation failed for %s on %s"):format(player.Name, key))
 			return nil, "invalid_args"
 		end
 		return handler(player, ...)
 	end
 end
 
+function Network.withActionRateLimits(rules, handler, bucket)
+	assert(
+		type(rules) == "table" and type(rules.default) == "table" and type(rules.default.limit) == "number",
+		"[Network] Action rate limits require a default budget"
+	)
+	local defaultRule = rules.default
+	local key = bucket
+	if key == nil then
+		anonymousBuckets += 1
+		key = `anonymous:{anonymousBuckets}`
+	end
+
+	return function(player, action, ...)
+		local rule = defaultRule
+		local actionKey = "default"
+		if typeof(action) == "string" then
+			local candidate = rules[action]
+			if type(candidate) == "table" and type(candidate.limit) == "number" then
+				rule = candidate
+				actionKey = action
+			end
+		end
+		local actionBucket = `{key}:action:{actionKey}`
+		local window = if type(rule.window) == "number" then rule.window else 1
+		if not checkRateLimit(player, actionBucket, rule.limit, window) then
+			warnOnce(
+				player,
+				`rate:{actionBucket}`,
+				("[Network] Rate limited: %s on %s"):format(player.Name, actionBucket)
+			)
+			return nil, "rate_limited"
+		end
+		return handler(player, action, ...)
+	end
+end
+
 function Network.handleProtected(name, middleware, callback)
 	assert(IS_SERVER, "[Network] handleProtected can only be called on the server")
 	local handler = callback
+	if middleware.actionRateLimits then
+		handler = Network.withActionRateLimits(middleware.actionRateLimits, handler, name)
+	end
 	if middleware.validate then
-		handler = Network.withValidation(middleware.validate, handler)
+		handler = Network.withValidation(middleware.validate, handler, name)
 	end
 	if middleware.rateLimit then
 		handler = Network.withRateLimit(middleware.rateLimit, handler, name)

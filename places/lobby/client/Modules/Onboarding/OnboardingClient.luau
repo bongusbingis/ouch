@@ -25,7 +25,9 @@ local UIFeedback = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("UIFeedback")
 )
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
-local AimDirector = require(script.Parent.Parent:WaitForChild("Input"):WaitForChild("AimDirector"))
+local DeviceClass = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass")
+)
 local GameAudio = require(script.Parent.Parent:WaitForChild("Presentation"):WaitForChild("GameAudio"))
 local ThrowUXClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ThrowUXClient"))
 
@@ -37,6 +39,9 @@ export type Snapshot = {
 	step: string,
 	cue: string,
 	trackTargets: boolean,
+	retrying: boolean,
+	checkpoint: number,
+	checkpointCount: number,
 	deviceClass: string,
 	hintLevel: number,
 	succeeded: boolean,
@@ -59,8 +64,11 @@ local state: Snapshot = {
 	active = false,
 	resolved = false,
 	step = "Intro",
-	cue = "Ready",
+	cue = "Intro",
 	trackTargets = false,
+	retrying = false,
+	checkpoint = 0,
+	checkpointCount = 1,
 	deviceClass = "Mouse",
 	hintLevel = 0,
 	succeeded = false,
@@ -69,6 +77,11 @@ local state: Snapshot = {
 }
 
 local lastAttemptAt = os.clock()
+local CURSOR_REASON = "OnboardingPointer"
+
+local function releasePointer()
+	Combat.releaseCursor(CURSOR_REASON)
+end
 
 local function playCue(name: string)
 	local ok, err = pcall(GameAudio.play, name)
@@ -80,10 +93,6 @@ end
 -- The same vocabulary the rest of combat uses (Config.AimAssist keys, the
 -- DeviceClass attribute, the sim's release device). A second naming scheme here
 -- would silently mismatch every hint the moment either side changed.
-local function deviceClass(): string
-	return AimDirector.deviceClass()
-end
-
 local function publish(changes: { [string]: any })
 	local next = table.clone(state)
 	for key, value in changes do
@@ -104,31 +113,11 @@ function OnboardingClient.subscribe(listener: (Snapshot) -> ()): () -> ()
 	return unsubscribe
 end
 
-local function reportAttempt(escalated: boolean?)
-	lastAttemptAt = os.clock()
-	Network.fireServer("OnboardingAction", "Attempt", if escalated then "escalated" else nil)
-end
-
 function OnboardingClient.skip()
-	Network.fireServer("OnboardingAction", "Skip")
-end
-
--- An intent is an attempt, never a completion. Lessons are finished by the
--- server when the player actually connects with a target, so trying and missing
--- reads as effort here rather than as progress.
-local function onIntent(intent: string)
-	if not state.active then
+	if not state.active or state.celebrating then
 		return
 	end
-	if
-		intent == "NormalThrow"
-		or intent == "ReleaseCharge"
-		or intent == "BeginCharge"
-		or intent == "CancelCharge"
-		or intent == "HammerAttack"
-	then
-		reportAttempt()
-	end
+	Network.fireServer("OnboardingAction", "Skip")
 end
 
 local function tickHints()
@@ -159,6 +148,7 @@ local function onServerState(packet: any)
 	end
 	local wasActive = state.active
 	if packet.active ~= true then
+		releasePointer()
 		publish({
 			active = false,
 			resolved = true,
@@ -167,6 +157,7 @@ local function onServerState(packet: any)
 			hintLevel = 0,
 			waypoint = CLEAR,
 			trackTargets = false,
+			retrying = false,
 		})
 		Combat.setInputEnabled(false)
 		Combat.setCameraEnabled(false)
@@ -183,6 +174,9 @@ local function onServerState(packet: any)
 
 	local changedStep = packet.step ~= state.step
 	local entering = not state.active
+	if packet.step == "Celebration" then
+		releasePointer()
+	end
 	lastAttemptAt = os.clock()
 
 	publish({
@@ -190,17 +184,20 @@ local function onServerState(packet: any)
 		resolved = true,
 		step = packet.step,
 		cue = packet.cue or packet.step,
-		trackTargets = packet.trackTargets == true,
+		trackTargets = false,
+		retrying = packet.retrying == true,
+		checkpoint = packet.checkpoint or 0,
+		checkpointCount = packet.checkpointCount or 1,
 		succeeded = packet.succeeded == true,
 		hintLevel = 0,
 		celebrating = packet.step == "Celebration",
 		waypoint = packet.waypoint or CLEAR,
 	})
 
-	if packet.reason == "hit" then
+	if packet.reason == "success" or packet.reason == "checkpoint" then
 		playCue("OnboardingStepSuccess")
 		UIFeedback.haptic("Notification")
-		if packet.step == "ChargedThrow" then
+		if packet.step == "TimeHammer" then
 			playCue("OnboardingCoreComplete")
 		end
 	elseif entering or changedStep then
@@ -212,22 +209,26 @@ local function onServerState(packet: any)
 		end
 	end
 
-	-- Every lesson before the free-for-all teaches one weapon, so the player is
-	-- given it and their own equip controls stay inert until the mini-fight.
-	Combat.setWeaponLocked(packet.step ~= "Practice")
-
-	if changedStep and packet.step == "Hammer" then
-		Combat.equipHammer()
-	elseif
-		changedStep and (packet.step == "NormalThrow" or packet.step == "ChargedThrow" or packet.step == "Practice")
-	then
-		Combat.equipDodgeball()
-	end
-
-	-- Training runs the same combat camera the arena uses, so aim, charge and
-	-- the trajectory preview behave identically to a real match.
+	-- Keep Splashdown's movement camera, while combat gestures and weapon
+	-- presentation remain disabled. Native movement/jump controls stay active.
+	Combat.setWeaponLocked(true)
 	Combat.setCameraEnabled(true)
-	Combat.setInputEnabled(true)
+	Combat.setInputEnabled(false)
+	if entering or packet.reason == "recovered" then
+		local camera = Workspace.CurrentCamera
+		local character = Players.LocalPlayer.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if camera and humanoid and root and root:IsA("BasePart") then
+			camera.CameraSubject = humanoid
+			camera.CameraType = Enum.CameraType.Custom
+			local facing = if typeof(packet.facing) == "Vector3" then packet.facing else root.CFrame.LookVector
+			camera.CFrame = CFrame.lookAt(
+				root.Position - facing * 16 + Vector3.new(0, 8, 0),
+				root.Position + facing * 12 + Vector3.new(0, 2, 0)
+			)
+		end
+	end
 end
 
 function OnboardingClient.start()
@@ -236,7 +237,7 @@ function OnboardingClient.start()
 	end
 	started = true
 	ThrowUXClient.setHintGate(function()
-		return not state.active or (state.step ~= "Intro" and state.step ~= "NormalThrow")
+		return not state.active
 	end)
 	local inputContext = Players.LocalPlayer:WaitForChild(InputConfig.ContextName)
 	assert(inputContext:IsA("InputContext"), `[OnboardingClient] {InputConfig.ContextName} must be an InputContext`)
@@ -244,7 +245,6 @@ function OnboardingClient.start()
 	assert(skipAction:IsA("InputAction"), "[OnboardingClient] CombatInput.OnboardingSkip must be an InputAction")
 
 	table.insert(connections, Network.on("OnboardingState", onServerState))
-	table.insert(disposers, Combat.onIntent(onIntent))
 	table.insert(
 		connections,
 		skipAction.Pressed:Connect(function()
@@ -254,14 +254,35 @@ function OnboardingClient.start()
 		end)
 	)
 	table.insert(
-		connections,
-		UserInputService.LastInputTypeChanged:Connect(function()
-			local device = deviceClass()
+		disposers,
+		DeviceClass.observe(function(device)
+			if device ~= "Mouse" then
+				releasePointer()
+			end
 			if device ~= state.deviceClass then
 				publish({ deviceClass = device })
 			end
 		end)
 	)
+	-- Aiming owns the locked cursor during lessons. Holding Alt temporarily
+	-- hands it to the visible controls without changing the combat camera mode.
+	table.insert(
+		connections,
+		UserInputService.InputBegan:Connect(function(input, processed)
+			if input.KeyCode == Enum.KeyCode.LeftAlt and not processed and state.active and not state.celebrating then
+				Combat.requestCursor(CURSOR_REASON)
+			end
+		end)
+	)
+	table.insert(
+		connections,
+		UserInputService.InputEnded:Connect(function(input)
+			if input.KeyCode == Enum.KeyCode.LeftAlt then
+				releasePointer()
+			end
+		end)
+	)
+	table.insert(connections, UserInputService.WindowFocusReleased:Connect(releasePointer))
 
 	local accumulator = 0
 	heartbeat = RunService.Heartbeat:Connect(function(dt: number)
@@ -270,10 +291,13 @@ function OnboardingClient.start()
 			return
 		end
 		accumulator = 0
+		local character = Players.LocalPlayer.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if state.active and humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
+			lastAttemptAt = os.clock()
+		end
 		tickHints()
 	end)
-
-	publish({ deviceClass = deviceClass() })
 
 	task.spawn(function()
 		local ok, result = pcall(Network.call, "OnboardingReady")
@@ -290,6 +314,7 @@ function OnboardingClient.start()
 end
 
 function OnboardingClient.destroy()
+	releasePointer()
 	for _, connection in connections do
 		if typeof(connection) == "RBXScriptConnection" then
 			connection:Disconnect()

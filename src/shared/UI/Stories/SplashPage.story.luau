@@ -11,10 +11,14 @@ return function(target: Instance)
 	return mount(
 		target,
 		React.createElement(SplashPage, {
-			PartyState = "READY TO BRAWL?",
+			PartyState = "",
 			ShowMatchmakingActivity = false,
 			PlayText = "PLAY",
 			PlayEnabled = true,
+			QueueOptions = { { id = "Arena", title = "ARENA PVP" }, { id = "Splashdown", title = "SPLASHDOWN" } },
+			SelectedQueueId = "Splashdown",
+			QueueEnabled = true,
+			OnSelectQueue = function() end,
 			OnPlay = function() end,
 			OnInvite = function() end,
 			OnJoinCode = function() end,

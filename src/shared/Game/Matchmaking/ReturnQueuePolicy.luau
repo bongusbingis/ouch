@@ -11,6 +11,9 @@ function ReturnQueuePolicy.arm(party: any, payload: any, now: number, timeout: n
 	end
 	party.lastReturnMatchId = payload.matchId
 	party.returnSourcePartyId = payload.partyId
+	if typeof(payload.queueId) == "string" and payload.queueId ~= "" then
+		party.queueId = payload.queueId
+	end
 	party.returnQueue = if payload.queueOnArrival == true
 		then {
 			matchId = payload.matchId,

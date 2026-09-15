@@ -18,6 +18,9 @@
     },
 
     "ReplicatedStorage": {
+      "ThirdPartyCredits": {
+        "$path": "generated/ThirdPartyCredits.luau"
+      },
       "Shared": {
         "$path": "src/shared"
       },

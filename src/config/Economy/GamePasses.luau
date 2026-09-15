@@ -32,6 +32,7 @@ export type GamePassDef = {
 	Categories: { string },
 	EntitlementItemIds: { string },
 	Boosts: Boosts?,
+	EmoteSlots: number?,
 }
 
 local Catalog: { [string]: GamePassDef } = {
@@ -40,11 +41,12 @@ local Catalog: { [string]: GamePassDef } = {
 		Icon = "rbxassetid://133448903949274",
 		CatalogStatus = "Active",
 		DisplayName = "Showtime",
-		PurchaseMessage = "Your victory emotes are ready. Open Backpack → Emotes to choose your celebration.",
-		Description = "Twirl, flex or bounce! Three victory emotes for your result card and every podium you earn.",
+		PurchaseMessage = "Eight emote slots unlocked. Open Backpack → Emotes to fill them.",
+		Description = "Double your emote wheel to eight slots, plus three exclusive emotes.",
 		DisplayOrder = 405,
 		Categories = { "EmoteAssets" },
 		EntitlementItemIds = { "ShowtimeTwirl", "ShowtimeFlex", "ShowtimeBounce" },
+		EmoteSlots = 8,
 	},
 	SplatStarter = {
 		Id = 1968922292,
@@ -104,6 +106,10 @@ for key, definition in Catalog do
 		assert(xp == nil or xp > 1, `game pass "{key}" XpMultiplier must be greater than 1`)
 		assert(bonks == nil or bonks > 1, `game pass "{key}" BonksMultiplier must be greater than 1`)
 	end
+	assert(
+		definition.EmoteSlots == nil or (definition.EmoteSlots % 1 == 0 and definition.EmoteSlots > 0),
+		`game pass "{key}" EmoteSlots must be a positive integer`
+	)
 	if definition.Id ~= nil then
 		assert(
 			#definition.EntitlementItemIds > 0 or definition.Boosts ~= nil,

@@ -1,7 +1,6 @@
--- Description: Server owner of first-session training: resolves eligibility from the profile, gives each learner their own arena, stages the encounter each step calls for, judges every hit against the real weapon geometry, and persists a checkpoint only once the player has actually performed the mechanic. The client presents; this module decides and remembers.
-
 --!strict
-
+-- Server-owned obstacle lessons. Retains first-session eligibility, resumable
+-- checkpoints, skip, analytics and social cancellation from the combat tutorial.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MovementGuard = require(
@@ -13,42 +12,33 @@ local Workspace = game:GetService("Workspace")
 local Config = ReplicatedStorage:WaitForChild("Config")
 local OnboardingConfig = require(Config:WaitForChild("Interface"):WaitForChild("Onboarding"))
 local AnalyticsConfig = require(Config:WaitForChild("Infra"):WaitForChild("Analytics"))
-local CombatConfig = require(Config:WaitForChild("Gameplay"):WaitForChild("Combat"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local OnboardingState = require(SharedGame:WaitForChild("Onboarding"):WaitForChild("OnboardingState"))
-local OnboardingHit = require(SharedGame:WaitForChild("Onboarding"):WaitForChild("OnboardingHit"))
-local OnboardingLayout = require(SharedGame:WaitForChild("Onboarding"):WaitForChild("OnboardingLayout"))
-local OnboardingAssist = require(SharedGame:WaitForChild("Onboarding"):WaitForChild("OnboardingAssist"))
-local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
-local ServerAuthAdapter = require(SharedGame:WaitForChild("Adapters"):WaitForChild("ServerAuthAdapter"))
 local DevSoloPlay = require(SharedGame:WaitForChild("Matchmaking"):WaitForChild("DevSoloPlay"))
 local PlayerData = require(script.Parent.Parent:WaitForChild("PlayerData"))
 local AnalyticsService = require(script.Parent.Parent:WaitForChild("AnalyticsService"))
 local OnboardingArena = require(script.Parent:WaitForChild("OnboardingArena"))
-local OnboardingDummies = require(script.Parent:WaitForChild("OnboardingDummies"))
 local OnboardingCombat = require(script.Parent:WaitForChild("OnboardingCombat"))
 
-type Step = OnboardingState.Step
-type Dummy = OnboardingDummies.Dummy
-type BallSample = {
-	ball: BasePart,
-	previous: Vector3,
-	current: Vector3,
-	velocity: Vector3,
-	ownerId: string?,
-	charge: number?,
-}
+local Course = require(script.Parent.OnboardingCourse)
+local Progress = require(SharedGame.Onboarding.OnboardingProgress)
+local RotatingPlatforms = require(SharedGame.MapFeatures.RotatingPlatforms)
+local Bumpers = require(script.Parent.Parent.TrainingHazards.Bumpers)
+local RotorBump = require(script.Parent.Parent.TrainingHazards.RotorBump)
+local L = OnboardingConfig.Course
 
+type Step = OnboardingState.Step
 type Session = {
 	player: Player,
-	arena: OnboardingArena.Arena,
+	arena: Course.Course,
 	step: Step,
-	encounter: string?,
-	dummies: { Dummy },
-	chases: boolean,
-	awaitingBridge: boolean,
-	waypoint: Vector3?,
+	checkpoint: number,
+	targetIndex: number,
+	jumped: boolean,
+	retryAt: number?,
+	graceUntil: number,
+	succeeded: boolean,
 	startedAt: number,
 	stepStartedAt: number,
 	attempts: { [string]: number },
@@ -56,51 +46,21 @@ type Session = {
 	finished: boolean,
 	generation: number,
 	connections: { RBXScriptConnection },
+	returnCFrame: CFrame?,
+	debugRecord: OnboardingState.Record?,
 }
-
 local OnboardingService = {}
-
-local PHASE_IN_FLIGHT = 2
-local PHASE_BOUNCING = 3
-
--- Which encounter belongs to each step. Intro and the first throw share one, so
--- the dummy the player is about to be told to hit is already walking at them
--- before the prompt changes, rather than popping in on the word THROW.
-local ENCOUNTER_FOR_STEP: { [string]: string } = {
-	Intro = "Approach",
-	NormalThrow = "Approach",
-	Hammer = "Bonk",
-	ChargedThrow = "Charge",
-	Practice = "Brawl",
-}
-
--- What the player should be doing right now. A step is not enough on its own:
--- the hammer lesson has a crossing before it has anything to hit, and the prompt
--- must never name a dummy that has not spawned yet.
-local CUE_FOR_STEP: { [string]: string } = {
-	Intro = "Ready",
-	NormalThrow = "Throw",
-	Hammer = "Bonk",
-	ChargedThrow = "Charge",
-	Practice = "Brawl",
-	Celebration = "Done",
-}
-
-local BALL_GRANT_STEPS: { [string]: boolean } = {
-	Intro = true,
-	NormalThrow = true,
-	ChargedThrow = true,
-	Practice = true,
-}
-local BALL_HIT_STEPS: { [string]: boolean } = { NormalThrow = true, ChargedThrow = true, Practice = true }
-local HAMMER_HIT_STEPS: { [string]: boolean } = { Hammer = true, Practice = true }
-
 local started = false
 local sessions: { [Player]: Session } = {}
 local arenasInUse: { [number]: boolean } = {}
-local ballPositions: { [BasePart]: Vector3 } = {}
+local overlap = OverlapParams.new()
+overlap.FilterType = Enum.RaycastFilterType.Include
 
 local function readRecord(player: Player): OnboardingState.Record?
+	local session = sessions[player]
+	if session and session.debugRecord then
+		return table.clone(session.debugRecord)
+	end
 	local data = PlayerData.get(player)
 	if data == nil then
 		return nil
@@ -109,6 +69,11 @@ local function readRecord(player: Player): OnboardingState.Record?
 end
 
 local function writeRecord(player: Player, record: OnboardingState.Record)
+	local session = sessions[player]
+	if session and session.debugRecord then
+		session.debugRecord = table.clone(record)
+		return
+	end
 	local data = PlayerData.get(player)
 	if data == nil then
 		return
@@ -138,326 +103,78 @@ local function characterRoot(player: Player): BasePart?
 	return if root and root:IsA("BasePart") then root else nil
 end
 
--- Where a player belongs if they fall or stray onto the elimination ring. Before
--- the crossing that is the spawn pad; after it, the island end of the bridge, so
--- recovery never undoes progress the player already made on foot.
-local function safeCFrame(session: Session): CFrame
-	local step = session.step
-	if step == "Intro" or step == "NormalThrow" then
-		return session.arena.spawnCFrame
-	end
-	local landing = OnboardingArena.point(session.arena, OnboardingConfig.Training.BridgeWaypointDistance - 6, 0)
-	local centre = session.arena.frame.origin
-	return OnboardingArena.facing(landing + Vector3.new(0, 4, 0), Vector3.new(centre.x, centre.y, centre.z))
+local function lessonFor(session: Session)
+	return L.Lessons[session.step] or L.Lessons.AvoidBumpers
+end
+
+local function targetFor(session: Session): number
+	local lesson = lessonFor(session)
+	return lesson.checkpoints[session.targetIndex] or lesson.checkpoints[#lesson.checkpoints]
+end
+
+local function publish(session: Session, reason: string)
+	Network.fire("OnboardingState", session.player, {
+		active = not session.finished,
+		step = session.step,
+		cue = session.step,
+		reason = reason,
+		succeeded = session.succeeded,
+		retrying = session.retryAt ~= nil,
+		facing = Course.direction(session.arena, session.checkpoint, targetFor(session)),
+		waypoint = if session.step ~= "Celebration" then Course.position(session.arena, targetFor(session)) else nil,
+		trackTargets = false,
+		checkpoint = session.targetIndex - 1,
+		checkpointCount = #lessonFor(session).checkpoints,
+	})
 end
 
 local function placeAtSafePoint(session: Session)
 	local character = OnboardingCombat.ensureCharacter(session.player)
-	if character == nil then
+	if not character or sessions[session.player] ~= session or session.finished then
 		return
 	end
-	character:PivotTo(safeCFrame(session))
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
+	Bumpers.forget(session.player)
+	RotorBump.forget(session.player)
+	character:PivotTo(Course.spawnAt(session.arena, session.checkpoint, targetFor(session)))
+	local root = characterRoot(session.player)
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
 		MovementGuard.reset(root)
 	end
-end
-
-local function clearDummies(session: Session)
-	for _, dummy in session.dummies do
-		OnboardingDummies.destroy(dummy)
-	end
-	table.clear(session.dummies)
-end
-
-local function standingTargets(session: Session): { Dummy }
-	local standing: { Dummy } = {}
-	for _, dummy in session.dummies do
-		if OnboardingDummies.isStanding(dummy) then
-			table.insert(standing, dummy)
-		end
-	end
-	return standing
-end
-
-local function cueFor(session: Session): string
-	if session.step == "Hammer" and session.awaitingBridge then
-		return "Cross"
-	end
-	return CUE_FOR_STEP[session.step] or "Ready"
-end
-
-local function publish(session: Session, reason: string)
-	local cue = cueFor(session)
-	Network.fire("OnboardingState", session.player, {
-		active = not session.finished,
-		step = session.step,
-		cue = cue,
-		reason = reason,
-		succeeded = reason == "hit",
-		-- The crossing is a fixed place; the fight is whatever is walking at you.
-		waypoint = if cue == "Cross" then session.waypoint else nil,
-		trackTargets = cue == "Bonk",
-		remaining = #standingTargets(session),
-		attempts = session.attempts[session.step] or 0,
-		escalated = session.escalated[session.step] == true,
-	})
-end
-
--- Assistance widens the target rather than shortening the lesson: a struggling
--- player gets a more forgiving dummy, never a step that finishes without them.
-local function targetRadius(session: Session, dummy: Dummy): number
-	local training = OnboardingConfig.Training
-	local leniency = if session.escalated[session.step]
-		then training.EscalatedLeniencyStuds
-		else training.TargetLeniencyStuds
-	return dummy.radius + leniency
-end
-
--- The only path that finishes a lesson. A step advances once every dummy it
--- staged is down and the knock-back has had time to read; nothing else completes
--- a step, so the player has always performed the mechanic being taught.
-local function knockTarget(session: Session, dummy: Dummy, fromPosition: Vector3)
-	if not OnboardingDummies.isStanding(dummy) then
-		return
-	end
-	OnboardingDummies.knock(dummy, fromPosition)
-	publish(session, "hit")
-
-	local step = session.step
-	local generation = session.generation
-	task.delay(OnboardingConfig.Timing.SuccessHoldSeconds, function()
-		if sessions[session.player] ~= session or session.finished or session.generation ~= generation then
-			return
-		end
-		if #standingTargets(session) > 0 then
-			return
-		end
-		OnboardingService.completeStep(session.player, step)
-	end)
-end
-
-local function ballsFolder(): Folder?
-	local folder = Workspace:FindFirstChild("Balls")
-	return if folder and folder:IsA("Folder") then folder else nil
-end
-
--- Balls are shared world state, so they are sampled once per frame for every
--- session at once. Sampling per session would compare a ball against itself and
--- collapse the swept segment the contact test depends on.
-local function sampleBalls(): { BallSample }
-	local folder = ballsFolder()
-	if folder == nil then
-		table.clear(ballPositions)
-		return {}
-	end
-	local samples: { BallSample } = {}
-	local live: { [BasePart]: boolean } = {}
-	for _, ball in folder:GetChildren() do
-		if not ball:IsA("BasePart") then
-			continue
-		end
-		live[ball] = true
-		local current = ball.CFrame.Position
-		local previous = ballPositions[ball] or current
-		ballPositions[ball] = current
-		local phase = ball:GetAttribute("ph")
-		if phase ~= PHASE_IN_FLIGHT and phase ~= PHASE_BOUNCING then
-			continue
-		end
-		local velocity = ball:GetAttribute("vel")
-		table.insert(samples, {
-			ball = ball,
-			previous = previous,
-			current = current,
-			velocity = if typeof(velocity) == "Vector3" then velocity else Vector3.zero,
-			ownerId = ball:GetAttribute("ow") :: string?,
-			charge = ball:GetAttribute("rc") :: number?,
-		})
-	end
-	for ball in ballPositions do
-		if not live[ball] then
-			ballPositions[ball] = nil
-		end
-	end
-	return samples
-end
-
--- Velocity round-trips through the codec every tick, so nudging it between
--- steps is picked up by the next decode. Only the heading is touched, and only
--- toward a dummy the throw was already pointed near.
-local function steerBalls(session: Session, samples: { BallSample }, dt: number)
-	if not BALL_HIT_STEPS[session.step] then
-		return
-	end
-	local standing = standingTargets(session)
-	if #standing == 0 then
-		return
-	end
-	local assist = OnboardingConfig.Assist
-	local playerId = PlayerIds.toId(session.player)
-	local maxTurn = math.rad(assist.TurnRateDegPerSecond) * dt
-	local acquireCosine = math.cos(math.rad(assist.AcquireConeDeg))
-
-	for _, sample in samples do
-		if sample.ownerId ~= playerId then
-			continue
-		end
-		local best: Vector3? = nil
-		local bestDistance = math.huge
-		for _, dummy in standing do
-			local at = OnboardingDummies.position(dummy)
-			local distance = (at - sample.current).Magnitude
-			if distance < bestDistance then
-				best = at
-				bestDistance = distance
-			end
-		end
-		if best == nil then
-			continue
-		end
-		local steered =
-			OnboardingAssist.steer(sample.current, sample.velocity, best, maxTurn, acquireCosine, assist.MaxRangeStuds)
-		if steered ~= nil then
-			sample.ball:SetAttribute("vel", steered)
-		end
-	end
-end
-
-local function detectBallHits(session: Session, samples: { BallSample })
-	if not BALL_HIT_STEPS[session.step] then
-		return
-	end
-	local playerId = PlayerIds.toId(session.player)
-	local requiresCharge = session.step == "ChargedThrow"
-	for _, sample in samples do
-		if sample.ownerId ~= playerId then
-			continue
-		end
-		-- The charge lesson is only satisfied by an actually charged release, so
-		-- a reflexive tap cannot pass it.
-		if requiresCharge and (sample.charge or 0) < OnboardingConfig.Training.MinimumChargeAlpha then
-			continue
-		end
-		for _, dummy in standingTargets(session) do
-			local at = OnboardingDummies.position(dummy)
-			if OnboardingHit.ballReachedTarget(sample.previous, sample.current, at, targetRadius(session, dummy)) then
-				knockTarget(session, dummy, sample.current)
-			end
-		end
-	end
-end
-
--- The dummies are not simulation entities, so the hammer can never report a hit
--- on one. The swing itself is authoritative and carries its own origin and
--- direction, which is enough to re-run the weapon real cone against a target.
-local function onSimEvent(event: { [string]: any })
-	if event.kind ~= "HammerSwing" then
-		return
-	end
-	local player = PlayerIds.fromEvent(event)
-	local session = if player then sessions[player] else nil
-	if session == nil or session.finished or not HAMMER_HIT_STEPS[session.step] then
-		return
-	end
-	local origin, direction = event.position, event.direction
-	if origin == nil or direction == nil then
-		return
-	end
-	for _, dummy in standingTargets(session) do
-		local at = OnboardingDummies.position(dummy)
-		local radius = targetRadius(session, dummy)
-		if OnboardingHit.withinHammerCone(origin, direction, at, radius, CombatConfig.Hammer) then
-			-- One swing takes one target, matching the sim own resolution.
-			knockTarget(session, dummy, origin)
-			return
-		end
-	end
-end
-
-local function spawnDummyAt(session: Session, position: Vector3, walkSpeed: number): Dummy
-	local facing = OnboardingArena.facing(position, session.arena.spawnCFrame.Position)
-	local dummy = OnboardingDummies.spawn(facing, session.arena.model, walkSpeed, PlayerIds.toId(session.player))
-	table.insert(session.dummies, dummy)
-	return dummy
-end
-
-local function buildEncounter(session: Session, encounter: string)
-	local training = OnboardingConfig.Training
-	if encounter == "Approach" then
-		spawnDummyAt(
-			session,
-			OnboardingArena.point(session.arena, training.ThrowDummyDistance, 0),
-			training.ThrowDummyWalkSpeed
-		)
-		session.chases = true
-	elseif encounter == "Bonk" then
-		-- Held back until the player commits to the crossing, so the lesson is
-		-- "something ran at me on the bridge" rather than a dummy stood waiting.
-		session.waypoint = OnboardingArena.point(session.arena, training.BridgeWaypointDistance, 0)
-		session.awaitingBridge = true
-		session.chases = true
-	elseif encounter == "Charge" then
-		spawnDummyAt(session, OnboardingArena.point(session.arena, training.ChargeDummyDistance, 0), 0)
-		session.chases = false
-	elseif encounter == "Brawl" then
-		for index = 1, training.BrawlDummyCount do
-			spawnDummyAt(
-				session,
-				OnboardingArena.ringPoint(session.arena, training.BrawlRingRadius, index, training.BrawlDummyCount),
-				training.BrawlDummyWalkSpeed
-			)
-		end
-		session.chases = true
-	end
+	session.jumped = false
+	session.retryAt = nil
+	session.graceUntil = os.clock() + L.RecoveryGraceSeconds
 end
 
 local function stageStep(session: Session, step: Step)
 	session.generation += 1
-
-	local wanted = ENCOUNTER_FOR_STEP[step]
-	if wanted ~= session.encounter then
-		clearDummies(session)
-		session.encounter = wanted
-		session.waypoint = nil
-		session.awaitingBridge = false
-		session.chases = false
-		if wanted ~= nil then
-			buildEncounter(session, wanted)
-		end
-	end
-
-	if BALL_GRANT_STEPS[step] then
-		OnboardingCombat.grantBall(session.player)
-	else
-		-- A preserved ball returns straight to its owner's hand, and gaining a
-		-- hand ball is exactly what makes the simulation auto-equip the
-		-- dodgeball. Taking the ball away is what keeps the hammer lesson about
-		-- the hammer, without any weapon state needing to be forced back.
-		OnboardingCombat.clearBall(session.player)
-	end
-
+	session.targetIndex = 1
+	session.jumped = false
+	session.succeeded = false
+	session.retryAt = nil
+	session.checkpoint = if step == "Celebration" then L.Lessons.Practice.checkpoints[3] else lessonFor(session).start
 	local generation = session.generation
-	if step == "Intro" then
-		-- The intro is a beat, not a gate: nothing to press, it simply hands
-		-- control over once the player has landed and read one short line.
-		task.delay(OnboardingConfig.Timing.IntroSeconds, function()
-			if session.generation == generation and not session.finished then
-				OnboardingService.completeStep(session.player, "Intro")
+	if step == "Intro" or step == "Celebration" then
+		task.delay(
+			if step == "Intro" then OnboardingConfig.Timing.IntroSeconds else OnboardingConfig.Timing.CelebrationSeconds,
+			function()
+				if sessions[session.player] ~= session or session.generation ~= generation or session.finished then
+					return
+				end
+				if step == "Intro" then
+					OnboardingService.completeStep(session.player, "Intro")
+				else
+					OnboardingService.complete(session.player)
+				end
 			end
-		end)
-	elseif step == "Celebration" then
-		task.delay(OnboardingConfig.Timing.CelebrationSeconds, function()
-			if session.generation == generation and not session.finished then
-				OnboardingService.complete(session.player)
-			end
-		end)
+		)
 	end
 end
 
 local function endSession(player: Player, reason: string)
 	local session = sessions[player]
-	if session == nil then
+	if not session then
 		return
 	end
 	session.finished = true
@@ -466,9 +183,18 @@ local function endSession(player: Player, reason: string)
 		connection:Disconnect()
 	end
 	table.clear(session.connections)
-	clearDummies(session)
-	OnboardingArena.destroy(session.arena)
+	Bumpers.forget(player)
+	RotorBump.forget(player)
+	OnboardingCombat.clearBall(player)
 	OnboardingCombat.release(player)
+	local root = characterRoot(player)
+	if root and session.returnCFrame then
+		(player.Character :: Model):PivotTo(session.returnCFrame)
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+		MovementGuard.reset(root)
+	end
+	Course.destroy(session.arena)
 	arenasInUse[session.arena.index] = nil
 	sessions[player] = nil
 	Network.fire("OnboardingState", player, { active = false, step = session.step, reason = reason })
@@ -479,11 +205,11 @@ function OnboardingService.sessionFor(player: Player): Session?
 end
 
 function OnboardingService.beginFor(player: Player, forcedStep: Step?): (boolean, string?)
-	if sessions[player] ~= nil then
+	if sessions[player] then
 		return false, "already_active"
 	end
 	local record = readRecord(player)
-	if record == nil then
+	if not record then
 		return false, "no_profile"
 	end
 	if forcedStep == nil and not OnboardingState.isEligible(record) then
@@ -492,18 +218,25 @@ function OnboardingService.beginFor(player: Player, forcedStep: Step?): (boolean
 	if forcedStep == nil and not OnboardingConfig.Eligibility.AutoStartEnabled then
 		return false, "disabled"
 	end
-
+	if forcedStep and not OnboardingState.isStep(forcedStep) then
+		return false, "invalid_step"
+	end
+	local character = OnboardingCombat.ensureCharacter(player)
+	if not character then
+		return false, "no_character"
+	end
 	local resumeAt = forcedStep or OnboardingState.resumeStep(record, OnboardingConfig.Eligibility.ResumeEnabled)
 	local now = os.clock()
 	local session: Session = {
 		player = player,
-		arena = OnboardingArena.build(allocateArena()),
+		arena = Course.build(allocateArena()),
 		step = resumeAt,
-		encounter = nil,
-		dummies = {},
-		chases = false,
-		awaitingBridge = false,
-		waypoint = nil,
+		checkpoint = L.Lessons.AvoidBumpers.start,
+		targetIndex = 1,
+		jumped = false,
+		retryAt = nil,
+		succeeded = false,
+		graceUntil = now,
 		startedAt = now,
 		stepStartedAt = now,
 		attempts = {},
@@ -511,31 +244,30 @@ function OnboardingService.beginFor(player: Player, forcedStep: Step?): (boolean
 		finished = false,
 		generation = 0,
 		connections = {},
+		returnCFrame = character:GetPivot(),
+		-- Forced developer sessions exercise progression without saving it.
+		debugRecord = if forcedStep then OnboardingState.blank(OnboardingConfig.Version) else nil,
 	}
 	sessions[player] = session
-	OnboardingCombat.admit(player)
-
+	-- No ArenaReady admission: the lobby's developer combat stack cannot give
+	-- learners weapons or accept combat commands during the obstacle lessons.
+	OnboardingCombat.clearBall(player)
+	OnboardingCombat.release(player)
 	if record.Status == OnboardingState.Statuses.NotStarted then
+		record.Version = OnboardingConfig.Version
 		writeRecord(player, OnboardingState.withCheckpoint(record, "Intro"))
 	end
-
-	funnel(player, OnboardingConfig.Analytics.Steps.Started, {
-		resumed = resumeAt ~= "Intro",
-		resumeStep = resumeAt,
-	})
-
-	-- A reset or a fall must land the player back in their own arena on the step
-	-- they were already on, never in the lobby and never at step one.
+	funnel(player, OnboardingConfig.Analytics.Steps.Started, { resumed = resumeAt ~= "Intro", resumeStep = resumeAt })
 	table.insert(
 		session.connections,
 		player.CharacterAdded:Connect(function()
 			task.wait(0.2)
 			if sessions[player] == session and not session.finished then
 				placeAtSafePoint(session)
+				publish(session, "recovered")
 			end
 		end)
 	)
-
 	stageStep(session, resumeAt)
 	placeAtSafePoint(session)
 	publish(session, if resumeAt ~= "Intro" then "resumed" else "started")
@@ -554,6 +286,9 @@ function OnboardingService.completeStep(player: Player, step: Step): (boolean, s
 		return false, "wrong_step"
 	end
 
+	if step ~= "Intro" and step ~= "Celebration" and not session.succeeded then
+		return false, "not_demonstrated"
+	end
 	local record = readRecord(player)
 	if record == nil then
 		return false, "no_profile"
@@ -660,87 +395,82 @@ function OnboardingService.resolveFor(player: Player): { eligible: boolean, step
 	}
 end
 
--- No lesson is on a timer, so a ball that is somehow lost would strand the
--- player on a step they can no longer attempt. Preserved dodgeballs normally
--- return on their own; this only covers owning none at all.
-local function ensureBallAvailable(session: Session)
-	if not BALL_GRANT_STEPS[session.step] then
+local function retry(session: Session, now: number)
+	if session.retryAt or session.succeeded then
 		return
 	end
-	local folder = ballsFolder()
-	if folder == nil then
-		OnboardingCombat.grantBall(session.player)
-		return
-	end
-	local playerId = PlayerIds.toId(session.player)
-	for _, ball in folder:GetChildren() do
-		if ball:IsA("BasePart") and ball:GetAttribute("ow") == playerId then
-			return
-		end
-	end
-	OnboardingCombat.grantBall(session.player)
+	session.jumped = false
+	session.retryAt = now + L.RetrySeconds
+	session.attempts[session.step] = (session.attempts[session.step] or 0) + 1
+	publish(session, "retry")
 end
 
-local function releaseBridgeDummy(session: Session, position: Vector3)
-	local world = OnboardingConfig.World
-	local onBridge = OnboardingLayout.onBridge(
-		session.arena.frame,
-		position,
-		world.BridgeInnerRadius,
-		world.BridgeOuterRadius,
-		world.BridgeHalfWidth
-	)
-	if not onBridge then
-		return
-	end
-	session.awaitingBridge = false
-	spawnDummyAt(
-		session,
-		OnboardingArena.point(session.arena, OnboardingConfig.Training.BonkDummyDistance, 0),
-		OnboardingConfig.Training.BonkDummyWalkSpeed
-	)
-	publish(session, "advanced")
-end
-
-local function recoverIfLost(session: Session, position: Vector3)
-	local world = OnboardingConfig.World
-	local frame = session.arena.frame
-	local fallen = position.Y < frame.surfaceY - world.FallRecoveryDepth
-	local strayed = OnboardingLayout.overEliminationRing(
-		frame,
-		position,
-		world.RingInnerRadius,
-		world.RingOuterRadius,
-		world.BridgeHalfWidth
-	)
-	if fallen or strayed then
-		placeAtSafePoint(session)
-	end
-end
-
-local function tickSession(session: Session, samples: { BallSample }, now: number, dt: number, recover: boolean)
-	steerBalls(session, samples, dt)
-	detectBallHits(session, samples)
-
+local function tickSession(session: Session, now: number)
 	local root = characterRoot(session.player)
-	local chaseTarget = if session.chases and root ~= nil then root.Position else nil
-	for _, dummy in standingTargets(session) do
-		OnboardingDummies.update(dummy, now, chaseTarget)
+	if not root then
+		return
 	end
-
-	if root ~= nil then
-		local position = root.Position
-		if session.awaitingBridge then
-			releaseBridgeDummy(session, position)
+	local humanoid = root.Parent and root.Parent:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	local position = Course.localPosition(session.arena, root.Position)
+	if session.retryAt then
+		if now >= session.retryAt then
+			placeAtSafePoint(session)
+			publish(session, "recovered")
 		end
-		if recover then
-			recoverIfLost(session, position)
+		return
+	end
+	if Progress.isLost(position, OnboardingConfig.World) then
+		placeAtSafePoint(session)
+		publish(session, "recovered")
+		return
+	end
+	if session.step == "Intro" or session.step == "Celebration" or session.succeeded then
+		return
+	end
+	-- Query the real hazard collision geometry before awarding a checkpoint.
+	-- This is the same root-only overlap used by Splashdown's shared shove kits.
+	if now >= session.graceUntil then
+		overlap.FilterDescendantsInstances = { root }
+		for _, hazard in session.arena.hazards do
+			if #Workspace:GetPartsInPart(hazard, overlap) > 0 then
+				retry(session, now)
+				return
+			end
 		end
 	end
-
-	if recover then
-		ensureBallAvailable(session)
+	local lesson = lessonFor(session)
+	local target = targetFor(session)
+	local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
+	if Progress.jumpedAt(position, lesson.jumpAt, not grounded, root.AssemblyLinearVelocity.Y > 2) then
+		session.jumped = true
 	end
+	if not Progress.atCheckpoint(position, target, grounded, L) then
+		return
+	end
+	if Progress.needsJump(lesson.jumpAt, session.checkpoint, target) and not session.jumped then
+		retry(session, now)
+		return
+	end
+	if session.targetIndex < #lesson.checkpoints then
+		session.checkpoint = target
+		session.targetIndex += 1
+		session.jumped = false
+		publish(session, "checkpoint")
+		return
+	end
+	session.checkpoint = target
+	session.succeeded = true
+	publish(session, "success")
+	local generation = session.generation
+	local step = session.step
+	task.delay(OnboardingConfig.Timing.SuccessHoldSeconds, function()
+		if sessions[session.player] == session and not session.finished and session.generation == generation then
+			OnboardingService.completeStep(session.player, step)
+		end
+	end)
 end
 
 function OnboardingService.start()
@@ -749,28 +479,29 @@ function OnboardingService.start()
 	end
 	started = true
 	OnboardingArena.clearAll()
-
-	ServerAuthAdapter.onEvent(onSimEvent)
-
-	-- One loop drives every session: ball contact, dummy pursuit, the bridge
-	-- trigger and recovery. Keeping it at service scope rather than per step
-	-- means staging a step can never silently tear any of it down.
-	local recoveryAccumulator = 0
-	RunService.Heartbeat:Connect(function(dt: number)
+	RotatingPlatforms.startMover()
+	RunService.Heartbeat:Connect(function(dt)
 		if next(sessions) == nil then
 			return
 		end
-		local samples = sampleBalls()
 		local now = os.clock()
-		recoveryAccumulator += dt
-		local recover = recoveryAccumulator >= 0.5
-		if recover then
-			recoveryAccumulator = 0
-		end
+		local groups: { Instance } = {}
 		for _, session in sessions do
-			if not session.finished then
-				tickSession(session, samples, now, dt, recover)
+			table.insert(groups, session.arena.group)
+		end
+		local context = { instances = groups, now = now, deltaTime = dt }
+		Bumpers.tickWorld(context)
+		RotorBump.tickWorld(context)
+		for player, session in sessions do
+			if session.finished then
+				continue
 			end
+			local root = characterRoot(player)
+			if root and now >= session.graceUntil and not session.succeeded then
+				Bumpers.tickPlayer(context, player, root)
+				RotorBump.tickPlayer(context, player, root)
+			end
+			tickSession(session, now)
 		end
 	end)
 
@@ -832,9 +563,9 @@ function OnboardingService.start()
 		elseif action == "MarkCoreComplete" then
 			local record = readRecord(player)
 			if record then
-				local staged = OnboardingState.withCheckpoint(record, "NormalThrow")
-				staged = OnboardingState.withCheckpoint(staged, "Hammer")
-				staged = OnboardingState.withCheckpoint(staged, "ChargedThrow")
+				local staged = OnboardingState.withCheckpoint(record, "AvoidBumpers")
+				staged = OnboardingState.withCheckpoint(staged, "JumpSweepers")
+				staged = OnboardingState.withCheckpoint(staged, "TimeHammer")
 				writeRecord(player, staged)
 			end
 		elseif action == "CompleteNow" then

@@ -43,7 +43,11 @@ local function thresholds(count: number): { number }
 	return list
 end
 
--- 2026-09-01T00:00:00Z, running six weeks with a one-week rest before S2.
+-- 1788307200 is 2026-09-02T00:00:00Z, so the six-week window ends
+-- 2026-10-14T00:00:00Z. The comment here previously said September 1, which the
+-- value never matched; dates are the release owner's to set, so the description
+-- was corrected to the value rather than the value to the description. Confirm
+-- both against the intended commercial window before advertising it.
 local S1_START = 1788307200
 local SIX_WEEKS = 42 * 24 * 60 * 60
 

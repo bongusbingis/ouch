@@ -1,4 +1,4 @@
--- Description: Builds and parses the teleport payload the arena sends back to the lobby, validating the party identity, match id, and member list against the schema.
+-- Description: Builds and parses the teleport payload the arena sends back to the lobby, validating the party identity, match id, member list and queue against the schema.
 
 --!strict
 
@@ -15,10 +15,15 @@ export type Payload = {
 	memberUserIds: { number },
 	returnMode: "Party" | "Separate",
 	queueOnArrival: boolean?,
+	queueId: string?,
 }
 
 local function validId(value: any): boolean
 	return typeof(value) == "string" and #value > 0 and #value <= 100
+end
+
+local function validKey(value: any): boolean
+	return typeof(value) == "string" and #value > 0 and #value <= 32
 end
 
 local function copyMembers(value: any): ({ number }?, string?)
@@ -55,7 +60,8 @@ function ReturnPayload.build(
 	matchId: string,
 	memberUserIds: { number },
 	returnMode: ("Party" | "Separate")?,
-	queueOnArrival: boolean?
+	queueOnArrival: boolean?,
+	queueId: string?
 ): Payload
 	return {
 		schemaVersion = ReturnPayload.SchemaVersion,
@@ -64,6 +70,7 @@ function ReturnPayload.build(
 		memberUserIds = table.clone(memberUserIds),
 		returnMode = returnMode or "Party",
 		queueOnArrival = if returnMode ~= "Separate" and queueOnArrival == true then true else nil,
+		queueId = if validKey(queueId) then queueId else nil,
 	}
 end
 
@@ -87,6 +94,9 @@ function ReturnPayload.parse(value: any): (Payload?, string?)
 	if returnMode == "Separate" and value.queueOnArrival == true then
 		return nil, "invalid_queue_intent"
 	end
+	if value.queueId ~= nil and not validKey(value.queueId) then
+		return nil, "invalid_queue"
+	end
 
 	local members, membersError = copyMembers(value.memberUserIds)
 	if not members then
@@ -100,6 +110,7 @@ function ReturnPayload.parse(value: any): (Payload?, string?)
 		memberUserIds = members,
 		returnMode = returnMode,
 		queueOnArrival = if value.queueOnArrival == true then true else nil,
+		queueId = value.queueId,
 	},
 		nil
 end

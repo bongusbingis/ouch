@@ -3,12 +3,33 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Metrics = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("TextMetrics"))
 local TestAssets = require(game.ServerStorage.Tests.Helpers.TestAssets)
-local VictoryRig = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("VictoryRig")
+local EmoteRig = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteRig")
+)
+local ScrollingClipping = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("ScrollingClipping")
 )
 
 return function()
 	describe("UI detail contracts", function()
+		it("detects clipping scrolling ancestors", function()
+			local outer = Instance.new("ScrollingFrame")
+			local inner = Instance.new("Frame")
+			local target = Instance.new("Frame")
+			inner.Parent = outer
+			target.Parent = inner
+
+			outer.ClipsDescendants = true
+			expect(ScrollingClipping.isInsideClippingScrollingFrame(outer)).to.equal(true)
+			expect(ScrollingClipping.isInsideClippingScrollingFrame(target)).to.equal(true)
+			outer.ClipsDescendants = false
+			expect(ScrollingClipping.isInsideClippingScrollingFrame(target)).to.equal(false)
+
+			outer:Destroy()
+		end)
 		it("fits the entire currency group in a compact price cell", function()
 			for _, amount in { "500", "10,000", "999,999,999" } do
 				for _, width in { 68, 120, 300 } do
@@ -31,15 +52,14 @@ return function()
 				expect(TestAssets.get(stand, "Plaque", "Label", "Rank"):IsA("TextLabel")).to.equal(true)
 			end
 		end)
-		it("poses shared emotes at a world origin without drifting the character", function()
+		it("sets the shared emote rig origin at a world origin without drifting the character", function()
 			local world = Instance.new("Folder")
 			world.Parent = workspace
-			local display = VictoryRig.create(world)
-			local style = VictoryRig.style("ShowtimeTwirl")
-			display.pose(style, 0.6, false)
+			local display = EmoteRig.create(world)
+			display.setOrigin(CFrame.identity)
 			local first = display.model.HumanoidRootPart.CFrame
 			local origin = CFrame.new(20, 10000, 30)
-			display.pose(style, 0.6, false, origin)
+			display.setOrigin(origin)
 			local offset = display.model.HumanoidRootPart.Position - (origin * first).Position
 			local _, size = display.model:GetBoundingBox()
 			expect(size.Magnitude < 20).to.equal(true)

@@ -6,6 +6,8 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local c = React.createElement
+local UI = require(ReplicatedStorage.Config.Interface.UI)
+local Artwork = require(ReplicatedStorage.Config.Interface.RedesignArtwork)
 
 return function(props)
 	local native = table.clone(props.Native or {})
@@ -15,6 +17,22 @@ return function(props)
 	local radius = props.Radius or Config.Surface.RadiusPx
 	local shadow = if props.Shadow == false then 0 else Config.Surface.ShadowPx
 	local content = table.clone(props.children or {})
+	-- Opaque cyan panels use the same Figma image as Shop and Backpack.
+	-- Team chips and translucent gameplay overlays retain their role-specific fill.
+	if
+		Artwork.Page ~= ""
+		and props.Color == UI.ProgressionStyle.Panel
+		and radius == UI.Radius.Panel
+		and shadow > 0
+		and (props.Transparency or 0) == 0
+		and not props.StrokeColor
+	then
+		native.Image = Artwork.Page
+		native.ScaleType = Enum.ScaleType.Slice
+		native.SliceCenter = UI.Layout.PageSurface.SliceCenter
+		native.SliceScale = UI.Layout.PageSurface.SliceScale
+		return c("ImageLabel", native, content)
+	end
 	content.Corner = c("UICorner", { CornerRadius = UDim.new(0, radius) })
 	content.Stroke = c("UIStroke", {
 		Color = props.StrokeColor or Config.Colors.White,
@@ -24,14 +42,14 @@ return function(props)
 	return c("Frame", native, {
 		Shadow = if shadow > 0
 			then c("Frame", {
-				BackgroundColor3 = Config.Colors.Ink,
+				BackgroundColor3 = Config.Colors.Shadow,
 				BorderSizePixel = 0,
 				Position = UDim2.fromOffset(shadow, shadow),
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 1,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, radius) }),
-				Stroke = c("UIStroke", { Color = Config.Colors.Ink, Thickness = Config.Surface.StrokePx }),
+				Stroke = c("UIStroke", { Color = Config.Colors.Shadow, Thickness = Config.Surface.StrokePx }),
 			})
 			else nil,
 		Face = c("Frame", {

@@ -28,13 +28,19 @@ Data._loaded = {}
 Data._loadGeneration = {}
 Data._writeLeaseCounts = {}
 Data._pendingSaves = {}
+Data._loading = {}
 
 local loadedListeners = {}
 
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
 
---_dataStore = _dataStore.Mock
+
+local DebugConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
+if game:GetService("RunService"):IsStudio() and DebugConfig.MockProfiles == true then
+	_dataStore = _dataStore.Mock
+	warn("[Data] Studio mock profiles enabled (Debug.MockProfiles)")
+end
 
 local WRITE_LEASE_TIMEOUT_SECONDS = 10
 
@@ -94,6 +100,27 @@ local function _subscribeWhenReady(player, entry)
 	end)
 end
 
+local EMOTE_SLOT_COUNT = 8
+
+-- DataStores reject arrays with holes, so the slot list is always a dense
+-- eight-entry array where an empty string marks an empty slot.
+local function _migrateEmoteSlots(data)
+	local slots = data.Cosmetics.EmoteSlots
+	if type(slots) ~= "table" then
+		slots = {}
+	end
+	if type(data.Cosmetics.Equipped.EmoteAssets) == "string" and data.Cosmetics.Equipped.EmoteAssets ~= "" then
+		slots[1] = data.Cosmetics.Equipped.EmoteAssets
+		data.Cosmetics.Equipped.EmoteAssets = nil
+	end
+	local dense = {}
+	for index = 1, EMOTE_SLOT_COUNT do
+		local value = slots[index]
+		dense[index] = if type(value) == "string" then value else ""
+	end
+	data.Cosmetics.EmoteSlots = dense
+end
+
 local function _loadPlayerData(player)
 	return Promise.new(function(resolve, reject)
 		local profile = _dataStore:StartSessionAsync(`Player_{player.UserId}`, {
@@ -111,6 +138,7 @@ local function _loadPlayerData(player)
 		profile:AddUserId(player.UserId)
 
 		profile:Reconcile()
+		_migrateEmoteSlots(profile.Data)
 		local journal = MatchAwards.ensure(profile.Data)
 		for _, record in journal.Pending do
 			record.Ready = true
@@ -118,6 +146,9 @@ local function _loadPlayerData(player)
 
 		local sessionConn
 		sessionConn = profile.OnSessionEnd:Connect(function()
+			warn(
+				`[Data] session ended for {player.Name}; present={player:IsDescendantOf(PlayersService)}\n{debug.traceback()}`
+			)
 			if sessionConn then
 				sessionConn:Disconnect()
 				sessionConn = nil
@@ -229,6 +260,31 @@ end
 function Data.get(player)
 	local entry = Data._profiles[player.UserId]
 	return entry and entry.Data
+end
+
+-- CrateService prepares these values on detached tables. Apply the wallet,
+-- ownership, pity and receipt payload without yielding, before replication.
+-- Profile.Data and Replica.Data share this root; a failed FireClient must not
+-- turn an already-applied crate into a retryable grant.
+function Data.commitCrateOpen(player, expectedData, draft): boolean
+	local entry = Data._profiles[player.UserId]
+	if entry == nil or entry.Data ~= expectedData or not entry.Profile:IsActive() then
+		return false
+	end
+	local values = {
+		Bonks = draft.Bonks,
+		Cosmetics = draft.Cosmetics,
+		Crates = draft.Crates,
+		ReceiptWork = draft.ReceiptWork,
+	}
+	for key, value in values do
+		entry.Profile.Data[key] = value
+	end
+	local ok, err = pcall(entry.Replica.SetValues, entry.Replica, {}, values)
+	if not ok then
+		warn(`[Data] Crate committed but replication failed for user {player.UserId}: {err}`)
+	end
+	return true
 end
 
 function Data.isLoaded(player)
@@ -488,11 +544,22 @@ function Data.addFieldForAdmin(player, field, amount)
 	return Data.setFieldForAdmin(player, field, current + amount)
 end
 
+-- PlayerAdded and the startup sweep of existing players both call this, so a
+-- player who joins during server start must not open two sessions on one key.
 function Data.load(player)
-	local generation = (Data._loadGeneration[player.UserId] or 0) + 1
-	Data._loadGeneration[player.UserId] = generation
-	Data._loaded[player.UserId] = nil
-	return _loadPlayerData(player)
+	local userId = player.UserId
+	local inFlight = Data._loading[userId]
+	if inFlight then
+		return inFlight
+	end
+	if Data._profiles[userId] then
+		return Promise.resolve()
+	end
+	local generation = (Data._loadGeneration[userId] or 0) + 1
+	Data._loadGeneration[userId] = generation
+	Data._loaded[userId] = nil
+	local promise
+	promise = _loadPlayerData(player)
 		:andThen(function()
 			_buildLeaderStats(player):await()
 			local d = Data.get(player)
@@ -516,6 +583,13 @@ function Data.load(player)
 		:catch(function(err)
 			warn(`[Data] CRITICAL — failed to load profile for {player.Name} ({player.UserId}): {err}`)
 		end)
+		:finally(function()
+			if Data._loading[userId] == promise then
+				Data._loading[userId] = nil
+			end
+		end)
+	Data._loading[userId] = promise
+	return promise
 end
 
 local function _finishSave(userId, entry)
@@ -596,5 +670,7 @@ function Data.save(player)
 		_finishSave(userId, entry)
 	end)
 end
+
+Data._migrateEmoteSlots = _migrateEmoteSlots
 
 return Data

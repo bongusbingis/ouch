@@ -4,6 +4,7 @@
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -15,11 +16,24 @@ local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local JoinCodeLayout = require(script.Parent.Parent.Models.JoinCodeLayout)
+local ScrollFrame = require(script.Parent.ScrollFrame)
+local Well = require(script.Parent.Well)
+
+local modalSurface = require(script.Parent.ModalSurface)
 
 local c = React.createElement
 local Palette = UIConfig.ProgressionStyle
 local CODE_LENGTH = 6
-local HELP_TEXT = "Ex: 123-456"
+local HELP_TEXT = ""
+
+local function keyboardSnapshot()
+	return {
+		visible = UserInputService.OnScreenKeyboardVisible,
+		position = UserInputService.OnScreenKeyboardPosition,
+		size = UserInputService.OnScreenKeyboardSize,
+	}
+end
 
 local function sanitize(text: string): string
 	return string.sub(string.gsub(text, "%D", ""), 1, CODE_LENGTH)
@@ -51,15 +65,12 @@ local function DigitBox(props)
 		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
 		Position = UDim2.fromScale(0.409565, 0.0598802),
-		Size = UDim2.fromScale(0.8, 0.8),
+		Size = UDim2.new(0.95 / 6, -8, 1, 0),
 	}, {
 		EntranceScale = c("UIScale", { Scale = styles.Scale }),
 		UIAspectRatioConstraint = c("UIAspectRatioConstraint"),
 		UICorner = c("UICorner", {
-			BottomLeftRadius = UDim.new(0, 20),
-			BottomRightRadius = UDim.new(0, 20),
-			TopLeftRadius = UDim.new(0, 20),
-			TopRightRadius = UDim.new(0, 20),
+			CornerRadius = UDim.new(0, UIConfig.Radius.Tile),
 		}),
 		UIStroke = c("UIStroke", {
 			Color = Palette.White,
@@ -98,13 +109,21 @@ export type Props = {
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
-	local panelSize = ResponsiveLayout.panelSize(
+	local preferredSize = ResponsiveLayout.panelSize(
 		safeArea.size,
 		UIConfig.Layout.Panels.JoinCode,
 		UIConfig.Layout.PortraitMaxAspect,
 		UIConfig.Layout.ShortLandscapeMaxHeightPx
 	)
+	local rootPosition, setRootPosition = React.useState(Vector2.zero)
+	local keyboard, setKeyboard = React.useState(keyboardSnapshot)
+	local keyboardDismissInput = React.useRef(nil)
+	local layout = JoinCodeLayout.resolve(safeArea, preferredSize, rootPosition, keyboard)
+	local panelSize = layout.size
 	local inputRef = React.useRef(nil)
+	local formScrollRef = React.useRef(nil)
+	local scrollTargetRef = React.useRef(layout.scrollY)
+	scrollTargetRef.current = layout.scrollY
 	local previousSelection = React.useRef(nil)
 	local focusRevision = React.useRef(0)
 	local errorRevision = React.useRef(0)
@@ -112,6 +131,8 @@ return function(props: Props)
 	local openRef = React.useRef(props.Open)
 	local focusAllowedRef = React.useRef(props.Open and props.FocusEnabled ~= false)
 	local closingRef = React.useRef(false)
+	local resumeFocusRef = React.useRef(true)
+	local submittingRef = React.useRef(false)
 	local aliveRef = React.useRef(true)
 	openRef.current = props.Open
 	focusAllowedRef.current = props.Open and props.FocusEnabled ~= false
@@ -127,6 +148,16 @@ return function(props: Props)
 		immediate = reducedMotion,
 	})
 
+	local function positionForm(scroll: ScrollingFrame)
+		-- ScrollFrame owns its ref; native geometry events provide the actual host.
+		formScrollRef.current = scroll
+		if not scroll.Parent or not openRef.current or closingRef.current then
+			return
+		end
+		local maximum = math.max(0, scroll.AbsoluteCanvasSize.Y - scroll.AbsoluteWindowSize.Y)
+		scroll.CanvasPosition = Vector2.new(0, math.min(scrollTargetRef.current, maximum))
+	end
+
 	local function scheduleFocus(delay: number?)
 		focusRevision.current += 1
 		local revision = focusRevision.current
@@ -135,6 +166,7 @@ return function(props: Props)
 			if
 				revision == focusRevision.current
 				and focusAllowedRef.current
+				and resumeFocusRef.current
 				and not closingRef.current
 				and input
 				and not input:IsFocused()
@@ -159,6 +191,8 @@ return function(props: Props)
 
 	local function close()
 		closingRef.current = true
+		resumeFocusRef.current = false
+		submittingRef.current = false
 		focusRevision.current += 1
 		errorRevision.current += 1
 		submitRevision.current += 1
@@ -178,9 +212,10 @@ return function(props: Props)
 	end
 
 	local function submit()
-		if submitting or #code ~= CODE_LENGTH then
+		if submittingRef.current or not focusAllowedRef.current or closingRef.current or #code ~= CODE_LENGTH then
 			return
 		end
+		submittingRef.current = true
 		setSubmitting(true)
 		submitRevision.current += 1
 		local revision = submitRevision.current
@@ -193,6 +228,7 @@ return function(props: Props)
 			if not aliveRef.current or revision ~= submitRevision.current then
 				return
 			end
+			submittingRef.current = false
 			setSubmitting(false)
 			if success then
 				close()
@@ -200,7 +236,6 @@ return function(props: Props)
 				if message then
 					showError(message)
 				end
-				scheduleFocus()
 			end
 		end)
 	end
@@ -208,10 +243,16 @@ return function(props: Props)
 	React.useEffect(function()
 		if not props.Open then
 			closingRef.current = true
+			resumeFocusRef.current = false
+			submittingRef.current = false
+			setSubmitting(false)
 			submitRevision.current += 1
 			return
 		end
 		closingRef.current = false
+		resumeFocusRef.current = true
+		submittingRef.current = false
+		setSubmitting(false)
 		previousSelection.current = GuiService.SelectedObject
 		setCode("")
 		setErrorText(HELP_TEXT)
@@ -238,13 +279,68 @@ return function(props: Props)
 			focusRevision.current += 1
 			local input = inputRef.current
 			if input and input:IsFocused() then
+				resumeFocusRef.current = true
 				input:ReleaseFocus()
 			end
-		else
+		elseif resumeFocusRef.current then
 			closingRef.current = false
 			scheduleFocus(0)
 		end
 	end, { props.Open, props.FocusEnabled })
+
+	React.useEffect(function()
+		local scroll = formScrollRef.current
+		if scroll then
+			positionForm(scroll)
+		end
+	end, { props.Open, layout.scrollY, layout.contentHeight, panelSize.Y })
+
+	React.useEffect(function()
+		if not props.Open then
+			return
+		end
+		local active = true
+		local function update()
+			local snapshot = keyboardSnapshot()
+			-- A tap may dismiss the keyboard before its button receives Activated.
+			-- Keep that button in place until the same gesture has finished.
+			if active and (snapshot.visible or keyboardDismissInput.current == nil) then
+				setKeyboard(snapshot)
+			end
+		end
+		local connections = {}
+		for _, property in { "OnScreenKeyboardVisible", "OnScreenKeyboardPosition", "OnScreenKeyboardSize" } do
+			table.insert(connections, UserInputService:GetPropertyChangedSignal(property):Connect(update))
+		end
+		table.insert(
+			connections,
+			UserInputService.InputEnded:Connect(function(input)
+				if input == keyboardDismissInput.current then
+					task.defer(function()
+						if active and input == keyboardDismissInput.current then
+							keyboardDismissInput.current = nil
+							update()
+						end
+					end)
+				end
+			end)
+		)
+		table.insert(
+			connections,
+			UserInputService.WindowFocusReleased:Connect(function()
+				keyboardDismissInput.current = nil
+				update()
+			end)
+		)
+		update()
+		return function()
+			active = false
+			keyboardDismissInput.current = nil
+			for _, connection in connections do
+				connection:Disconnect()
+			end
+		end
+	end, { props.Open })
 
 	React.useEffect(function()
 		aliveRef.current = true
@@ -269,7 +365,7 @@ return function(props: Props)
 				BackgroundTransparency = 1,
 				LayoutOrder = 4,
 				Position = UDim2.fromScale(0.500703, 0.109386),
-				Size = UDim2.fromScale(0.0492974, 0.781228),
+				Size = UDim2.fromScale(0.05, 1),
 				Text = "-",
 				Font = Enum.Font.LuckiestGuy,
 				TextColor3 = Palette.White,
@@ -284,8 +380,7 @@ return function(props: Props)
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			HorizontalFlex = Enum.UIFlexAlignment.Fill,
-			Padding = UDim.new(0.01, 0),
+			Padding = UDim.new(0, 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -298,8 +393,8 @@ return function(props: Props)
 		})
 	end
 
-	local canSubmit = #code == CODE_LENGTH and not submitting
-	return c("TextButton", {
+	local canSubmit = #code == CODE_LENGTH and not submitting and props.FocusEnabled ~= false
+	return modalSurface({
 		Active = true,
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(),
@@ -308,15 +403,20 @@ return function(props: Props)
 		Text = "",
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 100,
+		[React.Change.AbsolutePosition] = function(root: GuiObject)
+			setRootPosition(root.AbsolutePosition)
+		end,
 	}, {
 		Panel = c("ImageLabel", {
 			Active = true,
 			ZIndex = 101,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
-			Position = UDim2.fromScale(0.5, 0.534555),
-			Rotation = modalStyles.Rotation,
+			Image = UIConfig.Layout.PageSurface.Image,
+			Position = if layout.position
+				then UDim2.fromOffset(layout.position.X, layout.position.Y)
+				else UDim2.fromScale(0.5, 0.534555),
+			Rotation = if layout.position then 0 else modalStyles.Rotation,
 			ScaleType = Enum.ScaleType.Slice,
 			SelectionGroup = true,
 			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
@@ -324,153 +424,177 @@ return function(props: Props)
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
+			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 			Visible = true,
 		}, {
 			ModalScale = c("UIScale", { Scale = modalStyles.Scale }),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 46,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.147601),
-					Size = UDim2.fromScale(0.9, 0.144798),
-					Text = "ENTER PARTY CODE",
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 2,
-				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = Palette.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-			Frame = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundColor3 = Color3.new(1, 1, 1),
-				BorderColor3 = Color3.new(),
+			FormScroll = c(ScrollFrame, {
+				Active = true,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.202036),
-				Size = UDim2.fromScale(0.8, 0.015),
-			}),
-			Title2 = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = UIConfig.Text.BodyFont,
-				MaxTextSize = 32,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
-					Position = UDim2.fromScale(0.5, 0.275),
-					Size = UDim2.fromScale(0.9, 0.0881433),
-					Text = "Type the 6-digit code to join a party",
-					TextColor3 = Color3.new(1, 1, 1),
-					TextStrokeColor3 = Palette.Ink,
-					TextStrokeTransparency = 0.35,
-					ZIndex = 2,
-				},
-			}),
-			EntryBox = c("ImageLabel", {
-				BackgroundTransparency = 1,
-				Image = "rbxassetid://130293277730649",
-				Position = UDim2.fromScale(0.05, 0.333456),
-				ScaleType = Enum.ScaleType.Slice,
-				Size = UDim2.fromScale(0.9, 0.34441),
-				SliceCenter = Rect.new(61, 58, 958, 139),
-				SliceScale = 0.5,
+				Size = UDim2.fromScale(1, 1),
+				CanvasSize = UDim2.fromOffset(0, layout.contentHeight),
+				[React.Change.AbsoluteCanvasSize] = positionForm,
+				[React.Change.AbsoluteWindowSize] = positionForm,
+				ScrollingDirection = Enum.ScrollingDirection.Y,
+				ScrollingEnabled = layout.scrolling,
+				Selectable = layout.scrolling,
+				ScrollBarThickness = if layout.scrolling then 6 else 0,
+				ScrollBarImageColor3 = Palette.White,
 			}, {
-				Holder = c("Frame", {
+				Content = c("Frame", {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromScale(0.0137874, -0.0459255),
-					Size = UDim2.fromScale(0.962774, 1.04593),
-				}, digits),
-				InputCapture = c("TextBox", {
-					ref = inputRef,
-					BackgroundTransparency = 1,
-					ClearTextOnFocus = false,
-					FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json"),
-					MultiLine = false,
-					ShowNativeInput = true,
-					Size = UDim2.fromScale(1, 1),
-					Text = code,
-					TextColor3 = Color3.new(),
-					TextEditable = true,
-					TextSize = 14,
-					TextTransparency = 1,
-					[React.Change.Text] = function(input: TextBox)
-						local nextCode = sanitize(input.Text)
-						setCode(nextCode)
-						if input.Text ~= nextCode then
-							input.Text = nextCode
-							input.CursorPosition = #nextCode + 1
-						end
-					end,
-					[React.Event.FocusLost] = function(_input: TextBox, enterPressed: boolean)
-						if enterPressed then
-							submit()
-						end
-						if focusAllowedRef.current and not closingRef.current then
-							scheduleFocus()
-						end
-					end,
-					[React.Event.ReturnPressedFromOnScreenKeyboard] = submit,
+					Size = UDim2.new(1, 0, 0, layout.contentHeight),
+				}, {
+					Title = c(ResponsiveText, {
+						HostName = "Title",
+						MeasurementFont = Enum.Font.LuckiestGuy,
+						MaxTextSize = 46,
+						Native = {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundTransparency = 1,
+							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+							Position = UDim2.fromScale(0.5, 0.147601),
+							Size = UDim2.fromScale(0.9, 0.144798),
+							Text = "ENTER PARTY CODE",
+							TextColor3 = Color3.new(1, 1, 1),
+							ZIndex = 2,
+						},
+					}, {
+						Outline = c("UIStroke", {
+							Color = Palette.Ink,
+							Thickness = 0.045,
+							StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+						}),
+					}),
+					Frame = c("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0),
+						BackgroundColor3 = Color3.new(1, 1, 1),
+						BorderColor3 = Color3.new(),
+						BorderSizePixel = 0,
+						Position = UDim2.fromScale(0.5, 0.202036),
+						Size = UDim2.new(0.8, 0, 0, 2),
+					}),
+					EntryBox = c(Well, {
+						Native = {
+							Position = UDim2.fromScale(0.05, JoinCodeLayout.EntryTop),
+							Size = UDim2.fromScale(0.9, 0.34441),
+						},
+					}, {
+						Holder = c("Frame", {
+							BackgroundTransparency = 1,
+							Position = UDim2.fromOffset(
+								UIConfig.Spacing.CompactInsetPx,
+								UIConfig.Spacing.CompactInsetPx
+							),
+							Size = UDim2.new(
+								1,
+								-UIConfig.Spacing.CompactInsetPx * 2,
+								1,
+								-UIConfig.Spacing.CompactInsetPx * 2
+							),
+						}, digits),
+						InputCapture = c("TextBox", {
+							ref = inputRef,
+							BackgroundTransparency = 1,
+							ClearTextOnFocus = false,
+							FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json"),
+							MultiLine = false,
+							ShowNativeInput = true,
+							Size = UDim2.fromScale(1, 1),
+							Text = code,
+							TextColor3 = Color3.new(),
+							TextEditable = not submitting and props.FocusEnabled ~= false,
+							TextSize = 14,
+							TextTransparency = 1,
+							[React.Change.Text] = function(input: TextBox)
+								local nextCode = sanitize(input.Text)
+								setCode(nextCode)
+								if input.Text ~= nextCode then
+									input.Text = nextCode
+									input.CursorPosition = #nextCode + 1
+								end
+							end,
+							[React.Event.FocusLost] = function(
+								_input: TextBox,
+								enterPressed: boolean,
+								input: InputObject?
+							)
+								if
+									input
+									and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1)
+									and input.UserInputState ~= Enum.UserInputState.End
+									and input.UserInputState ~= Enum.UserInputState.Cancel
+								then
+									keyboardDismissInput.current = input
+								end
+								focusRevision.current += 1
+								if focusAllowedRef.current then
+									resumeFocusRef.current = false
+								end
+								if enterPressed then
+									submit()
+								end
+							end,
+							[React.Event.Focused] = function()
+								resumeFocusRef.current = true
+							end,
+							[React.Event.ReturnPressedFromOnScreenKeyboard] = submit,
+						}),
+					}),
+					Buttons = c("Frame", {
+						AnchorPoint = Vector2.new(0.5, 1),
+						BackgroundTransparency = 1,
+						Position = UDim2.fromScale(0.5, JoinCodeLayout.ActionBottom),
+						Size = UDim2.fromScale(0.8, 0.158129),
+					}, {
+						UIListLayout = c("UIListLayout", {
+							FillDirection = Enum.FillDirection.Horizontal,
+							HorizontalAlignment = Enum.HorizontalAlignment.Center,
+							Padding = UDim.new(0.03, 0),
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+						}),
+						Confirm = c(PriceButton, {
+							Color = Palette.Pink,
+							Enabled = canSubmit,
+							Text = if submitting then "JOINING…" else "JOIN PARTY",
+							TextSize = 24,
+							EntranceDelay = 0.025,
+							LayoutOrder = 3,
+							AnchorPoint = Vector2.zero,
+							Size = UDim2.fromScale(0.4, 1),
+							OnActivated = submit,
+						}),
+						Cancel = c(PriceButton, {
+							Enabled = props.FocusEnabled ~= false,
+							Text = if submitting then "CLOSE" else "CANCEL",
+							TextSize = 24,
+							Color = Palette.Cyan,
+							LayoutOrder = 2,
+							AnchorPoint = Vector2.zero,
+							Size = UDim2.fromScale(0.4, 1),
+							OnActivated = close,
+						}),
+					}),
+					ErrorText = c(ResponsiveText, {
+						HostName = "ErrorText",
+						MeasurementFont = UIConfig.Text.BodyFont,
+						Native = {
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							BackgroundTransparency = 1,
+							Font = UIConfig.Text.BodyFont,
+							Position = UDim2.fromScale(0.495, 0.73),
+							Size = UDim2.fromScale(0.9, 0.0741377),
+							Text = errorText,
+							TextColor3 = errorColor,
+							TextStrokeColor3 = Palette.Ink,
+							TextStrokeTransparency = 0.35,
+							ZIndex = 2,
+						},
+					}),
 				}),
-			}),
-			Buttons = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 1),
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.5, 0.944206),
-				Size = UDim2.fromScale(0.8, 0.158129),
-			}, {
-				UIListLayout = c("UIListLayout", {
-					FillDirection = Enum.FillDirection.Horizontal,
-					HorizontalAlignment = Enum.HorizontalAlignment.Center,
-					Padding = UDim.new(0.03, 0),
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-				}),
-				Confirm = c(PriceButton, {
-					Color = Palette.Pink,
-					Enabled = canSubmit,
-					Text = if submitting then "JOINING…" else "JOIN PARTY",
-					TextSize = 24,
-					EntranceDelay = 0.025,
-					LayoutOrder = 3,
-					AnchorPoint = Vector2.zero,
-					Size = UDim2.fromScale(0.4, 1),
-					OnActivated = submit,
-				}),
-				Cancel = c(PriceButton, {
-					Enabled = not submitting,
-					Text = "CANCEL",
-					TextSize = 24,
-					Color = Palette.Cyan,
-					LayoutOrder = 2,
-					AnchorPoint = Vector2.zero,
-					Size = UDim2.fromScale(0.4, 1),
-					OnActivated = close,
-				}),
-			}),
-			ErrorText = c(ResponsiveText, {
-				HostName = "ErrorText",
-				MeasurementFont = UIConfig.Text.BodyFont,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
-					Position = UDim2.fromScale(0.495, 0.73),
-					Size = UDim2.fromScale(0.9, 0.0741377),
-					Text = errorText,
-					TextColor3 = errorColor,
-					TextStrokeColor3 = Palette.Ink,
-					TextStrokeTransparency = 0.35,
-					ZIndex = 2,
-				},
 			}),
 		}),
 	})

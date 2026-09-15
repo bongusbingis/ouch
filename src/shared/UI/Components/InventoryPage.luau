@@ -12,24 +12,38 @@ local InventoryConfig =
 local InventoryModel = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("InventoryModel")
 )
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local TabPill = require(script.Parent.TabPill)
+local Card = require(script.Parent.ItemTile)
+local PanelFrame = require(script.Parent.PanelFrame)
+local T = require(script.Parent.Parent.Tokens)
+local Motion = require(script.Parent.Parent.Motion)
 local ActivityDots = require(script.Parent.ActivityDots)
 local InventoryPreview = require(script.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local BackpackTitle = require(script.Parent.BackpackTitle)
+local SectionHeader = require(script.Parent.SectionHeader)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
+local EmoteSlotRail = require(script.Parent.EmoteSlotRail)
+local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
+local Network = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Network"))
 
+local Well = require(script.Parent.Well)
+
+local ClientRequest = require(ReplicatedStorage.Shared.Game.Data.ClientRequest)
 local c = React.createElement
 
 export type Props = {
 	Data: any?,
 	Position: any?,
 	WorldWindowRef: any?,
+	HeaderHeight: number?,
 	OnEquip: (InventoryModel.Entry) -> (),
 	OnInspect: ((InventoryModel.Entry) -> ())?,
 	SelectedTab: string,
 	OnTabChanged: (string) -> (),
+	OnLockedSlot: (() -> ())?,
 }
 
 local function ownershipKey(data: any?): string
@@ -46,142 +60,33 @@ local function ownershipKey(data: any?): string
 	return table.concat(ids, "\0")
 end
 
-local function shortName(entry: InventoryModel.Entry): string
-	local name = string.gsub(entry.displayName, "^Default%s+", "")
-	local suffix = if entry.category == "BallAssets"
-		then " Ball"
-		elseif entry.category == "HammerAssets" then " Hammer"
-		else nil
-	if suffix ~= nil and string.sub(name, -#suffix) == suffix and #name > #suffix then
-		return string.sub(name, 1, #name - #suffix)
-	end
-	return name
-end
-
-local function cardColor(entry: InventoryModel.Entry): Color3
-	local color = entry.definition.PreviewColor or InventoryConfig.RarityColors[entry.rarity]
-	assert(color ~= nil, `[InventoryPage] unknown rarity {entry.rarity}`)
-	return color
-end
-
-local function Card(props)
-	local entry: InventoryModel.Entry = props.Entry
-	return c(AnimatedButton, {
-		Style = "Card",
-		Native = {
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://123285423801571",
-			LayoutOrder = props.LayoutOrder,
-			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromOffset(props.CardSize, props.CardHeight),
-			SliceCenter = Rect.new(107, 27, 126, 128),
-			TileSize = UDim2.fromScale(0.4, 0.35),
-		},
-		OnActivated = props.OnActivated,
-		OnSelectionGained = props.OnSelectionGained,
-	}, {
-		Minimum = c("UISizeConstraint", {
-			MinSize = Vector2.new(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx),
-		}),
-		Checkmark = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://168702841",
-			ImageColor3 = UIConfig.ProgressionStyle.Yellow,
-			Position = UDim2.fromScale(0.82, 0.16),
-			Size = UDim2.fromScale(0.2, 0.2),
-			Visible = props.Equipped,
-			ZIndex = 6,
-		}),
-		Background = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
-			BorderSizePixel = 0,
-			Image = "rbxassetid://80477338860845",
-			ImageColor3 = cardColor(entry),
-			Position = UDim2.fromScale(0.49, 0.496),
-			Size = UDim2.fromScale(0.96, 0.955),
-		}, {
-			Texture = c("ImageLabel", {
-				BackgroundTransparency = 1,
-				Image = "rbxassetid://6794188517",
-				ImageTransparency = 0.92,
-				Size = UDim2.fromScale(1, 1),
-			}),
-		}),
-		NameBand = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = if props.Equipped
-				then UIConfig.ProgressionStyle.Claimed
-				else UIConfig.ProgressionStyle.Cyan,
-			BackgroundTransparency = 0,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, 0, 1, -5),
-			Size = UDim2.new(1, -12, 0, 36),
-			ZIndex = 6,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 6) }),
-			ItemName = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 17,
-				MinTextSize = 12,
-				Wrapped = true,
-				Native = {
-					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(4, 2),
-					Size = UDim2.new(1, -8, 1, -4),
-					Font = Enum.Font.LuckiestGuy,
-					Text = string.upper(shortName(entry)),
-					TextWrapped = true,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 7,
-				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-		}),
-		Preview = c("Frame", {
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 1, -36),
-			ZIndex = 5,
-		}, {
-			Content = c(InventoryPreview, {
-				ItemId = entry.itemId,
-				Category = entry.category,
-				Definition = entry.definition,
-				ColorId = props.ColorId,
-				CostumeId = props.CostumeId,
-				ZIndex = 5,
-			}),
-		}),
-	})
-end
-
 local function Section(props)
 	local cardChildren = {
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = if props.Compact
-				then Enum.HorizontalAlignment.Center
-				else Enum.HorizontalAlignment.Left,
-			Padding = UDim.new(0, 7),
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			Padding = UDim.new(0, if props.Compact then T.LobbyLandscape.ScrollInset else T.Layout.Gap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Wraps = true,
 		}),
-		UIPadding = c("UIPadding", { PaddingBottom = UDim.new(0.05, 0) }),
+		UIPadding = c("UIPadding", {
+			PaddingBottom = UDim.new(0, T.Layout.Gap),
+			PaddingTop = UDim.new(0, if props.Compact then T.LobbyLandscape.ScrollInset else T.Layout.CompactGap),
+			PaddingLeft = UDim.new(0, T.Shape.StrokeCard),
+		}),
 	}
 	for index, entry in props.Entries do
 		cardChildren[entry.id] = c(Card, {
+			Compact = props.Compact,
 			Entry = entry,
+			Selected = props.SelectedItemId == entry.itemId,
 			CardSize = props.CardSize,
 			CardHeight = props.CardHeight,
 			LayoutOrder = index,
-			Equipped = InventoryModel.isEquipped(entry, props.Equipped),
+			Equipped = if props.SlotOf
+				then props.SlotOf(entry.itemId) ~= nil
+				else InventoryModel.isEquipped(entry, props.Equipped),
+			SlotIndex = if props.SlotOf then props.SlotOf(entry.itemId) else nil,
 			ColorId = props.Equipped.CharacterColor,
 			CostumeId = props.Equipped.CostumeAssets,
 			OnActivated = function()
@@ -192,47 +97,22 @@ local function Section(props)
 	end
 
 	return {
-		Header = c("Frame", {
-			BackgroundTransparency = 1,
+		Header = c(SectionHeader, {
+			Text = props.Title,
+			Candy = true,
+			HeightPx = props.HeaderHeight,
 			LayoutOrder = props.LayoutOrder,
-			Size = UDim2.new(1, 0, 0, props.HeaderHeight),
-		}, {
-			Frame = c("Frame", {
-				BackgroundColor3 = Color3.new(1, 1, 1),
-				BorderColor3 = Color3.new(),
-				BorderSizePixel = 0,
-				Position = UDim2.new(0, 0, 1, -4),
-				Size = UDim2.new(1, 0, 0, 3),
-				ZIndex = 4,
-			}),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 32,
-				Truncate = true,
-				Native = {
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Size = UDim2.new(1, 0, 1, -8),
-					Text = props.Title,
-					TextColor3 = Color3.new(1, 1, 1),
-					TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-					TextStrokeTransparency = 0.15,
-					TextXAlignment = Enum.TextXAlignment.Left,
-				},
-			}),
 		}),
 		Content = c("Frame", {
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = props.LayoutOrder + 1,
-			Position = UDim2.fromScale(0.225777, 0.0863153),
 			Size = UDim2.fromScale(1, 0),
 		}, cardChildren),
 		Spacer = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = props.LayoutOrder + 2,
-			Size = UDim2.new(1, 0, 0, UIConfig.Layout.Inventory.SpacerHeightPx),
+			Size = UDim2.new(1, 0, 0, T.Layout.CompactGap),
 		}),
 	}
 end
@@ -240,7 +120,7 @@ end
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local composition = if props.WorldWindowRef
-		then ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout)
+		then ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout, props.HeaderHeight)
 		else nil
 	local panelSize = if composition
 		then composition.panel.size
@@ -254,11 +134,8 @@ return function(props: Props)
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local contentTop = if short
-		then inventoryLayout.ShortContentTopPx
-		else math.max(
-			panelSize.Y * 0.2902715,
-			panelSize.Y * 0.198 + UIConfig.Interaction.MinTargetPx + UIConfig.Layout.InventoryContentGapPx
-		)
+		then T.LobbyLandscape.PanelHeader
+		else if panelSize.X < T.Layout.WheelMinWidth then T.Layout.CompactWellTop else T.Layout.WellTop
 	local contentBottom = if short then panelSize.Y - inventoryLayout.ShortContentBottomPx else panelSize.Y * 0.9684105
 	local railGap = inventoryLayout.ShortRailGapPx
 	local railPadding = railGap
@@ -277,13 +154,84 @@ return function(props: Props)
 		else contentWidth * 0.94076 * 0.94
 	local _, cardSize = ResponsiveLayout.gridCellSize(
 		cardWidth,
-		if short then inventoryLayout.ShortCardMinPx else inventoryLayout.CardMinPx,
-		if short then inventoryLayout.ShortCardSizePx else inventoryLayout.CardMaxPx,
-		inventoryLayout.CardGapPx,
-		inventoryLayout.MaxColumns
+		if short
+			then T.LobbyLandscape.InventoryCardMin
+			elseif panelSize.X < T.Layout.WheelMinWidth then 124
+			else T.Layout.CardMin,
+		if short then T.LobbyLandscape.InventoryCard else T.Layout.CardMax,
+		if short then T.LobbyLandscape.ScrollInset else T.Layout.Gap,
+		T.Layout.MaxColumns
 	)
 	local selectedTab = props.SelectedTab
+	local emoteTab = selectedTab == "EMOTES"
+	local wheel = EmoteWheelController.useSnapshot()
+	local selectedSlot, setSelectedSlot = React.useState(nil :: number?)
+	local function slotOf(itemId: string?): number?
+		if itemId == nil then
+			return nil
+		end
+		for index = 1, wheel.capacity do
+			if wheel.slots[index] == itemId then
+				return index
+			end
+		end
+		return nil
+	end
+	local pendingEmote, setPendingEmote = React.useState(nil)
+	local assignmentBusy = React.useRef(false)
+	local mounted = React.useRef(true)
+	React.useEffect(function()
+		mounted.current = true
+		return function()
+			mounted.current = false
+		end
+	end, {})
+	local assignmentError, setAssignmentError = React.useState(nil)
+	local function assignToSlot(index: number, itemId: string?)
+		if assignmentBusy.current or index > wheel.capacity then
+			return
+		end
+		assignmentBusy.current = true
+		setAssignmentError(nil)
+		task.spawn(function()
+			local ok, accepted = ClientRequest(Network.call, "SetEmoteSlot", index, itemId)
+			assignmentBusy.current = false
+			if not mounted.current then
+				return
+			end
+			if ok and accepted then
+				setPendingEmote(nil)
+				setSelectedSlot(nil)
+				Motion.celebrate("EmoteAssets", itemId)
+			else
+				setAssignmentError("Could not update wheel. Try again.")
+			end
+		end)
+	end
+	local function selectSlot(index: number?)
+		if index and pendingEmote then
+			assignToSlot(index, if wheel.slots[index] == pendingEmote.itemId then nil else pendingEmote.itemId)
+		else
+			setSelectedSlot(index)
+		end
+	end
+	local function assignEmote(entry: InventoryModel.Entry)
+		if selectedSlot then
+			assignToSlot(selectedSlot, if wheel.slots[selectedSlot] == entry.itemId then nil else entry.itemId)
+		else
+			setPendingEmote(entry)
+		end
+	end
+	local onEquip = if emoteTab then assignEmote else props.OnEquip
+	local onInspect = if emoteTab then nil else props.OnInspect
 	local categoriesRef = React.useRef(nil :: ScrollingFrame?)
+	React.useEffect(function()
+		local scroller = categoriesRef.current
+		if scroller then
+			return Motion.tabSwitch(scroller)
+		end
+		return nil
+	end, { selectedTab })
 	React.useLayoutEffect(function()
 		local scroller = categoriesRef.current
 		if scroller then
@@ -301,6 +249,15 @@ return function(props: Props)
 			if tab.Id == selectedTab then
 				for _, section in tab.Sections do
 					local entries = InventoryModel.entries(Cosmetics, owned, section.Category)
+					if tab.Id == "EMOTES" then
+						local filtered = {}
+						for _, entry in entries do
+							if not entry.isDefault then
+								table.insert(filtered, entry)
+							end
+						end
+						entries = filtered
+					end
 					if #entries > 0 then
 						table.insert(result, { Title = section.Id, Entries = entries })
 					end
@@ -317,22 +274,49 @@ return function(props: Props)
 		UIPadding = c("UIPadding", {
 			PaddingLeft = UDim.new(0.01, 0),
 			PaddingRight = UDim.new(0.035, 0),
-			PaddingTop = UDim.new(0, UIConfig.Layout.InventoryContentGapPx),
+			PaddingTop = UDim.new(
+				0,
+				if short then T.LobbyLandscape.ScrollPadding else UIConfig.Layout.InventoryContentGapPx
+			),
 			PaddingBottom = UDim.new(0, UIConfig.Layout.InventoryContentGapPx),
 		}),
 	}
+	if emoteTab then
+		categoryChildren.EmoteSlotRail = c(EmoteSlotRail, {
+			LayoutOrder = -3,
+			Compact = short,
+			ContentWidth = cardWidth,
+			ColorId = equipped.CharacterColor,
+			CostumeId = equipped.CostumeAssets,
+			HeaderHeight = if short then T.LobbyLandscape.InventoryHeader else inventoryLayout.HeaderHeightPx,
+			SelectedSlot = selectedSlot,
+			OnSelectSlot = selectSlot,
+			PendingEmote = pendingEmote,
+			ErrorText = assignmentError,
+			OnAssign = assignToSlot,
+			OnLockedSlot = props.OnLockedSlot,
+		})
+	end
 	for index, section in sections do
 		local elements = Section({
 			Title = section.Title,
 			Compact = short,
 			Entries = section.Entries,
 			Equipped = equipped,
-			CardSize = cardSize,
-			CardHeight = cardSize,
+			CardSize = if emoteTab
+				then math.min(cardSize, T.Layout.EmoteCardMax)
+				elseif selectedTab == "EFFECTS" then math.min(cardSize, T.Layout.EffectCardMax)
+				else cardSize,
+			CardHeight = if emoteTab
+				then math.min(cardSize, T.Layout.EmoteCardMax)
+				elseif selectedTab == "EFFECTS" then math.min(cardSize, T.Layout.EffectCardMax)
+				else cardSize,
 			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
 			LayoutOrder = (index - 1) * 3,
-			OnEquip = props.OnEquip,
-			OnInspect = props.OnInspect,
+			OnEquip = onEquip,
+			OnInspect = onInspect,
+			SlotOf = if emoteTab then slotOf else nil,
+			SelectedItemId = if pendingEmote then pendingEmote.itemId else nil,
 			OnSelectionGained = Selection.scrollIntoView,
 		})
 		categoryChildren[`CategoryHeader_{section.Title}`] = elements.Header
@@ -356,61 +340,53 @@ return function(props: Props)
 			})
 			else nil,
 	}
+	local narrowTabs = not short and panelSize.X < T.Layout.WheelMinWidth
+	if narrowTabs then
+		tabs.UIListLayout = nil
+	end
 	for layoutOrder, definition in InventoryConfig.Tabs do
-		local active = selectedTab == definition.Id
-		tabs[definition.Id] = c(AnimatedButton, {
+		tabs[definition.Id] = c(TabPill, {
+			Tilt = if short then 0 else nil,
 			Enabled = props.Data ~= nil,
+			Active = selectedTab == definition.Id,
+			Text = definition.Id,
+			TextSize = if short or narrowTabs then T.Type.Minimum else T.Type.Tab,
 			Native = {
-				BackgroundTransparency = 1,
-				Image = if active then "rbxassetid://94748581468730" else "rbxassetid://136021539696619",
 				LayoutOrder = layoutOrder,
-				ScaleType = Enum.ScaleType.Slice,
+				Position = if narrowTabs
+					then UDim2.new(
+						(layoutOrder - 1) % 2 * 0.51,
+						0,
+						0,
+						math.floor((layoutOrder - 1) / 2) * (T.Layout.MinTarget + T.Layout.CompactGap)
+					)
+					else nil,
 				Size = if short
-					then UDim2.new(1, -inventoryLayout.ShortRailGapPx, 0, UIConfig.Interaction.MinTargetPx)
-					else UDim2.fromScale(0.181575, 1),
-				SliceCenter = Rect.new(198, 228, 841, 468),
-				SliceScale = 0.1,
+					then UDim2.new(1, -inventoryLayout.ShortRailGapPx, 0, T.Layout.MinTarget)
+					elseif narrowTabs then UDim2.new(0.46, 0, 0, T.Layout.MinTarget)
+					else UDim2.fromScale(0.22, 1),
 			},
 			OnActivated = function()
 				props.OnTabChanged(definition.Id)
 			end,
 			OnSelectionGained = if short then Selection.scrollIntoView else nil,
-		}, {
-			TextLabel = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = if short then 18 else 24,
-				Truncate = false,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.new(1, -12, 0.75, 0),
-					Text = definition.Id,
-					TextColor3 = Color3.new(1, 1, 1),
-					TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-					TextStrokeTransparency = 0.15,
-					ZIndex = 2,
-				},
-			}),
 		})
 	end
 
-	return c("ImageLabel", {
-		BackgroundTransparency = 1,
-		ClipsDescendants = false,
-		Image = "rbxassetid://124751224634629",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = props.Position or (if composition
-			then UDim2.fromOffset(
-				safeArea.position.X + composition.panel.position.X + panelSize.X / 2,
-				safeArea.position.Y + composition.panel.position.Y + panelSize.Y / 2
-			)
-			else UIConfig.Layout.PagePosition),
-		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(31, 41, 978, 620),
-		SliceScale = 0.5,
+	return c(PanelFrame, {
+		Tilt = if short then 0 else nil,
+		Native = {
+			BackgroundTransparency = 1,
+			ClipsDescendants = false,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = props.Position or (if composition
+				then UDim2.fromOffset(
+					safeArea.position.X + composition.panel.position.X + panelSize.X / 2,
+					safeArea.position.Y + composition.panel.position.Y + panelSize.Y / 2
+				)
+				else UIConfig.Layout.PagePosition),
+			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+		},
 	}, {
 		WorldWindow = if composition
 			then c("Frame", {
@@ -426,48 +402,19 @@ return function(props: Props)
 				Size = UDim2.fromOffset(composition.world.size.X, composition.world.size.Y),
 			})
 			else nil,
-		Title = c(ResponsiveText, {
-			HostName = "Title",
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 62,
-			Truncate = true,
+		Title = c(BackpackTitle, { Compact = short or narrowTabs, Landscape = short }),
+		Main = c(Well, {
+			Candy = true,
 			Native = {
-				BackgroundTransparency = 1,
-				BorderColor3 = Color3.new(),
-				BorderSizePixel = 0,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+				AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0.5),
 				LayoutOrder = 3,
 				Position = if short
-					then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, 4)
-					else UDim2.fromScale(0.12, 0.0540634),
+					then UDim2.fromOffset(inventoryLayout.ShortContentLeftPx, contentTop)
+					else UDim2.new(0.498913, 0, 0, (contentTop + contentBottom) / 2),
 				Size = if short
-					then UDim2.new(
-						1,
-						-UIConfig.Layout.InventoryContentGapPx * 2,
-						0,
-						inventoryLayout.ShortHeaderHeightPx
-					)
-					else UDim2.fromScale(0.76, 0.0898091),
-				Text = "BACKPACK",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-				TextStrokeTransparency = 0.15,
+					then UDim2.fromOffset(contentWidth, math.max(contentBottom - contentTop, 0))
+					else UDim2.new(0.930013, 0, 0, math.max(contentBottom - contentTop, 0)),
 			},
-		}),
-		Main = c("ImageLabel", {
-			AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
-			LayoutOrder = 3,
-			Position = if short
-				then UDim2.fromOffset(inventoryLayout.ShortContentLeftPx, contentTop)
-				else UDim2.new(0.498913, 0, 0, (contentTop + contentBottom) / 2),
-			ScaleType = Enum.ScaleType.Slice,
-			Size = if short
-				then UDim2.fromOffset(contentWidth, math.max(contentBottom - contentTop, 0))
-				else UDim2.new(0.930013, 0, 0, math.max(contentBottom - contentTop, 0)),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
 		}, {
 			CategoriesHolder = if props.Data and #sections > 0
 				then c("ScrollingFrame", {
@@ -479,17 +426,12 @@ return function(props: Props)
 					BorderSizePixel = 0,
 					CanvasSize = UDim2.fromOffset(0, 0),
 					Position = if short
-						then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, 0)
+						then UDim2.fromOffset(T.LobbyLandscape.ScrollInset, T.LobbyLandscape.ScrollInset)
 						else UDim2.fromScale(0.0341613, 0.0426996),
-					ScrollBarImageColor3 = UIConfig.ProgressionStyle.White,
-					ScrollBarThickness = if short then inventoryLayout.ShortRailGapPx else nil,
+					ScrollBarImageColor3 = T.Colors.Pink,
+					ScrollBarThickness = T.Layout.CompactGap,
 					Size = if short
-						then UDim2.new(
-							1,
-							-UIConfig.Layout.InventoryContentGapPx * 2,
-							1,
-							-inventoryLayout.ShortRailGapPx
-						)
+						then UDim2.new(1, -T.LobbyLandscape.ScrollInset * 2, 1, -T.LobbyLandscape.ScrollInset * 2)
 						else UDim2.fromScale(0.94076, 0.907841),
 				}, categoryChildren)
 				else c("Frame", {
@@ -505,7 +447,7 @@ return function(props: Props)
 							Position = UDim2.fromScale(0.5, 0.44),
 							Size = UDim2.fromScale(0.75, 0.12),
 							Text = if props.Data then "NOTHING HERE YET" else "LOADING BACKPACK…",
-							TextColor3 = Color3.new(1, 1, 1),
+							TextColor3 = T.Colors.Ink,
 							TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
 							TextStrokeTransparency = 0.15,
 						},
@@ -519,18 +461,8 @@ return function(props: Props)
 					}),
 				}),
 		}),
-		Frame = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderColor3 = Color3.new(),
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.499408, 0, 0, contentTop - 4),
-			Size = if short
-				then UDim2.new(1, -UIConfig.Layout.InventoryContentGapPx * 2, 0, 2)
-				else UDim2.fromScale(0.888649, 0.003),
-			ZIndex = 4,
-		}),
 		Tabs = c(if short then "ScrollingFrame" else "Frame", {
+			ZIndex = 5,
 			Active = short,
 			Selectable = false,
 			AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0),
@@ -543,10 +475,15 @@ return function(props: Props)
 			ScrollBarImageColor3 = if short then UIConfig.ProgressionStyle.White else nil,
 			Position = if short
 				then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, contentTop)
-				else UDim2.fromScale(0.499792, 0.198),
+				else UDim2.new(0.5, 0, 0, if narrowTabs then T.Layout.CompactTabsTop else T.Layout.TabsTop),
 			Size = if short
 				then UDim2.fromOffset(inventoryLayout.ShortRailWidthPx, railHeight)
-				else UDim2.new(0.866389, 0, 0, UIConfig.Interaction.MinTargetPx),
+				else UDim2.new(
+					0.866389,
+					0,
+					0,
+					if narrowTabs then T.Layout.MinTarget * 2 + T.Layout.CompactGap else T.Layout.TabHeight
+				),
 		}, tabs),
 	})
 end

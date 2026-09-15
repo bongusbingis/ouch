@@ -59,8 +59,9 @@ export type ItemDef = {
 	InventoryVisible: boolean?,
 	Equippable: boolean?,
 	EffectId: string?,
-	EmoteStyle: string?,
 	Thumbnail: string,
+	-- Semantic key in Interface.RedesignArtwork.Icons; shared by every reward preview.
+	Icon: string?,
 	SplatColor: Color3?,
 	AlwaysAvailable: boolean?,
 	ShopEligible: boolean?,
@@ -71,10 +72,10 @@ export type ItemDef = {
 }
 
 export type DefaultDef = {
+	Icon: string?,
 	DisplayName: string,
 	Rarity: string,
 	EffectId: string?,
-	EmoteStyle: string?,
 	SplatColor: Color3?,
 	SortOrder: number?,
 	PreviewColor: Color3?,
@@ -140,9 +141,8 @@ local Defaults: { [string]: DefaultDef } = {
 		Rarity = "Common",
 	},
 	EmoteAssets = {
-		DisplayName = "Victory Wave",
+		DisplayName = "Wave",
 		Rarity = "Common",
-		EmoteStyle = require(script.Parent.Emotes).DefaultStyle,
 	},
 	BallAssets = {
 		DisplayName = "Default Dodgeball",
@@ -162,6 +162,7 @@ local Defaults: { [string]: DefaultDef } = {
 	},
 	ElimEffectAssets = {
 		DisplayName = "Default Bonk",
+		Icon = "Speaker",
 		Rarity = "Common",
 		ElimEffect = {
 			DodgeballSound = "DefaultElimination",
@@ -171,6 +172,7 @@ local Defaults: { [string]: DefaultDef } = {
 	-- Config.CosmeticEffects binds this EffectId to the events that fire it.
 	ImpactEffectAssets = {
 		DisplayName = "Default Impact",
+		Icon = "Explosion",
 		Rarity = "Common",
 		EffectId = "DefaultImpact",
 	},
@@ -199,6 +201,7 @@ end
 local function eliminationEffect(rarity: string, displayName: string, sound: string, sortOrder: number): ItemDef
 	return {
 		Category = "ElimEffectAssets",
+		Icon = "Bell",
 		Rarity = rarity,
 		DisplayName = displayName,
 		Thumbnail = "",
@@ -211,11 +214,18 @@ local function eliminationEffect(rarity: string, displayName: string, sound: str
 end
 
 local Items: { [string]: ItemDef } = {
+	EmoteWave = {
+		Category = "EmoteAssets",
+		Rarity = "Common",
+		DisplayName = "Wave",
+		Thumbnail = "",
+		AlwaysAvailable = true,
+		ShopEligible = false,
+	},
 	ShowtimeTwirl = {
 		Category = "EmoteAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Confetti Twirl",
-		EmoteStyle = "ConfettiTwirl",
 		Thumbnail = "",
 		ShopEligible = false,
 		SortOrder = 10,
@@ -224,7 +234,6 @@ local Items: { [string]: ItemDef } = {
 		Category = "EmoteAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Champion Flex",
-		EmoteStyle = "ChampionFlex",
 		Thumbnail = "",
 		ShopEligible = false,
 		SortOrder = 20,
@@ -233,7 +242,6 @@ local Items: { [string]: ItemDef } = {
 		Category = "EmoteAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Party Bounce",
-		EmoteStyle = "PartyBounce",
 		Thumbnail = "",
 		ShopEligible = false,
 		SortOrder = 30,
@@ -247,6 +255,7 @@ local Items: { [string]: ItemDef } = {
 	ElimSoundClang = eliminationEffect("Common", "Clang", "ClangElimination", 10),
 
 	ConfettiImpact = {
+		Icon = "Confetti",
 		Category = "ImpactEffectAssets",
 		Rarity = "Common",
 		DisplayName = "Confetti Impact",
@@ -255,6 +264,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 15,
 	},
 	StarPop = {
+		Icon = "Star",
 		Category = "ImpactEffectAssets",
 		Rarity = "Common",
 		DisplayName = "Star Pop",
@@ -263,6 +273,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 10,
 	},
 	FoamPoof = {
+		Icon = "Cloud",
 		Category = "ImpactEffectAssets",
 		Rarity = "Common",
 		DisplayName = "Foam Poof",
@@ -271,6 +282,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 20,
 	},
 	JellySplash = {
+		Icon = "Drop",
 		Category = "ImpactEffectAssets",
 		Rarity = "Rare",
 		DisplayName = "Jelly Splash",
@@ -279,6 +291,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 30,
 	},
 	PartyPopper = {
+		Icon = "Celebration",
 		Category = "ImpactEffectAssets",
 		Rarity = "Rare",
 		DisplayName = "Party Popper",
@@ -287,6 +300,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 40,
 	},
 	ComicBonk = {
+		Icon = "Explosion",
 		Category = "ImpactEffectAssets",
 		Rarity = "Legendary",
 		DisplayName = "Comic Bonk",
@@ -295,6 +309,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 50,
 	},
 	CandyCrash = {
+		Icon = "Candy",
 		Category = "ImpactEffectAssets",
 		Rarity = "Rare",
 		DisplayName = "Candy Crash",
@@ -303,6 +318,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 60,
 	},
 	BubbleBurst = {
+		Icon = "Bubbles",
 		Category = "ImpactEffectAssets",
 		Rarity = "Legendary",
 		DisplayName = "Bubble Burst",
@@ -311,6 +327,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 70,
 	},
 	RoyalParty = {
+		Icon = "Crown",
 		Category = "ImpactEffectAssets",
 		Rarity = "Legendary",
 		DisplayName = "Royal Party",
@@ -324,6 +341,7 @@ local Items: { [string]: ItemDef } = {
 	-- Studio asset); EffectId resolves through the script-effect registry. See
 	-- docs/cosmetic-vfx-import.md.
 	SugarRush = {
+		Icon = "IceCream",
 		Category = "ImpactEffectAssets",
 		Rarity = "Rare",
 		DisplayName = "Sugar Rush",
@@ -332,6 +350,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 35,
 	},
 	Prismatic = {
+		Icon = "Diamond",
 		Category = "ImpactEffectAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Prismatic",
@@ -340,6 +359,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 90,
 	},
 	Galaxy = {
+		Icon = "Planet",
 		Category = "ImpactEffectAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Galaxy",
@@ -348,6 +368,7 @@ local Items: { [string]: ItemDef } = {
 		SortOrder = 100,
 	},
 	Starlight = {
+		Icon = "Sparkle",
 		Category = "ImpactEffectAssets",
 		Rarity = "Exclusive",
 		DisplayName = "Starlight",

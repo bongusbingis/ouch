@@ -1,181 +1,274 @@
--- Custom standings expose the same authoritative scores on keyboard, gamepad and touch.
+-- Name: MatchScoreboard.luau
+-- Author: Jack C.
+-- Description: The full match standings, shown only while the player holds the scoreboard key (Tab or Select) or after tapping the standings strip on touch: a translucent overlay panel listing every player in one or two columns with team totals, which never takes the cursor or GUI selection so the fight underneath keeps playing.
+-- Created: 2026-09-10
 --!strict
 
-local GuiService = game:GetService("GuiService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Surface = require(script.Parent.Surface)
 local Label = require(script.Parent.Label)
-local ActionButton = require(script.Parent.ActionButton)
+local ModalClose = require(script.Parent.Parent.ModalClose)
+local WellScroll = require(script.Parent.Parent.WellScroll)
+local MatchHUDModel = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
 local useSafeArea = require(script.Parent.Parent.Parent.Hooks.useSafeArea)
-local Selection = require(script.Parent.Parent.Parent.Services.Selection)
+
 local c = React.createElement
+local colors = Config.Colors
+local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+
+local function stroke(thickness: number)
+	return c("UIStroke", {
+		Color = colors.Ink,
+		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+		Thickness = thickness,
+	})
+end
+
+local function row(entry, index: number, height: number, teamMode: boolean, z: number)
+	local textSize = if height < 28 then 14 else 17
+	return c("Frame", {
+		BackgroundColor3 = if entry.isLocal then colors.Pink else colors.Claimed,
+		BackgroundTransparency = if entry.isLocal then 0 else 0.35,
+		BorderSizePixel = 0,
+		LayoutOrder = index,
+		Size = UDim2.new(1, 0, 0, height),
+		ZIndex = z,
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
+		Rank = c("TextLabel", {
+			BackgroundTransparency = 1,
+			FontFace = DISPLAY_FONT,
+			Position = UDim2.fromOffset(10, 1),
+			Size = UDim2.fromOffset(30, height),
+			Text = if teamMode then "" else tostring(entry.placement),
+			TextColor3 = if entry.placement == 1 then colors.Yellow else colors.White,
+			TextSize = textSize,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = z + 1,
+		}, { Outline = stroke(0.045) }),
+		Name = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = UI.Text.BodyFont,
+			Position = UDim2.fromOffset(if teamMode then 12 else 40, 0),
+			Size = UDim2.new(1, -(if teamMode then 12 else 40) - (if entry.alive then 60 else 166), 1, 0),
+			Text = entry.displayName .. (if entry.isLocal then " (YOU)" else ""),
+			TextColor3 = colors.White,
+			TextSize = textSize,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = z + 1,
+		}, { Outline = stroke(0.03) }),
+		Status = if not entry.alive
+			then c("TextLabel", {
+				AnchorPoint = Vector2.new(1, 0),
+				BackgroundTransparency = 1,
+				Font = UI.Text.BodyFont,
+				Position = UDim2.new(1, -56, 0, 0),
+				Size = UDim2.fromOffset(100, height),
+				Text = "RESPAWNING",
+				TextColor3 = colors.Muted,
+				TextSize = textSize - 3,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				ZIndex = z + 1,
+			})
+			else nil,
+		Score = c("TextLabel", {
+			AnchorPoint = Vector2.new(1, 0),
+			BackgroundTransparency = 1,
+			FontFace = DISPLAY_FONT,
+			Position = UDim2.new(1, -10, 0, 1),
+			Size = UDim2.fromOffset(44, height),
+			Text = tostring(entry.score),
+			TextColor3 = colors.Yellow,
+			TextSize = textSize,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = z + 1,
+		}, { Outline = stroke(0.045) }),
+	})
+end
 
 return function(props)
 	local safe = useSafeArea(Enum.ScreenInsets.None)
-	local rootRef = React.useRef(nil)
-	local closeRef = React.useRef(nil)
-	React.useEffect(function()
-		if not props.Visible then
-			return
-		end
-		local previous = GuiService.SelectedObject
-		local root = rootRef.current
-		local active = true
-		local clearedSelection = false
-		task.defer(function()
-			if not active then
-				return
-			end
-			local selected = GuiService.SelectedObject
-			if selected and not selected:IsDescendantOf(Players.LocalPlayer.PlayerGui) then
-				return
-			end
-			local selectedRoot = if selected then selected:FindFirstAncestorWhichIsA("ScreenGui") else nil
-			local ownRoot = if root then root:FindFirstAncestorWhichIsA("ScreenGui") else nil
-			if selectedRoot and ownRoot and selectedRoot.DisplayOrder > ownRoot.DisplayOrder then
-				return
-			end
-			if string.find(UserInputService:GetLastInputType().Name, "Gamepad") then
-				if Selection.isSelectable(closeRef.current) then
-					GuiService.SelectedObject = closeRef.current
-				end
-			elseif selected and root and not selected:IsDescendantOf(root) then
-				clearedSelection = true
-				GuiService.SelectedObject = nil
-			end
-		end)
-		return function()
-			active = false
-			local selected = GuiService.SelectedObject
-			if (root and selected and selected:IsDescendantOf(root)) or (selected == nil and clearedSelection) then
-				GuiService.SelectedObject = if Selection.isSelectable(previous) then previous else nil
-			end
-		end
-	end, { props.Visible })
 	if not props.Visible then
 		return nil
 	end
 	local view = props.Snapshot
-	local colors = Config.Colors
-	local width = math.min(safe.size.X * Config.Scoreboard.WidthScale, Config.Scoreboard.MaxWidthPx)
-	local rowCount = math.max(#view.entries, Config.Scoreboard.MinRows)
-	local height = math.min(
-		safe.size.Y * Config.Scoreboard.HeightScale,
-		Config.Scoreboard.ChromePx + rowCount * Config.Scoreboard.RowPx + (rowCount - 1) * Config.Scoreboard.RowGapPx
+	local layout = Config.Scoreboard
+	local short = safe.size.Y < Config.Results.ShortHeightPx
+	local rowHeight = if short then layout.ShortRowPx else layout.RowPx
+	local inset = if short then UI.Spacing.CompactInsetPx else UI.Spacing.PageInsetPx
+	local headerHeight = if short then layout.HeaderPx else 80
+	local footerHeight = if short then layout.FooterPx else 44
+	-- A narrow (portrait) safe area cannot fit two readable columns, so a
+	-- free-for-all stays in one column there however long it is.
+	local narrow = safe.size.X < layout.TwoColumnMinWidthPx
+	local stackTeams = narrow and view.teamMode
+	local columns = MatchHUDModel.columns(
+		view.entries,
+		if view.teamMode then view.teams else nil,
+		if narrow then math.huge else layout.SingleColumnMaxRows
 	)
-	local rows = {
+	local longest = 0
+	for _, column in columns do
+		longest = math.max(longest, #column)
+	end
+	longest = math.max(longest, 1)
+	local columnHeader = if view.teamMode then rowHeight + 6 else 0
+	local listHeight = columnHeader + longest * rowHeight + (longest - 1) * layout.RowGapPx
+	if stackTeams then
+		listHeight = 0
+		for _, column in columns do
+			listHeight += columnHeader + #column * (rowHeight + layout.RowGapPx)
+		end
+		listHeight += layout.ColumnGapPx
+	end
+	local width = math.min(safe.size.X * (if short or narrow then 0.94 else layout.WidthScale), layout.MaxWidthPx)
+	local height = math.min(safe.size.Y * layout.HeightScale, headerHeight + listHeight + footerHeight + 24)
+	local touch = UserInputService.TouchEnabled
+	local z = 81
+	local columnChildren = {
 		Layout = c("UIListLayout", {
-			Padding = UDim.new(0, Config.Scoreboard.RowGapPx),
+			FillDirection = if stackTeams then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, layout.ColumnGapPx),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 	}
-	for index, entry in view.entries do
-		local status = if not entry.alive
-			then "RESPAWNING"
-			else if view.teamMode and entry.teamId then string.upper(entry.teamId) else ""
-		rows[tostring(entry.userId)] = c(Surface, {
-			Color = if entry.isLocal then colors.PanelRaised else colors.Track,
-			Shadow = false,
-			StrokeTransparency = if entry.isLocal then 0 else 0.8,
-			Native = { Size = UDim2.new(1, -8, 0, Config.Scoreboard.RowPx), LayoutOrder = index },
-		}, {
-			Rank = c(Label, {
-				Text = if view.teamMode then "" else tostring(entry.placement),
-				Title = true,
-				Size = 25,
-				Native = { Size = UDim2.fromScale(0.1, 1) },
+	for columnIndex, column in columns do
+		local rows = {
+			Layout = c("UIListLayout", {
+				Padding = UDim.new(0, layout.RowGapPx),
+				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
-			Name = c(Label, {
-				Text = entry.displayName .. (if entry.isLocal then " (YOU)" else ""),
-				Size = 24,
-				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromScale(0.11, 0), Size = UDim2.fromScale(0.49, 1) },
-			}),
-			Status = if status ~= ""
-				then c(Surface, {
-					Color = if entry.teamId == "Red"
-						then colors.Pink
-						else if entry.teamId == "Blue" then colors.Cyan else colors.Disabled,
-					Shadow = false,
-					Native = { Position = UDim2.fromScale(0.62, 0.15), Size = UDim2.fromScale(0.23, 0.7) },
-				}, { Text = c(Label, { Text = status, Size = 17 }) })
-				else nil,
-			Score = c(Label, {
-				Text = tostring(entry.score),
-				Title = true,
-				Color = colors.Yellow,
-				Size = 28,
-				Native = { Position = UDim2.fromScale(0.86, 0), Size = UDim2.fromScale(0.14, 1) },
-			}),
-		})
+		}
+		local team = if view.teamMode then view.teams[columnIndex] else nil
+		if team then
+			rows.Header = c("Frame", {
+				BackgroundColor3 = colors[team.accent],
+				BorderSizePixel = 0,
+				LayoutOrder = 0,
+				Size = UDim2.new(1, 0, 0, rowHeight),
+				ZIndex = z + 2,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
+				Text = c(Label, {
+					Text = `{team.label}  {team.score}`,
+					Title = true,
+					Size = if short then 16 else 20,
+					Native = { Size = UDim2.fromScale(1, 1), ZIndex = z + 3 },
+				}),
+			})
+		end
+		for index, entry in column do
+			rows[`Row{index}`] = row(entry, index, rowHeight, view.teamMode, z + 2)
+		end
+		columnChildren[`Column{columnIndex}`] = c("Frame", {
+			BackgroundTransparency = 1,
+			LayoutOrder = columnIndex,
+			Size = if stackTeams
+				then UDim2.new(1, 0, 0, columnHeader + #column * (rowHeight + layout.RowGapPx))
+				else UDim2.new(1 / #columns, -(layout.ColumnGapPx * (#columns - 1)) / #columns, 0, listHeight),
+			ZIndex = z + 2,
+		}, rows)
 	end
-	return c("TextButton", {
-		ref = rootRef,
-		Text = "",
-		AutoButtonColor = false,
-		Selectable = false,
-		Active = true,
+	return c("Frame", {
+		Active = false,
 		BackgroundColor3 = colors.Ink,
-		BackgroundTransparency = 0.22,
+		BackgroundTransparency = 0.45,
+		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 80,
 	}, {
+		Dismiss = if touch
+			then c("TextButton", {
+				AutoButtonColor = false,
+				BackgroundTransparency = 1,
+				Selectable = false,
+				Size = UDim2.fromScale(1, 1),
+				Text = "",
+				ZIndex = 80,
+				[React.Event.Activated] = props.OnClose,
+			})
+			else nil,
 		Panel = c(Surface, {
-			Color = UI.ProgressionStyle.Panel,
+			Color = colors.Panel,
+			Transparency = 0,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, safe.position.Y + safe.size.Y / 2),
 				Size = UDim2.fromOffset(width, height),
-				ZIndex = 81,
-				SelectionGroup = true,
+				ZIndex = z,
 			},
 		}, {
 			Title = c(Label, {
 				Text = "SCOREBOARD",
 				Title = true,
-				Size = 34,
+				Size = if short then 24 else 30,
 				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -134, 0, 44) },
-			}),
-			Close = c(ActionButton, {
-				ButtonRef = closeRef,
-				Text = "BACK",
-				Color = colors.Cyan,
-				TextSize = 22,
-				OnActivated = props.OnClose,
-				Native = { Position = UDim2.new(1, -106, 0, 8), Size = UDim2.fromOffset(92, 44) },
+				Native = {
+					Position = UDim2.fromOffset(inset, if short then 8 else 16),
+					Size = UDim2.new(1, -140, 0, 34),
+					ZIndex = z + 2,
+				},
 			}),
 			Mode = c(Label, {
-				Text = view.title .. "  •  " .. view.clock,
+				Text = view.title .. "  •  " .. view.clock .. (if view.target > 0
+					then `  •  FIRST TO {view.target}`
+					else ""),
 				Color = colors.White,
-				Size = 18,
+				Size = if short then 13 else 16,
 				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromOffset(16, 57), Size = UDim2.new(1, -128, 0, 25) },
+				Native = {
+					Position = UDim2.fromOffset(inset, if short then 32 else 50),
+					Size = UDim2.new(1, -140, 0, 20),
+					ZIndex = z + 2,
+				},
 			}),
-			ScoreHeading = c(Label, {
-				Text = "ELIMS",
+			Close = if touch
+				then c(ModalClose, {
+					Position = UDim2.new(1, -12, 0, 12),
+					SizePx = UI.Interaction.MinTargetPx,
+					OnActivated = props.OnClose,
+					ZIndex = z + 3,
+				})
+				else c(Label, {
+					Text = if string.find(UserInputService:GetLastInputType().Name, "Gamepad")
+						then "HOLD SELECT"
+						else "HOLD TAB",
+					Color = colors.White,
+					Size = UI.Text.CaptionMinPx,
+					Align = Enum.TextXAlignment.Right,
+					Native = { Position = UDim2.new(1, -116, 0, 12), Size = UDim2.fromOffset(100, 20), ZIndex = z + 2 },
+				}),
+			Columns = c(WellScroll, {
+				InsetPx = if short then 8 else UI.Spacing.CompactInsetPx,
+				Native = {
+					Position = UDim2.fromOffset(inset, headerHeight),
+					Size = UDim2.new(1, -inset * 2, 1, -headerHeight - footerHeight),
+					CanvasSize = UDim2.fromOffset(0, listHeight),
+					ScrollingDirection = Enum.ScrollingDirection.Y,
+					ScrollBarThickness = 4,
+					ScrollBarImageColor3 = colors.White,
+					Selectable = false,
+					ZIndex = z + 2,
+				},
+			}, columnChildren),
+			Footer = c(Label, {
+				Text = view.footer,
 				Color = colors.White,
-				Title = true,
-				Size = 18,
-				Native = { Position = UDim2.new(1, -94, 0, 57), Size = UDim2.fromOffset(74, 25) },
+				Size = UI.Text.CaptionMinPx,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 1),
+					Position = UDim2.new(0.5, 0, 1, if short then -8 else -16),
+					Size = UDim2.new(1, -32, 0, 18),
+					ZIndex = z + 2,
+				},
 			}),
-			List = c("ScrollingFrame", {
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(16, 92),
-				Size = UDim2.new(1, -32, 1, -Config.Scoreboard.ChromePx),
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				CanvasSize = UDim2.new(),
-				ScrollBarThickness = 4,
-				ScrollBarImageColor3 = colors.White,
-				ZIndex = 3,
-			}, rows),
 		}),
 	})
 end

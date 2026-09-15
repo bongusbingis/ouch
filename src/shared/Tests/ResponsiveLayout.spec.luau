@@ -12,6 +12,15 @@ local INVENTORY_PANEL = {
 		AspectRatio = 1.08,
 	},
 }
+local SHOP_PANEL = {
+	Portrait = { WidthScale = 0.956, HeightScale = 0.78, MaxSize = Vector2.new(680, 760) },
+	Landscape = {
+		WidthScale = 0.9,
+		HeightScale = 0.82,
+		MaxSize = Vector2.new(1240, 820),
+		AspectRatio = 1.5,
+	},
+}
 local PORTRAIT_MAX_ASPECT = 1
 -- Mirrors SplashPage's portrait action dock: the BottomRight frame is bottom
 -- anchored at 0.98 and PortraitActionsHeightPx tall, so the progress panels have
@@ -25,6 +34,9 @@ local SPLASH_PANELS = {
 	EdgePaddingPx = 24,
 	GapPx = 10,
 	Landscape = {
+		SeasonHeightPx = 88,
+		DailyHeightPx = 140,
+		QuestsMinHeightPx = 116,
 		DailyBottomScale = 0.9,
 		SeasonTopScale = 0.145,
 		QuestsTopScale = 0.31,
@@ -67,17 +79,37 @@ end
 
 local function landscapePanels()
 	local config = table.clone(SPLASH_PANELS)
-	config.DailyMinHeightPx = 116
+	config.DailyMinHeightPx = 140
 	config.Landscape = table.clone(config.Landscape)
 	config.Landscape.ActionsReservePx = 252
 	config.Landscape.ShortTopPx = 80
-	config.Landscape.ShortBottomPx = 70
+	config.Landscape.ShortBottomPx = 78
 	config.Season = table.clone(config.Season)
 	config.Season.ShortHeightScale = 0.19
 	config.Season.ShortAspectRatio = 4
 	config.Quests = table.clone(config.Quests)
 	config.Quests.ShortHeightScale = 0.4
 	return config
+end
+
+local function shopPanels()
+	local inventory = { Portrait = INVENTORY_PANEL.Portrait, Landscape = table.clone(INVENTORY_PANEL.Landscape) }
+	inventory.Landscape.ShortWidthScale = 0.9
+	inventory.Landscape.ShortHeightScale = 0.7
+	inventory.Landscape.ShortAspectRatio = 2.4
+	local shop = { Portrait = SHOP_PANEL.Portrait, Landscape = table.clone(SHOP_PANEL.Landscape) }
+	shop.Landscape.ShortWidthScale = 0.9
+	shop.Landscape.ShortHeightScale = 0.7
+	shop.Landscape.ShortAspectRatio = 2.5
+	return {
+		PortraitMaxAspect = PORTRAIT_MAX_ASPECT,
+		ShortLandscapeMaxHeightPx = 500,
+		PagePosition = { X = { Scale = 0.5, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+		InventoryPagePosition = { X = { Scale = 0.32, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+		Panels = { Inventory = inventory, Shop = shop },
+		TopBar = { ShortHeightPx = 72 },
+		Inventory = { ShortPanelMinWidthPx = 360, ShortPanelWidthScale = 0.58, ShortWorldMinWidthPx = 170 },
+	}
 end
 
 T.describe("Inset coordinate conversion", function()
@@ -112,27 +144,35 @@ T.describe("Inset coordinate conversion", function()
 end)
 
 T.describe("Responsive UI layout", function()
-	T.it("keeps desktop quests clear of the full action stack across the short-layout boundary", function()
+	T.it("keeps home progression clear of actions across fixed and fallback compositions", function()
 		local config = landscapePanels()
 		for _, size in
 			{
 				Vector2.new(820, 501),
 				Vector2.new(1158, 520),
 				Vector2.new(1158, 600),
+				Vector2.new(1158, 691),
+				Vector2.new(1158, 692),
 				Vector2.new(1158, 725),
 				Vector2.new(1920, 1080),
 			}
 		do
 			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
-			local actionsTop = size.Y - 252
-			T.expect(layout.quests.position.Y + layout.quests.size.Y <= actionsTop):toBeTruthy()
-			T.expect(layout.quests.position.Y >= layout.season.position.Y + layout.season.size.Y + config.GapPx)
-				:toBeTruthy()
-			T.expect(layout.quests.size.Y >= 44):toBeTruthy()
+			if layout.progressStack then
+				local stack = layout.progressStack
+				-- Non-short stacks share the action dock's 24 px bottom margin so the column and PLAY end together.
+				T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - (if layout.tabbed then 12 else 24))
+				T.expect(stack.size.Y >= 100):toBeTruthy()
+			else
+				T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252):toBeTruthy()
+				T.expect(layout.quests.position.Y >= layout.daily.position.Y + layout.daily.size.Y + config.GapPx)
+					:toBeTruthy()
+				T.expect(layout.quests.size.Y - 60 >= 44):toBeTruthy()
+			end
 		end
 	end)
 
-	T.it("applies the desktop action reserve only after the short-landscape breakpoint", function()
+	T.it("reflows an intermediate-height home when the desktop actions leave too little card space", function()
 		local config = landscapePanels()
 		local unreserved = landscapePanels()
 		unreserved.Landscape.ActionsReservePx = 0
@@ -143,23 +183,31 @@ T.describe("Responsive UI layout", function()
 				T.expect(layout[name].position.Y):toEqual(original[name].position.Y)
 				T.expect(layout[name].size.Y):toEqual(original[name].size.Y)
 			end
-			T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 70):toBeTruthy()
+			T.expect(layout.tabbed):toBeTruthy()
+			local stack = assert(layout.progressStack)
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
 		end
 		local size = Vector2.new(820, 501)
 		local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 		local original = ResponsiveLayout.splashPanels(size, unreserved, 1, 500)
-		T.expect(original.quests.position.Y + original.quests.size.Y > size.Y - 252):toBeTruthy()
-		T.expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252):toBeTruthy()
+		T.expect(original.progressStack):toBeNil()
+		local stack = assert(layout.progressStack)
+		T.expect(layout.tabbed):toBeTruthy()
+		T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
 	end)
 
-	T.it("preserves full quest panel height when the desktop action stack already has room", function()
+	T.it("keeps desktop rewards aligned and uses the available column for scrollable quests", function()
 		local config = landscapePanels()
-		local spec = { Portrait = config.Quests, Landscape = config.Quests }
 		local size = Vector2.new(1920, 1080)
-		local preferred = ResponsiveLayout.panelSize(size, spec, 1, 500)
 		local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
-		T.expect(layout.quests.size.Y):toEqual(preferred.Y)
-		T.expect(layout.quests.size.X):toEqual(preferred.X)
+		T.expect(layout.progressStack):toBeNil()
+		T.expect(layout.quests.position.Y + layout.quests.size.Y):toEqual(size.Y - 252)
+		for _, panel in { layout.daily, layout.quests } do
+			T.expect(panel.position.X):toEqual(layout.season.position.X)
+			T.expect(panel.size.X):toEqual(layout.season.size.X)
+		end
+		T.expect(layout.daily.position.Y >= layout.season.position.Y + layout.season.size.Y + config.GapPx):toBeTruthy()
+		T.expect(layout.quests.size.Y - 60 >= 44):toBeTruthy()
 	end)
 
 	T.it("uses short landscape dimensions without changing the portrait branch", function()
@@ -178,7 +226,7 @@ T.describe("Responsive UI layout", function()
 		T.expect(portrait.Y):toEqual(633)
 	end)
 
-	T.it("reserves a whole short quest row between season progress and lobby actions", function()
+	T.it("reserves readable quest content when phone categories occupy the right column", function()
 		local config = table.clone(SPLASH_PANELS)
 		config.Landscape = table.clone(config.Landscape)
 		config.Landscape.ShortTopPx = 80
@@ -189,7 +237,10 @@ T.describe("Responsive UI layout", function()
 		config.Quests.ShortHeightScale = 0.4
 		local layout = ResponsiveLayout.splashPanels(Vector2.new(666, 316), config, 1, 500)
 		T.expect(layout.quests.size.Y >= 120):toBeTruthy()
-		T.expect(layout.quests.position.Y + layout.quests.size.Y <= 254):toBeTruthy()
+		T.expect(layout.tabbed):toBeTruthy()
+		local stack = assert(layout.progressStack)
+		T.expect(stack.position.Y + stack.size.Y):toEqual(304)
+		T.expect(stack.size.Y - 44 - 12 >= 140):toBeTruthy()
 		T.expect(overlaps(layout.season.position, layout.season.size, layout.quests.position, layout.quests.size))
 			:toEqual(false)
 	end)
@@ -204,6 +255,69 @@ T.describe("Responsive UI layout", function()
 		local size = ResponsiveLayout.panelSize(Vector2.new(1920, 1080), INVENTORY_PANEL, PORTRAIT_MAX_ASPECT)
 		T.expect(size.X):toEqual(872)
 		T.expect(size.Y):toEqual(807)
+	end)
+
+	T.it("gives the landscape shop the midpoint between its original width and the backpack", function()
+		local available = Vector2.new(1920, 1080)
+		local config = {
+			PortraitMaxAspect = PORTRAIT_MAX_ASPECT,
+			ShortLandscapeMaxHeightPx = 500,
+			PagePosition = { X = { Scale = 0.5, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+			InventoryPagePosition = { X = { Scale = 0.32, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+			Panels = { Inventory = INVENTORY_PANEL, Shop = SHOP_PANEL },
+		}
+		local backpack = ResponsiveLayout.inventoryComposition(available, config)
+		local original = ResponsiveLayout.panelSize(available, SHOP_PANEL, PORTRAIT_MAX_ASPECT, 500)
+		local shop = ResponsiveLayout.shopComposition(available, config)
+		T.expect(shop.panel.size.X):toEqual(math.floor((backpack.panel.size.X + original.X) / 2))
+		T.expect(shop.panel.size.Y):toEqual(math.floor((backpack.panel.size.Y + original.Y) / 2))
+		T.expect(shop.panel.position.X):toEqual(backpack.panel.position.X)
+		T.expect(shop.world.position.X):toEqual(shop.panel.position.X + shop.panel.size.X + 12)
+		T.expect(shop.world.position.X + shop.world.size.X):toEqual(available.X - 12)
+	end)
+
+	T.it("preserves desktop shop geometry without a mobile header reservation", function()
+		local available = Vector2.new(1920, 1080)
+		local config = shopPanels()
+		local backpack = ResponsiveLayout.inventoryComposition(available, config)
+		local original = ResponsiveLayout.panelSize(available, config.Panels.Shop, PORTRAIT_MAX_ASPECT, 500)
+		local shop = ResponsiveLayout.shopComposition(available, config, nil)
+		T.expect(shop.panel.size.X):toEqual(math.floor((backpack.panel.size.X + original.X) / 2))
+		T.expect(shop.panel.size.Y):toEqual(math.floor((backpack.panel.size.Y + original.Y) / 2))
+		T.expect(shop.panel.position.X):toEqual(backpack.panel.position.X)
+		T.expect(shop.panel.position.Y)
+			:toEqual(backpack.panel.position.Y + (backpack.panel.size.Y - shop.panel.size.Y) / 2)
+	end)
+
+	T.it("gives landscape browsers usable width below the mobile header and a separate preview", function()
+		for _, available in { Vector2.new(600, 280), Vector2.new(750, 304), Vector2.new(844, 344) } do
+			local config = shopPanels()
+			local shop = ResponsiveLayout.shopComposition(available, config, 13)
+			local backpack = ResponsiveLayout.inventoryComposition(available, config, 13)
+			T.expect(shop.panel.size):toEqual(backpack.panel.size)
+			T.expect(shop.panel.position.Y >= 13 + 12):toBeTruthy()
+			T.expect(shop.panel.position.Y + shop.panel.size.Y <= available.Y - 12):toBeTruthy()
+			T.expect(shop.panel.size.X >= 390):toBeTruthy()
+			T.expect(shop.world.size.X >= 154):toBeTruthy()
+			T.expect(shop.panel.position.X + shop.panel.size.X < shop.world.position.X):toBeTruthy()
+			T.expect(shop.world.position.X + shop.world.size.X <= available.X - 12):toBeTruthy()
+		end
+	end)
+
+	T.it("extends portrait shop content through the height freed by compact navigation", function()
+		local available = Vector2.new(402, 778)
+		local config = shopPanels()
+		local legacy = ResponsiveLayout.shopComposition(available, config)
+		local shop = ResponsiveLayout.shopComposition(available, config, 17)
+		T.expect(shop.panel.position.Y):toEqual(29)
+		T.expect(shop.panel.position.Y + shop.panel.size.Y):toEqual(766)
+		T.expect(shop.panel.position.X):toEqual(legacy.panel.position.X)
+		T.expect(shop.panel.size.X):toEqual(legacy.panel.size.X)
+		T.expect(shop.panel.size.Y - legacy.panel.size.Y >= 120):toBeTruthy()
+		T.expect(shop.world.position.Y):toEqual(shop.panel.position.Y)
+		T.expect(shop.world.size.Y):toEqual(shop.panel.size.Y)
+		local tallerHeader = ResponsiveLayout.shopComposition(available, config, 67)
+		T.expect(shop.panel.size.Y - tallerHeader.panel.size.Y):toEqual(50)
 	end)
 
 	T.it("derives usable inventory card columns from available width", function()
@@ -296,21 +410,78 @@ T.describe("Responsive UI layout", function()
 end)
 
 T.describe("Phone progression readability", function()
-	T.it("gives the short progression stack the action-safe column with room to discover quests", function()
+	T.it("fits category targets and a readable daily card on narrow landscape phones", function()
+		for _, size in { Vector2.new(750, 304), Vector2.new(600, 302) } do
+			local config = landscapePanels()
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(layout.progressStack)
+			T.expect(layout.tabbed):toBeTruthy()
+			T.expect((stack.size.X - config.GapPx * 2) / 3 - 6 >= 44):toBeTruthy()
+			T.expect(stack.size.Y - 44 - 12 >= config.DailyMinHeightPx):toBeTruthy()
+			T.expect(stack.size.Y - 44 - 12 >= 138):toBeTruthy()
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
+		end
+	end)
+	T.it("keeps every category visible when an intermediate home has room for a vertical column", function()
+		local config = landscapePanels()
+		for _, size in { Vector2.new(1158, 600), Vector2.new(1158, 662), Vector2.new(1158, 719) } do
+			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(layout.progressStack)
+			T.expect(layout.tabbed):toBeFalsy()
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 24)
+			-- Two card gaps plus the column's top/bottom padding must also fit.
+			local questContentBudget = stack.size.Y - layout.season.size.Y - layout.daily.size.Y - config.GapPx * 3.5
+			T.expect(layout.season.size.Y >= 88):toBeTruthy()
+			T.expect(layout.daily.size.Y >= config.DailyMinHeightPx):toBeTruthy()
+			T.expect(questContentBudget >= config.Landscape.QuestsMinHeightPx):toBeTruthy()
+		end
+	end)
+	T.it("returns to fixed desktop cards only when all cards and actions fit", function()
+		local config = landscapePanels()
+		local intermediate = ResponsiveLayout.splashPanels(Vector2.new(1158, 719), config, 1, 500)
+		local stack = assert(intermediate.progressStack)
+		T.expect(intermediate.tabbed):toBeFalsy()
+		T.expect(stack.position.Y + stack.size.Y):toEqual(719 - 24)
+		local desktop = ResponsiveLayout.splashPanels(Vector2.new(1158, 725), config, 1, 500)
+		T.expect(desktop.progressStack):toBeNil()
+		T.expect(desktop.daily.size.Y >= 140):toBeTruthy()
+		T.expect(desktop.quests.size.Y >= config.Landscape.QuestsMinHeightPx):toBeTruthy()
+		T.expect(desktop.quests.position.Y + desktop.quests.size.Y <= 725 - config.Landscape.ActionsReservePx)
+			:toBeTruthy()
+	end)
+	T.it("uses the phone right column to its bottom margin independently of left-side actions", function()
 		local config = landscapePanels()
 		for _, size in { Vector2.new(666, 258), Vector2.new(666, 316), Vector2.new(750, 303), Vector2.new(820, 500) } do
 			local layout = ResponsiveLayout.splashPanels(size, config, 1, 500)
 			local stack = assert(layout.progressStack)
 			T.expect(stack.position.Y):toEqual(layout.season.position.Y)
-			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - config.Landscape.ShortBottomPx)
+			T.expect(layout.tabbed):toBeTruthy()
+			T.expect(stack.position.Y + stack.size.Y):toEqual(size.Y - 12)
 			T.expect(stack.position.X >= 0 and stack.position.X + stack.size.X <= size.X):toEqual(true)
 			T.expect(stack.size.X - config.GapPx * 2 >= layout.season.size.X):toEqual(true)
-			T.expect(stack.size.Y >= layout.season.size.Y + config.GapPx * 1.5 + 36):toEqual(true)
+			T.expect(stack.size.Y - 44 - 12 >= 44):toEqual(true)
 		end
 	end)
-	T.it("leaves desktop and portrait progression unstacked", function()
-		for _, size in { Vector2.new(820, 501), Vector2.new(1158, 725), Vector2.new(390, 844) } do
+	T.it("leaves roomy desktop progression unstacked", function()
+		for _, size in { Vector2.new(820, 725), Vector2.new(1158, 725) } do
 			T.expect(ResponsiveLayout.splashPanels(size, landscapePanels(), 1, 500).progressStack):toBeNil()
+		end
+	end)
+	T.it("reserves a real portrait world window above the progression tabs and action dock", function()
+		for _, size in { Vector2.new(375, 586), Vector2.new(390, 844), Vector2.new(440, 802) } do
+			local config = landscapePanels()
+			local panels = ResponsiveLayout.splashPanels(size, config, 1, 500)
+			local stack = assert(panels.progressStack)
+			local world = ResponsiveLayout.splashWorldWindow(size, {
+				Splash = { ProgressPanels = config },
+				PortraitMaxAspect = 1,
+				ShortLandscapeMaxHeightPx = 500,
+			})
+			T.expect(panels.tabbed):toBeTruthy()
+			T.expect(world.size.X > 1 and world.size.Y > 1):toBeTruthy()
+			T.expect(world.position.Y + world.size.Y < stack.position.Y):toBeTruthy()
+			T.expect(stack.position.Y + stack.size.Y < size.Y - 24 - SPLASH_ACTIONS_HEIGHT_PX):toBeTruthy()
+			T.expect(stack.size.Y - 56 >= 140):toBeTruthy()
 		end
 	end)
 	T.it("reserves a full quest title and readable daily amounts in portrait", function()

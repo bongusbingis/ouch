@@ -12,6 +12,7 @@ export type QuestTrack = {
 }
 
 export type QuestDefinition = {
+	Icon: string,
 	id: string,
 	title: string,
 	goal: number,
@@ -42,6 +43,7 @@ local Quests = {
 			steps = 5,
 			reward = { kind = "Bonks", amount = 150 },
 			track = { kind = "Elim" },
+			Icon = "Target",
 		},
 		{
 			id = "catches_3",
@@ -50,6 +52,7 @@ local Quests = {
 			steps = 3,
 			reward = { kind = "Bonks", amount = 125 },
 			track = { kind = "Catch" },
+			Icon = "Hand",
 		},
 		{
 			id = "matches_2",
@@ -58,6 +61,7 @@ local Quests = {
 			steps = 2,
 			reward = { kind = "Bonks", amount = 100 },
 			track = { kind = "MatchPlayed" },
+			Icon = "Controller",
 		},
 		{
 			id = "wins_1",
@@ -66,6 +70,7 @@ local Quests = {
 			steps = 1,
 			reward = { kind = "Bonks", amount = 200 },
 			track = { kind = "Win" },
+			Icon = "Trophy",
 		},
 		{
 			id = "ffa_wins_1",
@@ -74,6 +79,7 @@ local Quests = {
 			steps = 1,
 			reward = { kind = "Bonks", amount = 225 },
 			track = { kind = "ModeWin", modeId = "FFA" },
+			Icon = "Trophy",
 		},
 		{
 			id = "tdm_wins_1",
@@ -82,6 +88,7 @@ local Quests = {
 			steps = 1,
 			reward = { kind = "Bonks", amount = 225 },
 			track = { kind = "ModeWin", modeId = "TDM" },
+			Icon = "Trophy",
 		},
 		{
 			id = "dodgeball_elims_3",
@@ -90,6 +97,7 @@ local Quests = {
 			steps = 3,
 			reward = { kind = "Bonks", amount = 175 },
 			track = { kind = "DodgeballElim" },
+			Icon = "Ball",
 		},
 		{
 			id = "hammer_elims_3",
@@ -98,6 +106,7 @@ local Quests = {
 			steps = 3,
 			reward = { kind = "Bonks", amount = 175 },
 			track = { kind = "HammerElim" },
+			Icon = "Hammer",
 		},
 		{
 			id = "hammer_hits_5",
@@ -106,6 +115,7 @@ local Quests = {
 			steps = 5,
 			reward = { kind = "Bonks", amount = 150 },
 			track = { kind = "HammerHit" },
+			Icon = "Hammer",
 		},
 		{
 			id = "throws_10",
@@ -114,6 +124,7 @@ local Quests = {
 			steps = 10,
 			reward = { kind = "Bonks", amount = 125 },
 			track = { kind = "BallThrow" },
+			Icon = "Ball",
 		},
 	} :: { QuestDefinition },
 }

@@ -54,6 +54,16 @@ T.describe("WriteThroughProxy", function()
 		T.expect(table.concat(offers, ",")):toEqual("BallRed,BallBlue")
 	end)
 
+	T.it("unwraps a read-back nested proxy on assignment so later nested writes do not recurse", function()
+		local raw, proxy, writes = fixture()
+		proxy.Shop.Offers = proxy.Shop.Offers or {}
+		T.expect(getmetatable(raw.Shop.Offers)):toBeNil()
+		T.expect(raw.Shop.Offers == writes[#writes].value):toBeTruthy()
+		proxy.Shop.Offers[1] = "BallRed"
+		T.expect(raw.Shop.Offers[1]):toEqual("BallRed")
+		T.expect(#writes):toEqual(2)
+	end)
+
 	T.it("keeps repeated nested reads bounded and writable", function()
 		local raw, proxy, writes = fixture()
 

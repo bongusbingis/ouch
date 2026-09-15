@@ -35,6 +35,8 @@ local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local useSafeArea = require(UI.Hooks.useSafeArea)
 local ResponsiveLayout = require(UI.Models.ResponsiveLayout)
+local modalSurface = require(script.Parent.ModalSurface)
+
 local c = React.createElement
 
 local BACK_ACTION = "CloseCombatMenuLayer"
@@ -143,8 +145,8 @@ local function MenuToggle(props)
 			Position = styles.Position,
 			ScaleType = Enum.ScaleType.Slice,
 			Size = UDim2.fromScale(0.105, 0.078),
-			SliceCenter = Rect.new(224, 202, 770, 474),
-			SliceScale = 0.12,
+			SliceCenter = UIConfig.LobbyArtwork.Action.CyanSlice,
+			SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
 			Visible = props.Available or props.Open,
 			ZIndex = 80,
 		},
@@ -187,7 +189,7 @@ local function MenuToggle(props)
 			Size = UDim2.fromScale(toggleLayout.KeycapWidthScale, 0.54),
 			ZIndex = 82,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0.22, 0) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 			Stroke = c("UIStroke", {
 				Color = Color3.new(1, 1, 1),
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
@@ -447,6 +449,9 @@ local function CombatMenuContent(props)
 						OnTabChanged = controller.setInventoryTab,
 						OnEquip = controller.equip,
 						OnInspect = controller.inspectInventory,
+						OnLockedSlot = function()
+							CombatMenuClient.navigate("Shop")
+						end,
 					})
 				elseif pageName == "Shop" then
 					return c(ShopPage, {
@@ -468,7 +473,8 @@ local function CombatMenuContent(props)
 		Size = UDim2.fromScale(1, 1),
 	}, {
 		Overlay = if present
-			then c("Frame", {
+			then modalSurface({
+				ClassName = "Frame",
 				Active = true,
 				BackgroundColor3 = Color3.fromRGB(17, 24, 28),
 				BackgroundTransparency = styles.BackdropTransparency,
@@ -481,6 +487,7 @@ local function CombatMenuContent(props)
 				ZIndex = 2,
 			}, {
 				Views = c("Frame", {
+					ClipsDescendants = true,
 					BackgroundTransparency = 1,
 					Size = UDim2.fromScale(1, 1),
 					ZIndex = 3,

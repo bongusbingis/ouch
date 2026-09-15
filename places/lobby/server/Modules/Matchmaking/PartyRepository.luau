@@ -69,7 +69,7 @@ function PartyRepository:_claimCode(partyId)
 	return nil, "code_space_unavailable"
 end
 
-function PartyRepository:CreateParty(userId, characterColorId, costumeId)
+function PartyRepository:CreateParty(userId, characterColorId, costumeId, queueId)
 	local partyId = HttpService:GenerateGUID(false)
 	local joinCode, codeError = self:_claimCode(partyId)
 	if not joinCode then
@@ -93,6 +93,7 @@ function PartyRepository:CreateParty(userId, characterColorId, costumeId)
 		},
 		allowFriendJoins = true,
 		phase = "Lobby",
+		queueId = queueId or Config.DefaultQueueId,
 		queueTicket = nil,
 		claim = nil,
 		matchId = nil,
@@ -153,6 +154,8 @@ function PartyRepository:SetUserParty(userId, partyId)
 		return self._userMap:SetAsync(tostring(userId), {
 			partyId = partyId,
 			jobId = game.JobId,
+			placeId = game.PlaceId,
+			publicServer = game.PrivateServerId == "",
 			refreshedAt = os.time(),
 		}, Config.PresenceLifetime)
 	end)
@@ -161,6 +164,11 @@ function PartyRepository:SetUserParty(userId, partyId)
 end
 
 function PartyRepository:GetUserPartyId(userId)
+	local value, readError = self:GetUserPresence(userId)
+	return value and value.partyId or nil, readError
+end
+
+function PartyRepository:GetUserPresence(userId)
 	local success, value = CloudRetry.call("PartyRepository.GetUserPartyId", function()
 		return self._userMap:GetAsync(tostring(userId))
 	end)
@@ -168,7 +176,7 @@ function PartyRepository:GetUserPartyId(userId)
 		return nil, value
 	end
 
-	return value and value.partyId or nil
+	return value
 end
 
 function PartyRepository:RemoveUserParty(userId, expectedPartyId)

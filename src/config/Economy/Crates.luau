@@ -68,19 +68,28 @@ local Catalog: { [string]: CrateDef } = {
 		OpenQuantities = OPEN_QUANTITIES,
 		ItemPool = poolOf({ "HammerAssets" }),
 	},
-	-- Trails and elimination effects are separate equip slots but one crate:
-	-- they are the same "effects" purchase to a player, and two near-empty
+	-- Elimination effects and impact effects are separate equip slots but one
+	-- crate: they are the same "effects" purchase to a player, and two near-empty
 	-- crates would read as padding.
+	--
+	-- TrailAssets is deliberately absent. It is a real equip slot with no items
+	-- authored against it yet, and naming an empty category in a paid pool means
+	-- advertising content that cannot drop. Add it back the same commit the first
+	-- trail ships.
+	--
+	-- Priced below the weapon crates because its pool is roughly a third of
+	-- theirs: the per-open odds are identical, but a shallow pool saturates into
+	-- duplicate payouts far sooner, and the price is what has to carry that.
 	EffectsCrate = {
 		DisplayName = "Effects",
 		Description = "Hit effects and knockout sounds. Make your mark.",
 		DisplayOrder = 300,
 		Thumbnail = "",
 		CatalogStatus = "Active",
-		BonksPrice = 500,
+		BonksPrice = 300,
 		Pity = { Rare = 5, Legendary = 25 },
 		OpenQuantities = OPEN_QUANTITIES,
-		ItemPool = poolOf({ "TrailAssets", "ElimEffectAssets", "ImpactEffectAssets" }),
+		ItemPool = poolOf({ "ElimEffectAssets", "ImpactEffectAssets" }),
 	},
 }
 
@@ -92,6 +101,18 @@ for crateId, crate in Catalog do
 	)
 	if crate.CatalogStatus == "Active" then
 		assert(#crate.ItemPool > 0, `active crate {crateId} has an empty item pool`)
+		-- Pity guarantees a rarity by a stated number of opens, so a crate that
+		-- names one it cannot actually drop publishes a promise it will never keep.
+		for rarity in crate.Pity or {} do
+			local present = false
+			for _, itemId in crate.ItemPool do
+				if Cosmetics.Items[itemId].Rarity == rarity then
+					present = true
+					break
+				end
+			end
+			assert(present, `active crate {crateId} guarantees {rarity} but has no {rarity} item in its pool`)
+		end
 	end
 	if crate.BonksPrice ~= nil then
 		assert(crate.BonksPrice > 0, `crate {crateId} must have a positive BonksPrice`)

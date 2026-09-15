@@ -20,6 +20,9 @@ function TDM.resolveRules(): GameMode.MatchRules
 		MinPlayers = m.MinPlayers,
 		MinParties = m.MinParties,
 		ScoreTarget = m.ScoreTarget,
+		ReferencePlayers = m.ReferencePlayers,
+		MinScoreTarget = m.MinScoreTarget,
+		MaxScoreTarget = m.MaxScoreTarget,
 		TimeCapSeconds = m.TimeCapSeconds,
 		ResultsSeconds = PostMatch.ResultsSeconds,
 		IntermissionSeconds = GameModes.VoteDurationSeconds,
@@ -39,10 +42,11 @@ function TDM.onMatchStart(ctx: GameMode.ModeContext)
 	end
 end
 
-function TDM.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, isFirstSpawn: boolean)
-	if isFirstSpawn then
-		ctx.balls.grantHeldBall(player)
-	end
+-- Every spawn, not only the first: wave respawns return a whole squad at once,
+-- and a squad that arrives with nothing to throw cannot contest the push it was
+-- respawned for.
+function TDM.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, _isFirstSpawn: boolean)
+	ctx.balls.grantHeldBall(player)
 end
 
 function TDM.onElim(_ctx: GameMode.ModeContext, _sourceId: string?, _targetId: string?) end

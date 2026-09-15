@@ -18,13 +18,14 @@ return function(props)
 	native.Size = native.Size or UDim2.fromOffset(200, Config.Action.HeightPx)
 	native.ZIndex = native.ZIndex or 5
 	return c(AnimatedButton, {
-		SelectionRadius = UDim.new(0, Config.Surface.RadiusPx),
+		SelectionRadius = UDim.new(0, Config.Surface.ControlRadiusPx),
 		Native = native,
 		Enabled = enabled,
 		Style = if props.Primary then "Primary" else "Standard",
 		OnActivated = props.OnActivated,
 		ButtonRef = props.ButtonRef,
 		Visual = c(Surface, {
+			Radius = Config.Surface.ControlRadiusPx,
 			Color = if props.Completed
 				then Config.Colors.Claimed
 				else if not enabled

@@ -5,7 +5,6 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
@@ -14,11 +13,15 @@ local Presentation =
 local Model = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("MatchHUDModel")
 )
-local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
+local ModeRegistry = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
+)
 local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)
 local listeners: { (any) -> () } = {}
 local connection: RBXScriptConnection? = nil
+local focusConnection: RBXScriptConnection? = nil
+local textFocusConnection: RBXScriptConnection? = nil
 local scoreboardOpen = false
 local available = false
 local action = "ArenaScoreboard"
@@ -51,6 +54,20 @@ local function update()
 	end
 	local modeId = state:GetAttribute("modeId")
 	local mode = GameModes.Modes[modeId]
+	-- Team identity comes from the mode's own roster, not from two hardcoded
+	-- attribute names: a mode whose sides are Survivors and Infected has to reach
+	-- the HUD as those, and every team-scoped element reads them from here.
+	local teams = nil
+	if state:GetAttribute("scoreScope") == "Team" then
+		local definition = if typeof(modeId) == "string" then ModeRegistry.get(modeId) else nil
+		local teamIds = if definition then definition.teams else nil
+		if teamIds then
+			teams = {}
+			for _, teamId in teamIds do
+				table.insert(teams, { id = teamId, score = state:GetAttribute(`TeamScore_{teamId}`) or 0 })
+			end
+		end
+	end
 	local character = player.Character
 	local players = {}
 	for _, member in Players:GetPlayers() do
@@ -72,9 +89,9 @@ local function update()
 		title = if mode then mode.Title else "MATCH",
 		timeRemaining = state:GetAttribute("timeRemaining"),
 		scoreTarget = state:GetAttribute("scoreTarget"),
-		teamMode = state:GetAttribute("scoreScope") == "Team",
-		redScore = state:GetAttribute("TeamScore_Red"),
-		blueScore = state:GetAttribute("TeamScore_Blue"),
+		scoreLabel = GameModes.ScoreLabel(modeId),
+		combat = GameModes.IsCombat(modeId),
+		teams = teams,
 		score = player:GetAttribute("MatchScore"),
 		teamId = player:GetAttribute("TeamId"),
 		eligible = player:GetAttribute("ArenaRoundEligible"),
@@ -95,13 +112,10 @@ local function update()
 	end
 end
 
+-- The board is a hold-to-view overlay: it never asks for the cursor, so the
+-- player keeps moving and aiming while they glance at it.
 local function setOpen(open: boolean)
 	scoreboardOpen = open and available
-	if scoreboardOpen then
-		Combat.requestCursor(action)
-	else
-		Combat.releaseCursor(action)
-	end
 	update()
 end
 
@@ -136,14 +150,25 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 			end
 		end)
 		ContextActionService:BindActionAtPriority(action, function(_, inputState)
+			-- A release must close the board even if chat gained focus while held.
+			if inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
+				setOpen(false)
+				return if available then Enum.ContextActionResult.Sink else Enum.ContextActionResult.Pass
+			end
 			if not available or UserInputService:GetFocusedTextBox() then
 				return Enum.ContextActionResult.Pass
 			end
 			if inputState == Enum.UserInputState.Begin then
-				MatchHUDClient.toggleScoreboard()
+				setOpen(true)
 			end
 			return Enum.ContextActionResult.Sink
 		end, false, Enum.ContextActionPriority.High.Value + 2, Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect)
+		focusConnection = UserInputService.WindowFocusReleased:Connect(function()
+			setOpen(false)
+		end)
+		textFocusConnection = UserInputService.TextBoxFocused:Connect(function()
+			setOpen(false)
+		end)
 	end
 	update()
 	callback(snapshot)
@@ -155,6 +180,14 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 		if #listeners == 0 and connection then
 			connection:Disconnect()
 			connection = nil
+			if focusConnection then
+				focusConnection:Disconnect()
+				focusConnection = nil
+			end
+			if textFocusConnection then
+				textFocusConnection:Disconnect()
+				textFocusConnection = nil
+			end
 			ContextActionService:UnbindAction(action)
 			MatchHUDClient.setAvailable(false)
 		end

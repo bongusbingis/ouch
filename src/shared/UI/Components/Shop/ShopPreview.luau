@@ -11,6 +11,7 @@ local InventoryPreview = require(script.Parent.Parent.InventoryPreview)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 
 local c = React.createElement
+local T = require(script.Parent.Parent.Parent.Tokens)
 
 return React.memo(function(props)
 	if props.Thumbnail ~= nil and props.Thumbnail ~= "" then
@@ -34,7 +35,7 @@ return React.memo(function(props)
 		return c(BonksLabel, {
 			Amount = props.PlaceholderBonks,
 			MaxTextSize = props.BonksTextSize or 34,
-			TextColor = props.TextColor,
+			TextColor = props.TextColor or T.Colors.Ink,
 			TextStroke = props.TextStroke or 0.05,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -47,16 +48,16 @@ return React.memo(function(props)
 	end
 	if #props.Items == 0 then
 		return c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
+			MeasurementFont = T.Type.Display,
 			MaxTextSize = 34,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+				Font = T.Type.Display,
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(0.8, 0.55),
 				Text = props.Placeholder or "COMING SOON",
-				TextColor3 = props.TextColor or Color3.new(1, 1, 1),
+				TextColor3 = props.TextColor or T.Colors.Ink,
 				TextTransparency = 0.15,
 				ZIndex = props.ZIndex or 5,
 			},
@@ -88,6 +89,8 @@ return React.memo(function(props)
 				ItemId = entry.itemId,
 				Category = entry.category,
 				Definition = entry.definition,
+				Candy = true,
+				Playing = props.Playing == true,
 				ColorId = props.ColorId,
 				CostumeId = props.CostumeId,
 				TextColor = props.TextColor,

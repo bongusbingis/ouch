@@ -1,8 +1,10 @@
 -- Description: Shared wire protocol for lobby party traffic: join-code normalization, request validation, success and failure envelopes, cross-server message shapes, and invite data encoding.
 
 local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(script.Parent.Config)
+local Queues = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Queues"))
 
 local Protocol = {}
 
@@ -14,6 +16,7 @@ Protocol.Actions = table.freeze({
 	LeaveParty = "LeaveParty",
 	StartMatchmaking = "StartMatchmaking",
 	CancelMatchmaking = "CancelMatchmaking",
+	SetQueue = "SetQueue",
 })
 
 Protocol.Errors = table.freeze({
@@ -22,6 +25,7 @@ Protocol.Errors = table.freeze({
 	Busy = "busy",
 	Internal = "internal_error",
 	InvalidCode = "invalid_code",
+	InvalidQueue = "invalid_queue",
 	InvalidRequest = "invalid_request",
 	MatchForming = "match_forming",
 	MatchmakingUnavailable = "matchmaking_unavailable",
@@ -73,6 +77,10 @@ function Protocol.validateRequest(_player, action, payload)
 			and payload.targetUserId ~= 0
 			and payload.targetUserId % 1 == 0,
 			Protocol.Errors.InvalidRequest
+	end
+
+	if action == Protocol.Actions.SetQueue then
+		return typeof(payload) == "table" and Queues.isEnabled(payload.queueId), Protocol.Errors.InvalidQueue
 	end
 
 	return false, Protocol.Errors.InvalidRequest

@@ -11,6 +11,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
 local Debug = require(ConfigRoot:WaitForChild("Infra"):WaitForChild("Debug"))
+local GameModes = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigReplication = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -38,6 +39,7 @@ local connections = {}
 local combatPresenters = {}
 local damagePresenters = {}
 local DeathEffects
+local FanAirflow
 
 ConfigReplication.startClient(LiveConfig.loadModules("arena"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
@@ -83,7 +85,20 @@ local systems = {
 	{ name = "MatchAudio", parent = Presentation, method = "start" },
 	{ name = "GameAudio", parent = Presentation, combat = true },
 	{ name = "PlayerHighlights", parent = Presentation, method = "start" },
+	{ name = "SplashdownCamera", parent = Presentation, method = "start" },
+	{ name = "SplashEffects", parent = Presentation, method = "start" },
+	{ name = "SplashdownAudio", parent = Presentation, method = "start" },
 	{ name = "JumpPadVisuals", parent = Presentation, method = "start" },
+	{ name = "BumperVisuals", parent = Presentation, method = "start" },
+	{ name = "EmotePlayback", parent = Presentation, method = "start" },
+	{
+		name = "FanAirflow",
+		parent = Presentation,
+		method = "start",
+		onLoaded = function(module)
+			FanAirflow = module
+		end,
+	},
 	{ name = "RotatingPlatforms", parent = MapFeatures, method = "load" },
 	{ name = "PlatformRider", parent = Movement, method = "start" },
 	{ name = "DebugVisuals", parent = DebugModules, method = "start", combat = true },
@@ -119,11 +134,13 @@ end
 
 local matchState: Folder? = nil
 local matchStateConnection: RBXScriptConnection? = nil
+local matchStateModeConnection: RBXScriptConnection? = nil
 local function updateCombatInput()
 	Combat.setInputEnabled(
 		Players.LocalPlayer:GetAttribute("ArenaReady") == true
 			and matchState ~= nil
 			and matchState:GetAttribute("phase") == "Active"
+			and GameModes.IsCombat(matchState:GetAttribute("modeId"))
 	)
 end
 
@@ -131,8 +148,12 @@ local function attachMatchState(folder: Folder)
 	if matchStateConnection then
 		matchStateConnection:Disconnect()
 	end
+	if matchStateModeConnection then
+		matchStateModeConnection:Disconnect()
+	end
 	matchState = folder
 	matchStateConnection = folder:GetAttributeChangedSignal("phase"):Connect(updateCombatInput)
+	matchStateModeConnection = folder:GetAttributeChangedSignal("modeId"):Connect(updateCombatInput)
 	updateCombatInput()
 end
 
@@ -188,8 +209,14 @@ table.insert(
 
 script.Destroying:Connect(function()
 	Combat.setInputEnabled(false)
+	if FanAirflow then
+		FanAirflow.stop()
+	end
 	if matchStateConnection then
 		matchStateConnection:Disconnect()
+	end
+	if matchStateModeConnection then
+		matchStateModeConnection:Disconnect()
 	end
 	for _, connection in connections do
 		if typeof(connection) == "RBXScriptConnection" then

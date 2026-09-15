@@ -1,6 +1,6 @@
--- Description: Animated modal that presents the daily reward claim: spring entrance, 7-day progress strip, reward display, and a dismiss button.
-
 --!strict
+local T = require(script.Parent.Parent.Tokens)
+-- Description: Animated modal that presents the daily reward claim: spring entrance, 7-day progress strip, reward display, and a dismiss button.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local AnimatedButton = require(script.Parent.PuffyButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
@@ -17,18 +17,20 @@ local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local Palette = UIConfig.ProgressionStyle
+local Palette = require(script.Parent.Parent.EconomyPalette)
 
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 
+local modalSurface = require(script.Parent.ModalSurface)
+
+local Well = require(script.Parent.Well)
+
 local c = React.createElement
+local Title = require(script.Parent.CandyTitle)
 
-local CLAIM_COLOR = Palette.Pink
-local CLAIMED_COLOR = Palette.Claimed
-local AVAILABLE_GLOW = Palette.Yellow
-
-local ButtonSurface = require(script.Parent.ButtonSurface)
+local Surface = require(script.Parent.CandyPanel)
+local artwork = UIConfig.LobbyArtwork.Action
 
 export type PublicDay = {
 	day: number,
@@ -56,42 +58,50 @@ export type Props = {
 	OnClose: (() -> ())?,
 }
 
+local function label(text: string, position: UDim2, size: UDim2, maximum: number, left: boolean?)
+	return c(ResponsiveText, {
+		MeasurementFont = Enum.Font.FredokaOne,
+		MaxTextSize = maximum,
+		Native = {
+			BackgroundTransparency = 1,
+			Position = position,
+			Size = size,
+			Font = Enum.Font.FredokaOne,
+			Text = text,
+			TextColor3 = T.Colors.Ink,
+			TextXAlignment = if left then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center,
+			ZIndex = 3,
+		},
+	}, {
+		Outline = c(
+			"UIStroke",
+			{ Color = Palette.Ink, Thickness = 0, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
+		),
+	})
+end
+
 local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 	local day = dayProps.Day
 	local claimed = day.claimed and not day.available
-	local bgColor = if claimed then CLAIMED_COLOR elseif day.available then AVAILABLE_GLOW else Palette.PanelRaised
-
 	return c("Frame", {
-		BackgroundColor3 = bgColor,
+		BackgroundColor3 = if day.available then Palette.Pink else Palette.Claimed,
 		BorderSizePixel = 0,
 		LayoutOrder = dayProps.Order,
-		Size = UDim2.fromScale(1 / 7 - 0.01, 1),
+		Size = UDim2.new(1 / 7, -36 / 7, 1, 0),
 	}, {
-		UICorner = c("UICorner", { CornerRadius = UDim.new(0.2, 0) }),
-		DayLabel = if claimed
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
+		Outline = c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Shape.StrokeInner }),
+		Number = if claimed
 			then c("ImageLabel", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://168702841",
-				ImageColor3 = Palette.White,
+				ImageColor3 = T.Colors.Ink,
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromScale(0.82, 0.9),
+				Size = UDim2.fromScale(0.55, 0.65),
 				ScaleType = Enum.ScaleType.Fit,
 			})
-			else c(ResponsiveText, {
-				MeasurementFont = UIConfig.Text.BodyFont,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.fromEnum(UIConfig.Text.BodyFont),
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromScale(0.9, 0.8),
-					Text = tostring(day.day),
-					TextColor3 = Palette.White,
-					TextStrokeColor3 = Palette.Ink,
-					TextStrokeTransparency = 0.35,
-				},
-			}),
+			else label(tostring(day.day), UDim2.fromOffset(2, 1), UDim2.new(1, -4, 1, -2), 23),
 	})
 end
 
@@ -156,7 +166,7 @@ return function(props: Props)
 		immediate = reducedMotion,
 	})
 	local rewardStyles = ReactSpring.useSpring({
-		Scale = if claimed then 1.15 else 1,
+		Scale = if claimed then 1.04 else 1,
 		config = Motion.Pop,
 		immediate = reducedMotion,
 	})
@@ -179,196 +189,147 @@ return function(props: Props)
 		end
 	end
 
+	local width = math.min(520, math.max(420, panelSize.X), safeArea.size.X - 24)
+	local height = math.min(360, math.max(280, panelSize.Y), safeArea.size.Y - 24)
+	local compact = height < 300
+	local padding = if height < 240 then 10 else if compact then 16 else 24
+	local gap = if height < 240 then 8 else if compact then 12 else 16
+	local dayHeight = if height < 240 then 24 else if compact then 30 else 36
+	local actionHeight = if height < 240 then 44 else if compact then 48 else 52
+	local innerWidth = width - padding * 2
+	local dayY = padding + 44 + gap
+	local rewardY = dayY + dayHeight + gap
+	local actionY = height - padding - actionHeight
+	local rewardHeight = actionY - gap - rewardY
+	local enabled = not props.Pending and props.FocusEnabled ~= false
 	local miniDays = {
-		UIListLayout = c("UIListLayout", {
+		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Padding = UDim.new(0.008, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6),
 		}),
 	}
 	for index, day in state.days do
 		miniDays[`Day{index}`] = c(MiniDay, { Day = day, Order = index })
 	end
-
-	local streakText = if claimed then "CLAIMED!" else `DAY {currentDayNumber}`
-
-	return c("TextButton", {
+	return modalSurface({
 		Active = true,
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.new(),
-		BackgroundTransparency = 0.35,
 		Selectable = false,
 		Text = "",
-		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = T.Colors.Ink,
+		BackgroundTransparency = 0.35,
 		ZIndex = 120,
 	}, {
-		Panel = c("Frame", {
-			Active = true,
-			ZIndex = 121,
-			SelectionGroup = true,
-			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Palette.Panel,
-			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Rotation = styles.Rotation,
-			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+		Panel = c(Surface, {
+			Color = Palette.Panel,
+			Radius = UIConfig.Radius.Panel,
+			Native = {
+				Active = true,
+				ZIndex = 121,
+				SelectionGroup = true,
+				SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(
+					safeArea.position.X + safeArea.size.X / 2,
+					safeArea.position.Y + safeArea.size.Y / 2
+				),
+				Size = UDim2.fromOffset(width, height),
+				Rotation = styles.Rotation,
+			},
 		}, {
 			ModalScale = c("UIScale", { Scale = styles.Scale }),
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
-			Outline = c("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 3 }),
-			HeaderBand = c("Frame", {
-				BackgroundColor3 = Palette.Yellow,
-				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(6, 6),
-				Size = UDim2.new(1, -12, 0.17, 0),
-			}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }) }),
-			Title = c(ResponsiveText, {
-				HostName = "Title",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 36,
+			Title = c(Title, {
+				Text = "DAILY REWARDS",
+				TextSize = if width < 420 then 24 else 30,
 				Native = {
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromOffset(18, 6),
-					Size = UDim2.new(1, -86, 0.17, 0),
-					Text = "DAILY REWARDS",
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextColor3 = Palette.White,
-					ZIndex = 2,
+					Position = UDim2.fromOffset(padding - 4, padding - 12),
+					Size = UDim2.fromOffset(innerWidth - 54, 52),
+					ZIndex = 10,
 				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = Palette.Ink,
-					Thickness = 0.045,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-			DayStrip = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0),
-				BackgroundTransparency = 1,
-				Position = UDim2.new(0.5, 0, 0.17, 18),
-				Size = UDim2.fromScale(0.85, 0.1),
-			}, miniDays),
-			RewardArea = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Palette.PanelRaised,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.48),
-				Size = UDim2.fromScale(0.7, 0.25),
-			}, {
-				RewardScale = c("UIScale", { Scale = rewardStyles.Scale }),
-				Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
-				RewardDisplay = if currentReward and currentReward.kind == "Bonks"
-					then c(BonksLabel, {
-						Amount = currentReward.amount or 0,
-						MaxTextSize = 54,
-						TextColor = Palette.White,
-						TextStroke = 0.045,
-						IconSize = UDim2.fromScale(0.25, 0.8),
-					})
-					else nil,
-			}),
-			StreakLabel = c(ResponsiveText, {
-				HostName = "Streak",
-				MaxTextSize = 24,
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.63),
-					Size = UDim2.fromScale(0.8, 0.08),
-					Text = props.ErrorText or streakText,
-					TextColor3 = Palette.White,
-					ZIndex = 2,
-				},
-			}, {
-				Outline = c(
-					"UIStroke",
-					{ Color = Palette.Ink, Thickness = 0.045, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
-				),
 			}),
 			CloseButton = c(AnimatedButton, {
+				Text = "X",
+				TextSize = 26,
+				TextColor = T.Colors.Ink,
+				Color = T.Colors.Surface,
+				Shadow = false,
 				ButtonRef = actionRef,
-				SelectionRadius = UDim.new(0.5, 0),
-				Visual = c(ButtonSurface, { Color = Palette.Pink, Radius = UDim.new(0.5, 0) }),
-				Enabled = props.OnClose ~= nil,
+				SelectionRadius = UDim.new(0, artwork.CornerPx),
+				Enabled = props.OnClose ~= nil and props.FocusEnabled ~= false,
 				OnActivated = props.OnClose,
 				Native = {
-					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -8, 0, 8),
-					Size = UDim2.fromOffset(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx),
 					BackgroundTransparency = 1,
-					ZIndex = 3,
+					Image = artwork.Pink,
+					ScaleType = Enum.ScaleType.Slice,
+					SliceCenter = artwork.PinkSlice,
+					SliceScale = artwork.SliceScale,
+					Position = UDim2.fromOffset(width - padding - 44, padding),
+					Size = UDim2.fromOffset(44, 44),
+					ZIndex = 4,
+				},
+			}, { Label = label("X", UDim2.fromOffset(0, 1), UDim2.fromScale(1, 1), 30) }),
+			DayStrip = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(padding, dayY),
+				Size = UDim2.fromOffset(innerWidth, dayHeight),
+			}, miniDays),
+			RewardArea = c(Well, {
+				Candy = true,
+				Color = Palette.Claimed,
+				Radius = UIConfig.Radius.Control,
+				Native = {
+					Position = UDim2.fromOffset(padding, rewardY),
+					Size = UDim2.fromOffset(innerWidth, rewardHeight),
 				},
 			}, {
-				Label = c(ResponsiveText, {
-					MaxTextSize = 42,
-					MeasurementFont = UIConfig.Text.BodyFont,
-					Native = {
-						BackgroundTransparency = 1,
-						Size = UDim2.fromScale(1, 1),
-						Text = "×",
-						TextColor3 = Color3.new(1, 1, 1),
-						Font = UIConfig.Text.BodyFont,
-						ZIndex = 4,
-					},
-				}, {
-					Outline = c("UIStroke", {
-						Color = Palette.Ink,
-						Thickness = 0.045,
-						StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					}),
-				}),
+				Status = label(
+					props.ErrorText or (if claimed then "CLAIMED!" else `DAY {currentDayNumber}`),
+					UDim2.fromOffset(10, 6),
+					UDim2.new(1, -20, 0, 22),
+					if props.ErrorText then 16 else 20
+				),
+				Reward = if currentReward and currentReward.kind == "Bonks"
+					then c(BonksLabel, {
+						Amount = currentReward.amount or 0,
+						MaxTextSize = if compact then 52 else 68,
+						TextColor = T.Colors.Ink,
+						TextStroke = 0,
+						Native = { Position = UDim2.fromOffset(12, 27), Size = UDim2.new(1, -24, 1, -33), ZIndex = 3 },
+					}, { Pop = c("UIScale", { Scale = rewardStyles.Scale }) })
+					else nil,
 			}),
 			ActionButton = c(AnimatedButton, {
-				SelectionRadius = UDim.new(0.5, 0),
-				Visual = c(ButtonSurface, { Color = CLAIM_COLOR, Enabled = not props.Pending }),
+				Text = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM" else "DONE",
+				TextSize = 26,
+				TextColor = T.Colors.Ink,
+				Color = if state.canClaim then T.Colors.Pink else T.Colors.Surface,
+				Shadow = false,
+				SelectionRadius = UDim.new(0, artwork.CornerPx),
+				Enabled = enabled and (if state.canClaim then props.OnClaim ~= nil else props.OnClose ~= nil),
 				Style = "Primary",
-				Enabled = not props.Pending and (if state.canClaim then props.OnClaim ~= nil else props.OnClose ~= nil),
+				OnActivated = if state.canClaim then props.OnClaim else props.OnClose,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 1),
 					BackgroundTransparency = 1,
-					Image = "",
-					Position = UDim2.fromScale(0.5, 0.92),
-					Size = UDim2.fromScale(0.72, 0.16),
+					Image = if state.canClaim then artwork.Pink else artwork.Cyan,
+					ImageColor3 = if enabled then Palette.White else Color3.fromRGB(140, 140, 140),
+					ScaleType = Enum.ScaleType.Slice,
+					SliceCenter = if state.canClaim then artwork.PinkSlice else artwork.CyanSlice,
+					SliceScale = artwork.SliceScale,
+					Position = UDim2.fromOffset(padding, actionY),
+					Size = UDim2.fromOffset(innerWidth, actionHeight),
+					ZIndex = 4,
 				},
-				OnActivated = function()
-					if state.canClaim then
-						if props.OnClaim then
-							props.OnClaim()
-						end
-					elseif props.OnClose then
-						props.OnClose()
-					end
-				end,
 			}, {
-				UISizeConstraint = c(
-					"UISizeConstraint",
-					{ MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx) }
+				Label = label(
+					if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM" else "DONE",
+					UDim2.fromOffset(10, 2),
+					UDim2.new(1, -20, 1, -4),
+					if compact then 28 else 32
 				),
-				TextLabel = c(ResponsiveText, {
-					MeasurementFont = Enum.Font.LuckiestGuy,
-					MaxTextSize = 30,
-					Native = {
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundTransparency = 1,
-						FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-						Position = UDim2.fromScale(0.5, 0.5),
-						Size = UDim2.fromScale(0.88, 0.72),
-						Text = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM REWARD" else "DONE",
-						TextColor3 = Color3.new(1, 1, 1),
-						ZIndex = 2,
-					},
-				}, {
-					Outline = c("UIStroke", { Thickness = 0.05, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }),
-				}),
 			}),
 		}),
 	})

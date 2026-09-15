@@ -9,13 +9,13 @@ local CloudRetry = require(script.Parent.CloudRetry)
 local QueueRepository = {}
 QueueRepository.__index = QueueRepository
 
-local function queueName()
-	return Config.MemoryStoreNamespace .. ":Queue:" .. Config.QueueKey
+local function queueName(queueId)
+	return Config.MemoryStoreNamespace .. ":Queue:" .. queueId
 end
 
-function QueueRepository.new()
+function QueueRepository.new(queueId)
 	return setmetatable({
-		_map = MemoryStoreService:GetSortedMap(queueName()),
+		_map = MemoryStoreService:GetSortedMap(queueName(queueId)),
 	}, QueueRepository)
 end
 

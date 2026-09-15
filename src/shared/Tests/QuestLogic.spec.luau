@@ -68,6 +68,12 @@ T.describe("QuestLogic", function()
 		T.expect(QuestLogic.nextResetAt(now)):toEqual(1783987200)
 	end)
 
+	T.it("recognizes a new quest cycle only after the initial daily snapshot", function()
+		T.expect(QuestLogic.isNewDailyCycle(nil, "2026-07-13")):toEqual(false)
+		T.expect(QuestLogic.isNewDailyCycle("2026-07-13", "2026-07-13")):toEqual(false)
+		T.expect(QuestLogic.isNewDailyCycle("2026-07-13", "2026-07-14")):toEqual(true)
+	end)
+
 	T.it("maps event progress to the intended player and mode", function()
 		local byId = QuestLogic.definitionsById(definitions)
 		local elim = { kind = "Elim", sourceId = "1", targetId = "2" }

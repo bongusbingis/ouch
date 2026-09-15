@@ -19,6 +19,7 @@ local Surface = require(script.Parent.Arena.Surface)
 local ActionButton = require(script.Parent.Arena.ActionButton)
 local Podium = require(script.Parent.Arena.ResultsPodium)
 local Progress = require(script.Parent.Arena.ResultProgress)
+local formatNumber = require(script.Parent.Parent.Models.NumberText)
 local c = React.createElement
 local colors = Config.Colors
 
@@ -190,6 +191,16 @@ return function(props)
 				else "PLAY AGAIN"
 	local returnText = if actions.returnAction == "LeaveParty" then "LEAVE PARTY" else "LOBBY"
 	local returnCallback = if actions.returnAction == "LeaveParty" then props.OnLeaveParty else props.OnReturnToLobby
+	-- The storefront shortcut rides the header beside the scores toggle, and only
+	-- where there is room for a second control without crowding the mode name. On a
+	-- narrow screen it is dropped rather than squeezed: the menu toggle reaches the
+	-- same page, so nothing becomes unreachable. Labelled from what this match
+	-- actually paid, so it reads as a consequence of the round and not an advert.
+	local earnedBonks = if result.rewards then result.rewards.bonks else nil
+	local shopText = if typeof(earnedBonks) == "number" and earnedBonks > 0
+		then `SPEND {formatNumber(earnedBonks)}`
+		else "SHOP"
+	local showShop = props.OnOpenShop ~= nil and width >= 760 and not short
 	local rows = { Layout = c("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }) }
 	for index, score in result.scores do
 		rows[score.id] = c(
@@ -255,7 +266,7 @@ return function(props)
 				Align = Enum.TextXAlignment.Left,
 				Native = {
 					Position = UDim2.fromOffset(10, 0),
-					Size = UDim2.new(1, -168, 0, headerHeight * 0.64),
+					Size = UDim2.new(1, if showShop then -310 else -168, 0, headerHeight * 0.64),
 					ZIndex = 3,
 				},
 			}),
@@ -268,9 +279,19 @@ return function(props)
 				Native = {
 					Position = UDim2.fromOffset(10, headerHeight * 0.68),
 					ZIndex = 3,
-					Size = UDim2.new(1, -148, 0, headerHeight * 0.3),
+					Size = UDim2.new(1, if showShop then -290 else -148, 0, headerHeight * 0.3),
 				},
 			}),
+			ShopButton = if showShop
+				then c(ActionButton, {
+					Text = shopText,
+					TextSize = 20,
+					Color = colors.Yellow,
+					Enabled = interactive,
+					Native = { Position = UDim2.new(1, -270, 0, 0), Size = UDim2.fromOffset(130, 44) },
+					OnActivated = props.OnOpenShop,
+				})
+				else nil,
 			StandingsButton = c(ActionButton, {
 				Text = if standings then "PODIUM" else "SCORES",
 				ButtonRef = scoresRef,
@@ -308,6 +329,7 @@ return function(props)
 						ResultId = result.resultId,
 						Compact = short,
 						ShowLabels = not standings,
+						ScoreLabel = result.scoreLabel,
 					}),
 				}),
 				Standings = if standings

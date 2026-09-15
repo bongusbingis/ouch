@@ -1,4 +1,4 @@
--- Description: Infection game mode: picks patient zero, converts eliminated survivors to the infected side instead of scoring, and hands the win to the survivors if the clock runs out.
+-- Description: Infection game mode: picks patient zero, converts eliminated survivors to the infected side instead of scoring, scores both sides by headcount, and hands the win to the survivors if the clock runs out.
 
 --!strict
 
@@ -80,27 +80,46 @@ local function teamsOf(ctx: GameMode.ModeContext): { string? }
 	return teamIds
 end
 
-function Infection.onMatchStart(ctx: GameMode.ModeContext)
+-- Both sides score their own headcount, so the scoreboard reads as the thing the
+-- mode is actually about -- how many are left -- rather than a kill tally that
+-- climbs every time a survivor knocks an infected player down for three seconds.
+-- MatchService recomputes this whenever the roster or anyone's team changes.
+function Infection.teamScore(ctx: GameMode.ModeContext, teamId: string): number
+	local count = 0
+	for _, player in ctx.getPlayers() do
+		if ctx.getPlayerTeam(player) == teamId then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Split out from onMatchStart with the chooser passed in, the same way
+-- pickPatientZero takes one: side assignment is the part worth pinning down, and
+-- it cannot be if reaching it means going through a live Random.
+function Infection.assignSides(ctx: GameMode.ModeContext, chooseIndex: (number) -> number)
 	local players = ctx.getPlayers()
-	local patientZero = Infection.pickPatientZero(#players, randomIndex)
+	local patientZero = Infection.pickPatientZero(#players, chooseIndex)
 
 	for index, player in players do
 		local infected = index == patientZero
 		ctx.setPlayerTeam(player, if infected then Infection.InfectedTeam else Infection.SurvivorTeam)
-		if not infected then
-			ctx.balls.grantHeldBall(player)
-		end
+		-- Patient zero is armed like everyone else. Opening the round with the one
+		-- player who has to start the chain holding nothing but a seven-stud hammer
+		-- left the first half-minute with nothing happening in it.
+		ctx.balls.grantHeldBall(player)
 	end
+end
+
+function Infection.onMatchStart(ctx: GameMode.ModeContext)
+	Infection.assignSides(ctx, randomIndex)
 end
 
 function Infection.onPlayerSpawned(ctx: GameMode.ModeContext, player: Player, isFirstSpawn: boolean)
 	if isFirstSpawn and ctx.getPlayerTeam(player) == nil then
 		ctx.setPlayerTeam(player, Infection.InfectedTeam)
-		return
 	end
-	if isFirstSpawn and ctx.getPlayerTeam(player) == Infection.SurvivorTeam then
-		ctx.balls.grantHeldBall(player)
-	end
+	ctx.balls.grantHeldBall(player)
 end
 
 function Infection.onElim(ctx: GameMode.ModeContext, sourceId: string?, targetId: string?)

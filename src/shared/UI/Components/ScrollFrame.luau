@@ -18,7 +18,15 @@ return function(props)
 	end, {})
 	local native = table.clone(props)
 	native.children = nil
-	native.ref = scrollRef
+	native.ScrollRef = nil
+	native.ref = React.useCallback(function(instance)
+		scrollRef.current = instance
+		if type(props.ScrollRef) == "function" then
+			props.ScrollRef(instance)
+		elseif props.ScrollRef then
+			props.ScrollRef.current = instance
+		end
+	end, { props.ScrollRef })
 	native[React.Event.SelectionGained] = function()
 		setFocused(true)
 	end
@@ -38,6 +46,6 @@ return function(props)
 		Thickness = UI.Interaction.FocusStrokePx,
 		Transparency = if focused then 0 else 1,
 	})
-	children.FocusCorner = c("UICorner", { CornerRadius = UDim.new(0, 8) })
+	children.FocusCorner = c("UICorner", { CornerRadius = UDim.new(0, UI.Interaction.FocusCornerPx) })
 	return c("ScrollingFrame", native, children)
 end

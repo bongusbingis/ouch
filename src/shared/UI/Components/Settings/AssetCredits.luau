@@ -1,0 +1,87 @@
+-- Read-only asset attribution from the generated provenance manifest.
+--!strict
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
+local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
+local Credits = require(ReplicatedStorage:WaitForChild("ThirdPartyCredits"))
+local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local usePreferredTextSize = require(script.Parent.Parent.Parent.Hooks.usePreferredTextSize)
+local Tokens = require(script.Parent.Parent.Parent.Tokens)
+
+local c = React.createElement
+local C = Tokens.Colors
+
+local function CreditText(props)
+	local ref = React.useRef(nil)
+	local height, setHeight = React.useState(1)
+	React.useEffect(function()
+		local label = ref.current
+		local function measure()
+			if label.AbsoluteSize.X > 0 then
+				local bounds = TextService:GetTextSize(
+					props.Text,
+					props.TextSize,
+					Enum.Font.BuilderSans,
+					Vector2.new(label.AbsoluteSize.X, 100000)
+				)
+				setHeight(math.ceil(bounds.Y) + 4)
+			end
+		end
+		local changed = label:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+		measure()
+		return function()
+			changed:Disconnect()
+		end
+	end, { props.Text, props.TextSize })
+	return c("TextLabel", {
+		ref = ref,
+		BackgroundTransparency = 1,
+		Font = Enum.Font.BuilderSans,
+		LayoutOrder = props.LayoutOrder,
+		Size = UDim2.new(1, 0, 0, height),
+		Text = props.Text,
+		TextColor3 = C.InkSoft,
+		TextSize = props.TextSize,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ZIndex = 5,
+	})
+end
+
+return function()
+	local preferred = usePreferredTextSize()
+	local scale = UIConfig.Text.PreferredScale[preferred.Name] or 1
+	local entries = {
+		Layout = c("UIListLayout", { Padding = UDim.new(0, 18), SortOrder = Enum.SortOrder.LayoutOrder }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
+		Padding = c("UIPadding", {
+			PaddingLeft = UDim.new(0, 12),
+			PaddingRight = UDim.new(0, 12),
+			PaddingTop = UDim.new(0, 12),
+			PaddingBottom = UDim.new(0, 12),
+		}),
+	}
+	for index, credit in Credits do
+		entries[tostring(index)] = c(CreditText, {
+			LayoutOrder = index,
+			Text = `{credit.author} — {credit.source_id}\n{credit.license}\n\n{credit.source_url}\n{credit.license_url}\n\n{credit.license_text}`,
+			TextSize = math.round(18 * scale),
+		})
+	end
+	return c("Frame", {
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = C.SurfaceWarm,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 0),
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, Tokens.Shape.RadiusCard) }),
+		Outline = c("UIStroke", { Color = C.WellLine, Thickness = Tokens.Shape.StrokeInner }),
+		Content = c("Frame", {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 0),
+		}, entries),
+	})
+end

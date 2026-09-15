@@ -45,13 +45,33 @@ T.describe("LiveConfig registry", function()
 
 	T.it("preserves each place's override scope with unique ordered module names", function()
 		T.expect(table.concat(LiveConfig.moduleNames("arena"), ","))
-			:toEqual("AimAssist,Combat,Crates,GameModes,MapFeatures,Modes,Shop")
+			:toEqual("AimAssist,Combat,Crates,GameModes,MapFeatures,Modes,Progression,Shop")
 		T.expect(table.concat(LiveConfig.moduleNames("lobby"), ",")):toEqual("Crates,GameModes,Matchmaking,Shop")
-		T.expect(#LiveConfig.moduleNames()):toEqual(8)
+		T.expect(#LiveConfig.moduleNames()):toEqual(9)
 	end)
 
 	T.it("stays within the Open Cloud repository key limit", function()
 		T.expect(#LiveConfig.Entries <= 100):toBeTruthy()
+	end)
+
+	-- The faucet is tunable, but not down to nothing: a completed match and a win
+	-- must always pay, or a player finishes the loop and sees no reward at all.
+	T.it("keeps completing a match and winning payable at every allowed award rate", function()
+		local mustPay = {
+			["Progression.ProgressionXP.MatchComplete"] = true,
+			["Progression.ProgressionXP.Win"] = true,
+			["Progression.ProgressionBonks.MatchComplete"] = true,
+			["Progression.ProgressionBonks.Win"] = true,
+		}
+		local found = 0
+		for _, entry in LiveConfig.Entries do
+			if mustPay[entry.Key] then
+				found += 1
+				T.expect(entry.Minimum):toBeTruthy()
+				T.expect((entry.Minimum :: number) >= 1):toBeTruthy()
+			end
+		end
+		T.expect(found):toEqual(4)
 	end)
 end)
 

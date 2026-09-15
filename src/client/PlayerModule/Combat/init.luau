@@ -14,6 +14,8 @@ local MovementSuppression = require(script:WaitForChild("MovementSuppression"))
 local CombatConfig = require(script:WaitForChild("CombatConfig"))
 local DeviceInput = require(script:WaitForChild("DeviceInput"))
 local TouchIntent = require(script:WaitForChild("TouchIntent"))
+
+local cameraSuppressions: { [string]: boolean } = {}
 local TouchRegions = require(script:WaitForChild("TouchRegions"))
 
 local Combat = {}
@@ -132,6 +134,22 @@ function Combat.releaseMovementSuppression(reason: string)
 	MovementSuppression.release(reason)
 end
 
+function Combat.requestCameraSuppression(reason: string)
+	if cameraSuppressions[reason] then
+		return
+	end
+	cameraSuppressions[reason] = true
+	CombatCamera.refresh()
+end
+
+function Combat.releaseCameraSuppression(reason: string)
+	if not cameraSuppressions[reason] then
+		return
+	end
+	cameraSuppressions[reason] = nil
+	CombatCamera.refresh()
+end
+
 function Combat.onIntent(listener: (Intent) -> ()): () -> ()
 	table.insert(listeners, listener)
 	return function()
@@ -244,7 +262,9 @@ function Combat.start()
 		TouchRegions.setExclusion(name, rect)
 	end)
 	CombatCamera.setChargingPredicate(TouchIntent.isCharging)
-	CombatCamera.setCameraSuppressedPredicate(TouchIntent.isCameraSuppressed)
+	CombatCamera.setCameraSuppressedPredicate(function()
+		return TouchIntent.isCameraSuppressed() or next(cameraSuppressions) ~= nil
+	end)
 	CombatCamera.start()
 	TouchIntent.setHandlers(handlers)
 	DeviceInput.setHandlers(handlers)

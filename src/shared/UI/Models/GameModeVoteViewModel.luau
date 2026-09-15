@@ -4,8 +4,12 @@
 
 local GameModeVoteViewModel = {}
 
-function GameModeVoteViewModel.description(rules: any, teamMode: boolean): string
-	local target = rules.ScoreTarget
+-- projectedTarget is the target this roster would actually play to, published on
+-- the ballot by the server. The authored rules value is only the number at the
+-- mode's reference roster, so selling that one would promise a match length
+-- nobody is about to play.
+function GameModeVoteViewModel.description(rules: any, teamMode: boolean, projectedTarget: number?): string
+	local target = projectedTarget or rules.ScoreTarget
 	if target == math.huge then
 		return "Survive until time runs out. Eliminated survivors join the infected."
 	end

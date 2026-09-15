@@ -3,16 +3,17 @@
 --!strict
 
 local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
-local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local useButtonMotion = require(script.Parent.Parent.Hooks.useButtonMotion)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local Selection = require(script.Parent.Parent.Services.Selection)
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local ScrollingClipping = require(script.Parent.Parent.Services.ScrollingClipping)
 
 local c = React.createElement
 
@@ -33,8 +34,11 @@ export type Props = {
 	Native: { [any]: any },
 	Enabled: boolean?,
 	Style: "Standard" | "Primary" | "Card"?,
+	HoverRotation: boolean?,
 	OnActivated: (() -> ())?,
 	OnSelectionGained: ((GuiButton) -> ())?,
+	OnHoverChanged: ((boolean) -> ())?,
+	OnPointerDown: ((InputObject) -> ())?,
 	ButtonRef: any?,
 	SelectionRadius: UDim?,
 	EntranceDelay: number?,
@@ -49,23 +53,30 @@ return function(props: Props)
 	local entered, setEntered = React.useState(props.EntranceDelay == nil)
 	local entranceRevision = React.useRef(0)
 	local hovering, setHovering = React.useState(false)
-	local focused, setFocused = React.useState(false)
 	local pressing, setPressing = React.useState(false)
+	local rotationBlocked, setRotationBlocked = React.useState(false)
 	local reducedMotion = useReducedMotion()
 	local preset = Motion.Controls[props.Style or "Standard"]
 	local scale = if not entered
 		then 0.82
 		else if not enabled then 1 else if pressing then preset.pressed else if hovering then preset.hover else 1
-	local rotation = if enabled and hovering and not pressing then preset.rotation else 0
-	local styles = ReactSpring.useSpring({
-		Scale = scale,
-		Rotation = rotation,
-		config = Motion.Control,
-		immediate = reducedMotion,
-	})
-	local visualRotation = styles.Rotation:map(function(value: number)
-		return value + (props.Native.Rotation or 0)
-	end)
+	local rotation = if enabled
+			and hovering
+			and not pressing
+			and props.HoverRotation ~= false
+		then preset.rotation
+		else 0
+	local styles = useButtonMotion(scale, rotation, pressing and enabled, reducedMotion)
+	local restRotation = props.Native.Rotation or 0
+	local visualRotation = if rotationBlocked
+		then restRotation
+		else styles.Rotation:map(function(value: number)
+			-- The ref check also covers an interaction arriving before the mount effect runs.
+			if ScrollingClipping.isInsideClippingScrollingFrame(buttonRef.current) then
+				return restRotation
+			end
+			return value + restRotation
+		end)
 	local layoutChildren = {}
 	local visualChildren = {}
 	for key, child in props.children or {} do
@@ -77,23 +88,12 @@ return function(props: Props)
 		end
 	end
 	local children = merge(layoutChildren, {
-		SelectionImage = c("Frame", {
-			ref = selectionImageRef,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = (props.Native.ZIndex or 1) + 10,
-		}, {
-			Corner = c(
-				"UICorner",
-				{ CornerRadius = props.SelectionRadius or UDim.new(0, UIConfig.Interaction.FocusCornerPx) }
-			),
-			Outline = c("UIStroke", {
-				Color = UIConfig.ProgressionStyle.Yellow,
-				Thickness = UIConfig.Interaction.FocusStrokePx,
-				Transparency = if focused and enabled then 0 else 1,
-			}),
-		}),
+		-- Roblox draws SelectionImageObject itself. Keep that template empty and
+		-- draw one border in local hitbox coordinates to avoid a second offset ring.
+		SelectionImage = c(
+			"Frame",
+			{ ref = selectionImageRef, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }
+		),
 		InteractionVisual = c(
 			"ImageLabel",
 			{
@@ -119,7 +119,9 @@ return function(props: Props)
 				ZIndex = props.Native.ZIndex or 1,
 			},
 			merge(visualChildren, {
-				Visual = props.Visual,
+				Visual = if props.Visual
+					then React.cloneElement(props.Visual, { PressDepth = styles.PressDepth })
+					else nil,
 				InteractionScale = c("UIScale", {
 					Scale = styles.Scale,
 				}),
@@ -145,6 +147,35 @@ return function(props: Props)
 		end
 	end, { props.ButtonRef })
 	React.useEffect(function()
+		local button: ImageButton? = buttonRef.current
+		if not button then
+			return nil
+		end
+		local active = true
+		local clippingConnections: { RBXScriptConnection } = {}
+		local function update()
+			if active then
+				setRotationBlocked(ScrollingClipping.isInsideClippingScrollingFrame(button))
+			end
+		end
+		local ancestor = button.Parent
+		while ancestor do
+			if ancestor:IsA("ScrollingFrame") then
+				table.insert(clippingConnections, ancestor:GetPropertyChangedSignal("ClipsDescendants"):Connect(update))
+			end
+			ancestor = ancestor.Parent
+		end
+		local ancestryConnection = button.AncestryChanged:Connect(update)
+		update()
+		return function()
+			active = false
+			ancestryConnection:Disconnect()
+			for _, connection in clippingConnections do
+				connection:Disconnect()
+			end
+		end
+	end, {})
+	React.useEffect(function()
 		if props.EntranceDelay == nil then
 			setEntered(true)
 			return
@@ -168,16 +199,45 @@ return function(props: Props)
 			or input.KeyCode == Enum.KeyCode.ButtonA
 	end
 
+	-- Releases outside the hitbox and focus loss must never leave a control sunk.
+	React.useEffect(function()
+		local release = UserInputService.InputEnded:Connect(function(input)
+			if isPressInput(input) then
+				setPressing(false)
+			end
+		end)
+		local blur = UserInputService.WindowFocusReleased:Connect(function()
+			setPressing(false)
+			setHovering(false)
+		end)
+		return function()
+			release:Disconnect()
+			blur:Disconnect()
+		end
+	end, {})
+	React.useEffect(function()
+		if not enabled then
+			setPressing(false)
+			setHovering(false)
+		end
+	end, { enabled })
+
 	local function beginHover()
 		if enabled and not hovering then
 			setHovering(true)
 			UIFeedback.hover()
+			if props.OnHoverChanged then
+				props.OnHoverChanged(true)
+			end
 		end
 	end
 
 	local function endHover()
 		setHovering(false)
 		setPressing(false)
+		if props.OnHoverChanged then
+			props.OnHoverChanged(false)
+		end
 	end
 
 	return c(
@@ -185,6 +245,7 @@ return function(props: Props)
 		merge(props.Native, {
 			ref = buttonRef,
 			Active = enabled,
+			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			ImageTransparency = 1,
@@ -224,6 +285,9 @@ return function(props: Props)
 							end
 						end
 					end
+					if props.OnPointerDown then
+						props.OnPointerDown(input)
+					end
 					if isPressInput(input) then
 						setPressing(true)
 					end
@@ -237,7 +301,6 @@ return function(props: Props)
 				end
 				else nil,
 			[React.Event.SelectionGained] = function(button)
-				setFocused(true)
 				if GuiService.SelectedObject ~= nil then
 					beginHover()
 				end
@@ -248,7 +311,6 @@ return function(props: Props)
 				end
 			end,
 			[React.Event.SelectionLost] = function()
-				setFocused(false)
 				endHover()
 			end,
 		}),

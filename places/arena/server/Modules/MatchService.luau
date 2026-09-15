@@ -19,6 +19,7 @@ local GameMode = require(Game:WaitForChild("Modes"):WaitForChild("GameMode"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 local ModeOptions = require(Game:WaitForChild("Modes"):WaitForChild("ModeOptions"))
 local ModeAvailability = require(Game:WaitForChild("Modes"):WaitForChild("ModeAvailability"))
+local ScoreTarget = require(Game:WaitForChild("Modes"):WaitForChild("ScoreTarget"))
 local PartyTeamAllocator = require(Game:WaitForChild("Modes"):WaitForChild("PartyTeamAllocator"))
 local PlayerIds = require(Game:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local PostMatchResult = require(Game:WaitForChild("PostMatch"):WaitForChild("PostMatchResult"))
@@ -29,6 +30,7 @@ local ArenaService = require(script.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local BallService = require(script.Parent.BallService)
 local EliminationService = require(script.Parent.EliminationService)
+local SpawnRouter = require(script.Parent.SpawnRouter)
 
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -55,6 +57,7 @@ local watchedPlayers: { [number]: RBXScriptConnection } = {}
 local nativeDeathConnections: { [number]: RBXScriptConnection } = {}
 local lastResult: PostMatchResult.GlobalResult? = nil
 local resultRosterByUserId: { [number]: PostMatchResult.Contestant } = {}
+local contestantStatsByUserId: { [number]: { [string]: number } } = {}
 local opponentDeadline: number? = nil
 local refreshPopulation: () -> ()
 
@@ -138,10 +141,11 @@ local function rememberContestant(player: Player)
 		teamId = playerTeam(player),
 		colorId = player:GetAttribute("Equip_CharacterColor"),
 		costumeId = player:GetAttribute("Equip_CostumeAssets"),
-		emoteId = player:GetAttribute("Equip_EmoteAssets"),
+		emoteId = player:GetAttribute("EmoteSlot_1"),
 		ballId = player:GetAttribute("Equip_BallAssets"),
 		hammerId = player:GetAttribute("Equip_HammerAssets"),
 		contribution = playerMatchElims[PlayerIds.toId(player)] or 0,
+		stats = contestantStatsByUserId[player.UserId],
 	}
 end
 
@@ -171,6 +175,8 @@ local function buildResult(activeMode: GameMode.GameMode, event: { [string]: any
 		modeId = activeMode.id,
 		modeName = activeMode.displayName,
 		scoreScope = activeMode.scoreScope or "Player",
+		scoreLabel = GameModes.ScoreLabel(activeMode.id),
+		statLabels = activeMode.statLabels,
 		winnerId = event.winnerId,
 		reason = tostring(event.reason or "Complete"),
 		interactiveAt = now + PostMatchConfig.RevealSeconds,
@@ -333,8 +339,35 @@ local function modeContext(): GameMode.ModeContext
 	}
 end
 
+-- Modes that own their scoreboard (GameMode.teamScore) have it recomputed here
+-- rather than accumulated, so a player leaving, joining or changing side moves
+-- the number the same way an elimination does.
+local function refreshTeamScores()
+	local activeMode = mode
+	if activeMode == nil or activeMode.teamScore == nil then
+		return
+	end
+	-- Frozen once the match is decided, so players drifting away during results
+	-- cannot walk the final scoreboard away from what it was won with.
+	if state.phase ~= "Starting" and state.phase ~= "Active" then
+		return
+	end
+	local scorer = activeMode.teamScore
+	local ctx = modeContext()
+	local events: { MatchSim.MatchEvent } = {}
+	for _, teamId in teamIds() do
+		MatchSim.setScore(state, teamId, scorer(ctx, teamId), events)
+	end
+	if #events > 0 then
+		handleMatchEvents(events)
+	end
+end
+
 local function grantSpawnProtection(character: Model)
 	local activeMode = assert(mode, "[MatchService] spawn protection requires an active mode")
+	if activeMode.rules.SpawnInvulnSeconds <= 0 then
+		return
+	end
 	local generation = (spawnProtectionGeneration[character] or 0) + 1
 	spawnProtectionGeneration[character] = generation
 	character:SetAttribute("minv", true)
@@ -352,6 +385,7 @@ end
 local function startMatch(events: { MatchSim.MatchEvent })
 	local activeMode = assert(mode, "[MatchService] startMatch requires a selected mode")
 	table.clear(resultRosterByUserId)
+	table.clear(contestantStatsByUserId)
 	table.clear(spawnedThisMatch)
 	table.clear(playerMatchElims)
 	table.clear(pendingWaveRespawns)
@@ -368,7 +402,7 @@ local function startMatch(events: { MatchSim.MatchEvent })
 			respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 			EliminationService.up(player)
 			spawnedThisMatch[key] = true
-			ArenaService.teleport(character, playerTeam(player))
+			SpawnRouter.spawn(character, player, playerTeam(player), "MatchStart")
 			grantSpawnProtection(character)
 		end
 	end
@@ -377,7 +411,11 @@ local function startMatch(events: { MatchSim.MatchEvent })
 	activeMode.onMatchStart(modeContext())
 	MatchSim.start(state, activeMode.rules, events)
 	setStateAttribute("modeId", activeMode.id)
-	setStateAttribute("scoreTarget", activeMode.rules.ScoreTarget)
+	-- A mode with no elimination target replicates zero rather than infinity: the
+	-- HUD reads zero as "no target, play to the clock", and an infinite attribute
+	-- reaches the objective line as the literal word.
+	local target = activeMode.rules.ScoreTarget
+	setStateAttribute("scoreTarget", if target == math.huge then 0 else target)
 	setStateAttribute("scoreScope", activeMode.scoreScope or "Player")
 end
 
@@ -395,7 +433,7 @@ local function cleanupMatch()
 		local character = player.Character
 		if character then
 			EliminationService.up(player)
-			ArenaService.teleport(character, nil)
+			SpawnRouter.spawn(character, player, nil, "Cleanup")
 		end
 	end
 end
@@ -503,15 +541,17 @@ local function onCharacterAdded(player: Player, character: Model)
 	EliminationService.up(player)
 	player:SetAttribute("MatchRespawnAt", nil)
 	if not isArenaJoinPhase() then
+		SpawnRouter.spawn(character, player, playerTeam(player), "Idle")
 		return
 	end
-	ArenaService.teleport(character, playerTeam(player))
+	SpawnRouter.spawn(character, player, playerTeam(player), "Join")
 	grantSpawnProtection(character)
 
 	local isFirstSpawn = not spawnedThisMatch[key]
 	spawnedThisMatch[key] = true
 	local activeMode = assert(mode, "[MatchService] arena join phase without a selected mode")
 	activeMode.onPlayerSpawned(modeContext(), player, isFirstSpawn)
+	refreshTeamScores()
 end
 
 local function watchPlayer(player: Player)
@@ -545,19 +585,22 @@ local function respawnPlayer(player: Player)
 		return
 	end
 	if humanoid.Health <= 0 then
-		-- Native death during a combat ragdoll can bypass Roblox's automatic replacement.
-		if EliminationService.forget(character) then
-			task.spawn(function()
-				while player.Parent ~= nil and player.Character == character do
-					local ok, err = pcall(player.LoadCharacterAsync, player)
-					if ok then
-						return
-					end
-					warn(`[MatchService] Native character replacement failed: {err}`)
-					task.wait(GameModes.NativeRespawnRetrySeconds)
+		-- A native death (fall/void/etc.) can reach here without ever going through
+		-- EliminationService.down, so forget() has nothing to tear down and must not
+		-- gate this replacement retry -- doing so left the corpse in place indefinitely,
+		-- relying on Roblox's own (slower, uncoordinated) auto-respawn timer.
+		EliminationService.forget(character)
+		player:SetAttribute("MatchRespawnAt", nil)
+		task.spawn(function()
+			while player.Parent ~= nil and player.Character == character do
+				local ok, err = pcall(player.LoadCharacterAsync, player)
+				if ok then
+					return
 				end
-			end)
-		end
+				warn(`[MatchService] Native character replacement failed: {err}`)
+				task.wait(GameModes.NativeRespawnRetrySeconds)
+			end
+		end)
 		return
 	end
 	if not EliminationService.up(player) then
@@ -565,12 +608,13 @@ local function respawnPlayer(player: Player)
 	end
 	player:SetAttribute("MatchRespawnAt", nil)
 	if state.phase == "Active" then
-		ArenaService.teleport(character, playerTeam(player))
+		SpawnRouter.spawn(character, player, playerTeam(player), "Respawn")
 	end
 	grantSpawnProtection(character)
 	if state.phase == "Active" then
 		local activeMode = assert(mode, "[MatchService] active phase without a selected mode")
 		activeMode.onPlayerSpawned(modeContext(), player, false)
+		refreshTeamScores()
 	end
 end
 
@@ -703,7 +747,7 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.kind ~= "Elim" then
 		return false
 	end
-	if state.phase ~= "Active" then
+	if state.phase ~= "Active" or (mode ~= nil and not GameModes.IsCombat(mode.id)) then
 		return false
 	end
 	local target = PlayerIds.fromId(event.targetId)
@@ -731,7 +775,15 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	end
 
 	local events: { MatchSim.MatchEvent } = {}
-	MatchSim.applyElim(state, activeMode.rules, scoreIdForElim(acceptedEvent.sourceId), acceptedEvent.targetId, events)
+	if activeMode.teamScore == nil then
+		MatchSim.applyElim(
+			state,
+			activeMode.rules,
+			scoreIdForElim(acceptedEvent.sourceId),
+			acceptedEvent.targetId,
+			events
+		)
+	end
 	dispatch(table.clone(acceptedEvent))
 	Network.fire("CombatFeed", nil, {
 		kind = "Elim",
@@ -748,6 +800,7 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 		activeMode.onElim(modeContext(), acceptedEvent.sourceId, acceptedEvent.targetId)
 	end
 	handleMatchEvents(events)
+	refreshTeamScores()
 	return true
 end
 
@@ -785,6 +838,10 @@ local function captureRules(selectedMode: GameMode.GameMode)
 		selectedMode.rules.MinPlayers = 1
 		selectedMode.rules.MinParties = 1
 	end
+	-- Resolved once, here, against the roster that is actually starting. Players
+	-- join and leave mid-match; a target that moved with them would change what
+	-- winning takes while the match is being played.
+	selectedMode.rules.ScoreTarget = ScoreTarget.resolve(selectedMode.rules, #players)
 end
 
 refreshPopulation = function()
@@ -853,6 +910,7 @@ function MatchService.beginMode(modeId: string): (boolean, string?)
 	end
 
 	handleMatchEvents(events)
+	refreshTeamScores()
 	return true, nil
 end
 
@@ -879,6 +937,7 @@ function MatchService.restartForAdmin(modeId: string?): (boolean, string?)
 	local events: { MatchSim.MatchEvent } = {}
 	startMatch(events)
 	handleMatchEvents(events)
+	refreshTeamScores()
 	return true
 end
 
@@ -971,8 +1030,48 @@ function MatchService.teleportToSpawnForAdmin(player: Player): (boolean, string?
 	if character == nil then
 		return false, "no_character"
 	end
-	ArenaService.teleport(character, playerTeam(player))
+	SpawnRouter.spawn(character, player, playerTeam(player), "Admin")
 	return true
+end
+
+-- Server seams for a mode owner that scores something other than eliminations
+-- (Splashdown points): the score still flows through MatchSim so the replicated
+-- attribute, leaderstats and results all read from one place.
+function MatchService.setPlayerScore(player: Player, score: number): boolean
+	if state.phase ~= "Active" and state.phase ~= "Starting" then
+		return false
+	end
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.setScore(state, PlayerIds.toId(player), score, events) then
+		return false
+	end
+	handleMatchEvents(events)
+	return true
+end
+
+function MatchService.finishMatch(winnerId: string?, reason: string): boolean
+	local activeMode = mode
+	if activeMode == nil then
+		return false
+	end
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.finish(state, activeMode.rules, reason, events, winnerId) then
+		return false
+	end
+	handleMatchEvents(events)
+	return true
+end
+
+function MatchService.setContestantStats(player: Player, stats: { [string]: number })
+	contestantStatsByUserId[player.UserId] = table.clone(stats)
+	local contestant = resultRosterByUserId[player.UserId]
+	if contestant then
+		contestant.stats = contestantStatsByUserId[player.UserId]
+	end
+end
+
+function MatchService.activeModeId(): string?
+	return if mode then mode.id else nil
 end
 
 function MatchService.start()
@@ -1004,7 +1103,10 @@ function MatchService.start()
 		refreshPopulation()
 	end)
 	ArenaSessionService.onRoundEligibilityChanged(function()
-		task.defer(refreshPopulation)
+		task.defer(function()
+			refreshPopulation()
+			refreshTeamScores()
+		end)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		if resultRosterByUserId[player.UserId] then
@@ -1027,6 +1129,7 @@ function MatchService.start()
 		task.defer(function()
 			syncPlayers()
 			refreshPopulation()
+			refreshTeamScores()
 		end)
 	end)
 	for _, player in matchPlayers() do

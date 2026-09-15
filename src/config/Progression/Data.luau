@@ -36,6 +36,7 @@ return {
 		Cosmetics = {
 			Owned = {}, -- { [itemId]: true }
 			Equipped = {}, -- { [slot]: itemId }
+			EmoteSlots = {}, -- { [slotIndex]: itemId }
 		},
 		Quests = {
 			DailyKey = "",

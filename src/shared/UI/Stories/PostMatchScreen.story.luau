@@ -55,6 +55,7 @@ local function Story()
 			end,
 			OnReturnToLobby = function() end,
 			OnLeaveParty = function() end,
+			OnOpenShop = function() end,
 		}),
 		Toolbar = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0),

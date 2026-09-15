@@ -22,6 +22,7 @@ local CombatToolbarViewModel = require(SharedUI:WaitForChild("Models"):WaitForCh
 local useExternalStore = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local useReducedMotion = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useReducedMotion"))
 local useViewportSize = require(SharedUI:WaitForChild("Hooks"):WaitForChild("useViewportSize"))
+local EmoteWheelController = require(SharedUI:WaitForChild("Services"):WaitForChild("EmoteWheelController"))
 local ChargeAim = require(script.Parent.Parent.Modules.Presentation.ChargeAim)
 local ThrowUXClient = require(script.Parent.Parent.Modules.UI.ThrowUXClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
@@ -496,6 +497,7 @@ end
 return function()
 	local snapshot = useExternalStore(ThrowUXClient.getSnapshot, ThrowUXClient.subscribe)
 	local cosmetics = useEquippedWeaponCosmetics()
+	local wheel = EmoteWheelController.useSnapshot()
 	local toolbarModel = CombatToolbarViewModel.fromSnapshot({
 		active = snapshot.active,
 		weapon = snapshot.weapon,
@@ -517,7 +519,7 @@ return function()
 		snapshot.gesture.kind,
 		snapshot.gesture.progress
 	)
-	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, {
+	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = not wheel.open }, {
 		Trajectory = c(Trajectory),
 		Reticle = c(Reticle, { snapshot = snapshot }),
 		Swipe = c(SwipeFeedback, { snapshot = snapshot }),

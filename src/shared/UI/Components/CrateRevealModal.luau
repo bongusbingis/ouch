@@ -1,24 +1,26 @@
--- Description: Animated crate reveal: a rarity-scaled shake and burst that resolves into the item a single open produced, or a staggered grid for a bulk open, with skip, replay and duplicate-refund reporting.
-
 --!strict
+local T = require(script.Parent.Parent.Tokens)
+local EconomyPalette = require(script.Parent.Parent.EconomyPalette)
+-- Description: Short candy-glow build, landing and reward reveal, with skip, replay and duplicate-refund reporting.
 
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
+local TextService = game:GetService("TextService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
-local ReactSpring = require(Packages:WaitForChild("react-spring"))
+local useCrateRevealMotion = require(script.Parent.Parent.Hooks.useCrateRevealMotion)
+local CrateOpeningGlow = require(script.Parent.CrateOpeningGlow)
+local OuchPanel = require(script.Parent.CandyPanel)
+local PuffyButton = require(script.Parent.PuffyButton)
+local Ribbon = require(script.Parent.RarityRibbon)
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local InventoryConfig =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
-local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
-local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
@@ -26,29 +28,29 @@ local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild(
 local CosmeticsLogic = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic")
 )
-local AnimatedButton = require(script.Parent.AnimatedButton)
 
+local modalSurface = require(script.Parent.ModalSurface)
+
+local ModalClose = require(script.Parent.ModalClose)
+
+local CandyTitle = require(script.Parent.CandyTitle)
 local c = React.createElement
 
--- Rarity drives the whole pacing of the reveal: a Common resolves almost
--- immediately, a Legendary is held back so the wait itself reads as a signal
--- that something good is coming. Shake amplitude is in panel-scale units.
+-- Rarity changes the celebratory ray count only; timing stays short for every pull.
 local RARITY_TIERS = {
-	Common = { shake = 0.5, amplitude = 0.006, rays = 8, punch = 1.06, tone = 0 },
-	Rare = { shake = 0.9, amplitude = 0.011, rays = 12, punch = 1.12, tone = 1 },
-	Legendary = { shake = 1.5, amplitude = 0.018, rays = 18, punch = 1.2, tone = 2 },
-	Exclusive = { shake = 1.8, amplitude = 0.022, rays = 22, punch = 1.24, tone = 3 },
+	Common = { rays = 8 },
+	Rare = { rays = 12 },
+	Legendary = { rays = 18 },
+	Exclusive = { rays = 22 },
 }
 local DEFAULT_TIER = RARITY_TIERS.Common
-local BURST_SECONDS = 0.42
-local GRID_STAGGER = 0.09
 
 local function tierFor(rarity: string?)
 	return (if rarity then RARITY_TIERS[rarity] else nil) or DEFAULT_TIER
 end
 
 local function rarityColor(rarity: string?): Color3
-	return (if rarity then InventoryConfig.RarityColors[rarity] else nil) or Color3.new(1, 1, 1)
+	return (if rarity then (if T.Rarity[rarity] then T.Rarity[rarity].Color else nil) else nil) or Color3.new(1, 1, 1)
 end
 
 -- Ranks a batch so the summary can lead with the best pull. Lower is better;
@@ -104,10 +106,14 @@ local function subtitleFor(entry: any): string
 	return string.upper(entry.rarity)
 end
 
-local function gridCell(entry: any, index: number, revealedCount: number, zIndex: number, selected, onSelect, onInspect)
+local function gridCell(entry, index, revealedCount, z, selected, onSelect, onInspect)
 	local shown = index <= revealedCount
-	local color = rarityColor(entry.rarity)
-	return c(AnimatedButton, {
+	local tier = T.Rarity[entry.rarity]
+	return c(PuffyButton, {
+		Color = T.Colors.Surface,
+		Radius = T.Shape.RadiusCard,
+		Shadow = false,
+		StrokeColor = if selected then T.Colors.Yellow else T.Colors.Ink,
 		Enabled = shown and entry.preview ~= nil,
 		OnActivated = function()
 			onSelect(index)
@@ -119,56 +125,51 @@ local function gridCell(entry: any, index: number, revealedCount: number, zIndex
 			onSelect(index)
 			Selection.scrollIntoView(button)
 		end,
-		Native = {
-			BackgroundColor3 = color,
-			BackgroundTransparency = if shown then 0.25 else 0.85,
-			BorderSizePixel = 0,
-			LayoutOrder = index,
-			ZIndex = zIndex,
-		},
+		Native = { LayoutOrder = index, Size = UDim2.fromScale(1, 1), ZIndex = z },
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0.12, 0) }),
-		Stroke = c("UIStroke", {
-			Color = if selected then Color3.new(1, 1, 1) else color,
-			Thickness = if selected then 3 else if shown then 2 else 0,
-			Transparency = if shown then 0.1 else 1,
-		}),
+		Rarity = if shown
+			then c(Ribbon, {
+				Rarity = entry.rarity,
+				Color = if tier then tier.Color else nil,
+				Native = { Position = UDim2.fromOffset(8, 8), Size = UDim2.new(1, -16, 0, 26), ZIndex = z + 6 },
+			})
+			else nil,
 		Preview = if shown
 			then c("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromScale(0.1, 0.06),
-				Size = UDim2.fromScale(0.8, 0.6),
-				ZIndex = zIndex + 1,
+				Position = UDim2.fromOffset(8, 42),
+				Size = UDim2.new(1, -16, 1, -162),
+				ZIndex = z + 6,
 			}, {
-				Content = c(ShopPreview, {
-					Items = if entry.preview then { entry.preview } else {},
-					Thumbnail = "",
-					ZIndex = zIndex + 1,
-				}),
+				Content = c(ShopPreview, { Items = if entry.preview then { entry.preview } else {}, ZIndex = z + 6 }),
 			})
 			else nil,
-		Label = if shown
-			then c(ResponsiveText, {
-				MeasurementFont = Enum.Font.SourceSansBold,
-				MaxTextSize = 18,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 1),
-					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/SourceSansPro.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
-					Position = UDim2.fromScale(0.5, 0.98),
-					Size = UDim2.fromScale(0.92, 0.28),
-					Text = if entry.isDupe
-						then `+{formatNumber(entry.bonksRefund)}`
-						else string.upper(entry.displayName),
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = zIndex + 2,
-				},
-			})
-			else nil,
+		Name = c("TextLabel", {
+			BackgroundColor3 = T.Colors.Ink,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 8, 1, -112),
+			Size = UDim2.new(1, -16, 0, 52),
+			Font = T.Type.Display,
+			Text = if shown then string.upper(entry.displayName) else "…",
+			TextSize = T.Type.Minimum,
+			TextColor3 = T.Colors.Surface,
+			TextWrapped = true,
+			ZIndex = z + 7,
+		}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }) }),
+		Status = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0, 8, 1, -52),
+			Size = UDim2.new(1, -16, 0, 44),
+			Font = T.Type.Label,
+			Text = if not shown
+				then ""
+				elseif entry.isDupe then "+" .. formatNumber(entry.bonksRefund) .. " BONKS · DUPE"
+				else "NEW ITEM",
+			TextSize = T.Type.Minimum,
+			TextColor3 = T.Colors.Ink,
+			TextWrapped = true,
+			ZIndex = z + 7,
+		}),
 	})
 end
 
@@ -187,11 +188,13 @@ return function(props)
 	local lastSelection = React.useRef(nil)
 	local selectedIndex, setSelectedIndex = React.useState(nil :: number?)
 	local reducedMotion = useReducedMotion()
-	local generation = React.useRef(0)
 
 	local results = if reveal then reveal.results else nil
 	local count = if results then #results else 0
 	local isBulk = count > 1
+	if not isBulk and not portrait then
+		panelSize = Vector2.new(math.min(panelSize.X, 820), math.min(panelSize.Y, 440))
+	end
 	local headline = if results
 		then (if selectedIndex then results[selectedIndex] else nil) or (if isBulk
 			then bestEntry(results)
@@ -200,107 +203,15 @@ return function(props)
 	local tier = tierFor(if headline then headline.rarity else nil)
 	local color = rarityColor(if headline then headline.rarity else nil)
 
-	local phase, setPhase = React.useState("Idle")
-	local revealedCount, setRevealedCount = React.useState(0)
+	local motion = useCrateRevealMotion(reveal, reducedMotion)
+	local phase = motion.phase
+	local revealedCount = motion.revealedCount
 	local settled = phase == "Done" or (phase == "Item" and revealedCount >= count)
-
-	local shakeStyles, shakeApi = ReactSpring.useSpring(function()
-		return { Offset = 0 }
-	end)
-	local burstStyles, burstApi = ReactSpring.useSpring(function()
-		return { Alpha = 1 }
-	end)
-	local itemStyles, itemApi = ReactSpring.useSpring(function()
-		return { Scale = 0.4, Glow = 1 }
-	end)
-
-	local finish = React.useCallback(function()
-		generation.current += 1
-		shakeApi.start({ Offset = 0, immediate = true })
-		burstApi.start({ Alpha = 1, immediate = true })
-		itemApi.start({ Scale = 1, Glow = 0, immediate = true })
-		setPhase("Done")
-		setRevealedCount(count)
-	end, { count })
-
+	local finish = motion.finish
 	React.useEffect(function()
 		setSelectedIndex(nil)
 		lastSelection.current = nil
-		if reveal == nil then
-			setPhase("Idle")
-			setRevealedCount(0)
-			return
-		end
-
-		generation.current += 1
-		local run = generation.current
-		local function alive()
-			return generation.current == run
-		end
-
-		if reducedMotion then
-			setPhase("Done")
-			setRevealedCount(count)
-			shakeApi.start({ Offset = 0, immediate = true })
-			burstApi.start({ Alpha = 1, immediate = true })
-			itemApi.start({ Scale = 1, Glow = 0, immediate = true })
-			return
-		end
-
-		setPhase("Shake")
-		setRevealedCount(0)
-		shakeApi.start({ Offset = 0, immediate = true })
-		burstApi.start({ Alpha = 1, immediate = true })
-		itemApi.start({ Scale = 0.4, Glow = 1, immediate = true })
-
-		local shakeThread = task.spawn(function()
-			local elapsed = 0
-			while alive() and elapsed < tier.shake do
-				local ramp = elapsed / tier.shake
-				shakeApi.start({ Offset = (math.random() * 2 - 1) * tier.amplitude * (0.35 + ramp), immediate = true })
-				task.wait(0.035)
-				elapsed += 0.035
-			end
-			if not alive() then
-				return
-			end
-			shakeApi.start({ Offset = 0, immediate = true })
-			UIFeedback.notification()
-			setPhase("Burst")
-			burstApi.start({ Alpha = 1, immediate = true })
-			burstApi.start({ Alpha = 0, config = { duration = BURST_SECONDS } })
-			itemApi.start({ Scale = tier.punch, Glow = 0, config = Motion.Control }):andThen(function()
-				if alive() then
-					itemApi.start({ Scale = 1, config = Motion.Control })
-				end
-			end)
-			task.wait(BURST_SECONDS * 0.5)
-			if not alive() then
-				return
-			end
-			setPhase("Item")
-			if not isBulk then
-				setRevealedCount(1)
-				return
-			end
-			for index = 1, count do
-				if not alive() then
-					return
-				end
-				setRevealedCount(index)
-				UIFeedback.click()
-				task.wait(GRID_STAGGER)
-			end
-			if alive() then
-				setPhase("Done")
-			end
-		end)
-
-		return function()
-			generation.current += 1
-			pcall(task.cancel, shakeThread)
-		end
-	end, { reveal, reducedMotion })
+	end, { reveal })
 
 	React.useEffect(function()
 		if reveal == nil then
@@ -341,25 +252,15 @@ return function(props)
 		end
 	end, { reveal, props.FocusEnabled, settled })
 
-	React.useEffect(function()
-		return function()
-			generation.current += 1
-			shakeApi.stop()
-			burstApi.stop()
-			itemApi.stop()
-		end
-	end, {})
-
 	if reveal == nil or headline == nil then
 		return nil
 	end
 
-	local building = phase == "Shake"
+	local building = phase == "Shake" or phase == "Landing" or phase == "Idle"
 	local short = not portrait and panelSize.Y < 420
 	local inset = if short then 16 else 22
 	local actionHeight = if short then 44 else 54
-	local bodyTop = if short then 56 else 76
-	local bodyHeight = math.max(44, panelSize.Y - bodyTop - actionHeight - inset * 2)
+
 	local preview = headline.preview
 	local owned = preview ~= nil and CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, preview.itemId)
 	local equipped = preview ~= nil and (props.Equipped or {})[preview.category] == preview.itemId
@@ -395,6 +296,7 @@ return function(props)
 					then `AGAIN {props.OpenAgainCount}x`
 					else props.OpenAgainText or "OPEN AGAIN",
 				bonks = props.OpenAgainBonks,
+				color = EconomyPalette.Pink,
 				enabled = props.OpenAgainEnabled == true,
 				run = props.OnOpenAgain,
 			})
@@ -402,30 +304,50 @@ return function(props)
 	else
 		table.insert(actions, { text = "SKIP", enabled = true, focus = true, run = finish })
 	end
+	local columns = if portrait then math.min(2, #actions) else #actions
+	local footerHeight = math.ceil(#actions / columns) * (actionHeight + 12) - 12
+	local title = if building then "OPENING..." else if isBulk then `YOU GOT {count} ITEMS` else "YOU GOT"
+	local titleSize = if portrait or short then 26 else 36
+	local titleWidth = panelSize.X - inset * 2 - 64
+	local titleHeight = math.max(
+		44,
+		TextService:GetTextSize(title, titleSize, T.Type.Display, Vector2.new(math.max(titleWidth - 36, 1), 10000)).Y
+			+ 12
+	)
+	local bodyTop = inset + titleHeight + 34
+	local bodyHeight = math.max(44, panelSize.Y - bodyTop - footerHeight - inset * 2)
+	local singleArtSize =
+		math.min(240, panelSize.X * (if portrait then 0.68 else 0.44), bodyHeight * (if portrait then 0.6 else 1))
 	local buttons = {}
 	for index, action in actions do
 		buttons[`Action{index}`] = c(ShopPriceButton, {
+			TextSize = UIConfig.Text.LabelPx,
 			ButtonRef = if action.focus then buttonRef else nil,
 			Enabled = action.enabled,
-			Position = UDim2.fromScale((index - 0.5) / #actions, 1),
-			Size = UDim2.new(1 / #actions, -6, 0, actionHeight),
+			Position = UDim2.new(
+				((index - 1) % columns + 0.5) / columns,
+				0,
+				0,
+				math.floor((index - 1) / columns) * (actionHeight + 12) + actionHeight
+			),
+			Size = UDim2.new(1 / columns, -UIConfig.Spacing.ControlGapPx, 0, actionHeight),
 			Text = action.text,
+			Color = action.color or T.Colors.Surface,
 			SubBonks = action.bonks,
 			OnActivated = action.run,
 			ZIndex = 114,
 		})
 	end
-	local title = if building then "OPENING..." else if isBulk then `YOU GOT {count} ITEMS` else "YOU GOT"
 	local refundLine = if isBulk and reveal.totalRefund > 0
 		then `{formatNumber(reveal.totalRefund)} BONKS REFUNDED FROM DUPLICATES`
 		else nil
 
-	return c("TextButton", {
+	return modalSurface({
 		ref = modalRef,
 		Active = true,
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.new(),
-		BackgroundTransparency = 0.28,
+		BackgroundColor3 = T.Colors.Ink,
+		BackgroundTransparency = 0.52,
 		Selectable = false,
 		Size = UDim2.fromScale(1, 1),
 		Text = "",
@@ -437,81 +359,78 @@ return function(props)
 			end
 		end,
 	}, {
-		Panel = c("ImageLabel", {
-			SelectionGroup = true,
-			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
-			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://124751224634629",
-			ImageColor3 = if building then Color3.fromRGB(214, 220, 226) else color,
-			Position = shakeStyles.Offset:map(function(offset: number)
-				return UDim2.fromScale(0.5 + offset, 0.53 + offset * 0.6)
-			end),
-			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-			SliceCenter = Rect.new(31, 41, 978, 620),
-			SliceScale = 0.5,
-			ZIndex = 112,
+		Panel = c(OuchPanel, {
+			Padding = 0,
+			Gloss = true,
+			Native = {
+				SelectionGroup = true,
+				SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
+				SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Image = UIConfig.Layout.PageSurface.Image,
+				ImageColor3 = EconomyPalette.White,
+				Position = UDim2.fromScale(0.5, 0.53),
+				ScaleType = Enum.ScaleType.Slice,
+				Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+				SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
+				SliceScale = UIConfig.Layout.PageSurface.SliceScale,
+				ZIndex = 112,
+			},
 		}, {
-			Close = c(AnimatedButton, {
+			Opening = if building
+				then c("Frame", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, 0, 0, bodyTop + bodyHeight / 2),
+					Size = UDim2.fromOffset(math.min(bodyHeight, 240), math.min(bodyHeight, 240)),
+					ZIndex = 114,
+				}, { Glow = c(CrateOpeningGlow, { Motion = motion }) })
+				else nil,
+			Close = c(ModalClose, {
 				OnActivated = props.OnClose,
-				Native = {
-					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -4, 0, 4),
-					Size = UDim2.fromOffset(44, 44),
-					BackgroundTransparency = 1,
-					ZIndex = 118,
-				},
-			}, {
-				Label = c("TextLabel", {
-					Size = UDim2.fromScale(1, 1),
-					BackgroundTransparency = 1,
-					Text = "×",
-					TextSize = 32,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 118,
-				}),
+				Position = UDim2.new(1, -12, 0, 12),
+				SizePx = 44,
+				ZIndex = 118,
 			}),
-			Burst = if phase == "Burst" or phase == "Item"
+			Burst = if phase == "Burst"
+					or phase == "Item"
+					or phase == "Done"
 				then c("Frame", {
 					BackgroundTransparency = 1,
 					Size = UDim2.fromScale(1, 1),
 					ZIndex = 116,
-				}, burstRays(tier, color, burstStyles.Alpha, 116))
+				}, burstRays(tier, color, motion.burst, 116))
 				else nil,
 			Flash = c("Frame", {
 				BackgroundColor3 = Color3.new(1, 1, 1),
-				BackgroundTransparency = burstStyles.Alpha:map(function(alpha: number)
-					return math.clamp(1 - (1 - alpha) * 0.15, 0, 1)
+				BackgroundTransparency = motion.burst:map(function(alpha: number)
+					return math.clamp(1 - alpha * 0.15, 0, 1)
 				end),
 				BorderSizePixel = 0,
 				Size = UDim2.fromScale(1, 1),
 				Visible = phase == "Burst",
 				ZIndex = 117,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0.06, 0) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Panel.RadiusPx) }),
 			}),
-			Title = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 46,
+			Title = c(CandyTitle, {
+				Text = title,
+				TextSize = titleSize,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromOffset(panelSize.X * 0.5, inset),
-					Size = UDim2.new(0.8, -24, 0, if short then 26 else 34),
-					Text = title,
-					TextColor3 = Color3.new(1, 1, 1),
+					Position = UDim2.fromOffset(inset, inset),
+					Size = UDim2.fromOffset(titleWidth, titleHeight),
 					ZIndex = 114,
 				},
 			}),
 			Pity = if not building
 				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.SourceSansBold,
+					MeasurementFont = T.Type.Label,
 					MaxTextSize = 20,
+					MinTextSize = T.Type.Minimum,
+					Wrapped = true,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
@@ -520,40 +439,51 @@ return function(props)
 							Enum.FontWeight.Bold,
 							Enum.FontStyle.Normal
 						),
-						Position = UDim2.new(0.5, 0, 0, bodyTop - 20),
-						Size = UDim2.new(0.88, 0, 0, 18),
+						Position = UDim2.new(0.5, 0, 0, bodyTop - 30),
+						Size = UDim2.new(0.88, 0, 0, 28),
 						Text = if reveal.pityTriggered
 							then `PITY  •  GUARANTEED {string.upper(reveal.pityTriggered)}`
-							else "SELECT A REWARD TO INSPECT",
-						TextColor3 = Color3.fromRGB(255, 235, 130),
+							else "SELECT TO INSPECT",
+						TextColor3 = T.Colors.Ink,
 						ZIndex = 115,
 					},
 				})
 				else nil,
 			Single = if not isBulk
-				then c(AnimatedButton, {
+				then c(PuffyButton, {
+					Radius = T.Shape.RadiusCard,
+					Shadow = false,
+					Color = T.Colors.Well,
 					Enabled = settled and preview ~= nil and props.OnInspectItem ~= nil,
 					OnActivated = function()
 						props.OnInspectItem(preview)
 					end,
 					Native = {
 						BackgroundTransparency = 1,
-						Position = UDim2.new(if portrait then 0.16 else 0.04, 0, 0, bodyTop),
-						Size = UDim2.new(
-							if portrait then 0.68 else 0.44,
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.new(
+							if portrait then 0.5 else 0.26,
 							0,
 							0,
-							bodyHeight * (if portrait then 0.64 else 1)
+							bodyTop + bodyHeight * (if portrait then 0.32 else 0.5)
 						),
+						Size = UDim2.fromOffset(singleArtSize, singleArtSize),
 						Visible = revealedCount >= 1,
 						ZIndex = 113,
 					},
 				}, {
-					Scale = c("UIScale", { Scale = itemStyles.Scale }),
 					Content = c(ShopPreview, {
 						Items = if headline.preview then { headline.preview } else {},
 						Thumbnail = "",
-						ZIndex = 113,
+						ZIndex = 120,
+					}),
+					Rarity = c(Ribbon, {
+						Rarity = headline.rarity,
+						Native = {
+							Position = UDim2.fromOffset(8, 8),
+							Size = UDim2.new(1, -16, 0, 44),
+							ZIndex = 121,
+						},
 					}),
 				})
 				else nil,
@@ -566,18 +496,22 @@ return function(props)
 						CanvasSize = UDim2.fromOffset(0, 0),
 						Position = UDim2.new(0.06, 0, 0, bodyTop),
 						ScrollBarImageTransparency = 0.2,
-						ScrollBarThickness = 5,
-						Size = UDim2.new(0.88, 0, 0, math.max(44, bodyHeight - 42)),
+						ScrollBarThickness = 8,
+						ScrollBarImageColor3 = T.Colors.Pink,
+						Size = UDim2.new(0.88, 0, 0, math.max(44, bodyHeight - 86)),
 						VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 						ZIndex = 113,
 					},
 					(function()
 						local cells: { [string]: any } = {
 							Layout = c("UIGridLayout", {
-								CellPadding = UDim2.fromOffset(6, 6),
-								CellSize = if portrait
-									then UDim2.new(1 / 3, -6, 0, 112)
-									else UDim2.new(1 / 5, -6, 0, if short then 78 else 112),
+								CellPadding = UDim2.fromOffset(10, 10),
+								CellSize = UDim2.new(
+									1 / math.max(1, math.floor((panelSize.X * 0.88) / 200)),
+									-10,
+									0,
+									260
+								),
 								SortOrder = Enum.SortOrder.LayoutOrder,
 							}),
 						}
@@ -597,32 +531,51 @@ return function(props)
 				)
 				else nil,
 			Name = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 42,
+				MeasurementFont = Enum.Font.FredokaOne,
+				MaxTextSize = if isBulk then 22 else 32,
+				MinTextSize = T.Type.Minimum,
+				Wrapped = true,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+					FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
 					Position = UDim2.new(
 						if isBulk or portrait then 0.5 else 0.73,
 						0,
 						0,
-						bodyTop + (if isBulk then bodyHeight - 40 else bodyHeight * (if portrait then 0.64 else 0.18))
+						bodyTop
+							+ (
+								if isBulk
+									then bodyHeight - 80
+									elseif not short and not portrait then bodyHeight / 2 - 50
+									else bodyHeight * (if portrait then 0.64 else 0.18)
+							)
 					),
 					Size = UDim2.new(
 						if isBulk or portrait then 0.9 else 0.44,
 						0,
 						0,
-						if isBulk then 22 else bodyHeight * (if portrait then 0.22 else 0.44)
+						if isBulk
+							then 30
+							elseif not short and not portrait then 76
+							else bodyHeight * (if portrait then 0.22 else 0.44)
 					),
 					Text = if settled then string.upper(headline.displayName) else "",
-					TextColor3 = Color3.new(1, 1, 1),
+					TextColor3 = T.Colors.Ink,
 					ZIndex = 114,
 				},
+			}, {
+				Outline = c("UIStroke", {
+					Color = EconomyPalette.Ink,
+					Thickness = 0,
+					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
+				}),
 			}),
 			Subtitle = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.SourceSansBold,
-				MaxTextSize = 25,
+				MeasurementFont = T.Type.Label,
+				MaxTextSize = 22,
+				MinTextSize = T.Type.Minimum,
+				Wrapped = true,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					BackgroundTransparency = 1,
@@ -635,18 +588,27 @@ return function(props)
 						if isBulk or portrait then 0.5 else 0.73,
 						0,
 						0,
-						bodyTop + (if isBulk then bodyHeight - 18 else bodyHeight * (if portrait then 0.86 else 0.66))
+						bodyTop
+							+ (
+								if isBulk
+									then bodyHeight - 46
+									elseif not short and not portrait then bodyHeight / 2 + 34
+									else bodyHeight * (if portrait then 0.86 else 0.66)
+							)
 					),
 					Size = UDim2.new(
 						if isBulk or portrait then 0.88 else 0.44,
 						0,
 						0,
-						if isBulk then 18 else bodyHeight * (if portrait then 0.14 else 0.25)
+						if isBulk
+							then 44
+							elseif not short and not portrait then 28
+							else bodyHeight * (if portrait then 0.14 else 0.25)
 					),
 					Text = if not settled
 						then ""
 						else if isBulk and refundLine then refundLine else subtitleFor(headline),
-					TextColor3 = if isBulk then Color3.fromRGB(255, 235, 130) else Color3.new(1, 1, 1),
+					TextColor3 = T.Colors.Ink,
 					ZIndex = 114,
 				},
 			}),
@@ -654,7 +616,7 @@ return function(props)
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
 				Position = UDim2.new(0.5, 0, 1, -inset),
-				Size = UDim2.new(0.9, 0, 0, actionHeight),
+				Size = UDim2.new(0.9, 0, 0, footerHeight),
 				ZIndex = 114,
 			}, buttons),
 		}),

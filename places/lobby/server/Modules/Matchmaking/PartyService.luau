@@ -32,6 +32,7 @@ local ReturnQueuePolicy = require(
 		:WaitForChild("Matchmaking")
 		:WaitForChild("ReturnQueuePolicy")
 )
+local Queues = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Queues"))
 local AnalyticsConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local AnalyticsService = require(script.Parent.Parent.AnalyticsService)
@@ -42,9 +43,27 @@ PartyService.__index = PartyService
 
 local APPEARANCE_ATTRIBUTES = { "Equip_CharacterColor", "Equip_CostumeAssets" }
 
+local function cloneModeSelection(selection)
+	if selection.strategy == "Vote" then
+		return { strategy = "Vote", options = table.clone(selection.options) }
+	end
+	return { strategy = "Fixed", modeId = selection.modeId }
+end
+
+-- The policy that arms a return intent stays pure; whether a carried queueId
+-- is one this deployment currently runs is decided here, before arming.
+local function sanitizedReturnPayload(returning)
+	if typeof(returning.queueId) ~= "string" or Queues.isEnabled(returning.queueId) then
+		return returning
+	end
+	local sanitized = table.clone(returning)
+	sanitized.queueId = nil
+	return sanitized
+end
+
 function PartyService.new(
 	partyRepository,
-	queueRepository,
+	queueRepositories,
 	matchRepository,
 	partyBus,
 	teleportCoordinator,
@@ -53,8 +72,9 @@ function PartyService.new(
 )
 	local self = setmetatable({
 		_players = if runtime and runtime.players then runtime.players else Players,
+		_lobbyGatherCoordinator = runtime and runtime.lobbyGatherCoordinator,
 		_partyRepository = partyRepository,
-		_queueRepository = queueRepository,
+		_queueRepositories = queueRepositories,
 		_matchRepository = matchRepository,
 		_partyBus = partyBus,
 		_teleportCoordinator = teleportCoordinator,
@@ -82,6 +102,10 @@ end
 
 function PartyService:SetQueueChangedHandler(handler)
 	self._queueChangedHandler = handler
+end
+
+function PartyService:_queueRepositoryFor(queueId)
+	return self._queueRepositories[queueId or Config.DefaultQueueId]
 end
 
 function PartyService:_sendSnapshot(player, party, reason)
@@ -136,7 +160,7 @@ function PartyService:_maybeTeleport(party)
 	end
 
 	if party.phase == "Assigned" then
-		self:_reportFunnel(party.partyId, "Matched", { matchId = party.matchId })
+		self:_reportFunnel(party.partyId, "Matched", { matchId = party.matchId, queueId = party.queueId })
 		task.spawn(function()
 			local updated = self._partyRepository:UpdateParty(party.partyId, function(current)
 				if not current or current.phase ~= "Assigned" or current.matchId ~= party.matchId then
@@ -187,12 +211,18 @@ function PartyService:_maybeTeleport(party)
 			return
 		end
 
-		local currentPlayers = self:_getLocalPlayers(party.partyId)
+		local currentPlayers = {}
+		for _, player in self:_getLocalPlayers(party.partyId) do
+			-- An in-flight lobby transfer must finish/fail before starting the arena transfer.
+			if not self._lobbyGatherCoordinator or not self._lobbyGatherCoordinator:IsGathering(player) then
+				table.insert(currentPlayers, player)
+			end
+		end
 		if #currentPlayers == 0 then
 			self._teleportDispatching[party.partyId] = nil
 			return
 		end
-		self:_reportFunnel(party.partyId, "Teleporting", { matchId = party.matchId })
+		self:_reportFunnel(party.partyId, "Teleporting", { matchId = party.matchId, queueId = party.queueId })
 		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, currentPlayers)
 		self._teleportDispatching[party.partyId] = nil
 	end)
@@ -205,10 +235,30 @@ function PartyService:HandleTeleportPresentationReady(player)
 	end
 end
 
+function PartyService:_maybeGatherLobby(party)
+	if not self._lobbyGatherCoordinator or party.phase ~= "Lobby" or #party.members < 2 then
+		return
+	end
+	for _, player in self:_getLocalPlayers(party.partyId) do
+		task.spawn(function()
+			self._lobbyGatherCoordinator:Consider(player, party.partyId, function()
+				local current = self._cache[party.partyId]
+				return not self._destroyed
+					and self._localPartyByUser[player.UserId] == party.partyId
+					and current ~= nil
+					and current.phase == "Lobby"
+			end, function()
+				return self._teleportCoordinator:IsTeleporting(player)
+			end)
+		end)
+	end
+end
+
 function PartyService:_applyParty(party, reason)
 	local cached = self._cache[party.partyId]
 	if cached and cached.revision >= party.revision then
 		self:_maybeTeleport(party)
+		self:_maybeGatherLobby(cached)
 		return false
 	end
 
@@ -222,6 +272,7 @@ function PartyService:_applyParty(party, reason)
 		end
 	end
 	self:_maybeTeleport(party)
+	self:_maybeGatherLobby(party)
 	return true
 end
 
@@ -435,7 +486,7 @@ function PartyService:_removeMemberFromParty(userId, partyId, reason, removeInde
 	end
 
 	if removedTicket then
-		self._queueRepository:Remove(partyId)
+		self:_queueRepositoryFor(removedTicket.queueId):Remove(partyId)
 	end
 
 	if #updated.members == 0 then
@@ -551,7 +602,7 @@ function PartyService:_restoreReturningParty(player, returning)
 				PartyModel.removeMember(nextParty, member.userId)
 			end
 		end
-		ReturnQueuePolicy.arm(nextParty, returning, os.time(), Config.ReturnQueueWaitSeconds)
+		ReturnQueuePolicy.arm(nextParty, sanitizedReturnPayload(returning), os.time(), Config.ReturnQueueWaitSeconds)
 		return PartyModel.touch(nextParty, os.time())
 	end)
 end
@@ -651,6 +702,18 @@ function PartyService:_initializePlayerUnlocked(player)
 		return
 	end
 
+	if self._lobbyGatherCoordinator then
+		local handled, arrivalError = self._lobbyGatherCoordinator:RestoreArrival(player, function(party)
+			self:_attach(player, party, "PartyRestored")
+		end)
+		if handled then
+			if arrivalError then
+				self:_sendError(player, Protocol.Errors.NotReady)
+			end
+			return
+		end
+	end
+
 	local target, requireFriendAccess, returning = self:_resolveArrivalTarget(player)
 	if target then
 		local joined = self:_joinTarget(player, target, requireFriendAccess)
@@ -682,7 +745,12 @@ function PartyService:_initializePlayerUnlocked(player)
 				return nil
 			end
 			local nextParty = PartyModel.clone(current)
-			ReturnQueuePolicy.arm(nextParty, returning, os.time(), Config.ReturnQueueWaitSeconds)
+			ReturnQueuePolicy.arm(
+				nextParty,
+				sanitizedReturnPayload(returning),
+				os.time(),
+				Config.ReturnQueueWaitSeconds
+			)
 			return PartyModel.touch(nextParty, os.time())
 		end)
 		party = restored or party
@@ -851,7 +919,7 @@ function PartyService:_kickMember(player, payload)
 
 	self._partyRepository:RemoveUserParty(targetUserId, updated.partyId)
 	if removedTicket then
-		self._queueRepository:Remove(updated.partyId)
+		self:_queueRepositoryFor(removedTicket.queueId):Remove(updated.partyId)
 	end
 
 	self:NotifyCommitted(updated, "MemberKicked", player.UserId)
@@ -959,6 +1027,7 @@ function PartyService:_startMatchmaking(player, returnMatchId)
 		nextParty.queueTicket = {
 			ticketId = HttpService:GenerateGUID(false),
 			partyId = current.partyId,
+			queueId = current.queueId or Config.DefaultQueueId,
 			partySize = #current.members,
 			enqueuedAt = DateTime.now().UnixTimestampMillis / 1000,
 		}
@@ -968,7 +1037,8 @@ function PartyService:_startMatchmaking(player, returnMatchId)
 		return Protocol.failure(denial or Protocol.Errors.Internal)
 	end
 
-	local enqueued = self._queueRepository:Enqueue(updated.queueTicket)
+	local queueRepository = self:_queueRepositoryFor(updated.queueTicket.queueId)
+	local enqueued = queueRepository:Enqueue(updated.queueTicket)
 	if not enqueued then
 		local rolledBack = self._partyRepository:UpdateParty(updated.partyId, function(current)
 			if
@@ -991,7 +1061,7 @@ function PartyService:_startMatchmaking(player, returnMatchId)
 	end
 
 	self:NotifyCommitted(updated, "MatchmakingStarted", player.UserId)
-	self:_reportFunnel(updated.partyId, "Queued", { partySize = #updated.members })
+	self:_reportFunnel(updated.partyId, "Queued", { partySize = #updated.members, queueId = updated.queueId })
 	if self._queueChangedHandler then
 		task.spawn(self._queueChangedHandler)
 	end
@@ -1042,14 +1112,13 @@ function PartyService:_startDevSoloPlay(player)
 		return Protocol.failure(reserveError or Protocol.Errors.Internal)
 	end
 
+	local queueId = checkedParty.queueId or Config.DefaultQueueId
 	local matchId = HttpService:GenerateGUID(false)
 	local matchRecord = {
 		schemaVersion = Config.ProtocolVersion,
 		matchId = matchId,
-		modeSelection = {
-			strategy = "Vote",
-			options = table.clone(Config.ModeVoteOptions),
-		},
+		queueId = queueId,
+		modeSelection = cloneModeSelection(Config.Queues[queueId].ModeSelection),
 		arenaPlaceId = Config.ArenaPlaceId,
 		targetPlayers = 1,
 		parties = {
@@ -1106,6 +1175,7 @@ function PartyService:_cancelMatchmaking(player)
 	end
 
 	local denial
+	local removedTicket
 	local updated = self._partyRepository:UpdateParty(party.partyId, function(current)
 		if not current or not PartyModel.hasMember(current, player.UserId) then
 			denial = Protocol.Errors.NotFound
@@ -1129,6 +1199,7 @@ function PartyService:_cancelMatchmaking(player)
 			return nil
 		end
 
+		removedTicket = current.queueTicket
 		local nextParty = PartyModel.clone(current)
 		PartyModel.returnToLobby(nextParty)
 		return PartyModel.touch(nextParty, os.time())
@@ -1137,11 +1208,51 @@ function PartyService:_cancelMatchmaking(player)
 		return Protocol.failure(denial or Protocol.Errors.Internal)
 	end
 
-	self._queueRepository:Remove(updated.partyId)
+	if removedTicket then
+		self:_queueRepositoryFor(removedTicket.queueId):Remove(updated.partyId)
+	end
 	self:NotifyCommitted(updated, "MatchmakingCancelled", player.UserId)
 	self:_reportEvent(updated.partyId, AnalyticsConfig.CustomEvents.MatchmakingCancelled, {
 		partySize = #updated.members,
 	})
+	return Protocol.success(PartyModel.toSnapshot(updated))
+end
+
+function PartyService:_setQueue(player, payload)
+	if not Queues.isEnabled(payload.queueId) then
+		return Protocol.failure(Protocol.Errors.InvalidQueue)
+	end
+
+	local party = self:_partyForPlayer(player)
+	if not party then
+		return Protocol.failure(Protocol.Errors.NotReady)
+	end
+
+	local queueId = payload.queueId
+	local denial
+	local updated = self._partyRepository:UpdateParty(party.partyId, function(current)
+		if not current or not PartyModel.hasMember(current, player.UserId) then
+			denial = Protocol.Errors.NotFound
+			return nil
+		end
+		if current.leaderUserId ~= player.UserId then
+			denial = Protocol.Errors.NotLeader
+			return nil
+		end
+		if current.phase ~= "Lobby" or current.returnQueue ~= nil then
+			denial = Protocol.Errors.MatchForming
+			return nil
+		end
+
+		local nextParty = PartyModel.clone(current)
+		nextParty.queueId = queueId
+		return PartyModel.touch(nextParty, os.time())
+	end)
+	if not updated then
+		return Protocol.failure(denial or Protocol.Errors.Internal)
+	end
+
+	self:NotifyCommitted(updated, "QueueChanged", player.UserId)
 	return Protocol.success(PartyModel.toSnapshot(updated))
 end
 
@@ -1161,12 +1272,21 @@ function PartyService:_dispatchRequest(player, action, payload)
 		return self:_startMatchmaking(player)
 	elseif action == Protocol.Actions.CancelMatchmaking then
 		return self:_cancelMatchmaking(player)
+	elseif action == Protocol.Actions.SetQueue then
+		return self:_setQueue(player, payload)
 	end
 
 	return Protocol.failure(Protocol.Errors.InvalidRequest)
 end
 
 function PartyService:HandleRequest(player, action, payload)
+	if
+		action ~= Protocol.Actions.GetSnapshot
+		and self._lobbyGatherCoordinator
+		and self._lobbyGatherCoordinator:IsGathering(player)
+	then
+		return Protocol.failure(Protocol.Errors.Busy)
+	end
 	if self._busy[player.UserId] then
 		return Protocol.failure(Protocol.Errors.Busy)
 	end
@@ -1194,10 +1314,15 @@ function PartyService:HandleTeleportFailure(player)
 	end
 end
 
-function PartyService:HasLocalQueuedParty()
+function PartyService:HasLocalQueuedParty(queueId)
 	for partyId in self._localPlayersByParty do
 		local party = self._cache[partyId]
-		if party and (party.phase == "Queued" or party.phase == "Claimed") and party.queueTicket then
+		if
+			party
+			and (party.phase == "Queued" or party.phase == "Claimed")
+			and party.queueTicket
+			and party.queueTicket.queueId == queueId
+		then
 			return true
 		end
 	end
@@ -1242,7 +1367,7 @@ function PartyService:_refreshParties()
 	for partyId in self._localPlayersByParty do
 		local party = self._partyRepository:RefreshParty(partyId)
 		if party and party.phase == "Queued" and party.queueTicket then
-			self._queueRepository:Refresh(party.queueTicket)
+			self:_queueRepositoryFor(party.queueTicket.queueId):Refresh(party.queueTicket)
 		end
 	end
 end
@@ -1346,11 +1471,21 @@ function PartyService:Start()
 		local party = self:_partyForPlayer(player)
 		local inMatchTransition = party
 			and (party.phase == "Claimed" or party.phase == "Assigned" or party.phase == "Teleporting")
-		if not self._teleportCoordinator:IsTeleporting(player) and not inMatchTransition and party then
+		local gathering = self._lobbyGatherCoordinator
+			and self._lobbyGatherCoordinator:IsGathering(player, party and party.partyId)
+		if
+			not gathering
+			and not self._teleportCoordinator:IsTeleporting(player)
+			and not inMatchTransition
+			and party
+		then
 			self:_removeMemberFromParty(player.UserId, party.partyId, "MemberLeft", true)
 		end
 		self:_detachFromLocalParty(player)
 		self._teleportCoordinator:Clear(player)
+		if self._lobbyGatherCoordinator then
+			self._lobbyGatherCoordinator:Clear(player)
+		end
 	end)
 
 	for _, player in self._players:GetPlayers() do
@@ -1386,12 +1521,17 @@ function PartyService:Shutdown()
 	table.clear(self._appearanceConnections)
 	for _, player in self._players:GetPlayers() do
 		local party = self:_partyForPlayer(player)
-		if party and party.phase ~= "Assigned" and party.phase ~= "Teleporting" then
+		local gathering = self._lobbyGatherCoordinator
+			and self._lobbyGatherCoordinator:IsGathering(player, party and party.partyId)
+		if party and not gathering and party.phase ~= "Assigned" and party.phase ~= "Teleporting" then
 			self:_removeMemberFromParty(player.UserId, party.partyId, "ServerClosing", true)
 		end
 	end
 	self._partyBus:Destroy()
 	self._teleportCoordinator:Destroy()
+	if self._lobbyGatherCoordinator then
+		self._lobbyGatherCoordinator:Destroy()
+	end
 end
 
 return PartyService

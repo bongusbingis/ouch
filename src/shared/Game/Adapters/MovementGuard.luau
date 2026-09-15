@@ -31,13 +31,25 @@ function Guard.reset(root: BasePart)
 	}
 end
 
-function Guard.allow(root: BasePart, key: string, seconds: number, horizontal: number, upward: number)
+function Guard.allow(
+	root: BasePart,
+	key: string,
+	seconds: number,
+	horizontal: number,
+	upward: number,
+	wallObstacle: BasePart?
+)
 	if not histories[root] then
 		Guard.reset(root)
 	end
 	local history = histories[root]
 	if history then
-		history.allowances[key] = { untilAt = os.clock() + seconds, horizontal = horizontal, upward = upward }
+		history.allowances[key] = {
+			untilAt = os.clock() + seconds,
+			horizontal = horizontal,
+			upward = upward,
+			wallObstacle = wallObstacle,
+		}
 	end
 end
 
@@ -90,6 +102,7 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 	local horizontal = base * Config.WalkTolerance + Config.PlatformSpeedAllowance
 	local upward = Config.UpwardSpeed
 	local airborneAllowance = false
+	local wallExcluded: { Instance }? = nil
 	for key, allowance in history.allowances do
 		if now > allowance.untilAt then
 			history.allowances[key] = nil
@@ -97,6 +110,10 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 			horizontal = math.max(horizontal, allowance.horizontal)
 			upward = math.max(upward, allowance.upward)
 			airborneAllowance = true
+			if allowance.wallObstacle then
+				wallExcluded = wallExcluded or table.clone(excluded)
+				table.insert(wallExcluded, allowance.wallObstacle)
+			end
 		end
 	end
 	for _, platform in Rotating.all() do
@@ -113,7 +130,7 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 	end
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = excluded
+	params.FilterDescendantsInstances = wallExcluded or excluded
 	params.RespectCanCollide = true
 	if delta.Magnitude > Config.WallCheckMinimumStuds then
 		local hit = Workspace:Spherecast(from, Config.WallProbeRadius, delta, params)
@@ -121,6 +138,9 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 			return recover(root, history, false)
 		end
 	end
+	-- The moving obstacle is exempt only from this launch's wall sweep. It must
+	-- remain visible to the ordinary ground/support check.
+	params.FilterDescendantsInstances = excluded
 	local groundDistance = (if humanoid then humanoid.HipHeight else 2) + root.Size.Y / 2 + Config.GroundToleranceStuds
 	local support = Workspace:Raycast(root.Position, Vector3.new(0, -groundDistance, 0), params)
 	if support and support.Normal.Y > 0.5 then

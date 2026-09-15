@@ -1,0 +1,19 @@
+{
+  "checked_on": "2026-09-08",
+  "figma_auth": "PASS",
+  "figma_file_inspect": "PASS: canonical file contains Page 1 (0:1)",
+  "figma_write": "PASS: created, inspected, and removed disposable node 5:2; original empty canvas restored",
+  "studio_mcp": "PASS: native StudioMCP stdio inspect-only calls verified arena 121997450145716 and lobby 130584867985467 in Edit mode; Workspace and ReplicatedStorage inspected",
+  "blender_computer_use": "PASS: visible Blender 5.2 inspected; recovery copy saved; disposable scene/cube created, saved, visually verified, removed; original scene and Edit mode restored",
+  "real_roblox_upload": "NOT RUN: prohibited during bootstrap",
+  "claude_subscription": "PASS: subscription allowed requests; source review completed; streaming wrapper smoke completed in 12 seconds; 900-second configurable deadline and persisted progress",
+  "gemini_text": "PASS: gemini-3.7-flash returned OK with existing credential; strongest currently responsive tested model",
+  "gemini_image": "PASS: gemini-3.7-flash completed structured star-icon review; .review/gemini-3c28ef35-0cc3-4c38-9f93-d8c16bfcfb82",
+  "iconify": "PASS: search, MIT metadata, original SVG, PNG rasterization, notices",
+  "offline_regressions": "PASS: 28 distinct tests",
+  "native_gate_gui": "PASS: every new/resumed popup raises and focuses once; all three successive native demo windows confirmed focused; zero writes",
+  "installed_gate_interruption": "PASS: forced process-tree termination; same SHA-256 and WAITING_FOR_APPROVAL after recovery",
+  "claude_source_review": "PASS: gate source reviewed successfully with explicit medium effort; valid batch recovery finding fixed and regression tested; remaining findings reconciled",
+  "place_ci_scope": "Confirmed by user: preserve place CI; gate standalone asset uploads only",
+  "human_only_security_boundary": "ACKNOWLEDGED: user accepts the documented cooperative same-user boundary; no further hardening requested"
+}

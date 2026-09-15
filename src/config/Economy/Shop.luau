@@ -46,14 +46,16 @@ local Bundle: BundleConfig = {
 	},
 }
 
--- The per-player rotating shop: temporary offers drawn from these categories only.
+-- The per-player rotating shop: temporary offers drawn from these categories
+-- only. TrailAssets is omitted until a trail is actually authored -- the draw
+-- tolerates an empty category, but listing one states the shop can offer
+-- something it cannot.
 local Rotation: RotationConfig = {
 	RotationSeconds = 24 * 60 * 60,
 	OfferCount = 3,
 	Categories = {
 		"BallAssets",
 		"HammerAssets",
-		"TrailAssets",
 		"ElimEffectAssets",
 		"ImpactEffectAssets",
 		"CostumeAssets",

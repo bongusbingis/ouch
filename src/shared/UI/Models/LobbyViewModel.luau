@@ -4,11 +4,34 @@
 
 local LobbyViewModel = {}
 
+export type QueueChoice = { partyId: string, leaderUserId: number, queueId: string }
+
+-- An idle leader must explicitly choose this session. A server default alone is
+-- not a choice. Members and in-flight parties display their authoritative queue.
+function LobbyViewModel.selectedQueueId(snapshot: any?, userId: number, choice: QueueChoice?): string?
+	if snapshot == nil then
+		return nil
+	end
+	if snapshot.leaderUserId ~= userId or snapshot.phase ~= "Lobby" or snapshot.returnQueuePending then
+		return snapshot.queueId
+	end
+	if
+		choice
+		and choice.partyId == snapshot.partyId
+		and choice.leaderUserId == snapshot.leaderUserId
+		and choice.queueId == snapshot.queueId
+	then
+		return choice.queueId
+	end
+	return nil
+end
+
 export type PartyPresentation = {
 	partyState: string,
 	playText: string,
 	playEnabled: boolean,
 	showMatchmakingActivity: boolean,
+	canPickQueue: boolean,
 }
 
 function LobbyViewModel.sanitizeCode(value: string): string
@@ -30,13 +53,21 @@ function LobbyViewModel.formatPartyCode(code: string?, visible: boolean): string
 	return `PARTY CODE: {string.sub(code, 1, 3)}-{string.sub(code, 4, 6)}`
 end
 
-function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: boolean): PartyPresentation
+-- The queue is the leader's to change only while the party is idle in the
+-- lobby: a queued, claimed or regrouping party already belongs to a queue.
+function LobbyViewModel.partyPresentation(
+	snapshot: any?,
+	userId: number,
+	busy: boolean,
+	selectedQueueId: string?
+): PartyPresentation
 	if snapshot == nil then
 		return {
 			partyState = "LOADING PARTY",
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = false,
+			canPickQueue = false,
 		}
 	end
 	local isLeader = snapshot.leaderUserId == userId
@@ -46,13 +77,18 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "CANCEL",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = true,
+			canPickQueue = false,
 		}
 	elseif snapshot.phase == "Lobby" then
 		return {
-			partyState = if isLeader then "READY TO BRAWL?" else "WAITING FOR PARTY LEADER",
+			partyState = if not isLeader
+				then "WAITING FOR PARTY LEADER"
+				elseif selectedQueueId == nil then "SELECT A GAME MODE"
+				else "CLICK PLAY TO ENTER MATCHMAKING",
 			playText = "PLAY",
-			playEnabled = isLeader and not busy,
+			playEnabled = isLeader and not busy and selectedQueueId ~= nil and selectedQueueId == snapshot.queueId,
 			showMatchmakingActivity = false,
+			canPickQueue = isLeader and not busy,
 		}
 	elseif snapshot.phase == "Queued" then
 		return {
@@ -60,6 +96,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "CANCEL",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = true,
+			canPickQueue = false,
 		}
 	elseif snapshot.phase == "Claimed" then
 		return {
@@ -67,6 +104,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = true,
+			canPickQueue = false,
 		}
 	elseif snapshot.phase == "Assigned" then
 		return {
@@ -74,13 +112,15 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = false,
+			canPickQueue = false,
 		}
 	end
 	return {
-		partyState = "HEADING TO THE ARENA",
+		partyState = "HEADING TO THE MATCH",
 		playText = "PLAY",
 		playEnabled = false,
 		showMatchmakingActivity = false,
+		canPickQueue = false,
 	}
 end
 

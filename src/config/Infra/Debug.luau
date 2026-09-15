@@ -51,6 +51,9 @@ return {
 	-- the lobby to spawn onto the baseplate with stationary respawning dummies,
 	-- both weapons, and the arena overlay menu, so equipped cosmetics can be
 	-- iterated on without entering the arena. Gated to Studio and never runs live.
+	-- Studio-only: back profiles with the in-memory ProfileStore mock so play sessions
+	-- never touch the real DataStore or fight its session lock. Must be false at ship.
+	MockProfiles = false,
 	LobbyCombatTest = true,
 
 	-- Tap-corner gesture that lets a dev/tester end the active match solo and
@@ -62,6 +65,11 @@ return {
 		TapCount = 10,
 		TapWindowSeconds = 1.25,
 	},
+
+	-- Studio-only: the matchmaking queue a direct (non-teleported) arena play
+	-- session pretends it came from, so a Splashdown server can be tested without
+	-- the lobby. "Arena" or "Splashdown"; live servers always read the teleport.
+	StudioQueue = "Splashdown",
 
 	-- Adds a handful of non-persisted example settings (both toggle variants,
 	-- every slider mode, a disabled row, and a Lobby-only row) to the real

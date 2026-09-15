@@ -99,7 +99,9 @@ local function sendGroup(
 	end
 	local prepared = coordinator:Prepare(Env.LobbyPlaceId, players, function(_retryPlayers)
 		local options = Instance.new("TeleportOptions")
-		options:SetTeleportData(ReturnPayload.build(partyId, matchId, memberUserIds, "Party", queueOnArrival))
+		options:SetTeleportData(
+			ReturnPayload.build(partyId, matchId, memberUserIds, "Party", queueOnArrival, ArenaSessionService.queueId())
+		)
 		return options
 	end, rewardPreflight())
 	if #prepared == 0 then
@@ -197,14 +199,22 @@ local function returnOptionsFor(player: Player, separateFromParty: boolean?, que
 				session.matchId,
 				ArenaSessionService.partyMemberUserIdsFor(player),
 				if separateFromParty then "Separate" else "Party",
-				queueOnArrival
+				queueOnArrival,
+				ArenaSessionService.queueId()
 			)
 		)
 	elseif queueOnArrival then
 		local result = MatchService.resultSnapshot()
 		assert(result, "[ArenaReturnService] finding players requires a result")
 		options:SetTeleportData(
-			ReturnPayload.build(`solo:{player.UserId}`, result.resultId, { player.UserId }, "Party", true)
+			ReturnPayload.build(
+				`solo:{player.UserId}`,
+				result.resultId,
+				{ player.UserId },
+				"Party",
+				true,
+				ArenaSessionService.queueId()
+			)
 		)
 	end
 	return options

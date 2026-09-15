@@ -1,4 +1,4 @@
--- Description: In-place spec checking the shipped lobby matchmaking configuration is coherent: a real arena place, usable party bounds, a reachable relaxing population target, positive lifetimes, and separated store namespaces.
+-- Description: In-place spec checking the shipped lobby matchmaking configuration is coherent: a real arena place, usable party bounds, a reachable relaxing population ladder and valid mode selection per queue, positive lifetimes, and separated store namespaces.
 
 --!strict
 
@@ -17,22 +17,45 @@ return function()
 		it("keeps party bounds usable", function()
 			expect(Config.PartyMinPlayers >= 1).to.equal(true)
 			expect(Config.PartyMaxPlayers >= Config.PartyMinPlayers).to.equal(true)
-			expect(Config.MatchTargetPlayers >= Config.PartyMaxPlayers).to.equal(true)
 		end)
 
-		it("relaxes the population requirement over time and stays reachable", function()
-			local ladder = Config.MatchPopulationExpansion
-			expect(#ladder > 0).to.equal(true)
-			expect(ladder[1].AfterSeconds).to.equal(0)
+		it("relaxes every queue's population requirement over time and stays reachable", function()
+			expect(#Config.QueueOrder > 0).to.equal(true)
+			for _, queueId in Config.QueueOrder do
+				local queue = Config.Queues[queueId]
+				expect(queue).never.to.equal(nil)
+				expect(type(queue.MatchTargetPlayers)).to.equal("number")
+				expect(queue.MatchTargetPlayers > 0).to.equal(true)
+				expect(queue.MatchTargetPlayers >= Config.PartyMaxPlayers).to.equal(true)
 
-			local previous = ladder[1]
-			for index = 2, #ladder do
-				local step = ladder[index]
-				expect(step.AfterSeconds > previous.AfterSeconds).to.equal(true)
-				expect(step.MinimumPlayers <= previous.MinimumPlayers).to.equal(true)
-				previous = step
+				local ladder = queue.MatchPopulationExpansion
+				expect(#ladder > 0).to.equal(true)
+				expect(ladder[1].AfterSeconds).to.equal(0)
+
+				local previous = ladder[1]
+				for index = 2, #ladder do
+					local step = ladder[index]
+					expect(step.AfterSeconds > previous.AfterSeconds).to.equal(true)
+					expect(step.MinimumPlayers <= previous.MinimumPlayers).to.equal(true)
+					previous = step
+				end
+				expect(ladder[#ladder].MinimumPlayers <= queue.MatchTargetPlayers).to.equal(true)
 			end
-			expect(ladder[#ladder].MinimumPlayers <= Config.PartyMaxPlayers).to.equal(true)
+		end)
+
+		it("gives every queue a valid mode selection", function()
+			for _, queueId in Config.QueueOrder do
+				local selection = Config.Queues[queueId].ModeSelection
+				if selection.strategy == "Vote" then
+					expect(typeof(selection.options)).to.equal("table")
+					expect(#selection.options > 0).to.equal(true)
+				elseif selection.strategy == "Fixed" then
+					expect(type(selection.modeId)).to.equal("string")
+					expect(#selection.modeId > 0).to.equal(true)
+				else
+					expect(false).to.equal(true)
+				end
+			end
 		end)
 
 		it("keeps every lifetime and interval positive", function()

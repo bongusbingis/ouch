@@ -14,8 +14,11 @@ local ArenaReturnService = require(Modules:WaitForChild("ArenaReturnService"))
 local LiveConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("LiveConfig"))
 local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local BallService = require(Modules:WaitForChild("BallService"))
+local ArenaService = require(Modules:WaitForChild("ArenaService"))
+local VenueService = require(Modules:WaitForChild("VenueService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
 local ModeVoteService = require(Modules:WaitForChild("ModeVoteService"))
+local SplashdownService = require(Modules:WaitForChild("Splashdown"):WaitForChild("SplashdownService"))
 local MapFeatureService = require(Modules:WaitForChild("MapFeatureService"))
 local AnalyticsService = require(Modules:WaitForChild("AnalyticsService"))
 local CombatPoseService = require(Modules:WaitForChild("CombatPoseService"))
@@ -91,10 +94,20 @@ ArenaReturnService.start()
 PlayerConfigService.start({ schemas = { PlayerAssist } })
 InputSetup.start()
 BallService.start()
-MapFeatureService.start()
+-- Replenishment and void recovery, both keyed off the arena's own spawn geometry.
+-- Without these a match only ever loses balls: every one thrown off the map is
+-- gone for the round, and nothing puts a new one into play.
+local arena = ArenaService.start()
+BallService.startGroundSpawns(arena.ballSpawns)
+BallService.configureRecovery(arena.ballSpawns, arena.origin.Position.Y + Combat.Dodgeball.RecoveryBelowOffset)
+-- A Splashdown server parks the arena interior here, after the ball supply it
+-- stands down was configured and before the kits look for their folders.
+VenueService.start()
 RotatingPlatforms.startMover()
+MapFeatureService.start() -- inspect the anchored features after this frame's mover
 MatchService.start()
 ModeVoteService.start()
+SplashdownService.start()
 AnalyticsService.start(MatchService)
 CombatPoseService.start()
 AnalyticsService.registerGauge("droppedSimMs", ServerAuthAdapter.takeDroppedMilliseconds)

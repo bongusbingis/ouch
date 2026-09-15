@@ -51,6 +51,9 @@ export type Card = {
 	pityRemaining: { [string]: number }?,
 	openQuantities: { number }?,
 	bonksAvailable: number?,
+	-- Set only when a card carries its own deadline rather than its block's --
+	-- the starter window is per player, so it cannot use a rotation clock.
+	countdownAt: number?,
 	definition: any,
 }
 
@@ -478,6 +481,20 @@ function ShopViewModel.build(options: any): Model
 	args.metadata = options.metadata or {}
 	args.ownedPasses = options.ownedPasses or {}
 
+	-- The starter window is the only hero entry that expires per player rather than
+	-- on a shared rotation, so it carries its own countdown and leads the row: it is
+	-- the one offer in the storefront the player cannot come back to later.
+	local starter = shopState.starterOffer
+	local starterId: string? = nil
+	if starter and starter.passKey and args.gamePasses.Catalog[starter.passKey] then
+		local card = passCard(args, starter.passKey, args.gamePasses.Catalog[starter.passKey])
+		if not card.owned then
+			card.badge = "STARTER OFFER"
+			card.countdownAt = starter.expiresAt
+			starterId = card.id
+			appendCard(model, model.hero, card)
+		end
+	end
 	if shopState.bundle and shopState.bundle.bundleId then
 		local bundle = bundleCard(args, shopState.bundle.bundleId)
 		if bundle then
@@ -488,6 +505,9 @@ function ShopViewModel.build(options: any): Model
 		appendCard(model, model.hero, crateCard(args, shopState.featured.id, true))
 	end
 	table.sort(model.hero, function(left, right)
+		if (left.id == starterId) ~= (right.id == starterId) then
+			return left.id == starterId
+		end
 		local leftPriority = if left.status == "Active" then 0 else 1
 		local rightPriority = if right.status == "Active" then 0 else 1
 		if leftPriority ~= rightPriority then
@@ -532,14 +552,12 @@ function ShopViewModel.build(options: any): Model
 	end
 	table.insert(model.sections, bonks)
 
+	-- The season pass leads this section rather than trailing it. The block is laid
+	-- out as one featured row of passes with the remainder spilling into an overflow
+	-- block printed after the offers, so with four permanent passes filling that row
+	-- a season pass appended last landed below the whole storefront -- the opposite
+	-- of its standing. It is the only card here that expires, so it goes first.
 	local more: Section = { id = "More", title = "PASSES & MORE", countdownAt = nil, cards = {} }
-	for _, key in
-		orderedCatalogKeys(args.gamePasses.Catalog, function(definition)
-			return definition.CatalogStatus ~= "Hidden"
-		end)
-	do
-		appendCard(model, more.cards, passCard(args, key, args.gamePasses.Catalog[key]))
-	end
 	for _, key in
 		orderedCatalogKeys(args.products, function(definition)
 			local season = BattlePassLogic.activeSeason(args.seasons or {}, args.now)
@@ -550,6 +568,13 @@ function ShopViewModel.build(options: any): Model
 		end)
 	do
 		appendCard(model, more.cards, productCard(args, key, args.products[key]))
+	end
+	for _, key in
+		orderedCatalogKeys(args.gamePasses.Catalog, function(definition)
+			return definition.CatalogStatus ~= "Hidden"
+		end)
+	do
+		appendCard(model, more.cards, passCard(args, key, args.gamePasses.Catalog[key]))
 	end
 	table.insert(model.sections, more)
 

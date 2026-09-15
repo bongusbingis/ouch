@@ -1,0 +1,131 @@
+{
+  "attribution_required": true,
+  "author": "Phosphor Icons",
+  "license": "MIT",
+  "license_text": "MIT License\n\nCopyright (c) 2023 Phosphor Icons\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+  "license_url": "https://github.com/phosphor-icons/core/blob/main/LICENSE",
+  "modifications": [
+    "Packed licensed SVGs into 192px cells; currentColor rendered white with 16px gutters for Roblox tinting."
+  ],
+  "production_file": "assets/ui/redesign-ph.png",
+  "provider": "Iconify",
+  "sha256": "8b0ab07e9c5a35ffe9ca3489035c868543dc8ad246897924044814821de7774e",
+  "source_id": "ph:ouch-redesign-atlas",
+  "source_url": "https://icon-sets.iconify.design/ph/confetti-fill/",
+  "sources": [
+    {
+      "original_file": "assets/source/external/ph/confetti-fill.svg",
+      "original_sha256": "47a1909e24efc8703b3e7d44906301f822b7ae26bda875ced429d3c969e4df75",
+      "source_id": "ph:confetti-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/confetti-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/star-fill.svg",
+      "original_sha256": "90d8c37f733262fb2ff7b24fe7f46b1aa754bb69323761416b9f330be9c60a2d",
+      "source_id": "ph:star-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/star-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/cloud-fill.svg",
+      "original_sha256": "852cab661e73cee2a1e0ce051e16790820c83d7e4bc000c5f65a2ed83b12ef16",
+      "source_id": "ph:cloud-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/cloud-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/crown-fill.svg",
+      "original_sha256": "7b3926ebc4ed31a86ac969fd86082c352b058e0dd6cb7a3aa85436d7088db610",
+      "source_id": "ph:crown-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/crown-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/diamond-fill.svg",
+      "original_sha256": "8570871dcb825eae6250e801fd438a6a9dd05b909453840f342e42ca85a8092b",
+      "source_id": "ph:diamond-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/diamond-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/planet-fill.svg",
+      "original_sha256": "aa7aeba5ffc9a1c4439b59c0136ee86c4d0c3a82fbe9d72ba4f68260463daf05",
+      "source_id": "ph:planet-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/planet-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/sparkle-fill.svg",
+      "original_sha256": "f4ff0e1d4b6257bf1f279d97289845084dbbde279daaae313ee61f392fd4832a",
+      "source_id": "ph:sparkle-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/sparkle-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/ice-cream-fill.svg",
+      "original_sha256": "81e1c20e0e341c7454ca158c07581e350c10c3e2ae49317c788fa8c290337db3",
+      "source_id": "ph:ice-cream-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/ice-cream-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/circles-three-fill.svg",
+      "original_sha256": "8acab06bcbfe55ce990fb12e9e803ece3a554cc17a0c8758443af9c111d59d78",
+      "source_id": "ph:circles-three-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/circles-three-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/cookie-fill.svg",
+      "original_sha256": "4e3e082ec78235d96a885cb3aeada9623620515a5fea7f267363eb802a1f7306",
+      "source_id": "ph:cookie-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/cookie-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/bell-fill.svg",
+      "original_sha256": "e6a92a3e3d375953441826a740be86d7747d4591a9911f7576edc4d1744285ac",
+      "source_id": "ph:bell-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/bell-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/speaker-high-fill.svg",
+      "original_sha256": "50e1f4d2f7b5ed715ee6cd06fedb8b97a78599c017d372325db2afc5cb623b9e",
+      "source_id": "ph:speaker-high-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/speaker-high-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/target-fill.svg",
+      "original_sha256": "fe11bbe9e08c8601a5c89622afdcebae0c4caeb6bea5b25b688c408c9ea5a924",
+      "source_id": "ph:target-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/target-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/hand-grabbing-fill.svg",
+      "original_sha256": "8796dce5dfc27b93c504c0d46880b1bf979bde2f8b58e3106a26ef98ff8f0673",
+      "source_id": "ph:hand-grabbing-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/hand-grabbing-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/trophy-fill.svg",
+      "original_sha256": "9e463955c99bc4bf72b5afed83540a0b3f44217fbfb96cd367e5a5e4ab2b5c54",
+      "source_id": "ph:trophy-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/trophy-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/game-controller-fill.svg",
+      "original_sha256": "8400942841b13310f77b59452a426b2d6b055ffbc9c4e9c1f1a2068e93f28429",
+      "source_id": "ph:game-controller-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/game-controller-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/hammer-fill.svg",
+      "original_sha256": "4714b4e00e90fff669ceace2ba34fb71ab059de4f9c35d546a629c0a21012440",
+      "source_id": "ph:hammer-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/hammer-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/baseball-fill.svg",
+      "original_sha256": "c2aa28aaa31068d1b7c0e346691338872c0ce048b456e3bbc815694c8ed0f7fb",
+      "source_id": "ph:baseball-fill",
+      "source_url": "https://icon-sets.iconify.design/ph/baseball-fill/"
+    },
+    {
+      "original_file": "assets/source/external/ph/check-bold.svg",
+      "original_sha256": "c7305a0fe3683d3f1ba8fa652fd699d57eb8c9e6da88426149c548f810402a16",
+      "source_id": "ph:check-bold",
+      "source_url": "https://icon-sets.iconify.design/ph/check-bold/"
+    }
+  ]
+}

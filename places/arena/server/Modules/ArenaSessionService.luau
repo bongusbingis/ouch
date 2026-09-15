@@ -1,15 +1,18 @@
--- Description: Owns the arena server's matchmaking session identity: validates arriving teleport payloads and their source place, tracks admission and party identity across reconnects, and gates the start of play on client readiness.
+-- Description: Owns the arena server's matchmaking session identity: validates arriving teleport payloads and their source place, establishes which queue and mode selection this server plays, tracks admission and party identity across reconnects, and gates the start of play on client readiness.
 
 --!strict
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
 local AnalyticsConfig = require(Config:WaitForChild("Infra"):WaitForChild("Analytics"))
+local Debug = require(Config:WaitForChild("Infra"):WaitForChild("Debug"))
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Matchmaking = Shared:WaitForChild("Game"):WaitForChild("Matchmaking")
@@ -26,6 +29,8 @@ local ArenaSessionService = {}
 
 export type Snapshot = {
 	matchId: string,
+	queueId: string,
+	fixedModeId: string?,
 	expectedPlayerCount: number,
 	modeOptions: { string },
 	arrivedPlayerCount: number,
@@ -39,7 +44,17 @@ export type Admission = "Direct" | "Matched" | "Rejected"
 type Session = {
 	matchId: string,
 	expectedPlayerCount: number,
+	queueId: string,
 	modeOptions: { string },
+	fixedModeId: string?,
+}
+
+-- What this server plays, fixed by its first arrival: a matched session's
+-- payload, or the Studio queue for a direct play session.
+type Identity = {
+	queueId: string,
+	modeOptions: { string },
+	fixedModeId: string?,
 }
 
 type PartyContext = {
@@ -50,11 +65,12 @@ type PartyContext = {
 
 local LOAD_STATE_FOLDER_NAME = "ArenaLoadState"
 local LOAD_SNAPSHOT_NAME = "Snapshot"
-local LOAD_SCHEMA_VERSION = 1
+local LOAD_SCHEMA_VERSION = 2
 local READY_ATTRIBUTE = "ArenaReady"
 local READINESS_DEADLINE_SECONDS = Loading.ArenaWaitSeconds
 
 local session: Session? = nil
+local identity: Identity? = nil
 local gate: ArenaReadinessGate.State? = nil
 local partyByUserId: { [number]: string } = {}
 local partyById: { [string]: PartyContext } = {}
@@ -64,6 +80,7 @@ local roundEligibleByUserId: { [number]: boolean } = {}
 local readyListeners: { (Player) -> () } = {}
 local roundEligibilityListeners: { (Player, boolean) -> () } = {}
 local gateReleasedListeners: { (string) -> () } = {}
+local sessionListeners: { (string, string?) -> () } = {}
 local loadSnapshotValue: StringValue? = nil
 local loadRevision = 0
 local gateGeneration = 0
@@ -133,7 +150,29 @@ local function ensureLoadState(): StringValue
 end
 
 local function currentModeOptions(): { string }
-	return if session then table.clone(session.modeOptions) else table.clone(GameModes.VoteOptions)
+	return if identity then table.clone(identity.modeOptions) else table.clone(GameModes.VoteOptions)
+end
+
+-- A fixed selection resolves to exactly its mode or nothing: the ballot fallback
+-- ModeOptions applies to a vote would silently turn a race server into a brawl.
+local function resolveSelection(selection: TeleportPayload.ModeSelection): ({ string }?, string?)
+	if selection.strategy == "Fixed" then
+		local resolved = ModeOptions.resolve({ selection.modeId })
+		if #resolved ~= 1 or resolved[1] ~= selection.modeId then
+			return nil, nil
+		end
+		return resolved, selection.modeId
+	end
+	local resolved = ModeOptions.resolve(selection.options)
+	return if #resolved > 0 then resolved else nil, nil
+end
+
+local function selectionForQueue(queueId: string): TeleportPayload.ModeSelection
+	local definition = Queues.get(queueId)
+	if definition.ModeSelection.Strategy == "Fixed" then
+		return { strategy = "Fixed", modeId = definition.ModeSelection.ModeId }
+	end
+	return { strategy = "Vote", options = table.clone(GameModes.VoteOptions) }
 end
 
 local function loadSnapshot(): { [string]: any }
@@ -155,6 +194,8 @@ local function loadSnapshot(): { [string]: any }
 		deadlineAt = gateSnapshot.deadlineAt,
 		gateReleased = gateSnapshot.gateReleased,
 		modeOptions = currentModeOptions(),
+		queueId = ArenaSessionService.queueId(),
+		fixedModeId = if identity then identity.fixedModeId else nil,
 		revision = loadRevision,
 	}
 end
@@ -164,6 +205,20 @@ local function publishLoadState()
 	local snapshot = loadSnapshot()
 	snapshot.revision = loadRevision
 	ensureLoadState().Value = HttpService:JSONEncode(snapshot)
+end
+
+local function establishIdentity(queueId: string, modeOptions: { string }, fixedModeId: string?)
+	if identity ~= nil then
+		return
+	end
+	identity = { queueId = queueId, modeOptions = table.clone(modeOptions), fixedModeId = fixedModeId }
+	publishLoadState()
+	for _, listener in table.clone(sessionListeners) do
+		local ok, err = pcall(listener, queueId, fixedModeId)
+		if not ok then
+			warn(`[ArenaSessionService] session listener error: {err}`)
+		end
+	end
 end
 
 local function dispatchReady(player: Player)
@@ -246,6 +301,7 @@ local function setAdmission(player: Player, admission: Admission)
 	if previous ~= admission then
 		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaArrival, 1, {
 			admission = admission,
+			queueId = ArenaSessionService.queueId(),
 		})
 	end
 end
@@ -290,7 +346,7 @@ local function addArrival(player: Player, admission: Admission)
 			count += 1
 		end
 	end
-	if count >= GameModes.MatchCapacity then
+	if count >= GameModes.QueueCapacity(ArenaSessionService.queueId()) then
 		setAdmission(player, "Rejected")
 		publishLoadState()
 		warn(`[ArenaSessionService] Arena capacity reached for {player.Name}`)
@@ -313,6 +369,14 @@ local function reject(player: Player, warning: string)
 	warn(warning)
 end
 
+local function directQueueId(): string
+	local requested = Debug.StudioQueue
+	if RunService:IsStudio() and Queues.isEnabled(requested) then
+		return requested
+	end
+	return Queues.DefaultQueueId
+end
+
 local function receive(player: Player)
 	local success, joinData = pcall(player.GetJoinData, player)
 	if not success then
@@ -331,7 +395,14 @@ local function receive(player: Player)
 			return
 		end
 		if gate == nil then
+			local queueId = directQueueId()
+			local modeOptions, fixedModeId = resolveSelection(selectionForQueue(queueId))
+			if modeOptions == nil then
+				reject(player, `[ArenaSessionService] Rejected direct arrival: queue {queueId} has no available mode`)
+				return
+			end
 			createGate("Direct", 1)
+			establishIdentity(queueId, modeOptions, fixedModeId)
 		elseif gate.kind ~= "Direct" then
 			reject(player, `[ArenaSessionService] Rejected mixed direct arrival for {player.Name}`)
 			return
@@ -353,8 +424,8 @@ local function receive(player: Player)
 		return
 	end
 
-	local modeOptions = ModeOptions.resolve(payload.modeSelection.options)
-	if #modeOptions == 0 then
+	local modeOptions, fixedModeId = resolveSelection(payload.modeSelection)
+	if modeOptions == nil then
 		reject(player, `[ArenaSessionService] Rejected session without an available mode for {player.Name}`)
 		return
 	end
@@ -367,12 +438,17 @@ local function receive(player: Player)
 		session = {
 			matchId = payload.matchId,
 			expectedPlayerCount = payload.expectedPlayerCount,
+			queueId = payload.queueId,
 			modeOptions = modeOptions,
+			fixedModeId = fixedModeId,
 		}
 		createGate("Matched", payload.expectedPlayerCount)
+		establishIdentity(payload.queueId, modeOptions, fixedModeId)
 	elseif
 		session.matchId ~= payload.matchId
 		or session.expectedPlayerCount ~= payload.expectedPlayerCount
+		or session.queueId ~= payload.queueId
+		or session.fixedModeId ~= fixedModeId
 		or not ModeOptions.equals(session.modeOptions, modeOptions)
 	then
 		reject(player, `[ArenaSessionService] Rejected mismatched matchmaking session for {player.Name}`)
@@ -479,6 +555,8 @@ function ArenaSessionService.getSnapshot(): Snapshot?
 	local gateSnapshot = ArenaReadinessGate.snapshot(assert(gate, "matched session requires a readiness gate"))
 	return {
 		matchId = session.matchId,
+		queueId = session.queueId,
+		fixedModeId = session.fixedModeId,
 		expectedPlayerCount = session.expectedPlayerCount,
 		modeOptions = table.clone(session.modeOptions),
 		arrivedPlayerCount = gateSnapshot.arrivedPlayerCount,
@@ -490,6 +568,20 @@ end
 
 function ArenaSessionService.modeOptions(): { string }
 	return currentModeOptions()
+end
+
+-- The queue this server plays for; the default queue until the first arrival
+-- establishes one, so every caller has an answer.
+function ArenaSessionService.queueId(): string
+	return if identity then identity.queueId else Queues.DefaultQueueId
+end
+
+function ArenaSessionService.fixedModeId(): string?
+	return if identity then identity.fixedModeId else nil
+end
+
+function ArenaSessionService.isEstablished(): boolean
+	return identity ~= nil
 end
 
 function ArenaSessionService.partyIdFor(player: Player): string?
@@ -568,49 +660,41 @@ function ArenaSessionService.canOpenVote(): boolean
 	return gate ~= nil and gate.gateReleased
 end
 
-function ArenaSessionService.onReady(listener: (Player) -> ()): () -> ()
-	table.insert(readyListeners, listener)
+local function subscribe<T>(list: { T }, listener: T): () -> ()
+	table.insert(list, listener)
 	local connected = true
 	return function()
 		if not connected then
 			return
 		end
 		connected = false
-		local index = table.find(readyListeners, listener)
+		local index = table.find(list, listener)
 		if index then
-			table.remove(readyListeners, index)
+			table.remove(list, index)
 		end
 	end
+end
+
+function ArenaSessionService.onReady(listener: (Player) -> ()): () -> ()
+	return subscribe(readyListeners, listener)
 end
 
 function ArenaSessionService.onRoundEligibilityChanged(listener: (Player, boolean) -> ()): () -> ()
-	table.insert(roundEligibilityListeners, listener)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(roundEligibilityListeners, listener)
-		if index then
-			table.remove(roundEligibilityListeners, index)
-		end
-	end
+	return subscribe(roundEligibilityListeners, listener)
 end
 
 function ArenaSessionService.onGateReleased(listener: (string) -> ()): () -> ()
-	table.insert(gateReleasedListeners, listener)
-	local connected = true
-	return function()
-		if not connected then
-			return
-		end
-		connected = false
-		local index = table.find(gateReleasedListeners, listener)
-		if index then
-			table.remove(gateReleasedListeners, index)
-		end
+	return subscribe(gateReleasedListeners, listener)
+end
+
+-- Fires once, when the first arrival defines what this server plays; a
+-- listener added after that hears it immediately.
+function ArenaSessionService.onSessionEstablished(listener: (string, string?) -> ()): () -> ()
+	local disconnect = subscribe(sessionListeners, listener)
+	if identity then
+		listener(identity.queueId, identity.fixedModeId)
 	end
+	return disconnect
 end
 
 return ArenaSessionService

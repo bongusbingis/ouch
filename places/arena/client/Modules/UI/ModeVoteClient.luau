@@ -26,6 +26,7 @@ export type Snapshot = {
 	durationSeconds: number,
 	options: { string },
 	voteCounts: { [string]: number },
+	scoreTargets: { [string]: number },
 	selectedModeId: string?,
 	winnerModeId: string?,
 	revision: number,
@@ -44,6 +45,7 @@ local projected = {
 	durationSeconds = 0,
 	options = {},
 	voteCounts = {},
+	scoreTargets = {},
 	winnerModeId = nil,
 	revision = 0,
 }
@@ -64,6 +66,7 @@ local function snapshot(): Snapshot
 		durationSeconds = projected.durationSeconds,
 		options = table.clone(projected.options),
 		voteCounts = counts,
+		scoreTargets = table.clone(projected.scoreTargets),
 		selectedModeId = if typeof(selectedModeId) == "string" then selectedModeId else nil,
 		winnerModeId = projected.winnerModeId,
 		revision = projected.revision,
@@ -82,6 +85,14 @@ local function decode(value: string)
 	end
 	local options = {}
 	local counts = {}
+	local targets = {}
+	if typeof(data.scoreTargets) == "table" then
+		for modeId, target in data.scoreTargets do
+			if typeof(modeId) == "string" and typeof(target) == "number" then
+				targets[modeId] = target
+			end
+		end
+	end
 	if typeof(data.options) == "table" then
 		for _, modeId in data.options do
 			if typeof(modeId) == "string" then
@@ -103,6 +114,7 @@ local function decode(value: string)
 		durationSeconds = if typeof(data.durationSeconds) == "number" then data.durationSeconds else 0,
 		options = options,
 		voteCounts = counts,
+		scoreTargets = targets,
 		winnerModeId = if typeof(data.winnerModeId) == "string" and data.winnerModeId ~= ""
 			then data.winnerModeId
 			else nil,
@@ -130,6 +142,7 @@ local function decodeLegacy(folder: Folder)
 		durationSeconds = (folder:GetAttribute("durationSeconds") :: number?) or 0,
 		options = options,
 		voteCounts = counts,
+		scoreTargets = {},
 		winnerModeId = if typeof(winnerModeId) == "string" and winnerModeId ~= "" then winnerModeId else nil,
 		revision = (folder:GetAttribute("revision") :: number?) or 0,
 	}

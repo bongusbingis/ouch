@@ -13,35 +13,80 @@ export type Props = {
 	Active: boolean,
 	Onscreen: UDim2,
 	Offscreen: UDim2,
-	Render: (any) -> any,
+	Preset: string?,
+	Render: (any, any?, any?) -> any,
 }
 
 return function(props: Props)
 	local present, setPresent = React.useState(props.Active)
 	local revision = React.useRef(0)
+	local wasActive = React.useRef(props.Active)
 	local reducedMotion = useReducedMotion()
+	local preset = if props.Preset then Motion.LobbyPages[props.Preset] else nil
+	local offscreen = if not preset
+		then props.Offscreen
+		elseif preset.Axis == "X" then UDim2.new(UDim.new(preset.OffscreenScale, 0), props.Onscreen.Y)
+		else UDim2.new(props.Onscreen.X, UDim.new(preset.OffscreenScale, 0))
 	local styles, api = ReactSpring.useSpring(function()
-		return { Position = if props.Active then props.Onscreen else props.Offscreen }
+		return {
+			Position = if props.Active then props.Onscreen else offscreen,
+			Scale = if props.Active or not preset then 1 else preset.StartScale,
+			Arrival = if props.Active then 1 else 0,
+		}
 	end)
 
 	React.useEffect(function()
 		revision.current += 1
 		local currentRevision = revision.current
+		local entering = props.Active and not wasActive.current
+		wasActive.current = props.Active
 		if props.Active then
 			setPresent(true)
-			api.start({ Position = props.Onscreen, config = Motion.Page, immediate = reducedMotion })
-		else
-			api.start({ Position = props.Offscreen, config = Motion.Page, immediate = reducedMotion })
-				:andThen(function()
+			if preset and entering and not reducedMotion then
+				api.start({
+					Position = props.Onscreen + UDim2.fromOffset(preset.ArrivalOffset.X, preset.ArrivalOffset.Y),
+					Scale = preset.ArrivalScale,
+					Arrival = 0.8,
+					config = Motion.pageTiming(preset.Enter),
+					immediate = false,
+				}):andThen(function()
 					if revision.current == currentRevision then
-						setPresent(false)
+						api.start({
+							Position = props.Onscreen,
+							Scale = 1,
+							Arrival = 1,
+							config = Motion.pageTiming(preset.Settle),
+							immediate = false,
+						})
 					end
 				end)
+			else
+				api.start({
+					Position = props.Onscreen,
+					Scale = 1,
+					Arrival = 1,
+					config = if preset then Motion.pageTiming(preset.Settle) else Motion.Page,
+					immediate = reducedMotion,
+				})
+			end
+		else
+			api.start({
+				Position = offscreen,
+				Scale = if preset then preset.StartScale else 1,
+				Arrival = 0,
+				config = if preset then Motion.pageTiming(preset.Exit, true) else Motion.Page,
+				immediate = reducedMotion,
+			}):andThen(function()
+				if revision.current == currentRevision then
+					setPresent(false)
+				end
+			end)
 		end
 		return function()
 			revision.current += 1
+			api.stop()
 		end
-	end, { props.Active, props.Onscreen, props.Offscreen, reducedMotion })
+	end, { props.Active, props.Onscreen, offscreen, preset, reducedMotion })
 
 	React.useEffect(function()
 		return function()
@@ -52,5 +97,5 @@ return function(props: Props)
 	if not present then
 		return nil
 	end
-	return props.Render(styles.Position)
+	return props.Render(styles.Position, styles.Scale, styles.Arrival)
 end

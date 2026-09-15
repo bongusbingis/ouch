@@ -23,6 +23,8 @@ local Animations = require(Config:WaitForChild("Infra"):WaitForChild("Animations
 local Audio = require(Config:WaitForChild("Infra"):WaitForChild("Audio"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
+local Splashdown = require(Config:WaitForChild("Gameplay"):WaitForChild("Splashdown"))
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeOptions = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeOptions"))
@@ -50,6 +52,8 @@ export type Snapshot = {
 	deadlineAt: number,
 	gateReleased: boolean,
 	modeOptions: { string },
+	queueId: string,
+	fixedModeId: string?,
 	matchPhase: string,
 	fatalError: string?,
 }
@@ -61,6 +65,8 @@ type ServerSnapshot = {
 	deadlineAt: number,
 	gateReleased: boolean,
 	modeOptions: { string },
+	queueId: string,
+	fixedModeId: string?,
 }
 
 local player = Players.LocalPlayer
@@ -95,6 +101,8 @@ local serverState: ServerSnapshot = {
 	deadlineAt = 0,
 	gateReleased = false,
 	modeOptions = table.clone(GameModes.VoteOptions),
+	queueId = Queues.DefaultQueueId,
+	fixedModeId = nil,
 }
 local startedAt = 0
 local preloadStartedAt = 0
@@ -154,6 +162,8 @@ local function currentSnapshot(): Snapshot
 		deadlineAt = serverState.deadlineAt,
 		gateReleased = serverState.gateReleased,
 		modeOptions = table.clone(serverState.modeOptions),
+		queueId = serverState.queueId,
+		fixedModeId = serverState.fixedModeId,
 		matchPhase = if matchState then (matchState:GetAttribute("phase") :: string?) or "Idle" else "Idle",
 		fatalError = localState.fatalError,
 	}
@@ -228,13 +238,18 @@ local function decodeLoadSnapshot(value: string)
 			end
 		end
 	end
+	local fixedModeId = if typeof(decoded.fixedModeId) == "string" and decoded.fixedModeId ~= ""
+		then decoded.fixedModeId
+		else nil
 	serverState = {
 		expectedPlayerCount = math.max(1, number(decoded.expectedPlayerCount, 1)),
 		arrivedPlayerCount = math.max(0, number(decoded.arrivedPlayerCount, 0)),
 		readyPlayerCount = math.max(0, number(decoded.readyPlayerCount, 0)),
 		deadlineAt = number(decoded.deadlineAt, 0),
 		gateReleased = decoded.gateReleased == true,
-		modeOptions = ModeOptions.resolve(options),
+		modeOptions = if fixedModeId then { fixedModeId } else ModeOptions.resolve(options),
+		queueId = if Queues.isEnabled(decoded.queueId) then decoded.queueId else Queues.DefaultQueueId,
+		fixedModeId = fixedModeId,
 	}
 	changed()
 end
@@ -347,6 +362,17 @@ local function criticalInstances(): { Instance }
 	end
 	for _, folder in Cosmetics.VisualFolders do
 		add(cosmetics:WaitForChild(folder))
+	end
+	-- A race server stands its courses from these templates the moment the
+	-- match starts, so they warm with everything else rather than on the pads.
+	if serverState.fixedModeId == "Splashdown" then
+		local courses: Instance? = assets
+		for _, name in Splashdown.TemplatesPath do
+			courses = if courses then courses:FindFirstChild(name) else nil
+		end
+		if courses and courses ~= assets then
+			add(courses)
+		end
 	end
 	return result
 end

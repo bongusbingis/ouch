@@ -14,6 +14,13 @@ return function(props)
 	if not props.Visible or not view.teamMode then
 		return nil
 	end
+	local accent = "Cyan"
+	for _, team in view.teams or {} do
+		if team.id == view.teamId then
+			accent = team.accent
+			break
+		end
+	end
 	local markers = {}
 	for _, entry in view.entries do
 		if entry.head and Model.isTeammate(entry, view.teamId) then
@@ -27,7 +34,7 @@ return function(props)
 			}, {
 				Name = c(Label, {
 					Text = `TEAM • {entry.displayName}`,
-					Color = if view.teamId == "Red" then Config.Colors.Pink else Config.Colors.Cyan,
+					Color = Config.Colors[accent],
 					Size = 17,
 				}),
 			})

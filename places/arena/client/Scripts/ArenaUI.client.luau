@@ -19,6 +19,9 @@ local ShopClient = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):W
 local LoadingScreen = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("LoadingScreen"))
 local ReactRoot = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("ReactRoot"))
 local TeleportGui = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("TeleportGui"))
+local EmoteWheel = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("EmoteWheel"))
+local EmoteWheelController =
+	require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteWheelController"))
 
 local c = React.createElement
 
@@ -51,6 +54,8 @@ ArenaLoadingClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
 local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+local SplashdownClient =
+	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("SplashdownClient"))
 local ArenaTeleportClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaTeleportClient"))
 local ArenaMenuClient = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CombatMenuClient"))
@@ -60,6 +65,7 @@ local ArenaCoreUI = require(script.Parent.Parent:WaitForChild("Modules"):WaitFor
 ArenaCoreUI.start()
 ArenaLoadingClient.start()
 ModeVoteClient.start()
+SplashdownClient.start()
 ArenaTeleportClient.start()
 ArenaMenuClient.start()
 PostMatchClient.start()
@@ -112,7 +118,7 @@ local container = ReactRoot.create("ArenaRoot", Enum.ScreenInsets.None, 1000)
 local root = ReactRoblox.createRoot(container)
 local combatContainer = ReactRoot.create("ArenaCombatRoot", Enum.ScreenInsets.None, 100)
 local combatRoot = ReactRoblox.createRoot(combatContainer)
-local menuContainer = ReactRoot.create("ArenaMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500)
+local menuContainer = ReactRoot.create("ArenaMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500, true)
 local menuRoot = ReactRoblox.createRoot(menuContainer)
 local postMatchContainer = ReactRoot.create("ArenaPostMatchRoot", Enum.ScreenInsets.None, 700)
 local postMatchRoot = ReactRoblox.createRoot(postMatchContainer)
@@ -141,6 +147,34 @@ end
 if postMatchOk then
 	postMatchRoot:render(c(PostMatchApp))
 end
+local emoteContainer = ReactRoot.create("ArenaEmoteRoot", Enum.ScreenInsets.CoreUISafeInsets, 800, true)
+local emoteRoot = ReactRoblox.createRoot(emoteContainer)
+emoteRoot:render(c(EmoteWheel, { EmptySlotsAssignable = false, TouchButtonPlacement = "BesideToolbar" }))
+EmoteWheelController.start({
+	onPlay = function(emoteId)
+		Network.fireServer("PlayEmote", emoteId)
+	end,
+	isEnabled = function()
+		if ArenaMenuClient.getSnapshot().open then
+			return false
+		end
+		if PostMatchClient.getSnapshot().visible then
+			return true
+		end
+		local state = ReplicatedStorage:FindFirstChild("MatchState")
+		return state ~= nil
+			and state:GetAttribute("phase") == "Active"
+			and Players.LocalPlayer:GetAttribute("ArenaReady") == true
+	end,
+})
+local Combat = require(game:GetService("StarterPlayer"):WaitForChild("PlayerModule")).Combat
+local emoteCameraUnsubscribe = EmoteWheelController.subscribe(function(wheel)
+	if wheel.open then
+		Combat.requestCameraSuppression("EmoteWheel")
+	else
+		Combat.releaseCameraSuppression("EmoteWheel")
+	end
+end)
 Replica.RequestData()
 
 local teleportContainer = ReactRoot.createDetached("ArenaReturnLoadingScreen", Enum.ScreenInsets.None, 1100)
@@ -204,9 +238,15 @@ script.Destroying:Connect(function()
 	end
 	ArenaTeleportClient.destroy()
 	ArenaMenuClient.destroy()
+	emoteCameraUnsubscribe()
+	Combat.releaseCameraSuppression("EmoteWheel")
+	EmoteWheelController.stop()
+	emoteRoot:unmount()
+	emoteContainer:Destroy()
 	PostMatchClient.destroy()
 	ArenaCoreUI.destroy()
 	ModeVoteClient.destroy()
+	SplashdownClient.destroy()
 	ArenaLoadingClient.destroy()
 	EconomyStore.stop()
 	SettingsStore.stop()
