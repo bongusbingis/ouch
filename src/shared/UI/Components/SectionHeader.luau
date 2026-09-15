@@ -22,6 +22,8 @@ export type Props = {
 	HeightPx: number?,
 	Color: Color3?,
 	UnderlineGapPx: number?,
+	BottomGapPx: number?,
+	TitleRotation: number?,
 	Accessory: any?,
 	AccessoryWidthPx: number?,
 	LayoutOrder: number?,

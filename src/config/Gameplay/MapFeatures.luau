@@ -68,6 +68,7 @@ return {
 			["obstacle_6_001.007"] = true,
 		},
 		DegreesPerSecond = 100,
+		ContactPadding = 0.75, -- modest reach beyond the authored paddle bounds
 		KnockbackSpeed = 42,
 		UpwardSpeed = 16,
 		ShoveSeconds = 0.15,
@@ -100,6 +101,7 @@ return {
 	},
 	Bumper = {
 		NamePrefixes = { "obstacle_18_001", "obstacle_19_001" },
+		ContactPadding = 0.75, -- modest reach beyond the authored bumper bounds
 		KnockbackSpeed = 36,
 		UpwardSpeed = 14,
 		ShoveSeconds = 0.12,
@@ -133,6 +135,8 @@ return {
 		RotorCarries = "RotorCarries", -- riders are carried with the part
 		Shove = "Shove", -- contact pushes the player along the surface motion
 		ShoveSpeed = "ShoveSpeed",
+		ShoveUpwardSpeed = "ShoveUpwardSpeed",
+		ShoveSeconds = "ShoveSeconds",
 		Bumper = "Bumper",
 		Fan = "Fan",
 		FanBlade = "FanBlade",
@@ -141,6 +145,7 @@ return {
 		ScriptableRoot = "ScriptableRoot", -- CollectionService tag on every Scriptables folder the kits drive
 	},
 	RotorBump = {
+		ContactPadding = 0.75, -- modest reach beyond the authored rotor bounds
 		KnockbackSpeed = 34,
 		UpwardSpeed = 14,
 		OutwardBias = 0.35,

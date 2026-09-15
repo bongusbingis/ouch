@@ -38,6 +38,7 @@ export type Props = {
 	Data: any?,
 	Position: any?,
 	WorldWindowRef: any?,
+	HeaderHeight: number?,
 	OnEquip: (InventoryModel.Entry) -> (),
 	OnInspect: ((InventoryModel.Entry) -> ())?,
 	SelectedTab: string,
@@ -63,21 +64,20 @@ local function Section(props)
 	local cardChildren = {
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = if props.Compact
-				then Enum.HorizontalAlignment.Center
-				else Enum.HorizontalAlignment.Left,
-			Padding = UDim.new(0, T.Layout.Gap),
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			Padding = UDim.new(0, if props.Compact then T.LobbyLandscape.ScrollInset else T.Layout.Gap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Wraps = true,
 		}),
 		UIPadding = c("UIPadding", {
 			PaddingBottom = UDim.new(0, T.Layout.Gap),
-			PaddingTop = UDim.new(0, T.Layout.CompactGap),
+			PaddingTop = UDim.new(0, if props.Compact then T.LobbyLandscape.ScrollInset else T.Layout.CompactGap),
 			PaddingLeft = UDim.new(0, T.Shape.StrokeCard),
 		}),
 	}
 	for index, entry in props.Entries do
 		cardChildren[entry.id] = c(Card, {
+			Compact = props.Compact,
 			Entry = entry,
 			Selected = props.SelectedItemId == entry.itemId,
 			CardSize = props.CardSize,
@@ -120,7 +120,7 @@ end
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local composition = if props.WorldWindowRef
-		then ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout)
+		then ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout, props.HeaderHeight)
 		else nil
 	local panelSize = if composition
 		then composition.panel.size
@@ -134,7 +134,7 @@ return function(props: Props)
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local contentTop = if short
-		then inventoryLayout.ShortContentTopPx
+		then T.LobbyLandscape.PanelHeader
 		else if panelSize.X < T.Layout.WheelMinWidth then T.Layout.CompactWellTop else T.Layout.WellTop
 	local contentBottom = if short then panelSize.Y - inventoryLayout.ShortContentBottomPx else panelSize.Y * 0.9684105
 	local railGap = inventoryLayout.ShortRailGapPx
@@ -155,11 +155,11 @@ return function(props: Props)
 	local _, cardSize = ResponsiveLayout.gridCellSize(
 		cardWidth,
 		if short
-			then inventoryLayout.ShortCardMinPx
+			then T.LobbyLandscape.InventoryCardMin
 			elseif panelSize.X < T.Layout.WheelMinWidth then 124
 			else T.Layout.CardMin,
-		if short then inventoryLayout.ShortCardSizePx else T.Layout.CardMax,
-		T.Layout.Gap,
+		if short then T.LobbyLandscape.InventoryCard else T.Layout.CardMax,
+		if short then T.LobbyLandscape.ScrollInset else T.Layout.Gap,
 		T.Layout.MaxColumns
 	)
 	local selectedTab = props.SelectedTab
@@ -274,7 +274,10 @@ return function(props: Props)
 		UIPadding = c("UIPadding", {
 			PaddingLeft = UDim.new(0.01, 0),
 			PaddingRight = UDim.new(0.035, 0),
-			PaddingTop = UDim.new(0, UIConfig.Layout.InventoryContentGapPx),
+			PaddingTop = UDim.new(
+				0,
+				if short then T.LobbyLandscape.ScrollPadding else UIConfig.Layout.InventoryContentGapPx
+			),
 			PaddingBottom = UDim.new(0, UIConfig.Layout.InventoryContentGapPx),
 		}),
 	}
@@ -285,7 +288,7 @@ return function(props: Props)
 			ContentWidth = cardWidth,
 			ColorId = equipped.CharacterColor,
 			CostumeId = equipped.CostumeAssets,
-			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
+			HeaderHeight = if short then T.LobbyLandscape.InventoryHeader else inventoryLayout.HeaderHeightPx,
 			SelectedSlot = selectedSlot,
 			OnSelectSlot = selectSlot,
 			PendingEmote = pendingEmote,
@@ -343,6 +346,7 @@ return function(props: Props)
 	end
 	for layoutOrder, definition in InventoryConfig.Tabs do
 		tabs[definition.Id] = c(TabPill, {
+			Tilt = if short then 0 else nil,
 			Enabled = props.Data ~= nil,
 			Active = selectedTab == definition.Id,
 			Text = definition.Id,
@@ -370,6 +374,7 @@ return function(props: Props)
 	end
 
 	return c(PanelFrame, {
+		Tilt = if short then 0 else nil,
 		Native = {
 			BackgroundTransparency = 1,
 			ClipsDescendants = false,
@@ -397,7 +402,7 @@ return function(props: Props)
 				Size = UDim2.fromOffset(composition.world.size.X, composition.world.size.Y),
 			})
 			else nil,
-		Title = c(BackpackTitle, { Compact = short or narrowTabs }),
+		Title = c(BackpackTitle, { Compact = short or narrowTabs, Landscape = short }),
 		Main = c(Well, {
 			Candy = true,
 			Native = {
@@ -421,12 +426,12 @@ return function(props: Props)
 					BorderSizePixel = 0,
 					CanvasSize = UDim2.fromOffset(0, 0),
 					Position = if short
-						then UDim2.fromOffset(UIConfig.Spacing.CompactInsetPx, UIConfig.Spacing.CompactInsetPx)
+						then UDim2.fromOffset(T.LobbyLandscape.ScrollInset, T.LobbyLandscape.ScrollInset)
 						else UDim2.fromScale(0.0341613, 0.0426996),
 					ScrollBarImageColor3 = T.Colors.Pink,
 					ScrollBarThickness = T.Layout.CompactGap,
 					Size = if short
-						then UDim2.new(1, -UIConfig.Spacing.CompactInsetPx * 2, 1, -UIConfig.Spacing.CompactInsetPx * 2)
+						then UDim2.new(1, -T.LobbyLandscape.ScrollInset * 2, 1, -T.LobbyLandscape.ScrollInset * 2)
 						else UDim2.fromScale(0.94076, 0.907841),
 				}, categoryChildren)
 				else c("Frame", {

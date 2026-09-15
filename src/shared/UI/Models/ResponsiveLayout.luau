@@ -1,6 +1,7 @@
 --!strict
 
 local LobbyHeaderLayout = require(script.Parent.LobbyHeaderLayout)
+local T = require(script.Parent.Parent.Tokens)
 
 local ResponsiveLayout = {}
 
@@ -268,9 +269,29 @@ function ResponsiveLayout.splashPanels(
 	}
 end
 
-function ResponsiveLayout.inventoryComposition(available: Vector2, layout: any)
+function ResponsiveLayout.landscapePage(available: Vector2, headerHeight: number?, preview: boolean?)
+	local l = T.LobbyLandscape
+	local top = (headerHeight or LobbyHeaderLayout.resolve(available).height) + l.HeaderGap
+	local width = available.X - l.Edge * 2
+	local panelWidth = if preview
+		then math.min(math.floor(width * l.BrowserFraction), width - l.Gap - l.PreviewMinWidth)
+		else width
+	local height = math.max(1, available.Y - top - l.Edge)
+	return {
+		panel = { position = Vector2.new(l.Edge, top), size = Vector2.new(math.max(1, panelWidth), height) },
+		world = {
+			position = Vector2.new(l.Edge + panelWidth + l.Gap, top),
+			size = Vector2.new(math.max(1, width - panelWidth - l.Gap), height),
+		},
+	}
+end
+
+function ResponsiveLayout.inventoryComposition(available: Vector2, layout: any, headerHeight: number?)
 	local portrait = ResponsiveLayout.isPortrait(available, layout.PortraitMaxAspect)
 	local short = not portrait and available.Y <= layout.ShortLandscapeMaxHeightPx
+	if short and headerHeight ~= nil then
+		return ResponsiveLayout.landscapePage(available, headerHeight, true)
+	end
 	local edge = 12
 	local size = ResponsiveLayout.panelSize(
 		available,
@@ -290,6 +311,50 @@ function ResponsiveLayout.inventoryComposition(available: Vector2, layout: any)
 			math.max(inventory.ShortPanelMinWidthPx, math.floor(available.X * inventory.ShortPanelWidthScale) - edge)
 		local maximumWidth = math.max(1, available.X - edge * 3 - inventory.ShortWorldMinWidthPx)
 		size = Vector2.new(math.min(preferredWidth, maximumWidth), math.max(1, available.Y - position.Y - edge))
+	end
+	local worldX = position.X + size.X + edge
+	return {
+		panel = { position = position, size = size },
+		world = {
+			position = Vector2.new(worldX, position.Y),
+			size = Vector2.new(math.max(1, available.X - worldX - edge), size.Y),
+		},
+	}
+end
+
+function ResponsiveLayout.shopComposition(available: Vector2, layout: any, headerHeight: number?)
+	local portrait = ResponsiveLayout.isPortrait(available, layout.PortraitMaxAspect)
+	if not portrait and available.Y <= layout.ShortLandscapeMaxHeightPx and headerHeight ~= nil then
+		return ResponsiveLayout.landscapePage(available, headerHeight, true)
+	end
+	local inventory = ResponsiveLayout.inventoryComposition(available, layout)
+	local originalSize = ResponsiveLayout.panelSize(
+		available,
+		layout.Panels.Shop,
+		layout.PortraitMaxAspect,
+		layout.ShortLandscapeMaxHeightPx
+	)
+	local size = if portrait
+		then originalSize
+		else Vector2.new(
+			math.floor((inventory.panel.size.X + originalSize.X) / 2),
+			math.floor((inventory.panel.size.Y + originalSize.Y) / 2)
+		)
+	local position = if portrait
+		then Vector2.new(
+			available.X * layout.PagePosition.X.Scale + layout.PagePosition.X.Offset - size.X / 2,
+			available.Y * layout.PagePosition.Y.Scale + layout.PagePosition.Y.Offset - size.Y / 2
+		)
+		else Vector2.new(
+			inventory.panel.position.X,
+			inventory.panel.position.Y + (inventory.panel.size.Y - size.Y) / 2
+		)
+	local edge = 12
+	if headerHeight ~= nil then
+		-- Mobile navigation shares Roblox's row; reclaim the old second header.
+		local top = math.max(headerHeight, 0) + edge
+		position = Vector2.new(position.X, top)
+		size = Vector2.new(size.X, math.max(1, available.Y - top - edge))
 	end
 	local worldX = position.X + size.X + edge
 	return {

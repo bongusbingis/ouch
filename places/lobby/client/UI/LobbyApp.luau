@@ -16,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UI = Shared:WaitForChild("UI")
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local useSafeArea = require(UI.Hooks.useSafeArea)
+local useHeaderInsets = require(UI.Hooks.useHeaderInsets)
 local ResponsiveLayout = require(UI.Models.ResponsiveLayout)
 local StageFraming = require(UI.Models.StageFraming)
 local MatchmakingConfig = require(Shared:WaitForChild("Matchmaking"):WaitForChild("Config"))
@@ -46,8 +47,11 @@ local SettingsPage = require(Components:WaitForChild("SettingsPage"))
 local ShopPage = require(Components:WaitForChild("ShopPage"))
 local UIAnalytics = require(UI:WaitForChild("Services"):WaitForChild("UIAnalytics"))
 local SplashPage = require(Components:WaitForChild("SplashPage"))
+local QueuePickerModal = require(Components.QueuePickerModal)
 local TopBar = require(Components:WaitForChild("TopBar"))
 local LobbyHeaderLayout = require(UI.Models.LobbyHeaderLayout)
+local SplashLayout = require(UI.Models.SplashLayout)
+local Tokens = require(UI.Tokens)
 local NumberText = require(UI.Models.NumberText)
 local EmoteWheelController = require(UI.Services.EmoteWheelController)
 local GameVersion = require(Components:WaitForChild("GameVersion"))
@@ -72,13 +76,13 @@ local PAGE_POSITIONS = {
 		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 	Settings = {
-		onscreen = UIConfig.Layout.PagePosition,
+		onscreen = UIConfig.Layout.InventoryPagePosition,
 		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 }
 
 local PAGE_BACKGROUND_COLORS = {
-	SplashScreen = Color3.fromRGB(255, 211, 64),
+	SplashScreen = Tokens.Splash.BackdropColor,
 	Inventory = Color3.fromRGB(232, 225, 7),
 	Shop = Color3.fromRGB(142, 31, 232),
 }
@@ -90,7 +94,10 @@ local WORLD_CAMERA_PAGE = { Settings = "Inventory" }
 
 local QUEUE_OPTIONS = {}
 for _, queueId in Queues.Order do
-	table.insert(QUEUE_OPTIONS, { id = queueId, title = Queues.Queues[queueId].Title })
+	table.insert(
+		QUEUE_OPTIONS,
+		{ id = queueId, title = Queues.Queues[queueId].Title, description = Queues.Queues[queueId].Description }
+	)
 end
 
 local function useParty(client, notifications)
@@ -218,10 +225,16 @@ local function useWorldTransition(
 		local pageColor = PAGE_BACKGROUND_COLORS[cameraPage]
 		assert(pageColor ~= nil, `[LobbyApp] No background color configured for {cameraPage}`)
 		background.current = partyBackground
-		local framedPage = currentPage == "SplashScreen" or currentPage == "Inventory"
+		local characterPreview = currentPage == "Inventory" or currentPage == "Shop"
+		local framedPage = currentPage == "SplashScreen" or characterPreview
 		if framedPage then
-			local minimum, maximum, points, viewTarget =
-				partyBounds(party, currentPage == "Inventory", inventoryWeapons, partyCount, target.CFrame)
+			local minimum, maximum, points, viewTarget = partyBounds(
+				party,
+				characterPreview,
+				currentPage == "Inventory" and inventoryWeapons,
+				partyCount,
+				target.CFrame
+			)
 			framing.current =
 				{ page = currentPage, minimum = minimum, maximum = maximum, points = points, viewTarget = viewTarget }
 		else
@@ -319,6 +332,7 @@ end
 local function LobbyContent(props)
 	local effectPreview = useExternalStore(CosmeticPreviewClient.getSnapshot, CosmeticPreviewClient.subscribe)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local headerInsets = useHeaderInsets()
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local shortPages = not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local wheelSnapshot = EmoteWheelController.useSnapshot()
@@ -328,16 +342,31 @@ local function LobbyContent(props)
 	local rootRef = React.useRef(nil)
 	local splashWorldRef = React.useRef(nil)
 	local inventoryWorldRef = React.useRef(nil)
-	local inventoryComposition = ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout)
-	local splashWorld = ResponsiveLayout.splashWorldWindow(safeArea.size, UIConfig.Layout)
+	local shopWorldRef = React.useRef(nil)
+	local shopHeader = LobbyHeaderLayout.resolveMobile(safeArea.size, headerInsets)
+	local mobileHeaderHeight = if shopHeader then shopHeader.height else nil
+	local inventoryComposition =
+		ResponsiveLayout.inventoryComposition(safeArea.size, UIConfig.Layout, mobileHeaderHeight)
+	local settingsComposition = if shortPages
+		then ResponsiveLayout.landscapePage(safeArea.size, mobileHeaderHeight, false)
+		else nil
+	local shopComposition =
+		ResponsiveLayout.shopComposition(safeArea.size, UIConfig.Layout, if shopHeader then shopHeader.height else nil)
+	local splashComposition = SplashLayout.resolve(safeArea.size, false, nil, false, mobileHeaderHeight)
+	local splashWorld = splashComposition.world
+	local partyRect = splashComposition.party or headerLayout.party
 	local worldWindows = {
 		SplashScreen = { ref = splashWorldRef, position = safeArea.position + splashWorld.position },
 		Inventory = if portrait
 			then nil
 			else { ref = inventoryWorldRef, position = safeArea.position + inventoryComposition.world.position },
+		Shop = if portrait
+			then nil
+			else { ref = shopWorldRef, position = safeArea.position + shopComposition.world.position },
 	}
 	local presented = React.useRef(false)
 	local playButtonRef = React.useRef(nil)
+	local modeButtonRef = React.useRef(nil)
 	local previousSelection = React.useRef(nil)
 	local focusRevision = React.useRef(0)
 	local isGamepad, setIsGamepad = React.useState(false)
@@ -397,6 +426,13 @@ local function LobbyContent(props)
 		UIAnalytics.menuOpened(currentPage)
 	end, { currentPage })
 	local joinOpen, setJoinOpen = React.useState(false)
+	local modeOpen, setModeOpen = React.useState(false)
+	local queueChoice, setQueueChoice = React.useState(nil :: LobbyViewModel.QueueChoice?)
+	React.useEffect(function()
+		if currentPage ~= "SplashScreen" then
+			setModeOpen(false)
+		end
+	end, { currentPage })
 	local partyMembersOpen, setPartyMembersOpen = React.useState(false)
 	local codeVisible, setCodeVisible = React.useState(false)
 	local devTapState = React.useRef({ lastTapAt = 0, tapCount = 0 })
@@ -446,6 +482,11 @@ local function LobbyContent(props)
 	end, { onboardingActive, onboardingResolved, economyData, notifications })
 
 	local snapshot, requestBusy = useParty(partyClient, notifications)
+	local partyId = if snapshot then snapshot.partyId else nil
+	local leaderUserId = if snapshot then snapshot.leaderUserId else nil
+	React.useEffect(function()
+		setQueueChoice(nil)
+	end, { partyId, leaderUserId })
 	local partyCount = 1
 	local framedUserIds = { [Players.LocalPlayer.UserId] = true }
 	for _, member in if snapshot then snapshot.members else {} do
@@ -458,7 +499,10 @@ local function LobbyContent(props)
 		end
 	end
 	local teleportStatus = partyClient:getTeleportStatus()
-	local presentation = LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy)
+	local confirmedQueueId = LobbyViewModel.selectedQueueId(snapshot, Players.LocalPlayer.UserId, queueChoice)
+	local selectedQueueId = if Queues.isEnabled(confirmedQueueId) then confirmedQueueId else nil
+	local presentation =
+		LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy, selectedQueueId)
 	React.useEffect(function()
 		focusRevision.current += 1
 		local revision = focusRevision.current
@@ -467,7 +511,7 @@ local function LobbyContent(props)
 			if previousSelection.current == nil then
 				previousSelection.current = GuiService.SelectedObject
 			end
-			if currentPage == "SplashScreen" and presentation.playEnabled then
+			if currentPage == "SplashScreen" and (presentation.playEnabled or presentation.canPickQueue) then
 				task.defer(function()
 					if
 						focusRevision.current ~= revision
@@ -476,7 +520,7 @@ local function LobbyContent(props)
 					then
 						return
 					end
-					local button = playButtonRef.current
+					local button = if presentation.playEnabled then playButtonRef.current else modeButtonRef.current
 					if Selection.isSelectable(button) then
 						GuiService.SelectedObject = button
 					end
@@ -498,7 +542,7 @@ local function LobbyContent(props)
 		return function()
 			focusRevision.current += 1
 		end
-	end, { lobbyVisible, isGamepad, presentation.playEnabled })
+	end, { lobbyVisible, isGamepad, currentPage, presentation.playEnabled, presentation.canPickQueue })
 	local teleportPhase = if snapshot then snapshot.phase else nil
 	local loadingVisible = (teleportPhase == "Assigned" or teleportPhase == "Teleporting")
 		and not (teleportStatus and teleportStatus.state == "Failed")
@@ -734,6 +778,7 @@ local function LobbyContent(props)
 		or showDailyRewardModal
 		or partyMembersOpen
 		or joinOpen
+		or modeOpen
 		or economyMenu.selectedShopCardId ~= nil
 		or economyMenu.crateReveal ~= nil
 	React.useEffect(function()
@@ -775,6 +820,9 @@ local function LobbyContent(props)
 			elseif showDailyRewardModal then
 				setShowDailyRewardModal(false)
 				return
+			elseif modeOpen then
+				setModeOpen(false)
+				return
 			elseif partyMembersOpen then
 				setPartyMembersOpen(false)
 				return
@@ -798,6 +846,7 @@ local function LobbyContent(props)
 		showDailyRewardModal,
 		partyMembersOpen,
 		joinOpen,
+		modeOpen,
 		currentPage,
 		onboardingActive,
 	})
@@ -825,39 +874,60 @@ local function LobbyContent(props)
 	end
 	local views = {}
 	for pageName, positions in PAGE_POSITIONS do
+		local pageComposition = if pageName == "Inventory"
+			then inventoryComposition
+			elseif pageName == "Shop" then shopComposition
+			elseif pageName == "Settings" then settingsComposition
+			else nil
 		views[pageName] = c(PageTransition, {
 			Active = currentPage == pageName,
-			Onscreen = if pageName == "Inventory" and not portrait
+			Preset = if pageName == "Inventory" then nil else pageName,
+			Onscreen = if pageComposition and (not portrait or (pageName == "Shop" and shopHeader ~= nil))
 				then UDim2.fromOffset(
-					safeArea.position.X + inventoryComposition.panel.position.X + inventoryComposition.panel.size.X / 2,
-					safeArea.position.Y + inventoryComposition.panel.position.Y + inventoryComposition.panel.size.Y / 2
+					safeArea.position.X + pageComposition.panel.position.X + pageComposition.panel.size.X / 2,
+					safeArea.position.Y + pageComposition.panel.position.Y + pageComposition.panel.size.Y / 2
 				)
 				elseif shortPages and pageName ~= "SplashScreen" then UIConfig.Layout.ShortPagePosition
-				elseif portrait and pageName == "Inventory" then UIConfig.Layout.PagePosition
+				elseif portrait and (pageName == "Inventory" or pageName == "Shop") then UIConfig.Layout.PagePosition
 				else positions.onscreen,
 			Offscreen = if shortPages and pageName ~= "SplashScreen"
 				then UIConfig.Layout.ShortPageOffscreen
 				else positions.offscreen,
-			Render = function(position)
+			Render = function(position, scale, arrival)
 				if pageName == "SplashScreen" then
 					return c(SplashPage, {
+						HeaderHeight = mobileHeaderHeight,
 						Position = position,
+						PageArrival = arrival,
 						PlayButtonRef = playButtonRef,
+						ModeButtonRef = modeButtonRef,
 						WorldWindowRef = splashWorldRef,
 						PartyState = presentation.partyState,
 						ShowMatchmakingActivity = presentation.showMatchmakingActivity,
 						PlayText = presentation.playText,
 						PlayEnabled = presentation.playEnabled,
 						QueueOptions = QUEUE_OPTIONS,
-						SelectedQueueId = if snapshot and Queues.isEnabled(snapshot.queueId)
-							then snapshot.queueId
-							else Queues.DefaultQueueId,
+						SelectedQueueId = selectedQueueId,
 						QueueEnabled = presentation.canPickQueue,
-						OnSelectQueue = function(queueId)
-							task.spawn(partyClient.setQueue, partyClient, queueId)
+						OnOpenModes = function()
+							if presentation.canPickQueue then
+								setModeOpen(true)
+							end
 						end,
 						OnPlay = function()
-							task.spawn(partyClient.toggleMatchmaking, partyClient)
+							-- Recheck the live party so stale input cannot start the default queue.
+							local current = partyClient:getSnapshot()
+							local selected =
+								LobbyViewModel.selectedQueueId(current, Players.LocalPlayer.UserId, queueChoice)
+							local action = LobbyViewModel.partyPresentation(
+								current,
+								Players.LocalPlayer.UserId,
+								partyClient:isBusy(),
+								if Queues.isEnabled(selected) then selected else nil
+							)
+							if action.playEnabled then
+								task.spawn(partyClient.toggleMatchmaking, partyClient)
+							end
 						end,
 						OnInvite = function()
 							task.spawn(partyClient.promptInvite, partyClient)
@@ -884,6 +954,7 @@ local function LobbyContent(props)
 					})
 				elseif pageName == "Inventory" then
 					return c(InventoryPage, {
+						HeaderHeight = mobileHeaderHeight,
 						OnLockedSlot = function()
 							setCurrentPage("Shop")
 						end,
@@ -896,12 +967,22 @@ local function LobbyContent(props)
 						OnInspect = economyMenu.inspectInventory,
 					})
 				elseif pageName == "Settings" then
-					return c(SettingsPage, { Position = position, Place = "Lobby" })
+					return c(
+						SettingsPage,
+						{
+							Position = position,
+							Size = if settingsComposition then settingsComposition.panel.size else nil,
+							TransitionScale = scale,
+							Place = "Lobby",
+						}
+					)
 				elseif pageName == "Shop" then
 					return c(ShopPage, {
 						SeasonState = seasonState,
 						Model = economyMenu.shopModel,
 						Position = position,
+						Size = shopComposition.panel.size,
+						TransitionScale = scale,
 						OnCardActivated = economyMenu.activateShopCard,
 						OnRefresh = economyMenu.refreshShop,
 					})
@@ -927,6 +1008,20 @@ local function LobbyContent(props)
 			Size = UDim2.fromScale(1, 1),
 			Visible = lobbyVisible and not effectPreview.active,
 		}, {
+			ShopWorldWindow = if portrait
+				then nil
+				else c("Frame", {
+					ref = shopWorldRef,
+					Active = false,
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					Position = UDim2.fromOffset(
+						safeArea.position.X + shopComposition.world.position.X,
+						safeArea.position.Y + shopComposition.world.position.Y
+					),
+					Selectable = false,
+					Size = UDim2.fromOffset(shopComposition.world.size.X, shopComposition.world.size.Y),
+				}),
 			Views = c("Frame", {
 				ClipsDescendants = true,
 				BackgroundTransparency = 1,
@@ -946,15 +1041,17 @@ local function LobbyContent(props)
 				PartyCode = c(PageTransition, {
 					Active = currentPage == "SplashScreen",
 					Onscreen = UDim2.fromOffset(
-						safeArea.position.X + headerLayout.party.position.X + headerLayout.party.size.X,
-						safeArea.position.Y + headerLayout.party.position.Y
+						safeArea.position.X + partyRect.position.X + partyRect.size.X,
+						safeArea.position.Y + partyRect.position.Y
 					),
 					Offscreen = UDim2.new(1, -8, -1, 0),
 					Render = function(position)
 						return c(PartyCode, {
 							Compact = true,
-							Size = UDim2.fromOffset(headerLayout.party.size.X, headerLayout.party.size.Y),
-							Label = headerLayout.partyLabel,
+							Size = UDim2.fromOffset(partyRect.size.X, partyRect.size.Y),
+							Label = if splashComposition.landscape
+								then `PARTY ({partyCount})`
+								else headerLayout.partyLabel,
 							Position = position,
 							CodeText = LobbyViewModel.formatPartyCode(
 								if snapshot then snapshot.joinCode else nil,
@@ -978,6 +1075,44 @@ local function LobbyContent(props)
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 100,
 			}, {
+				GameModes = c(QueuePickerModal, {
+					Open = modeOpen
+						and currentPage == "SplashScreen"
+						and lobbyVisible
+						and not loadingVisible
+						and not showDailyRewardModal,
+					FocusEnabled = notifications.request == nil,
+					Options = QUEUE_OPTIONS,
+					SelectedId = selectedQueueId,
+					Enabled = presentation.canPickQueue,
+					OnClose = function()
+						setModeOpen(false)
+					end,
+					OnSelect = function(queueId)
+						if not presentation.canPickQueue or not snapshot or not Queues.isEnabled(queueId) then
+							return
+						end
+						task.spawn(function()
+							-- Even choosing the internal default is an explicit, accepted request.
+							local response = partyClient:setQueue(queueId)
+							if not response or not response.ok then
+								return
+							end
+							local choice =
+								{ partyId = snapshot.partyId, leaderUserId = snapshot.leaderUserId, queueId = queueId }
+							local current = partyClient:getSnapshot()
+							if
+								current
+								and current.partyId == choice.partyId
+								and current.leaderUserId == choice.leaderUserId
+								and current.queueId == queueId
+							then
+								setQueueChoice(choice)
+								setModeOpen(false)
+							end
+						end)
+					end,
+				}),
 				PartyMembers = c(PartyMembersModal, {
 					Open = partyMembersOpen and currentPage == "SplashScreen",
 					FocusEnabled = notifications.request == nil,

@@ -34,9 +34,10 @@ return function(props: Props)
 	local section = props.Section
 	local grid = props.Grid
 	local countdownAt = section.countdownAt
-	local countdownWidth = 98
-	local compactHeader = countdownAt ~= nil and props.Width < 300
-	local headerHeight = math.max(props.HeaderHeight or ShopUI.HeaderHeightPx, if compactHeader then 58 else 0)
+	local layout = T.Shop
+	local countdownWidth = layout.CountdownWidth
+	local compactHeader = countdownAt ~= nil and props.Width < layout.CountdownWrapWidth
+	local headerHeight = props.HeaderHeight or ShopUI.HeaderHeight(props.Width, countdownAt, false)
 	local children = {}
 	if #section.cards == 0 then
 		children.Empty = c(ResponsiveText, {
@@ -88,8 +89,13 @@ return function(props: Props)
 		Header = c(SectionHeader, {
 			Candy = true,
 			Text = section.title,
-			TextSize = if compactHeader then T.Type.TileLabel else ShopUI.HeaderTextSize,
-			HeightPx = if compactHeader then 28 else headerHeight,
+			TextSize = if compactHeader or headerHeight < layout.SectionHeight
+				then T.Type.TileLabel
+				else ShopUI.HeaderTextSize,
+			HeightPx = if compactHeader then layout.CountdownTitleHeight else headerHeight,
+			BottomGapPx = if compactHeader then 0 else layout.SectionContentGap,
+			UnderlineGapPx = layout.SectionUnderlineGap,
+			TitleRotation = 0,
 			LayoutOrder = 1,
 			ZIndex = 5,
 			Accessory = if countdownAt and not compactHeader
@@ -102,13 +108,15 @@ return function(props: Props)
 					OnExpired = props.OnExpired,
 				})
 				else nil,
-			AccessoryWidthPx = if countdownAt and not compactHeader then countdownWidth else 0,
+			AccessoryWidthPx = if countdownAt and not compactHeader
+				then countdownWidth + layout.SectionContentGap
+				else 0,
 		}),
 		Countdown = if compactHeader
 			then c(ShopCountdown, {
 				ExpiresAt = countdownAt,
-				Position = UDim2.fromOffset(0, 28),
-				Size = UDim2.fromOffset(countdownWidth, 24),
+				Position = UDim2.fromOffset(0, layout.CountdownTitleHeight + layout.SectionContentGap),
+				Size = UDim2.fromOffset(countdownWidth, layout.CountdownHeight),
 				OnExpired = props.OnExpired,
 				ZIndex = 8,
 			})

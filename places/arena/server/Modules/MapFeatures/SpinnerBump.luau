@@ -63,9 +63,10 @@ function SpinnerBump.tickWorld(context: MapFeatureKit.Context)
 			local spinner = if enabled then assembly:FindFirstChild(name) else nil
 			if spinner and spinner:IsA("BasePart") then
 				activeSpinners[spinner] = true
-				-- Inspect the actual mesh collision shape, not its bounding box.
-				-- Root-only contact deliberately excludes cosmetic/limb grazing.
-				for _, root in Workspace:GetPartsInPart(spinner, overlap) do
+				-- Root-only contact excludes cosmetic/limb grazing. A small padded
+				-- oriented box makes near-edge contacts register more reliably.
+				local padding = Vector3.one * MapFeatures.Spinner.ContactPadding * 2
+				for _, root in Workspace:GetPartBoundsInBox(spinner.CFrame, spinner.Size + padding, overlap) do
 					contacts[root] = contacts[root] or spinner
 				end
 			end

@@ -2,11 +2,20 @@
 
 -- Splashdown race tunables. Courses carry their own cap and close window
 -- because difficulty differs: a spiral climb with rising lava needs longer than
--- a straight sprint. Everything the five courses share lives at the top level.
+-- a straight sprint. Everything the courses share lives at the top level.
 -- Units are studs and seconds.
 return {
 	RoundCount = 3,
-	IntroSeconds = 5,
+	IntroSeconds = 9,
+	-- Course-only responses. Arena brawl hazards keep their existing tuning.
+	HazardResponse = {
+		Rotor = { Speed = 48, UpwardSpeed = 20, HoldSeconds = 0.24 },
+		Bumper = { Speed = 54, UpwardSpeed = 22, HoldSeconds = 0.26 },
+		HammerSpeed = 58,
+		MaceSpeed = 54,
+		RollerSpeed = 48,
+		SlidingWallSpeed = 44,
+	},
 	CountdownSeconds = 3,
 	RoundResultsSeconds = 6,
 	-- Between the splash and standing on the checkpoint pad again.
@@ -21,7 +30,16 @@ return {
 	-- always scores the same number; last place scores 1 and a DNF scores 0.
 	PointsForFirst = 30,
 	-- A DNF is charged the round cap in the cumulative-time tiebreak.
-	CourseOrder = { "WhirlPool", "DiscJockey", "KnockKnock", "BumperBay", "SummitSplash" },
+	CourseOrder = {
+		"WhirlPool",
+		"DiscJockey",
+		"KnockKnock",
+		"BumperBay",
+		"SummitSplash",
+		"TiltTrip",
+		"CrossCurrent",
+		"Downpour",
+	},
 	Courses = {
 		WhirlPool = {
 			DisplayName = "WHIRL POOL",
@@ -55,10 +73,31 @@ return {
 		SummitSplash = {
 			DisplayName = "SUMMIT SPLASH",
 			Difficulty = 3,
-			ParSeconds = 95,
-			CapSeconds = 180,
-			CloseWindowSeconds = 40,
+			ParSeconds = 115,
+			CapSeconds = 210,
+			CloseWindowSeconds = 45,
 			LavaRise = { Studs = 60, DelaySeconds = 20, Seconds = 140 },
+		},
+		TiltTrip = {
+			DisplayName = "TILT TRIP",
+			Difficulty = 2,
+			ParSeconds = 120,
+			CapSeconds = 210,
+			CloseWindowSeconds = 45,
+		},
+		CrossCurrent = {
+			DisplayName = "CROSS CURRENT",
+			Difficulty = 3,
+			ParSeconds = 145,
+			CapSeconds = 240,
+			CloseWindowSeconds = 55,
+		},
+		Downpour = {
+			DisplayName = "DOWNPOUR",
+			Difficulty = 2,
+			ParSeconds = 115,
+			CapSeconds = 210,
+			CloseWindowSeconds = 45,
 		},
 	},
 	-- Every course carries its own invisible boundary ring, wider than the
@@ -76,13 +115,6 @@ return {
 		FinishTime = "RaceFinishTime",
 		Splashes = "RaceSplashes",
 		RoundPoints = "RaceRoundPoints",
-	},
-	Intro = {
-		-- Camera flyover during the intro: a slow orbit above the course centre.
-		Distance = 320,
-		Height = 180,
-		RotationSpeedDeg = 9,
-		BlurSize = 0,
 	},
 	Splash = {
 		ParticleBurst = 40,

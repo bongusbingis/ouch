@@ -37,7 +37,7 @@ return function(props)
 	local children = table.clone(props.children or {})
 	children.Decoration = c(
 		"Frame",
-		{ BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Rotation = S.TiltPanel },
+		{ BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Rotation = props.Tilt or S.TiltPanel },
 		{
 			Shadow = c("Frame", {
 				BackgroundColor3 = C.Ink,

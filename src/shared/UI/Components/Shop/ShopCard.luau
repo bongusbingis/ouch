@@ -10,6 +10,7 @@ local PriceButton = require(script.Parent.ShopPriceButton)
 local Ribbon = require(script.Parent.Parent.RarityRibbon)
 local Surface = require(script.Parent.Parent.CandySurface)
 local Progress = require(script.Parent.Parent.CandyProgressBar)
+local UIFeedback = require(script.Parent.Parent.Parent.Services.UIFeedback)
 local c, C, L = React.createElement, T.Colors, T.Shop
 local accents = {
 	SeasonPass = C.Gold,
@@ -21,18 +22,23 @@ local accents = {
 }
 return React.memo(function(props)
 	local card = props.Card
-	local hovered, setHovered = React.useState(false)
+	local pointerHovered, setPointerHovered = React.useState(false)
+	local actionHovered, setActionHovered = React.useState(false)
+	local hovered = pointerHovered or actionHovered
 	local season = card.kind == "SeasonPass"
 	local width, height = props.CardWidth, props.CardHeight
+	local short = height <= T.LobbyLandscape.CardHeight
 	local split = (props.Class.Layout == "Split" or season) and width >= L.PromoMin
 	local currency = card.kind == "Bonks"
+	local owned = card.owned and not season
 	local pad = L.CardPadding
 	local infoX = if split then math.floor(width * L.SplitArtScale) else pad
 	local infoWidth = width - infoX - pad
-	local nameHeight = if height < 220 then 48 else L.NameHeight
+	local nameHeight = if short then 40 elseif height < 220 then 48 else L.NameHeight
 	local actionHeight = L.ActionHeight
 	local actionY = height - pad - actionHeight
-	local nameY = if split then L.ArtTop else actionY - nameHeight - pad
+	local artTop = if short then 44 else L.ArtTop
+	local nameY = if split then artTop else actionY - nameHeight - pad
 	local artBottom = if split then height - pad else nameY - pad
 	local accent = accents[card.kind] or C.NeutralTile
 	local background = accent:Lerp(C.Surface, 0.75)
@@ -72,8 +78,11 @@ return React.memo(function(props)
 	local badge = if season then "SEASON PASS" else card.badge or string.upper(card.kind)
 	local rarity = if T.Rarity[card.badge] then card.badge else nil
 	local state = if season and height >= 220 then props.SeasonState else nil
-	local name = if state and state.active
-		then string.upper(state.displayName)
+	local name = if season
+			and props.SeasonState
+			and props.SeasonState.active
+		then string.upper(props.SeasonState.displayName)
+		elseif state and state.active then string.upper(state.displayName)
 		elseif currency then number(card.definition.BonksAmount or 0) .. " BONKS"
 		else string.upper(card.displayName)
 	local secondary = if season
@@ -89,10 +98,10 @@ return React.memo(function(props)
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 4,
 		[React.Event.MouseEnter] = function()
-			setHovered(true)
+			setPointerHovered(true)
 		end,
 		[React.Event.MouseLeave] = function()
-			setHovered(false)
+			setPointerHovered(false)
 		end,
 	}, {
 		Surface = c(Surface, {
@@ -108,30 +117,40 @@ return React.memo(function(props)
 				Rarity = rarity,
 				Color = if season then C.Gold else nil,
 				Native = {
-					Position = UDim2.fromOffset(pad, 10),
-					Size = UDim2.new(1, -pad * 2, 0, L.BadgeHeight),
+					Position = UDim2.fromOffset(pad, L.BadgeTop),
+					Size = UDim2.new(
+						1,
+						-pad * 2 - (if owned and split then L.OwnedWidth + L.BadgeGap else 0),
+						0,
+						L.BadgeHeight
+					),
 					ZIndex = 10,
 				},
 			})
 			else nil,
-		Owned = if card.owned and not season
+		Owned = if owned
 			then c(Ribbon, {
 				Text = "OWNED",
 				Color = C.Yellow,
 				Native = {
 					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -pad, 0, L.ArtTop),
-					Size = UDim2.fromOffset(80, L.BadgeHeight),
+					Position = UDim2.new(
+						1,
+						-pad,
+						0,
+						if split then L.BadgeTop else L.BadgeTop + L.BadgeHeight + L.BadgeGap
+					),
+					Size = UDim2.fromOffset(L.OwnedWidth, L.BadgeHeight),
 					ZIndex = 13,
 				},
 			})
 			else nil,
 		Artwork = c("Frame", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(pad, L.ArtTop),
+			Position = UDim2.fromOffset(pad, artTop),
 			Size = UDim2.fromOffset(
-				if split then infoX - pad * 2 else width - pad * 2,
-				math.max(artBottom - L.ArtTop, 28)
+				if split then infoX - pad * 2 else width - pad * 2 - (if owned then L.OwnedWidth + L.BadgeGap else 0),
+				math.max(artBottom - artTop, 28)
 			),
 			ZIndex = 9,
 		}, {
@@ -151,7 +170,7 @@ return React.memo(function(props)
 			Size = UDim2.fromOffset(infoWidth, nameHeight),
 			Font = T.Type.Display,
 			Text = name,
-			TextSize = T.Type.TileLabel,
+			TextSize = if short then T.Type.Minimum else T.Type.TileLabel,
 			TextColor3 = C.Surface,
 			TextWrapped = true,
 			ZIndex = 12,
@@ -192,6 +211,20 @@ return React.memo(function(props)
 				ZIndex = 12,
 			})
 			else nil,
+		-- The artwork/name affordance opens the same inspection as the footer.
+		-- Keep sibling hitboxes separate and a single keyboard/controller stop.
+		Inspect = c("TextButton", {
+			BackgroundTransparency = 1,
+			Text = "",
+			AutoButtonColor = false,
+			Selectable = false,
+			Size = UDim2.new(1, 0, 0, actionY - T.Shape.StrokeCard * 2),
+			ZIndex = 14,
+			[React.Event.Activated] = function()
+				UIFeedback.click()
+				props.OnActivated(card)
+			end,
+		}),
 		Action = c(PriceButton, {
 			Text = text,
 			BonksAmount = amount,
@@ -201,7 +234,7 @@ return React.memo(function(props)
 			Position = UDim2.fromOffset(infoX, actionY),
 			Size = UDim2.fromOffset(infoWidth, actionHeight),
 			ZIndex = 12,
-			OnHoverChanged = setHovered,
+			OnHoverChanged = setActionHovered,
 			OnActivated = function()
 				props.OnActivated(card)
 			end,

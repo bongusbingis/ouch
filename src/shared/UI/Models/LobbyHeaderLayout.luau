@@ -62,4 +62,64 @@ function LobbyHeaderLayout.resolve(available: Vector2, tabCount: number?, includ
 	}
 end
 
+-- TopbarInset describes the free CoreGui row relative to the device-safe origin.
+-- Return full-screen rectangles so callers can convert once into their root space.
+function LobbyHeaderLayout.resolveMobile(available: Vector2, insets: any, includeEmote: boolean?)
+	if not includeEmote and not LobbyHeaderLayout.resolve(available).compact then
+		return nil
+	end
+	local n = T.LobbyNavigation
+	local target = T.Layout.MinTarget
+	local deviceOffset, deviceSize = insets.deviceOffset, insets.deviceSize
+	if deviceSize.X < target * 4 + n.MobileEdge * 2 or deviceSize.Y < target then
+		return nil
+	end
+	local topbar = insets.topbar
+	local left = deviceOffset.X + math.max(0, topbar.Min.X) + n.MobileEdge
+	local right = deviceOffset.X + math.min(topbar.Max.X, deviceSize.X) - n.MobileEdge
+	local freeWidth = math.max(0, right - left)
+	local topbarHeight = topbar.Max.Y - topbar.Min.Y
+	local width, height = n.MobileWidth, n.MobileHeight
+	local iconOnly = false
+	local docked = topbarHeight > 0 and freeWidth >= width
+	if not docked and topbarHeight > 0 and freeWidth >= target * 4 then
+		width, height = target * 4, target
+		iconOnly, docked = true, true
+	end
+	local emote = nil
+	local navLeft, navTop
+	if docked then
+		-- Accessories use spare room; they never displace readable navigation.
+		local hasEmote = includeEmote and freeWidth >= width + n.MobileAccessoryGap + target
+		local clusterWidth = width + (if hasEmote then n.MobileAccessoryGap + target else 0)
+		navLeft = left + (freeWidth - clusterWidth) / 2
+		local centerY = deviceOffset.Y + topbar.Min.Y + topbarHeight / 2
+		navTop = centerY - height / 2
+		if hasEmote then
+			emote = {
+				position = Vector2.new(navLeft + width + n.MobileAccessoryGap, centerY - target / 2),
+				size = Vector2.new(target, target),
+			}
+		end
+	else
+		-- If even four minimum-size icons cannot fit beside CoreGui, retain one
+		-- labeled row below it, never the old extra logo/accessory row.
+		width = math.min(width, deviceSize.X - n.MobileEdge * 2)
+		navLeft = deviceOffset.X + (deviceSize.X - width) / 2
+		navTop = insets.coreOffset.Y + n.MobileFallbackGap
+	end
+	local clearance = if deviceSize.X > deviceSize.Y and deviceSize.Y <= T.LobbyLandscape.MaxHeight
+		then n.LandscapeSelectionClearance
+		else n.MobileSelectionClearance
+	local bandHeight = math.max(insets.coreOffset.Y, navTop + height + clearance + n.MobileBandPadding)
+	return {
+		nav = { position = Vector2.new(navLeft, navTop), size = Vector2.new(width, height) },
+		emote = emote,
+		bandHeight = bandHeight,
+		height = math.max(0, bandHeight - insets.coreOffset.Y),
+		docked = docked,
+		iconOnly = iconOnly,
+	}
+end
+
 return table.freeze(LobbyHeaderLayout)

@@ -4,6 +4,28 @@
 
 local LobbyViewModel = {}
 
+export type QueueChoice = { partyId: string, leaderUserId: number, queueId: string }
+
+-- An idle leader must explicitly choose this session. A server default alone is
+-- not a choice. Members and in-flight parties display their authoritative queue.
+function LobbyViewModel.selectedQueueId(snapshot: any?, userId: number, choice: QueueChoice?): string?
+	if snapshot == nil then
+		return nil
+	end
+	if snapshot.leaderUserId ~= userId or snapshot.phase ~= "Lobby" or snapshot.returnQueuePending then
+		return snapshot.queueId
+	end
+	if
+		choice
+		and choice.partyId == snapshot.partyId
+		and choice.leaderUserId == snapshot.leaderUserId
+		and choice.queueId == snapshot.queueId
+	then
+		return choice.queueId
+	end
+	return nil
+end
+
 export type PartyPresentation = {
 	partyState: string,
 	playText: string,
@@ -33,7 +55,12 @@ end
 
 -- The queue is the leader's to change only while the party is idle in the
 -- lobby: a queued, claimed or regrouping party already belongs to a queue.
-function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: boolean): PartyPresentation
+function LobbyViewModel.partyPresentation(
+	snapshot: any?,
+	userId: number,
+	busy: boolean,
+	selectedQueueId: string?
+): PartyPresentation
 	if snapshot == nil then
 		return {
 			partyState = "LOADING PARTY",
@@ -54,9 +81,12 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 		}
 	elseif snapshot.phase == "Lobby" then
 		return {
-			partyState = if isLeader then "CLICK PLAY TO ENTER MATCHMAKING" else "WAITING FOR PARTY LEADER",
+			partyState = if not isLeader
+				then "WAITING FOR PARTY LEADER"
+				elseif selectedQueueId == nil then "SELECT A GAME MODE"
+				else "CLICK PLAY TO ENTER MATCHMAKING",
 			playText = "PLAY",
-			playEnabled = isLeader and not busy,
+			playEnabled = isLeader and not busy and selectedQueueId ~= nil and selectedQueueId == snapshot.queueId,
 			showMatchmakingActivity = false,
 			canPickQueue = isLeader and not busy,
 		}

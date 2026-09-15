@@ -5,7 +5,7 @@
 local OnboardingState = {}
 
 export type Status = "NotStarted" | "InProgress" | "CoreComplete" | "Completed" | "Skipped"
-export type Step = "Intro" | "NormalThrow" | "Hammer" | "ChargedThrow" | "Practice" | "Celebration"
+export type Step = "Intro" | "AvoidBumpers" | "JumpSweepers" | "TimeHammer" | "Practice" | "Celebration"
 
 export type Record = {
 	Status: Status,
@@ -23,15 +23,15 @@ OnboardingState.Statuses = table.freeze({
 })
 
 -- Ordered: index is progression order, and the three mandatory mechanics are
--- NormalThrow through ChargedThrow. Reaching the end of ChargedThrow is what
+-- AvoidBumpers through TimeHammer. Reaching the end of TimeHammer is what
 -- CoreComplete means.
-local ORDER: { Step } = { "Intro", "NormalThrow", "Hammer", "ChargedThrow", "Practice", "Celebration" }
+local ORDER: { Step } = { "Intro", "AvoidBumpers", "JumpSweepers", "TimeHammer", "Practice", "Celebration" }
 local INDEX: { [string]: number } = {}
 for index, step in ORDER do
 	INDEX[step] = index
 end
 
-local CORE_STEPS: { Step } = { "NormalThrow", "Hammer", "ChargedThrow" }
+local CORE_STEPS: { Step } = { "AvoidBumpers", "JumpSweepers", "TimeHammer" }
 
 OnboardingState.Steps = table.freeze(ORDER)
 OnboardingState.CoreSteps = table.freeze(CORE_STEPS)
@@ -81,6 +81,11 @@ function OnboardingState.normalize(stored: any, version: number): Record
 	if OnboardingState.Statuses[status] == nil then
 		status = OnboardingState.Statuses.NotStarted
 	end
+	-- Partial combat lessons do not demonstrate any obstacle skills. Only
+	-- unfinished legacy learners restart; terminal statuses stay ineligible.
+	if status == OnboardingState.Statuses.InProgress and stored.Version ~= version then
+		return OnboardingState.blank(version)
+	end
 	local checkpoint = if OnboardingState.isStep(stored.Checkpoint) then stored.Checkpoint else "Intro"
 	local storedVersion = if typeof(stored.Version) == "number" and stored.Version >= 0
 		then math.floor(stored.Version)
@@ -122,7 +127,7 @@ function OnboardingState.withCheckpoint(record: Record, step: Step): Record
 	if next.Status == OnboardingState.Statuses.NotStarted then
 		next.Status = OnboardingState.Statuses.InProgress
 	end
-	if step == "ChargedThrow" and next.Status == OnboardingState.Statuses.InProgress then
+	if step == "TimeHammer" and next.Status == OnboardingState.Statuses.InProgress then
 		next.Status = OnboardingState.Statuses.CoreComplete
 	end
 	return next

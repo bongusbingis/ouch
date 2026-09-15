@@ -15,6 +15,7 @@ local MovementGuard = require(
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 
 local Bumpers = {}
+local ShoveTuning = require(ReplicatedStorage.Shared.Game.MapFeatures.ShoveTuning)
 Bumpers.folderName = "Rotating"
 Bumpers.instanceClass = "Folder"
 
@@ -66,6 +67,13 @@ local function bumpersFor(assembly: Model): { BasePart }
 end
 
 function Bumpers.tickWorld(context: MapFeatureKit.Context)
+	-- Private training arenas and race courses are short-lived. Do not retain
+	-- destroyed assemblies (and all their bumper instances) between sessions.
+	for assembly in bumpersByAssembly do
+		if not assembly:IsDescendantOf(Workspace) then
+			bumpersByAssembly[assembly] = nil
+		end
+	end
 	table.clear(contacts)
 	table.clear(activeBumpers)
 	table.clear(roots)
@@ -88,9 +96,10 @@ function Bumpers.tickWorld(context: MapFeatureKit.Context)
 		end
 		for _, bumper in bumpersFor(assembly) do
 			activeBumpers[bumper] = true
-			-- Inspect the actual mesh collision shape, not its bounding box.
-			-- Root-only contact deliberately excludes cosmetic/limb grazing.
-			for _, root in Workspace:GetPartsInPart(bumper, overlap) do
+			-- Root-only contact excludes cosmetic/limb grazing. A small padded
+			-- oriented box makes near-edge contacts register more reliably.
+			local padding = Vector3.one * MapFeatures.Bumper.ContactPadding * 2
+			for _, root in Workspace:GetPartBoundsInBox(bumper.CFrame, bumper.Size + padding, overlap) do
 				contacts[root] = contacts[root] or bumper
 			end
 		end
@@ -104,7 +113,13 @@ local function bump(
 	root: BasePart,
 	humanoid: Humanoid
 )
-	local settings = MapFeatures.Bumper
+	local attributes = MapFeatures.Attributes
+	local settings = ShoveTuning.resolve(
+		MapFeatures.Bumper,
+		bumper:GetAttribute(attributes.ShoveSpeed),
+		bumper:GetAttribute(attributes.ShoveUpwardSpeed),
+		bumper:GetAttribute(attributes.ShoveSeconds)
+	)
 	local offset = root.Position - bumper.Position
 	local flat = Vector3.new(offset.X, 0, offset.Z)
 	local direction = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis

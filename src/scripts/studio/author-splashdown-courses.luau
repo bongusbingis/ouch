@@ -1,6 +1,6 @@
 -- Name: author-splashdown-courses.luau
 -- Author: Jack C.
--- Description: Studio Edit-mode authoring for the five Splashdown course templates: clones pieces from the Workspace.battle_stadium pack showcase at arena scale, lays each course out inside the stadium bowl through a small course DSL, writes the templates to ReplicatedStorage.Assets.Maps.Splashdown, and can preview one course in the bowl with the arena interior parked, restoring it afterwards.
+-- Description: Studio Edit-mode authoring for Splashdown course templates: clones pieces from the Workspace.battle_stadium pack showcase at arena scale, lays each course out inside the stadium bowl through a small course DSL, writes the templates to ReplicatedStorage.Assets.Maps.Splashdown, and can preview one course in the bowl with the arena interior parked, restoring it afterwards.
 -- Created: 2026-09-14
 
 --!strict
@@ -171,6 +171,7 @@ type Course = {
 	doors: Folder,
 	checkpointCount: number,
 	groupCount: number,
+	floorFamily: string,
 	counters: { [string]: number },
 }
 
@@ -233,6 +234,10 @@ local function newCourse(courseId: string): Course
 		doors = folder("Doors", scriptables),
 		checkpointCount = 0,
 		groupCount = 0,
+		floorFamily = if courseId == "KnockKnock" or courseId == "Downpour"
+			then "platform_002"
+			elseif courseId == "TiltTrip" or courseId == "DiscJockey" then "platform_003"
+			else "platform_001",
 		counters = {},
 	}
 end
@@ -299,25 +304,58 @@ local function boundary(course: Course)
 	folder.Parent = course.model
 end
 
-local DECK = "bridge_003"
 local PLAZA = "octagon_002"
 local RAIL = "wall_004"
 local POST = "tower_001"
 
--- A deck tile is 124 long and 76 wide at arena scale. deck() runs its long
--- axis along the heading; wideTile() runs it across the heading.
+-- Six inflatable platforms sit on a flat raft of showcase water tiles. The
+-- raft supports the rounded lips and the imported cushions' collision seams.
+local function floorDeck(
+	course: Course,
+	center: Vector3,
+	heading: number,
+	top: number,
+	parent: Instance,
+	narrow: boolean?
+): (BasePart, Vector3)
+	local root: BasePart? = nil
+	local height = 0
+	for _, along in { -37, 0, 37 } do
+		for _, across in if narrow then { 0 } else { -17.3, 17.3 } do
+			local part, size = piece(course.floorFamily)
+			part.Name = nextName(course, "sd_" .. course.floorFamily)
+			height = size.Y
+			local position = center + forward(heading) * along + right(heading) * across
+			placePart(part, Vector3.new(position.X, top - size.Y, position.Z), heading, root or parent)
+			root = root or part
+		end
+	end
+	local base = if course.floorFamily == "platform_002" then "water_platform_001" else "water_platform_003"
+	for _, along in { -50, -30, -10, 10, 30, 50 } do
+		for _, across in if narrow then { -9.5, 9.5 } else { -28.5, -9.5, 9.5, 28.5 } do
+			local part, size = piece(base)
+			part.Name = nextName(course, "sd_" .. base)
+			local position = center + forward(heading) * along + right(heading) * across
+			placePart(part, Vector3.new(position.X, top - 0.25 - size.Y, position.Z), heading, root or parent)
+		end
+	end
+	return assert(root, "[SplashdownAuthor] floor deck needs a root"),
+		Vector3.new(if narrow then 38.5 else 77.5, height, 123.4)
+end
+
 local function deck(course: Course, center: Vector3, heading: number, top: number?): (BasePart, Vector3)
-	local part, size = piece(DECK)
-	part.Name = nextName(course, "sd_deck")
-	placePart(part, Vector3.new(center.X, (top or DECK_Y) - size.Y, center.Z), heading + 90, course.geometry)
-	return part, size
+	return floorDeck(course, center, heading, top or DECK_Y, course.geometry)
+end
+
+-- One intact cushion lane with matching support underneath, using the same
+-- authored pieces at the same scale. Hazards span a real crossing instead of
+-- sitting in the middle of a wide, bypassable floor.
+local function narrowDeck(course: Course, center: Vector3, heading: number, top: number?): (BasePart, Vector3)
+	return floorDeck(course, center, heading, top or DECK_Y, course.geometry, true)
 end
 
 local function wideTile(course: Course, center: Vector3, heading: number, top: number?): (BasePart, Vector3)
-	local part, size = piece(DECK)
-	part.Name = nextName(course, "sd_deck")
-	placePart(part, Vector3.new(center.X, (top or DECK_Y) - size.Y, center.Z), heading, course.geometry)
-	return part, size
+	return floorDeck(course, center, heading + 90, top or DECK_Y, course.geometry)
 end
 
 -- Plazas sit a hair under deck level so an overlapping deck never fights it.
@@ -325,6 +363,13 @@ local function plaza(course: Course, center: Vector3, top: number?): (BasePart, 
 	local part, size = piece(PLAZA)
 	part.Name = nextName(course, "sd_plaza")
 	placePart(part, Vector3.new(center.X, (top or DECK_Y - 0.2) - size.Y, center.Z), 0, course.geometry)
+	for x = -40, 40, 20 do
+		for z = -40, 40, 20 do
+			local tile, tileSize = piece("water_platform_003")
+			tile.Name = nextName(course, "sd_island_support")
+			placePart(tile, Vector3.new(center.X + x, (top or DECK_Y - 0.2) - 0.25 - tileSize.Y, center.Z + z), 0, part)
+		end
+	end
 	return part, size
 end
 
@@ -469,9 +514,10 @@ local function rotorAttributes(spec: RotorSpec): { [string]: any }
 	end
 	if spec.shove then
 		attributes[A.Shove] = true
-	end
-	if spec.shoveSpeed then
-		attributes[A.ShoveSpeed] = spec.shoveSpeed
+		local response = Splashdown.HazardResponse.Rotor
+		attributes[A.ShoveSpeed] = spec.shoveSpeed or response.Speed
+		attributes[A.ShoveUpwardSpeed] = response.UpwardSpeed
+		attributes[A.ShoveSeconds] = response.HoldSeconds
 	end
 	return attributes
 end
@@ -521,10 +567,10 @@ local function windmill(course: Course, position: Vector3, speed: number)
 	return post
 end
 
--- Paddle wheel: four pads turning about a horizontal axle across the path,
--- raised so the lowest pad skims the deck instead of passing through it.
+-- Paddle wheel: the lowest pad starts one stud above the deck, with the
+-- axle across the path so its swept pads intersect standing runners.
 local function paddleWheel(course: Course, position: Vector3, heading: number, speed: number)
-	return obstacle(course, "obstacle_24", position + Vector3.new(0, 3, 0), heading, {
+	return obstacle(course, "obstacle_24", position + Vector3.new(0, 1, 0), heading, {
 		attributes = rotorAttributes({ mode = "spin", axis = "X", speed = speed, shove = true }),
 	})
 end
@@ -542,10 +588,10 @@ local function flap(course: Course, position: Vector3, heading: number, phase: n
 	return axle
 end
 
--- Hammer: a blade swinging from a mount 19 studs up, so the blade's lowest
--- reach passes through hip height and clears the deck.
+-- Hammer: the assembly's bottom is the blade tip, not the mount. A two-stud
+-- bottom clearance puts the blade through hip height at the foot of its swing.
 local function hammer(course: Course, position: Vector3, heading: number, phase: number, amplitude: number?)
-	local pivot, size = obstacle(course, "obstacle_3", position + Vector3.new(0, 19, 0), heading)
+	local pivot, size = obstacle(course, "obstacle_3", position + Vector3.new(0, 2, 0), heading)
 	local blade = child(pivot, "sd_obstacle_3_002", "blade")
 	blade.PivotOffset = blade.CFrame:ToObjectSpace(CFrame.new(pivot.Position))
 	setAttributes(
@@ -557,16 +603,16 @@ local function hammer(course: Course, position: Vector3, heading: number, phase:
 			period = 2.4,
 			phase = phase,
 			shove = true,
-			shoveSpeed = 38,
+			shoveSpeed = Splashdown.HazardResponse.HammerSpeed,
 		})
 	)
 	return pivot, size
 end
 
--- Chain mace: the whole chain swings as one body from its top link, hung 16
--- studs up so the ball passes through hip height.
+-- Chain mace: the piece's bottom is the ball. One stud of bottom clearance
+-- leaves the ball at hip height while the whole chain swings from its top link.
 local function mace(course: Course, position: Vector3, heading: number, phase: number)
-	return obstacle(course, "obstacle_5_001", position + Vector3.new(0, 16, 0), heading, {
+	return obstacle(course, "obstacle_5_001", position + Vector3.new(0, 1, 0), heading, {
 		attributes = rotorAttributes({
 			mode = "rock",
 			axis = "Z",
@@ -574,7 +620,7 @@ local function mace(course: Course, position: Vector3, heading: number, phase: n
 			period = 2.6,
 			phase = phase,
 			shove = true,
-			shoveSpeed = 40,
+			shoveSpeed = Splashdown.HazardResponse.MaceSpeed,
 		}),
 	})
 end
@@ -583,7 +629,16 @@ end
 local function roller(course: Course, position: Vector3, heading: number, speed: number)
 	local frame = obstacle(course, "obstacle_2", position, heading)
 	local drum = child(frame, "sd_obstacle_2_002", "drum")
-	setAttributes(drum, rotorAttributes({ mode = "spin", axis = "X", speed = speed, shove = true, shoveSpeed = 34 }))
+	setAttributes(
+		drum,
+		rotorAttributes({
+			mode = "spin",
+			axis = "X",
+			speed = speed,
+			shove = true,
+			shoveSpeed = Splashdown.HazardResponse.RollerSpeed,
+		})
+	)
 	return frame
 end
 
@@ -600,7 +655,15 @@ local function slidingWall(
 	local panel = child(rail, "sd_obstacle_7_002", "panel")
 	setAttributes(
 		panel,
-		rotorAttributes({ mode = "slide", axis = "X", amplitude = amplitude, period = period, phase = phase })
+		rotorAttributes({
+			mode = "slide",
+			axis = "X",
+			amplitude = amplitude,
+			period = period,
+			phase = phase,
+			shove = true,
+			shoveSpeed = Splashdown.HazardResponse.SlidingWallSpeed,
+		})
 	)
 	return rail
 end
@@ -653,7 +716,21 @@ local function spinningDisc(
 end
 
 local function bumper(course: Course, base: string, position: Vector3)
-	return obstacle(course, base, position, 0, { attributes = { [A.Bumper] = true } })
+	local response = Splashdown.HazardResponse.Bumper
+	return obstacle(
+		course,
+		base,
+		position,
+		0,
+		{
+			attributes = {
+				[A.Bumper] = true,
+				[A.ShoveSpeed] = response.Speed,
+				[A.ShoveUpwardSpeed] = response.UpwardSpeed,
+				[A.ShoveSeconds] = response.HoldSeconds,
+			},
+		}
+	)
 end
 
 -- Fan: the caged propeller sinks into the deck so only its grate stands proud,
@@ -709,7 +786,7 @@ local function steps(course: Course, from: Vector3, heading: number, count: numb
 end
 
 local function door(course: Course, row: number, index: number, position: Vector3, heading: number)
-	local part = piece("door_00" .. ((row + index) % 6 + 2), { scale = 0.35 })
+	local part = piece("door_00" .. ((row + index) % 6 + 2))
 	part.Name = string.format("sd_door_%d_%d", row, index)
 	part:SetAttribute(A.DoorRow, row)
 	part:SetAttribute(A.DoorIndex, index)
@@ -727,6 +804,78 @@ end
 
 -- Recipes -----------------------------------------------------------------------
 
+-- The rectangular platform raft rolls around its long Z axis. The six meshes
+-- share one pivot and carry riders together, with a stable central crossing.
+local function tiltDeck(course: Course, center: Vector3, heading: number, phase: number, amplitude: number?)
+	local part, size = floorDeck(course, center, heading, center.Y, course.assembly, true)
+	part.Name = nextName(course, "sd_tilt_deck")
+	part.PivotOffset = part.CFrame:ToObjectSpace(
+		CFrame.new(center - Vector3.yAxis * size.Y / 2) * CFrame.Angles(0, math.rad(heading), 0)
+	)
+	setAttributes(
+		part,
+		rotorAttributes({
+			mode = "rock",
+			axis = "Z",
+			amplitude = amplitude or 12,
+			period = 4.8,
+			phase = phase,
+			carries = true,
+		})
+	)
+	for index, along in { -26, 26 } do
+		local offset = forward(heading) * along + right(heading) * (if index == 1 then -4 else 4)
+		local pad = bumper(course, "obstacle_19_001", center + offset)
+		-- A raft follower: the bumper never floats above a rocking surface.
+		pad.Parent = part
+	end
+	return part
+end
+
+-- Pendulum log: the 19-stud assembly hangs from its top axle. Its bottom is
+-- two studs above the floor at rest, crossing a runner's hips on each swing.
+local function pendulum(course: Course, position: Vector3, heading: number, phase: number)
+	local axle = obstacle(course, "obstacle_4", position + Vector3.new(0, 2, 0), heading)
+	local log = child(axle, "sd_obstacle_4_002", "log")
+	local pivot = CFrame.new(axle.Position) * CFrame.Angles(0, math.rad(heading), 0)
+	log.PivotOffset = log.CFrame:ToObjectSpace(pivot)
+	setAttributes(
+		log,
+		rotorAttributes({ mode = "rock", axis = "Z", amplitude = 48, period = 3.4, phase = phase, shove = true })
+	)
+	return axle
+end
+
+-- Straight platform runs overlap at their ends, including diagonal crossings.
+local function deckRun(course: Course, from: Vector3, to: Vector3, top: number, narrow: boolean?): number
+	local delta = to - from
+	local heading = math.deg(math.atan2(-delta.X, -delta.Z))
+	local intervals = math.max(math.ceil(delta.Magnitude / 100), 1)
+	for index = 0, intervals do
+		floorDeck(course, from:Lerp(to, index / intervals), heading, top, course.geometry, narrow)
+	end
+	return heading
+end
+
+-- Three 49-stud slides have their upper tread 23.8 studs above the bounds'
+-- bottom and their low lip 3.8 studs above it. The chute descends along heading.
+local function slideChutes(course: Course, center: Vector3, heading: number, bottom: number)
+	for _, offset in { -21, 0, 21 } do
+		local slide = piece("slide_001")
+		slide.Name = nextName(course, "sd_slide")
+		placePart(slide, center + right(heading) * offset + Vector3.new(0, bottom, 0), heading, course.geometry)
+	end
+end
+
+-- Flat showcase mats bridge curved deck seams and form narrow exposed paths.
+-- Their walking surface is 15.4 wide by 30.8 long, with no raised end lips.
+local function mat(course: Course, center: Vector3, heading: number, top: number?): BasePart
+	local part, size = piece("obstacle_9_001")
+	part.Name = nextName(course, "sd_mat")
+	placePart(part, Vector3.new(center.X, (top or DECK_Y) - size.Y, center.Z), heading, course.geometry)
+	return part
+end
+
 local recipes: { [string]: (Course) -> () } = {}
 
 -- Whirl Pool: a straight sprint north through spinner rows and windmill bars,
@@ -736,27 +885,37 @@ recipes.WhirlPool = function(course: Course)
 	lavaFloor(course)
 	local heading = 0
 	deck(course, Vector3.new(0, 0, 260), heading)
-	startPads(course, Vector3.new(0, 0, 300), heading)
+	startPads(course, Vector3.new(0, 0, 282), heading)
 	bothRails(course, Vector3.new(0, 0, 322), heading, 124, 37)
 
 	deck(course, Vector3.new(0, 0, 136), heading)
 	deck(course, Vector3.new(0, 0, 12), heading)
-	bothRails(course, Vector3.new(0, 0, 198), heading, 248, 37)
-	spinner(course, Vector3.new(-18, DECK_Y, 170), 110, 0)
-	spinner(course, Vector3.new(18, DECK_Y, 170), -110, 90)
-	spinner(course, Vector3.new(0, DECK_Y, 125), 130, 45)
+	mat(course, Vector3.new(0, 0, 198), heading)
+	mat(course, Vector3.new(0, 0, 74), heading)
+	for index, x in { -24, 0, 24 } do
+		spinner(course, Vector3.new(x, DECK_Y, 170), if index % 2 == 0 then -95 else 95, index * 45)
+		spinner(course, Vector3.new(x, DECK_Y, 120), if index % 2 == 0 then 105 else -105, index * 60)
+	end
+	-- Close the straight outer shoulder between the two spinner rows.
+	for _, x in { -33, 33 } do
+		bumper(course, "obstacle_19_001", Vector3.new(x, DECK_Y, 145))
+	end
 	checkpoint(course, Vector3.new(0, 0, 84), heading, 76)
-	windmill(course, Vector3.new(0, DECK_Y, 40), 110)
-	windmill(course, Vector3.new(0, DECK_Y, -14), -130)
+	for index, x in { -24, 0, 24 } do
+		windmill(course, Vector3.new(x, DECK_Y, 35), if index % 2 == 0 then -85 else 85)
+		windmill(course, Vector3.new(x, DECK_Y, -14), if index % 2 == 0 then 95 else -95)
+	end
 
 	fan(course, Vector3.new(-16, DECK_Y, -42))
 	fan(course, Vector3.new(16, DECK_Y, -42))
 	deck(course, Vector3.new(0, 0, -132), heading)
-	bothRails(course, Vector3.new(0, 0, -70), heading, 124, 37)
-	checkpoint(course, Vector3.new(0, 0, -76), heading, 76)
-	paddleWheel(course, Vector3.new(0, DECK_Y, -110), heading, 70)
-	paddleWheel(course, Vector3.new(12, DECK_Y, -160), heading, -85)
-	checkpoint(course, Vector3.new(0, 0, -192), heading, 76)
+	checkpoint(course, Vector3.new(0, 0, -94), heading, 70)
+	paddleWheel(course, Vector3.new(-18, DECK_Y, -120), heading, 65)
+	paddleWheel(course, Vector3.new(18, DECK_Y, -145), heading, -75)
+	bumper(course, "obstacle_18_001", Vector3.new(29, DECK_Y, -120))
+	bumper(course, "obstacle_19_001", Vector3.new(-29, DECK_Y, -145))
+	checkpoint(course, Vector3.new(0, 0, -174), heading, 70)
+	mat(course, Vector3.new(0, 0, -195), heading)
 
 	plaza(course, Vector3.new(0, 0, -278))
 	for index, x in { -30, -10, 10, 30 } do
@@ -775,10 +934,10 @@ recipes.DiscJockey = function(course: Course)
 	lavaFloor(course)
 	local west, east = -200, 200
 	deck(course, Vector3.new(west, 0, 190), 0)
-	startPads(course, Vector3.new(west, 0, 226), 0)
+	startPads(course, Vector3.new(west, 0, 210), 0)
 	bothRails(course, Vector3.new(west, 0, 252), 0, 124, 37)
 
-	for index, z in { 102.6, 56.6, 10.6, -35.4 } do
+	for index, z in { 118, 82, 46, 10, -26, -62 } do
 		spinningDisc(course, "obstacle_16_001", Vector3.new(west, 0, z), if index % 2 == 0 then -32 else 32)
 	end
 	deck(course, Vector3.new(west, 0, -122), 0)
@@ -795,7 +954,7 @@ recipes.DiscJockey = function(course: Course)
 	deck(course, Vector3.new(east, 0, -122), 180)
 	checkpoint(course, Vector3.new(east, 0, -130), 180, 76)
 
-	for index, z in { -37.7, 6.3, 50.3 } do
+	for index, z in { -45, -3, 39, 81 } do
 		spinningDisc(course, "obstacle_15_001", Vector3.new(east, 0, z), if index % 2 == 0 then 40 else -40)
 	end
 	deck(course, Vector3.new(east, 0, 134.5), 180)
@@ -804,7 +963,8 @@ recipes.DiscJockey = function(course: Course)
 	jumpPad(course, Vector3.new(east - 14, DECK_Y, 168))
 	jumpPad(course, Vector3.new(east + 14, DECK_Y, 168))
 	wideTile(course, Vector3.new(east, 0, 222), 180, 12)
-	finishLine(course, Vector3.new(east, 0, 215), 180, 124, 12)
+	deck(course, Vector3.new(east, 0, 230), 180, 12)
+	finishLine(course, Vector3.new(east, 0, 215), 180, 70, 12)
 	flags(course, { Vector3.new(east - 50, 12, 250), Vector3.new(east + 50, 12, 250) })
 end
 
@@ -814,22 +974,30 @@ recipes.KnockKnock = function(course: Course)
 	lavaFloor(course)
 	local heading = 0
 	deck(course, Vector3.new(0, 0, 260), heading)
-	startPads(course, Vector3.new(0, 0, 300), heading)
+	startPads(course, Vector3.new(0, 0, 282), heading)
 	bothRails(course, Vector3.new(0, 0, 322), heading, 124, 37)
 
 	local perRow = Splashdown.Courses.KnockKnock.Doors.PerRow
 	for row, z in { 174, 98, 22, -54 } do
-		wideTile(course, Vector3.new(0, 0, z), heading)
-		bothRails(course, Vector3.new(0, 0, z + 38), heading, 76, 62)
+		-- Endcaps extend past the floor edge, leaving no walkable outer lip.
+		wideTile(course, Vector3.new(-50, 0, z), heading)
+		wideTile(course, Vector3.new(50, 0, z), heading)
+		deck(course, Vector3.new(0, 0, z), heading)
+		bothRails(course, Vector3.new(0, 0, z + 38), heading, 76, 112)
+		for _, x in { -107, 107 } do
+			local cap = piece("wall_001")
+			cap.Name = nextName(course, "sd_door_endcap")
+			placePart(cap, Vector3.new(x, DECK_Y, z + 18), 0, course.geometry)
+		end
 		for index = 1, perRow do
-			local across = (index - (perRow + 1) / 2) * 24.6
+			local across = (index - (perRow + 1) / 2) * 40.5
 			door(course, row, index, Vector3.new(across, DECK_Y, z + 18), heading)
 		end
 	end
-	checkpoint(course, Vector3.new(0, 0, -80), heading, 124)
+	checkpoint(course, Vector3.new(0, 0, -74), heading, 70)
+	mat(course, Vector3.new(0, 0, -92), heading)
 
 	deck(course, Vector3.new(0, 0, -154), heading)
-	bothRails(course, Vector3.new(0, 0, -92), heading, 124, 37)
 	for index, z in { -120, -154, -188 } do
 		slidingWall(course, Vector3.new(-19, DECK_Y, z), 0, 11, 3.2, (index - 1) * 0.9)
 		slidingWall(course, Vector3.new(19, DECK_Y, z), 0, 11, 3.2, (index - 1) * 0.9 + 1.6)
@@ -838,11 +1006,13 @@ recipes.KnockKnock = function(course: Course)
 
 	for index, x in { -25, 0, 25 } do
 		flap(course, Vector3.new(x, DECK_Y, -216), heading, (index - 1) * 0.9)
+		mat(course, Vector3.new(x, 0, -243), heading)
 	end
 	deck(course, Vector3.new(0, 0, -302), heading)
 	bothRails(course, Vector3.new(0, 0, -240), heading, 124, 37)
-	checkpoint(course, Vector3.new(0, 0, -252), heading, 76)
-	finishLine(course, Vector3.new(0, 0, -300), heading, 124)
+	checkpoint(course, Vector3.new(0, 0, -268), heading, 70)
+	wideTile(course, Vector3.new(0, 0, -320), heading)
+	finishLine(course, Vector3.new(0, 0, -300), heading, 70)
 	flags(course, { Vector3.new(-50, DECK_Y, -345), Vector3.new(50, DECK_Y, -345) })
 end
 
@@ -853,8 +1023,8 @@ recipes.BumperBay = function(course: Course)
 	lavaFloor(course)
 	local east, west = 190, -190
 	deck(course, Vector3.new(east, 0, 240), 0)
-	startPads(course, Vector3.new(east, 0, 276), 0)
-	bothRails(course, Vector3.new(east, 0, 302), 0, 124, 37)
+	startPads(course, Vector3.new(east, 0, 260), 0)
+	bothRails(course, Vector3.new(east, 0, 296), 0, 118, 37)
 
 	for index, z in { 156, 92, 28 } do
 		local plank = piece("bridge_001")
@@ -867,13 +1037,15 @@ recipes.BumperBay = function(course: Course)
 		)
 	end
 	deck(course, Vector3.new(east, 0, -60), 0)
-	checkpoint(course, Vector3.new(east, 0, -10), 0, 76)
+	mat(course, Vector3.new(east, 0, -4), 0, -4)
+	checkpoint(course, Vector3.new(east, 0, -30), 0, 70)
 	for index, offset in { -24, -8, 8, 24 } do
 		beachBall(course, Vector3.new(east + offset, DECK_Y + 6, -60 - (index % 2) * 16))
 	end
 	bumper(course, "obstacle_18_001", Vector3.new(east - 26, DECK_Y, -96))
 	bumper(course, "obstacle_18_001", Vector3.new(east + 26, DECK_Y, -96))
 	deck(course, Vector3.new(east, 0, -160), 90)
+	mat(course, Vector3.new(east, 0, -118), 0)
 	checkpoint(course, Vector3.new(east - 30, 0, -160), 90, 76)
 
 	for _, x in { 96, 32, -32, -96 } do
@@ -881,89 +1053,244 @@ recipes.BumperBay = function(course: Course)
 		plank.Name = nextName(course, "sd_bridge")
 		placePart(plank, Vector3.new(x, DECK_Y - 13, -160), 0, course.geometry)
 	end
-	hammer(course, Vector3.new(80, DECK_Y, -160), 90, 0)
-	hammer(course, Vector3.new(0, DECK_Y, -160), 90, 0.8)
-	hammer(course, Vector3.new(-80, DECK_Y, -160), 90, 1.6)
+	for index, x in { 96, 32, -32, -96 } do
+		hammer(course, Vector3.new(x, DECK_Y, -160), 90, (index - 1) * 0.6, 45)
+	end
 	deck(course, Vector3.new(west, 0, -160), 90)
-	checkpoint(course, Vector3.new(west, 0, -135), 0, 76)
+	mat(course, Vector3.new(136, 0, -160), 90, -4)
+	mat(course, Vector3.new(-136, 0, -160), 90, -4)
+	checkpoint(course, Vector3.new(west, 0, -135), 180, 70)
 
-	deck(course, Vector3.new(west, 0, -60), 180)
-	bothRails(course, Vector3.new(west, 0, -122), 180, 124, 37)
+	narrowDeck(course, Vector3.new(west, 0, -60), 180)
+	mat(course, Vector3.new(west, 0, -118), 180)
 	roller(course, Vector3.new(west, DECK_Y, -95), 0, 90)
 	roller(course, Vector3.new(west, DECK_Y, -35), 0, -110)
+	for _, z in { -95, -35 } do
+		for _, offset in { -17, 17 } do
+			bumper(course, "obstacle_18_001", Vector3.new(west + offset, DECK_Y, z))
+		end
+	end
 	checkpoint(course, Vector3.new(west, 0, -5), 180, 76)
+	mat(course, Vector3.new(west, 0, -2), 180, -4)
 	rockingPlank(course, Vector3.new(west, DECK_Y - 13, 34), 90, 0)
 	rockingPlank(course, Vector3.new(west, DECK_Y - 13, 98), 90, 1.6)
 	steps(course, Vector3.new(west, 0, 140), 180, 4, 2.5)
 	wideTile(course, Vector3.new(west, 0, 232), 180, 13)
-	finishLine(course, Vector3.new(west, 0, 215), 180, 124, 13)
+	finishLine(course, Vector3.new(west, 0, 215), 180, 70, 13)
 	flags(course, { Vector3.new(west - 50, 13, 258), Vector3.new(west + 50, 13, 258) })
 end
 
--- Summit Splash: a rising spiral of decks around the bowl with windmill bars,
--- maces and humps over the climb, fans between tiers and a summit finish; the
--- lava climbs through the round and floods the lower tiers.
+-- Arc families share a 200-stud outer radius and a 160-stud inner radius.
+-- Their bounding centres differ with sector angle; the outer midpoint pins
+-- each original mesh to the same circle without stretching or patching it.
 recipes.SummitSplash = function(course: Course)
 	local rise = Splashdown.Courses.SummitSplash.LavaRise
 	lavaFloor(course, rise.Studs, rise.DelaySeconds, rise.Seconds)
-	-- Polar course space: angle 0 points south (+Z) and angles grow toward east
-	-- first; a tile's heading faces along the tangent toward increasing angle.
 	local function polar(angle: number, radius: number): Vector3
 		local radians = math.rad(angle)
 		return Vector3.new(math.sin(radians) * radius, 0, math.cos(radians) * radius)
 	end
-	local tileLength = 124
-	local gap = 4
-	local tiles = 10
-	local checkpointsAt = { [3] = true, [6] = true, [8] = true, [10] = true }
+	local sectors = {
+		{ "arc_001", 90 },
+		{ "arc_004", 45 },
+		{ "arc_002", 56 },
+		{ "arc_003", 56 },
+		{ "arc_001", 90 },
+		{ "arc_004", 45 },
+		{ "arc_002", 56 },
+		{ "arc_004", 45 },
+	}
 	local angle = 180
-	local radius = 256
-	local top = -20
-	local lastCenter = Vector3.zero
-	for index = 0, tiles do
-		local center = polar(angle, radius)
-		local heading = angle - 90
-		deck(course, center, heading, top)
-		rails(course, center - forward(heading) * (tileLength / 2) + polar(angle, 38), heading, tileLength, 0, top)
-		if index == 0 then
-			startPads(course, center - forward(heading) * 24, heading, top)
-		else
-			if index % 3 == 1 then
-				windmill(course, center + Vector3.new(0, top, 0), if index % 2 == 0 then 120 else -120)
-			elseif index % 3 == 2 then
-				mace(course, center + Vector3.new(0, top, 0), heading, index * 0.7)
+	for index, sector in sectors do
+		local span = sector[2] :: number
+		local midpoint = angle + span / 2
+		local top = -25 + index * 5
+		local arc, size = piece(sector[1] :: string)
+		arc.Name = nextName(course, "sd_arc")
+		placePart(arc, polar(midpoint, 200 - size.Z / 2) + Vector3.new(0, top - size.Y, 0), midpoint, course.geometry)
+		if index == 1 then
+			startPads(course, polar(angle + 15, 180), angle + 15 - 90, top)
+		end
+		local encounters = math.ceil(span / 26)
+		for beat = 1, encounters do
+			local at = angle + (beat - 0.5) * span / encounters
+			if index == 1 and at < angle + 34 then
+				continue -- clear launch area for the full starting pack
+			end
+			if index % 2 == 0 and at > angle + span - 20 then
+				continue -- the checkpoint needs a clear approach and respawn pad
+			end
+			local y = Vector3.new(0, top, 0)
+			if (index + beat) % 2 == 0 then
+				windmill(course, polar(at, 180) + y, if beat % 2 == 0 then -80 else 80)
+				for _, radius in { 165, 195 } do
+					bumper(course, "obstacle_19_001", polar(at, radius) + y)
+				end
 			else
-				local ahead = forward(heading) * 30
-				hump(course, center + ahead + Vector3.new(0, top, 0), heading)
-				hump(course, center - ahead + Vector3.new(0, top, 0), heading)
-			end
-			if index == 4 or index == 7 then
-				fan(course, center + forward(heading) * 52 + Vector3.new(0, top, 0))
-			end
-			if checkpointsAt[index] then
-				checkpoint(course, center - forward(heading) * 20, heading, 76, top)
+				-- A visible chicane pushes the racing line across the arc, with a
+				-- clear 11-stud passage rather than an unbroken inside shortcut.
+				local wall = piece("wall_003")
+				wall.Name = nextName(course, "sd_arc_chicane")
+				local radius = if index % 2 == 0 then 173 else 187
+				placePart(wall, polar(at, radius) + y, at + 90, course.geometry)
+				mace(course, polar(at + 8, 180) + y, at - 82, beat * 0.65)
 			end
 		end
-		lastCenter = center
-		local nextRadius = radius - 9
-		angle += math.deg(2 * math.asin(math.min((tileLength + gap) / (2 * nextRadius), 1)))
-		radius = nextRadius
-		top += 4
+		angle += span
+		if index % 2 == 0 then
+			checkpoint(course, polar(angle - 9, 180), angle - 99, 36, top)
+		end
 	end
+	local inwardHeading = angle - 8
+	for _, radius in { 145, 115, 85 } do
+		for _, across in { -15, 0, 15 } do
+			local road, size = piece("road_001")
+			road.Name = nextName(course, "sd_road")
+			placePart(
+				road,
+				polar(angle - 8, radius) + right(inwardHeading) * across + Vector3.new(0, 17.5 - size.Y, 0),
+				inwardHeading,
+				course.geometry
+			)
+		end
+	end
+	plaza(course, Vector3.zero, 20)
+	finishLine(course, Vector3.zero, inwardHeading, 70, 20)
+	flags(course, { Vector3.new(-45, 20, -35), Vector3.new(45, 20, 35) })
+end
 
-	local summitTop = top
-	local summit, summitSize = piece("octagon_001")
-	summit.Name = "sd_summit"
-	placePart(summit, Vector3.new(0, summitTop - summitSize.Y, 0), 0, course.geometry)
-	local inward = -lastCenter.Unit
-	local bridgeCenter = lastCenter + inward * (38 + tileLength / 2 - 6)
-	local bridge = piece(DECK)
-	bridge.Name = nextName(course, "sd_deck")
-	local bridgeHeading = math.deg(math.atan2(-inward.X, -inward.Z))
-	placePart(bridge, Vector3.new(bridgeCenter.X, summitTop - 5, bridgeCenter.Z), bridgeHeading + 90, course.geometry)
-	bothRails(course, lastCenter + inward * 38, bridgeHeading, tileLength - 6, 37, summitTop)
-	finishLine(course, Vector3.new(0, 0, 0), bridgeHeading, 60, summitTop)
-	flags(course, { Vector3.new(-30, summitTop, 30), Vector3.new(30, summitTop, -30) })
+recipes.TiltTrip = function(course: Course)
+	lavaFloor(course)
+	deck(course, Vector3.new(-190, 0, 235), 0)
+	startPads(course, Vector3.new(-190, 0, 255), 0)
+	bothRails(course, Vector3.new(-190, 0, 297), 0, 90, 37)
+	for index, center in
+		{
+			Vector3.new(-190, 0, 120),
+			Vector3.new(-160, 0, 10),
+			Vector3.new(-190, 0, -100),
+		}
+	do
+		tiltDeck(course, center, 0, (index - 1) * 1.6)
+	end
+	deck(course, Vector3.new(-175, 0, -210), 0)
+	checkpoint(course, Vector3.new(-175, 0, -190), 0, 70)
+
+	deckRun(course, Vector3.new(-165, 0, -230), Vector3.new(185, 0, -230), 0, true)
+	for index, x in { -110, -45, 20, 85, 150 } do
+		pendulum(course, Vector3.new(x, 0, -230), 270, (index - 1) * 0.85)
+		bumper(course, "obstacle_1_001", Vector3.new(x, 0, -230 + (if index % 2 == 0 then 13 else -13)))
+	end
+	deck(course, Vector3.new(190, 0, -195), 180)
+	checkpoint(course, Vector3.new(190, 0, -172), 180, 70)
+
+	for index, center in
+		{
+			Vector3.new(190, 0, -80),
+			Vector3.new(215, 0, 30),
+			Vector3.new(185, 0, 140),
+		}
+	do
+		tiltDeck(course, center, 180, (index - 1) * 1.6, 14)
+	end
+	deck(course, Vector3.new(175, 0, 235), 90)
+	checkpoint(course, Vector3.new(170, 0, 235), 90, 70)
+	tiltDeck(course, Vector3.new(60, 0, 235), 90, 0.8)
+	plaza(course, Vector3.new(-40, 0, 235), 0)
+	finishLine(course, Vector3.new(-44, 0, 235), 90, 70)
+	flags(course, { Vector3.new(-90, 0, 205), Vector3.new(-90, 0, 265) })
+end
+
+recipes.CrossCurrent = function(course: Course)
+	lavaFloor(course)
+	local start = Vector3.new(-200, 0, 200)
+	local northEast = Vector3.new(200, 0, -200)
+	local southEast = Vector3.new(200, 0, 200)
+	local northWest = Vector3.new(-200, 0, -200)
+	local upperHeading = deckRun(course, start, northEast, 36)
+	startPads(course, start, upperHeading, 36)
+	bothRails(course, start - forward(upperHeading) * 25, upperHeading, 70, 37, 36)
+	for index, distance in { 100, 190, 280, 370, 460 } do
+		local center = start + forward(upperHeading) * distance + Vector3.new(0, 36, 0)
+		slidingWall(course, center + right(upperHeading) * 18, upperHeading, 14, 3.8, index * 0.8)
+		slidingWall(course, center - right(upperHeading) * 18, upperHeading, 14, 3.8, index * 0.8 + 1.9)
+	end
+	deck(course, northEast, 180, 36)
+	checkpoint(course, Vector3.new(200, 0, -170), 180, 70, 36)
+
+	for index, z in { -85, 30, 145 } do
+		local top = 36 - index * 8
+		narrowDeck(course, Vector3.new(200, 0, z), 180, top)
+		spinner(course, Vector3.new(194, top, z - 18), 90 + index * 10)
+		spinner(course, Vector3.new(206, top, z + 18), -90 - index * 10)
+	end
+	deck(course, southEast, 45, 0)
+	checkpoint(course, Vector3.new(145, 0, 145), 45, 70)
+
+	course.floorFamily = "platform_002"
+	local lowerHeading = deckRun(course, southEast, northWest, 0, true)
+	for index, distance in { 110, 170, 230, 345, 415, 495 } do
+		local center = southEast + forward(lowerHeading) * distance
+		pendulum(course, center, lowerHeading, index * 0.85)
+		bumper(course, "obstacle_1_001", center + right(lowerHeading) * (if index % 2 == 0 then 13 else -13))
+	end
+	deck(course, northWest, 180)
+	checkpoint(course, Vector3.new(-200, 0, -170), 180, 70)
+	narrowDeck(course, Vector3.new(-200, 0, -85), 180)
+	windmill(course, Vector3.new(-200, 0, -125), 90)
+	windmill(course, Vector3.new(-200, 0, -65), -90)
+	plaza(course, Vector3.new(-200, 0, 20), 0)
+	finishLine(course, Vector3.new(-200, 0, 0), 180, 70)
+	flags(course, { Vector3.new(-230, 0, 65), Vector3.new(-170, 0, 65) })
+end
+
+recipes.Downpour = function(course: Course)
+	lavaFloor(course)
+	for index, z in { 200, 80, -40, -160 } do
+		local top = 44 - index * 4
+		(if index == 1 then deck else narrowDeck)(course, Vector3.new(-190, 0, z), 0, top)
+		if index == 1 then
+			startPads(course, Vector3.new(-190, 0, 220), 0, top)
+		else
+			mat(course, Vector3.new(-190, 0, z + 60), 0, top)
+			-- Alternating sweeps reach each shoulder in turn. The clear lane
+			-- switches sides, with room between rows to read the next paddle.
+			windmill(course, Vector3.new(-196, top, z + 24), 75 + index * 5)
+			windmill(course, Vector3.new(-184, top, z - 24), -75 - index * 5)
+		end
+	end
+	checkpoint(course, Vector3.new(-190, 0, -150), 0, 70, 28)
+	deck(course, Vector3.new(-190, 0, -200), 270, 28)
+
+	for index, x in { -70, 50, 170 } do
+		local top = 28 - index * 4
+		narrowDeck(course, Vector3.new(x, 0, -200), 270, top)
+		mat(course, Vector3.new(x - 60, 0, -200), 270, top)
+		paddleWheel(course, Vector3.new(x - 24, top, -200), 270, 55 + index * 10)
+		paddleWheel(course, Vector3.new(x + 24, top, -200), 270, -55 - index * 10)
+	end
+	deck(course, Vector3.new(190, 0, -160), 180, 16)
+	checkpoint(course, Vector3.new(190, 0, -126), 180, 70, 16)
+
+	for index, z in { -40, 80, 200 } do
+		local top = 16 - index * 4
+		narrowDeck(course, Vector3.new(190, 0, z), 180, top)
+		mat(course, Vector3.new(190, 0, z - 60), 180, top)
+		bumper(course, "obstacle_18_001", Vector3.new(186, top, z - 25))
+		bumper(course, "obstacle_19_001", Vector3.new(194, top, z + 15))
+	end
+	checkpoint(course, Vector3.new(190, 0, 170), 180, 70, 4)
+	deck(course, Vector3.new(190, 0, 220), 90, 4)
+	narrowDeck(course, Vector3.new(70, 0, 220), 90, 0)
+	mat(course, Vector3.new(130, 0, 220), 90)
+	deck(course, Vector3.new(0, 0, 220), 90)
+	pendulum(course, Vector3.new(95, 0, 220), 90, 0)
+	deck(course, Vector3.new(0, 0, 156), 0)
+	slideChutes(course, Vector3.new(0, 0, 91), 0, -23.8)
+	deck(course, Vector3.new(0, 0, 16), 0, -20)
+	plaza(course, Vector3.new(0, 0, -44), -20)
+	finishLine(course, Vector3.new(0, 0, -15), 0, 70, -20)
+	flags(course, { Vector3.new(-45, -20, -60), Vector3.new(45, -20, -60) })
 end
 
 -- Building and previewing --------------------------------------------------------

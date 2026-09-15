@@ -23,7 +23,7 @@ local function blocks(entries, width, offset, props)
 	for _, entry in entries do
 		entry.class = Config.CardClasses[entry.style.Class]
 		if props.Short then
-			entry.class = Composition.shortClass(entry.class, L.PromoMin, L.ShortCardHeight)
+			entry.class = Composition.shortClass(entry.class, L.PromoMin, T.LobbyLandscape.CardHeight)
 		end
 		entry.span = Composition.span(width, entry.style.Span, entry.class.MinPx, Config.GapPx, L.WideMin, L.MediumMin)
 		entry.width = Layout.spanWidth(unit, entry.span, Config.GapPx)
@@ -32,9 +32,19 @@ local function blocks(entries, width, offset, props)
 			entry.class.MaxPx = entry.width
 		end
 		entry.grid = Layout.grid(entry.width, #entry.cards, entry.class, Config.CardGapPx, entry.style.MaxColumns)
-		entry.headerHeight = if props.Short and (not entry.countdownAt or entry.width >= 300)
-			then 44
-			else Config.HeaderHeightPx
+		local adapted = Composition.adaptiveClass(
+			entry.class,
+			entry.grid.cardWidth,
+			L.CatalogSplitMin,
+			L.CatalogSplitHeight,
+			L.PromoMin,
+			L.CardHeight
+		)
+		if adapted ~= entry.class then
+			entry.class = adapted
+			entry.grid = Layout.grid(entry.width, #entry.cards, adapted, Config.CardGapPx, entry.style.MaxColumns)
+		end
+		entry.headerHeight = Config.HeaderHeight(entry.width, entry.countdownAt, props.Short)
 		entry.height = Layout.sectionHeight(entry.grid, entry.headerHeight, Config.EmptyHeightPx)
 	end
 	local placements, bottom = Layout.compact(entries, Config.Tracks, Config.GapPx)
@@ -60,21 +70,26 @@ local function blocks(entries, width, offset, props)
 end
 return function(props)
 	local safe = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
-	local size = Responsive.panelSize(
-		safe.size,
-		UI.Layout.Panels.Shop,
-		UI.Layout.PortraitMaxAspect,
-		UI.Layout.ShortLandscapeMaxHeightPx
-	)
 	local portrait = Responsive.isPortrait(safe.size, UI.Layout.PortraitMaxAspect)
+	local size = props.Size
+		or Responsive.panelSize(
+			safe.size,
+			UI.Layout.Panels.Shop,
+			UI.Layout.PortraitMaxAspect,
+			UI.Layout.ShortLandscapeMaxHeightPx
+		)
 	local short = not portrait and safe.size.Y <= UI.Layout.ShortLandscapeMaxHeightPx
-	local inset = if portrait or short then L.CompactInset else L.Inset
-	local header = if portrait then L.PortraitHeaderHeight elseif short then L.CompactHeaderHeight else L.HeaderHeight
+	local inset = if short then T.LobbyLandscape.PanelInset elseif portrait then L.CompactInset else L.Inset
+	local header = if portrait
+		then L.PortraitHeaderHeight
+		elseif short then T.LobbyLandscape.PanelHeader
+		else L.HeaderHeight
+	local scrollInset = if short then T.LobbyLandscape.ScrollInset else UI.Well.InsetPx
+	local scrollPadding = if short then T.LobbyLandscape.ScrollPadding else Config.PaddingXPx
 	local reduced = useReducedMotion()
 	local scroller = React.useRef(nil)
-	local width, setWidth = React.useState(
-		math.max(1, size.X - inset * 2 - UI.Well.InsetPx * 2 - Config.PaddingXPx * 2 - Config.ScrollBarPx)
-	)
+	local width, setWidth =
+		React.useState(math.max(1, size.X - inset * 2 - scrollInset * 2 - scrollPadding * 2 - Config.ScrollBarPx))
 	local renderProps = table.clone(props)
 	renderProps.Short = short
 	local featured, catalog = Composition.groups(props.Model, Config)
@@ -85,7 +100,7 @@ return function(props)
 		content[id] = child
 	end
 	content.Padding =
-		c("UIPadding", { PaddingLeft = UDim.new(0, Config.PaddingXPx), PaddingRight = UDim.new(0, Config.PaddingXPx) })
+		c("UIPadding", { PaddingLeft = UDim.new(0, scrollPadding), PaddingRight = UDim.new(0, scrollPadding) })
 	local status = props.Model.status
 	if status == "Loading" or status == "Idle" or status == "Error" then
 		content.Status = c("TextLabel", {
@@ -113,6 +128,7 @@ return function(props)
 	local walletY = if portrait then 91 else header / 2
 	local getWidth = if short then T.Layout.MinTarget else 156
 	return c(Panel, {
+		Tilt = if short then 0 else nil,
 		Native = {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = props.Position or UI.Layout.PagePosition,
@@ -120,7 +136,9 @@ return function(props)
 			LayoutOrder = 5,
 		},
 	}, {
+		EntranceScale = if props.TransitionScale then c("UIScale", { Scale = props.TransitionScale }) else nil,
 		Title = c(Title, {
+			Tilt = if short then 0 else nil,
 			Text = "SHOP",
 			TextSize = if portrait then 38 elseif short then T.Type.Section else T.Type.Title,
 			Native = {
@@ -179,8 +197,8 @@ return function(props)
 				BorderSizePixel = 0,
 				CanvasSize = UDim2.fromOffset(0, bottom + Config.PaddingBottomPx),
 				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
-				Position = UDim2.fromOffset(UI.Well.InsetPx, UI.Well.InsetPx),
-				Size = UDim2.new(1, -UI.Well.InsetPx * 2, 1, -UI.Well.InsetPx * 2),
+				Position = UDim2.fromOffset(scrollInset, scrollInset),
+				Size = UDim2.new(1, -scrollInset * 2, 1, -scrollInset * 2),
 				ScrollBarImageColor3 = C.Pink,
 				ScrollBarThickness = Config.ScrollBarPx,
 				ScrollingDirection = Enum.ScrollingDirection.Y,
@@ -188,7 +206,7 @@ return function(props)
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 				ZIndex = 4,
 				[React.Change.AbsoluteSize] = function(instance)
-					setWidth(math.max(1, instance.AbsoluteSize.X - Config.ScrollBarPx - Config.PaddingXPx * 2))
+					setWidth(math.max(1, instance.AbsoluteSize.X - Config.ScrollBarPx - scrollPadding * 2))
 				end,
 			}, content),
 		}),

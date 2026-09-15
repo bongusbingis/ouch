@@ -11,8 +11,8 @@ return function(target: Instance)
 		React.createElement(Overlay, {
 			Snapshot = {
 				active = true,
-				cue = target:GetAttribute("Cue") or "Throw",
-				step = target:GetAttribute("Step") or "NormalThrow",
+				cue = target:GetAttribute("Cue") or "AvoidBumpers",
+				step = target:GetAttribute("Step") or "AvoidBumpers",
 				deviceClass = target:GetAttribute("DeviceClass") or "Touch",
 				hintLevel = 2,
 			},

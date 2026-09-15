@@ -1,8 +1,9 @@
--- Description: Reusable slider for the settings system: continuous, step-snapped, or an explicit set of allowed stops, all resolved through SettingsValues' single alpha/value mapping so track clicks, thumb drags, and controller nudges can never disagree. Mouse and touch both drive one InputBegan/Changed/Ended path declared on the hit-target frame, so no lingering connection needs cleanup when the row unmounts.
+-- Description: Reusable slider for the settings system: continuous, step-snapped, or an explicit set of allowed stops, all resolved through SettingsValues' single alpha/value mapping so track clicks, thumb drags, and controller nudges can never disagree. A press begins on the hit target, then global move/release tracking keeps the drag claimed until the player lets go even when the pointer leaves the control.
 
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -12,10 +13,13 @@ local SettingsValues = require(Shared:WaitForChild("Game"):WaitForChild("Setting
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local UIFeedback = require(script.Parent.Parent.Parent.Services.UIFeedback)
 local Selection = require(script.Parent.Parent.Parent.Services.Selection)
+local CandySurface = require(script.Parent.Parent.CandySurface)
+local Tokens = require(script.Parent.Parent.Parent.Tokens)
 
 local c = React.createElement
 
-local palette = UIConfig.ProgressionStyle
+local C = Tokens.Colors
+local SETTINGS = Tokens.Settings
 local DRAG_CLAIM_PIXELS = 10
 
 export type Props = {
@@ -32,6 +36,7 @@ export type Props = {
 
 type DragState = {
 	trackRef: any,
+	input: InputObject,
 	claimed: boolean,
 	rejected: boolean,
 	startX: number,
@@ -45,6 +50,8 @@ return function(props: Props)
 	local selectionImageRef = React.useRef(nil)
 	local focused, setFocused = React.useState(false)
 	local drag = React.useRef(nil :: DragState?)
+	local latestProps = React.useRef(props)
+	latestProps.current = props
 
 	React.useEffect(function()
 		local target = trackRef.current
@@ -68,19 +75,22 @@ return function(props: Props)
 	local function alphaFromX(x: number): number
 		local track = trackRef.current
 		if track == nil then
-			return alpha
+			local latest = latestProps.current
+			return SettingsValues.valueToAlpha(latest.Definition, latest.Value)
 		end
 		local origin = track.AbsolutePosition.X
 		local width = track.AbsoluteSize.X
 		if width <= 0 then
-			return alpha
+			local latest = latestProps.current
+			return SettingsValues.valueToAlpha(latest.Definition, latest.Value)
 		end
 		return math.clamp((x - origin) / width, 0, 1)
 	end
 
 	local function apply(newAlpha: number, committed: boolean)
-		local value = SettingsValues.alphaToValue(definition, newAlpha)
-		props.OnChange(value, committed)
+		local latest = latestProps.current
+		local value = SettingsValues.alphaToValue(latest.Definition, newAlpha)
+		latest.OnChange(value, committed)
 	end
 
 	local function endDrag(committed: boolean)
@@ -91,18 +101,32 @@ return function(props: Props)
 		end
 	end
 
-	local function beginMouseDrag(x: number)
-		drag.current = { trackRef = trackRef, claimed = true, rejected = false, startX = x, startY = 0 }
-		apply(alphaFromX(x), false)
+	local function beginMouseDrag(input: InputObject)
+		drag.current = {
+			trackRef = trackRef,
+			input = input,
+			claimed = true,
+			rejected = false,
+			startX = input.Position.X,
+			startY = input.Position.Y,
+		}
+		apply(alphaFromX(input.Position.X), false)
 	end
 
-	local function beginTouch(x: number, y: number)
-		drag.current = { trackRef = trackRef, claimed = false, rejected = false, startX = x, startY = y }
+	local function beginTouch(input: InputObject)
+		drag.current = {
+			trackRef = trackRef,
+			input = input,
+			claimed = false,
+			rejected = false,
+			startX = input.Position.X,
+			startY = input.Position.Y,
+		}
 	end
 
 	local function moveMouse(x: number)
 		local state = drag.current
-		if state == nil or not enabled then
+		if state == nil or latestProps.current.Enabled == false then
 			return
 		end
 		state.startX = x
@@ -111,7 +135,7 @@ return function(props: Props)
 
 	local function moveTouch(x: number, y: number)
 		local state = drag.current
-		if state == nil or state.rejected or not enabled then
+		if state == nil or state.rejected or latestProps.current.Enabled == false then
 			return
 		end
 		if not state.claimed then
@@ -130,6 +154,44 @@ return function(props: Props)
 		apply(alphaFromX(x), false)
 	end
 
+	React.useEffect(function()
+		local changed = UserInputService.InputChanged:Connect(function(input: InputObject)
+			local state = drag.current
+			if state == nil then
+				return
+			end
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				if state.input.UserInputType == Enum.UserInputType.MouseButton1 then
+					moveMouse(input.Position.X)
+				end
+			elseif input.UserInputType == Enum.UserInputType.Touch and input == state.input then
+				moveTouch(input.Position.X, input.Position.Y)
+			end
+		end)
+		local ended = UserInputService.InputEnded:Connect(function(input: InputObject)
+			local state = drag.current
+			if state == nil then
+				return
+			end
+			local mouseReleased = state.input.UserInputType == Enum.UserInputType.MouseButton1
+				and input.UserInputType == Enum.UserInputType.MouseButton1
+			if input == state.input or mouseReleased then
+				endDrag(true)
+			end
+		end)
+		local focusReleased = UserInputService.WindowFocusReleased:Connect(function()
+			if drag.current then
+				endDrag(true)
+			end
+		end)
+		return function()
+			drag.current = nil
+			changed:Disconnect()
+			ended:Disconnect()
+			focusReleased:Disconnect()
+		end
+	end, {})
+
 	local function step(direction: number)
 		if not enabled then
 			return
@@ -147,19 +209,20 @@ return function(props: Props)
 		LayoutOrder = props.LayoutOrder,
 		Position = props.Position,
 		Size = props.Size or UDim2.fromScale(1, 1),
+		ZIndex = 6,
 	}, {
 		Value = c(ResponsiveText, {
-			MeasurementFont = UIConfig.Text.BodyFont,
+			MeasurementFont = Tokens.Type.Label,
 			MaxTextSize = 20,
 			MinTextSize = 16,
 			Native = {
 				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
-				Font = UIConfig.Text.BodyFont,
+				Font = Tokens.Type.Label,
 				Position = UDim2.fromScale(1, 0),
 				Size = UDim2.new(1, 0, 0, UIConfig.Layout.SettingsControls.SliderLabelHeightPx),
 				Text = displayText,
-				TextColor3 = palette.White,
+				TextColor3 = C.Ink,
 				TextTransparency = if enabled then 0 else 0.3,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = 5,
@@ -185,28 +248,13 @@ return function(props: Props)
 					return
 				end
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
-					beginMouseDrag(input.Position.X)
+					beginMouseDrag(input)
 				elseif input.UserInputType == Enum.UserInputType.Touch then
-					beginTouch(input.Position.X, input.Position.Y)
+					beginTouch(input)
 				elseif input.KeyCode == Enum.KeyCode.DPadLeft then
 					step(-1)
 				elseif input.KeyCode == Enum.KeyCode.DPadRight then
 					step(1)
-				end
-			end,
-			[React.Event.InputChanged] = function(_object, input: InputObject)
-				if input.UserInputType == Enum.UserInputType.MouseMovement and drag.current then
-					moveMouse(input.Position.X)
-				elseif input.UserInputType == Enum.UserInputType.Touch then
-					moveTouch(input.Position.X, input.Position.Y)
-				end
-			end,
-			[React.Event.InputEnded] = function(_object, input: InputObject)
-				if
-					input.UserInputType == Enum.UserInputType.MouseButton1
-					or input.UserInputType == Enum.UserInputType.Touch
-				then
-					endDrag(true)
 				end
 			end,
 		}, {
@@ -219,31 +267,44 @@ return function(props: Props)
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Interaction.FocusCornerPx) }),
 				Outline = c("UIStroke", {
-					Color = palette.Yellow,
+					Color = C.Yellow,
 					Thickness = UIConfig.Interaction.FocusStrokePx,
 					Transparency = if focused and enabled then 0 else 1,
 				}),
 			}),
 			Track = c("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
-				BackgroundColor3 = palette.Surface,
-				BackgroundTransparency = if enabled then 0 else 0.3,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(0, 0.5),
-				Size = UDim2.fromScale(1, 0.34),
+				Size = UDim2.new(1, 0, 0, SETTINGS.SliderTrackHeight),
 				ZIndex = 4,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Outline = c("UIStroke", { Color = palette.White, Thickness = 1, Transparency = 0.65 }),
+				Surface = c(CandySurface, {
+					Color = if enabled then C.Surface else C.WellLine,
+					LipColor = C.WellLine,
+					Radius = Tokens.Shape.RadiusPill,
+					Shadow = false,
+					ZIndex = 4,
+				}),
 				Fill = c("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
-					BackgroundColor3 = if enabled then palette.Pink else palette.Disabled,
+					BackgroundColor3 = if enabled then C.Pink else C.WellLine,
 					BorderSizePixel = 0,
-					Position = UDim2.fromScale(0, 0.5),
-					Size = UDim2.fromScale(alpha, 1),
-					ZIndex = 5,
+					Position = UDim2.new(0, 0, 0.5, -Tokens.Shape.LipHeight / 2),
+					Size = UDim2.new(alpha, 0, 1, -Tokens.Shape.LipHeight),
+					ZIndex = 7,
 				}, {
 					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+					Highlight = c("Frame", {
+						BackgroundColor3 = C.Surface,
+						BackgroundTransparency = Tokens.Shape.HighlightTransparency,
+						BorderSizePixel = 0,
+						Size = UDim2.fromScale(1, 0.45),
+						ZIndex = 8,
+					}, {
+						Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+					}),
 				}),
 				Ticks = if #stops > 1
 					then c(
@@ -254,12 +315,12 @@ return function(props: Props)
 							for index, stop in stops do
 								marks[`Tick{index}`] = c("Frame", {
 									AnchorPoint = Vector2.new(0.5, 0.5),
-									BackgroundColor3 = palette.White,
-									BackgroundTransparency = 0.55,
+									BackgroundColor3 = C.InkSoft,
+									BackgroundTransparency = 0.7,
 									BorderSizePixel = 0,
 									Position = UDim2.fromScale(SettingsValues.valueToAlpha(definition, stop), 0.5),
 									Size = UDim2.fromOffset(6, 6),
-									ZIndex = 6,
+									ZIndex = 9,
 								}, {
 									Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 								})
@@ -271,16 +332,18 @@ return function(props: Props)
 			}),
 			Thumb = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = if enabled then palette.White else palette.Muted,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Position = UDim2.fromScale(alpha, 0.5),
-				Size = UDim2.fromOffset(26, 26),
-				ZIndex = 6,
+				Size = UDim2.fromOffset(SETTINGS.SliderThumbSize, SETTINGS.SliderThumbSize),
+				ZIndex = 10,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Stroke = c("UIStroke", {
-					Color = palette.Ink,
-					Thickness = UIConfig.Button.StrokePx,
+				Surface = c(CandySurface, {
+					Color = if enabled then C.Yellow else C.WellLine,
+					LipColor = if enabled then C.YellowLip else C.WellLine,
+					Radius = Tokens.Shape.RadiusPill,
+					Shadow = false,
+					ZIndex = 10,
 				}),
 			}),
 		}),

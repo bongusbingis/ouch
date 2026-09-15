@@ -33,7 +33,11 @@ local FakeCFrame = {
 }
 
 local function fakeColor3(r: number, g: number, b: number)
-	return { R = r, G = g, B = b, r = r, g = g, b = b }
+	local color = { R = r, G = g, B = b, r = r, g = g, b = b }
+	function color:Lerp(other, alpha)
+		return fakeColor3(r + (other.R - r) * alpha, g + (other.G - g) * alpha, b + (other.B - b) * alpha)
+	end
+	return color
 end
 
 local FakeColor3 = {

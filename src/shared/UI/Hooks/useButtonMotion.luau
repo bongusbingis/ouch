@@ -32,8 +32,8 @@ return function(scale: number, rotation: number, pressing: boolean, reducedMotio
 		local tween = TweenService:Create(
 			source,
 			TweenInfo.new(
-				if pressing then T.Motion.Press else T.Motion.TabSwitch,
-				if pressing then Enum.EasingStyle.Back else Enum.EasingStyle.Elastic,
+				if pressing then T.Motion.Press else T.Motion.Release,
+				Enum.EasingStyle.Cubic,
 				Enum.EasingDirection.Out
 			),
 			{ Value = target }

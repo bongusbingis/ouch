@@ -134,7 +134,8 @@ return function(props)
 				Position = UDim2.fromOffset(T.Layout.CompactGap, S.StrokeCard),
 				Size = UDim2.new(
 					1,
-					-T.Layout.CompactGap * 2 - (if props.Equipped then T.Layout.SmallBadgeSize else 0),
+					-T.Layout.CompactGap * 2
+						- (if props.Equipped and not props.Compact then T.Layout.SmallBadgeSize else 0),
 					0,
 					T.Layout.RarityHeight
 				),
@@ -203,7 +204,16 @@ return function(props)
 		Checkmark = c(Badge, {
 			Visible = props.Equipped == true,
 			Text = if props.SlotIndex then tostring(props.SlotIndex) else "✓",
-			Native = { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.96, 0.04), ZIndex = 12 },
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = if props.Compact and entry.category ~= "CharacterColor"
+					then UDim2.new(1, -16, 0, 48)
+					else UDim2.fromScale(0.96, 0.04),
+				Size = if props.Compact
+					then UDim2.fromOffset(T.Layout.SmallBadgeSize, T.Layout.SmallBadgeSize)
+					else nil,
+				ZIndex = 12,
+			},
 		}),
 		NewBadge = if props.New and not seen
 			then c(Badge, {

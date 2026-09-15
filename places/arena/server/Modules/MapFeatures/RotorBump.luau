@@ -12,6 +12,7 @@ local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local MovementGuard = require(Game:WaitForChild("Adapters"):WaitForChild("MovementGuard"))
 local RotatingPlatforms = require(Game:WaitForChild("MapFeatures"):WaitForChild("RotatingPlatforms"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
+local ShoveTuning = require(Game.MapFeatures.ShoveTuning)
 
 local RotorBump = {}
 RotorBump.folderName = "Rotating"
@@ -47,9 +48,10 @@ local function testPart(platform: RotatingPlatforms.Platform, rotor: RotatingPla
 	if part.Parent == nil then
 		return
 	end
-	-- Inspect the actual mesh collision shape, not its bounding box.
-	-- Root-only contact deliberately excludes cosmetic/limb grazing.
-	for _, root in Workspace:GetPartsInPart(part, overlap) do
+	-- Root-only contact excludes cosmetic/limb grazing. A small padded
+	-- oriented box makes near-edge contacts register more reliably.
+	local padding = Vector3.one * MapFeatures.RotorBump.ContactPadding * 2
+	for _, root in Workspace:GetPartBoundsInBox(part.CFrame, part.Size + padding, overlap) do
 		if contacts[root] == nil then
 			contacts[root] = { platform = platform, rotor = rotor, part = part }
 		end
@@ -100,6 +102,13 @@ local function bump(
 	humanoid: Humanoid
 )
 	local settings = MapFeatures.RotorBump
+	local attributes = MapFeatures.Attributes
+	local response = ShoveTuning.resolve(
+		settings,
+		contact.rotor.shoveSpeed,
+		contact.rotor.part:GetAttribute(attributes.ShoveUpwardSpeed),
+		contact.rotor.part:GetAttribute(attributes.ShoveSeconds)
+	)
 	local now = Workspace:GetServerTimeNow()
 	local center = RotatingPlatforms.rotorPoseAt(contact.platform, contact.rotor, now).Position
 	local offset = root.Position - center
@@ -110,11 +119,11 @@ local function bump(
 	local direction = if flatSurface.Magnitude >= settings.MinimumSurfaceSpeed
 		then (flatSurface.Unit + outward * settings.OutwardBias).Unit
 		else outward
-	local speed = contact.rotor.shoveSpeed or settings.KnockbackSpeed
+	local speed = response.KnockbackSpeed
 	local current = root.AssemblyLinearVelocity
 	-- A target velocity, rather than an additive kick, prevents re-entry from
 	-- stacking speed. A stronger fan/jump-pad ascent remains intact.
-	local target = direction * speed + Vector3.yAxis * math.max(current.Y, settings.UpwardSpeed)
+	local target = direction * speed + Vector3.yAxis * math.max(current.Y, response.UpwardSpeed)
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	root.AssemblyLinearVelocity = target
 	-- A brief hold clears the moving part before the normal controller slows
@@ -134,9 +143,9 @@ local function bump(
 		root = root,
 		rotor = contact.rotor,
 		attachment = attachment,
-		expiresAt = context.now + settings.ShoveSeconds,
+		expiresAt = context.now + response.ShoveSeconds,
 	}
-	MovementGuard.allow(root, "RotorBump", settings.GuardSeconds, speed * 1.3, target.Y * 1.3, contact.part)
+	MovementGuard.allow(root, "RotorBump", response.GuardSeconds, speed * 1.3, target.Y * 1.3, contact.part)
 end
 
 function RotorBump.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)

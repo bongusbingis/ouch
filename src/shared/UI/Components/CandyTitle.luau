@@ -37,7 +37,9 @@ return function(props)
 			BackgroundColor3 = props.Color or C.Pink,
 			BorderSizePixel = 0,
 			Size = UDim2.new(0, width, 1, 0),
-			Rotation = if width > 500 then T.Shape.TiltPanel else T.Shape.TiltTitle,
+			Rotation = if props.Tilt ~= nil
+				then props.Tilt
+				else if width > 500 then T.Shape.TiltPanel else T.Shape.TiltTitle,
 			ZIndex = z,
 		}, {
 			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusPanel) }),

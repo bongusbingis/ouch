@@ -12,40 +12,55 @@ local Game = Shared:WaitForChild("Game")
 local SettingsRegistry = require(Game:WaitForChild("Settings"):WaitForChild("SettingsRegistry"))
 local SettingsStore = require(Game:WaitForChild("Settings"):WaitForChild("SettingsStore"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
-local PageTitle = require(script.Parent.PageTitle)
 local SectionHeader = require(script.Parent.SectionHeader)
 local SettingRow = require(script.Parent.Settings.SettingRow)
 local AssetCredits = require(script.Parent.Settings.AssetCredits)
-local ActionButton = require(script.Parent.Shop.ShopPriceButton)
+local CandyPanel = require(script.Parent.CandyPanel)
+local CandyTitle = require(script.Parent.CandyTitle)
+local PuffyButton = require(script.Parent.PuffyButton)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local Tokens = require(script.Parent.Parent.Tokens)
 
 local Well = require(script.Parent.Well)
 
 local c = React.createElement
+local C = Tokens.Colors
+local SETTINGS = Tokens.Settings
 
 local ROW_HEIGHT = UIConfig.Layout.SettingsControls.RowHeight
 
 export type Props = {
 	Position: any?,
+	Size: Vector2?,
+	TransitionScale: any?,
 	Place: "Lobby" | "Arena",
 }
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
-	local panelSize = ResponsiveLayout.panelSize(
-		safeArea.size,
-		UIConfig.Layout.Panels.Settings,
-		UIConfig.Layout.PortraitMaxAspect,
-		UIConfig.Layout.ShortLandscapeMaxHeightPx
-	)
+	local panelSize = props.Size
+		or ResponsiveLayout.panelSize(
+			safeArea.size,
+			UIConfig.Layout.Panels.Settings,
+			UIConfig.Layout.PortraitMaxAspect,
+			UIConfig.Layout.ShortLandscapeMaxHeightPx
+		)
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local compact = not short and panelSize.X * 0.93 * 0.95 < UIConfig.Layout.CompactMaxWidthPx
-	local inset = if short or compact then UIConfig.Spacing.CompactInsetPx else UIConfig.Spacing.PageInsetPx
-	local contentTop = if short then 48 else 96
+	local inset = if short
+		then Tokens.LobbyLandscape.PanelInset
+		elseif compact then SETTINGS.CompactInset
+		else SETTINGS.Inset
+	local contentTop = if short
+		then Tokens.LobbyLandscape.PanelHeader
+		else if compact then SETTINGS.CompactHeaderHeight else SETTINGS.HeaderHeight
 	local revision, setRevision = React.useState(0)
 	local creditsOpen, setCreditsOpen = React.useState(false)
+	local titleWidth = if creditsOpen
+		then if compact or short then SETTINGS.CompactCreditsTitleWidth else SETTINGS.CreditsTitleWidth
+		else if compact or short then SETTINGS.CompactTitleWidth else SETTINGS.TitleWidth
 	local scrollRef = React.useRef(nil)
 	local creditsButtonRef = React.useRef(nil)
 	local creditsBackRef = React.useRef(nil)
@@ -105,14 +120,14 @@ return function(props: Props)
 
 	local content: { [string]: any } = {
 		UIListLayout = c("UIListLayout", {
-			Padding = UDim.new(0, 8),
+			Padding = UDim.new(0, if short then Tokens.LobbyLandscape.SettingsGap else SETTINGS.SectionGap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 		UIPadding = c("UIPadding", {
-			PaddingBottom = UDim.new(0, 24),
-			PaddingLeft = UDim.new(0, 4),
-			PaddingRight = UDim.new(0, 12),
-			PaddingTop = UDim.new(0, 4),
+			PaddingBottom = UDim.new(0, SETTINGS.ContentInset),
+			PaddingLeft = UDim.new(0, SETTINGS.ContentInset),
+			PaddingRight = UDim.new(0, SETTINGS.ContentInset + SETTINGS.ScrollBar),
+			PaddingTop = UDim.new(0, SETTINGS.ContentInset),
 		}),
 	}
 	local saveStatus = ""
@@ -127,27 +142,29 @@ return function(props: Props)
 		end
 	end
 	local layoutOrder = 0
+	local columnHeights = { 0, 0 }
+	local columns = short and panelSize.X >= 700
+	if columns then
+		content.UIListLayout = nil
+	end
 	for _, category in categoryOrder do
 		layoutOrder += 1
 		content[`Category{category}`] = c(SectionHeader, {
 			Text = category,
+			Candy = true,
 			HeightPx = if short then 30 else 38,
-			TextSize = if short then 20 else 24,
+			TextSize = if short then 20 else Tokens.Type.TileLabel,
 			LayoutOrder = layoutOrder,
 			ZIndex = 5,
 		})
 		local categoryRows = {
-			Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }),
-			Padding = c("UIPadding", {
-				PaddingTop = UDim.new(0, 8),
-				PaddingBottom = UDim.new(0, 8),
-				PaddingLeft = UDim.new(0, UIConfig.Spacing.ContentInsetPx),
-				PaddingRight = UDim.new(0, UIConfig.Spacing.PageInsetPx),
+			Layout = c("UIListLayout", {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, SETTINGS.RowGap),
 			}),
 		}
-		local categoryHeight = 16
-		for _, definition in byCategory[category] do
-			layoutOrder += 1
+		local categoryHeight = 0
+		for rowOrder, definition in byCategory[category] do
 			local hasDescription = definition.Description ~= nil and definition.Description ~= ""
 			local heightTable = if compact then ROW_HEIGHT.Compact else ROW_HEIGHT.Wide
 			local rowHeight = (if hasDescription then heightTable.Description else heightTable.Plain)
@@ -159,41 +176,67 @@ return function(props: Props)
 			if short then
 				rowHeight = UIConfig.Layout.SettingsControls.ShortRowHeightPx
 			end
-			categoryHeight += rowHeight + 8
+			categoryHeight += rowHeight
+			if rowOrder > 1 then
+				categoryHeight += SETTINGS.RowGap
+			end
 			categoryRows[definition.Id] = c(SettingRow, {
 				Definition = definition,
 				Value = SettingsStore.get(definition.Id),
 				Compact = compact,
 				Height = rowHeight,
-				LayoutOrder = layoutOrder,
+				LayoutOrder = rowOrder,
 				OnChange = handleChange,
 			})
 		end
-		content[`Well{category}`] = c(
-			Well,
-			{ Native = { LayoutOrder = layoutOrder, Size = UDim2.new(1, 0, 0, categoryHeight - 8) } },
-			categoryRows
-		)
 		layoutOrder += 1
-		content[`Gap{category}`] = c("Frame", {
+		content[`Rows{category}`] = c("Frame", {
 			BackgroundTransparency = 1,
 			LayoutOrder = layoutOrder,
-			Size = UDim2.new(1, 0, 0, 8),
-		})
+			Size = UDim2.new(1, 0, 0, categoryHeight),
+		}, categoryRows)
+		if columns then
+			local column = if columnHeights[1] <= columnHeights[2] then 1 else 2
+			local headerKey, rowsKey = `Category{category}`, `Rows{category}`
+			local blockHeight = 38 + categoryHeight
+			content[`Column{category}`] = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.new((column - 1) * 0.5, if column == 2 then 8 else 0, 0, columnHeights[column]),
+				Size = UDim2.new(0.5, -16, 0, blockHeight),
+			}, {
+				Header = content[headerKey],
+				Rows = c(
+					"Frame",
+					{
+						BackgroundTransparency = 1,
+						Position = UDim2.fromOffset(0, 38),
+						Size = UDim2.new(1, 0, 0, categoryHeight),
+					},
+					categoryRows
+				),
+			})
+			content[headerKey], content[rowsKey] = nil, nil
+			columnHeights[column] += blockHeight + SETTINGS.RowGap
+		end
 	end
 
-	content.AssetCredits = c(ActionButton, {
+	content.AssetCredits = c(PuffyButton, {
 		ButtonRef = creditsButtonRef,
-		AnchorPoint = Vector2.zero,
-		Position = UDim2.fromOffset(0, 0),
-		Size = UDim2.new(1, 0, 0, 44),
-		LayoutOrder = layoutOrder + 1,
 		Text = "ASSET CREDITS",
-		TextSize = 22,
-		Compact = true,
+		TextSize = Tokens.Type.Minimum,
+		TextColor = C.Ink,
+		Color = C.SurfaceWarm,
+		LipColor = C.WellLine,
+		Shadow = false,
 		OnActivated = function()
 			showCredits(true)
 		end,
+		Native = {
+			LayoutOrder = layoutOrder + 1,
+			Position = if columns then UDim2.fromOffset(0, math.max(columnHeights[1], columnHeights[2])) else nil,
+			Size = UDim2.new(1, 0, 0, SETTINGS.CreditsButtonHeight),
+			ZIndex = 6,
+		},
 	})
 	local creditsContent = {
 		Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }),
@@ -206,32 +249,33 @@ return function(props: Props)
 		Credits = c(AssetCredits),
 	}
 
-	return c("ImageLabel", {
-		BackgroundTransparency = 1,
-		Image = UIConfig.Layout.PageSurface.Image,
-		LayoutOrder = 5,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = props.Position or UIConfig.Layout.PagePosition,
-		ScaleType = Enum.ScaleType.Slice,
-		Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-		SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
-		SliceScale = UIConfig.Layout.PageSurface.SliceScale,
+	return c(CandyPanel, {
+		Tilt = if short then 0 else nil,
+		Native = {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = props.Position or UIConfig.Layout.PagePosition,
+			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
+			LayoutOrder = 5,
+		},
 	}, {
-		Title = c(PageTitle, {
+		EntranceScale = if props.TransitionScale then c("UIScale", { Scale = props.TransitionScale }) else nil,
+		Title = c(CandyTitle, {
+			Tilt = if short then 0 else nil,
 			Text = if creditsOpen then "ASSET CREDITS" else "SETTINGS",
-			TextSize = if short then 26 else 42,
+			TextSize = if short then 26 elseif compact then 38 else 46,
 			Native = {
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.new(0.5, 0, 0, if short then 8 else 24),
-				Size = UDim2.new(0.76, 0, 0, if short then 30 else 54),
-				ZIndex = 5,
+				Position = UDim2.fromOffset(inset + 12, if short then 2 else -18),
+				Size = UDim2.fromOffset(titleWidth, if short then 48 else 70),
+				ZIndex = 8,
 			},
 		}),
-		Main = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0),
-			BackgroundTransparency = 1,
-			Position = UDim2.new(0.5, 0, 0, contentTop),
-			Size = UDim2.new(1, -inset * 2, 0, math.max(panelSize.Y - inset - contentTop, 0)),
+		Main = c(Well, {
+			Candy = true,
+			Native = {
+				Position = UDim2.fromOffset(inset, contentTop),
+				Size = UDim2.new(1, -inset * 2, 1, -contentTop - inset),
+				ZIndex = 3,
+			},
 		}, {
 			Content = c("ScrollingFrame", {
 				ref = scrollRef,
@@ -241,27 +285,40 @@ return function(props: Props)
 				BorderSizePixel = 0,
 				CanvasSize = UDim2.fromOffset(0, 0),
 				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
-				Position = UDim2.fromOffset(0, 0),
+				Position = UDim2.fromOffset(4, 4),
 				ScrollingDirection = Enum.ScrollingDirection.Y,
-				ScrollBarImageColor3 = Color3.new(1, 1, 1),
-				ScrollBarImageTransparency = 0.1,
-				ScrollBarThickness = if compact then 5 else 7,
+				ScrollBarImageColor3 = C.Pink,
+				ScrollBarImageTransparency = 0,
+				ScrollBarThickness = SETTINGS.ScrollBar,
 				Selectable = creditsOpen,
-				Size = UDim2.new(1, 0, 1, if creditsOpen then -56 elseif saveStatus ~= "" then -38 else 0),
+				Size = UDim2.new(
+					1,
+					-8,
+					1,
+					if creditsOpen
+						then -(SETTINGS.CreditsButtonHeight + SETTINGS.SectionGap + 8)
+						elseif saveStatus ~= "" then -(SETTINGS.StatusHeight + 8)
+						else -8
+				),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
+				ZIndex = 4,
 			}, if creditsOpen then creditsContent else content),
 			CreditsBack = if creditsOpen
-				then c(ActionButton, {
+				then c(PuffyButton, {
 					ButtonRef = creditsBackRef,
-					AnchorPoint = Vector2.new(0, 1),
-					Position = UDim2.fromScale(0.025, 1),
-					Size = UDim2.new(0.95, 0, 0, 44),
 					Text = "BACK TO SETTINGS",
-					TextSize = 22,
-					Compact = true,
+					TextSize = Tokens.Type.Minimum,
+					Color = C.Pink,
+					Shadow = false,
 					OnActivated = function()
 						showCredits(false)
 					end,
+					Native = {
+						AnchorPoint = Vector2.new(0, 1),
+						Position = UDim2.new(0, SETTINGS.ContentInset, 1, -SETTINGS.ContentInset),
+						Size = UDim2.new(1, -SETTINGS.ContentInset * 2, 0, SETTINGS.CreditsButtonHeight),
+						ZIndex = 6,
+					},
 				})
 				else nil,
 			SaveStatus = if not creditsOpen and saveStatus ~= ""
@@ -272,10 +329,11 @@ return function(props: Props)
 					Native = {
 						BackgroundTransparency = 1,
 						Font = UIConfig.Text.BodyFont,
-						Position = UDim2.new(0.025, 0, 1, -34),
-						Size = UDim2.new(0.95, 0, 0, 30),
+						Position = UDim2.new(0, SETTINGS.ContentInset, 1, -SETTINGS.StatusHeight - 4),
+						Size = UDim2.new(1, -SETTINGS.ContentInset * 2, 0, SETTINGS.StatusHeight),
 						Text = saveStatus,
-						TextColor3 = Color3.new(1, 1, 1),
+						TextColor3 = C.InkSoft,
+						TextWrapped = true,
 						ZIndex = 5,
 					},
 				})

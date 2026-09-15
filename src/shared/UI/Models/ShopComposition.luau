@@ -1,5 +1,24 @@
 --!strict
 local Composition = {}
+-- Choose proportions from the measured card width, after the parent section
+-- has resolved its columns. Narrow cards retain the vertical artwork band.
+function Composition.adaptiveClass(class, cardWidth, minimum, height, splitMinimum, stackHeight)
+	if class.Layout == "Split" and cardWidth < splitMinimum then
+		local stacked = table.clone(class)
+		stacked.Layout = "Stack"
+		stacked.MinHeightPx = stackHeight
+		stacked.MaxHeightPx = stackHeight
+		return stacked
+	end
+	if not class.Adaptive or class.Layout ~= "Stack" or cardWidth < minimum then
+		return class
+	end
+	local adapted = table.clone(class)
+	adapted.Layout = "Split"
+	adapted.MinHeightPx = height
+	adapted.MaxHeightPx = height
+	return adapted
+end
 function Composition.shortClass(class, minimum, height)
 	local compact = table.clone(class)
 	compact.Layout = "Split"

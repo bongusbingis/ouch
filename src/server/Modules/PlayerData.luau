@@ -35,6 +35,7 @@ local loadedListeners = {}
 local _profileToken = Replica.Token("GameProfile")
 local _dataStore = ProfileStore.New(Env.PrimaryDataKey or "DefaultDataKey", DataConfig.Template)
 
+
 local DebugConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Debug"))
 if game:GetService("RunService"):IsStudio() and DebugConfig.MockProfiles == true then
 	_dataStore = _dataStore.Mock

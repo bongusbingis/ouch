@@ -1,4 +1,4 @@
--- Keeps decorative viewport coverage current without changing the lobby's core-safe root.
+-- Tracks viewport/device bounds and CoreGui's free top row without changing the root inset.
 --!strict
 
 local GuiService = game:GetService("GuiService")
@@ -19,12 +19,28 @@ return function()
 			connection:Disconnect()
 		end
 	end, {})
-	local ok, full, core = pcall(function()
+	local ok, full, core, device, topbar = pcall(function()
 		return GuiService:GetInsetArea(Enum.ScreenInsets.None),
-			GuiService:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets)
+			GuiService:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets),
+			GuiService:GetInsetArea(Enum.ScreenInsets.DeviceSafeInsets),
+			GuiService.TopbarInset
 	end)
 	if ok and typeof(full) == "Rect" and typeof(core) == "Rect" then
-		return { viewport = full.Max - full.Min, coreOffset = core.Min - full.Min, coreSize = core.Max - core.Min }
+		return {
+			viewport = full.Max - full.Min,
+			coreOffset = core.Min - full.Min,
+			coreSize = core.Max - core.Min,
+			deviceOffset = device.Min - full.Min,
+			deviceSize = device.Max - device.Min,
+			topbar = topbar,
+		}
 	end
-	return { viewport = viewport, coreOffset = Vector2.zero, coreSize = viewport }
+	return {
+		viewport = viewport,
+		coreOffset = Vector2.zero,
+		coreSize = viewport,
+		deviceOffset = Vector2.zero,
+		deviceSize = viewport,
+		topbar = Rect.new(0, 0, viewport.X, 0),
+	}
 end

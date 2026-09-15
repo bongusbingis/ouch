@@ -252,7 +252,7 @@ local function ActionSlot(props: {
 		StatusScale = if feedback == "Unlock" then 1.12 else 1,
 		ProgressTransparency = if progressVisible then 0 else 1,
 		Progress = math.clamp(progress, 0, 1),
-		config = if feedback == "Unlock" then Motion.Pop else Motion.Control,
+		config = Motion.Control,
 		immediate = reducedMotion,
 	})
 

@@ -14,6 +14,7 @@ local ArenaLoadingClient = require(script.Parent.Parent.Modules.UI.ArenaLoadingC
 local ArenaTeleportClient = require(script.Parent.Parent.Modules.UI.ArenaTeleportClient)
 local ModeVoteClient = require(script.Parent.Parent.Modules.UI.ModeVoteClient)
 local PostMatchClient = require(script.Parent.Parent.Modules.UI.PostMatchClient)
+local SplashdownClient = require(script.Parent.Parent.Modules.UI.SplashdownClient)
 
 local c = React.createElement
 
@@ -39,9 +40,10 @@ return function(props)
 	local vote = useExternalStore(ModeVoteClient.getSnapshot, ModeVoteClient.subscribe)
 	local teleportStatus = useExternalStore(ArenaTeleportClient.getSnapshot, ArenaTeleportClient.subscribe)
 	local postMatch = useExternalStore(PostMatchClient.getSnapshot, PostMatchClient.subscribe)
+	local race = useExternalStore(SplashdownClient.getView, SplashdownClient.subscribeView)
 
 	return c(CombatMenu, {
-		Available = menuAvailable(loading, vote, teleportStatus, postMatch.result ~= nil),
+		Available = not race.intro and menuAvailable(loading, vote, teleportStatus, postMatch.result ~= nil),
 		ShopClient = props.ShopClient,
 		Place = "Arena",
 	})

@@ -26,11 +26,13 @@ return function(props)
 			{ BackgroundColor3 = lip, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = z + 1 },
 			{
 				Corner = corner,
-				Outline = c("UIStroke", {
-					Color = props.StrokeColor or C.Ink,
-					Thickness = S.StrokeTab,
-					LineJoinMode = Enum.LineJoinMode.Round,
-				}),
+				Outline = if props.Stroke == false
+					then nil
+					else c("UIStroke", {
+						Color = props.StrokeColor or C.Ink,
+						Thickness = S.StrokeTab,
+						LineJoinMode = Enum.LineJoinMode.Round,
+					}),
 			}
 		),
 		Fill = c("Frame", {

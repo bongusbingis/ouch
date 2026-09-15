@@ -1,7 +1,7 @@
 --!strict
 local T = require(script.Parent.Parent.Tokens)
 local L = T.Shop
-local function class(minimum, maximum, height, layout, aspect)
+local function class(minimum, maximum, height, layout, aspect, adaptive)
 	return {
 		MinPx = minimum,
 		MaxPx = maximum,
@@ -9,6 +9,7 @@ local function class(minimum, maximum, height, layout, aspect)
 		MaxHeightPx = height,
 		Aspect = aspect,
 		Layout = layout,
+		Adaptive = adaptive == true,
 		ArtScale = L.SplitArtScale,
 		NameScale = 0.2,
 		NameTextSize = T.Type.TileLabel,
@@ -19,6 +20,12 @@ local function class(minimum, maximum, height, layout, aspect)
 	}
 end
 return table.freeze({
+	HeaderHeight = function(width, countdownAt, short)
+		if countdownAt and width < L.CountdownWrapWidth then
+			return L.CountdownTitleHeight + L.SectionContentGap * 2 + L.CountdownHeight
+		end
+		return if short then T.LobbyLandscape.SectionHeight else L.SectionHeight
+	end,
 	Tracks = L.Tracks,
 	SpanSteps = L.SpanSteps,
 	GapPx = L.Gap,
@@ -30,8 +37,8 @@ return table.freeze({
 	PaddingXPx = 12,
 	PaddingBottomPx = 24,
 	CardClasses = {
-		Pass = class(L.CardMin, L.CardMax, L.CardHeight, "Stack", 1),
-		Feature = class(L.CardMin, L.CardMax, L.CardHeight, "Stack", 1),
+		Pass = class(L.CardMin, L.CatalogCardMax, L.CardHeight, "Stack", 1, true),
+		Feature = class(L.CardMin, L.CatalogCardMax, L.CardHeight, "Stack", 1, true),
 		Tile = class(L.CurrencyMin, L.CurrencyMax, L.CurrencyHeight, "Split", 0.56),
 		Promo = class(L.PromoMin, L.PromoMax, L.PromoHeight, "Split", 0.4),
 		Season = class(L.PromoMin, L.PromoMax, L.PromoHeight, "Stack", 0.8),

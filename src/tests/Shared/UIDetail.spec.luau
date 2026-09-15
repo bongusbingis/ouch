@@ -6,9 +6,30 @@ local TestAssets = require(game.ServerStorage.Tests.Helpers.TestAssets)
 local EmoteRig = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteRig")
 )
+local ScrollingClipping = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("ScrollingClipping")
+)
 
 return function()
 	describe("UI detail contracts", function()
+		it("detects clipping scrolling ancestors", function()
+			local outer = Instance.new("ScrollingFrame")
+			local inner = Instance.new("Frame")
+			local target = Instance.new("Frame")
+			inner.Parent = outer
+			target.Parent = inner
+
+			outer.ClipsDescendants = true
+			expect(ScrollingClipping.isInsideClippingScrollingFrame(outer)).to.equal(true)
+			expect(ScrollingClipping.isInsideClippingScrollingFrame(target)).to.equal(true)
+			outer.ClipsDescendants = false
+			expect(ScrollingClipping.isInsideClippingScrollingFrame(target)).to.equal(false)
+
+			outer:Destroy()
+		end)
 		it("fits the entire currency group in a compact price cell", function()
 			for _, amount in { "500", "10,000", "999,999,999" } do
 				for _, width in { 68, 120, 300 } do

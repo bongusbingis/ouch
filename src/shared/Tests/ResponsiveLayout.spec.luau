@@ -12,6 +12,15 @@ local INVENTORY_PANEL = {
 		AspectRatio = 1.08,
 	},
 }
+local SHOP_PANEL = {
+	Portrait = { WidthScale = 0.956, HeightScale = 0.78, MaxSize = Vector2.new(680, 760) },
+	Landscape = {
+		WidthScale = 0.9,
+		HeightScale = 0.82,
+		MaxSize = Vector2.new(1240, 820),
+		AspectRatio = 1.5,
+	},
+}
 local PORTRAIT_MAX_ASPECT = 1
 -- Mirrors SplashPage's portrait action dock: the BottomRight frame is bottom
 -- anchored at 0.98 and PortraitActionsHeightPx tall, so the progress panels have
@@ -81,6 +90,26 @@ local function landscapePanels()
 	config.Quests = table.clone(config.Quests)
 	config.Quests.ShortHeightScale = 0.4
 	return config
+end
+
+local function shopPanels()
+	local inventory = { Portrait = INVENTORY_PANEL.Portrait, Landscape = table.clone(INVENTORY_PANEL.Landscape) }
+	inventory.Landscape.ShortWidthScale = 0.9
+	inventory.Landscape.ShortHeightScale = 0.7
+	inventory.Landscape.ShortAspectRatio = 2.4
+	local shop = { Portrait = SHOP_PANEL.Portrait, Landscape = table.clone(SHOP_PANEL.Landscape) }
+	shop.Landscape.ShortWidthScale = 0.9
+	shop.Landscape.ShortHeightScale = 0.7
+	shop.Landscape.ShortAspectRatio = 2.5
+	return {
+		PortraitMaxAspect = PORTRAIT_MAX_ASPECT,
+		ShortLandscapeMaxHeightPx = 500,
+		PagePosition = { X = { Scale = 0.5, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+		InventoryPagePosition = { X = { Scale = 0.32, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+		Panels = { Inventory = inventory, Shop = shop },
+		TopBar = { ShortHeightPx = 72 },
+		Inventory = { ShortPanelMinWidthPx = 360, ShortPanelWidthScale = 0.58, ShortWorldMinWidthPx = 170 },
+	}
 end
 
 T.describe("Inset coordinate conversion", function()
@@ -226,6 +255,69 @@ T.describe("Responsive UI layout", function()
 		local size = ResponsiveLayout.panelSize(Vector2.new(1920, 1080), INVENTORY_PANEL, PORTRAIT_MAX_ASPECT)
 		T.expect(size.X):toEqual(872)
 		T.expect(size.Y):toEqual(807)
+	end)
+
+	T.it("gives the landscape shop the midpoint between its original width and the backpack", function()
+		local available = Vector2.new(1920, 1080)
+		local config = {
+			PortraitMaxAspect = PORTRAIT_MAX_ASPECT,
+			ShortLandscapeMaxHeightPx = 500,
+			PagePosition = { X = { Scale = 0.5, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+			InventoryPagePosition = { X = { Scale = 0.32, Offset = 0 }, Y = { Scale = 0.56, Offset = 0 } },
+			Panels = { Inventory = INVENTORY_PANEL, Shop = SHOP_PANEL },
+		}
+		local backpack = ResponsiveLayout.inventoryComposition(available, config)
+		local original = ResponsiveLayout.panelSize(available, SHOP_PANEL, PORTRAIT_MAX_ASPECT, 500)
+		local shop = ResponsiveLayout.shopComposition(available, config)
+		T.expect(shop.panel.size.X):toEqual(math.floor((backpack.panel.size.X + original.X) / 2))
+		T.expect(shop.panel.size.Y):toEqual(math.floor((backpack.panel.size.Y + original.Y) / 2))
+		T.expect(shop.panel.position.X):toEqual(backpack.panel.position.X)
+		T.expect(shop.world.position.X):toEqual(shop.panel.position.X + shop.panel.size.X + 12)
+		T.expect(shop.world.position.X + shop.world.size.X):toEqual(available.X - 12)
+	end)
+
+	T.it("preserves desktop shop geometry without a mobile header reservation", function()
+		local available = Vector2.new(1920, 1080)
+		local config = shopPanels()
+		local backpack = ResponsiveLayout.inventoryComposition(available, config)
+		local original = ResponsiveLayout.panelSize(available, config.Panels.Shop, PORTRAIT_MAX_ASPECT, 500)
+		local shop = ResponsiveLayout.shopComposition(available, config, nil)
+		T.expect(shop.panel.size.X):toEqual(math.floor((backpack.panel.size.X + original.X) / 2))
+		T.expect(shop.panel.size.Y):toEqual(math.floor((backpack.panel.size.Y + original.Y) / 2))
+		T.expect(shop.panel.position.X):toEqual(backpack.panel.position.X)
+		T.expect(shop.panel.position.Y)
+			:toEqual(backpack.panel.position.Y + (backpack.panel.size.Y - shop.panel.size.Y) / 2)
+	end)
+
+	T.it("gives landscape browsers usable width below the mobile header and a separate preview", function()
+		for _, available in { Vector2.new(600, 280), Vector2.new(750, 304), Vector2.new(844, 344) } do
+			local config = shopPanels()
+			local shop = ResponsiveLayout.shopComposition(available, config, 13)
+			local backpack = ResponsiveLayout.inventoryComposition(available, config, 13)
+			T.expect(shop.panel.size):toEqual(backpack.panel.size)
+			T.expect(shop.panel.position.Y >= 13 + 12):toBeTruthy()
+			T.expect(shop.panel.position.Y + shop.panel.size.Y <= available.Y - 12):toBeTruthy()
+			T.expect(shop.panel.size.X >= 390):toBeTruthy()
+			T.expect(shop.world.size.X >= 154):toBeTruthy()
+			T.expect(shop.panel.position.X + shop.panel.size.X < shop.world.position.X):toBeTruthy()
+			T.expect(shop.world.position.X + shop.world.size.X <= available.X - 12):toBeTruthy()
+		end
+	end)
+
+	T.it("extends portrait shop content through the height freed by compact navigation", function()
+		local available = Vector2.new(402, 778)
+		local config = shopPanels()
+		local legacy = ResponsiveLayout.shopComposition(available, config)
+		local shop = ResponsiveLayout.shopComposition(available, config, 17)
+		T.expect(shop.panel.position.Y):toEqual(29)
+		T.expect(shop.panel.position.Y + shop.panel.size.Y):toEqual(766)
+		T.expect(shop.panel.position.X):toEqual(legacy.panel.position.X)
+		T.expect(shop.panel.size.X):toEqual(legacy.panel.size.X)
+		T.expect(shop.panel.size.Y - legacy.panel.size.Y >= 120):toBeTruthy()
+		T.expect(shop.world.position.Y):toEqual(shop.panel.position.Y)
+		T.expect(shop.world.size.Y):toEqual(shop.panel.size.Y)
+		local tallerHeader = ResponsiveLayout.shopComposition(available, config, 67)
+		T.expect(shop.panel.size.Y - tallerHeader.panel.size.Y):toEqual(50)
 	end)
 
 	T.it("derives usable inventory card columns from available width", function()

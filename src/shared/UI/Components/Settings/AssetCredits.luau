@@ -7,8 +7,10 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local Credits = require(ReplicatedStorage:WaitForChild("ThirdPartyCredits"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local usePreferredTextSize = require(script.Parent.Parent.Parent.Hooks.usePreferredTextSize)
+local Tokens = require(script.Parent.Parent.Parent.Tokens)
 
 local c = React.createElement
+local C = Tokens.Colors
 
 local function CreditText(props)
 	local ref = React.useRef(nil)
@@ -39,7 +41,7 @@ local function CreditText(props)
 		LayoutOrder = props.LayoutOrder,
 		Size = UDim2.new(1, 0, 0, height),
 		Text = props.Text,
-		TextColor3 = UIConfig.ProgressionStyle.White,
+		TextColor3 = C.InkSoft,
 		TextSize = props.TextSize,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -70,8 +72,16 @@ return function()
 	end
 	return c("Frame", {
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = UIConfig.ProgressionStyle.Claimed:Lerp(UIConfig.ProgressionStyle.Ink, 0.14),
+		BackgroundColor3 = C.SurfaceWarm,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 0),
-	}, entries)
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, Tokens.Shape.RadiusCard) }),
+		Outline = c("UIStroke", { Color = C.WellLine, Thickness = Tokens.Shape.StrokeInner }),
+		Content = c("Frame", {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 0),
+		}, entries),
+	})
 end

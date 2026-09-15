@@ -13,7 +13,7 @@ local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local Selection = require(script.Parent.Parent.Services.Selection)
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local ScrollingClipping = require(script.Parent.Parent.Services.ScrollingClipping)
 
 local c = React.createElement
 
@@ -53,8 +53,8 @@ return function(props: Props)
 	local entered, setEntered = React.useState(props.EntranceDelay == nil)
 	local entranceRevision = React.useRef(0)
 	local hovering, setHovering = React.useState(false)
-	local focused, setFocused = React.useState(false)
 	local pressing, setPressing = React.useState(false)
+	local rotationBlocked, setRotationBlocked = React.useState(false)
 	local reducedMotion = useReducedMotion()
 	local preset = Motion.Controls[props.Style or "Standard"]
 	local scale = if not entered
@@ -67,9 +67,16 @@ return function(props: Props)
 		then preset.rotation
 		else 0
 	local styles = useButtonMotion(scale, rotation, pressing and enabled, reducedMotion)
-	local visualRotation = styles.Rotation:map(function(value: number)
-		return value + (props.Native.Rotation or 0)
-	end)
+	local restRotation = props.Native.Rotation or 0
+	local visualRotation = if rotationBlocked
+		then restRotation
+		else styles.Rotation:map(function(value: number)
+			-- The ref check also covers an interaction arriving before the mount effect runs.
+			if ScrollingClipping.isInsideClippingScrollingFrame(buttonRef.current) then
+				return restRotation
+			end
+			return value + restRotation
+		end)
 	local layoutChildren = {}
 	local visualChildren = {}
 	for key, child in props.children or {} do
@@ -87,22 +94,6 @@ return function(props: Props)
 			"Frame",
 			{ ref = selectionImageRef, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }
 		),
-		FocusOutline = c("Frame", {
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = (props.Native.ZIndex or 1) + 10,
-		}, {
-			Corner = c(
-				"UICorner",
-				{ CornerRadius = props.SelectionRadius or UDim.new(0, UIConfig.Interaction.FocusCornerPx) }
-			),
-			Outline = c("UIStroke", {
-				Color = UIConfig.ProgressionStyle.Yellow,
-				Thickness = UIConfig.Interaction.FocusStrokePx,
-				Transparency = if focused and enabled then 0 else 1,
-			}),
-		}),
 		InteractionVisual = c(
 			"ImageLabel",
 			{
@@ -155,6 +146,35 @@ return function(props: Props)
 			end
 		end
 	end, { props.ButtonRef })
+	React.useEffect(function()
+		local button: ImageButton? = buttonRef.current
+		if not button then
+			return nil
+		end
+		local active = true
+		local clippingConnections: { RBXScriptConnection } = {}
+		local function update()
+			if active then
+				setRotationBlocked(ScrollingClipping.isInsideClippingScrollingFrame(button))
+			end
+		end
+		local ancestor = button.Parent
+		while ancestor do
+			if ancestor:IsA("ScrollingFrame") then
+				table.insert(clippingConnections, ancestor:GetPropertyChangedSignal("ClipsDescendants"):Connect(update))
+			end
+			ancestor = ancestor.Parent
+		end
+		local ancestryConnection = button.AncestryChanged:Connect(update)
+		update()
+		return function()
+			active = false
+			ancestryConnection:Disconnect()
+			for _, connection in clippingConnections do
+				connection:Disconnect()
+			end
+		end
+	end, {})
 	React.useEffect(function()
 		if props.EntranceDelay == nil then
 			setEntered(true)
@@ -281,7 +301,6 @@ return function(props: Props)
 				end
 				else nil,
 			[React.Event.SelectionGained] = function(button)
-				setFocused(true)
 				if GuiService.SelectedObject ~= nil then
 					beginHover()
 				end
@@ -292,7 +311,6 @@ return function(props: Props)
 				end
 			end,
 			[React.Event.SelectionLost] = function()
-				setFocused(false)
 				endHover()
 			end,
 		}),

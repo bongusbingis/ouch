@@ -44,7 +44,7 @@ return function(props)
 	end, { expired, props.ExpiresAt, props.OnExpired })
 	return c(ResponsiveText, {
 		HostName = props.HostName or "Countdown",
-		MeasurementFont = UIConfig.Text.BodyFont,
+		MeasurementFont = T.Type.Label,
 		MinTextSize = T.Type.Minimum,
 		MaxTextSize = props.MaxTextSize or 18,
 		Native = {
@@ -52,7 +52,7 @@ return function(props)
 			BackgroundColor3 = T.Colors.Ink,
 			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
-			Font = UIConfig.Text.BodyFont,
+			Font = T.Type.Label,
 			Position = props.Position,
 			Size = props.Size or UDim2.fromScale(0.3, 1),
 			Text = if expired then "UPDATING" else formatRemaining(props.ExpiresAt - now),

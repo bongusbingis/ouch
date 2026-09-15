@@ -103,9 +103,10 @@ function ArenaService.start(): Arena
 	assert(origin:IsA("BasePart"), "[ArenaService] Workspace.Assets.Arena.MapOrigin must be a BasePart")
 	local function projectOrigin()
 		root:SetAttribute("MapOriginPosition", origin.Position)
+		root:SetAttribute("MapOriginCFrame", origin.CFrame)
 	end
 	projectOrigin()
-	origin:GetPropertyChangedSignal("Position"):Connect(projectOrigin)
+	origin:GetPropertyChangedSignal("CFrame"):Connect(projectOrigin)
 	local playerSpawnsFolder = requireFolder(root, "PlayerSpawns", "Workspace.Assets.Arena.PlayerSpawns")
 	local teamSpawnsFolder = requireFolder(root, "TeamSpawns", "Workspace.Assets.Arena.TeamSpawns")
 	local redSpawns = requireFolder(teamSpawnsFolder, "Red", "Workspace.Assets.Arena.TeamSpawns.Red")

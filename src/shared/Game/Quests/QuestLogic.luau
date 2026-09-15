@@ -68,6 +68,12 @@ function QuestLogic.dailyKey(now: number): string
 	return os.date("!%Y-%m-%d", now)
 end
 
+-- A missing first snapshot establishes the current cycle; only a later UTC
+-- key change represents newly assigned quests for an already-mounted client.
+function QuestLogic.isNewDailyCycle(previousKey: string?, currentKey: string?): boolean
+	return previousKey ~= nil and currentKey ~= nil and currentKey ~= "" and previousKey ~= currentKey
+end
+
 function QuestLogic.nextResetAt(now: number): number
 	local utc = os.date("!*t", now)
 	if DateTime ~= nil then

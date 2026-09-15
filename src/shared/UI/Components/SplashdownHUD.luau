@@ -1,6 +1,6 @@
 -- Name: SplashdownHUD.luau
 -- Author: Jack C.
--- Description: The in-race Splashdown HUD, built from the arena's surfaces so it reads as the same game as the brawl: a top band with the round, course, race clock and checkpoint progress, the countdown and GO in the middle of the screen, the course intro card, the finish banner, the round-results toast, and the shared standings strip and scoreboard carrying placement points.
+-- Description: Splashdown race HUD with a dedicated candy cinematic intro, a race band with clock and checkpoints, countdown and GO, finish banner, round results, and shared standings and scoreboard.
 -- Created: 2026-09-14
 
 --!strict
@@ -11,7 +11,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local Splashdown = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Splashdown"))
+local SplashdownIntro = require(script.Parent.SplashdownIntro)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Surface = require(script.Parent.Arena.Surface)
 local Label = require(script.Parent.Arena.Label)
@@ -29,42 +29,6 @@ export type Props = {
 	OnToggleScores: (() -> ())?,
 	OnCloseScores: (() -> ())?,
 }
-
-local function courseName(courseId: string): string
-	local definition = Splashdown.Courses[courseId]
-	return if definition then definition.DisplayName else string.upper(courseId)
-end
-
-local function sequencePills(view, short: boolean)
-	local pills = {
-		Layout = c("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 8),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		}),
-	}
-	for index, courseId in view.sequence do
-		local current = index == view.roundIndex
-		pills[`Pill{index}`] = c(Surface, {
-			Color = if current then colors.Pink else colors.Claimed,
-			Radius = UIConfig.Radius.Tile,
-			Shadow = false,
-			Native = {
-				LayoutOrder = index,
-				Size = UDim2.fromOffset(if short then 118 else 150, if short then 26 else 32),
-			},
-		}, {
-			Text = c(Label, {
-				Text = `{index}. {courseName(courseId)}`,
-				Size = if short then 12 else 15,
-				Color = colors.White,
-				Native = { Position = UDim2.fromOffset(4, 0), Size = UDim2.new(1, -8, 1, 0) },
-			}),
-		})
-	end
-	return pills
-end
 
 local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 	local children = {
@@ -139,6 +103,7 @@ return function(props: Props)
 		HUD = c(Surface, {
 			Color = colors.Cyan,
 			Native = {
+				Visible = not view.intro,
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromOffset(centerX, top),
 				Size = UDim2.fromOffset(width, height),
@@ -239,36 +204,11 @@ return function(props: Props)
 			})
 			else nil,
 		Intro = if view.intro
-			then c(Surface, {
-				Color = colors.Panel,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 1),
-					Position = UDim2.fromOffset(centerX, safe.position.Y + safe.size.Y - (if short then 24 else 48)),
-					Size = UDim2.fromOffset(math.min(560, safe.size.X - 32), if short then 104 else 140),
-					ZIndex = 12,
-				},
-			}, {
-				Round = c(Label, {
-					Text = view.roundLabel,
-					Size = if short then 14 else 18,
-					Color = colors.Yellow,
-					Native = { Position = UDim2.fromOffset(0, 8), Size = UDim2.new(1, 0, 0, 22) },
-				}),
-				Course = c(Label, {
-					Text = view.title,
-					Title = true,
-					Size = if short then 30 else 42,
-					Color = colors.White,
-					Native = {
-						Position = UDim2.fromOffset(0, if short then 26 else 30),
-						Size = UDim2.new(1, 0, 0, if short then 36 else 50),
-					},
-				}),
-				Sequence = c("Frame", {
-					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(0, if short then 68 else 94),
-					Size = UDim2.new(1, 0, 0, if short then 26 else 32),
-				}, sequencePills(view, short)),
+			then c(SplashdownIntro, {
+				CourseId = view.courseId,
+				Title = view.title,
+				RoundLabel = view.roundLabel,
+				EndsAt = view.introEndsAt,
 			})
 			else nil,
 		Toast = if toast
@@ -335,7 +275,7 @@ return function(props: Props)
 			else nil,
 		Scoreboard = if match
 			then c(Scoreboard, {
-				Visible = props.Visible and match.scoreboardOpen,
+				Visible = props.Visible and not view.intro and match.scoreboardOpen,
 				Snapshot = match,
 				OnClose = props.OnCloseScores,
 			})

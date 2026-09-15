@@ -24,6 +24,7 @@
     },
 
     "ReplicatedStorage": {
+      "SplashdownTraining": { "$path": "assets/SplashdownTraining.rbxm" },
       "ThirdPartyCredits": {
         "$path": "generated/ThirdPartyCredits.luau"
       },
@@ -85,6 +86,13 @@
 
           "PlayerData": {
             "$path": "src/server/Modules/PlayerData.luau"
+          },
+
+          "TrainingHazards": {
+            "$className": "Folder",
+            "MapFeatureKit": { "$path": "places/arena/server/Modules/MapFeatures/MapFeatureKit.luau" },
+            "Bumpers": { "$path": "places/arena/server/Modules/MapFeatures/Bumpers.luau" },
+            "RotorBump": { "$path": "places/arena/server/Modules/MapFeatures/RotorBump.luau" }
           },
 
           "CombatPoseService": {
