@@ -1,4 +1,4 @@
--- Description: Studio story previewing the loading screen at a fixed progress state.
+-- Description: Studio story previewing the candy loading screen while a race server waits for its roster, with the queue kicker, a partly filled roster bar and a rotating tip.
 
 --!strict
 
@@ -13,9 +13,11 @@ return function(target: Instance)
 		target,
 		React.createElement(LoadingScreen, {
 			Visible = true,
+			Kicker = "SPLASHDOWN",
 			Title = "GETTING EVERYONE READY",
-			Detail = "3 OF 4 READY",
-			Tip = "CATCH AN INCOMING DODGEBALL TO STEAL IT.",
+			Detail = "18 OF 24 READY",
+			Progress = 0.75,
+			Tip = "PURPLE LAVA SENDS YOU BACK TO YOUR LAST CHECKPOINT.",
 		})
 	)
 end

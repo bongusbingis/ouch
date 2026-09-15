@@ -62,10 +62,17 @@ Visual reference: [lead artist's launch-era UI comparison](https://www.artstatio
 
 The approved Backpack is the baseline for the Shop, item inspection, crate odds/results, season rewards, daily rewards, purchase notifications, and effect/sound audition controls. [SHOP_REDESIGN_PLAN.md](SHOP_REDESIGN_PLAN.md) records the implementation spec written before this extension. Reuse these rules across future UI work; do not choose a fresh palette or panel style for each screen.
 
+## Loading and teleport screens
+
+Every loading surface is one component, `LoadingScreen`, drawn on `LoadingBackdrop`: the lobby's sky-to-pink gradient with the faint swirl tile and slow confetti drift, so the trip from lobby to arena and back never leaves the candy world. The cropped OUCH! logo bobs above a cream `CandyPanel` whose decorative face tilts while the copy stays upright: an optional yellow kicker pill names the queue (ARENA PVP / SPLASHDOWN), the status is a plum Fredoka title with a Builder Sans detail line, and the meter is either a `CandyProgressBar` with scrolling stripes (asset preload, then the roster count while the server waits for everyone) or three hopping pink/yellow/cyan dots when nothing can be measured. Failure states put a pink puffy primary and a pale secondary in the panel, with gamepad focus on the primary. A cream tip sticker with a yellow TIP chip sits at the bottom; race servers rotate `Config.Interface.Loading.RaceTips` instead of the brawl tips. `Loading.Layout` owns the geometry, with compact values for narrow or short safe areas and the logo dropping when actions must fit a short screen.
+
+Static teleport screens (the GUI carried through a teleport) render with `Static = true`: no pop, bob, drift or stripe motion, the dots at rest, no tip, so the captured snapshot is complete. Reduced motion holds every animation the same way. The `OnPresented` handshake, gamepad focus restore and fade timings are unchanged from the previous screen.
+
 ### Shared primitives
 
 | Component | Use |
 | --- | --- |
+| `LoadingBackdrop` | Full-screen candy gradient, swirl and confetti for loading and transition screens; `Static` freezes the drift |
 | `CandySurface` | Common puffy fill, highlight, lip, and outline recipe used by `PuffyButton` and Shop cards |
 | `CandyPanel` | Cream outer shell; decorative face tilts while content, refs, and scrollers stay upright |
 | `CandyTitle` | Pink measured title sticker; keep a reserved title band clear of Close/Back |

@@ -10,6 +10,7 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ModeRegistry = require(Shared:WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry"))
@@ -58,7 +59,7 @@ local function imageId(value: any): string
 	return if string.find(text, "rbxassetid://", 1, true) == 1 then text else `rbxassetid://{text}`
 end
 
-local function useLoadingTip(visible: boolean): string?
+local function useLoadingTip(visible: boolean, tips: { string }): string?
 	local tip, setTip = React.useState(nil :: string?)
 	React.useEffect(function()
 		if not visible then
@@ -67,11 +68,11 @@ local function useLoadingTip(visible: boolean): string?
 		end
 		local thread = task.delay(Loading.TipDelaySeconds, function()
 			local index = 1
-			setTip(Loading.Tips[index])
+			setTip(tips[index])
 			while true do
 				task.wait(Loading.TipIntervalSeconds)
-				index = index % #Loading.Tips + 1
-				setTip(Loading.Tips[index])
+				index = index % #tips + 1
+				setTip(tips[index])
 			end
 		end)
 		return function()
@@ -187,38 +188,54 @@ return function(props: Props)
 			MatchHUDClient.setAvailable(false)
 		end
 	end, { hudAvailable })
-	local tip = useLoadingTip(loadingVisible and not returning)
+	local tip = useLoadingTip(
+		loadingVisible and not returning,
+		if loading.fixedModeId == "Splashdown" then Loading.RaceTips else Loading.Tips
+	)
 	local title, detail = loadingCopy(loading, vote, teleportStatus, postMatch.result ~= nil)
+	local queue = Queues.Queues[loading.queueId]
+	local kicker = if queue then queue.Title else nil
+	-- The bar counts assets while the client warms up, then the roster while
+	-- the server waits for everyone; anything else waits on the dots.
+	local progress: number? = nil
+	if not loading.preloadReady and loading.preloadProgress > 0 then
+		progress = loading.preloadProgress
+	elseif loading.localReady and not loading.gateReleased and not returning and loading.fatalError == nil then
+		local count = if loading.arrivedPlayerCount < loading.expectedPlayerCount
+			then loading.arrivedPlayerCount
+			else loading.readyPlayerCount
+		progress = count / math.max(loading.expectedPlayerCount, 1)
+	end
 	local primaryAction = nil
 	local secondaryAction = nil
 	if teleportStatus and teleportStatus.state == "Failed" then
 		primaryAction = {
 			Text = "TRY AGAIN",
-			Color = "Blue",
+			Style = "Primary",
 			OnActivated = ArenaTeleportClient.retry,
 		}
 		secondaryAction = {
 			Text = "STAY",
-			Color = "Red",
+			Style = "Secondary",
 			OnActivated = ArenaTeleportClient.stay,
 		}
 	elseif loading.fatalError then
 		primaryAction = if loading.simulationReady
 			then {
 				Text = "TRY AGAIN",
-				Color = "Blue",
+				Style = "Primary",
 				OnActivated = ArenaLoadingClient.retryInitialization,
 			}
 			else nil
 		secondaryAction = {
 			Text = "RETURN",
-			Color = "Red",
+			Style = "Secondary",
 			OnActivated = ArenaTeleportClient.returnToLobby,
 		}
 	elseif loading.admission == "Rejected" then
 		primaryAction = {
 			Text = "RETURN",
-			Color = "Blue",
+			Style = "Primary",
 			OnActivated = ArenaTeleportClient.returnToLobby,
 		}
 	end
@@ -291,10 +308,9 @@ return function(props: Props)
 			ParentScreenInsets = Enum.ScreenInsets.None,
 			Title = title,
 			Detail = detail,
+			Kicker = kicker,
 			Tip = tip,
-			Progress = if not loading.preloadReady and loading.preloadProgress > 0
-				then loading.preloadProgress
-				else nil,
+			Progress = progress,
 			PrimaryAction = primaryAction,
 			SecondaryAction = secondaryAction,
 			OnPresented = function()
