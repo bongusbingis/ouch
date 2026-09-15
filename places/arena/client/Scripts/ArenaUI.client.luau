@@ -54,6 +54,8 @@ ArenaLoadingClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
 local ModeVoteClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+local SplashdownClient =
+	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("SplashdownClient"))
 local ArenaTeleportClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaTeleportClient"))
 local ArenaMenuClient = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CombatMenuClient"))
@@ -63,6 +65,7 @@ local ArenaCoreUI = require(script.Parent.Parent:WaitForChild("Modules"):WaitFor
 ArenaCoreUI.start()
 ArenaLoadingClient.start()
 ModeVoteClient.start()
+SplashdownClient.start()
 ArenaTeleportClient.start()
 ArenaMenuClient.start()
 PostMatchClient.start()
@@ -243,6 +246,7 @@ script.Destroying:Connect(function()
 	PostMatchClient.destroy()
 	ArenaCoreUI.destroy()
 	ModeVoteClient.destroy()
+	SplashdownClient.destroy()
 	ArenaLoadingClient.destroy()
 	EconomyStore.stop()
 	SettingsStore.stop()

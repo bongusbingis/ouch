@@ -42,8 +42,20 @@ T.describe("LobbyViewModel", function()
 		T.expect(claimed.showMatchmakingActivity):toEqual(true)
 		T.expect(assigned.partyState):toEqual("MATCH FOUND!")
 		T.expect(assigned.showMatchmakingActivity):toEqual(false)
-		T.expect(teleporting.partyState):toEqual("HEADING TO THE ARENA")
+		T.expect(teleporting.partyState):toEqual("HEADING TO THE MATCH")
 		T.expect(teleporting.showMatchmakingActivity):toEqual(false)
+	end)
+
+	T.it("lets only an idle party leader change the queue", function()
+		local function canPick(snapshot, userId, busy)
+			return LobbyViewModel.partyPresentation(snapshot, userId, busy).canPickQueue
+		end
+		T.expect(canPick({ leaderUserId = 1, phase = "Lobby" }, 1, false)):toEqual(true)
+		T.expect(canPick({ leaderUserId = 1, phase = "Lobby" }, 1, true)):toEqual(false)
+		T.expect(canPick({ leaderUserId = 1, phase = "Lobby" }, 2, false)):toEqual(false)
+		T.expect(canPick({ leaderUserId = 1, phase = "Queued" }, 1, false)):toEqual(false)
+		T.expect(canPick({ leaderUserId = 1, phase = "Lobby", returnQueuePending = true }, 1, false)):toEqual(false)
+		T.expect(canPick(nil, 1, false)):toEqual(false)
 	end)
 end)
 

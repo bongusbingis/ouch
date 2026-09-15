@@ -367,6 +367,7 @@ return {
 		Splash = {
 			DesktopLogoSizePx = Vector2.new(220, 110),
 			ActionsGapPx = 8,
+			QueuePickerHeightPx = 44,
 			ActionTextPx = 26,
 			PrimaryActionTextPx = 30,
 			ActionHeightPx = 52,

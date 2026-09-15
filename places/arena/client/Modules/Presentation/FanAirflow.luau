@@ -5,14 +5,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local MapFeatures = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
+local ScriptableRoots = require(ReplicatedStorage.Shared.Game.MapFeatures.ScriptableRoots)
 
 local FanAirflow = {}
 
 type Stroke = { first: Attachment, last: Attachment, beam: Beam, phase: number, x: number, z: number }
 local fans: { [BasePart]: { Stroke } } = {}
 local connections: { RBXScriptConnection } = {}
+local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
+local unwatch: (() -> ())? = nil
 local started = false
-local generation = 0
 
 local function forget(instance: Instance)
 	local strokes = fans[instance :: BasePart]
@@ -27,8 +29,16 @@ local function forget(instance: Instance)
 	end
 end
 
+local function isFan(instance: Instance): boolean
+	return instance:IsA("BasePart")
+		and (
+			MapFeatures.Fan.EnabledNames[instance.Name] == true
+			or instance:GetAttribute(MapFeatures.Attributes.Fan) == true
+		)
+end
+
 local function track(instance: Instance)
-	if not instance:IsA("BasePart") or not MapFeatures.Fan.EnabledNames[instance.Name] or fans[instance] then
+	if not instance:IsA("BasePart") or not isFan(instance) or fans[instance] then
 		return
 	end
 	local strokes = {}
@@ -74,6 +84,10 @@ end
 local function step()
 	local now = Workspace:GetServerTimeNow()
 	for base, strokes in fans do
+		if base.Parent == nil then
+			forget(base)
+			continue
+		end
 		local top = base.Size.Y / 2 + 0.5
 		for _, stroke in strokes do
 			local rise = ((now * 0.65 + stroke.phase) % 1) * 7
@@ -85,27 +99,49 @@ local function step()
 	end
 end
 
+local function addRoot(root: Instance)
+	local list = {}
+	rootConnections[root] = list
+	table.insert(list, root.DescendantAdded:Connect(track))
+	table.insert(list, root.DescendantRemoving:Connect(forget))
+	for _, instance in root:GetDescendants() do
+		track(instance)
+	end
+end
+
+local function removeRoot(root: Instance)
+	local list = rootConnections[root]
+	if list then
+		for _, connection in list do
+			connection:Disconnect()
+		end
+		rootConnections[root] = nil
+	end
+	for base in fans do
+		if base:IsDescendantOf(root) or base.Parent == nil then
+			forget(base)
+		end
+	end
+end
+
 function FanAirflow.start()
 	if started then
 		return
 	end
 	started = true
-	local currentGeneration = generation
-	local root = Workspace:WaitForChild("Assets"):WaitForChild("Arena"):WaitForChild("Scriptables")
-	if not started or generation ~= currentGeneration then
-		return
-	end
-	table.insert(connections, root.DescendantAdded:Connect(track))
-	table.insert(connections, root.DescendantRemoving:Connect(forget))
-	for _, instance in root:GetDescendants() do
-		track(instance)
-	end
+	unwatch = ScriptableRoots.watch(addRoot, removeRoot)
 	table.insert(connections, RunService.RenderStepped:Connect(step))
 end
 
 function FanAirflow.stop()
 	started = false
-	generation += 1
+	if unwatch then
+		unwatch()
+		unwatch = nil
+	end
+	for root in rootConnections do
+		removeRoot(root)
+	end
 	for _, connection in connections do
 		connection:Disconnect()
 	end

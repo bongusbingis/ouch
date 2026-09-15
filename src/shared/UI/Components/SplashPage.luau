@@ -10,6 +10,7 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local ButtonSurface = require(script.Parent.ButtonSurface)
 local DailyRewardsPanel = require(script.Parent.DailyRewardsPanel)
 local PartyStatus = require(script.Parent.PartyStatus)
+local QueuePicker = require(script.Parent.QueuePicker)
 local QuestsPanel = require(script.Parent.QuestsPanel)
 local ResponsiveText = require(script.Parent.OuchText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
@@ -107,6 +108,10 @@ export type Props = {
 	ShowMatchmakingActivity: boolean,
 	PlayText: string,
 	PlayEnabled: boolean,
+	QueueOptions: { QueuePicker.Option }?,
+	SelectedQueueId: string?,
+	QueueEnabled: boolean?,
+	OnSelectQueue: ((queueId: string) -> ())?,
 	OnPlay: () -> (),
 	OnInvite: () -> (),
 	OnJoinCode: () -> (),
@@ -155,6 +160,23 @@ return function(props: Props)
 			then Vector2.new(safeArea.size.X * 0.9 * 0.96, actions.PrimaryActionHeightPx)
 			else Vector2.new(actionWidth, actions.DesktopPrimaryActionHeightPx)
 	local secondaryTextSize = if short then actions.ShortActionTextPx else actions.ActionTextPx
+	local pickerHeight = actions.QueuePickerHeightPx
+	local queueOptions = props.QueueOptions or {}
+	local pickerVisible = #queueOptions > 1
+	local pickerExtra = if pickerVisible then pickerHeight + actions.ActionsGapPx else 0
+	local function queuePicker(native)
+		if not pickerVisible then
+			return nil
+		end
+		return c(QueuePicker, {
+			Options = queueOptions,
+			SelectedId = props.SelectedQueueId or queueOptions[1].id,
+			Enabled = props.QueueEnabled == true,
+			OnSelect = props.OnSelectQueue or function() end,
+			Compact = short,
+			Native = native,
+		})
+	end
 	local secondaryFittingText = if short then "INVITE" else "INVITE FRIENDS"
 	local tabHeight = 44
 	local tabContentHeight = if stack then math.max(1, stack.size.Y - tabHeight - 12) else 0
@@ -285,15 +307,29 @@ return function(props: Props)
 			Size = if short
 				then UDim2.fromOffset(actionWidth, UIConfig.Layout.Splash.ShortActionsHeightPx)
 				else if portrait
-					then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx)
+					then UDim2.new(0.9, 0, 0, UIConfig.Layout.Splash.PortraitActionsHeightPx + pickerExtra)
 					else UDim2.fromOffset(
 						actionWidth,
 						actions.DesktopStatusHeightPx
 							+ actions.ActionHeightPx * 2
 							+ primarySize.Y
 							+ actions.ActionsGapPx * 3
+							+ pickerExtra
 					),
 		}, {
+			-- The queue choice sits directly above PLAY in every layout: a list row
+			-- on desktop, a strip over the actions when short, and a band between
+			-- the secondary actions and PLAY in portrait.
+			QueuePicker = if short
+				then nil
+				else queuePicker({
+					LayoutOrder = 2,
+					AnchorPoint = if portrait then Vector2.new(0.5, 0) else Vector2.zero,
+					Position = if portrait
+						then UDim2.new(0.5, 0, 0, actions.SecondaryActionHeightPx + actions.ActionsGapPx)
+						else nil,
+					Size = if portrait then UDim2.new(0.96, 0, 0, pickerHeight) else UDim2.new(1, 0, 0, pickerHeight),
+				}),
 			Status = if not short and not portrait
 				then c("Frame", {
 					BackgroundTransparency = 1,
@@ -374,7 +410,7 @@ return function(props: Props)
 					BackgroundTransparency = 1,
 					Image = artwork.Pink,
 					ImageColor3 = if props.PlayEnabled then Color3.new(1, 1, 1) else Color3.fromRGB(110, 110, 110),
-					LayoutOrder = 2,
+					LayoutOrder = 3,
 					AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.zero,
 					Position = if portrait then UDim2.fromScale(0.5, 1) else UDim2.fromScale(-0.0570855, 0.787143),
 					ScaleType = Enum.ScaleType.Slice,
@@ -393,6 +429,18 @@ return function(props: Props)
 				),
 			}),
 		}),
+		ShortQueuePicker = if short and pickerVisible
+			then queuePicker({
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(
+					0,
+					worldWindow.position.X + worldWindow.size.X / 2,
+					1,
+					-actions.ShortActionsBottomPx - actions.ShortActionsHeightPx - actions.ActionsGapPx
+				),
+				Size = UDim2.fromOffset(math.min(actionWidth, 360), pickerHeight - 8),
+			})
+			else nil,
 		BottomMiddle = if (short or portrait) and props.ShowMatchmakingActivity
 			then c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),

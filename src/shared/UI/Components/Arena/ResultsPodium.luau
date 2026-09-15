@@ -55,7 +55,7 @@ return function(props)
 				},
 			}),
 			Score = c(Label, {
-				Text = `{entry.score} ELIMS`,
+				Text = `{entry.score} {props.ScoreLabel}`,
 				Color = Colors.White,
 				Size = if props.Compact then 12 else 15,
 				Native = {

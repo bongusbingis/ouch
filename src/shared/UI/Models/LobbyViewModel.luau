@@ -9,6 +9,7 @@ export type PartyPresentation = {
 	playText: string,
 	playEnabled: boolean,
 	showMatchmakingActivity: boolean,
+	canPickQueue: boolean,
 }
 
 function LobbyViewModel.sanitizeCode(value: string): string
@@ -30,6 +31,8 @@ function LobbyViewModel.formatPartyCode(code: string?, visible: boolean): string
 	return `PARTY CODE: {string.sub(code, 1, 3)}-{string.sub(code, 4, 6)}`
 end
 
+-- The queue is the leader's to change only while the party is idle in the
+-- lobby: a queued, claimed or regrouping party already belongs to a queue.
 function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: boolean): PartyPresentation
 	if snapshot == nil then
 		return {
@@ -37,6 +40,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = false,
+			canPickQueue = false,
 		}
 	end
 	local isLeader = snapshot.leaderUserId == userId
@@ -46,6 +50,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "CANCEL",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = true,
+			canPickQueue = false,
 		}
 	elseif snapshot.phase == "Lobby" then
 		return {
@@ -53,6 +58,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "PLAY",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = false,
+			canPickQueue = isLeader and not busy,
 		}
 	elseif snapshot.phase == "Queued" then
 		return {
@@ -60,6 +66,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "CANCEL",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = true,
+			canPickQueue = false,
 		}
 	elseif snapshot.phase == "Claimed" then
 		return {
@@ -67,6 +74,7 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = true,
+			canPickQueue = false,
 		}
 	elseif snapshot.phase == "Assigned" then
 		return {
@@ -74,13 +82,15 @@ function LobbyViewModel.partyPresentation(snapshot: any?, userId: number, busy: 
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = false,
+			canPickQueue = false,
 		}
 	end
 	return {
-		partyState = "HEADING TO THE ARENA",
+		partyState = "HEADING TO THE MATCH",
 		playText = "PLAY",
 		playEnabled = false,
 		showMatchmakingActivity = false,
+		canPickQueue = false,
 	}
 end
 

@@ -33,10 +33,12 @@ local ModeVoteClient =
 local PostMatchClient =
 	require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("PostMatchClient"))
 local MatchHUD = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("MatchHUD"))
+local SplashdownHUD = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("SplashdownHUD"))
 local TeammateMarkers =
 	require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("Arena"):WaitForChild("TeammateMarkers"))
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local MatchHUDClient = require(script.Parent.Parent.Modules.UI.MatchHUDClient)
+local SplashdownClient = require(script.Parent.Parent.Modules.UI.SplashdownClient)
 local CombatMenuClient = require(Shared:WaitForChild("UI"):WaitForChild("Services"):WaitForChild("CombatMenuClient"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
@@ -80,6 +82,7 @@ local function useLoadingTip(visible: boolean): string?
 end
 
 local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
+	local fixed = loading.fixedModeId ~= nil
 	if teleportStatus then
 		if teleportStatus.state == "Failed" then
 			if teleportStatus.reason == "rewards_pending" then
@@ -101,7 +104,7 @@ local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 		if loading.preloadReady and not loading.simulationReady then
 			return "LOADING ARENA", "STARTING GAMEPLAY SYSTEMS"
 		elseif loading.preloadReady then
-			return "GETTING THE VOTE READY", nil
+			return if fixed then "GETTING THE RACE READY" else "GETTING THE VOTE READY", nil
 		end
 		return "LOADING ARENA", "PREPARING THE ARENA"
 	elseif not loading.gateReleased then
@@ -113,12 +116,15 @@ local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 		return "GETTING THE VOTE READY", nil
 	elseif loading.matchPhase == "Results" and not hasResult then
 		return "JOINING NEXT ROUND", "THIS ROUND IS WRAPPING UP"
+	elseif fixed then
+		return "GETTING THE RACE READY", "THE NEXT RACE STARTS SOON"
 	end
 	return "JOINING MATCH", nil
 end
 
 return function(props: Props)
 	local matchHUD = useExternalStore(MatchHUDClient.getSnapshot, MatchHUDClient.subscribe)
+	local race = useExternalStore(SplashdownClient.getView, SplashdownClient.subscribeView)
 	local menu = useExternalStore(CombatMenuClient.getSnapshot, CombatMenuClient.subscribe)
 	local loading = useExternalStore(ArenaLoadingClient.getSnapshot, ArenaLoadingClient.subscribe)
 	local vote = useExternalStore(ModeVoteClient.getSnapshot, ModeVoteClient.subscribe)
@@ -148,8 +154,16 @@ return function(props: Props)
 		end
 	end
 
+	-- A fixed-mode session (Splashdown) never shows a ballot: the vote step of
+	-- the loading gate is satisfied outright so readiness reports as usual.
+	local fixedMode = loading.fixedModeId ~= nil
+	React.useEffect(function()
+		if fixedMode then
+			ArenaLoadingClient.markVotePrepared()
+		end
+	end, { fixedMode })
 	local clientReady = loading.localReady and loading.serverReady
-	local canPresentVote = clientReady and vote.admitted and vote.open
+	local canPresentVote = clientReady and vote.admitted and vote.open and not fixedMode
 	local votePresented = canPresentVote and presentedVoteStartsAt == vote.startsAt
 	local matchVisible = clientReady
 		and (
@@ -164,6 +178,9 @@ return function(props: Props)
 	local hudVisible = not loadingVisible
 		and (loading.matchPhase == "Active" or loading.matchPhase == "Starting")
 		and not menu.open
+	-- The race HUD replaces the brawl HUD for the whole non-combat mode; the
+	-- match HUD's own combat flag comes from the same replicated mode id.
+	local raceMode = matchHUD.combat == false or loading.fixedModeId == "Splashdown"
 	React.useEffect(function()
 		MatchHUDClient.setAvailable(hudAvailable)
 		return function()
@@ -232,30 +249,43 @@ return function(props: Props)
 				},
 			})
 			else nil,
-		GameModeSelect = c(GameModeSelect, {
-			Active = canPresentVote,
-			Prepared = vote.admitted and #modes > 0,
-			Modes = modes,
-			EndsAt = vote.endsAt,
-			DurationSeconds = vote.durationSeconds,
-			OnVote = ModeVoteClient.vote,
-			OnPrepared = ArenaLoadingClient.markVotePrepared,
-			OnPresented = function()
-				setPresentedVoteStartsAt(vote.startsAt)
-				ArenaLoadingClient.markBallotPresented(vote.startsAt)
-			end,
-		}),
+		GameModeSelect = if fixedMode
+			then nil
+			else c(GameModeSelect, {
+				Active = canPresentVote,
+				Prepared = vote.admitted and #modes > 0,
+				Modes = modes,
+				EndsAt = vote.endsAt,
+				DurationSeconds = vote.durationSeconds,
+				OnVote = ModeVoteClient.vote,
+				OnPrepared = ArenaLoadingClient.markVotePrepared,
+				OnPresented = function()
+					setPresentedVoteStartsAt(vote.startsAt)
+					ArenaLoadingClient.markBallotPresented(vote.startsAt)
+				end,
+			}),
 		GameVersion = c(GameVersion),
 		Teammates = ReactRoblox.createPortal(
 			c(TeammateMarkers, { Snapshot = matchHUD, Visible = hudAvailable and not matchHUD.scoreboardOpen }),
 			playerGui
 		),
-		MatchHUD = c(MatchHUD, {
-			Snapshot = matchHUD,
-			Visible = hudVisible,
-			OnToggleScores = MatchHUDClient.toggleScoreboard,
-			OnCloseScores = MatchHUDClient.closeScoreboard,
-		}),
+		MatchHUD = if raceMode
+			then nil
+			else c(MatchHUD, {
+				Snapshot = matchHUD,
+				Visible = hudVisible,
+				OnToggleScores = MatchHUDClient.toggleScoreboard,
+				OnCloseScores = MatchHUDClient.closeScoreboard,
+			}),
+		SplashdownHUD = if raceMode
+			then c(SplashdownHUD, {
+				Snapshot = race,
+				Match = matchHUD,
+				Visible = hudVisible and race.visible,
+				OnToggleScores = MatchHUDClient.toggleScoreboard,
+				OnCloseScores = MatchHUDClient.closeScoreboard,
+			})
+			else nil,
 		LoadingScreen = c(LoadingScreen, {
 			Visible = loadingVisible,
 			ParentScreenInsets = Enum.ScreenInsets.None,

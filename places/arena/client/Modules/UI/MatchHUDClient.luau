@@ -89,6 +89,8 @@ local function update()
 		title = if mode then mode.Title else "MATCH",
 		timeRemaining = state:GetAttribute("timeRemaining"),
 		scoreTarget = state:GetAttribute("scoreTarget"),
+		scoreLabel = GameModes.ScoreLabel(modeId),
+		combat = GameModes.IsCombat(modeId),
 		teams = teams,
 		score = player:GetAttribute("MatchScore"),
 		teamId = player:GetAttribute("TeamId"),

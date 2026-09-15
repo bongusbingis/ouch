@@ -75,7 +75,9 @@ return function(props)
 			},
 		}, {
 			Objective = c(Label, {
-				Text = view.title .. " • " .. (if view.target > 0 then `FIRST TO {view.target} ELIMS` else "SURVIVE"),
+				Text = view.title .. " • " .. (if view.target > 0
+					then `FIRST TO {view.target} {view.scoreLabel}`
+					else "SURVIVE"),
 				Size = if short then 14 else 17,
 				Color = colors.White,
 				Align = Enum.TextXAlignment.Left,
@@ -94,7 +96,8 @@ return function(props)
 					Size = UDim2.new(1, -116, 1, -40),
 				}, teamPanels(view))
 				else c(Label, {
-					Text = `{view.score} ELIMS` .. (if view.placement then `  •  #{view.placement}` else ""),
+					Text = `{view.score} {view.scoreLabel}`
+						.. (if view.placement then `  •  #{view.placement}` else ""),
 					Title = true,
 					Size = 28,
 					Align = Enum.TextXAlignment.Left,

@@ -25,6 +25,7 @@ local CosmeticPreviewClient = require(UI.Services.CosmeticPreviewClient)
 local Selection = require(UI.Services.Selection)
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
+local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
 local LobbyViewModel = require(UI:WaitForChild("Models"):WaitForChild("LobbyViewModel"))
 local Motion = require(UI:WaitForChild("Motion"))
 local EconomyMenuController = require(UI:WaitForChild("Hooks"):WaitForChild("EconomyMenuController"))
@@ -86,6 +87,11 @@ local PAGE_BACKGROUND_COLORS = {
 -- borrows Inventory's camera and background color rather than requiring a new
 -- Views.Party.SettingsCamera part before the page is navigable.
 local WORLD_CAMERA_PAGE = { Settings = "Inventory" }
+
+local QUEUE_OPTIONS = {}
+for _, queueId in Queues.Order do
+	table.insert(QUEUE_OPTIONS, { id = queueId, title = Queues.Queues[queueId].Title })
+end
 
 local function useParty(client, notifications)
 	local _, forceUpdate = React.useReducer(function(revision: number, _action: any)
@@ -496,7 +502,7 @@ local function LobbyContent(props)
 	local teleportPhase = if snapshot then snapshot.phase else nil
 	local loadingVisible = (teleportPhase == "Assigned" or teleportPhase == "Teleporting")
 		and not (teleportStatus and teleportStatus.state == "Failed")
-	local loadingTitle = if teleportPhase == "Assigned" then "MATCH FOUND" else "TRAVELING TO ARENA"
+	local loadingTitle = if teleportPhase == "Assigned" then "MATCH FOUND" else "TRAVELING TO THE MATCH"
 	local loadingDetail = if teleportPhase == "Assigned" then "PREPARING YOUR SERVER" else nil
 	if teleportStatus and teleportStatus.state == "Retrying" then
 		loadingTitle = "RECONNECTING"
@@ -842,6 +848,14 @@ local function LobbyContent(props)
 						ShowMatchmakingActivity = presentation.showMatchmakingActivity,
 						PlayText = presentation.playText,
 						PlayEnabled = presentation.playEnabled,
+						QueueOptions = QUEUE_OPTIONS,
+						SelectedQueueId = if snapshot and Queues.isEnabled(snapshot.queueId)
+							then snapshot.queueId
+							else Queues.DefaultQueueId,
+						QueueEnabled = presentation.canPickQueue,
+						OnSelectQueue = function(queueId)
+							task.spawn(partyClient.setQueue, partyClient, queueId)
+						end,
 						OnPlay = function()
 							task.spawn(partyClient.toggleMatchmaking, partyClient)
 						end,

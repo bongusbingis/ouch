@@ -74,6 +74,8 @@ The approved Backpack is the baseline for the Shop, item inspection, crate odds/
 | `ShopPriceButton` | Pink primary, cream secondary, muted unavailable; currency and quantity remain legible together |
 | `EconomyPalette` | Compatibility roles derived from `Tokens`, not another independent palette |
 
+| `QueuePicker` | Row of candy pills for the lobby's matchmaking queue (ARENA PVP / SPLASHDOWN); the chosen queue is pink, the rest cream, and only an idle party leader can press them |
+
 `BackpackTitle` and `PanelFrame` retain the approved Backpack composition. New economy surfaces share their tokens and puffy recipe through the components above. Do not replace the legacy `OuchPanel` globally: other UI families still use it.
 
 ### Storefront composition

@@ -21,6 +21,7 @@ export type Contestant = {
 	ballId: string?,
 	hammerId: string?,
 	contribution: number?,
+	stats: { [string]: number }?,
 }
 
 export type ShowcaseEntry = Contestant & { placement: number, score: number }
@@ -32,18 +33,25 @@ export type ScoreEntry = {
 	placement: number?,
 }
 
+export type StatLabel = {
+	id: string,
+	label: string,
+}
+
 export type GlobalResult = {
 	schemaVersion: number,
 	resultId: string,
 	modeId: string,
 	modeName: string,
 	scoreScope: "Player" | "Team",
+	scoreLabel: string,
 	winnerId: string?,
 	reason: string,
 	interactiveAt: number,
 	endsAt: number,
 	contestants: { Contestant },
 	scores: { ScoreEntry },
+	statLabels: { StatLabel }?,
 }
 
 export type PersonalSummary = {
@@ -134,6 +142,7 @@ export type PlayerResult = {
 	resultId: string,
 	modeId: string,
 	modeName: string,
+	scoreLabel: string,
 	outcome: Outcome,
 	firstMatch: boolean?,
 	rewardsPending: boolean?,
@@ -158,6 +167,7 @@ export type BuildInput = {
 	modeId: string,
 	modeName: string,
 	scoreScope: "Player" | "Team",
+	scoreLabel: string,
 	winnerId: string?,
 	reason: string,
 	interactiveAt: number,
@@ -165,6 +175,7 @@ export type BuildInput = {
 	contestants: { Contestant },
 	scores: { [string]: number },
 	teamIds: { string }?,
+	statLabels: { StatLabel }?,
 }
 
 local function copyContestants(contestants: { Contestant }): { Contestant }
@@ -181,6 +192,7 @@ local function copyContestants(contestants: { Contestant }): { Contestant }
 			ballId = contestant.ballId,
 			hammerId = contestant.hammerId,
 			contribution = contestant.contribution,
+			stats = if contestant.stats then table.clone(contestant.stats) else nil,
 		})
 	end
 	table.sort(result, function(a, b)
@@ -250,12 +262,14 @@ function PostMatchResult.build(input: BuildInput): GlobalResult
 		modeId = input.modeId,
 		modeName = input.modeName,
 		scoreScope = input.scoreScope,
+		scoreLabel = input.scoreLabel,
 		winnerId = input.winnerId,
 		reason = input.reason,
 		interactiveAt = input.interactiveAt,
 		endsAt = input.endsAt,
 		contestants = contestants,
 		scores = orderedScores(input, contestants),
+		statLabels = input.statLabels,
 	}
 end
 
@@ -309,7 +323,7 @@ local function presentation(result: GlobalResult, outcome: Outcome, placement: n
 		then "VICTORY"
 		else if outcome == "Defeat" then "ROUND OVER" else "MATCH COMPLETE"
 
-	if result.modeId == "FFA" then
+	if result.scoreScope == "Player" then
 		return {
 			eyebrow = eyebrow,
 			title = if placement then `{PostMatchResult.formatPlacement(placement)} PLACE` else "ROUND OVER",
@@ -347,8 +361,23 @@ local function presentation(result: GlobalResult, outcome: Outcome, placement: n
 	}
 end
 
-local function personalStats(summary: PersonalSummary?, placement: number?): { Stat }
+local function personalStats(
+	summary: PersonalSummary?,
+	placement: number?,
+	contestant: Contestant,
+	statLabels: { StatLabel }?
+): { Stat }
 	local stats = {}
+	if statLabels then
+		local values = contestant.stats
+		for _, label in statLabels do
+			table.insert(stats, { id = label.id, label = label.label, value = (values and values[label.id]) or 0 })
+		end
+		if placement ~= nil then
+			table.insert(stats, { id = "Placement", label = "PLACEMENT", value = placement })
+		end
+		return stats
+	end
 	if summary then
 		if summary.elims ~= nil then
 			table.insert(stats, { id = "Eliminations", label = "ELIMINATIONS", value = summary.elims })
@@ -466,6 +495,7 @@ function PostMatchResult.forPlayer(
 		resultId = result.resultId,
 		modeId = result.modeId,
 		modeName = result.modeName,
+		scoreLabel = result.scoreLabel,
 		outcome = outcome,
 		firstMatch = if summary then summary.firstMatch else nil,
 		rewardsPending = if summary then summary.rewardsPending else nil,
@@ -475,7 +505,7 @@ function PostMatchResult.forPlayer(
 		endsAt = result.endsAt,
 		presentation = presentation(result, outcome, placement),
 		scores = table.clone(result.scores),
-		personalStats = personalStats(summary, placement),
+		personalStats = personalStats(summary, placement, contestant, result.statLabels),
 		podium = PostMatchResult.podium(result),
 		personalAppearance = table.clone(contestant),
 		rewards = rewards(summary),
@@ -494,6 +524,22 @@ end
 
 local function optionalNumber(value: any): boolean
 	return value == nil or finiteNumber(value)
+end
+
+local function copyContestantStats(value: any): { [string]: number }?
+	if typeof(value) ~= "table" then
+		return nil
+	end
+	local copied: { [string]: number } = {}
+	local count = 0
+	for key, stat in value do
+		count += 1
+		if count > 12 or typeof(key) ~= "string" or not finiteNumber(stat) or stat < 0 then
+			return nil
+		end
+		copied[key] = stat
+	end
+	return copied
 end
 
 local function copyAppearance(value: any): Contestant?
@@ -522,6 +568,13 @@ local function copyAppearance(value: any): Contestant?
 			end
 			copied[key] = value[key]
 		end
+	end
+	if value.stats ~= nil then
+		local stats = copyContestantStats(value.stats)
+		if stats == nil then
+			return nil
+		end
+		copied.stats = stats
 	end
 	return copied
 end
@@ -810,6 +863,7 @@ function PostMatchResult.parse(value: any): (PlayerResult?, string?)
 		not validText(value.resultId, 100)
 		or not validText(value.modeId, 32)
 		or not validText(value.modeName, 64)
+		or not validText(value.scoreLabel, 16)
 		or (value.outcome ~= "Victory" and value.outcome ~= "Defeat" and value.outcome ~= "RoundOver")
 		or not finiteNumber(value.interactiveAt)
 		or not finiteNumber(value.endsAt)
@@ -852,6 +906,7 @@ function PostMatchResult.parse(value: any): (PlayerResult?, string?)
 		resultId = value.resultId,
 		modeId = value.modeId,
 		modeName = value.modeName,
+		scoreLabel = value.scoreLabel,
 		outcome = value.outcome,
 		firstMatch = value.firstMatch,
 		rewardsPending = value.rewardsPending,

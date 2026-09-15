@@ -122,6 +122,7 @@ function mockPartyClient:joinByCode(_code)
 end
 
 function mockPartyClient:toggleMatchmaking() end
+function mockPartyClient:setQueue(_queueId) end
 function mockPartyClient:promptInvite() end
 function mockPartyClient:kick(_targetUserId) end
 function mockPartyClient:retryInitialization() end

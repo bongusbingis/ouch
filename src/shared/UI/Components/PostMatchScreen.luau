@@ -329,6 +329,7 @@ return function(props)
 						ResultId = result.resultId,
 						Compact = short,
 						ShowLabels = not standings,
+						ScoreLabel = result.scoreLabel,
 					}),
 				}),
 				Standings = if standings

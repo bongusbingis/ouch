@@ -108,7 +108,13 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 	local target = if rawTarget ~= rawTarget or rawTarget == math.huge then 0 else rawTarget
 	local teams = MatchHUDModel.teams(snapshot.teams)
 	local teamMode = #teams > 0
-	local objective = if target > 0 then `FIRST TO {target} ELIMINATIONS` else "SURVIVE UNTIL TIME RUNS OUT"
+	-- Absent means combat, matching GameModes.IsCombat: every mode before
+	-- Splashdown only ever ran combat HUD copy, so old callers need not pass it.
+	local combat = snapshot.combat ~= false
+	local scoreLabel = snapshot.scoreLabel or "ELIMS"
+	local objective = if not combat
+		then "RACE TO THE FINISH"
+		else if target > 0 then `FIRST TO {target} ELIMINATIONS` else "SURVIVE UNTIL TIME RUNS OUT"
 
 	-- Without an elimination target -- a headcount scoreboard -- the bars read
 	-- against the total on the board instead, so they still fill to one.
@@ -121,9 +127,11 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 	-- Rows always carry a player's own eliminations; the column headers carry
 	-- whatever the mode scores by, which is not always the same thing. The legend
 	-- says which, rather than calling a headcount a kill count.
-	local footer = if not teamMode
-		then "ELIMINATIONS"
-		else if target > 0 then "ELIMINATIONS • TEAM TOTAL ABOVE" else "ELIMINATIONS • PLAYERS LEFT ABOVE"
+	local footer = if not combat
+		then scoreLabel
+		else if not teamMode
+			then "ELIMINATIONS"
+			else if target > 0 then "ELIMINATIONS • TEAM TOTAL ABOVE" else "ELIMINATIONS • PLAYERS LEFT ABOVE"
 
 	local scores
 	if teamMode then
@@ -174,6 +182,8 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 		objective = objective,
 		scores = scores,
 		footer = footer,
+		scoreLabel = scoreLabel,
+		combat = combat,
 		respawn = respawn,
 	}
 end
