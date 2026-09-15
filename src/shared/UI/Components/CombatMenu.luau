@@ -6,7 +6,6 @@ local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
-local UserInputService = game:GetService("UserInputService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -15,12 +14,13 @@ local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UI = Shared:WaitForChild("UI")
 local Components = UI:WaitForChild("Components")
-local AnimatedButton = require(Components:WaitForChild("AnimatedButton"))
+local PuffyButton = require(Components:WaitForChild("PuffyButton"))
+local T = require(UI.Tokens)
+local useArenaHUDLayout = require(UI.Hooks.useArenaHUDLayout)
 local EconomyMenuModals = require(Components:WaitForChild("EconomyMenuModals"))
 local InventoryPage = require(Components:WaitForChild("InventoryPage"))
 local NotificationModal = require(Components:WaitForChild("NotificationModal"))
 local PageTransition = require(Components:WaitForChild("PageTransition"))
-local ResponsiveText = require(Components:WaitForChild("ResponsiveText"))
 local SettingsPage = require(Components:WaitForChild("SettingsPage"))
 local ShopPage = require(Components:WaitForChild("ShopPage"))
 local TopBar = require(Components:WaitForChild("TopBar"))
@@ -41,8 +41,6 @@ local c = React.createElement
 
 local BACK_ACTION = "CloseCombatMenuLayer"
 local BACK_PRIORITY = Enum.ContextActionPriority.High.Value + 2
-local SELECTED_IMAGE = "rbxassetid://94748581468730"
-local UNSELECTED_IMAGE = "rbxassetid://136021539696619"
 
 local PAGE_POSITIONS = {
 	Inventory = {
@@ -58,14 +56,6 @@ local PAGE_POSITIONS = {
 		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 }
-
-local GAMEPAD_IMAGE = ""
-do
-	local ok, image = pcall(UserInputService.GetImageForKeyCode, UserInputService, Enum.KeyCode.ButtonY)
-	if ok and typeof(image) == "string" then
-		GAMEPAD_IMAGE = image
-	end
-end
 
 local function validSelection(selection: Instance?): boolean
 	return selection ~= nil
@@ -121,111 +111,26 @@ local function useHudExclusion(buttonRef, enabled: boolean)
 end
 
 local function MenuToggle(props)
-	local toggleLayout = UIConfig.Layout.MenuToggle
 	local buttonRef = React.useRef(nil)
-	local reducedMotion = useReducedMotion()
-	local styles = ReactSpring.useSpring({
-		Position = if not props.Available
-			then UDim2.fromScale(-0.16, 0.5)
-			else if props.Open then UDim2.fromScale(0.012, 0.95) else UDim2.fromScale(0.012, 0.5),
-		config = { mass = 1, tension = 360, friction = 34 },
-		immediate = reducedMotion,
-	})
+	local geometry, origin = useArenaHUDLayout(Enum.ScreenInsets.CoreUISafeInsets)
 	useHudExclusion(buttonRef, props.Available)
-	local showGamepadImage = props.InputMethod == "Gamepad" and GAMEPAD_IMAGE ~= ""
-	local hint = if props.InputMethod == "Gamepad" then "Y" else if props.InputMethod == "Touch" then "TAP" else "M"
-
-	return c(AnimatedButton, {
+	local position = geometry.menu.position - origin
+	return c(PuffyButton, {
 		ButtonRef = buttonRef,
 		Enabled = props.Available,
+		Text = if props.Open then "CLOSE" else "MENU",
+		TextSize = 17,
+		TextColor = T.Colors.Ink,
+		Color = if props.Open then T.Colors.Yellow else T.Colors.SurfaceWarm,
+		LipColor = if props.Open then T.Colors.YellowLip else T.Colors.WellLine,
+		Shadow = false,
 		Native = {
-			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundTransparency = 1,
-			Image = if props.Open then SELECTED_IMAGE else UNSELECTED_IMAGE,
-			Position = styles.Position,
-			ScaleType = Enum.ScaleType.Slice,
-			Size = UDim2.fromScale(0.105, 0.078),
-			SliceCenter = UIConfig.LobbyArtwork.Action.CyanSlice,
-			SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
+			Position = if props.Open then UDim2.new(1, -88, 1, -54) else UDim2.fromOffset(position.X, position.Y),
+			Size = UDim2.fromOffset(geometry.menu.size.X, geometry.menu.size.Y),
 			Visible = props.Available or props.Open,
 			ZIndex = 80,
 		},
 		OnActivated = CombatMenuClient.toggle,
-	}, {
-		Bounds = c("UISizeConstraint", {
-			MaxSize = Vector2.new(210, 88),
-			MinSize = Vector2.new(126, 54),
-		}),
-		Label = c(ResponsiveText, {
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 32,
-			Native = {
-				AnchorPoint = Vector2.new(0, 0.5),
-				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				Position = UDim2.new(0, toggleLayout.HorizontalPaddingPx, 0.54, 0),
-				Size = UDim2.new(
-					1 - toggleLayout.KeycapWidthScale,
-					-(toggleLayout.HorizontalPaddingPx * 2 + toggleLayout.LabelKeycapGapPx),
-					0.58,
-					0
-				),
-				Text = if props.Open then "CLOSE" else "MENU",
-				TextColor3 = Color3.new(1, 1, 1),
-				TextXAlignment = Enum.TextXAlignment.Left,
-				ZIndex = 82,
-			},
-		}, {
-			Stroke = c("UIStroke", {
-				Color = UIConfig.ProgressionStyle.Ink,
-				Thickness = UIConfig.Button.StrokePx,
-			}),
-		}),
-		Keycap = c("Frame", {
-			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundColor3 = UIConfig.ProgressionStyle.Cyan,
-			BorderSizePixel = 0,
-			Position = UDim2.new(1, -toggleLayout.HorizontalPaddingPx, 0.51, 0),
-			Size = UDim2.fromScale(toggleLayout.KeycapWidthScale, 0.54),
-			ZIndex = 82,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
-			Stroke = c("UIStroke", {
-				Color = Color3.new(1, 1, 1),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.055,
-				Transparency = 0.12,
-			}),
-			Icon = if showGamepadImage
-				then c("ImageLabel", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Image = GAMEPAD_IMAGE,
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromScale(0.66, 0.66),
-					ZIndex = 83,
-				})
-				else nil,
-			Text = if not showGamepadImage
-				then c(ResponsiveText, {
-					MeasurementFont = UIConfig.Text.BodyFont,
-					MaxTextSize = 24,
-					Native = {
-						BackgroundTransparency = 1,
-						Font = UIConfig.Text.BodyFont,
-						Size = UDim2.fromScale(1, 1),
-						Text = hint,
-						TextColor3 = Color3.new(1, 1, 1),
-						ZIndex = 83,
-					},
-				}, {
-					Stroke = c("UIStroke", {
-						Color = UIConfig.ProgressionStyle.Ink,
-						Thickness = UIConfig.Button.StrokePx,
-					}),
-				})
-				else nil,
-		}),
 	})
 end
 

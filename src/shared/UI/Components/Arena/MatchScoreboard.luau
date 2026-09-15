@@ -11,30 +11,23 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
-local Surface = require(script.Parent.Surface)
-local Label = require(script.Parent.Label)
+local Surface = require(script.Parent.HUDSurface)
+local Label = require(script.Parent.HUDLabel)
 local ModalClose = require(script.Parent.Parent.ModalClose)
 local WellScroll = require(script.Parent.Parent.WellScroll)
 local MatchHUDModel = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
 local useSafeArea = require(script.Parent.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
-local colors = Config.Colors
-local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
-
-local function stroke(thickness: number)
-	return c("UIStroke", {
-		Color = colors.Ink,
-		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-		Thickness = thickness,
-	})
-end
+local T = require(script.Parent.Parent.Parent.Tokens)
+local colors = T.ArenaHUD.Colors
+local DISPLAY_FONT = Font.fromEnum(T.Type.Display)
 
 local function row(entry, index: number, height: number, teamMode: boolean, z: number)
 	local textSize = if height < 28 then 14 else 17
 	return c("Frame", {
 		BackgroundColor3 = if entry.isLocal then colors.Pink else colors.Claimed,
-		BackgroundTransparency = if entry.isLocal then 0 else 0.35,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		LayoutOrder = index,
 		Size = UDim2.new(1, 0, 0, height),
@@ -47,28 +40,28 @@ local function row(entry, index: number, height: number, teamMode: boolean, z: n
 			Position = UDim2.fromOffset(10, 1),
 			Size = UDim2.fromOffset(30, height),
 			Text = if teamMode then "" else tostring(entry.placement),
-			TextColor3 = if entry.placement == 1 then colors.Yellow else colors.White,
+			TextColor3 = colors.Ink,
 			TextSize = textSize,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = z + 1,
-		}, { Outline = stroke(0.045) }),
+		}),
 		Name = c("TextLabel", {
 			BackgroundTransparency = 1,
-			Font = UI.Text.BodyFont,
+			Font = T.Type.Label,
 			Position = UDim2.fromOffset(if teamMode then 12 else 40, 0),
 			Size = UDim2.new(1, -(if teamMode then 12 else 40) - (if entry.alive then 60 else 166), 1, 0),
 			Text = entry.displayName .. (if entry.isLocal then " (YOU)" else ""),
-			TextColor3 = colors.White,
+			TextColor3 = colors.Ink,
 			TextSize = textSize,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = z + 1,
-		}, { Outline = stroke(0.03) }),
+		}),
 		Status = if not entry.alive
 			then c("TextLabel", {
 				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
-				Font = UI.Text.BodyFont,
+				Font = T.Type.Label,
 				Position = UDim2.new(1, -56, 0, 0),
 				Size = UDim2.fromOffset(100, height),
 				Text = "RESPAWNING",
@@ -85,11 +78,11 @@ local function row(entry, index: number, height: number, teamMode: boolean, z: n
 			Position = UDim2.new(1, -10, 0, 1),
 			Size = UDim2.fromOffset(44, height),
 			Text = tostring(entry.score),
-			TextColor3 = colors.Yellow,
+			TextColor3 = colors.Ink,
 			TextSize = textSize,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			ZIndex = z + 1,
-		}, { Outline = stroke(0.045) }),
+		}),
 	})
 end
 
@@ -220,7 +213,7 @@ return function(props)
 				Text = view.title .. "  •  " .. view.clock .. (if view.target > 0
 					then `  •  FIRST TO {view.target}`
 					else ""),
-				Color = colors.White,
+				Color = colors.Ink,
 				Size = if short then 13 else 16,
 				Align = Enum.TextXAlignment.Left,
 				Native = {
@@ -240,12 +233,13 @@ return function(props)
 					Text = if string.find(UserInputService:GetLastInputType().Name, "Gamepad")
 						then "HOLD SELECT"
 						else "HOLD TAB",
-					Color = colors.White,
+					Color = colors.Ink,
 					Size = UI.Text.CaptionMinPx,
 					Align = Enum.TextXAlignment.Right,
 					Native = { Position = UDim2.new(1, -116, 0, 12), Size = UDim2.fromOffset(100, 20), ZIndex = z + 2 },
 				}),
 			Columns = c(WellScroll, {
+				Candy = true,
 				InsetPx = if short then 8 else UI.Spacing.CompactInsetPx,
 				Native = {
 					Position = UDim2.fromOffset(inset, headerHeight),
@@ -253,14 +247,14 @@ return function(props)
 					CanvasSize = UDim2.fromOffset(0, listHeight),
 					ScrollingDirection = Enum.ScrollingDirection.Y,
 					ScrollBarThickness = 4,
-					ScrollBarImageColor3 = colors.White,
+					ScrollBarImageColor3 = colors.Pink,
 					Selectable = false,
 					ZIndex = z + 2,
 				},
 			}, columnChildren),
 			Footer = c(Label, {
 				Text = view.footer,
-				Color = colors.White,
+				Color = colors.Ink,
 				Size = UI.Text.CaptionMinPx,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),

@@ -3,8 +3,9 @@
 -- Matchmaking queues. Each queue is its own MemoryStore queue and worker lease
 -- in the lobby, and decides how the arena picks its mode: a ballot over
 -- GameModes.VoteOptions, or one fixed mode. MatchCapacity is the roster a match
--- fills to; the population ladder relaxes from it as the oldest ticket waits,
--- in the same shape as the arena ladder that shipped first.
+-- fills to; the population ladder relaxes from it as the oldest viable ticket
+-- waits. MaxWaitSeconds caps waiting for a larger roster: after that, any
+-- roster at or above MinPlayers can start. Reservation/teleport time is extra.
 local queues = {
 	Arena = {
 		Enabled = true,
@@ -13,6 +14,7 @@ local queues = {
 		SortOrder = 1,
 		MatchCapacity = 20,
 		MinPlayers = 2,
+		MaxWaitSeconds = 30,
 		PopulationExpansion = {
 			{ AfterSeconds = 0, MinimumPlayers = 20 },
 			{ AfterSeconds = 8, MinimumPlayers = 16 },
@@ -29,13 +31,16 @@ local queues = {
 		SortOrder = 2,
 		MatchCapacity = 30,
 		MinPlayers = 2,
-		-- The roster is 20 to 30 by decision: the ladder never relaxes below 20,
-		-- so a queue with fewer waiting players keeps searching.
+		MaxWaitSeconds = 30,
+		-- Give busy queues a short chance to fill, then favor getting the
+		-- waiting racers into a game. Two racers can play all three rounds.
 		PopulationExpansion = {
 			{ AfterSeconds = 0, MinimumPlayers = 30 },
-			{ AfterSeconds = 10, MinimumPlayers = 26 },
-			{ AfterSeconds = 20, MinimumPlayers = 23 },
-			{ AfterSeconds = 30, MinimumPlayers = 20 },
+			{ AfterSeconds = 5, MinimumPlayers = 20 },
+			{ AfterSeconds = 10, MinimumPlayers = 12 },
+			{ AfterSeconds = 15, MinimumPlayers = 8 },
+			{ AfterSeconds = 20, MinimumPlayers = 4 },
+			{ AfterSeconds = 30, MinimumPlayers = 2 },
 		},
 		ModeSelection = { Strategy = "Fixed", ModeId = "Splashdown" },
 	},

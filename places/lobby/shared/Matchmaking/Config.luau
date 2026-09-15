@@ -58,6 +58,8 @@ for _, queueId in Queues.Order do
 		QueueId = queueId,
 		Title = definition.Title,
 		MatchTargetPlayers = definition.MatchCapacity,
+		MatchMinPlayers = definition.MinPlayers,
+		MatchMaxWaitSeconds = definition.MaxWaitSeconds,
 		MatchPopulationExpansion = definition.PopulationExpansion,
 		ModeSelection = modeSelection,
 	}

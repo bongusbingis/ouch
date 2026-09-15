@@ -1,4 +1,4 @@
--- Description: Renders the ring and course bumpers, tracking their authored parts under every tagged Scriptables root and playing a squash animation and impact sound when the server broadcasts a bumper hit.
+-- Description: Renders the ring and course bumpers, tracking their authored parts under every tagged Scriptables root, pulsing them to the live music beat, and playing a stronger squash and impact sound when the server broadcasts a bumper hit.
 
 --!strict
 
@@ -12,6 +12,7 @@ local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ScriptableRoots = require(Game:WaitForChild("MapFeatures"):WaitForChild("ScriptableRoots"))
 local Spring = require(Game:WaitForChild("Util"):WaitForChild("Spring"))
 local GameAudio = require(script.Parent.GameAudio)
+local MatchAudio = require(script.Parent.MatchAudio)
 
 local BumperVisuals = {}
 
@@ -24,6 +25,10 @@ local bumpers: { [BasePart]: BumperState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
 local started = false
+local beatSound: Sound? = nil
+local beatEnvelope = 0
+local previousLoudness = 0
+local lastBeatAt = -math.huge
 
 local function config()
 	return MapFeatures.Bumper
@@ -113,7 +118,7 @@ local function removeRoot(root: Instance)
 	end
 end
 
-local function impulse(part: BasePart)
+local function hitImpulse(part: BasePart)
 	local state = bumpers[part]
 	if state == nil then
 		return
@@ -122,7 +127,51 @@ local function impulse(part: BasePart)
 	GameAudio.play("JumpPadBounce", part)
 end
 
+local function resetBeatDetector(sound: Sound?)
+	beatSound = sound
+	beatEnvelope = if sound then sound.PlaybackLoudness else 0
+	previousLoudness = beatEnvelope
+	lastBeatAt = -math.huge
+end
+
+local function pulseBeat()
+	for _, state in bumpers do
+		Spring.impulse(state.spring, config().BeatImpulse)
+	end
+end
+
+local function updateBeat(deltaTime: number)
+	local sound = MatchAudio.getCurrentMusic()
+	if sound ~= beatSound then
+		resetBeatDetector(sound)
+		return
+	end
+	if sound == nil or not sound.IsPlaying then
+		return
+	end
+
+	local settings = config()
+	local loudness = sound.PlaybackLoudness
+	local alpha = 1 - math.exp(-settings.BeatEnvelopeResponseHz * math.max(deltaTime, 0))
+	beatEnvelope += (loudness - beatEnvelope) * alpha
+	local threshold = math.max(settings.BeatLoudnessFloor, beatEnvelope * settings.BeatSensitivity)
+	local trackTime = sound.TimePosition
+	if trackTime < lastBeatAt then
+		lastBeatAt = -math.huge
+	end
+	if
+		loudness > previousLoudness
+		and loudness >= threshold
+		and trackTime - lastBeatAt >= settings.BeatCooldownSeconds
+	then
+		lastBeatAt = trackTime
+		pulseBeat()
+	end
+	previousLoudness = loudness
+end
+
 local function step(deltaTime: number)
+	updateBeat(deltaTime)
 	local settings = config()
 	for part, state in bumpers do
 		if part.Parent == nil then
@@ -150,7 +199,7 @@ function BumperVisuals.start()
 
 	Network.on("BumperHit", function(part)
 		if typeof(part) == "Instance" and part:IsA("BasePart") then
-			impulse(part)
+			hitImpulse(part)
 		end
 	end)
 
@@ -165,6 +214,7 @@ function BumperVisuals.stop()
 	for root in rootConnections do
 		removeRoot(root)
 	end
+	resetBeatDetector(nil)
 	started = false
 end
 

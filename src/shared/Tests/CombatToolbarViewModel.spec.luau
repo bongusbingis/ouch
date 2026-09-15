@@ -108,8 +108,10 @@ T.describe("CombatToolbar responsive layout", function()
 	T.it("keeps phone and tablet touch targets compact but usable", function()
 		for _, viewport in { Vector2.new(896, 414), Vector2.new(844, 390), Vector2.new(1180, 820) } do
 			local layout = ViewModel.layout(viewport, "Touch")
-			T.expect(layout.width >= 260 and layout.width <= 350):toBeTruthy()
-			T.expect(layout.height >= 95 and layout.height <= 117):toBeTruthy()
+			T.expect(layout.width <= viewport.X * 0.3):toBeTruthy()
+			T.expect(layout.height <= 72):toBeTruthy()
+			T.expect(layout.height - 12 >= 44):toBeTruthy()
+			T.expect(layout.width / 2 - 10 >= 44):toBeTruthy()
 		end
 	end)
 

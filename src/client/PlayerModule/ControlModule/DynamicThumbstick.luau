@@ -609,6 +609,10 @@ function DynamicThumbstick:Create(parentFrame: GuiBase2d)
 		self.thumbstickButton = Instance.new("ImageButton")
 		self.thumbstickButton.Name = "DynamicThumbstickUIModifier"
 		self.thumbstickButton.BackgroundTransparency = 1
+		-- Touch capture regions must never receive the whole-region selection outline.
+		self.thumbstickButton.Selectable = false
+		self.thumbstickButton.BorderSizePixel = 0
+		self.thumbstickButton.Image = ""
 		self.thumbstickButton.ImageTransparency = 1
 		self.thumbstickButton.AutoButtonColor = false
 		self.thumbstickButton.Size = UDim2.new(1, 0, 1, 0)

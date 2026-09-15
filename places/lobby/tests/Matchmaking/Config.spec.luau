@@ -4,6 +4,9 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Queues = require(ReplicatedStorage.Config.Gameplay.Queues)
+local Modes = require(ReplicatedStorage.Config.Gameplay.Modes)
+
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Matchmaking"):WaitForChild("Config"))
 
 return function()
@@ -27,6 +30,15 @@ return function()
 				expect(type(queue.MatchTargetPlayers)).to.equal("number")
 				expect(queue.MatchTargetPlayers > 0).to.equal(true)
 				expect(queue.MatchTargetPlayers >= Config.PartyMaxPlayers).to.equal(true)
+				local definition = Queues.get(queueId)
+				expect(queue.MatchMinPlayers).to.equal(definition.MinPlayers)
+				expect(queue.MatchMinPlayers >= 2).to.equal(true)
+				expect(queue.MatchMinPlayers <= queue.MatchTargetPlayers).to.equal(true)
+				expect(queue.MatchMaxWaitSeconds).to.equal(definition.MaxWaitSeconds)
+				expect(queue.MatchMaxWaitSeconds > 0 and queue.MatchMaxWaitSeconds <= 30).to.equal(true)
+				expect(queue.MatchMaxWaitSeconds + Config.WorkerPollInterval < Config.QueueRecordLifetime).to.equal(
+					true
+				)
 
 				local ladder = queue.MatchPopulationExpansion
 				expect(#ladder > 0).to.equal(true)
@@ -39,7 +51,17 @@ return function()
 					expect(step.MinimumPlayers <= previous.MinimumPlayers).to.equal(true)
 					previous = step
 				end
-				expect(ladder[#ladder].MinimumPlayers <= queue.MatchTargetPlayers).to.equal(true)
+				expect(ladder[#ladder].MinimumPlayers).to.equal(queue.MatchMinPlayers)
+				expect(ladder[#ladder].AfterSeconds <= queue.MatchMaxWaitSeconds).to.equal(true)
+				for _, step in ladder do
+					expect(step.MinimumPlayers >= queue.MatchMinPlayers).to.equal(true)
+					expect(step.MinimumPlayers <= queue.MatchTargetPlayers).to.equal(true)
+				end
+				local selection = queue.ModeSelection
+				local modeIds = if selection.strategy == "Fixed" then { selection.modeId } else selection.options
+				for _, modeId in modeIds do
+					expect(queue.MatchMinPlayers >= Modes[modeId].MinPlayers).to.equal(true)
+				end
 			end
 		end)
 

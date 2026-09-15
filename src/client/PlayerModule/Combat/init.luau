@@ -227,6 +227,7 @@ export type InputGeometry = {
 	-- The on-screen primary action button (the touch hammer/BONK control), if it
 	-- is currently shown, so a prompt can point at the real control.
 	actionButtonRect: TouchRegions.Rect?,
+	jumpButtonRect: TouchRegions.Rect?,
 	-- How far that swipe must travel to register, in pixels.
 	swipeDistancePixels: number,
 	swipeEnabled: boolean,
@@ -245,6 +246,7 @@ function Combat.inputGeometry(): InputGeometry
 		swipeAnchor = TouchRegions.bottomSwipeAnchor(),
 		moveRect = TouchRegions.thumbstickRect(),
 		actionButtonRect = TouchRegions.getExclusion("HammerButton"),
+		jumpButtonRect = TouchRegions.getExclusion("JumpButton"),
 		swipeDistancePixels = TouchRegions.scale(CombatConfig.BottomSwipe.MinDistance),
 		swipeEnabled = CombatConfig.BottomSwipe.Enabled,
 	}

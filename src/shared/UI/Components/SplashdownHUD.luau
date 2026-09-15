@@ -13,14 +13,16 @@ local Config =
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local SplashdownIntro = require(script.Parent.SplashdownIntro)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
-local Surface = require(script.Parent.Arena.Surface)
-local Label = require(script.Parent.Arena.Label)
+local Surface = require(script.Parent.Arena.HUDSurface)
+local Label = require(script.Parent.Arena.HUDLabel)
 local Scoreboard = require(script.Parent.Arena.MatchScoreboard)
 local StandingsStrip = require(script.Parent.Arena.StandingsStrip)
 
 local c = React.createElement
-local colors = Config.Colors
-local layout = Config.HUD
+local T = require(script.Parent.Parent.Tokens)
+local useArenaHUDLayout = require(script.Parent.Parent.Hooks.useArenaHUDLayout)
+local ScoresButton = require(script.Parent.Arena.ScoresButton)
+local colors = T.ArenaHUD.Colors
 
 export type Props = {
 	Snapshot: any,
@@ -49,7 +51,7 @@ local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 				Text = tostring(row.placement),
 				Title = true,
 				Size = textSize + 2,
-				Color = if row.placement == 1 then colors.Yellow else colors.White,
+				Color = colors.Ink,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(34, rowHeight), ZIndex = z + 1 },
 			}),
@@ -69,7 +71,7 @@ local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 				Text = `+{row.points}`,
 				Title = true,
 				Size = textSize + 2,
-				Color = colors.Yellow,
+				Color = colors.Ink,
 				Align = Enum.TextXAlignment.Right,
 				Native = { Position = UDim2.new(1, -66, 0, 0), Size = UDim2.fromOffset(56, rowHeight), ZIndex = z + 1 },
 			}),
@@ -82,16 +84,12 @@ return function(props: Props)
 	local safe = useSafeArea(Enum.ScreenInsets.None)
 	local view = props.Snapshot
 	local match = props.Match
-	local width = math.min(layout.WidthPx, safe.size.X - layout.EdgePx * 2)
-	local top = math.max(safe.position.Y + layout.TopPx, 44)
-	local short = safe.size.Y < Config.Results.ShortHeightPx
-	local height = if short then 64 else 78
-	local stripWidth = if short then Config.Standings.ShortWidthPx else Config.Standings.WidthPx
-	local bandRight = safe.position.X + safe.size.X / 2 + width / 2
-	local stripLeft = safe.position.X + safe.size.X - layout.EdgePx - stripWidth
-	local beside = stripLeft - bandRight >= Config.Standings.GapPx
-	local stripTop = if beside then top else top + height + Config.Standings.GapPx
-	local centerX = safe.position.X + safe.size.X / 2
+	local geometry = useArenaHUDLayout()
+	local width, height = geometry.hud.size.X, geometry.hud.size.Y
+	local top = geometry.hud.position.Y
+	local short = geometry.compact
+	local centerX = geometry.hud.position.X + width / 2
+	local stripTop = geometry.menu.position.Y + 56
 	local toast = view.toast
 	local rowHeight = if short then 24 else 30
 	local rows = if toast then toastRows(toast, rowHeight, short, 22) else nil
@@ -101,7 +99,7 @@ return function(props: Props)
 
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = props.Visible }, {
 		HUD = c(Surface, {
-			Color = colors.Cyan,
+			Color = colors.Panel,
 			Native = {
 				Visible = not view.intro,
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -112,8 +110,8 @@ return function(props: Props)
 		}, {
 			Round = c(Label, {
 				Text = `{view.roundLabel} • {view.title}`,
-				Size = if short then 14 else 17,
-				Color = colors.White,
+				Size = if short then 12 else 15,
+				Color = colors.Ink,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -104, 0, 22) },
 			}),
@@ -126,10 +124,10 @@ return function(props: Props)
 			Checkpoint = c(Label, {
 				Text = view.checkpointLabel,
 				Title = true,
-				Size = if short then 20 else 24,
+				Size = if short then 16 else 20,
 				Align = Enum.TextXAlignment.Left,
 				Native = {
-					Position = UDim2.fromOffset(12, if short then 26 else 30),
+					Position = UDim2.fromOffset(12, if short then 22 else 26),
 					Size = UDim2.fromOffset(progressWidth, 28),
 				},
 			}),
@@ -137,7 +135,7 @@ return function(props: Props)
 				BackgroundColor3 = colors.Ink,
 				BackgroundTransparency = 0.55,
 				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(12, if short then 54 else 62),
+				Position = UDim2.fromOffset(12, if short then 46 else 56),
 				Size = UDim2.fromOffset(progressWidth, if short then 6 else 8),
 				ZIndex = 3,
 			}, {
@@ -156,7 +154,7 @@ return function(props: Props)
 					Color = colors.Pink,
 					Align = Enum.TextXAlignment.Right,
 					Native = {
-						Position = UDim2.new(1, -132, 0, if short then 40 else 44),
+						Position = UDim2.new(1, -132, 0, if short then 34 else 38),
 						Size = UDim2.fromOffset(124, 22),
 					},
 				})
@@ -164,6 +162,7 @@ return function(props: Props)
 		}),
 		Countdown = if view.countdown
 			then c(Label, {
+				Outline = true,
 				Text = view.countdown,
 				Title = true,
 				Size = if short then 72 else 110,
@@ -189,7 +188,7 @@ return function(props: Props)
 				Title = c(Label, {
 					Text = view.finishLabel or "FINISHED",
 					Title = true,
-					Color = colors.White,
+					Color = colors.Ink,
 					Size = if short then 26 else 32,
 					Native = { Size = UDim2.new(1, 0, 0, if short then 34 else 42) },
 				}),
@@ -225,7 +224,7 @@ return function(props: Props)
 					Text = toast.title,
 					Title = true,
 					Size = if short then 22 else 28,
-					Color = colors.White,
+					Color = colors.Ink,
 					Native = {
 						Position = UDim2.fromOffset(0, 6),
 						Size = UDim2.new(1, 0, 0, if short then 26 else 34),
@@ -235,7 +234,7 @@ return function(props: Props)
 				Subtitle = c(Label, {
 					Text = toast.subtitle,
 					Size = if short then 13 else 16,
-					Color = colors.Yellow,
+					Color = colors.Muted,
 					Native = {
 						Position = UDim2.fromOffset(0, if short then 30 else 40),
 						Size = UDim2.new(1, 0, 0, 20),
@@ -252,7 +251,7 @@ return function(props: Props)
 					Text = toast.summary,
 					Title = true,
 					Size = if short then 16 else 20,
-					Color = colors.Yellow,
+					Color = colors.Ink,
 					Native = {
 						AnchorPoint = Vector2.new(0, 1),
 						Position = UDim2.new(0, 0, 1, -6),
@@ -262,13 +261,22 @@ return function(props: Props)
 				}),
 			})
 			else nil,
-		Standings = if not view.intro
+		ScoresButton = if not view.intro and match
+			then c(ScoresButton, {
+				Rect = geometry.scores,
+				OnActivated = props.OnToggleScores,
+				Visible = props.Visible,
+			})
+			else nil,
+		Standings = if not short
+				and not view.intro
+				and geometry.menu.position.X + geometry.menu.size.X - Config.Standings.WidthPx >= geometry.hud.position.X + width + T.ArenaHUD.Gap
 				and toast == nil
 				and match
 			then c(StandingsStrip, {
 				Snapshot = match,
 				Short = short,
-				Position = UDim2.fromOffset(safe.position.X + safe.size.X - layout.EdgePx, stripTop),
+				Position = UDim2.fromOffset(geometry.menu.position.X + geometry.menu.size.X, stripTop),
 				OnActivated = props.OnToggleScores,
 				ZIndex = 10,
 			})
