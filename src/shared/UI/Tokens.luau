@@ -358,6 +358,8 @@ return table.freeze({
 		StickerTilt = -6,
 		WideMin = 920,
 		MediumMin = 560,
+		CullBand = 160,
+		CullMargin = 160,
 	}),
 	SeasonRewards = table.freeze({
 		MaxWidth = 1240,

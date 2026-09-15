@@ -278,7 +278,8 @@ return React.memo(function(props)
 	return c("Frame", {
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder,
-		Size = UDim2.fromScale(1, 1),
+		Position = props.Position,
+		Size = props.Size or UDim2.fromScale(1, 1),
 		ZIndex = 4,
 		[React.Event.MouseEnter] = function()
 			setPointerHovered(true)

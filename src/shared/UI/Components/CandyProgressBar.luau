@@ -16,6 +16,14 @@ return function(props)
 	native.BorderSizePixel = 0
 	local z = native.ZIndex or 1
 	local reducedMotion = useReducedMotion()
+	local span = T.Layout.StripeWidth * 2
+	local stripeCount, setStripeCount = React.useState(4)
+	native[React.Change.AbsoluteSize] = function(instance)
+		local needed = math.clamp(math.ceil(instance.AbsoluteSize.X / span) + 1, 4, 42)
+		setStripeCount(function(current)
+			return if current == needed then current else needed
+		end)
+	end
 	local scrolling = props.Animated == true and not reducedMotion
 	local offset, setOffset = React.useBinding(0)
 	React.useEffect(function()
@@ -23,7 +31,6 @@ return function(props)
 			setOffset(0)
 			return
 		end
-		local span = T.Layout.StripeWidth * 2
 		local elapsed = 0
 		local connection = RunService.RenderStepped:Connect(function(deltaTime)
 			elapsed = (elapsed + deltaTime) % T.Motion.RingPeriod
@@ -33,13 +40,16 @@ return function(props)
 			connection:Disconnect()
 		end
 	end, { scrolling })
+	-- The stripe run only has to reach across this bar. A fixed count meant a
+	-- narrow bar still built dozens of off-screen frames, which is most of the
+	-- instances on a card that carries one.
 	local stripe = {}
-	for i = 0, 41 do
+	for i = 0, stripeCount - 1 do
 		stripe["Stripe" .. i] = c("Frame", {
 			BackgroundColor3 = T.Colors.Surface,
 			BackgroundTransparency = 0.65,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(i * T.Layout.StripeWidth * 2, -6),
+			Position = UDim2.fromOffset(i * span, -6),
 			Size = UDim2.new(0, T.Layout.StripeWidth, 1, 12),
 			Rotation = 0,
 			ZIndex = z + 2,

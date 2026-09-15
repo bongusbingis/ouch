@@ -63,6 +63,8 @@ local function blocks(entries, width, offset, props)
 			Height = e.height,
 			HeaderHeight = e.headerHeight,
 			LayoutOrder = index,
+			VisibleTop = props.VisibleTop,
+			VisibleBottom = props.VisibleBottom,
 			OnCardActivated = props.OnCardActivated,
 			OnExpired = props.OnRefresh,
 			SeasonState = props.SeasonState,
@@ -92,8 +94,15 @@ return function(props)
 	local scroller = React.useRef(nil)
 	local width, setWidth =
 		React.useState(math.max(1, size.X - inset * 2 - scrollInset * 2 - scrollPadding * 2 - Config.ScrollBarPx))
+	local band, setBand = React.useState(0)
 	local renderProps = table.clone(props)
 	renderProps.Short = short
+	-- Which slice of the canvas the sections should actually build. The band is
+	-- quantised so an ordinary scroll re-renders a few times rather than every
+	-- frame, and the margin builds the next cards before they are reached.
+	local viewHeight = math.max(size.Y - header - inset - scrollInset * 2, 1)
+	renderProps.VisibleTop = band * L.CullBand - L.CullMargin
+	renderProps.VisibleBottom = band * L.CullBand + viewHeight + L.CullBand + L.CullMargin
 	local featured, catalog = Composition.groups(props.Model, Config)
 	local content, featureBottom = blocks(featured, width, 0, renderProps)
 	local rest, bottom, anchors =
@@ -237,6 +246,12 @@ return function(props)
 				ZIndex = 4,
 				[React.Change.AbsoluteSize] = function(instance)
 					setWidth(math.max(1, instance.AbsoluteSize.X - Config.ScrollBarPx - scrollPadding * 2))
+				end,
+				[React.Change.CanvasPosition] = function(instance)
+					local reached = math.max(math.floor(instance.CanvasPosition.Y / L.CullBand), 0)
+					setBand(function(current)
+						return if current == reached then current else reached
+					end)
 				end,
 			}, content),
 		}),

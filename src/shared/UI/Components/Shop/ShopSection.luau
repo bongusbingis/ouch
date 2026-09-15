@@ -26,6 +26,8 @@ export type Props = {
 	Height: number,
 	HeaderHeight: number?,
 	LayoutOrder: number?,
+	VisibleTop: number?,
+	VisibleBottom: number?,
 	OnCardActivated: (any) -> (),
 	OnExpired: (() -> ())?,
 }
@@ -59,23 +61,37 @@ return function(props: Props)
 			UICorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
 		})
 	else
-		children.UIGridLayout = c("UIGridLayout", {
-			CellPadding = UDim2.fromOffset(ShopUI.CardGapPx, ShopUI.CardGapPx),
-			CellSize = UDim2.fromOffset(grid.cardWidth, grid.cardHeight),
-			FillDirectionMaxCells = grid.columns,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		})
+		-- Cards carry the position the grid layout used to give them, so a card
+		-- the player cannot see can be left out without moving the rest. The
+		-- storefront canvas is several times taller than its window, and every
+		-- card is a deep puffy subtree, so building only the visible band is
+		-- what keeps opening the Shop from stalling a frame.
+		local gap = ShopUI.CardGapPx
+		local columns = math.max(grid.columns, 1)
+		local contentTop = props.Position.Y.Offset + headerHeight
+		local visibleTop, visibleBottom = props.VisibleTop, props.VisibleBottom
+		local headline = section.style ~= nil and (section.style.Class == "Season" or section.style.Class == "Promo")
 		for index, card in section.cards do
-			children[card.id] = c(ShopCard, {
-				Card = card,
-				CardHeight = grid.cardHeight,
-				CardWidth = grid.cardWidth,
-				Class = props.Class,
-				Headline = section.style ~= nil and (section.style.Class == "Season" or section.style.Class == "Promo"),
-				LayoutOrder = index,
-				OnActivated = props.OnCardActivated,
-				SeasonState = props.SeasonState,
-			})
+			local row = math.floor((index - 1) / columns)
+			local y = row * (grid.cardHeight + gap)
+			local top = contentTop + y
+			local within = visibleTop == nil
+				or visibleBottom == nil
+				or (top < visibleBottom and top + grid.cardHeight > visibleTop)
+			if within then
+				children[card.id] = c(ShopCard, {
+					Card = card,
+					CardHeight = grid.cardHeight,
+					CardWidth = grid.cardWidth,
+					Class = props.Class,
+					Headline = headline,
+					LayoutOrder = index,
+					Position = UDim2.fromOffset(((index - 1) % columns) * (grid.cardWidth + gap), y),
+					Size = UDim2.fromOffset(grid.cardWidth, grid.cardHeight),
+					OnActivated = props.OnCardActivated,
+					SeasonState = props.SeasonState,
+				})
+			end
 		end
 	end
 
