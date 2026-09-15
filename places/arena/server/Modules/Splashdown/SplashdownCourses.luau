@@ -40,6 +40,7 @@ export type LiveCourse = {
 	finishTrigger: BasePart,
 	finishDeck: BasePart,
 	hazards: { BasePart },
+	boundary: { BasePart },
 	lava: BasePart?,
 	lavaBase: CFrame?,
 	lavaRise: LavaRise?,
@@ -145,6 +146,9 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local hazardsFolder = requireChild(model, "Hazards", `{path}.Hazards`, "Folder")
 	local hazards = sortedParts(hazardsFolder)
 	assert(#hazards > 0, `[SplashdownCourses] {path}.Hazards must hold at least one hazard`)
+	local boundaryFolder = requireChild(model, "Boundary", `{path}.Boundary`, "Folder")
+	local boundary = sortedParts(boundaryFolder)
+	assert(#boundary > 0, `[SplashdownCourses] {path}.Boundary must hold the course's wall ring`)
 
 	local lava: BasePart? = nil
 	local lavaRise: LavaRise? = nil
@@ -188,6 +192,7 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 		finishTrigger = finishTrigger,
 		finishDeck = finishDeck,
 		hazards = hazards,
+		boundary = boundary,
 		lava = lava,
 		lavaBase = if lava then lava.CFrame else nil,
 		lavaRise = lavaRise,

@@ -61,6 +61,11 @@ return {
 			LavaRise = { Studs = 60, DelaySeconds = 20, Seconds = 140 },
 		},
 	},
+	-- Every course carries its own invisible boundary ring, wider than the
+	-- arena's, so a racer stays inside the bowl without hitting a wall on the
+	-- outer decks; walls are the arena's authored boundary piece re-placed on
+	-- this radius.
+	Boundary = { Radius = 390, Segments = 24 },
 	-- Where the authored course templates live and what the live one is called.
 	TemplatesPath = { "Assets", "Maps", "Splashdown" },
 	ActiveCourseName = "SplashdownCourse",

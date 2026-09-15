@@ -27,6 +27,8 @@ assert(MAP_ORIGIN:IsA("BasePart"), "[SplashdownAuthor] MapOrigin must be a BaseP
 local SHOWCASE = workspace:WaitForChild("battle_stadium")
 local MOAT = ARENA:WaitForChild("Scriptables"):WaitForChild("ElimZones"):WaitForChild("base_circle_water_001.001")
 assert(MOAT:IsA("MeshPart"), "[SplashdownAuthor] moat must be a MeshPart")
+local ARENA_BOUNDARY = ARENA:WaitForChild("Map"):WaitForChild("Boundary")
+assert(ARENA_BOUNDARY:IsA("Folder"), "[SplashdownAuthor] Map.Boundary must be a Folder")
 local INTERIOR = { "Level_1", "Level_2", "Level_3" }
 local SIBLINGS = { "Scriptables", "PlayerSpawns", "TeamSpawns" }
 
@@ -259,6 +261,42 @@ local function lavaFloor(course: Course, riseStuds: number?, riseDelay: number?,
 	end
 	lava.Parent = course.hazards
 	return lava
+end
+
+-- The arena's own boundary ring sits inside the reach of the outer decks, so
+-- each course carries a wider ring of the same invisible wall piece, centred
+-- on MapOrigin at the bowl's edge.
+local function boundary(course: Course)
+	local wallTemplate: BasePart? = nil
+	for _, child in ARENA_BOUNDARY:GetChildren() do
+		if child:IsA("BasePart") then
+			wallTemplate = child
+			break
+		end
+	end
+	local wallSource = assert(wallTemplate, "[SplashdownAuthor] Map.Boundary has no wall part")
+	local folder = Instance.new("Folder")
+	folder.Name = "Boundary"
+	local radius = Splashdown.Boundary.Radius
+	local segments = Splashdown.Boundary.Segments
+	local height = wallSource.Size.Y
+	for index = 1, segments do
+		local angle = (index - 1) / segments * 2 * math.pi
+		local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local wall = wallSource:Clone()
+		wall.Name = string.format("Wall%02d", index)
+		wall.Anchored = true
+		wall.CanCollide = true
+		wall.CanTouch = false
+		wall.CanQuery = true
+		wall.Transparency = 1
+		wall.CFrame = CFrame.lookAt(
+			outward * radius + Vector3.new(0, LAVA_Y + height / 2, 0),
+			Vector3.new(0, LAVA_Y + height / 2, 0)
+		)
+		wall.Parent = folder
+	end
+	folder.Parent = course.model
 end
 
 local DECK = "bridge_003"
@@ -954,6 +992,7 @@ function Author.build(courseIds: { string }?): { string }
 		end
 		local course = newCourse(courseId)
 		recipe(course)
+		boundary(course)
 		course.model:SetAttribute("CheckpointCount", course.checkpointCount)
 		course.model.Parent = folder
 		table.insert(

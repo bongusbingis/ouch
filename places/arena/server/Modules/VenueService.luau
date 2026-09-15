@@ -23,6 +23,7 @@ export type Venue = "Arena" | "Splashdown"
 
 local PARK_NAME = "ArenaInterior"
 local INTERIOR = { "Level_1", "Level_2", "Level_3" }
+local MAP_CHILDREN = { "Boundary" }
 local SIBLINGS = { "Scriptables", "PlayerSpawns", "TeamSpawns" }
 
 local venue: Venue = "Arena"
@@ -61,6 +62,14 @@ local function swapToSplashdown()
 		local level = model:FindFirstChild(name)
 		if level then
 			level.Parent = park
+		end
+	end
+	-- The arena's boundary ring is tighter than the courses; each course
+	-- template carries its own wider ring.
+	for _, name in MAP_CHILDREN do
+		local child = arena.map:FindFirstChild(name)
+		if child then
+			child.Parent = park
 		end
 	end
 	for _, name in SIBLINGS do

@@ -30,7 +30,7 @@ return function()
 			it(`authors {courseId} to the course contract`, function()
 				local model = TestAssets.get(folder, courseId)
 				expect(model:IsA("Model")).to.equal(true)
-				local origin = TestAssets.get(model, "Origin")
+				local origin = TestAssets.get(model, "Origin") :: BasePart
 				expect(origin:IsA("BasePart")).to.equal(true)
 				TestAssets.get(model, "Scriptables")
 				TestAssets.get(model, "Geometry")
@@ -54,6 +54,17 @@ return function()
 				expect(TestAssets.get(finish, "Trigger"):IsA("BasePart")).to.equal(true)
 				expect(TestAssets.get(finish, "Deck"):IsA("BasePart")).to.equal(true)
 				expect(partCount(TestAssets.get(model, "Hazards")) > 0).to.equal(true)
+
+				local boundary = TestAssets.get(model, "Boundary")
+				expect(partCount(boundary) >= Splashdown.Boundary.Segments).to.equal(true)
+				for _, wall in boundary:GetChildren() do
+					if wall:IsA("BasePart") then
+						local offset = wall.Position - origin.Position
+						local radius = Vector3.new(offset.X, 0, offset.Z).Magnitude
+						expect(math.abs(radius - Splashdown.Boundary.Radius) < 1).to.equal(true)
+						expect(wall.CanCollide and wall.Anchored and wall.Transparency == 1).to.equal(true)
+					end
+				end
 
 				local doors = Splashdown.Courses[courseId].Doors
 				if doors then
