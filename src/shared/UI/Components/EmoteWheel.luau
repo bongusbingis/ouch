@@ -4,7 +4,6 @@
 -- Created: 2026-09-09
 --!strict
 
-local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 
@@ -17,7 +16,9 @@ local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelCon
 local ModalSurface = require(script.Parent.ModalSurface)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useViewportSize = require(script.Parent.Parent.Hooks.useViewportSize)
-local CombatToolbarViewModel = require(script.Parent.Parent.Models.CombatToolbarViewModel)
+local T = require(script.Parent.Parent.Tokens)
+local PuffyButton = require(script.Parent.PuffyButton)
+local useArenaHUDLayout = require(script.Parent.Parent.Hooks.useArenaHUDLayout)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local Config = ReplicatedStorage:WaitForChild("Config")
 local UI = require(Config:WaitForChild("Interface"):WaitForChild("UI"))
@@ -234,21 +235,8 @@ local function Wedge(props: {
 	})
 end
 
-local function TouchButton(props: {
-	Visible: boolean,
-	BottomPx: number,
-	Position: UDim2?,
-	AnchorPoint: Vector2?,
-	ZIndex: number,
-})
+local function TouchButton(props)
 	local ref = React.useRef(nil)
-	local pressing, setPressing = React.useState(false)
-	local reducedMotion = useReducedMotion()
-	local styles = ReactSpring.useSpring({
-		Scale = if pressing then 0.9 else 1,
-		config = Motion.Control,
-		immediate = reducedMotion,
-	})
 	React.useEffect(function()
 		local button = ref.current
 		if button == nil or not props.Visible then
@@ -256,13 +244,8 @@ local function TouchButton(props: {
 			return
 		end
 		local function register()
-			local position, size = button.AbsolutePosition, button.AbsoluteSize
-			registerExclusion("EmoteButton", {
-				minX = position.X,
-				minY = position.Y,
-				maxX = position.X + size.X,
-				maxY = position.Y + size.Y,
-			})
+			local p, s = button.AbsolutePosition, button.AbsoluteSize
+			registerExclusion("EmoteButton", { minX = p.X, minY = p.Y, maxX = p.X + s.X, maxY = p.Y + s.Y })
 		end
 		register()
 		local p = button:GetPropertyChangedSignal("AbsolutePosition"):Connect(register)
@@ -273,55 +256,34 @@ local function TouchButton(props: {
 			registerExclusion("EmoteButton", nil)
 		end
 	end, { props.Visible })
-	local px = WheelConfig.TouchButtonPx
+	local px = props.SizePx or WheelConfig.TouchButtonPx
 	local dots = {}
 	for index = 1, 4 do
-		local x, y = polar((index - 1) * 90, px * 0.22)
+		local x, y = polar((index - 1) * 90, px * 0.19)
 		dots["Dot" .. index] = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = WHITE,
+			BackgroundColor3 = T.Colors.Ink,
 			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, x, 0.5, y),
-			Size = UDim2.fromOffset(math.round(px * 0.17), math.round(px * 0.17)),
-			ZIndex = props.ZIndex + 2,
+			Position = UDim2.new(0.5, x, 0.5, y - 3),
+			Size = UDim2.fromOffset(6, 6),
+			ZIndex = props.ZIndex + 6,
 		}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 	end
-	return c("ImageButton", {
-		ref = ref,
-		Active = props.Visible,
-		AutoButtonColor = false,
-		BackgroundColor3 = Palette.Ink,
-		BackgroundTransparency = 0.35,
-		BorderSizePixel = 0,
-		AnchorPoint = props.AnchorPoint or Vector2.new(1, 1),
-		Position = props.Position or UDim2.new(1, -16, 1, -props.BottomPx),
-		Size = styles.Scale:map(function(scale: number)
-			local side = math.round(px * scale)
-			return UDim2.fromOffset(side, side)
-		end),
-		Visible = props.Visible,
-		ZIndex = props.ZIndex,
-		[React.Event.MouseButton1Down] = function()
-			setPressing(true)
-		end,
-		[React.Event.MouseButton1Up] = function()
-			setPressing(false)
-		end,
-		[React.Event.MouseLeave] = function()
-			setPressing(false)
-		end,
-		[React.Event.Activated] = function()
-			EmoteWheelController.openTouch()
-		end,
-	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-		Outline = c("UIStroke", { Color = WHITE, Thickness = UI.Button.StrokePx, Transparency = 0.15 }),
-		Dots = c(
-			"Frame",
-			{ BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = props.ZIndex + 1 },
-			dots
-		),
-	})
+	return c(PuffyButton, {
+		ButtonRef = ref,
+		Color = T.Colors.SurfaceWarm,
+		LipColor = T.Colors.WellLine,
+		Shadow = false,
+		Native = {
+			AnchorPoint = props.AnchorPoint or Vector2.new(1, 1),
+			Position = props.Position or UDim2.new(1, -16, 1, -props.BottomPx),
+			Size = UDim2.fromOffset(px, px),
+			Visible = props.Visible,
+			Selectable = false,
+			ZIndex = props.ZIndex,
+		},
+		OnActivated = EmoteWheelController.openTouch,
+	}, dots)
 end
 
 export type Props = {
@@ -335,22 +297,8 @@ export type Props = {
 	ZIndex: number?,
 }
 
-local function bottomSafeInset(viewport: Vector2): number
-	local ok, area = pcall(GuiService.GetInsetArea, GuiService, Enum.ScreenInsets.DeviceSafeInsets)
-	if not ok or typeof(area) ~= "Rect" then
-		return 0
-	end
-	return math.max(viewport.Y - (area :: Rect).Max.Y, 0)
-end
-
-local function touchButtonPlacement(viewport: Vector2): (UDim2, Vector2)
-	local toolbar = CombatToolbarViewModel.layout(viewport, "Touch")
-	local px = WheelConfig.TouchButtonPx
-	local bottom = toolbar.bottomGap + bottomSafeInset(viewport)
-	return UDim2.new(0.5, -toolbar.width / 2 - 12 - px, 1, -bottom - toolbar.height / 2 - px / 2), Vector2.zero
-end
-
 return function(props: Props)
+	local hudLayout, rootOrigin = useArenaHUDLayout(Enum.ScreenInsets.CoreUISafeInsets)
 	local snapshot = EmoteWheelController.useSnapshot()
 	local viewport = useViewportSize()
 	local reducedMotion = useReducedMotion()
@@ -399,10 +347,12 @@ return function(props: Props)
 		and not blocked
 	local touchPosition, touchAnchor = props.TouchButtonPosition, props.TouchButtonAnchor
 	if props.TouchButtonPlacement == "BesideToolbar" then
-		touchPosition, touchAnchor = touchButtonPlacement(viewport)
+		local position = hudLayout.emote.position - rootOrigin
+		touchPosition, touchAnchor = UDim2.fromOffset(position.X, position.Y), Vector2.zero
 	end
 	return c(React.Fragment, nil, {
 		Button = c(TouchButton, {
+			SizePx = if props.TouchButtonPlacement == "BesideToolbar" then T.ArenaHUD.EmoteSize else nil,
 			Visible = touchVisible,
 			BottomPx = WheelConfig.TouchButtonBottomPx,
 			Position = touchPosition,

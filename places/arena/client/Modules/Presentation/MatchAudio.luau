@@ -161,6 +161,12 @@ function MatchAudio.start()
 	timeConnection = state:GetAttributeChangedSignal("timeRemaining"):Connect(onTimeChanged)
 end
 
+-- Presentation systems can synchronize to the sound players actually hear
+-- without searching SoundService or keeping a second music clock.
+function MatchAudio.getCurrentMusic(): Sound?
+	return currentMusic
+end
+
 function MatchAudio._resetForTest()
 	if timeConnection then
 		timeConnection:Disconnect()

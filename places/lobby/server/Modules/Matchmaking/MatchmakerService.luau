@@ -286,7 +286,9 @@ function MatchmakerService:_process(deadline)
 	local requiredPlayers = PopulationPolicy.requiredPlayers(
 		self._queueConfig.MatchPopulationExpansion,
 		oldestWait,
-		self._queueConfig.MatchTargetPlayers
+		self._queueConfig.MatchTargetPlayers,
+		self._queueConfig.MatchMinPlayers,
+		self._queueConfig.MatchMaxWaitSeconds
 	)
 	if selectedPlayers < requiredPlayers then
 		return
@@ -301,7 +303,9 @@ function MatchmakerService:_process(deadline)
 	requiredPlayers = PopulationPolicy.requiredPlayers(
 		self._queueConfig.MatchPopulationExpansion,
 		oldestClaimedWait,
-		self._queueConfig.MatchTargetPlayers
+		self._queueConfig.MatchTargetPlayers,
+		self._queueConfig.MatchMinPlayers,
+		self._queueConfig.MatchMaxWaitSeconds
 	)
 	if claimedPlayers < requiredPlayers or os.clock() >= deadline then
 		for _, party in claimed do

@@ -28,6 +28,10 @@ local ThrowUXClient = require(script.Parent.Parent.Modules.UI.ThrowUXClient)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local c = React.createElement
+local T = require(SharedUI.Tokens)
+local Motion = require(SharedUI.Motion)
+local CandySurface = require(SharedUI.Components.CandySurface)
+local useSafeArea = require(SharedUI.Hooks.useSafeArea)
 
 local function useEquippedWeaponCosmetics()
 	local player = Players.LocalPlayer
@@ -365,11 +369,20 @@ local function HammerButton(props: { visible: boolean, itemId: string?, cooldown
 	local ref = React.useRef(nil)
 	local pressing, setPressing = React.useState(false)
 	local reducedMotion = useReducedMotion()
+	local viewport = useViewportSize()
+	local safe = useSafeArea(Enum.ScreenInsets.None)
+	local size = if viewport.Y <= T.ArenaHUD.ShortHeight then T.ArenaHUD.HammerSize else T.ArenaHUD.TabletHammerSize
+	local jump = Combat.inputGeometry().jumpButtonRect
+	local center = if jump
+		then Vector2.new((jump.minX + jump.maxX) / 2, jump.minY - T.ArenaHUD.ControlGap - size / 2)
+		else Vector2.new(
+			safe.position.X + safe.size.X - size / 2 - T.ArenaHUD.HammerFallbackInset,
+			safe.position.Y + safe.size.Y - T.ArenaHUD.HammerFallbackLift
+		)
 	local styles = ReactSpring.useSpring({
-		Scale = if pressing then 0.9 else 1,
-		IconColor = if props.cooldownProgress < 1 then Color3.fromRGB(202, 218, 220) else Color3.new(1, 1, 1),
+		Scale = if pressing then 0.94 else 1,
 		Progress = math.clamp(props.cooldownProgress, 0, 1),
-		config = { mass = 1, tension = 700, friction = 30 },
+		config = Motion.Control,
 		immediate = reducedMotion,
 	})
 	React.useEffect(function()
@@ -379,13 +392,8 @@ local function HammerButton(props: { visible: boolean, itemId: string?, cooldown
 			return
 		end
 		local function register()
-			local position, size = button.AbsolutePosition, button.AbsoluteSize
-			Combat.registerHudExclusion("HammerButton", {
-				minX = position.X,
-				minY = position.Y,
-				maxX = position.X + size.X,
-				maxY = position.Y + size.Y,
-			})
+			local p, s = button.AbsolutePosition, button.AbsoluteSize
+			Combat.registerHudExclusion("HammerButton", { minX = p.X, minY = p.Y, maxX = p.X + s.X, maxY = p.Y + s.Y })
 		end
 		register()
 		local p = button:GetPropertyChangedSignal("AbsolutePosition"):Connect(register)
@@ -404,9 +412,9 @@ local function HammerButton(props: { visible: boolean, itemId: string?, cooldown
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Image = "",
-		Position = UDim2.fromScale(0.9, 0.58),
+		Position = UDim2.fromOffset(center.X, center.Y),
+		Size = UDim2.fromOffset(size, size),
 		Selectable = false,
-		Size = UDim2.fromScale(0.09, 0.09),
 		Visible = props.visible,
 		ZIndex = 40,
 		[React.Event.Activated] = Combat.hammerPressed,
@@ -419,77 +427,44 @@ local function HammerButton(props: { visible: boolean, itemId: string?, cooldown
 			setPressing(false)
 		end,
 	}, {
-		Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
-		Bounds = c("UISizeConstraint", { MaxSize = Vector2.new(104, 104), MinSize = Vector2.new(72, 72) }),
-		Scale = c("UIScale", { Scale = styles.Scale }),
-		Shadow = c("Frame", {
+		Face = c("Frame", {
+			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Color3.fromRGB(24, 41, 48),
-			BackgroundTransparency = 0.34,
-			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.55),
-			Size = UDim2.fromScale(0.94, 0.94),
-			ZIndex = 39,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-		}),
-		Plate = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Color3.fromRGB(242, 24, 76),
-			BorderSizePixel = 0,
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.94, 0.94),
-			ZIndex = 40,
+			Size = UDim2.fromScale(1, 1),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Stroke = c("UIStroke", {
-				Color = Color3.new(1, 1, 1),
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				Thickness = 0.045,
-			}),
+			Scale = c("UIScale", { Scale = styles.Scale }),
+			Surface = c(
+				CandySurface,
+				{ Color = T.Colors.Pink, LipColor = T.Colors.PinkLip, Shadow = false, ZIndex = 0 }
+			),
 			Icon = c("CanvasGroup", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				GroupColor3 = styles.IconColor,
-				Position = UDim2.fromScale(0.5, 0.46),
-				Size = UDim2.fromScale(0.76, 0.76),
-				ZIndex = 41,
-			}, {
-				Preview = c(WeaponViewport, { Weapon = "Hammer", ItemId = props.itemId, ZIndex = 41 }),
-			}),
-			ReadyDot = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Color3.fromRGB(255, 224, 78),
-				BackgroundTransparency = if props.cooldownProgress >= 1 then 0 else 1,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.9),
-				Size = UDim2.fromScale(0.16, 0.055),
-				ZIndex = 43,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			}),
-			Cooldown = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Color3.fromRGB(24, 41, 48),
-				BackgroundTransparency = if props.cooldownProgress < 1 then 0.1 else 1,
-				BorderSizePixel = 0,
-				ClipsDescendants = true,
-				Position = UDim2.fromScale(0.5, 0.82),
-				Size = UDim2.fromScale(0.56, 0.055),
-				ZIndex = 44,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Fill = c("Frame", {
-					BackgroundColor3 = Color3.fromRGB(255, 224, 78),
+				GroupTransparency = if props.cooldownProgress < 1 then 0.25 else 0,
+				Position = UDim2.fromScale(0.5, 0.43),
+				Size = UDim2.fromScale(0.8, 0.72),
+				ZIndex = 5,
+			}, { Preview = c(WeaponViewport, { Weapon = "Hammer", ItemId = props.itemId, ZIndex = 5 }) }),
+			Cooldown = if props.cooldownProgress < 1
+				then c("Frame", {
+					BackgroundColor3 = T.Colors.InkSoft,
 					BorderSizePixel = 0,
-					Size = styles.Progress:map(function(value: number)
-						return UDim2.fromScale(value, 1)
-					end),
-					ZIndex = 45,
+					Position = UDim2.fromScale(0.24, 0.78),
+					Size = UDim2.new(0.52, 0, 0, 4),
+					ZIndex = 6,
 				}, {
 					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				}),
-			}),
+					Fill = c("Frame", {
+						BackgroundColor3 = T.Colors.Yellow,
+						BorderSizePixel = 0,
+						Size = styles.Progress:map(function(value)
+							return UDim2.fromScale(math.clamp(value, 0, 1), 1)
+						end),
+						ZIndex = 7,
+					}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+				})
+				else nil,
 		}),
 	})
 end

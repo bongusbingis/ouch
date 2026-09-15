@@ -106,9 +106,17 @@ The approved Backpack is the baseline for the Shop, item inspection, crate odds/
 
 Settings uses the same cream candy panel and pink title sticker as the Backpack and Shop. Its single pale-blue scroll well holds upright yellow-striped section headings and cream puffy setting cards; row labels use plum Builder Sans, while controls keep the pink primary state and a yellow slider knob. Toggle, saving, focus, persistence, and asset-credit behavior are unchanged. Slider mouse/touch tracking starts inside its 44-pixel hit target, stays claimed outside the control, and ends only on release; vertical touch movement still yields to page scrolling. `Tokens.Settings` owns the page-specific spacing and control geometry, and all interactive targets remain at least 44 logical pixels.
 
+## Arena HUD
+
+Active matches use compact cream candy score bands, plum Fredoka/Builder Sans labels, pale team score wells, and pink/yellow action states. On touch devices, full standings open from a 44-pixel Scores button; the always-on player list is reserved for roomy desktop layouts. The two weapon choices use small puffy cards at the bottom, with the emote launcher beside them. The hammer action sits above the actual jump-button bounds. Touch exclusions follow the real controls, and decorative press motion never changes their hitboxes.
+
+`Tokens.ArenaHUD` and `ArenaHUDLayout` own the full-screen geometry for combat and Splashdown. Use the free part of `GuiService.TopbarInset` for the score band and Menu/Scores controls where it fits, falling back below platform controls on narrow screens. Convert full-screen positions into each root's coordinate space once; do not apply the CoreUI inset again to bottom controls. Interactive controls still clear device cutouts and the home gesture area. The invisible dynamic-thumbstick input modifier is not selectable, preventing a selection outline around the whole movement region.
+
 ## Party modal
 
 The Your Party modal uses the Settings family: a cream candy shell, floating pink title sticker, and one pale-blue well containing cream puffy party-code and member cards. Code visibility is a yellow secondary control; member removal is an orange destructive control. Plum Builder Sans labels replace the legacy outlined white text. `Tokens.PartyModal` owns its responsive geometry, including clearance around scrolling member-card strokes so clipped viewports keep every outline intact. Showing or hiding the code, leader-only removal, scrolling, close behavior, and keyboard/gamepad focus remain unchanged, with every action retaining a 44-pixel target.
+
+The Join Party code-entry modal shares that cream shell and pink title sticker, with six cream puffy digit cards in a pale-blue well, plum labels, a pink Join action, and a cream Cancel action. A yellow card marks the next empty digit while typing. `Tokens.JoinCode` owns the visual geometry; `JoinCodeLayout` retains the native-keyboard avoidance and scroll budget. Keep the single transparent native text field over the decorative digits so paste, backspace, focus, and submit behavior stay intact. The title travels with the upright form when it must scroll above the keyboard, and outlines have inset clearance rather than touching the clipping boundary.
 
 ## Loading and teleport screens
 

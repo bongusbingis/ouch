@@ -15,8 +15,9 @@ local Icon = require(script.Parent.Parent.Icon)
 
 local c = React.createElement
 local Well = require(script.Parent.Parent.Well)
-local colors = Config.Colors
-local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local T = require(script.Parent.Parent.Parent.Tokens)
+local colors = T.ArenaHUD.Colors
+local DISPLAY_FONT = Font.fromEnum(T.Type.Display)
 
 export type Props = {
 	Snapshot: any,
@@ -32,14 +33,6 @@ local function shortName(name: string, limit: number): string
 		return name
 	end
 	return string.sub(name, 1, limit - 1) .. "…"
-end
-
-local function stroke(thickness: number)
-	return c("UIStroke", {
-		Color = colors.Ink,
-		StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-		Thickness = thickness,
-	})
 end
 
 local function stripHeight(rowCount: number, short: boolean): number
@@ -80,8 +73,8 @@ return function(props: Props)
 		local leader = entry.placement == 1
 		local textSize = if short then 14 else UI.Text.CaptionMinPx
 		children[`Row{index}`] = c("Frame", {
-			BackgroundColor3 = if entry.isLocal then colors.Pink else colors.Ink,
-			BackgroundTransparency = if entry.isLocal then 0.2 else 0.55,
+			BackgroundColor3 = if entry.isLocal then colors.Pink else colors.Panel,
+			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
 			LayoutOrder = index,
 			Size = UDim2.new(1, 0, 0, rowHeight),
@@ -104,11 +97,11 @@ return function(props: Props)
 				Position = UDim2.fromOffset(8, 1),
 				Size = UDim2.fromOffset(26, rowHeight),
 				Text = tostring(entry.placement),
-				TextColor3 = if leader then colors.Yellow else colors.White,
+				TextColor3 = colors.Ink,
 				TextSize = textSize,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = z + 2,
-			}, { Outline = stroke(0.045) }),
+			}),
 			Crown = if leader
 				then c(Icon, {
 					Name = "Crown",
@@ -122,16 +115,16 @@ return function(props: Props)
 				else nil,
 			Name = c("TextLabel", {
 				BackgroundTransparency = 1,
-				Font = UI.Text.BodyFont,
+				Font = T.Type.Label,
 				Position = UDim2.fromOffset(34, 0),
 				Size = UDim2.new(1, -34 - 52, 1, 0),
 				Text = if entry.isLocal then "YOU" else shortName(entry.displayName, layout.NameChars),
-				TextColor3 = colors.White,
+				TextColor3 = colors.Ink,
 				TextSize = textSize,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = z + 2,
-			}, { Outline = stroke(0.03) }),
+			}),
 			Score = c("TextLabel", {
 				AnchorPoint = Vector2.new(1, 0),
 				BackgroundTransparency = 1,
@@ -139,11 +132,11 @@ return function(props: Props)
 				Position = UDim2.new(1, -8, 0, 1),
 				Size = UDim2.fromOffset(48, rowHeight),
 				Text = tostring(entry.score),
-				TextColor3 = colors.Yellow,
+				TextColor3 = colors.Ink,
 				TextSize = textSize,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = z + 2,
-			}, { Outline = stroke(0.045) }),
+			}),
 		})
 	end
 	local height = stripHeight(#rows, short)
@@ -160,7 +153,7 @@ return function(props: Props)
 		ZIndex = z,
 		[React.Event.Activated] = props.OnActivated,
 	}, {
-		Well = c(Well, { Native = { Size = UDim2.fromScale(1, 1), ZIndex = z } }, {
+		Well = c(Well, { Candy = true, Native = { Size = UDim2.fromScale(1, 1), ZIndex = z } }, {
 			Rows = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = z + 1 }, children),
 		}),
 	})

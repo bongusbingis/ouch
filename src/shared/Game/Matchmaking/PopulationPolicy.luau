@@ -9,14 +9,26 @@ export type Expansion = {
 	MinimumPlayers: number,
 }
 
-function PopulationPolicy.requiredPlayers(expansions: { Expansion }, waitSeconds: number, targetPlayers: number): number
+function PopulationPolicy.requiredPlayers(
+	expansions: { Expansion },
+	waitSeconds: number,
+	targetPlayers: number,
+	minimumPlayers: number,
+	maxWaitSeconds: number
+): number
+	local minimum = math.clamp(minimumPlayers, 1, targetPlayers)
+	-- The ladder expresses preferred match sizes. It must never strand a
+	-- viable roster forever, even if its final step stays above the minimum.
+	if waitSeconds >= maxWaitSeconds then
+		return minimum
+	end
 	local required = targetPlayers
 
 	for _, expansion in expansions do
 		if waitSeconds < expansion.AfterSeconds then
 			break
 		end
-		required = math.clamp(expansion.MinimumPlayers, 1, targetPlayers)
+		required = math.clamp(expansion.MinimumPlayers, minimum, targetPlayers)
 	end
 
 	return required

@@ -1,4 +1,4 @@
--- Offline R02 probe: executes current matchmaking/repository/retry source against
+-- Offline matchmaking regression probe: executes current matchmaking/repository/retry source against
 -- atomic in-memory stores and a deterministic coroutine clock. No Roblox calls.
 -- Run from repository root: lune run src/scripts/lune/probe-matchmaking-capacity.luau
 local fs = require("@lune/fs")
@@ -6,11 +6,14 @@ local luau = require("@lune/luau")
 local serde = require("@lune/serde")
 local process = require("@lune/process")
 
-local output = ".review/production/2026-09-09-batch1/r02"
+local output = ".review/matchmaking"
 local base = "places/lobby/server/Modules/Matchmaking/"
 local files = {
 	Config = "places/lobby/shared/Matchmaking/Config.luau",
 	GameModes = "src/config/Gameplay/GameModes.luau",
+	Queues = "src/config/Gameplay/Queues.luau",
+	TeleportPayload = "src/shared/Game/Matchmaking/TeleportPayload.luau",
+	ArenaReadinessGate = "src/shared/Game/Matchmaking/ArenaReadinessGate.luau",
 	PopulationPolicy = "src/shared/Game/Matchmaking/PopulationPolicy.luau",
 	PartyModel = base .. "PartyModel.luau",
 	CloudRetry = base .. "CloudRetry.luau",
@@ -207,7 +210,8 @@ function World:map(worker, name)
 	}
 end
 
-function World:worker(id)
+function World:worker(id, queueId)
+	queueId = queueId or "Arena"
 	local world, cache = self, {}
 	local fakeGame = { JobId = id }
 	function fakeGame.GetService(_, serviceName)
@@ -292,7 +296,7 @@ function World:worker(id)
 	end
 	local config = load("Config")
 	local party = load("PartyRepository").new()
-	local queue = load("QueueRepository").new()
+	local queue = load("QueueRepository").new(queueId)
 	local matches = load("MatchRepository").new()
 	local retry = load("CloudRetry")
 	local teleport = {
@@ -305,19 +309,34 @@ function World:worker(id)
 			return if success then accessCode else nil
 		end,
 	}
-	local service = load("MatchmakerService").new(party, queue, matches, teleport, function(value, reason)
+	local service = load("MatchmakerService").new(queueId, party, queue, matches, teleport, function(value, reason)
 		table.insert(
 			world.notifications,
 			{ partyId = value.partyId, reason = reason, at = world.now, matchId = value.matchId }
 		)
 	end)
-	return { service = service, party = party, queue = queue, matches = matches, config = config }
+	return {
+		service = service,
+		party = party,
+		queue = queue,
+		matches = matches,
+		config = config,
+		payload = load("TeleportPayload"),
+		gate = load("ArenaReadinessGate"),
+	}
 end
 
-function World:seed(parties, size, state)
+function World:seed(parties, size, state, queueId)
+	queueId = queueId or "Arena"
 	for index = 1, parties do
 		local id = string.format("party-%04d", index)
-		local ticket = { partyId = id, ticketId = "ticket-" .. id, partySize = size, enqueuedAt = 999 + index / 10000 }
+		local ticket = {
+			queueId = queueId,
+			partyId = id,
+			ticketId = "ticket-" .. id,
+			partySize = size,
+			enqueuedAt = 999 + index / 10000,
+		}
 		local members = {}
 		for member = 1, size do
 			table.insert(members, { userId = index * 10 + member })
@@ -335,7 +354,7 @@ function World:seed(parties, size, state)
 			state(party, index)
 		end
 		self.maps.PartyById[id] = { value = party, expiresAt = 1600 }
-		self.maps.AllPlayers[id] = { value = ticket, sortKey = ticket.enqueuedAt, expiresAt = 1180 }
+		self.maps[queueId][id] = { value = ticket, sortKey = ticket.enqueuedAt, expiresAt = 1180 }
 	end
 end
 
@@ -387,6 +406,231 @@ local function case(name, callback)
 		)
 	)
 end
+
+-- Execute the real queue/party repositories and matchmaker from two distinct
+-- JobIds sharing one queue. The clock and cloud calls are simulated.
+for _, queueId in { "Arena", "Splashdown" } do
+	case(queueId .. "-two-solos-across-lobby-workers", function()
+		local world = World.new(0.005)
+		local first, second = world:worker("lobby-A", queueId), world:worker("lobby-B", queueId)
+		world:seed(2, 1, nil, queueId)
+		for at = 1000, 1034, first.config.WorkerPollInterval do
+			for _, worker in { first, second } do
+				world:schedule(at, function()
+					worker.service:Tick()
+				end)
+			end
+		end
+		world:run()
+		local result = world:summary()
+		assert(result.matchRecords == 1 and result.phases.Assigned == 2, "both solos must share exactly one match")
+		assert(
+			result.assignments["party-0001"] == result.assignments["party-0002"],
+			"workers must not split the racers"
+		)
+		local match = world.maps.MatchById[result.assignments["party-0001"]].value
+		assert(#match.expectedUserIds == 2 and #match.parties == 2, "match must contain the actual two players")
+		assert(match.queueId == queueId, "retain the selected mode's queue")
+		local assignedAt = world.notifications[1].at
+		assert(assignedAt >= 1029 and assignedAt < 1033, "assign at the 30-second fallback plus one poll")
+		for _, party in match.parties do
+			local payload = first.payload.build(match, party.partyId)
+			assert(payload.expectedPlayerCount == 2, "arena must wait for the actual roster, not capacity")
+			assert(first.payload.parse(payload), "arena must accept the small match payload")
+			local gate = first.gate.new("Matched", payload.expectedPlayerCount, 1100)
+			for _, userId in match.expectedUserIds do
+				first.gate.arrive(gate, userId)
+				first.gate.markReady(gate, userId)
+			end
+			local released, reason = first.gate.evaluate(gate, 1040)
+			assert(released and reason == "all_ready", "two ready racers must release the arrival gate")
+		end
+		result.assignmentAgeSeconds = assignedAt - 999.0001
+		result.outcome =
+			"PASS: two lobby workers assign both solos to one match at the fallback; two-player arrival gate opens"
+		return result
+	end)
+end
+
+case("Splashdown-three-minute-wait-regression", function()
+	local world = World.new(0)
+	local worker = world:worker("lobby-A", "Splashdown")
+	world:seed(2, 1, nil, "Splashdown")
+	-- Model still-connected players whose queue records have been refreshed.
+	for id, record in world.maps.Splashdown do
+		record.value.enqueuedAt = 820
+		record.sortKey = 820
+		world.maps.PartyById[id].value.queueTicket.enqueuedAt = 820
+	end
+	world:schedule(1000, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local result = world:summary()
+	assert(result.matchRecords == 1 and result.phases.Assigned == 2, "two racers waiting three minutes must match now")
+	result.outcome = "PASS: the reported two-player three-minute wait forms a match on the next tick"
+	return result
+end)
+
+for _, scenario in
+	{
+		{ name = "full-roster-immediate", parties = 30, size = 1, before = nil, at = 1000, expected = 30 },
+		{ name = "four-racers-at-20s", parties = 4, size = 1, before = 1019, at = 1020, expected = 4 },
+		{ name = "two-person-party-at-30s", parties = 1, size = 2, before = 1029, at = 1030, expected = 2 },
+	}
+do
+	case("Splashdown-" .. scenario.name, function()
+		local world = World.new(0)
+		local worker = world:worker("lobby-A", "Splashdown")
+		world:seed(scenario.parties, scenario.size, nil, "Splashdown")
+		if scenario.before then
+			world:schedule(scenario.before, function()
+				worker.service:Tick()
+			end)
+			world:run()
+			assert(world:summary().matchRecords == 0, "give the queue until its configured boundary to fill")
+		end
+		world:schedule(scenario.at, function()
+			worker.service:Tick()
+		end)
+		world:run()
+		local result = world:summary()
+		assert(result.matchRecords == 1 and result.phases.Assigned == scenario.parties, "whole roster must be assigned")
+		local match = world.maps.MatchById[result.assignments["party-0001"]].value
+		assert(
+			#match.expectedUserIds == scenario.expected and match.targetPlayers == 30,
+			"keep capacity separate from roster"
+		)
+		assert(
+			match.modeSelection.strategy == "Fixed" and match.modeSelection.modeId == "Splashdown",
+			"retain race mode"
+		)
+		result.outcome = "PASS: match forms at the correct boundary with intact parties and fixed Splashdown mode"
+		return result
+	end)
+end
+
+case("Splashdown-lone-racer-waits-then-matches-new-opponent", function()
+	local world = World.new(0)
+	local worker = world:worker("lobby-A", "Splashdown")
+	world:seed(2, 1, nil, "Splashdown")
+	local secondTicket = world.maps.Splashdown["party-0002"]
+	local secondParty = world.maps.PartyById["party-0002"]
+	world.maps.Splashdown["party-0002"] = nil
+	world.maps.PartyById["party-0002"] = nil
+	world:schedule(1030, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	assert(world:summary().matchRecords == 0 and world:summary().phases.Queued == 1, "do not start solo matches")
+	secondTicket.value.enqueuedAt = 1032
+	secondTicket.sortKey = 1032
+	secondParty.value.queueTicket.enqueuedAt = 1032
+	world.maps.Splashdown["party-0002"] = secondTicket
+	world.maps.PartyById["party-0002"] = secondParty
+	world:schedule(1032, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local result = world:summary()
+	assert(
+		result.matchRecords == 1 and result.phases.Assigned == 2,
+		"new opponent must not reset the first player's wait"
+	)
+	result.outcome = "PASS: one racer waits safely; a newly queued opponent joins their match immediately after the cap"
+	return result
+end)
+
+case("Splashdown-refresh-preserves-wait-and-timeout-survives-incomplete-ladder", function()
+	local world = World.new(0)
+	local worker = world:worker("lobby-A", "Splashdown")
+	world:seed(2, 1, nil, "Splashdown")
+	worker.config.Queues.Splashdown.MatchPopulationExpansion = {
+		{ AfterSeconds = 0, MinimumPlayers = 30 },
+		{ AfterSeconds = 10, MinimumPlayers = 20 },
+	}
+	world:schedule(1020, function()
+		for _, record in world.maps.PartyById do
+			assert(worker.queue:Refresh(record.value.queueTicket), "refresh must succeed")
+		end
+		worker.service:Tick()
+	end)
+	world:run()
+	assert(world:summary().matchRecords == 0, "incomplete ladder still prefers a larger match before timeout")
+	world:schedule(1030, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local result = world:summary()
+	assert(
+		result.matchRecords == 1 and result.phases.Assigned == 2,
+		"explicit fallback must override the incomplete ladder"
+	)
+	result.outcome = "PASS: queue refresh retains age; an incomplete ladder cannot block the two-player timeout"
+	return result
+end)
+
+case("Splashdown-stale-age-cannot-start-fresh-racers-early", function()
+	local world = World.new(0)
+	local worker = world:worker("lobby-A", "Splashdown")
+	world:seed(4, 1, function(party, index)
+		if index <= 2 then
+			party.phase = "Lobby"
+		end
+	end, "Splashdown")
+	for index = 1, 2 do
+		local id = string.format("party-%04d", index)
+		world.maps.Splashdown[id].value.enqueuedAt = 820
+		world.maps.Splashdown[id].sortKey = 820
+	end
+	world:schedule(1000, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local before = world:summary()
+	assert(
+		before.matchRecords == 0 and before.phases.Queued == 2,
+		"recheck age using only successfully claimed players"
+	)
+	world:schedule(1030, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local result = world:summary()
+	assert(
+		result.matchRecords == 1 and result.phases.Assigned == 2,
+		"fresh racers remain eligible at their own threshold"
+	)
+	result.outcome = "PASS: stale tickets cannot start fresh players early or prevent their later match"
+	return result
+end)
+
+case("Splashdown-reservation-failure-preserves-earned-wait", function()
+	local world = World.new(0.005)
+	local worker = world:worker("lobby-A", "Splashdown")
+	world:seed(2, 1, nil, "Splashdown")
+	world.fault = function(operation)
+		return if operation.kind == "ReserveServerAsync" then "error_before" else nil
+	end
+	world:schedule(1030, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local before = world:summary()
+	assert(before.matchRecords == 0 and before.phases.Queued == 2, "failed reservation must release both claims")
+	for _, record in world.maps.PartyById do
+		assert(record.value.queueTicket.enqueuedAt < 1000, "released claims must retain their original age")
+	end
+	world.fault = nil
+	world:schedule(world.now + worker.config.WorkerPollInterval, function()
+		worker.service:Tick()
+	end)
+	world:run()
+	local result = world:summary()
+	assert(result.matchRecords == 1 and result.phases.Assigned == 2, "retry must not impose another population wait")
+	result.outcome = "PASS: exhausted reservation retries release intact parties; the next healthy tick matches them"
+	return result
+end)
 
 for _, size in { 1, 4 } do
 	for _, milliseconds in { 0, 5, 20, 100, 200 } do
@@ -554,7 +798,7 @@ case("late-reservation-cannot-clear-newer-in-flight-claims", function()
 	)
 	local newClaim = world.maps.PartyById["party-0001"].value.claim.claimId
 	assert(newClaim ~= "match-1", "the surviving claim must belong to the new worker")
-	local lease = world.maps.WorkerLease[first.config.WorkerLeaseKey].value
+	local lease = world.maps.WorkerLease["Worker:Arena"].value
 	assert(
 		lease.ownerJobId == "worker-B" and lease.expiresAt > world.now,
 		"old cleanup must not release the new worker lease"
@@ -646,7 +890,7 @@ case("stale-four-player-prefix-cleared-in-one-bounded-snapshot", function()
 		"the first fetched snapshot contains only stale tickets"
 	)
 	assert(
-		count(world.maps.AllPlayers) == 5,
+		count(world.maps.Arena) == 5,
 		"one tick must clear the fetched 100 stale tickets without exceeding the snapshot"
 	)
 	world:schedule(1002, function()
@@ -678,7 +922,7 @@ case("stale-four-player-prefix-serves-viable-parties-in-first-tick", function()
 		result.phases.Assigned == 5 and result.matchRecords == 1,
 		"five viable parties inside the fetched prefix must match in one tick"
 	)
-	assert(count(world.maps.AllPlayers) == 0, "all stale and assigned tickets in this snapshot must be removed")
+	assert(count(world.maps.Arena) == 0, "all stale and assigned tickets in this snapshot must be removed")
 	result.outcome =
 		"PASS: one tick skips 95 stale four-player tickets and assigns the five viable parties already in the snapshot"
 	return result
@@ -703,7 +947,7 @@ for _, boundary in { "claimed", "reserved", "recorded", "partial_assignment" } d
 				or (boundary == "recorded" and operation.structure == "MatchById" and operation.kind == "SetAsync")
 				or (
 					boundary == "partial_assignment"
-					and operation.structure == "AllPlayers"
+					and operation.structure == "Arena"
 					and operation.kind == "RemoveAsync"
 				)
 			then
@@ -797,7 +1041,7 @@ for _, size in { 1, 4 } do
 		local world = World.new(0)
 		local worker = world:worker("worker-A")
 		world:seed(2, size)
-		for _, record in world.maps.AllPlayers do
+		for _, record in world.maps.Arena do
 			record.value.enqueuedAt = 1000
 		end
 		for _, record in world.maps.PartyById do
@@ -828,8 +1072,8 @@ case("stale-ticket-age-does-not-relax-young-viable-population", function()
 		local id = string.format("party-%04d", index)
 		local enqueuedAt = if index <= 4 then 900 else 1000
 		world.maps.PartyById[id].value.queueTicket.enqueuedAt = enqueuedAt
-		world.maps.AllPlayers[id].value.enqueuedAt = enqueuedAt
-		world.maps.AllPlayers[id].sortKey = enqueuedAt + index / 10000
+		world.maps.Arena[id].value.enqueuedAt = enqueuedAt
+		world.maps.Arena[id].sortKey = enqueuedAt + index / 10000
 		if index <= 4 then
 			world.maps.PartyById[id].value.phase = "Lobby"
 		end
@@ -870,7 +1114,7 @@ case("remaining-capacity-preserves-parties-and-oldest-fit-order", function()
 			table.remove(party.members)
 		end
 		party.queueTicket.partySize = size
-		world.maps.AllPlayers[id].value.partySize = size
+		world.maps.Arena[id].value.partySize = size
 	end
 	world:schedule(1000, function()
 		worker.service:Tick()
@@ -942,7 +1186,7 @@ case("unknown-match-read-failure-preserves-expired-claims-and-tickets", function
 		"a failed match lookup cannot establish that expired claims may be released"
 	)
 	assert(
-		count(world.maps.AllPlayers) == 40 and result.matchRecords == 0,
+		count(world.maps.Arena) == 40 and result.matchRecords == 0,
 		"unknown match state must not erase tickets or publish a match"
 	)
 	assert(
@@ -1027,7 +1271,7 @@ case("retry-transform-rechecks-presence-with-current-time", function()
 		"retry must observe the presence lease that expired while the request yielded"
 	)
 	assert(
-		result.matchRecords == 0 and count(world.maps.AllPlayers) == 0,
+		result.matchRecords == 0 and count(world.maps.Arena) == 0,
 		"expired presence cannot be revived by stale captured time"
 	)
 	result.outcome =
@@ -1048,7 +1292,7 @@ case("queue-range-error-does-not-claim-or-remove-parties", function()
 	world:run()
 	local result = world:summary()
 	assert(
-		result.errors == 4 and result.phases.Queued == 20 and count(world.maps.AllPlayers) == 20,
+		result.errors == 4 and result.phases.Queued == 20 and count(world.maps.Arena) == 20,
 		"failed candidate reads must preserve every valid party and ticket"
 	)
 	assert(
@@ -1122,5 +1366,5 @@ local evidence = {
 	demandSensitivity = demandSensitivity,
 }
 fs.writeDir(output)
-fs.writeFile(output .. "/after-reservation-guard.json", serde.encode("json", evidence, true))
-print("R02 evidence written: " .. output .. "/after-reservation-guard.json")
+fs.writeFile(output .. "/population-and-capacity.json", serde.encode("json", evidence, true))
+print("Matchmaking evidence written: " .. output .. "/population-and-capacity.json")

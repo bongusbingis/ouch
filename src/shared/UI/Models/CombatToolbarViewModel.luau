@@ -6,6 +6,7 @@ local Combat = require(Config:WaitForChild("Gameplay"):WaitForChild("Combat"))
 local Input = require(Config:WaitForChild("Interface"):WaitForChild("Input"))
 
 local CombatToolbarViewModel = {}
+local T = require(script.Parent.Parent.Tokens)
 
 export type Snapshot = {
 	active: boolean,
@@ -123,16 +124,23 @@ end
 
 function CombatToolbarViewModel.layout(viewport: Vector2, deviceClass: string): Layout
 	local touch = deviceClass == "Touch"
+	if touch then
+		return {
+			width = T.ArenaHUD.ToolbarWidth,
+			height = T.ArenaHUD.ToolbarHeight,
+			bottomGap = T.ArenaHUD.ToolbarBottom,
+		}
+	end
 	local portrait = viewport.Y > viewport.X
-	local widthFraction = if portrait then (if touch then 0.68 else 0.58) else if touch then 0.34 else 0.27
+	local widthFraction = if portrait then 0.58 else 0.27
 	local minimum = 260
-	local maximum = if touch then 350 else 332
+	local maximum = 332
 	local width = math.clamp(viewport.X * widthFraction, minimum, maximum)
-	local aspect = if touch then 3 else 3.15
+	local aspect = 3.15
 	return {
 		width = width,
 		height = width / aspect,
-		bottomGap = math.clamp(viewport.Y * (if touch then 0.02 else 0.016), 14, 22),
+		bottomGap = math.clamp(viewport.Y * 0.016, 14, 22),
 	}
 end
 

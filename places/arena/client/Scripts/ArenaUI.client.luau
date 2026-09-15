@@ -114,9 +114,9 @@ if not throwUxOk then
 	warn(`[ArenaUI] Throw feedback unavailable: {ThrowUXClient}`)
 end
 
-local container = ReactRoot.create("ArenaRoot", Enum.ScreenInsets.None, 1000)
+local container = ReactRoot.create("ArenaRoot", Enum.ScreenInsets.None, 1000, true)
 local root = ReactRoblox.createRoot(container)
-local combatContainer = ReactRoot.create("ArenaCombatRoot", Enum.ScreenInsets.None, 100)
+local combatContainer = ReactRoot.create("ArenaCombatRoot", Enum.ScreenInsets.None, 100, true)
 local combatRoot = ReactRoblox.createRoot(combatContainer)
 local menuContainer = ReactRoot.create("ArenaMenuRoot", Enum.ScreenInsets.CoreUISafeInsets, 500, true)
 local menuRoot = ReactRoblox.createRoot(menuContainer)
