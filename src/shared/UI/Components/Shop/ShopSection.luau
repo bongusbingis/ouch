@@ -71,6 +71,7 @@ return function(props: Props)
 				CardHeight = grid.cardHeight,
 				CardWidth = grid.cardWidth,
 				Class = props.Class,
+				Headline = section.style ~= nil and (section.style.Class == "Season" or section.style.Class == "Promo"),
 				LayoutOrder = index,
 				OnActivated = props.OnCardActivated,
 				SeasonState = props.SeasonState,
