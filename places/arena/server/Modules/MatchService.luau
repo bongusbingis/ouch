@@ -30,6 +30,7 @@ local ArenaService = require(script.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local BallService = require(script.Parent.BallService)
 local EliminationService = require(script.Parent.EliminationService)
+local SpawnRouter = require(script.Parent.SpawnRouter)
 
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -56,6 +57,7 @@ local watchedPlayers: { [number]: RBXScriptConnection } = {}
 local nativeDeathConnections: { [number]: RBXScriptConnection } = {}
 local lastResult: PostMatchResult.GlobalResult? = nil
 local resultRosterByUserId: { [number]: PostMatchResult.Contestant } = {}
+local contestantStatsByUserId: { [number]: { [string]: number } } = {}
 local opponentDeadline: number? = nil
 local refreshPopulation: () -> ()
 
@@ -143,6 +145,7 @@ local function rememberContestant(player: Player)
 		ballId = player:GetAttribute("Equip_BallAssets"),
 		hammerId = player:GetAttribute("Equip_HammerAssets"),
 		contribution = playerMatchElims[PlayerIds.toId(player)] or 0,
+		stats = contestantStatsByUserId[player.UserId],
 	}
 end
 
@@ -172,6 +175,8 @@ local function buildResult(activeMode: GameMode.GameMode, event: { [string]: any
 		modeId = activeMode.id,
 		modeName = activeMode.displayName,
 		scoreScope = activeMode.scoreScope or "Player",
+		scoreLabel = GameModes.ScoreLabel(activeMode.id),
+		statLabels = activeMode.statLabels,
 		winnerId = event.winnerId,
 		reason = tostring(event.reason or "Complete"),
 		interactiveAt = now + PostMatchConfig.RevealSeconds,
@@ -360,6 +365,9 @@ end
 
 local function grantSpawnProtection(character: Model)
 	local activeMode = assert(mode, "[MatchService] spawn protection requires an active mode")
+	if activeMode.rules.SpawnInvulnSeconds <= 0 then
+		return
+	end
 	local generation = (spawnProtectionGeneration[character] or 0) + 1
 	spawnProtectionGeneration[character] = generation
 	character:SetAttribute("minv", true)
@@ -377,6 +385,7 @@ end
 local function startMatch(events: { MatchSim.MatchEvent })
 	local activeMode = assert(mode, "[MatchService] startMatch requires a selected mode")
 	table.clear(resultRosterByUserId)
+	table.clear(contestantStatsByUserId)
 	table.clear(spawnedThisMatch)
 	table.clear(playerMatchElims)
 	table.clear(pendingWaveRespawns)
@@ -393,7 +402,7 @@ local function startMatch(events: { MatchSim.MatchEvent })
 			respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 			EliminationService.up(player)
 			spawnedThisMatch[key] = true
-			ArenaService.teleport(character, playerTeam(player))
+			SpawnRouter.spawn(character, player, playerTeam(player), "MatchStart")
 			grantSpawnProtection(character)
 		end
 	end
@@ -424,7 +433,7 @@ local function cleanupMatch()
 		local character = player.Character
 		if character then
 			EliminationService.up(player)
-			ArenaService.teleport(character, nil)
+			SpawnRouter.spawn(character, player, nil, "Cleanup")
 		end
 	end
 end
@@ -532,9 +541,10 @@ local function onCharacterAdded(player: Player, character: Model)
 	EliminationService.up(player)
 	player:SetAttribute("MatchRespawnAt", nil)
 	if not isArenaJoinPhase() then
+		SpawnRouter.spawn(character, player, playerTeam(player), "Idle")
 		return
 	end
-	ArenaService.teleport(character, playerTeam(player))
+	SpawnRouter.spawn(character, player, playerTeam(player), "Join")
 	grantSpawnProtection(character)
 
 	local isFirstSpawn = not spawnedThisMatch[key]
@@ -598,7 +608,7 @@ local function respawnPlayer(player: Player)
 	end
 	player:SetAttribute("MatchRespawnAt", nil)
 	if state.phase == "Active" then
-		ArenaService.teleport(character, playerTeam(player))
+		SpawnRouter.spawn(character, player, playerTeam(player), "Respawn")
 	end
 	grantSpawnProtection(character)
 	if state.phase == "Active" then
@@ -737,7 +747,7 @@ function MatchService.handleCombatEvent(event: { [string]: any }): boolean
 	if event.kind ~= "Elim" then
 		return false
 	end
-	if state.phase ~= "Active" then
+	if state.phase ~= "Active" or (mode ~= nil and not GameModes.IsCombat(mode.id)) then
 		return false
 	end
 	local target = PlayerIds.fromId(event.targetId)
@@ -1020,8 +1030,48 @@ function MatchService.teleportToSpawnForAdmin(player: Player): (boolean, string?
 	if character == nil then
 		return false, "no_character"
 	end
-	ArenaService.teleport(character, playerTeam(player))
+	SpawnRouter.spawn(character, player, playerTeam(player), "Admin")
 	return true
+end
+
+-- Server seams for a mode owner that scores something other than eliminations
+-- (Splashdown points): the score still flows through MatchSim so the replicated
+-- attribute, leaderstats and results all read from one place.
+function MatchService.setPlayerScore(player: Player, score: number): boolean
+	if state.phase ~= "Active" and state.phase ~= "Starting" then
+		return false
+	end
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.setScore(state, PlayerIds.toId(player), score, events) then
+		return false
+	end
+	handleMatchEvents(events)
+	return true
+end
+
+function MatchService.finishMatch(winnerId: string?, reason: string): boolean
+	local activeMode = mode
+	if activeMode == nil then
+		return false
+	end
+	local events: { MatchSim.MatchEvent } = {}
+	if not MatchSim.finish(state, activeMode.rules, reason, events, winnerId) then
+		return false
+	end
+	handleMatchEvents(events)
+	return true
+end
+
+function MatchService.setContestantStats(player: Player, stats: { [string]: number })
+	contestantStatsByUserId[player.UserId] = table.clone(stats)
+	local contestant = resultRosterByUserId[player.UserId]
+	if contestant then
+		contestant.stats = contestantStatsByUserId[player.UserId]
+	end
+end
+
+function MatchService.activeModeId(): string?
+	return if mode then mode.id else nil
 end
 
 function MatchService.start()

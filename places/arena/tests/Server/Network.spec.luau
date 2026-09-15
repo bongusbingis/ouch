@@ -35,6 +35,8 @@ local EXPECTED_REMOTES = {
 	OnboardingDebug = "RemoteEvent",
 	CombatSimEvent = "UnreliableRemoteEvent",
 	JumpPadImpulse = "UnreliableRemoteEvent",
+	DoorBroken = "UnreliableRemoteEvent",
+	SplashdownEvent = "UnreliableRemoteEvent",
 }
 
 local nextUserId = 400000

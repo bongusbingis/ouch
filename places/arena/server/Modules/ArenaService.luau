@@ -14,6 +14,12 @@ local MovementGuard = require(
 local Volume = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures"):WaitForChild("Volume")
 )
+local ScriptableRoots = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("ScriptableRoots")
+)
 
 local ArenaService = {}
 
@@ -106,6 +112,7 @@ function ArenaService.start(): Arena
 	local blueSpawns = requireFolder(teamSpawnsFolder, "Blue", "Workspace.Assets.Arena.TeamSpawns.Blue")
 
 	local scriptables = requireFolder(root, "Scriptables", "Workspace.Assets.Arena.Scriptables")
+	ScriptableRoots.tag(scriptables)
 	local playerSpawns = spawnParts(playerSpawnsFolder, "Workspace.Assets.Arena.PlayerSpawns", origin.Position)
 	local teamSpawns = {
 		Red = spawnParts(redSpawns, "Workspace.Assets.Arena.TeamSpawns.Red", origin.Position),

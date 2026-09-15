@@ -50,6 +50,10 @@ local function bumpersFor(assembly: Model): { BasePart }
 		if not descendant:IsA("BasePart") then
 			continue
 		end
+		if descendant:GetAttribute(MapFeatures.Attributes.Bumper) == true then
+			table.insert(found, descendant)
+			continue
+		end
 		for _, prefix in MapFeatures.Bumper.NamePrefixes do
 			if descendant.Name:find(prefix, 1, true) == 1 then
 				table.insert(found, descendant)

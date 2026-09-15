@@ -150,6 +150,11 @@ local function startWinner()
 		return
 	end
 	if reason == "not_enough_players" then
+		-- A fixed mode has no ballot to reopen; the pending winner simply waits
+		-- for the roster, and the next ready or eligibility change retries.
+		if ArenaSessionService.fixedModeId() then
+			return
+		end
 		cancelVote()
 		task.defer(beginVote)
 		return
@@ -239,6 +244,21 @@ beginVote = function()
 	end
 	local options = configuredOptions()
 	if options == nil then
+		return
+	end
+
+	-- A fixed-mode session (Splashdown) never opens a ballot: its mode becomes
+	-- the pending winner and starts the way a decided vote would, with the
+	-- snapshot publishing the winner and open = false.
+	local fixed = ArenaSessionService.fixedModeId()
+	if fixed then
+		if not table.find(options, fixed) then
+			return
+		end
+		pendingWinner = fixed
+		winnerModeId = fixed
+		publish()
+		startWinner()
 		return
 	end
 

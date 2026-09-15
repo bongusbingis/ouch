@@ -8,8 +8,10 @@ local ElimZones = require(script.Parent.ElimZones)
 local FoamPits = require(script.Parent.FoamPits)
 local FanUpdraft = require(script.Parent.FanUpdraft)
 local SpinnerBump = require(script.Parent.SpinnerBump)
+local RotorBump = require(script.Parent.RotorBump)
 local Bumpers = require(script.Parent.Bumpers)
 local BeachBalls = require(script.Parent.BeachBalls)
+local Doors = require(script.Parent.Doors)
 
 local kits: { MapFeatureKit.MapFeatureKit } = {
 	ElimZones,
@@ -17,8 +19,10 @@ local kits: { MapFeatureKit.MapFeatureKit } = {
 	FoamPits,
 	FanUpdraft,
 	SpinnerBump,
+	RotorBump,
 	Bumpers,
 	BeachBalls,
+	Doors,
 }
 
 local MapFeatureRegistry = {}

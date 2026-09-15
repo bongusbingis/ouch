@@ -37,6 +37,21 @@ T.describe("Rotation", function()
 	T.it("flips sign three quarters of the way through the period", function()
 		T.expect(Rotation.rockAt(3, 0.5, 4, 0)):toBeNear(-0.5, 1e-6)
 	end)
+
+	T.it("slides the same oscillation measured in studs", function()
+		T.expect(Rotation.slideAt(1, 12, 4, 0)):toBeNear(12, 1e-6)
+		T.expect(Rotation.slideAt(3, 12, 4, 0)):toBeNear(-12, 1e-6)
+		T.expect(Rotation.slideAt(0, 12, 4, 1)):toBeNear(Rotation.rockAt(1, 12, 4, 0), 1e-9)
+	end)
+
+	T.it("reports the swing rate as the derivative of the swing", function()
+		T.expect(Rotation.rockRateAt(0, 0.5, 4, 0)):toBeNear(0.5 * 2 * math.pi / 4, 1e-6)
+		T.expect(Rotation.rockRateAt(1, 0.5, 4, 0)):toBeNear(0, 1e-6)
+		T.expect(Rotation.rockRateAt(2, 0.5, 4, 0)):toBeNear(-0.5 * 2 * math.pi / 4, 1e-6)
+		local h = 1e-4
+		local numeric = (Rotation.rockAt(0.7 + h, 0.5, 4, 0.3) - Rotation.rockAt(0.7 - h, 0.5, 4, 0.3)) / (2 * h)
+		T.expect(Rotation.rockRateAt(0.7, 0.5, 4, 0.3)):toBeNear(numeric, 1e-4)
+	end)
 end)
 
 return true

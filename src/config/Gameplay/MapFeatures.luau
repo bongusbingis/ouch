@@ -120,4 +120,42 @@ return {
 		ResetRadius = 420, -- studs from MapOrigin
 		CheckIntervalSeconds = 0.5,
 	},
+	-- Authored arena pieces are matched by the name lists above. Splashdown
+	-- course clones carry these attributes instead, so the same kits drive both
+	-- without a course ever having to reuse an arena part name.
+	Attributes = {
+		Rotor = "Rotor", -- "spin" | "rock" | "slide"
+		RotorAxis = "RotorAxis", -- "X" | "Y" | "Z", in the part's own frame
+		RotorSpeed = "RotorSpeed", -- degrees per second, spin only
+		RotorAmplitude = "RotorAmplitude", -- degrees for rock, studs for slide
+		RotorPeriod = "RotorPeriod", -- seconds per full swing
+		RotorPhase = "RotorPhase", -- seconds
+		RotorCarries = "RotorCarries", -- riders are carried with the part
+		Shove = "Shove", -- contact pushes the player along the surface motion
+		ShoveSpeed = "ShoveSpeed",
+		Bumper = "Bumper",
+		Fan = "Fan",
+		FanBlade = "FanBlade",
+		DoorRow = "DoorRow",
+		DoorIndex = "DoorIndex",
+		ScriptableRoot = "ScriptableRoot", -- CollectionService tag on every Scriptables folder the kits drive
+	},
+	RotorBump = {
+		KnockbackSpeed = 34,
+		UpwardSpeed = 14,
+		OutwardBias = 0.35,
+		ShoveSeconds = 0.15,
+		RetriggerCooldown = 0.8,
+		GuardSeconds = 0.8,
+		-- Below this surface speed the contact point is on the rotor's axis and
+		-- has no direction of its own, so the push falls back to straight outward.
+		MinimumSurfaceSpeed = 0.5,
+	},
+	Door = {
+		-- Reach around a door slab within which an approaching root breaks a
+		-- breakable door, before the collision would stop it.
+		ContactPadding = 3,
+		VerticalPadding = 1,
+		BrokenSeconds = 1.6, -- client fall animation
+	},
 }

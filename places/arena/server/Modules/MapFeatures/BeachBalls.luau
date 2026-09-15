@@ -21,25 +21,22 @@ type BallInfo = {
 
 local balls: { [BasePart]: BallInfo } = {}
 local initializedAssemblies: { [Model]: boolean } = {}
-local runtimeFolder: Folder? = nil
 local nextCheckAt = 0
 local mapOrigin: Vector3? = nil
 local warnedNoMapOrigin = false
 
-local function getRuntimeFolder(): Folder
-	if runtimeFolder and runtimeFolder.Parent then
-		return runtimeFolder
-	end
-	local scriptables = ArenaService.get().scriptables
+-- Balls live beside their own Scriptables root -- the arena's or a course's --
+-- so a course's balls leave with the course instead of piling up under the
+-- arena folder.
+local function getRuntimeFolder(assembly: Model): Folder
+	local scriptables = assembly:FindFirstAncestor("Scriptables") or ArenaService.get().scriptables
 	local existing = scriptables:FindFirstChild("BeachBalls")
 	if existing and existing:IsA("Folder") then
-		runtimeFolder = existing
 		return existing
 	end
 	local folder = Instance.new("Folder")
 	folder.Name = "BeachBalls"
 	folder.Parent = scriptables
-	runtimeFolder = folder
 	return folder
 end
 
@@ -64,7 +61,7 @@ end
 local function initGroup(assembly: Model)
 	initializedAssemblies[assembly] = true
 	local settings = MapFeatures.BeachBall
-	local folder = getRuntimeFolder()
+	local folder = getRuntimeFolder(assembly)
 	local pivot = assembly:GetPivot()
 	for _, ball in assembly:GetChildren() do
 		if ball:IsA("BasePart") and ball.Name:find(settings.NamePrefix, 1, true) == 1 then
@@ -103,8 +100,9 @@ function BeachBalls.tickWorld(context: MapFeatureKit.Context)
 	end
 	local settings = MapFeatures.BeachBall
 	for ball, info in balls do
-		if ball.Parent == nil then
+		if ball.Parent == nil or info.assembly.Parent == nil then
 			balls[ball] = nil
+			initializedAssemblies[info.assembly] = nil
 			continue
 		end
 		local position = ball.Position
