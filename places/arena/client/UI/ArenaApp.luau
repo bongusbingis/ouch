@@ -164,14 +164,19 @@ return function(props: Props)
 		end
 	end, { fixedMode })
 	local clientReady = loading.localReady and loading.serverReady
-	local canPresentVote = clientReady and vote.admitted and vote.open and not fixedMode
+	-- A player already on their way to the lobby keeps the results screen, not the ballot.
+	local canPresentVote = clientReady and vote.admitted and vote.open and not fixedMode and not postMatch.departing
 	local votePresented = canPresentVote and presentedVoteStartsAt == vote.startsAt
+	-- Results stay up while a packet is showing or the lobby trip is under way. A
+	-- fixed-mode server has no ballot, so its intermission and starting beats show
+	-- the loading screen instead of an empty world between races.
+	local phase = loading.matchPhase
+	local resultsShowing = postMatch.result ~= nil and (phase == "Results" or postMatch.departing)
 	local matchVisible = clientReady
 		and (
-			loading.matchPhase == "Active"
-			or loading.matchPhase == "Starting"
-			or loading.matchPhase == "Intermission"
-			or (loading.matchPhase == "Results" and postMatch.result ~= nil)
+			phase == "Active"
+			or resultsShowing
+			or (not fixedMode and (phase == "Starting" or phase == "Intermission"))
 		)
 	local returning = teleportStatus ~= nil and teleportStatus.state ~= "Complete"
 	local loadingVisible = not hostPresented or returning or (not votePresented and not matchVisible)

@@ -32,6 +32,7 @@ return function()
 		Requesting = snapshot.requesting,
 		PendingAction = snapshot.pendingAction,
 		Error = snapshot.error,
+		Departing = snapshot.departing,
 		OnPlayAgain = PostMatchClient.playAgain,
 		OnReturnToLobby = PostMatchClient.returnToLobby,
 		OnLeaveParty = PostMatchClient.leaveParty,

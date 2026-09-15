@@ -10,6 +10,7 @@ local Listeners = require(
 		:WaitForChild("Listeners")
 )
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
@@ -32,6 +33,7 @@ export type Snapshot = {
 	requesting: boolean,
 	pendingAction: Action?,
 	error: string?,
+	departing: boolean,
 }
 
 local CURSOR_REASON = "PostMatch"
@@ -43,6 +45,7 @@ local state: Snapshot = {
 	requesting = false,
 	pendingAction = nil,
 	error = nil,
+	departing = false,
 }
 local listeners: Listeners.Collection<Snapshot> = Listeners.new("PostMatchClient", true, "listener failed")
 local connections: { RBXScriptConnection } = {}
@@ -82,22 +85,45 @@ local function setVisible(visible: boolean)
 	publish({ visible = visible })
 end
 
+-- A player whose party is heading to the lobby keeps the results up after the
+-- countdown, until the teleport screen takes over or they choose to stay; the
+-- round-eligibility attribute flips the moment they stay.
+local function lobbyBound(): boolean
+	local status = state.status
+	if status == nil then
+		return false
+	end
+	return status.selfReturning == true or status.state == "Returning" or status.nextDestination == "Lobby"
+end
+
 local function syncPhase()
 	local phase = if matchState then matchState:GetAttribute("phase") else nil
 	if phase == "Results" and state.result ~= nil then
 		awaitingResultsPhase = false
+		publish({ departing = false })
 		setVisible(true)
-	elseif phase ~= "Results" then
-		setVisible(false)
-		if awaitingResultsPhase and (phase == nil or phase == "Active") then
-			return
-		end
-		if phase == "Intermission" or phase == "Starting" or phase == "Active" or phase == "Idle" then
-			requestGeneration += 1
-			awaitingResultsPhase = false
-			pendingStatus = nil
-			publish({ result = CLEAR, status = CLEAR, requesting = false, pendingAction = CLEAR, error = CLEAR })
-		end
+		return
+	end
+	if
+		(phase == "Intermission" or phase == "Idle")
+		and state.result ~= nil
+		and lobbyBound()
+		and Players.LocalPlayer:GetAttribute("ArenaRoundEligible") ~= true
+	then
+		publish({ departing = true })
+		setVisible(true)
+		return
+	end
+	setVisible(false)
+	publish({ departing = false })
+	if awaitingResultsPhase and (phase == nil or phase == "Active") then
+		return
+	end
+	if phase == "Intermission" or phase == "Starting" or phase == "Active" or phase == "Idle" then
+		requestGeneration += 1
+		awaitingResultsPhase = false
+		pendingStatus = nil
+		publish({ result = CLEAR, status = CLEAR, requesting = false, pendingAction = CLEAR, error = CLEAR })
 	end
 end
 
@@ -169,6 +195,7 @@ function PostMatchClient.start()
 	started = true
 	table.insert(connections, Network.on("PostMatchResult", receiveResult))
 	table.insert(connections, Network.on("PostMatchStatus", receiveStatus))
+	table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaRoundEligible"):Connect(syncPhase))
 
 	local existing = ReplicatedStorage:FindFirstChild("MatchState")
 	if existing and existing:IsA("Folder") then
@@ -262,6 +289,7 @@ function PostMatchClient.destroy()
 		requesting = false,
 		pendingAction = nil,
 		error = nil,
+		departing = false,
 	}
 	started = false
 end

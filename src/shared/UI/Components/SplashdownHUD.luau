@@ -34,43 +34,61 @@ export type Props = {
 
 local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 	local children = {
-		Layout = c("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
+		Layout = c("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }),
 	}
+	local circle = rowHeight - 8
 	for index, row in toast.rows do
 		local textSize = if short then 13 else 16
 		children[`Row{index}`] = c("Frame", {
-			BackgroundColor3 = if row.isLocal then colors.Pink else colors.Claimed,
-			BackgroundTransparency = if row.isLocal then 0 else 0.35,
+			BackgroundColor3 = if row.isLocal then colors.Pink else T.Colors.Well,
 			BorderSizePixel = 0,
 			LayoutOrder = index,
 			Size = UDim2.new(1, 0, 0, rowHeight),
 			ZIndex = z,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-			Rank = c(Label, {
-				Text = tostring(row.placement),
-				Title = true,
-				Size = textSize + 2,
-				Color = colors.Ink,
-				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(34, rowHeight), ZIndex = z + 1 },
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+			Outline = c("UIStroke", {
+				Color = if row.isLocal then T.Colors.PinkLip else T.Colors.WellLine,
+				Thickness = 2,
+			}),
+			Rank = c("Frame", {
+				BackgroundColor3 = T.Results.PlacementColors[row.placement] or T.Colors.Surface,
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(4, 4),
+				Size = UDim2.fromOffset(circle, circle),
+				ZIndex = z + 1,
+			}, {
+				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Outline = c("UIStroke", { Color = colors.Ink, Thickness = 2 }),
+				Text = c(Label, {
+					Text = tostring(row.placement),
+					Title = true,
+					Size = textSize,
+					Color = colors.Ink,
+					Native = { Size = UDim2.fromScale(1, 1), ZIndex = z + 2 },
+				}),
 			}),
 			Name = c(Label, {
 				Text = row.name,
 				Size = textSize,
 				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromOffset(46, 0), Size = UDim2.new(1, -46 - 150, 1, 0), ZIndex = z + 1 },
+				Native = {
+					Position = UDim2.fromOffset(circle + 12, 0),
+					Size = UDim2.new(1, -circle - 12 - 150, 1, 0),
+					ZIndex = z + 1,
+				},
 			}),
 			Time = c(Label, {
 				Text = row.time,
 				Size = textSize,
+				Color = colors.Muted,
 				Align = Enum.TextXAlignment.Right,
 				Native = { Position = UDim2.new(1, -150, 0, 0), Size = UDim2.fromOffset(78, rowHeight), ZIndex = z + 1 },
 			}),
 			Points = c(Label, {
 				Text = `+{row.points}`,
 				Title = true,
-				Size = textSize + 2,
+				Size = textSize + 3,
 				Color = colors.Ink,
 				Align = Enum.TextXAlignment.Right,
 				Native = { Position = UDim2.new(1, -66, 0, 0), Size = UDim2.fromOffset(56, rowHeight), ZIndex = z + 1 },
@@ -91,10 +109,10 @@ return function(props: Props)
 	local centerX = geometry.hud.position.X + width / 2
 	local stripTop = geometry.menu.position.Y + 56
 	local toast = view.toast
-	local rowHeight = if short then 24 else 30
+	local rowHeight = if short then 26 else 32
 	local rows = if toast then toastRows(toast, rowHeight, short, 22) else nil
 	local toastWidth = math.min(520, safe.size.X - 32)
-	local toastHeight = (if short then 96 else 124) + (if toast then #toast.rows * (rowHeight + 3) else 0)
+	local toastHeight = (if short then 96 else 124) + (if toast then #toast.rows * (rowHeight + 4) else 0)
 	local progressWidth = width - 108 - 24
 
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = props.Visible }, {
@@ -244,7 +262,7 @@ return function(props: Props)
 				Rows = c("Frame", {
 					BackgroundTransparency = 1,
 					Position = UDim2.fromOffset(14, if short then 52 else 64),
-					Size = UDim2.new(1, -28, 0, #toast.rows * (rowHeight + 3)),
+					Size = UDim2.new(1, -28, 0, #toast.rows * (rowHeight + 4)),
 					ZIndex = 21,
 				}, rows),
 				Summary = c(Label, {

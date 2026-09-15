@@ -309,7 +309,7 @@ local function scoreDetail(scores: { ScoreEntry }): string?
 	return `{scores[1].score}  -  {scores[2].score}`
 end
 
-local function presentation(result: GlobalResult, outcome: Outcome, placement: number?): Presentation
+local function presentation(result: GlobalResult, outcome: Outcome, placement: number?, won: boolean): Presentation
 	if result.reason == "NoContest" then
 		return {
 			eyebrow = "ROUND ENDED",
@@ -327,13 +327,15 @@ local function presentation(result: GlobalResult, outcome: Outcome, placement: n
 		return {
 			eyebrow = eyebrow,
 			title = if placement then `{PostMatchResult.formatPlacement(placement)} PLACE` else "ROUND OVER",
-			detail = if result.winnerId and result.winnerId ~= ""
-				then `{contestantLabel(result.contestants, result.winnerId)} TAKES THE WIN`
-				else if result.scores[1]
-						and result.scores[2]
-						and result.scores[1].score == result.scores[2].score
-					then "TIED ROUND"
-					else "ROUND COMPLETE",
+			detail = if won
+				then "YOU TAKE THE WIN"
+				else if result.winnerId and result.winnerId ~= ""
+					then `{contestantLabel(result.contestants, result.winnerId)} TAKES THE WIN`
+					else if result.scores[1]
+							and result.scores[2]
+							and result.scores[1].score == result.scores[2].score
+						then "TIED ROUND"
+						else "ROUND COMPLETE",
 			accent = accent,
 		}
 	end
@@ -503,7 +505,7 @@ function PostMatchResult.forPlayer(
 		placement = placement,
 		interactiveAt = result.interactiveAt,
 		endsAt = result.endsAt,
-		presentation = presentation(result, outcome, placement),
+		presentation = presentation(result, outcome, placement, won),
 		scores = table.clone(result.scores),
 		personalStats = personalStats(summary, placement, contestant, result.statLabels),
 		podium = PostMatchResult.podium(result),
