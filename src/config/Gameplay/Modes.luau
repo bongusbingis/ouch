@@ -54,4 +54,16 @@ return {
 		SpawnInvulnSeconds = 1.5,
 		PreserveDodgeballs = true,
 	},
+	Splashdown = {
+		MinPlayers = 2,
+		-- Points, not eliminations, decide the race; there is no target to reach.
+		ScoreTarget = math.huge,
+		-- Outer safety net only. SplashdownService ends the match itself after the
+		-- last round, so this must exceed three rounds at their longest.
+		TimeCapSeconds = 720,
+		StartingSeconds = 0,
+		RespawnSeconds = 1,
+		SpawnInvulnSeconds = 0,
+		PreserveDodgeballs = false,
+	},
 }

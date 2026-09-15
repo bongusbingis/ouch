@@ -69,6 +69,8 @@ local definitions = {
 	CombatSimEvent = "unreliable",
 	JumpPadImpulse = "unreliable",
 	BumperHit = "unreliable",
+	DoorBroken = "unreliable",
+	SplashdownEvent = "unreliable",
 	ReportAnalyticsEvent = "event",
 }
 local rateLimitCounters = {}

@@ -13,6 +13,7 @@ local MockWorld = require(
 local SimTypes = require(script.Parent.Parent.Game.Sim.SimTypes)
 local SimCore = require(script.Parent.Parent.Game.Sim.SimCore)
 local ModeRegistry = require(script.Parent.Parent.Game.Modes.ModeRegistry)
+local GameModes = require(script.Parent.Parent.Parent.Config.Gameplay.GameModes)
 local Combat = require(script.Parent.Parent.Parent.Config.Gameplay.Combat)
 
 local DT = 1 / 60
@@ -225,9 +226,9 @@ T.describe("Ball preservation", function()
 		T.expect(returned):toEqual(1)
 	end)
 
-	T.it("turns the rule on for every shipped mode", function()
+	T.it("turns the rule on for every shipped combat mode and off for a race", function()
 		for _, mode in ModeRegistry.all() do
-			T.expect(mode.rules.PreserveDodgeballs):toEqual(true)
+			T.expect(mode.rules.PreserveDodgeballs):toEqual(GameModes.IsCombat(mode.id))
 		end
 	end)
 end)

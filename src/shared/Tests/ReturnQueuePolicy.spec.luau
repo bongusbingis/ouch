@@ -50,6 +50,28 @@ T.describe("ReturnQueuePolicy", function()
 		T.expect(Policy.evaluate(record, { [10] = true, [20] = true }, 101)):toEqual("Waiting")
 		T.expect(record.returnQueue.memberUserIds == payload.memberUserIds):toEqual(false)
 	end)
+	T.it("adopts the payload's queue when arming a fresh return intent", function()
+		local record = party()
+		local withQueue = table.clone(payload)
+		withQueue.queueId = "Splashdown"
+		Policy.arm(record, withQueue, 100, 20)
+		T.expect(record.queueId):toEqual("Splashdown")
+	end)
+	T.it("leaves the record's queue untouched when the payload names none", function()
+		local record = party()
+		record.queueId = "Arena"
+		Policy.arm(record, payload, 100, 20)
+		T.expect(record.queueId):toEqual("Arena")
+	end)
+	T.it("cannot change the queue by re-arming a consumed intent", function()
+		local record = party()
+		Policy.arm(record, payload, 100, 20)
+		record.queueId = "Arena"
+		local withQueue = table.clone(payload)
+		withQueue.queueId = "Splashdown"
+		Policy.arm(record, withQueue, 110, 20)
+		T.expect(record.queueId):toEqual("Arena")
+	end)
 end)
 
 return true

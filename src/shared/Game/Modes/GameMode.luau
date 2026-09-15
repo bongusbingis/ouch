@@ -43,6 +43,11 @@ export type ModeContext = {
 -- a number that means something, without every other mode paying for it.
 export type TeamScore = (ctx: ModeContext, teamId: string) -> number
 
+-- statLabels names the per-player stats a mode reports on the results screen
+-- in place of the combat trio; MatchService carries the values the mode's
+-- server owner stamps through setContestantStats.
+export type StatLabel = { id: string, label: string }
+
 export type GameMode = {
 	id: string,
 	displayName: string,
@@ -51,6 +56,7 @@ export type GameMode = {
 	scoreScope: ScoreScope?,
 	teams: { string }?,
 	teamScore: TeamScore?,
+	statLabels: { StatLabel }?,
 
 	onMatchStart: (ctx: ModeContext) -> (),
 	onPlayerSpawned: (ctx: ModeContext, player: Player, isFirstSpawn: boolean) -> (),

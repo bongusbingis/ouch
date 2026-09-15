@@ -20,6 +20,7 @@ PartyClient.ErrorMessages = {
 	internal_error = "PARTY SERVICE UNAVAILABLE",
 	invalid_args = "INVALID PARTY REQUEST",
 	invalid_code = "PARTY CODE NOT FOUND",
+	invalid_queue = "THAT QUEUE IS NOT AVAILABLE",
 	invalid_request = "INVALID PARTY REQUEST",
 	invite_unavailable = "INVITES ARE UNAVAILABLE",
 	match_forming = "MATCH IS ALREADY FORMING",
@@ -167,6 +168,10 @@ end
 
 function PartyClient:kick(targetUserId: number)
 	return self:request(Protocol.Actions.KickMember, { targetUserId = targetUserId })
+end
+
+function PartyClient:setQueue(queueId: string)
+	return self:request(Protocol.Actions.SetQueue, { queueId = queueId })
 end
 
 function PartyClient:toggleMatchmaking()

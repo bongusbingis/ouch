@@ -25,8 +25,27 @@ local function memberIds(party)
 	return ids
 end
 
-function MatchmakerService.new(partyRepository, queueRepository, matchRepository, teleportCoordinator, onChanged)
+local function cloneModeSelection(selection)
+	if selection.strategy == "Vote" then
+		return { strategy = "Vote", options = table.clone(selection.options) }
+	end
+	return { strategy = "Fixed", modeId = selection.modeId }
+end
+
+function MatchmakerService.new(
+	queueId,
+	partyRepository,
+	queueRepository,
+	matchRepository,
+	teleportCoordinator,
+	onChanged
+)
+	local queueConfig = Config.Queues[queueId]
+	assert(queueConfig, ("[MatchmakerService] unknown queue %q"):format(tostring(queueId)))
+
 	return setmetatable({
+		_queueId = queueId,
+		_queueConfig = queueConfig,
 		_partyRepository = partyRepository,
 		_queueRepository = queueRepository,
 		_matchRepository = matchRepository,
@@ -112,6 +131,7 @@ function MatchmakerService:_readCandidates()
 			or ticket.partySize < Config.PartyMinPlayers
 			or ticket.partySize > Config.PartyMaxPlayers
 			or typeof(ticket.enqueuedAt) ~= "number"
+			or ticket.queueId ~= self._queueId
 		then
 			self._queueRepository:Remove(item.key)
 		else
@@ -138,7 +158,7 @@ function MatchmakerService:_selectCandidates(candidates)
 
 	for _, candidate in candidates do
 		local memberCount = candidate.ticket.partySize
-		if totalPlayers + memberCount <= Config.MatchTargetPlayers then
+		if totalPlayers + memberCount <= self._queueConfig.MatchTargetPlayers then
 			table.insert(selected, candidate)
 			totalPlayers += memberCount
 		end
@@ -174,12 +194,12 @@ function MatchmakerService:_claimCandidates(candidates, matchId, deadline)
 	for index, candidate in candidates do
 		if
 			index > Config.QueueCandidateLimit
-			or totalPlayers >= Config.MatchTargetPlayers
+			or totalPlayers >= self._queueConfig.MatchTargetPlayers
 			or os.clock() >= deadline
 		then
 			break
 		end
-		local remainingPlayers = Config.MatchTargetPlayers - totalPlayers
+		local remainingPlayers = self._queueConfig.MatchTargetPlayers - totalPlayers
 		if candidate.ticket.partySize > remainingPlayers then
 			continue
 		end
@@ -245,12 +265,10 @@ function MatchmakerService:_createMatch(parties, accessCode, matchId)
 	return {
 		schemaVersion = Config.ProtocolVersion,
 		matchId = matchId,
-		modeSelection = {
-			strategy = "Vote",
-			options = table.clone(Config.ModeVoteOptions),
-		},
+		queueId = self._queueId,
+		modeSelection = cloneModeSelection(self._queueConfig.ModeSelection),
 		arenaPlaceId = Config.ArenaPlaceId,
-		targetPlayers = Config.MatchTargetPlayers,
+		targetPlayers = self._queueConfig.MatchTargetPlayers,
 		parties = matchParties,
 		expectedUserIds = expectedUserIds,
 		reservedServerAccessCode = accessCode,
@@ -265,8 +283,11 @@ function MatchmakerService:_process(deadline)
 	end
 	local candidates = self:_readCandidates()
 	local _, selectedPlayers, oldestWait = self:_selectCandidates(candidates)
-	local requiredPlayers =
-		PopulationPolicy.requiredPlayers(Config.MatchPopulationExpansion, oldestWait, Config.MatchTargetPlayers)
+	local requiredPlayers = PopulationPolicy.requiredPlayers(
+		self._queueConfig.MatchPopulationExpansion,
+		oldestWait,
+		self._queueConfig.MatchTargetPlayers
+	)
 	if selectedPlayers < requiredPlayers then
 		return
 	end
@@ -277,8 +298,11 @@ function MatchmakerService:_process(deadline)
 		return
 	end
 	-- A stale or already claimed ticket must not relax the minimum for younger viable parties.
-	requiredPlayers =
-		PopulationPolicy.requiredPlayers(Config.MatchPopulationExpansion, oldestClaimedWait, Config.MatchTargetPlayers)
+	requiredPlayers = PopulationPolicy.requiredPlayers(
+		self._queueConfig.MatchPopulationExpansion,
+		oldestClaimedWait,
+		self._queueConfig.MatchTargetPlayers
+	)
 	if claimedPlayers < requiredPlayers or os.clock() >= deadline then
 		for _, party in claimed do
 			self:_releaseClaim(party, "ClaimReleased")
@@ -326,7 +350,7 @@ function MatchmakerService:Tick()
 		-- Start before the yielding acquisition and allow for the lease's whole-second clock.
 		-- This bounds new claim work; it is not a fence for a later yielding match-record write.
 		local deadline = os.clock() + math.max(0, Config.WorkerLeaseLifetime - 1)
-		if not self._matchRepository:AcquireLease() then
+		if not self._matchRepository:AcquireLease(self._queueId) then
 			self._nextLeaseAttempt = os.clock() + random:NextNumber(3, 6)
 			return
 		end
@@ -335,7 +359,7 @@ function MatchmakerService:Tick()
 		self:_process(deadline)
 	end, debug.traceback)
 	if leaseAcquired then
-		self._matchRepository:ReleaseLease()
+		self._matchRepository:ReleaseLease(self._queueId)
 	end
 	self._running = false
 

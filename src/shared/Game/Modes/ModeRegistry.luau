@@ -5,12 +5,14 @@
 local GameMode = require(script.Parent.GameMode)
 local FFA = require(script.Parent.FFA)
 local Infection = require(script.Parent.Infection)
+local Splashdown = require(script.Parent.Splashdown)
 local TDM = require(script.Parent.TDM)
 
 local modes: { GameMode.GameMode } = {
 	FFA,
 	TDM,
 	Infection,
+	Splashdown,
 }
 
 local DEFAULT_ID = "FFA"

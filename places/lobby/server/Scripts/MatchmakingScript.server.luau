@@ -1,4 +1,4 @@
--- Description: Lobby server entry point for matchmaking: constructs the repositories, party bus, party service, matchmaker, and teleport coordinator and starts the matchmaking tick.
+-- Description: Lobby server entry point for matchmaking: constructs the repositories, party bus, party service, one matchmaker per queue, and the teleport coordinator, then starts the matchmaking tick.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -21,24 +21,41 @@ local TeleportCoordinator = require(matchmaking.TeleportCoordinator)
 local AnalyticsService = require(script.Parent.Parent:WaitForChild("Modules"):WaitForChild("AnalyticsService"))
 
 local partyRepository = PartyRepository.new()
-local queueRepository = QueueRepository.new()
 local matchRepository = MatchRepository.new()
 local partyBus = PartyBus.new()
 local teleportCoordinator = TeleportCoordinator.new(matchRepository)
 local banRepository = BanRepository.new()
-local partyService =
-	PartyService.new(partyRepository, queueRepository, matchRepository, partyBus, teleportCoordinator, banRepository, {
-		lobbyGatherCoordinator = LobbyGatherCoordinator.new(partyRepository),
-	})
-local matchmakerService = MatchmakerService.new(
+
+local queueRepositories = {}
+for _, queueId in Config.QueueOrder do
+	queueRepositories[queueId] = QueueRepository.new(queueId)
+end
+
+local partyService = PartyService.new(
 	partyRepository,
-	queueRepository,
+	queueRepositories,
 	matchRepository,
+	partyBus,
 	teleportCoordinator,
-	function(party, reason, actorUserId)
-		partyService:NotifyCommitted(party, reason, actorUserId)
-	end
+	banRepository,
+	{
+		lobbyGatherCoordinator = LobbyGatherCoordinator.new(partyRepository),
+	}
 )
+
+local matchmakerServices = {}
+for _, queueId in Config.QueueOrder do
+	matchmakerServices[queueId] = MatchmakerService.new(
+		queueId,
+		partyRepository,
+		queueRepositories[queueId],
+		matchRepository,
+		teleportCoordinator,
+		function(party, reason, actorUserId)
+			partyService:NotifyCommitted(party, reason, actorUserId)
+		end
+	)
+end
 
 teleportCoordinator:SetFailureHandler(function(player)
 	partyService:HandleTeleportFailure(player)
@@ -60,7 +77,9 @@ teleportCoordinator:SetStatusHandler(function(player, state, packet)
 	end
 end)
 partyService:SetQueueChangedHandler(function()
-	matchmakerService:Tick()
+	for _, matchmakerService in matchmakerServices do
+		matchmakerService:Tick()
+	end
 end)
 
 Network.handleProtected("PartyRequest", {
@@ -86,6 +105,10 @@ Network.handleProtected("PartyRequest", {
 			limit = 2,
 			window = 5,
 		},
+		[Protocol.Actions.SetQueue] = {
+			limit = 4,
+			window = 5,
+		},
 	},
 	validate = Protocol.validateRequest,
 }, function(player, action, payload)
@@ -102,10 +125,13 @@ local running = true
 task.spawn(function()
 	while running do
 		task.wait(Config.WorkerPollInterval)
-		if partyService:HasLocalQueuedParty() then
-			task.spawn(function()
-				matchmakerService:Tick()
-			end)
+		for _, queueId in Config.QueueOrder do
+			if partyService:HasLocalQueuedParty(queueId) then
+				local matchmakerService = matchmakerServices[queueId]
+				task.spawn(function()
+					matchmakerService:Tick()
+				end)
+			end
 		end
 	end
 end)

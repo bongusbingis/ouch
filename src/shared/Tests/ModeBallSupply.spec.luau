@@ -7,6 +7,7 @@
 
 local T = require(script.Parent.TestKit)
 local ModeRegistry = require(script.Parent.Parent.Game.Modes.ModeRegistry)
+local GameModes = require(script.Parent.Parent.Parent.Config.Gameplay.GameModes)
 local Infection = require(script.Parent.Parent.Game.Modes.Infection)
 
 type Fake = {
@@ -63,6 +64,9 @@ end
 T.describe("Mode ball supply", function()
 	T.it("arms every player at the start of a match", function()
 		for _, mode in ModeRegistry.all() do
+			if not GameModes.IsCombat(mode.id) then
+				continue
+			end
 			local harness = fake({ "a", "b", "c" })
 			startMatch(mode, harness.ctx)
 			for _, player in harness.players do
@@ -73,11 +77,27 @@ T.describe("Mode ball supply", function()
 
 	T.it("arms a player on a later spawn, not only their first", function()
 		for _, mode in ModeRegistry.all() do
+			if not GameModes.IsCombat(mode.id) then
+				continue
+			end
 			local harness = fake({ "a", "b" })
 			startMatch(mode, harness.ctx)
 			local before = harness.granted.a
 			mode.onPlayerSpawned(harness.ctx, harness.players[1] :: any, false)
 			T.expect(harness.granted.a > before):toBeTruthy()
+		end
+	end)
+
+	T.it("hands a non-combat mode nothing to throw", function()
+		for _, mode in ModeRegistry.all() do
+			if GameModes.IsCombat(mode.id) then
+				continue
+			end
+			local harness = fake({ "a", "b" })
+			startMatch(mode, harness.ctx)
+			mode.onPlayerSpawned(harness.ctx, harness.players[1] :: any, false)
+			T.expect(harness.granted.a):toEqual(0)
+			T.expect(harness.granted.b):toEqual(0)
 		end
 	end)
 

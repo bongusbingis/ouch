@@ -22,6 +22,25 @@ T.describe("GameModes config", function()
 			T.expect(definition.ThumbnailId):toEqual("")
 		end
 	end)
+
+	T.it("keeps the enabled Splashdown mode off the arena ballot and in its own queue", function()
+		T.expect(GameModes.Modes.Splashdown.Enabled):toBeTruthy()
+		T.expect(table.find(GameModes.VoteOptions, "Splashdown")):toBeNil()
+		T.expect(GameModes.ModeQueue("Splashdown")):toEqual("Splashdown")
+		T.expect(GameModes.ModeQueue("FFA")):toEqual("Arena")
+		T.expect(GameModes.QueueCapacity("Splashdown")):toEqual(30)
+		T.expect(GameModes.QueueCapacity("Arena")):toEqual(GameModes.MatchCapacity)
+		T.expect(GameModes.QueueCapacity("Nope")):toEqual(GameModes.MatchCapacity)
+	end)
+
+	T.it("labels combat by mode with combat as the default for unknown ids", function()
+		T.expect(GameModes.IsCombat("Splashdown")):toEqual(false)
+		T.expect(GameModes.IsCombat("TDM")):toEqual(true)
+		T.expect(GameModes.IsCombat(nil)):toEqual(true)
+		T.expect(GameModes.ScoreLabel("Splashdown")):toEqual("POINTS")
+		T.expect(GameModes.ScoreLabel("FFA")):toEqual("ELIMS")
+		T.expect(GameModes.ScoreLabel("")):toEqual("ELIMS")
+	end)
 end)
 
 return true
