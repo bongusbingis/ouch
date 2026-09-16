@@ -5,6 +5,7 @@ local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local T = require(ReplicatedStorage.Shared.UI.Tokens)
@@ -48,6 +49,159 @@ local BUBBLE_CAMERA_CLEARANCE = 2
 local PartyCharacterRenderer = {}
 PartyCharacterRenderer.__index = PartyCharacterRenderer
 
+local function corner(parent, radius)
+	local result = Instance.new("UICorner")
+	result.CornerRadius = UDim.new(0, radius)
+	result.Parent = parent
+	return result
+end
+
+local function kickLayer(name, color, position, size, zIndex, parent)
+	local layer = Instance.new("Frame")
+	layer.Name = name
+	layer.BackgroundColor3 = color
+	layer.BorderSizePixel = 0
+	layer.Position = position
+	layer.Size = size
+	layer.ZIndex = zIndex
+	corner(layer, T.Shape.RadiusPill)
+	layer.Parent = parent
+	return layer
+end
+
+local function configureKickButton(kickButton)
+	local tokens = T.PartyNametag
+	kickButton:ClearAllChildren()
+	kickButton.AutoButtonColor = false
+	kickButton.BackgroundTransparency = 1
+	kickButton.Image = ""
+	kickButton.Size = UDim2.fromOffset(tokens.KickSize, tokens.KickSize)
+
+	local visual = Instance.new("Frame")
+	visual.Name = "CandyFace"
+	visual.AnchorPoint = Vector2.new(0.5, 0.5)
+	visual.BackgroundTransparency = 1
+	visual.Position = UDim2.fromScale(0.5, 0.5)
+	visual.Rotation = tokens.KickTilt
+	visual.Size = UDim2.fromScale(1, 1)
+	visual.ZIndex = kickButton.ZIndex
+	visual.Parent = kickButton
+
+	local scale = Instance.new("UIScale")
+	scale.Parent = visual
+
+	local shadow = kickLayer(
+		"Shadow",
+		T.Colors.Ink,
+		UDim2.fromOffset(tokens.KickShadowOffset.X, tokens.KickShadowOffset.Y),
+		UDim2.fromScale(1, 1),
+		kickButton.ZIndex,
+		visual
+	)
+	shadow.BackgroundTransparency = T.Shape.ShadowTransparency
+
+	local lip = kickLayer(
+		"Lip",
+		T.Colors.OrangeLip,
+		UDim2.fromScale(0, 0),
+		UDim2.fromScale(1, 1),
+		kickButton.ZIndex + 1,
+		visual
+	)
+	local outline = Instance.new("UIStroke")
+	outline.Name = "CandyOutline"
+	outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	outline.Color = T.Colors.Ink
+	outline.LineJoinMode = Enum.LineJoinMode.Round
+	outline.Thickness = T.Shape.StrokeTab
+	outline.Parent = lip
+
+	local fill = kickLayer(
+		"Fill",
+		T.Colors.Orange,
+		UDim2.fromScale(0, 0),
+		UDim2.new(1, 0, 1, -T.Shape.LipHeight),
+		kickButton.ZIndex + 2,
+		visual
+	)
+	local highlight = kickLayer(
+		"Highlight",
+		T.Colors.Surface,
+		UDim2.fromOffset(T.Shape.StrokeTab, T.Shape.StrokeTab),
+		UDim2.new(1, -T.Shape.StrokeTab * 2, T.Shape.HighlightHeight, 0),
+		kickButton.ZIndex + 3,
+		fill
+	)
+	highlight.BackgroundTransparency = T.Shape.HighlightTransparency
+	local fade = Instance.new("UIGradient")
+	fade.Rotation = 90
+	fade.Transparency = NumberSequence.new(0, 1)
+	fade.Parent = highlight
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.BackgroundTransparency = 1
+	label.Font = T.Type.Display
+	label.Position = UDim2.fromOffset(0, -2)
+	label.Size = UDim2.new(1, 0, 1, -T.Shape.LipHeight)
+	label.Text = "X"
+	label.TextColor3 = T.Colors.Surface
+	label.TextSize = T.Type.Tab
+	label.ZIndex = kickButton.ZIndex + 5
+	label.Parent = visual
+	local labelOutline = Instance.new("UIStroke")
+	labelOutline.Color = T.Colors.Ink
+	labelOutline.Thickness = T.Type.Outline
+	labelOutline.Parent = label
+
+	local activeTween = nil
+	local function setScale(target, duration)
+		if activeTween then
+			activeTween:Cancel()
+			activeTween = nil
+		end
+		if GuiService.ReducedMotionEnabled then
+			scale.Scale = target
+		else
+			activeTween = TweenService:Create(
+				scale,
+				TweenInfo.new(duration, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out),
+				{ Scale = target }
+			)
+			activeTween:Play()
+		end
+	end
+	kickButton.MouseEnter:Connect(function()
+		if kickButton.Active then
+			setScale(T.Motion.HoverScale, T.Motion.Hover)
+		end
+	end)
+	kickButton.MouseLeave:Connect(function()
+		setScale(1, T.Motion.Release)
+	end)
+	kickButton.MouseButton1Down:Connect(function()
+		if kickButton.Active then
+			setScale(T.Motion.PressScale, T.Motion.Press)
+		end
+	end)
+	kickButton.MouseButton1Up:Connect(function()
+		setScale(if kickButton.Active then T.Motion.HoverScale else 1, T.Motion.Release)
+	end)
+	kickButton.SelectionGained:Connect(function()
+		if kickButton.Active then
+			setScale(T.Motion.HoverScale, T.Motion.Hover)
+		end
+	end)
+	kickButton.SelectionLost:Connect(function()
+		setScale(1, T.Motion.Release)
+	end)
+	kickButton:GetPropertyChangedSignal("Active"):Connect(function()
+		if not kickButton.Active then
+			setScale(1, T.Motion.Release)
+		end
+	end)
+end
+
 function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 	local assets = ReplicatedStorage:WaitForChild("Assets")
 	local partyView = Workspace:WaitForChild("Views"):WaitForChild("Party")
@@ -59,6 +213,7 @@ function PartyCharacterRenderer.new(localUserId, onKick, getWorldBounds)
 	for _, name in { "Username", "Crown", "KickButton" } do
 		nametagPositions[name] = nametagTemplate:WaitForChild(name).Position
 	end
+	nametagPositions.Crown += UDim2.fromOffset(0, -T.PartyNametag.CrownLift)
 	local spawns = {}
 
 	for index = 1, Config.PartyMaxPlayers do
@@ -757,6 +912,7 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	crownLabel.Active = false
 	crownLabel.Selectable = false
 	crownLabel.Visible = false
+	configureKickButton(kickButton)
 	kickButton.Active = false
 	kickButton.Selectable = false
 	kickButton.Visible = false

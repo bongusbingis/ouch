@@ -25,8 +25,17 @@ return function()
 				Bonks = 10000,
 				Cosmetics = { Owned = { FoamLeagueHead = true }, Equipped = {} },
 				Shop = {
+					Version = 1,
 					Bucket = FeaturedRotation.periodIndex(Shop.Rotation.RotationSeconds, 100000),
-					Offers = { "FoamLeague", "RainHopper" },
+					Offers = {
+						{ ItemId = "FoamLeague", Role = "Bonks", Rarity = Cosmetics.Items.FoamLeague.Rarity },
+						{
+							ItemId = "RainHopper",
+							Role = "RobuxCommon",
+							Rarity = Cosmetics.Items.RainHopper.Rarity,
+						},
+					},
+					Purchased = {},
 				},
 			}
 			PlayerData._profiles[player.UserId] = { Data = data }
@@ -58,7 +67,7 @@ return function()
 			expect(ShopService.offersFor(player)[2]).to.equal("RainHopper")
 		end)
 		it("refuses unoffered, component and unaffordable purchases without changing the profile", function()
-			for _, id in { "SnackStack", "FoamLeagueHead", "SundaeSprinter" } do
+			for _, id in { "SnackStack", "FoamLeagueHead", "SundaeSprinter", "RainHopper" } do
 				local result, reason = DirectPurchaseService.purchase(player, id)
 				expect(result).to.equal(nil)
 				expect(reason).to.equal("not_offered")

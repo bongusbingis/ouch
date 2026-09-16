@@ -128,7 +128,8 @@ local function Slot(props)
 end
 
 return function(props)
-	local wheel = Controller.useSnapshot()
+	local controllerWheel = Controller.useSnapshot()
+	local wheel = props.WheelSnapshot or controllerWheel
 	local radial = props.ContentWidth >= T.Layout.WheelMinWidth and not props.Compact
 	local height = if radial then T.Layout.WheelSize + T.Layout.WheelRowGap else 4 * (64 + T.Layout.CompactGap)
 	local children = {}

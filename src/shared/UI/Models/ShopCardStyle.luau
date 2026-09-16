@@ -23,6 +23,7 @@ export type Style = {
 	sticker: Sticker?,
 	rarity: string?,
 	owned: boolean,
+	ownedText: string,
 	accent: Color3,
 	tileColor: Color3,
 	tileLine: Color3,
@@ -77,6 +78,8 @@ function ShopCardStyle.actionText(card: any, robuxSymbol: string?): (string?, nu
 		return "VIEW REWARDS", nil
 	elseif card.pending then
 		return "PROCESSING…", nil
+	elseif card.purchased then
+		return "PURCHASED", nil
 	elseif card.owned then
 		return "VIEW ITEM", nil
 	elseif card.status == "Preview" then
@@ -149,7 +152,8 @@ function ShopCardStyle.resolve(card: any, seasonState: any?, options: Options?):
 		currency = currency,
 		sticker = ShopCardStyle.sticker(card),
 		rarity = if T.Rarity[card.badge] then card.badge else nil,
-		owned = card.owned == true and not season,
+		owned = (card.owned == true or card.purchased == true) and not season,
+		ownedText = if card.purchased then "✓ PURCHASED" else "✓ OWNED",
 		accent = accent,
 		tileColor = accent:Lerp(C.Surface, L.TileTint),
 		tileLine = accent:Lerp(C.Ink, L.TileLineTint),

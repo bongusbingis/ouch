@@ -459,7 +459,7 @@ result.claims = {
 }
 result.shop = {
 	eligiblePoolCount = #ShopRotation.pool(Cosmetics.Items, Shop.Rotation.Categories),
-	offerCount = Shop.Rotation.OfferCount,
+	offerCount = #Shop.Rotation.Roles,
 	rotationSeconds = Shop.Rotation.RotationSeconds,
 	note = "Direct-item timing is affordability only; target offer wait is not modeled or guaranteed.",
 }

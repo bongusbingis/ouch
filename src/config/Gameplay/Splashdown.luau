@@ -21,6 +21,10 @@ return {
 	-- Between the splash and standing on the checkpoint pad again.
 	RespawnDelaySeconds = 0.8,
 	HazardVerticalPadding = 2,
+	-- Below this downward speed (studs/s) a lava hit skips the camera pan-down
+	-- cue: a course where lava rises up to meet a standing racer shouldn't
+	-- play the same "falling in" cinematic as a racer plunging into it.
+	LavaCamera = { MinFallSpeed = 40 },
 	-- A root this far below the course floor counts as lost to the void.
 	VoidDepthStuds = 80,
 	-- Checkpoint and finish triggers are matched on the root, with this much

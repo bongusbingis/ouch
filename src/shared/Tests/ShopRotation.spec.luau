@@ -4,6 +4,7 @@
 
 local T = require(script.Parent.TestKit)
 local ShopRotation = require(script.Parent.Parent.Game.Economy.ShopRotation)
+local CosmeticsLogic = require(script.Parent.Parent.Game.Economy.CosmeticsLogic)
 local Cosmetics = require(script.Parent.Parent.Parent.Config.Cosmetics.Cosmetics)
 local Shop = require(script.Parent.Parent.Parent.Config.Economy.Shop)
 local Bundles = require(script.Parent.Parent.Parent.Config.Economy.Bundles)
@@ -140,6 +141,55 @@ T.describe("ShopRotation", function()
 		for _, category in Shop.Rotation.Categories do
 			T.expect(Cosmetics.Slots[category]):toEqual(true)
 		end
+		T.expect(table.find(Shop.Rotation.Categories, "EmoteAssets")):toBeNil()
+	end)
+
+	T.it("fills the three named roles deterministically with distinct items", function()
+		local pools = ShopRotation.poolByRarity(Cosmetics.Items, Shop.Rotation.Categories)
+		for userId = 1, 40 do
+			for bucket = 1, 10 do
+				local offers = ShopRotation.drawRoles(userId, bucket, pools, {}, Shop.Rotation.Roles, Cosmetics.Items)
+				local repeatDraw =
+					ShopRotation.drawRoles(userId, bucket, pools, {}, Shop.Rotation.Roles, Cosmetics.Items)
+				T.expect(#offers):toEqual(3)
+				local seen = {}
+				local byRole = {}
+				for index, offer in offers do
+					T.expect(offer.ItemId):toEqual(repeatDraw[index].ItemId)
+					T.expect(offer.Role):toEqual(repeatDraw[index].Role)
+					T.expect(seen[offer.ItemId]):toBeNil()
+					seen[offer.ItemId] = true
+					byRole[offer.Role] = offer
+				end
+				T.expect(byRole.RobuxCommon.Rarity):toEqual("Common")
+				T.expect(byRole.RobuxPremium.Rarity == "Rare" or byRole.RobuxPremium.Rarity == "Legendary")
+					:toBeTruthy()
+				T.expect(byRole.Bonks ~= nil):toBeTruthy()
+			end
+		end
+	end)
+
+	T.it("uses the configured 70/30 premium rarity mix", function()
+		local premium = Shop.Rotation.Roles[2]
+		T.expect(premium.Id):toEqual("RobuxPremium")
+		T.expect(premium.Rarities[1]):toEqual("Rare")
+		T.expect(premium.Rarities[2]):toEqual("Legendary")
+		T.expect(premium.Weights[1]):toEqual(70)
+		T.expect(premium.Weights[2]):toEqual(30)
+	end)
+
+	T.it("omits an exhausted Common role without changing either remaining role", function()
+		local pools = ShopRotation.poolByRarity(Cosmetics.Items, Shop.Rotation.Categories)
+		local owned = {}
+		for _, itemId in pools.Common do
+			for _, grantId in CosmeticsLogic.grantIds(Cosmetics.Items, itemId) do
+				owned[grantId] = true
+			end
+		end
+		local offers = ShopRotation.drawRoles(123, 456, pools, owned, Shop.Rotation.Roles, Cosmetics.Items)
+		T.expect(#offers):toEqual(2)
+		T.expect(offers[1].Role):toEqual("RobuxPremium")
+		T.expect(offers[2].Role):toEqual("Bonks")
 	end)
 
 	T.it("ships a bundle rotation naming only bundles that exist", function()

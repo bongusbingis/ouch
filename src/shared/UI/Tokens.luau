@@ -331,7 +331,7 @@ return table.freeze({
 		ShortCardHeight = 176,
 		PromoMin = 280,
 		PromoMax = 820,
-		PromoHeight = 270,
+		PromoHeight = 220,
 		CurrencyMin = 280,
 		CurrencyMax = 420,
 		CurrencyHeight = 206,

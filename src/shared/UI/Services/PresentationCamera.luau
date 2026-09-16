@@ -10,7 +10,8 @@ local Workspace = game:GetService("Workspace")
 local LeaseState = require(script.Parent.Parent.Parent.Game.Cosmetics.CameraLeaseState)
 
 local PresentationCamera = {}
-PresentationCamera.Priority = table.freeze({ Lobby = 10, Preview = 20, Death = 30, Results = 35, Vote = 40 })
+PresentationCamera.Priority =
+	table.freeze({ Lobby = 10, Preview = 20, Splash = 25, Death = 30, Results = 35, Vote = 40 })
 
 export type Token = LeaseState.Token
 type Owner = { render: (Camera, number) -> (), onPreempted: (() -> ())? }

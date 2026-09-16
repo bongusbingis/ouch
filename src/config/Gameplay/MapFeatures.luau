@@ -111,10 +111,24 @@ return {
 		SquashDampingRatio = 0.22,
 		SquashImpulse = -8,
 		BeatImpulse = -4,
+		-- The squash runs off a metronome locked to the track, not off whatever
+		-- is loud right now. Loudness only supplies the onsets the metronome
+		-- learns its tempo and phase from. BeatsPerPulse = 4 squashes on the
+		-- downbeat of each bar: impulse-2-3-4, impulse-2-3-4. Set it to 1 to
+		-- squash on every beat, or 2 for every other one.
+		BeatsPerPulse = 4,
+		BeatDefaultPeriodSeconds = 0.5, -- 120 BPM, used until the track is read
+		BeatMinPeriodSeconds = 0.3, -- 200 BPM
+		BeatMaxPeriodSeconds = 1.0, -- 60 BPM
 		BeatLoudnessFloor = 8,
 		BeatSensitivity = 1.35,
 		BeatEnvelopeResponseHz = 3,
-		BeatCooldownSeconds = 0.34,
+		BeatOnsetGapSeconds = 0.25, -- ignore rises closer than this so the tempo is learned from beats, not texture
+		BeatTempoSamples = 8,
+		BeatTempoAdaptRate = 0.35,
+		BeatPhaseCorrection = 0.12,
+		BeatPhaseWindow = 0.25, -- once locked, ignore onsets further than this fraction of a beat off the grid
+		BeatLockedScale = 0.25, -- how much of the tempo and phase correction survives locking
 		MinimumSquash = 0.6,
 		WidenScale = 0.35,
 	},

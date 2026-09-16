@@ -49,8 +49,13 @@ return function(props)
 		navHeight = n.Height
 		navTop = (layout.height - navHeight) / 2
 	end
-	return c(React.Fragment, nil, {
-		Decoration = ReactRoblox.createPortal(
+	local decorationTarget = props.DecorationTarget
+	if decorationTarget == nil then
+		local player = Players.LocalPlayer
+		decorationTarget = if player then player:FindFirstChildOfClass("PlayerGui") else false
+	end
+	local decoration = if decorationTarget
+		then ReactRoblox.createPortal(
 			c(React.Fragment, nil, {
 				LobbyHeaderDecoration = c("ScreenGui", {
 					Enabled = props.Visible ~= false,
@@ -86,8 +91,11 @@ return function(props)
 					}),
 				}),
 			}),
-			Players.LocalPlayer:WaitForChild("PlayerGui")
-		),
+			decorationTarget
+		)
+		else nil
+	return c(React.Fragment, nil, {
+		Decoration = decoration,
 		Controls = c("Frame", {
 			Visible = props.Visible ~= false,
 			BackgroundTransparency = 1,

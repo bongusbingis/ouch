@@ -361,11 +361,16 @@ local function splash(player: Player, root: BasePart)
 		splashTotals[id] = (splashTotals[id] or 0) + 1
 		player:SetAttribute(Attributes.Splashes, splashTotals[id])
 	end
-	fire({ kind = "Splash", playerId = id, position = root.Position, counted = counted ~= nil })
+	fire({
+		kind = "Splash",
+		playerId = id,
+		position = root.Position,
+		velocity = root.AssemblyLinearVelocity,
+		counted = counted ~= nil,
+	})
 	respawnGeneration += 1
 	local generation = respawnGeneration
 	pendingRespawns[player] = { generation = generation }
-	hold(character, root)
 	task.delay(Splashdown.RespawnDelaySeconds, function()
 		local pending = pendingRespawns[player]
 		if pending == nil or pending.generation ~= generation then

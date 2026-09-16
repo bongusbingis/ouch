@@ -25,7 +25,7 @@ local function signal()
 end
 return function()
 	describe("Shop purchase recovery", function()
-		local status, events, market, player, oldPoll, shopCalls, shopReply, openCalls, openReply, acknowledgements
+		local status, events, market, player, oldPoll, shopCalls, shopReply, openCalls, openReply, acknowledgements, productPrompts
 		beforeEach(function()
 			Shop.stop()
 			oldPoll = Config.PurchasePollSeconds
@@ -33,6 +33,7 @@ return function()
 			status = { receipts = {}, ownedPasses = {} }
 			shopCalls = 0
 			openCalls = 0
+			productPrompts = {}
 			acknowledgements = {}
 			openReply = function(crateId, count, sequence)
 				return {
@@ -52,7 +53,9 @@ return function()
 			market = {
 				PromptProductPurchaseFinished = signal(),
 				PromptGamePassPurchaseFinished = signal(),
-				PromptProductPurchase = function() end,
+				PromptProductPurchase = function(_self, _player, productId)
+					table.insert(productPrompts, productId)
+				end,
 				PromptGamePassPurchase = function() end,
 			}
 			Shop.start({
@@ -151,6 +154,37 @@ return function()
 			expect(Shop.snapshot().pending[key]).to.equal(true)
 			events.CrateOpened({ openId = "robux-open", source = "Robux", crateId = "EffectsCrate", results = {} })
 			expect(Shop.snapshot().pending[key]).to.equal(nil)
+		end)
+		it("prompts a named tier offer even when paid random purchases are restricted", function()
+			local product = Products.Catalog.OfferUnlockCommon
+			events.ShopStateChanged({
+				paidRandomAllowed = false,
+				paidRandomReason = "paid_random_restricted",
+				offers = {
+					{ itemId = "DodgeBall1", role = "RobuxCommon", rarity = "Common", purchased = false },
+				},
+			})
+			local ok, reason = Shop.promptProduct("common", product.Id)
+			expect(ok).to.equal(true)
+			expect(reason).to.equal(nil)
+			expect(productPrompts[#productPrompts]).to.equal(product.Id)
+		end)
+		it("refuses exhausted and purchased tier slots before opening a prompt", function()
+			local product = Products.Catalog.OfferUnlockCommon
+			events.ShopStateChanged({ paidRandomAllowed = true, offers = {} })
+			local missing, missingReason = Shop.promptProduct("common", product.Id)
+			expect(missing).to.equal(false)
+			expect(missingReason).to.equal("offer_unavailable")
+			events.ShopStateChanged({
+				paidRandomAllowed = true,
+				offers = {
+					{ itemId = "DodgeBall1", role = "RobuxCommon", rarity = "Common", purchased = true },
+				},
+			})
+			local purchased, purchasedReason = Shop.promptProduct("common", product.Id)
+			expect(purchased).to.equal(false)
+			expect(purchasedReason).to.equal("offer_unavailable")
+			expect(#productPrompts).to.equal(0)
 		end)
 		it("recovers a saved receipt after its grant notification is lost", function()
 			local id = Products.Catalog.Bonks500.Id

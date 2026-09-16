@@ -3,18 +3,25 @@
 --!nonstrict
 
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MonetizationService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MonetizationService"))
+local ShopService = require(ServerScriptService.Server.Modules.ShopService)
+local Cosmetics = require(ReplicatedStorage.Config.Cosmetics.Cosmetics)
+local Shop = require(ReplicatedStorage.Config.Economy.Shop)
+local FeaturedRotation = require(ReplicatedStorage.Shared.Game.Economy.FeaturedRotation)
 
 return function()
 	describe("MonetizationService", function()
 		beforeEach(function()
 			MonetizationService._resetForTest()
+			ShopService._resetForTest()
 		end)
 
 		afterEach(function()
 			MonetizationService._resetForTest()
+			ShopService._resetForTest()
 		end)
 
 		it("grants Bonks receipts once and emits one authoritative grant event", function()
@@ -92,6 +99,128 @@ return function()
 			expect(data.Bonks).to.equal(500)
 			expect(#grants).to.equal(1)
 			expect(#economyEvents).to.equal(1)
+		end)
+
+		it("settles tier offers through the real shop slots, including every substitution case", function()
+			local NOW = 100000
+			local player = { UserId = 720006 }
+			local data = {
+				Bonks = 0,
+				Receipts = {},
+				Cosmetics = { Owned = {}, Equipped = {} },
+				Crates = { Pity = {} },
+				Shop = {
+					Version = 1,
+					Bucket = FeaturedRotation.periodIndex(Shop.Rotation.RotationSeconds, NOW),
+					Offers = {
+						{ ItemId = "DodgeBall1", Role = "RobuxCommon", Rarity = "Common" },
+						{ ItemId = "DodgeBall19", Role = "RobuxPremium", Rarity = "Legendary" },
+						{ ItemId = "DodgeBall10", Role = "Bonks", Rarity = "Rare" },
+					},
+					Purchased = {},
+				},
+			}
+			local marketplace = {}
+			local grants, economyEvents = {}, {}
+			local playerData = {
+				get = function(target)
+					return if target == player then data else nil
+				end,
+				addBonks = function(target, amount)
+					if target == player then
+						data.Bonks += amount
+					end
+				end,
+				acquireWriteLease = function()
+					return function() end
+				end,
+				confirmReceiptSaved = function(_target, key)
+					return data.Receipts[key] ~= nil
+				end,
+			}
+			local network = {
+				handleProtected = function() end,
+				fire = function(name, _target, payload)
+					if name == "StorePurchaseGranted" then
+						table.insert(grants, payload)
+					end
+				end,
+			}
+			ShopService.start({
+				playerData = playerData,
+				network = network,
+				paidRandomPolicy = { canReceivePaidRandom = function() return false, "paid_random_restricted" end },
+				entitlements = {
+					isReady = function() return true end,
+					has = function() return false end,
+					ownsAny = function() return false end,
+				},
+				time = function() return NOW end,
+				sweepSeconds = 0,
+			})
+			local products = {
+				ById = {
+					[301] = { Type = "OfferUnlock", Rarity = "Common" },
+					[302] = { Type = "OfferUnlock", Rarity = "Rare" },
+					[303] = { Type = "OfferUnlock", Rarity = "Legendary" },
+				},
+			}
+			MonetizationService.start({
+				marketplace = marketplace,
+				players = { GetPlayerByUserId = function() return player end },
+				products = products,
+				playerData = playerData,
+				shopService = ShopService,
+				rewardService = {
+					grant = function(target, reward)
+						expect(target).to.equal(player)
+						data.Cosmetics.Owned[reward.itemId] = true
+						return true
+					end,
+				},
+				analyticsService = {
+					logEconomyEvent = function(...)
+						table.insert(economyEvents, { ... })
+					end,
+				},
+				network = network,
+				time = function() return NOW end,
+			})
+
+			local function receipt(productId, purchaseId)
+				return marketplace.ProcessReceipt({
+					PlayerId = player.UserId,
+					ProductId = productId,
+					PurchaseId = purchaseId,
+				})
+			end
+
+			expect(receipt(301, "common-grant")).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(data.Cosmetics.Owned.DodgeBall1).to.equal(true)
+			expect(data.Shop.Purchased.RobuxCommon).to.equal(true)
+			expect(grants[#grants].kind).to.equal("Cosmetic")
+			expect(grants[#grants].itemId).to.equal("DodgeBall1")
+
+			expect(receipt(301, "common-again")).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(data.Bonks).to.equal(Cosmetics.Rarities.Common.DirectBonks)
+			expect(grants[#grants].substitutionReason).to.equal("already_purchased")
+			local balance = data.Bonks
+			expect(receipt(301, "common-again")).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(data.Bonks).to.equal(balance)
+
+			expect(receipt(302, "rare-mismatch")).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(data.Bonks).to.equal(balance + Cosmetics.Rarities.Rare.DirectBonks)
+			expect(grants[#grants].substitutionReason).to.equal("rarity_mismatch")
+			expect(grants[#grants].offerItemId).to.equal("DodgeBall19")
+
+			data.Cosmetics.Owned.DodgeBall19 = true
+			expect(receipt(303, "legendary-owned")).to.equal(Enum.ProductPurchaseDecision.PurchaseGranted)
+			expect(data.Bonks).to.equal(
+				balance + Cosmetics.Rarities.Rare.DirectBonks + Cosmetics.Rarities.Legendary.DirectBonks
+			)
+			expect(grants[#grants].substitutionReason).to.equal("already_owned")
+			expect(#economyEvents).to.equal(4)
+			expect(economyEvents[#economyEvents][8].offerResolution).to.equal("Legendary:DodgeBall19:Substitute")
 		end)
 
 		it("serializes concurrent receipts and resumes a partial bundle without duplicate refunds", function()

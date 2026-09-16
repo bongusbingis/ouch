@@ -138,7 +138,6 @@ local entries: { Entry } = {
 	-- DirectBonks/DupeBonks are absent on purpose -- a live override there could
 	-- make crates strictly worse value than buying outright.
 	{ Key = "Shop.VariantId", Type = "string" },
-	{ Key = "Shop.Rotation.OfferCount", Type = "number", Minimum = 1, Maximum = 8 },
 	{ Key = "Shop.Rotation.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },
 	{ Key = "Shop.Featured.RotationSeconds", Type = "number", Minimum = 3600, Maximum = 2592000 },
 	{ Key = "Shop.Featured.DiscountPercent", Type = "number", Minimum = 0, Maximum = 20 },

@@ -1,4 +1,4 @@
--- Description: Plays the Splashdown race feedback the server announces: a purple burst and the fall cue where a racer hits the lava, a chime for the local racer's checkpoints and finish, and the breakaway fall of a Knock Knock door, restoring each door when the server makes it solid again.
+-- Description: Plays the Splashdown race feedback the server announces: a purple burst and the fall cue where a racer hits the lava, a detached camera that pans to keep watching a fast fall past the point of impact, a chime for the local racer's checkpoints and finish, and the breakaway fall of a Knock Knock door, restoring each door when the server makes it solid again.
 
 --!strict
 
@@ -16,16 +16,25 @@ local Network = require(Shared:WaitForChild("Network"))
 local PlayerIds = require(Shared:WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local GameAudio = require(script.Parent.GameAudio)
 local SplashdownClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("SplashdownClient"))
+local PresentationCamera = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Services")
+		:WaitForChild("PresentationCamera")
+)
 
 local SplashEffects = {}
 
 local LAVA_COLOR = Color3.fromRGB(214, 63, 214)
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
+local localPlayer = Players.LocalPlayer
 local started = false
 local connections: { RBXScriptConnection | () -> () } = {}
 local doorOrigins: { [BasePart]: { cframe: CFrame, transparency: number, watch: RBXScriptConnection } } = {}
 local template: BasePart? = nil
+local lavaCameraLease: PresentationCamera.Token? = nil
+local lavaCameraGeneration = 0
 
 local function buildTemplate(): BasePart
 	local part = Instance.new("Part")
@@ -91,6 +100,58 @@ local function splashAt(position: Vector3)
 	end
 	Debris:AddItem(burst, Splashdown.Splash.Lifetime)
 	GameAudio.play("ElimZoneFall", position)
+end
+
+local function humanoidRoot(character: Model): BasePart?
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		return root
+	end
+	return nil
+end
+
+local function fallingRootPosition(character: Model): Vector3?
+	local root = humanoidRoot(character)
+	return if root then root.Position else nil
+end
+
+local function stopLavaCamera()
+	lavaCameraGeneration += 1
+	if lavaCameraLease then
+		PresentationCamera.release(lavaCameraLease)
+		lavaCameraLease = nil
+	end
+end
+
+-- The racer keeps falling under ordinary gravity, uninterrupted; only the
+-- camera detaches, holding its position and panning to keep looking at the
+-- character as it drops past the lava's surface and out of view. Timed to
+-- Splashdown.RespawnDelaySeconds, the same window the server free-falls the
+-- racer for before pulling them back to their checkpoint.
+local function startLavaCamera(character: Model)
+	stopLavaCamera()
+	local camera = Workspace.CurrentCamera
+	local root = humanoidRoot(character)
+	if camera == nil or root == nil then
+		return
+	end
+
+	lavaCameraGeneration += 1
+	local generation = lavaCameraGeneration
+	local frozenPosition = camera.CFrame.Position
+	lavaCameraLease = PresentationCamera.acquire(
+		"LavaSplash",
+		PresentationCamera.Priority.Splash,
+		function(activeCamera: Camera, _deltaTime: number)
+			local target = fallingRootPosition(character) or frozenPosition
+			activeCamera.CFrame = CFrame.lookAt(frozenPosition, target)
+		end
+	)
+	task.delay(Splashdown.RespawnDelaySeconds, function()
+		if lavaCameraGeneration == generation then
+			stopLavaCamera()
+		end
+	end)
 end
 
 local function restoreDoor(door: BasePart)
@@ -160,6 +221,16 @@ function SplashEffects.start()
 		SplashdownClient.onEvent(function(event)
 			if event.kind == "Splash" and typeof(event.position) == "Vector3" then
 				splashAt(event.position)
+				if
+					event.playerId == localId
+					and typeof(event.velocity) == "Vector3"
+					and event.velocity.Y <= -Splashdown.LavaCamera.MinFallSpeed
+				then
+					local character = localPlayer.Character
+					if character then
+						startLavaCamera(character)
+					end
+				end
 			elseif event.kind == "Checkpoint" and event.playerId == localId then
 				GameAudio.play("OnboardingStepSuccess")
 			elseif event.kind == "Finish" and event.playerId == localId then
@@ -173,6 +244,12 @@ function SplashEffects.start()
 			if typeof(door) == "Instance" and door:IsA("BasePart") and typeof(from) == "Vector3" then
 				breakDoor(door, from)
 			end
+		end)
+	)
+	table.insert(
+		connections,
+		localPlayer.CharacterRemoving:Connect(function()
+			stopLavaCamera()
 		end)
 	)
 end
@@ -189,6 +266,7 @@ function SplashEffects.destroy()
 	for door in doorOrigins do
 		forgetDoor(door)
 	end
+	stopLavaCamera()
 	started = false
 end
 

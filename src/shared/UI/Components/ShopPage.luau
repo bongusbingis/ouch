@@ -24,6 +24,7 @@ local function blocks(entries, width, offset, props)
 	local unit = Layout.trackUnit(width, Config.Tracks, Config.GapPx)
 	for _, entry in entries do
 		entry.class = Config.CardClasses[entry.style.Class]
+		entry.priority = entry.style.Priority
 		if props.Short then
 			entry.class = Composition.shortClass(entry.class, L.PromoMin, T.LobbyLandscape.CardHeight)
 		end

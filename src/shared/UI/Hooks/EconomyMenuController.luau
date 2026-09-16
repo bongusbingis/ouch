@@ -59,6 +59,7 @@ local SHOP_ERRORS = {
 	insufficient_bonks = "You do not have enough Bonks.",
 	already_owned = "You already own that item.",
 	not_offered = "That offer has expired.",
+	offer_unavailable = "That offer is no longer available. Please check the refreshed shop.",
 	not_purchasable = "That item cannot be purchased.",
 	paid_random_restricted = "Crates are unavailable for this account.",
 	policy_lookup_failed = "Crates are temporarily unavailable.",
@@ -259,6 +260,8 @@ function EconomyMenuController.use(options: Options): Controller
 		local pass = if passKey then GamePasses.Catalog[passKey] else nil
 		local description = if pass and pass.PurchaseMessage
 			then pass.PurchaseMessage
+			else if grant.kind == "Bonks" and grant.substitutedFor
+				then `TODAY'S {string.upper(grant.substitutedFor)} OFFER WAS UNAVAILABLE, SO YOU RECEIVED {grant.amount} BONKS INSTEAD.`
 			else if grant.kind == "Bonks"
 				then `YOU RECEIVED {grant.amount} BONKS.`
 				else "NEW GEAR! CHECK YOUR BACKPACK."

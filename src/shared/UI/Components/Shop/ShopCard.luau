@@ -40,7 +40,7 @@ return React.memo(function(props)
 	local stickerHeight = if short then L.CompactStickerHeight else L.StickerHeight
 	local stickerText = T.Type.Minimum
 	local ribbonHeight = T.Layout.RarityHeight
-	local ownedWidth = labelWidth("✓ OWNED", stickerText, L.StickerPadding)
+	local ownedWidth = labelWidth(style.ownedText, stickerText, L.StickerPadding)
 	local stickerWidth = if style.sticker then labelWidth(style.sticker.Text, stickerText, L.StickerPadding) else 0
 	local stackedStamp = style.owned and style.sticker ~= nil and width < stickerWidth + ownedWidth + L.StickerPadding
 	local ownedY = if stackedStamp then stickerHeight + 2 else -L.StickerOverhang
@@ -263,7 +263,7 @@ return React.memo(function(props)
 				},
 			}, {
 				Stamp = c(Badge, {
-					Text = "✓ OWNED",
+					Text = style.ownedText,
 					Color = C.Yellow,
 					TextSize = stickerText,
 					Native = { Size = UDim2.fromScale(1, 1), ZIndex = 15 },

@@ -20,8 +20,14 @@ export type BundleConfig = {
 
 export type RotationConfig = {
 	RotationSeconds: number,
-	OfferCount: number,
+	Roles: { RotationRole },
 	Categories: { string },
+}
+
+export type RotationRole = {
+	Id: string,
+	Rarities: { string }?,
+	Weights: { number }?,
 }
 
 -- A/B variant label, stamped on every shop analytics row; empty is the baked config.
@@ -52,14 +58,17 @@ local Bundle: BundleConfig = {
 -- something it cannot.
 local Rotation: RotationConfig = {
 	RotationSeconds = 24 * 60 * 60,
-	OfferCount = 3,
+	Roles = {
+		{ Id = "RobuxCommon", Rarities = { "Common" } },
+		{ Id = "RobuxPremium", Rarities = { "Rare", "Legendary" }, Weights = { 70, 30 } },
+		{ Id = "Bonks" },
+	},
 	Categories = {
 		"BallAssets",
 		"HammerAssets",
 		"ElimEffectAssets",
 		"ImpactEffectAssets",
 		"CostumeAssets",
-		"EmoteAssets",
 	},
 }
 
@@ -71,11 +80,34 @@ assert(
 )
 assert(Bundle.RotationSeconds > 0, "bundle rotation period must be positive")
 assert(Rotation.RotationSeconds > 0, "shop rotation period must be positive")
-assert(
-	Rotation.OfferCount > 0 and Rotation.OfferCount % 1 == 0,
-	"shop rotation must offer a positive whole number of items"
-)
+assert(#Rotation.Roles > 0, "shop rotation must define at least one role")
 assert(#Rotation.Categories > 0, "shop rotation must draw from at least one category")
+
+local roleIds: { [string]: boolean } = {}
+local rarityRoles: { [string]: number } = {}
+for _, role in Rotation.Roles do
+	assert(role.Id ~= "" and not roleIds[role.Id], `shop rotation role "{role.Id}" must be unique`)
+	roleIds[role.Id] = true
+	if role.Id == "Bonks" then
+		assert(role.Rarities == nil and role.Weights == nil, "the Bonks role must draw from every eligible rarity")
+	else
+		assert(role.Rarities ~= nil and #role.Rarities > 0, `shop rotation role "{role.Id}" needs rarities`)
+		if role.Weights then
+			assert(#role.Weights == #role.Rarities, `shop rotation role "{role.Id}" weights must match its rarities`)
+		end
+		for index, rarity in role.Rarities do
+			assert(table.find({ "Common", "Rare", "Legendary" }, rarity) ~= nil, `unknown offer rarity "{rarity}"`)
+			rarityRoles[rarity] = (rarityRoles[rarity] or 0) + 1
+			if role.Weights then
+				assert(role.Weights[index] > 0, `shop rotation role "{role.Id}" weights must be positive`)
+			end
+		end
+	end
+end
+assert(roleIds.Bonks, "shop rotation must define one Bonks role")
+for _, rarity in { "Common", "Rare", "Legendary" } do
+	assert(rarityRoles[rarity] == 1, `shop rotation must define exactly one Robux role for {rarity}`)
+end
 
 local RobuxSymbol = "\u{E002}"
 
