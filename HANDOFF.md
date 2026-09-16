@@ -24,18 +24,21 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | `f76b621`, the Piston Peak build, on top of `0dead56` (the Tiptoe Trials handoff note) |
+| HEAD now | the hazard-reach fix pass of 2026-09-16: `c74a288` (Ball Barrage + the new regression), `2dcaa8a` (Door Dash) and this refresh, on top of `dc6051f`, the Piston Peak handoff note |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
 | Remote delivery | No push or PR performed |
-| New courses built | **ALL SIX.** Ball Barrage (Gate 3 APPROVED), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (scripted trials FAILED 0 of 8), Tumble Tunnels, Tiptoe Trials and **Piston Peak** (built 2026-09-16; statically clean, zero QA warnings, captures done, pistons/log-rolls/rising liquid verified against the real kit, scripted trials NOT COMPLETED). All six are LIVE in `CourseOrder` and promoted. |
+| New courses built | **ALL SIX.** Ball Barrage (Gate 3 APPROVED; **hammers and pistons remounted 2026-09-16, hash now `7a46da9c`**), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (scripted trials FAILED 0 of 8; **large hammer rehung 2026-09-16, hash now `aae4c298`**), Tumble Tunnels, Tiptoe Trials and **Piston Peak**. All six are LIVE in `CourseOrder`, promoted, and re-audited under the corrected surface sampler. |
 | Summit layout hardened | No -- **this is the next item, and section 12's replacement transaction is the one after it. Both need the user, not a successor's initiative.** |
 | Deprecated courses removed | No |
 
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
+2dcaa8a   fix(splashdown): hang Door Dash's inert hammer in reach
+c74a288   fix(splashdown): mount Ball Barrage's hammers and pistons in reach
+dc6051f   docs(splashdown): record the Piston Peak commit id in the handoff
 f76b621   feat(splashdown): build Piston Peak
 0dead56   docs(splashdown): record the Tiptoe Trials commit id in the handoff
 3e62299   feat(splashdown): build Tiptoe Trials
@@ -158,6 +161,96 @@ archive — so this session stopped here deliberately rather than carrying on.
 `SplashdownIntroModel.spec.luau` asserts it and the headless suite fails otherwise. Piston Peak's
 entry is in place. Headless is **984 tests, 0 failures**.
 
+#### The 2026-09-16 hazard-reach pass — READ THIS BEFORE 1.4's older entries
+
+The user chose this over carrying on building: fix Ball Barrage's inert hammers and pistons, then
+re-audit the four courses whose cut sets were measured with the OLD surface sampler. Both halves are
+done. **Nothing in Summit hardening (7.7) or section 12's transaction was started, and both still
+need the user.**
+
+**Ball Barrage's two pistons and two hammers now reach the lane, measured on the rebuilt template.**
+
+| Hazard | Before (on `ca5e95b4`) | After (on `7a46da9c`) |
+|---|---|---|
+| `Piston01` head | side +16.30..+24.02 against a lane half-width of 10.51 — 5.79 to 13.51 studs past the edge, over open water | side **+2.484..+10.198** at rest, swept **−3.516..+10.198**: 3.52 studs past the centreline on the punch |
+| `Piston02` head | mirrored, side −24.02..−16.30 | side **−10.197..−2.483** at rest, swept **−10.197..+3.517** |
+| `HammerLarge` head | Y 5.694..24.456 under a deck at Y 24.000 — top **0.46 studs** at deck level | swept Y **24.600..46.406** = deck **+0.600..+22.406**, side ±5.558 at rest and **±10.872** swept |
+| `HammerSmall` head | Y 5.804..25.356 — top 1.36 studs | swept Y **24.600..45.815**, side ±4.117 at rest and **±10.370** swept |
+
+The pistons were a mounting sign: `obstacle_22`'s head lies along the piece's own forward at a
+measured 13.160 studs from the base at scale 0.5, so a base INSIDE the lane facing outward throws the
+head away. `OffsetSide` is now ±19.5 (base outside, head reaching in, as Piston Peak mounts its
+three) and `OffsetAlong` moved from −30/−14 to −24/−8 so both stand over Floor04's flat deck rather
+than off its end over Ramp04's slope. The hammers were a mount height: both sources hang their heads
+a measured 8.925 and 8.420 studs BENEATH the housing at scale 0.6. `OffsetUp` is now
+`hang + hypot(halfX, halfY) + 0.6` = 20.428 and 19.627 — derived from the SWING, because the head
+rocks about its OWN centre (CoursePresets clears every display pivot), so its maximum vertical
+half-extent is `hypot(halfX, halfY)` at 30.7°/22.8°, not `halfY`. Hanging to that maximum is what
+keeps the head out of the floor at mid-swing; Tiptoe Trials' constants used the rest pose only and
+let its heads dip 1.5 studs into the deck at mid-swing. Ball Barrage's `CourseQA.check` afterwards:
+**zero errors, zero warnings, 48 PASS / 14 NOT RUN / 0 FAIL**, all six gate cut sets holding over a
+14,977-node / 2,392,356-edge graph from 18,548 cells. Re-staged and re-promoted; the Edit stage and
+an independent Play build agreed on `7a46da9c` / 143 BaseParts.
+
+**Door Dash had the identical hammer defect and it is fixed the same way.** Its `HammerLarge` measured
+Y 5.694..24.456 under a deck at Y 23.997 — the same 0.46 studs. `OffsetUp` is now the same 20.428
+expression; the head sweeps deck **+0.600..+22.406** and side **±10.872** across a ±9.11 lane. Rebuilt,
+re-staged, re-promoted: hash `8c00a748` → **`aae4c298`**, 221 BaseParts, route 882.067, zero errors,
+zero warnings, all six gate cut sets holding.
+
+**New regression, and the general form of both bugs.** `SplashdownQA.spec` gained **"sweeps every
+shoving hazard through its own beat's lane"**. For every `Rotor` + `Shove` part it drives the REAL
+`RotatingPlatforms` motion — `build` then `rotorPoseAt` over 240 samples across 12 seconds, so a
+hammer's windup+strike, a piston's period and every spin all cycle — takes the rotor part AND its
+followers (so a mace's reach is its ball's and a piston's is its head's), and requires the swept
+volume to contain a lane point at the calibration's own measured `RootOffsetStuds` of 3.5 above the
+deck. The lane comes from the BuildReport's route steps with their MEASURED `HalfWidth`, excluding
+`Mount` and `Flank` steps whose half-extent is the hazard's reach rather than the deck's. Hazards
+with `RotorCarries` (swing panels, log-rolls) are exempt and reported by name. It fails both original
+bugs: the pistons laterally, the hammers vertically.
+
+**Two test bugs the re-audit exposed, both fixed:**
+
+1. `"mounts every piston head where it can actually strike a runner"` ended in `expect(heads > 0)`,
+   which FAILS on the four courses that place no piston. It had only ever been run against Piston
+   Peak. It now counts `Preset == "Piston"` pieces in the spec and asserts `heads == declared`.
+2. `"clones each declared sub-part once"` keyed only on PieceId plus position, and a disc is a hub
+   with a CONCENTRIC plate: Whirlpool Waltz's `obstacle_15` and `obstacle_26` rides put a 29.9-stud
+   plate and a 6.5-stud hub on the same centre and were reported as doubled. The key now includes
+   Size, because a real duplicate is the same geometry twice.
+
+**The four-course re-audit under the corrected sampler — every result holds.** Zero errors, zero
+warnings and every gate cut set still a true cut set (0 of 30 spawn cells bypass any gate) on all
+four. The counts moved, and it is worth being precise about WHY: the old recorded runs also predate
+the Tiptoe session's launch-edge pass, so the edge explosion is mostly launch edges, not the sampler.
+The sampler shows up in the CELL and NODE counts, and only Door Dash — the one course with real
+stacked geometry, its door-corridor roof — moved much.
+
+| Course | Cells | Nodes | Edges | Gates |
+|---|---|---|---|---|
+| Ball Barrage (`943e493c` → `7a46da9c`, spec also changed) | 18,446 → 18,548 | 14,881 → 14,977 | 340,357 → 2,392,356 | 6/6 hold |
+| Whirlpool Waltz (`2fbc899c` → `78e562b8`) | 14,844 → **14,844** | 12,181 → **12,181** | 383,518 → 836,683 | 6/6 hold |
+| Door Dash (`8c00a748`, sampler only) | 38,241 → **40,121** | 28,121 → **29,921** | 1,272,671 → 3,359,436 | 6/6 hold |
+| Door Dash (`aae4c298`, after the hammer fix) | 40,121 | 29,918 | 3,366,017 | 6/6 hold |
+| Tumble Tunnels (`d390ff50`, unchanged) | 28,807 → 28,879 | 20,739 → 20,788 | 789,860 → 1,168,827 | 7/7 hold |
+| Tiptoe Trials (`0f8e9510`, unchanged) | 16,171 → 16,299 | 14,680 → 14,774 | 1,309,689 → 1,314,869 | 6/6 hold |
+
+Whirlpool Waltz's cell and node counts are IDENTICAL, which is the expected result for a course with
+no stacked storeys and is the cleanest evidence that the sampler fix neither lost nor invented
+geometry. Piston Peak was re-run as a control and reproduced its recorded 15,945 cells / 13,886 nodes
+/ 1,854,187 edges **exactly**, which is what says the pipeline itself did not move underneath the
+comparison.
+
+Studio TestEZ over all six courses, across three Play sessions: **21 assertions each, 126 in total,
+0 failures**, including the new swept-reach check and the two corrected checks above. Every course's
+`docs/splashdown/evidence/courses/<Id>/qa.json` was republished through the evidence sink and is
+current; they were all reformatted to 2-space indent with sorted keys, so from here their diffs are
+content diffs rather than key-order churn.
+
+**Still outstanding and unchanged:** the whole scripted-trial / interactive-playtest category (user's
+standing 2026-09-16 decision), `docs/splashdown/qa-report.md`, the per-course palette, and
+`Courses.DoorDash`'s Difficulty 3 against section 12.1's list of 2.
+
 #### Piston Peak, as built
 
 - Spec `src/shared/Game/Splashdown/CourseSpecs/PistonPeak.luau`; doc
@@ -202,8 +295,9 @@ entry is in place. Headless is **984 tests, 0 failures**.
 
 #### What Piston Peak exposed — carry these forward
 
-1. **Ball Barrage's two pistons are INERT, and its two hammers are effectively inert too. Measured,
-   not inferred, on the promoted template.** Piston01's head sits at world Z 76.16 spanning
+1. **[FIXED 2026-09-16 — see the hazard-reach pass above. Door Dash had the same hammer defect and
+   is fixed too.] Ball Barrage's two pistons are INERT, and its two hammers are effectively inert
+   too. Measured, not inferred, on the promoted template.** Piston01's head sits at world Z 76.16 spanning
    72.30-80.02 while its beat-03 lane spans Z 45.49-66.51 — the head sweeps 5.8 to 9.7 studs BEYOND
    the lane edge over open water, and Piston02 is the same mirrored. The cause is the mounting sign:
    the head lies along the piece's own forward, so a base placed INSIDE the lane facing outward
@@ -213,7 +307,9 @@ entry is in place. Headless is **984 tests, 0 failures**.
    that failure is the evidence.** The hammers: HammerLarge's head spans Y 5.70-24.46 under a lane
    whose top is Y 24.00, so only its top 0.46 studs ever reach deck level. Neither was fixed; Gate 3
    was approved with them and that is the user's call, not a successor's.
-2. **A per-part sampling window silently hid four fifths of a stacked course.**
+2. **[RE-AUDIT DONE 2026-09-16 — all five earlier courses re-measured under the fixed sampler; every
+   cut set still holds. See the table in the hazard-reach pass above.] A per-part sampling window
+   silently hid four fifths of a stacked course.**
    `CourseQA.sampleSurfaces` samples each X/Z column once — which is what keeps it tractable — but it
    used the vertical window of whichever PART claimed the column first. On a flat course nothing is
    stacked so it never mattered; on this tower the first run's slab claimed the column and the four
@@ -386,10 +482,13 @@ entry is in place. Headless is **984 tests, 0 failures**.
 
 #### Where the earlier five stand
 
-Their templates and hashes are unchanged by this session: Ball Barrage `ca5e95b4`, Whirlpool Waltz
-`78e562b8`, Door Dash `8c00a748`, Tumble Tunnels `d390ff50`, Tiptoe Trials `0f8e9510`, plus Piston
-Peak `e164c528` — all six promoted. Their outstanding 8.5 items are unchanged. Their recorded cut-set
-results, however, were measured with the OLD surface sampler; see "What Piston Peak exposed" item 2.
+Their templates and hashes were unchanged by the Piston Peak session: Ball Barrage `ca5e95b4`,
+Whirlpool Waltz `78e562b8`, Door Dash `8c00a748`, Tumble Tunnels `d390ff50`, Tiptoe Trials
+`0f8e9510`, plus Piston Peak `e164c528`. **The 2026-09-16 hazard-reach pass then moved two of them:
+Ball Barrage is now `7a46da9c` (143 BaseParts) and Door Dash is now `aae4c298` (221 BaseParts). The
+four current hashes are Whirlpool Waltz `78e562b8` (142), Tumble Tunnels `d390ff50` (163), Tiptoe
+Trials `0f8e9510` (160) and Piston Peak `e164c528` (162).** All six are staged and promoted, and all
+six have now been audited under the FIXED surface sampler. Their outstanding 8.5 items are unchanged.
 
 #### The set-wide route-length target is fixed (section 11's prerequisite)
 
@@ -452,14 +551,18 @@ ceiling.
    models and retires seven recipes with no archive, so neither should start on a successor's
    initiative. Section 7.7 step 10 and section 14.9 already treat a Summit conflict as a scope
    decision, and section 0.5 forbids deploying anything without explicit authorisation.
-2. Before 12.1, **re-audit the five earlier courses' cut sets**. The `sampleSurfaces` fix above means
-   every course now sees storeys it previously did not; their recorded clean cut sets were measured
-   with the old sampler. Piston Peak is the only course audited with the fixed one.
+2. **DONE 2026-09-16.** All five earlier courses' cut sets were re-audited under the fixed
+   `sampleSurfaces`; every one still holds, with the before/after counts in the hazard-reach pass
+   above. `qa.json` is current for all six courses.
 3. Section 12.1's difficulty list is `3, 3, 2, 3, 3, 4` plus Summit's 3. `Courses.DoorDash` currently
    carries **Difficulty 3, not the 2 that list wants** — carried over from when it was added. Fix it
    in the 12.1 change, not before, so it moves with the rest of the registry.
-4. Ball Barrage's inert pistons and hammers are measured and unfixed. The user has the evidence; a
-   fix is a change to an APPROVED pilot and needs their word.
+4. **DONE 2026-09-16**, on the user's explicit instruction. Ball Barrage's two pistons and two
+   hammers, and Door Dash's large hammer (the same defect, found by the new regression), now measure
+   into their own lanes. Ball Barrage is `7a46da9c` and Door Dash is `aae4c298`; both are re-staged,
+   re-promoted and re-audited. **Ball Barrage's Gate 3 approval predates this change** — the geometry
+   a human played is not quite the geometry that ships now, so the beat 03 and beat 05 timings are
+   worth one interactive pass whenever the user next plays it.
 5. The Whirlpool Waltz 8.5 blocker, and the scripted-trial category generally, are intentionally NOT
    being chased (user decision, 2026-09-16). The two guards in `run-course-routes.server.luau` are
    in place and still UNEXERCISED.
@@ -474,7 +577,16 @@ ceiling.
 
 ### 1.3 Studio
 
-Last connected arena: place ID **121997450145716**, title Match Place, studio_id f2e79758-7afe-47ea-8efc-85035edf8307 (2026-09-15, this session). Rediscover the ID before use — it changes every session.
+Last connected arena: place ID **121997450145716**, title Match Place, studio_id f2e79758-7afe-47ea-8efc-85035edf8307 (2026-09-16). Rediscover the ID before use — it changes every session.
+
+**Rojo, 2026-09-16:** this repo's own `arena.project.json` (project name `ouch-proto`) was already
+serving on **34872** and `lobby.project.json` on 34873, so `tests.project.json`'s declared port was
+taken and the plugin's auto-connect prompt offered the ARENA project, which does NOT sync
+`ServerStorage.Tests`. Serve the tests project on a free port instead —
+`rojo serve tests.project.json --port 34876` — then edit the port in the Rojo plugin panel (the
+field is at desktop (1860, 899), Connect at (1854, 944)), click **Allow** on the
+"Allow plugin Rojo to access localhost:34876?" dialog and **Accept** on the sync-patch panel. Do not
+kill the 34872 server; a parallel session may be using it.
 
 Do NOT edit lobby place 130584867985467, previously studio_id 89fa3e46-0f1a-4be4-a47a-e97b7066a656.
 
@@ -483,7 +595,7 @@ Recorded Edit state:
 - Workspace.battle_stadium: original source gallery; preserve it.
 - Workspace.LegacyCourses: **97 immediate children: seven course Models plus ninety Keyframes**. The seven Models are the user's copies of the original courses (see 1.2).
 - ReplicatedStorage.Assets.Maps.Splashdown: **exactly six models, `BallBarrage`, `WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials` and `PistonPeak`, all real promoted templates matching `CourseOrder`.** The `WhirlPool`/`KnockKnock` local-test fixtures have been destroyed; do not recreate them unless testing an isolated config again, and destroy them again afterward. This matches `Splashdown.CourseOrder` exactly as of the Piston Peak build — the folder is no longer expected to be empty.
-- ServerStorage.SplashdownStaging holds `BallBarrage`, `WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials` and `PistonPeak`, all staged and promoted on 2026-09-16 with hashes Ball Barrage `ca5e95b4`, Whirlpool Waltz `78e562b8`, Door Dash `8c00a748`, Tumble Tunnels `d390ff50`, Tiptoe Trials `0f8e9510`, Piston Peak `e164c528`. The first two changed from their earlier recorded values (`943e493c`, `2fbc899c`) when the two CoursePresets fixes in 1.4 touched every model. Re-stage before relying on either if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
+- ServerStorage.SplashdownStaging holds `BallBarrage`, `WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials` and `PistonPeak`, all staged and promoted on 2026-09-16 with hashes **Ball Barrage `7a46da9c` (143 BaseParts), Whirlpool Waltz `78e562b8` (142), Door Dash `aae4c298` (221), Tumble Tunnels `d390ff50` (163), Tiptoe Trials `0f8e9510` (160), Piston Peak `e164c528` (162)**. Ball Barrage moved `943e493c` → `ca5e95b4` (the two CoursePresets fixes in 1.4, which also dropped its part count from 158 to 143 by ending the doubled piston spring) → `7a46da9c` (the hazard-reach pass); Whirlpool Waltz moved `2fbc899c` → `78e562b8` the same way; Door Dash moved `8c00a748` → `aae4c298` (the hazard-reach pass). Re-stage before relying on any of them if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
 - `workspace.Assets.Arena.Map.Model` is at its correct original pivot (verified, see the tooling note above); do not need to re-check this unless something else reports it looks wrong.
 - The evidence sink on `http://127.0.0.1:34875/` is a scratchpad script (not checked in); rewrite it in ten lines when needed. The Command Bar's Run button measured at desktop (1884, 1033) this session and the text field at (840, 1030); clicking Run while Play is RUNNING does nothing, so stop Play first. Temporary kit probes, observer and review gallery removed. A Rojo-synced probe under `places/arena/server/Scripts/` (Temp*Probe) may be present while section 11 work is in progress; delete it before any commit.
 - The source gallery is unanchored and disappears from Workspace in Play. Export its source in Edit before testing.
