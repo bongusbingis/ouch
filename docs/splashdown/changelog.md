@@ -37,3 +37,32 @@
   clean whitespace diff, connected Match Place (placeId 121997450145716) confirmed in Edit mode
   with MapOrigin, gravity, 97 LegacyCourses children, 0 Splashdown templates and ServerStorage.Tests
   all matching the recorded snapshot. No code changed by this entry.
+
+## 2026-09-15 — Gate 3 prerequisites (section 4)
+
+- Built a source-only export group in Studio (`ServerStorage.SplashdownAuthoringSources`): `Kit`
+  (clone of `Workspace.battle_stadium`, 176 roots / 222 BaseParts, exact match to the inventory),
+  `SummitSource` (clone of `Workspace.LegacyCourses.SummitSplash`, 258 BaseParts), and
+  `ArenaSources` with `LiquidMesh` (the ElimZones water MeshPart) and one `BoundaryWall` (chosen by
+  a deterministic name+position sort since all 26 boundary parts share the name "Part"). No other
+  `LegacyCourses` child was touched; the original source gallery is unmodified.
+- Native "Save to File..." UI export was initially blocked: this session had no interactive desktop
+  window (`mcp__desktop__screenshot` BitBlt failure, `capture_studio.py` "window not found", and a
+  raw Win32 `EnumWindows` call returning zero visible windows system-wide). After a computer
+  restart gave the session a real window, exported all three groups as Roblox XML models:
+  `assets/splashdown/kit-source.rbxmx` (2,300,045 bytes), `assets/splashdown/summit-source.rbxmx`
+  (1,444,428 bytes), `assets/splashdown/arena-sources.rbxmx` (24,535 bytes). SHA256 hashes and
+  hierarchy/counts recorded in `docs/splashdown/evidence/source-hashes.json`.
+- Verified round-trip fidelity: re-imported `kit-source.rbxmx` into a disposable `Workspace.Kit`
+  via File > Import Roblox Model and compared every BasePart against the live source
+  (`Workspace.battle_stadium`) on relative path, ClassName, Size, MeshId and CanCollide — 222/222
+  parts matched with zero diffs. The disposable import and its temporary container were destroyed
+  immediately after.
+- Captured an actual fixed-camera screenshot of the source kit (camera at (-537.767, 500.777, 46)
+  looking at (-537.767, 460.777, -54.314), FOV 70) and saved it to
+  `docs/splashdown/evidence/kit-source-capture.png`; the Edit-mode camera was restored to
+  `Enum.CameraType.Custom` afterward. `screen_capture`'s own return is transient image data with no
+  file, so the real file came from a real-window OS-level capture once one was available.
+- Section 4 (Gate 2 closure and Gate 3 prerequisites) is complete: exports, hashes, reimport
+  verification and screenshot are all real, checked-in evidence. No course, spec or QA module has
+  been built yet; that is section 5 onward.
