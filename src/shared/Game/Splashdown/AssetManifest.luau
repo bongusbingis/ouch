@@ -7,7 +7,7 @@
 
 local AssetManifest = {}
 
-AssetManifest.Version = 3
+AssetManifest.Version = 4
 AssetManifest.SourceHash = "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec"
 AssetManifest.SourcePath = { "ServerStorage", "SplashdownAuthoringSources", "Kit" }
 
@@ -47,6 +47,14 @@ export type AssetEntry = {
 	-- actually crosses, at scale 1. The section 6 spin-speed formula is computed
 	-- at this radius, never at a decorative tip.
 	ContactRadius: number?,
+	-- Tunnel arches only, in root-local studs at scale 1: the half-width of the
+	-- open bore at deck level, the top of the threshold slab at each mouth (the
+	-- height a deck has to be laid at for the tunnel to read as standing on it),
+	-- and the lowest point of the canopy underside. A course spec turns these into
+	-- its mounting offset and its headroom budget rather than guessing at a pivot.
+	TunnelBoreHalfWidth: number?,
+	TunnelThresholdLocalY: number?,
+	TunnelCeilingLocalY: number?,
 	-- Heading (old-script convention: yaw 0 faces world -Z, matching
 	-- CFrame.Angles identity) that a Surface piece's own Entry->Exit local
 	-- forward direction represents. CoursePresets uses this scalar instead of
@@ -716,6 +724,120 @@ AssetManifest.Assets = (
 			Kind = "Mount",
 			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
 			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+
+		-- Tumble Tunnels sources. Every figure below comes from the raycast sweep
+		-- recorded in docs/splashdown/evidence/course-sockets-tumbletunnels.json,
+		-- taken on a disposable clone parked 12,000 studs above the arena so no
+		-- other collision geometry could answer a ray.
+		--
+		-- The three inflatable arches share one mesh at three colourways. The bore
+		-- runs along local Z (the 89.86-stud axis) and is genuinely open in
+		-- collision: a lateral ray from x=+-32 at any height between -6 and +8
+		-- passes clean through, and an axial ray down the centre line never hits.
+		-- The measured cross-section, in root-local studs at scale 1:
+		--   * part bottom            -20.3889 (the Support socket)
+		--   * end threshold slab      -20.39 .. -14.43, only within 6 studs of each
+		--                             mouth; TunnelThresholdLocalY is its top
+		--   * side skirts             |x| 21.17 .. 28.53, from the bottom up to
+		--                             about -6.4, which is what pens a beach ball
+		--   * open bore at deck level |x| <= 21.6 (43.2 studs wide)
+		--   * canopy underside        +8.28 at |x| = 14 rising to +12.06 at x = 0
+		-- so a deck laid at the threshold has 22.3 studs of headroom at the bore's
+		-- edges and 26.06 on its centre line, and 7.6 studs of solid wall each side.
+		arch_004 = {
+			Role = "TunnelArch",
+			Kind = "Mount",
+			Size = Vector3.new(57.0665, 40.7778, 89.8614),
+			Sockets = { Support = socket(0, -20.3889, 0, 0, -1, 0) },
+			TunnelBoreHalfWidth = 21.6,
+			TunnelThresholdLocalY = -14.43,
+			TunnelCeilingLocalY = 8.28,
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 2456,
+				Misses = 1704,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-tumbletunnels.json",
+			},
+		} :: AssetEntry,
+		arch_005 = {
+			Role = "TunnelArch",
+			Kind = "Mount",
+			Size = Vector3.new(57.0665, 40.7778, 89.8614),
+			Sockets = { Support = socket(0, -20.3889, 0, 0, -1, 0) },
+			TunnelBoreHalfWidth = 21.6,
+			TunnelThresholdLocalY = -14.43,
+			TunnelCeilingLocalY = 8.28,
+		} :: AssetEntry,
+		arch_006 = {
+			Role = "TunnelArch",
+			Kind = "Mount",
+			Size = Vector3.new(57.0665, 40.7778, 89.8614),
+			Sockets = { Support = socket(0, -20.3889, 0, 0, -1, 0) },
+			TunnelBoreHalfWidth = 21.6,
+			TunnelThresholdLocalY = -14.43,
+			TunnelCeilingLocalY = 8.28,
+		} :: AssetEntry,
+
+		-- The only standalone beach ball in the kit. air_balloon_001 is a basket
+		-- balloon and is NOT collision-equivalent (01-asset-inventory.md line 31).
+		ball_001 = {
+			Role = "BeachBall",
+			Kind = "Mount",
+			Size = Vector3.new(9.1778, 9.3183, 9.3183),
+			Sockets = { Support = socket(0, -4.6591, 0, 0, -1, 0) },
+		} :: AssetEntry,
+
+		-- The seesaw is a Surface, not a Mount: its board IS the route's floor for
+		-- 46 studs, so it carries Entry/Exit sockets on the board's own measured
+		-- walkable top and chains flush onto the lane either side of it. 1,767 of
+		-- 2,525 downward rays over the board returned its top between 17.7227 and
+		-- 17.8301 in pedestal-local studs, across |x| <= 4.50 and |z| <= 23.00;
+		-- the pedestal's lowest collision point is -9.3184, which is what a plinth
+		-- has to reach. The board is long in Z, so its tested axle is local X
+		-- (docs/splashdown/02-kits.md, Seesaws).
+		obstacle_25_001 = {
+			Role = "SeesawPedestal",
+			Kind = "Surface",
+			Size = Vector3.new(9.3183, 18.6366, 9.3183),
+			ForwardAxis = "Z",
+			ForwardHeadingDegrees = 180,
+			Sockets = {
+				Entry = socket(0, 17.7227, -23.0, 0, 0, -1),
+				Exit = socket(0, 17.7227, 23.0, 0, 0, 1),
+				Support = socket(0, -9.3184, 0, 0, -1, 0),
+				Axle = socket(0, 12.7051, 0, 1, 0, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_25_002",
+					RelativeCFrame = CFrame.new(0.0005, 12.7051, 0.0000),
+					Size = Vector3.new(9.3183, 10.2501, 46.5915),
+				},
+			},
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 1767,
+				Misses = 758,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-tumbletunnels.json",
+			},
+		} :: AssetEntry,
+
+		-- The single mallet is one mesh: a rounded pink head centred near x = -5.5
+		-- and a striped post between x = +1 and +9 that is thin in Z. Its imported
+		-- display pivot sits at (7.1026, -5.9487, -0.2810), which the ray sweep
+		-- confirms is the post's own base -- the only point the mesh can stand on
+		-- and the only plausible mechanical axle, so Support and Axle are the same
+		-- socket and a rock about local Z swings the head across the lane.
+		obstacle_1_001 = {
+			Role = "Mallet",
+			Kind = "Mount",
+			Size = Vector3.new(19.1815, 11.8974, 13.1538),
+			Sockets = {
+				Support = socket(7.1026, -5.9487, -0.2810, 0, -1, 0),
+				Axle = socket(7.1026, -5.9487, -0.2810, 0, 0, 1),
+			},
+			ContactRadius = 12.6,
 		} :: AssetEntry,
 	} :: any
 ) :: { [string]: AssetEntry }

@@ -14,11 +14,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
-local SELECTED_IDS = { "DoorDash" }
+local SELECTED_IDS = { "TumbleTunnels" }
 -- Cross-course checks (HANDOFF 8.4 override 2) are scored over every staged
 -- spec, not just the selected one, so a violation fails the set rather than one
 -- course. These are the specs that exist.
-local ALL_IDS = { "BallBarrage", "WhirlpoolWaltz", "DoorDash" }
+local ALL_IDS = { "BallBarrage", "WhirlpoolWaltz", "DoorDash", "TumbleTunnels" }
 
 -- See run-course-routes.server.luau for why this sink exists: a Script in Play
 -- has the Network capability the Assistant's execute_luau VM does not, so it can

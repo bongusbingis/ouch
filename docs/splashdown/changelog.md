@@ -227,3 +227,59 @@
   through the outer door fell off the deck. Doors are now scaled so one slab is exactly one channel
   wide and the row spans the corridor exactly -- measured z 6.95 to 105.05 for both -- with each sill
   on its own channel at that channel's height.
+
+## 2026-09-16 — Tumble Tunnels (HANDOFF section 11, course three of five)
+
+- Added `Layout.Kind = "Loop"` to `CourseBuilder`, the fourth layout kind, with five enforced
+  invariants: a five-segment run/cross/run/cross/stub guide, segments 1/3/5 parallel with 3 reversed,
+  both crosses exactly `LanePitch`, four turns of one handedness summing to exactly +-360 degrees,
+  and the finish landing inside a declared closure window of the start plaza. A Loop also declares
+  its central spine — `SpineHalfWidth` plus the two tunnel piece ids — and the builder checks the
+  outbound tunnel is placed on guide run 1 and the return tunnel on run 3, which is what "the route
+  crosses the spine twice" means in geometry. `BuildReport` gained `LoopClosureStuds` and
+  `LoopTotalTurnDegrees`.
+- Added three `CoursePresets`: `BeachBall` (ball_001, the kit's only standalone ball), `Seesaw`
+  (obstacle_25, built as a CHAINED surface because the board is the route's own floor for 46 studs,
+  so the lane meets it flush instead of across an invented gap) and `Mallet` (obstacle_1's
+  single-mesh hammer, rocking about the measured base of its post). `PieceSpec` gained
+  `PitchDegrees`, which lays a mounted asset on its side: 02-kits requires "Rotate the fan so the
+  visual grate faces the same direction", and a horizontal airflow column needs exactly that.
+  `AssetManifest` is version 4 with five measured sources added (arch_004/005/006, ball_001,
+  obstacle_25_001, obstacle_1_001) and a `TunnelBore*` socket group for arches.
+- **Built Tumble Tunnels**: spec hash `d390ff50`, 163 BaseParts, 880.45 measured studs against the
+  880 target, six ordered checkpoints, beat ratios 0.880-1.124, elevation 0/+6/-6/+12/-6/+12/+6/-12
+  matching section 7.4 exactly, identical hashes across a double build. `CourseQA.check` returns
+  **zero errors and zero warnings**: 43 findings PASS, all seven gate cut sets hold (0 of 30 spawn
+  cells bypass any gate) over a 20,739-node / 789,860-edge graph from 28,807 surface cells, all
+  twelve cross-course checks pass over four staged specs, and the largest flat square is 21 x 21.
+  Studio TestEZ: 16 passed, 0 failed.
+- **The cut-set audit caught a real bypass twice before the enclosure was right.** Section 5.2 wants
+  the finish "separated by enclosure so the finish is unreachable from the start plaza". A stack of
+  six coincident platform slabs left a standable bevelled rim proud of each slab above it, and the
+  graph found a 21-stud hop from the start plaza onto the third rim and a second hop from there onto
+  the finish deck — 30 of 30 spawn cells bypassing all seven gates. Two thinner door panels failed
+  identically. The shipped enclosure is ONE door panel at uniform scale 1.2 with no intermediate top
+  at all. Third time stacked stock geometry has become a staircase in this project.
+- **Beach balls are verified at the kit, not in a preview.** A new regression in
+  `places/arena/tests/Assets/SplashdownQA.spec.luau` drives the real `BeachBalls` kit over the built
+  model and asserts the balls are authored anchored with no motion owner, sit under
+  `Rotating/<group>/Assembly` at the depth the kit scans, and after one `tickWorld` are unanchored,
+  colliding, server-owned and reparented into `Scriptables/BeachBalls`. The door-slab defect that
+  cost the Door Dash build a rebuild was invisible to both the build and the audit, and a beach ball
+  has exactly the same failure mode.
+- **Foam penalty measured rather than assumed.** At the kit's 0.45 multiplier every stud of foam
+  costs 1/11.7 - 1/26 = 0.04696 s, so section 7.4's 112-stud centreline is +5.26 s against the direct
+  path. Both channels are built at 111.99 studs, sit six studs under the LOWEST point of the lane
+  beside them so neither is ever level with the route, and rejoin it with a six-stud step inside the
+  measured 11.5-stud ledge.
+- Sizing that the measurements forced, all recorded in the course document: the return tunnel is
+  scaled by what lives inside it (a 0.5 paddle wheel is 29.91 studs across its axle) and the wheel is
+  hung 8 studs below its deck so its cradles sweep through rider height instead of needing a
+  near-full-size arch; the opposing fan stands at the outbound tunnel's far mouth because a
+  17.69-stud cage on its side does not fit under a 12.93-stud ceiling, with its column axis 2.4 studs
+  up so the balls are inside their own fan's 6.19-stud column.
+- Added `src/config/Gameplay/Splashdown.luau`'s `Courses.TumbleTunnels` entry and
+  `src/config/Interface/SplashdownIntro.luau`'s `Intro.Courses.TumbleTunnels` entry in the same
+  change that put `TumbleTunnels` into `CourseOrder`; the template is promoted and
+  `ReplicatedStorage.Assets.Maps.Splashdown` again matches `CourseOrder` exactly. Headless suite:
+  984 tests, zero failures.

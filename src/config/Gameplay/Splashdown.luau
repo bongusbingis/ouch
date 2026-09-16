@@ -46,6 +46,7 @@ return {
 		"BallBarrage",
 		"WhirlpoolWaltz",
 		"DoorDash",
+		"TumbleTunnels",
 	},
 	Courses = {
 		BallBarrage = {
@@ -72,6 +73,13 @@ return {
 			-- for the whole course." SplashdownCourses.resolve asserts every resolved
 			-- row holds exactly PerRow slabs once this block exists.
 			Doors = { PerRow = 5, BreakablePerRow = 2 },
+		},
+		TumbleTunnels = {
+			DisplayName = "TUMBLE TUNNELS",
+			Difficulty = 3,
+			ParSeconds = 75,
+			CapSeconds = 180,
+			CloseWindowSeconds = 60,
 		},
 		WhirlPool = {
 			DisplayName = "WHIRL POOL",

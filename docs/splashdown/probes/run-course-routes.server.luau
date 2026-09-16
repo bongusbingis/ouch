@@ -20,7 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
-local COURSE_ID = "DoorDash"
+local COURSE_ID = "TumbleTunnels"
 -- Set true to stop after the deterministic double build and its published
 -- build.json. A build that fails its route, bounds or attribute checks is worth
 -- knowing in ten seconds rather than after eight scripted trials.

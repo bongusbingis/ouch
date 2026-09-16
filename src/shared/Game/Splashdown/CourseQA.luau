@@ -546,9 +546,14 @@ local ENCOUNTER_TYPES: { [string]: string } = {
 	SwingPanel = "RotorBump",
 	Mace = "RotorBump",
 	PaddleWheel = "RotorBump",
+	Mallet = "RotorBump",
 	RidePlatform = "RotatingPlatforms",
 	Door = "Door",
 	FoamPit = "FoamPit",
+	-- A seesaw is scored on its board ("Seesaw: each board") and a beach ball on the
+	-- ball ("BeachBall: each ball"), exactly as section 7's counting rule lists them.
+	Seesaw = "Seesaw",
+	BeachBall = "BeachBall",
 	-- Deliberately absent, because they are support geometry and never an
 	-- encounter: Platform, Ramp, Slide, Corner, Fill, Prop and RoundLanding.
 }

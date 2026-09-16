@@ -6,7 +6,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 ## 0. Read this first: authority and next action
 
 1. This file is an implementation specification for a successor. Writing this file did NOT execute Gate 3 or any later work.
-2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval. Section 11 has built Whirlpool Waltz and Door Dash; the next work is TumbleTunnels, TiptoeTrials, PistonPeak and Summit hardening — read section 1.4 before touching Splashdown code.
+2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval. Section 11 has built Whirlpool Waltz, Door Dash and Tumble Tunnels; the next work is TiptoeTrials, PistonPeak and Summit hardening — read section 1.4 before touching Splashdown code.
 3. Run the read-only health checks in section 2 first, same as always.
 4. The original brief has Gates 1, 2 and 3. The work after Gate 3 is the remaining-course stage and final verification, not an already-approved extra gate.
 5. Do not publish, deploy, push a branch, or open a PR without explicit user authorization. Local commits are part of the requested workflow.
@@ -24,12 +24,12 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | `1859788`, the Door Dash build, on top of `cea63ab` (both earlier courses into rotation) |
+| HEAD now | the Tumble Tunnels build, on top of `ca4d6bd` (the Door Dash handoff note) |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
 | Remote delivery | No push or PR performed |
-| New courses built | Ball Barrage (Gate 3 APPROVED), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (built 2026-09-16; statically clean, captures done, scripted trials FAILED 0 of 8). All three are LIVE in `CourseOrder`. |
+| New courses built | Ball Barrage (Gate 3 APPROVED), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (statically clean, captures done, scripted trials FAILED 0 of 8), Tumble Tunnels (built 2026-09-16; statically clean, zero QA warnings, captures done, beach balls verified against the real kit, scripted trials NOT COMPLETED). All four are LIVE in `CourseOrder` and promoted. |
 | Summit layout hardened | No |
 | Deprecated courses removed | No |
 
@@ -133,137 +133,142 @@ Still NOT verified or implemented:
 - The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports (now done) were required.
 - Every section 5 interface now exists and has been executed at least once: AssetManifest, CoursePresets, CourseBuilder, CourseAuthoring, CourseGraph, CourseQA, the CourseSpecs for BallBarrage and WhirlpoolWaltz, `places/arena/tests/Assets/SplashdownQA.spec.luau`, `src/shared/Tests/CourseGraph.spec.luau` and `CourseVariety.spec.luau`, all three Play probes under `docs/splashdown/probes/`, and `src/scripts/studio/author-splashdown-v2.luau`. **`docs/splashdown/qa-report.md` is the one listed artefact that still does not exist.** Section 1.4 is the current state.
 
-### 1.4 Section 11 progress — Ball Barrage, Whirlpool Waltz and Door Dash are the LIVE production pool
+### 1.4 Section 11 progress — Ball Barrage, Whirlpool Waltz, Door Dash and Tumble Tunnels are the LIVE production pool
 
 **Gate 3 remains approved** (user, 2026-09-15, interactive Studio playtest of Ball Barrage). Section
-11 has built two of its five courses: **Whirlpool Waltz** (2026-09-15; its 8.5 blocker is
-intentionally SKIPPED per the user's 2026-09-16 decision, see "Where Whirlpool Waltz stands") and
-**Door Dash** (2026-09-16, the session this section describes). Next in section 11's order:
-**TumbleTunnels**, then TiptoeTrials, PistonPeak, then Summit hardening.
+11 has built three of its five courses: **Whirlpool Waltz** (2026-09-15; its 8.5 blocker is
+intentionally SKIPPED per the user's 2026-09-16 decision), **Door Dash** (2026-09-16) and
+**Tumble Tunnels** (2026-09-16, the session this section describes). Next in section 11's order:
+**TiptoeTrials**, then PistonPeak, then Summit hardening.
 
 `src/config/Gameplay/Splashdown.luau`'s `CourseOrder` is `{"BallBarrage", "WhirlpoolWaltz",
-"DoorDash"}` and `ReplicatedStorage.Assets.Maps.Splashdown` holds exactly those three promoted
-templates. **Every course that enters `CourseOrder` needs its `Intro.Courses` entry in
+"DoorDash", "TumbleTunnels"}` and `ReplicatedStorage.Assets.Maps.Splashdown` holds exactly those four
+promoted templates. **Every course that enters `CourseOrder` needs its `Intro.Courses` entry in
 `src/config/Interface/SplashdownIntro.luau` in the SAME change** — `SplashdownIntroModel.spec.luau`
-asserts it and the headless suite fails otherwise. Door Dash's entry is in place, and its
-`Splashdown.Courses.DoorDash` config carries `Doors = { PerRow = 5, BreakablePerRow = 2 }` because
-`SplashdownCourses.resolve` asserts every resolved row holds exactly `PerRow` slabs once that block
-exists. Headless is **984 tests, 0 failures**.
+asserts it and the headless suite fails otherwise. Tumble Tunnels' entry is in place. Headless is
+**984 tests, 0 failures**.
 
-#### Door Dash, as built
+#### Tumble Tunnels, as built
 
-- Spec `src/shared/Game/Splashdown/CourseSpecs/DoorDash.luau`; doc
-  `docs/splashdown/courses/door-dash.md`; evidence
-  `docs/splashdown/evidence/courses/DoorDash/{build,qa,routes}.json`, its two fixed-camera captures,
-  `evidence/course-cameras.json` and `evidence/course-sockets-doordash.json`.
-- **Spec hash `8c00a748`, 221 BaseParts, 882.07 measured studs of route** against the 880 target,
-  five ordered checkpoints, beats 0.935-1.112 of their section 7.3 targets, elevation
-  0/-12/+6/+12/0/-6 matching section 7.3 exactly, zero attribute errors, zero route errors, zero
-  bounds violations, identical hashes across a double build.
-- `CourseQA.check` returns **zero errors and zero warnings**; 37 of 50 findings PASS and the other
-  13 are NOT RUN with reasons. All six gate cut sets hold (0 of 30 spawn cells bypass any gate) over
-  a 28,121-node / 1,272,671-edge graph sampled from 38,241 real surface cells, all twelve
-  cross-course checks pass over the three staged specs, and the largest flat square on the route is
-  16 x 16. Studio TestEZ: 12 passed, 0 failed.
-- New in the builder: **`Layout.Kind = "Chute"`**, with five enforced invariants — three segments,
-  the second run doubling back on the first, the cross segment exactly `LanePitch`, both runs at
-  least twice the pitch, and the hairpin turning inside a declared window. Door Dash's hairpin
-  enters the turn at 53.19% of the route, reverses at 60.09% and rejoins at 66.98%. New presets
-  `Mace` and `PaddleWheel`; `AssetManifest` is version 3 with three measured sources added.
-- **Its scripted trials FAILED, 0 of 8**, and that is reported as a measured FAIL. Best run: 2 of 5
-  checkpoints over the 150 s ceiling with 11 checkpoint respawns; 15 distinct pieces contacted
-  (eight door slabs, both beat-02 hazards, all three belts, the paddle wheel, the foam pit). The
-  straight-line proxy has no steering and a five-slab door row is a wall with one hole in it; seven
-  harness defects were found and fixed along the way (changelog) and the runs went from "stuck at
-  row 1 every trial" to crossing all three rows, the slide, the belts and the hairpin approach.
-  **HANDOFF 8.5's resolution applies: the interactive keyboard run, and a user mid-skill calibration
-  run if it disagrees with the proxy. Both are outstanding.**
+- Spec `src/shared/Game/Splashdown/CourseSpecs/TumbleTunnels.luau`; doc
+  `docs/splashdown/courses/tumble-tunnels.md`; evidence
+  `docs/splashdown/evidence/courses/TumbleTunnels/{build,qa}.json`, its two fixed-camera captures and
+  its entry in `evidence/course-cameras.json`.
+- **Spec hash `d390ff50`, 163 BaseParts, 880.45 measured studs of route** against the 880 target,
+  six ordered checkpoints, beats 0.880-1.124 of their scaled section 7.4 targets, elevation
+  0/+6/-6/+12/-6/+12/+6/-12 matching section 7.4 exactly, zero attribute errors, zero route errors,
+  zero bounds violations, identical hashes across a double build.
+- `CourseQA.check` returns **zero errors and ZERO WARNINGS**; 43 findings PASS and the rest are NOT
+  RUN with reasons. All seven gate cut sets hold (0 of 30 spawn cells bypass any gate) over a
+  20,739-node / 789,860-edge graph from 28,807 real surface cells, all twelve cross-course checks
+  pass over the four staged specs, and the largest flat square is 21 x 21. Studio TestEZ: **16
+  passed, 0 failed** (the 15 existing assertions plus the new beach-ball kit regression).
+- New in the builder: **`Layout.Kind = "Loop"`**, with five enforced invariants — five segments
+  (run/cross/run/cross/stub), segments 1/3/5 parallel with 3 reversed, both crosses exactly
+  `LanePitch`, four same-handed turns summing to exactly +-360 degrees, and the finish landing inside
+  a declared closure window of the start plaza. A Loop also declares its spine (`SpineHalfWidth` plus
+  the two tunnel piece ids) and the builder checks the outbound tunnel is on guide run 1 and the
+  return tunnel on run 3. Tumble Tunnels measures a 69.55-stud closure through exactly -360 degrees.
+  New presets `BeachBall`, `Seesaw` (a CHAINED surface, not a mount) and `Mallet`; new `PieceSpec`
+  field `PitchDegrees`; `AssetManifest` is version 4 with five measured sources added.
+- **Its scripted trials did NOT COMPLETE.** The harness published its build evidence and then ran for
+  3.5 hours without writing `ServerStorage.SplashdownCourseRouteResults`, against its own 8-trial /
+  150-second-per-trial budget, which should bound the pass at about 25 minutes. The rig was sampled
+  repeatedly throughout and was always alive and walking under `Humanoid:MoveTo` — on the outbound
+  run, at the east cross and back at the start plaza across successive resets — so the cost is in the
+  harness, most likely `buildRig`'s per-trial `CreateHumanoidModelFromDescription` (an async web call
+  with no timeout), not in the course. **No trial numbers are claimed.** Per the user's standing
+  2026-09-16 decision this category is reported plainly and not chased; the interactive keyboard run,
+  the deliberate missed-timing contacts and a user mid-skill calibration run are outstanding for this
+  course exactly as they are for the other two.
 
-#### Four real defects this course exposed — carry these forward
+#### What Tumble Tunnels exposed — carry these forward
 
-1. **A jumping character climbs a flat wall far higher than the 11.5-stud ledge calibration.** A
-   plain R15 rig walking into a 14.65-stud door slab and jumping rose **13.6 studs onto its top in
-   about 0.6 s**, reproducibly. `CourseQA`'s graph caps a jump's rise at the calibration, so it does
-   not model this: **any later course that relies on a wall's height to stop a climb is relying on
-   something that does not hold.** Door Dash closes it with a stock roof (section 6's own remedy) set
-   INTO the door tops; the same test against the shipped build reaches +6.64 studs and ends on the
-   floor. The roof took three passes, and the cut-set audit caught each wrong one: flush undersides
-   left a gap the rig jammed in; undersides that left the outer tops 0.46 studs proud made a
-   staircase onto the roof past five gates; and a roof wider than the corridor was itself a bridge to
-   the second run.
-2. **Doors must be scaled against the floor, not on their own.** The first build's 24.05-stud slabs
-   over 19.62-stud channels overhung the corridor by 11 studs a side, and the outermost door's
-   opening then led half over open water. One slab is now exactly one channel wide.
-3. **Door slabs were invisible to the door kit.** `CoursePresets` parented each slab inside a holder
-   Model, and both `DoorRows.resolve` and `MapFeatureService` walk IMMEDIATE BasePart children, so
-   every row resolved as zero rows and every slab would have stayed permanently solid. Whirlpool
-   Waltz's row was affected too.
-4. **Every nested assembly was built twice.** Cloning a root brings its whole source subtree, and the
-   code then cloned each declared sub-part from the source on top of it: the pilot's pistons carried
-   a duplicate spring and head, and a mace would have carried a duplicate ten-part chain. Sub-parts
-   now resolve inside the root clone first, and any descendant the manifest does not name is renamed
-   out of its source name (several MapFeatures kits select by name prefix).
+1. **Stacked stock geometry becomes a staircase, for the third time.** Section 5.2 wants the finish
+   "separated by enclosure so the finish is unreachable from the start plaza". A stack of six
+   coincident `platform_002` props left a standable bevelled rim proud of each slab above it, and the
+   cut-set audit found a 21-stud hop from the start plaza onto the third rim and a second hop from
+   there straight onto the finish deck — **30 of 30 spawn cells bypassing all seven gates**. Two
+   thinner door panels failed identically. Only ONE piece with no intermediate top worked: a single
+   `door_002` at uniform scale 1.2. **Never stack stock slabs to make a wall; find one tall piece.**
+2. **Verify a kit sees its own parts, at the kit.** The new
+   `places/arena/tests/Assets/SplashdownQA.spec.luau` test drives the real `BeachBalls` kit over the
+   built model and asserts the balls are authored anchored with no motion owner, sit under
+   `Rotating/<group>/Assembly` at the depth the kit scans, and after one `tickWorld` are unanchored,
+   colliding, server-owned and reparented into `Scriptables/BeachBalls`. Do the same for every new
+   kit a course is the first to use — the Door Dash door-slab defect was invisible to the build and
+   to the audit and only a kit-level assertion catches that class of bug.
+3. **Uniform scaling couples a hazard's size to its container's.** A 0.5 paddle wheel is 29.91 studs
+   across its axle and 24.02 tall above its mount, and no arch small enough to fit the route's
+   straight run clears that. It is hung 8 studs below its deck instead, so its cradles sweep through
+   rider height and the arch only has to clear 16. Likewise the horizontal fan stands at the tunnel's
+   far mouth, not inside it: a 17.69-stud cage on its side does not fit under a 12.93-stud ceiling.
+4. **A fan's column is a cylinder about the fan's own axis, not a box in front of it.** At scale 0.5
+   the measured radius is 6.19 studs; a beach ball's centre is 2.33 studs up. Mounted with its
+   Support at the deck, the pitched fan's axis sat 8.85 studs up and the balls were outside their own
+   fan's column. `OffsetUp` now puts the axis at ball height.
 
-Fixes 3 and 4 changed the other two courses, so **both were re-staged and re-promoted**: Ball Barrage
-156 to 143 BaseParts (`ca5e95b4`), Whirlpool Waltz 151 to 142 (`78e562b8`). Regression tests for both
-are in `places/arena/tests/Assets/SplashdownQA.spec.luau`.
+#### Where the earlier three stand
 
-#### Where Whirlpool Waltz stands
-
-Unchanged from the previous session except for the re-promote above. Built from
-`CourseSpecs/WhirlpoolWaltz.luau`; doc `docs/splashdown/courses/whirlpool-waltz.md`. Statically clean
-(route 884.78 studs, six beats 1.031-1.104 of target, zero attribute/bounds errors, all six cut sets,
-all twelve cross-course checks). **Its scripted trials failed 0 of 8** on `Pizza01`, the first ride
-deck in `02_WedgeWake`: a rider standing still is carried into one of the plate's real missing wedges
-after 1.0 s, and crossing the 26.4-stud deck also takes about 1.0 s at WalkSpeed 26, so a straight-line
-proxy meets the sweeping hole about half the time. **The user decided on 2026-09-16 to skip resolving
-that rather than treat it as a blocker.** Do not spend a session re-litigating it. Its fixed-camera
-captures, deliberate missed-timing contacts, interactive run and checkpoint-recovery checks are all
-still NOT RUN.
+Unchanged by this session. Ball Barrage `ca5e95b4`, Whirlpool Waltz `78e562b8`, Door Dash `8c00a748`,
+all promoted, all with the outstanding 8.5 items recorded in `docs/splashdown/qa-report.md`.
 
 #### The set-wide route-length target is fixed (section 11's prerequisite)
 
 Recorded in `docs/splashdown/03-overrides.md` with its full derivation: **880 measured studs of route
 arclength per course, and the section 7 beat targets are unchanged.** Ball Barrage measures 881.05,
-Whirlpool Waltz 884.78, Door Dash 882.07.
+Whirlpool Waltz 884.78, Door Dash 882.07, Tumble Tunnels 880.45. Tumble Tunnels is the first course
+to use the SCALED beat targets from the overrides table (165/132/121/121/99/154/88) as its
+`LengthTarget` values rather than the raw section 7 numbers; that is the healthier convention,
+because 0.85-1.15 of the scaled targets brackets 880 instead of requiring every beat to sit near its
+ceiling.
 
 #### Tooling notes that save a successor real time
 
-- **The Assistant's `execute_luau` cannot `require()` synced modules** ("has additional values for
-  the Capabilities property: LoadUnownedAsset"), in Edit OR in Play, for ReplicatedStorage AND
-  ServerScriptService modules. Anything needing a require runs from the **Studio Command Bar** (Edit)
-  or a Rojo-synced probe Script (Play). It CAN read and write instances freely, create parts, clone
-  models, drive a `Players:CreateHumanoidModelFromDescription` rig and raycast — which is enough for
-  most measurements.
+- **The Assistant's `execute_luau` cannot `require()` synced modules**, in Edit OR in Play, for
+  ReplicatedStorage AND ServerScriptService modules. Anything needing a require runs from the
+  **Studio Command Bar** (Edit) or a Rojo-synced probe Script (Play). It CAN read and write instances
+  freely, create parts, clone models, drive a rig and raycast, which is enough for most measurements.
 - **Edit-mode's `require()` cache does not invalidate when Rojo syncs a changed module.** Clone the
   whole `ReplicatedStorage.Shared.Game.Splashdown` folder to a temp sibling, `require()` the CLONE's
-  `CourseAuthoring`, then set the clone's `Parent = nil`. Use `Parent = nil` rather than `Destroy()`:
-  **any Command Bar text containing the literal word `Destroy` pops a blocking "Dangerous Command
+  module, then set the clone's `Parent = nil`. Use `Parent = nil` rather than `Destroy()`: **any
+  Command Bar text containing the literal word `Destroy` pops a blocking "Dangerous Command
   Detected" dialog** that silently swallows the command until a human clicks through it.
-- `CourseAuthoring.stage` now parks the full `BuildReport` for every staged course in
+- **The Command Bar can reach the network.** `HttpService:PostAsync` works from it, so an Edit-mode
+  QA report can be posted straight into the repository through the evidence sink instead of being
+  read back instance by instance. That is far cheaper than pulling a 10 KB StringValue through
+  `execute_luau`.
+- The Command Bar is at image (700, 857) on a 1600x900 screenshot of a 1920x1080 desktop, so click
+  (840, 1028) after the 1.2 scale; the Run button is at (1888, 1028). **Type, then Ctrl+Enter
+  immediately** — if anything steals focus between the two, the text sits there unexecuted, and a
+  plain Enter afterwards only adds a newline and turns the bar multiline.
+- `CourseAuthoring.stage` parks the full `BuildReport` for every staged course in
   `ServerStorage.SplashdownStageReport` (and each route trace beside it), because the Command Bar's
   Output cannot be read back reliably; read it with an ordinary instance read afterwards.
-- The Command Bar is at image (700, 857) on a 1600x900 screenshot of a 1920x1080 desktop, so click
-  (840, 1028) after the 1.2 scale; the Run button is at (1888, 1028).
-- **For fixed-camera captures, lift the PREVIEW, not the arena.** `workspace.Assets.Arena` keeps its
-  own hazard ring and PvP floor at MapOrigin and they fill the frame; moving the preview 9,000 studs
-  up gives an empty background and leaves every user model untouched. Camera writes from
-  `execute_luau` do reach the Edit viewport, but the viewport can lag a screenshot: take one
-  `Roblox_Studio.screen_capture` at the target camera first, then grab the window with
-  `scratchpad/capture_viewport.py` (crop 0,142-1180,1006). `workspace.Assets.Arena.Map.Model`'s exact
-  pivot is `CFrame.new(-537.766602, 519.175659, -54.3143196)`.
-- A probe in Play can POST evidence straight into the repository through
-  `scratchpad/evidence_sink.py` on `http://127.0.0.1:34875/`; `{path, data}` lands under
-  `docs/splashdown/evidence/`.
+- **For fixed-camera captures, lift the PREVIEW, not the arena**, 9,000 studs. `screen_capture` poses
+  its own camera and does NOT leave the viewport there, so a window grab taken after it shows the old
+  pose: set `workspace.CurrentCamera.CFrame` yourself through `execute_luau` first, then grab the
+  window (crop 0,142-1180,1006 on this layout). `workspace.Assets.Arena.Map.Model`'s exact pivot is
+  `CFrame.new(-537.766602, 519.175659, -54.3143196)` and it never needs to move.
+- A probe in Play, and the Edit Command Bar, can POST evidence straight into the repository through a
+  localhost sink on `http://127.0.0.1:34875/`; `{path, data}` lands under
+  `docs/splashdown/evidence/`. The sink is a scratchpad script, not checked in; rewrite it in ten
+  lines when you need it.
+- **`run-course-routes.server.luau` has no wall-clock budget of its own.** Its 150-second ceiling
+  bounds one trial, not the pass, and on Tumble Tunnels the pass never returned. If a successor needs
+  scripted trials, add an overall deadline and a `buildRig` timeout before starting one.
 - `StringValue.Value` caps at 200,000 characters; the route harness writes numbered chunks.
 
 #### Exact next actions
 
-1. Build **TumbleTunnels** next, per section 11's per-course loop, and add its `SplashdownIntro`
+1. Build **TiptoeTrials** next, per section 11's per-course loop, and add its `SplashdownIntro`
    entry in the same change that puts it in `CourseOrder`.
-2. Read "Four real defects" above before designing it: the wall-climb finding changes how any
-   anti-jump geometry must be built, and the two builder fixes changed every course's hashes.
-3. The Whirlpool Waltz 8.5 blocker is intentionally NOT being chased (user decision, 2026-09-16).
+2. Read "What Tumble Tunnels exposed" above and Door Dash's four defects (now in the changelog)
+   before designing it: Tiptoe Trials is falling tiles and launches, so the wall-climb finding and
+   the staircase finding both apply to its island enclosure, and it is the first course to use
+   `FallingTile` — give it a kit-level regression like the beach-ball one.
+3. The Whirlpool Waltz 8.5 blocker, and the scripted-trial category generally, are intentionally NOT
+   being chased (user decision, 2026-09-16).
 4. Delete any `places/arena/server/Scripts/Temp*Probe.server.luau` before any commit; they are
    Rojo-synced scratch copies of the checked-in probes and must never be committed.
 
@@ -277,8 +282,8 @@ Recorded Edit state:
 
 - Workspace.battle_stadium: original source gallery; preserve it.
 - Workspace.LegacyCourses: **97 immediate children: seven course Models plus ninety Keyframes**. The seven Models are the user's copies of the original courses (see 1.2).
-- ReplicatedStorage.Assets.Maps.Splashdown: **exactly three models, `BallBarrage`, `WhirlpoolWaltz` and `DoorDash`, all real promoted templates matching `CourseOrder`.** The `WhirlPool`/`KnockKnock` local-test fixtures have been destroyed; do not recreate them unless testing an isolated config again, and destroy them again afterward. This matches `Splashdown.CourseOrder` exactly as of commit `cea63ab` — the folder is no longer expected to be empty.
-- ServerStorage.SplashdownStaging holds `BallBarrage`, `WhirlpoolWaltz` and `DoorDash`, all staged and promoted on 2026-09-16 with hashes Ball Barrage `ca5e95b4`, Whirlpool Waltz `78e562b8`, Door Dash `8c00a748`. The first two changed from their earlier recorded values (`943e493c`, `2fbc899c`) when the two CoursePresets fixes in 1.4 touched every model. Re-stage before relying on either if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
+- ReplicatedStorage.Assets.Maps.Splashdown: **exactly four models, `BallBarrage`, `WhirlpoolWaltz`, `DoorDash` and `TumbleTunnels`, all real promoted templates matching `CourseOrder`.** The `WhirlPool`/`KnockKnock` local-test fixtures have been destroyed; do not recreate them unless testing an isolated config again, and destroy them again afterward. This matches `Splashdown.CourseOrder` exactly as of the Tumble Tunnels build — the folder is no longer expected to be empty.
+- ServerStorage.SplashdownStaging holds `BallBarrage`, `WhirlpoolWaltz`, `DoorDash` and `TumbleTunnels`, all staged and promoted on 2026-09-16 with hashes Ball Barrage `ca5e95b4`, Whirlpool Waltz `78e562b8`, Door Dash `8c00a748`, Tumble Tunnels `d390ff50`. The first two changed from their earlier recorded values (`943e493c`, `2fbc899c`) when the two CoursePresets fixes in 1.4 touched every model. Re-stage before relying on either if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
 - `workspace.Assets.Arena.Map.Model` is at its correct original pivot (verified, see the tooling note above); do not need to re-check this unless something else reports it looks wrong.
 - Temporary kit probes, observer and review gallery removed. A Rojo-synced probe under `places/arena/server/Scripts/` (Temp*Probe) may be present while section 11 work is in progress; delete it before any commit.
 - The source gallery is unanchored and disappears from Workspace in Play. Export its source in Edit before testing.

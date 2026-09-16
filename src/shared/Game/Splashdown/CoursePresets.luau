@@ -41,6 +41,14 @@ export type PresetName =
 	-- its measured X axle (NOT obstacle_8, the swing panel).
 	| "Mace"
 	| "PaddleWheel"
+	-- Tumble Tunnels additions. BeachBall is a real physics ball the runtime kit
+	-- unanchors and takes server ownership of; Seesaw is obstacle_25's rider-weighted
+	-- board, which is a CHAINED surface because the board is the route's own floor
+	-- for its whole length; Mallet is obstacle_1's single-mesh hammer, rocking about
+	-- the measured base of its post rather than floating like a Bumper.
+	| "BeachBall"
+	| "Seesaw"
+	| "Mallet"
 	-- A mounted piece of visible stock geometry with no kit attributes at all:
 	-- arch frames around a landing mouth, enclosure. It lives in Geometry like
 	-- any other static piece and is never an encounter.
@@ -77,6 +85,10 @@ export type PieceSpec = {
 	DoorIndex: number?,
 	VolumeSize: Vector3?,
 	SpeedMultiplier: number?,
+	MaxTiltDegrees: number?,
+	WindupSeconds: number?,
+	StrikeSeconds: number?,
+	FanBallSpeed: number?,
 }
 
 export type BuildContext = {
@@ -279,8 +291,34 @@ end
 
 -- Route pieces (Conveyor / Platform / Ramp / Slide / Fill): chained by Entry socket.
 local function buildChainPiece(context: BuildContext, spec: PieceSpec, cursor: Cursor): ChainResult
-	local holder, root, _, _, exitLocal = placeTravelPiece(context, spec, cursor, spec.Preset)
+	local holder, root, _, byPath, exitLocal = placeTravelPiece(context, spec, cursor, spec.Preset)
 	local exitWorldPosition = root.CFrame:PointToWorldSpace(exitLocal)
+
+	if spec.Preset == "Seesaw" then
+		-- obstacle_25: a fixed pedestal carrying a rider-weighted board. The board is
+		-- the route's floor here, which is why this is a chained Surface rather than a
+		-- Mount -- its Entry/Exit sockets are the board's own measured walkable ends, so
+		-- the lane meets it flush instead of across an invented gap.
+		--
+		-- 02-kits.md: "Mark the moving board Seesaw=true, with explicit centre/axle
+		-- pivot, SeesawAxis X or Z ... obstacle_25_002 is long in Z, so its tested axle
+		-- is X." clonePiece has already cleared the board's imported PivotOffset, so the
+		-- kit's GetPivot() base is the board's own centre, which is the axle.
+		local board = byPath["obstacle_25_002"]
+		assert(board ~= nil, `[CoursePresets] {spec.Id} missing cloned seesaw board obstacle_25_002`)
+		board:SetAttribute(A.Seesaw, true)
+		board:SetAttribute(A.SeesawAxis, "X")
+		board:SetAttribute(A.MaxTiltDegrees, spec.MaxTiltDegrees or 24)
+		board:SetAttribute(A.SeesawResponse, 3)
+		holder.Parent = context.Assembly
+		local delta = exitWorldPosition - cursor.Position
+		return {
+			Model = holder,
+			ExitCursor = { Position = exitWorldPosition, Yaw = cursor.Yaw },
+			PartCount = partCount(holder),
+			ArcLength = Vector3.new(delta.X, 0, delta.Z).Magnitude,
+		}
+	end
 
 	if spec.Preset == "Conveyor" then
 		root:SetAttribute(A.Conveyor, true)
@@ -424,7 +462,41 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		root:SetAttribute(A.FanColumnHeight, spec.FanColumnHeight or 18)
 		root:SetAttribute(A.LaunchSpeed, spec.LaunchSpeed or 48)
 		root:SetAttribute(A.FloatFactor, spec.FloatFactor or 0.2)
+		if spec.FanBallSpeed then
+			root:SetAttribute(A.FanBallSpeed, spec.FanBallSpeed)
+		end
 		sub("propeller_trampoline_2_001"):SetAttribute(A.FanBlade, true)
+	elseif spec.Preset == "BeachBall" then
+		-- 02-kits.md: "BeachBall=true discovers multiple renamed descendants in an
+		-- Assembly; do not also give them a kinematic motion owner. The kit moves them
+		-- beside their own Scriptables root, unanchors them and assigns server network
+		-- ownership." The template ball therefore ships ANCHORED, exactly as
+		-- AttributeAudit demands ("author parts anchored; BeachBall unanchors at
+		-- runtime"), and carries no Rotor of its own.
+		root:SetAttribute(A.BeachBall, true)
+	elseif spec.Preset == "Mallet" then
+		-- Section 6: "Single mallet / obstacle_1_001 | Scale .6; use only after measured
+		-- mounting/axle manifest; hammer profile, not a floating Bumper." The mesh is one
+		-- part, so the rock lives on the root and the pivot is moved back onto the
+		-- measured post base -- otherwise the whole mallet would swing about the mesh's
+		-- bounding centre, which sits inside the head rather than at the mount.
+		local axle = assert(manifest.Sockets.Axle, `[CoursePresets] {sourceId} has no measured Axle socket`)
+		root.PivotOffset = CFrame.new(axle.Position * spec.Scale)
+		root:SetAttribute(A.Rotor, "rock")
+		root:SetAttribute(A.RotorProfile, "hammer")
+		root:SetAttribute(A.RotorAxis, "Z")
+		root:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 55)
+		root:SetAttribute(A.WindupSeconds, spec.WindupSeconds or 1.8)
+		root:SetAttribute(A.StrikeSeconds, spec.StrikeSeconds or 0.3)
+		root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
+		root:SetAttribute(A.Shove, true)
+		root:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 58)
+		root:SetAttribute(A.ShoveUpwardSpeed, 20)
+		root:SetAttribute(A.ShoveSeconds, 0.24)
+		root:SetAttribute(A.ShoveContact, "mesh")
+		root:SetAttribute(A.ImpactVisual, true)
+		root:SetAttribute(A.RetriggerCooldown, 0.8)
+		root:SetAttribute(A.GuardSeconds, 1.0)
 	elseif spec.Preset == "JumpPad" then
 		-- Outer/Inner are required by the runtime pad contract (HANDOFF 3.3
 		-- Scriptables/JumpPads/<model>/Outer, Inner), so they keep those names

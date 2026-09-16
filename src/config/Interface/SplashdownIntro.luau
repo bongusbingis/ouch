@@ -37,6 +37,18 @@ return {
 				{ Eye = { -10, 55, -105 }, Look = { -60, 18, -42 }, FieldOfView = 60 },
 			},
 		},
+		TumbleTunnels = {
+			Description = "Two big beach balls come at you down the tunnel, and the fan behind them never stops pushing!",
+			Shots = {
+				{ Eye = { 0, 300, 40 }, Look = { 0, 10, 0 }, FieldOfView = 74 },
+				-- Straight down the outbound tunnel's own axis, low enough to be under
+				-- arch_004's canopy: the beach balls and the fan behind them are the shot.
+				{ Eye = { -60, 20, -49 }, Look = { 60, 12, -49 }, FieldOfView = 62 },
+				-- Across the loop from outside the west turn, so the return tunnel and the
+				-- circuit wrapping around the spine both read in one frame.
+				{ Eye = { -150, 66, 130 }, Look = { -20, 22, 49 }, FieldOfView = 60 },
+			},
+		},
 		TiltTrip = {
 			Description = "Keep your balance on tilting decks and dodge the swinging obstacles. Next stop: the finish!",
 			Shots = {

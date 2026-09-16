@@ -61,6 +61,14 @@ export type PieceSpec = {
 	-- create a recovery walkway").
 	MountTo: ("Cursor" | "Liquid")?,
 	FacingOffsetDegrees: number?,
+	-- Mount pieces only: an extra rotation about the piece's own local X axis,
+	-- applied after the yaw, so a mounted asset can be laid on its side. The one
+	-- thing in the kit that needs it is a fan: 02-kits.md requires "Rotate the fan
+	-- so the visual grate faces the same direction", and a horizontal airflow
+	-- column means the grate has to face along the route rather than at the sky.
+	-- The piece still mounts by its Support socket, so the rotation happens about
+	-- that socket and the caller lifts it back onto the deck with OffsetUp.
+	PitchDegrees: number?,
 	-- Pieces sharing a group are ONE encounter for section 7's counting rule
 	-- ("Bumper: each chicane, or each isolated forced bumper"), because the runner
 	-- solves them as a unit. Per-instance counts are reported separately and are
@@ -80,6 +88,10 @@ export type PieceSpec = {
 	DoorIndex: number?,
 	VolumeSize: Vector3?,
 	SpeedMultiplier: number?,
+	MaxTiltDegrees: number?,
+	WindupSeconds: number?,
+	StrikeSeconds: number?,
+	FanBallSpeed: number?,
 }
 
 export type BeatSpec = {
@@ -130,6 +142,30 @@ export type ChuteSpec = {
 	MinRunToPitchRatio: number,
 }
 
+-- HANDOFF 5.2's Loop: "A closed circuit around a central tunnel spine (arch_004
+-- outbound, arch_006 return) that the route crosses twice. Start and finish sit
+-- near each other on the outside of the loop but are separated by enclosure so the
+-- finish is unreachable from the start plaza."
+--
+-- The guide is a five-segment polyline -- run, cross, run, cross, stub -- and these
+-- are the invariants that make it a circuit rather than another chute:
+--   1. five segments, with 1/3/5 parallel (3 reversed) and 2/4 exactly LanePitch;
+--   2. four turns of the SAME handedness summing to exactly +-360 degrees, which is
+--      what closes the circuit; a chute's two turns sum to 180 and double back;
+--   3. the finish lands Closure{Min,Max}Studs from the start plaza, so the two
+--      really are adjacent on the outside of the loop without overlapping;
+--   4. the two long runs sit within SpineHalfWidth of the circuit's own centre
+--      line, so the spine is central rather than a wide perimeter ring;
+--   5. the declared outbound and return tunnels are placed, one on each long run,
+--      which is what "the route crosses [the spine] twice" means in geometry.
+export type LoopSpec = {
+	ClosureMinStuds: number,
+	ClosureMaxStuds: number,
+	SpineHalfWidth: number,
+	OutboundTunnelPieceId: string,
+	ReturnTunnelPieceId: string,
+}
+
 export type LayoutSpec = {
 	Kind: string,
 	LanePitch: number,
@@ -142,6 +178,7 @@ export type LayoutSpec = {
 	Guide: { Vector3 }?,
 	Spiral: SpiralSpec?,
 	Chute: ChuteSpec?,
+	Loop: LoopSpec?,
 	-- Spiral only: how far a chained run may drift from the parametric guide
 	-- before the build fails. A straight slab chord always sits slightly outside
 	-- the arc it approximates; this is the measured budget for that, not licence
@@ -230,6 +267,11 @@ export type BuildReport = {
 	HairpinFraction: number,
 	HairpinMidFraction: number,
 	HairpinExitFraction: number,
+	-- Loop only: the horizontal distance between the start plaza and the finish,
+	-- and the total signed heading change the route turned through. Zero for every
+	-- other layout.
+	LoopClosureStuds: number,
+	LoopTotalTurnDegrees: number,
 }
 
 local function forward(headingDegrees: number): Vector3
@@ -397,7 +439,11 @@ local function offsetCFrame(cursor: Cursor, piece: PieceSpec, liquidY: number): 
 		position = Vector3.new(position.X, liquidY + up, position.Z)
 	end
 	local yaw = cursor.Yaw + (piece.FacingOffsetDegrees or 0)
-	return CFrame.new(position) * CFrame.Angles(0, math.rad(yaw), 0)
+	local frame = CFrame.new(position) * CFrame.Angles(0, math.rad(yaw), 0)
+	if piece.PitchDegrees then
+		frame *= CFrame.Angles(math.rad(piece.PitchDegrees), 0, 0)
+	end
+	return frame
 end
 
 local function countParts(model: Model): number
@@ -662,11 +708,12 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local layout = spec.Layout
 	local liquidY = layout.LiquidY
 	assert(
-		layout.Kind == "Serpentine" or layout.Kind == "Spiral" or layout.Kind == "Chute",
+		layout.Kind == "Serpentine" or layout.Kind == "Spiral" or layout.Kind == "Chute" or layout.Kind == "Loop",
 		`[CourseBuilder] unknown Layout.Kind "{layout.Kind}"`
 	)
 	local isSpiral = layout.Kind == "Spiral"
 	local isChute = layout.Kind == "Chute"
+	local isLoop = layout.Kind == "Loop"
 	local curve: GuideCurve? = if isSpiral
 		then buildSpiralGuide(assert(layout.Spiral, "[CourseBuilder] a Spiral layout needs Layout.Spiral"))
 		else nil
@@ -707,6 +754,81 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				layout.LanePitch,
 				segments[1].Length,
 				segments[3].Length
+			)
+		)
+	end
+	local loop = if isLoop then assert(layout.Loop, "[CourseBuilder] a Loop layout needs Layout.Loop") else nil
+	local loopTotalTurn = 0
+	if loop then
+		assert(
+			#segments == 5,
+			`[CourseBuilder] a Loop guide is run/cross/run/cross/stub: 5 segments, not {#segments} (HANDOFF 5.2)`
+		)
+		for index, expected in { [3] = 180, [5] = 0 } do
+			local drift = normalizeDegrees(segments[index].Heading - segments[1].Heading - expected)
+			assert(
+				math.min(drift, 360 - drift) < 1e-3,
+				string.format(
+					"[CourseBuilder] a Loop's segment %d must run %d degrees off segment 1; it heads %.1f against %.1f",
+					index,
+					expected,
+					segments[index].Heading,
+					segments[1].Heading
+				)
+			)
+		end
+		for _, index in { 2, 4 } do
+			assert(
+				math.abs(segments[index].Length - layout.LanePitch) < 1e-3,
+				string.format(
+					"[CourseBuilder] a Loop's cross segment %d is %.2f studs but LanePitch is %.2f; the pitch IS the separation between the two runs",
+					index,
+					segments[index].Length,
+					layout.LanePitch
+				)
+			)
+		end
+		-- Four turns of one handedness, summing to a full circle. A chute's two turns
+		-- sum to 180 and reverse the route onto itself; only a closed circuit comes
+		-- back round to its own start.
+		local firstSign = 0
+		for index = 2, #segments do
+			local delta = normalizeDegrees(segments[index].Heading - segments[index - 1].Heading)
+			local signed = if delta > 180 then delta - 360 else delta
+			assert(
+				math.abs(math.abs(signed) - 90) < 1e-3,
+				string.format(
+					"[CourseBuilder] a Loop turns in right angles; turn %d is %.1f degrees",
+					index - 1,
+					signed
+				)
+			)
+			local sign = if signed > 0 then 1 else -1
+			if firstSign == 0 then
+				firstSign = sign
+			end
+			assert(
+				sign == firstSign,
+				string.format("[CourseBuilder] a Loop's turns must all go the same way; turn %d reverses", index - 1)
+			)
+			loopTotalTurn += signed
+		end
+		assert(
+			math.abs(math.abs(loopTotalTurn) - 360) < 1e-3,
+			string.format(
+				"[CourseBuilder] a Loop must close a full circuit: its turns sum to %.1f degrees, not 360",
+				loopTotalTurn
+			)
+		)
+		-- The spine is central when both long runs sit within the declared band of the
+		-- circuit's own centre line, which for a run/cross/run guide is exactly half
+		-- the lane pitch away from it.
+		assert(
+			layout.LanePitch / 2 <= loop.SpineHalfWidth,
+			string.format(
+				"[CourseBuilder] a Loop's runs sit %.2f studs off its centre line, outside the declared %.2f-stud spine (HANDOFF 5.2 wants a CENTRAL tunnel spine)",
+				layout.LanePitch / 2,
+				loop.SpineHalfWidth
 			)
 		)
 	end
@@ -1149,6 +1271,42 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		end
 	end
 
+	local loopClosure = 0
+	if loop then
+		local closure = cursor.Position - spec.Start.Position
+		loopClosure = Vector3.new(closure.X, 0, closure.Z).Magnitude
+		if loopClosure < loop.ClosureMinStuds or loopClosure > loop.ClosureMaxStuds then
+			fail(
+				string.format(
+					"the circuit closes %.2f studs from its start plaza, outside the declared %.1f-%.1f window (HANDOFF 5.2: start and finish sit near each other on the outside of the loop)",
+					loopClosure,
+					loop.ClosureMinStuds,
+					loop.ClosureMaxStuds
+				)
+			)
+		end
+		local tunnelSegments: { [string]: number } = {}
+		for _, step in route do
+			if step.PieceId == loop.OutboundTunnelPieceId or step.PieceId == loop.ReturnTunnelPieceId then
+				tunnelSegments[step.PieceId] = step.Segment
+			end
+		end
+		for expectedSegment, pieceId in { [1] = loop.OutboundTunnelPieceId, [3] = loop.ReturnTunnelPieceId } do
+			local placed = tunnelSegments[pieceId]
+			if placed == nil then
+				fail(string.format("the spine tunnel piece %s is not on the route", pieceId))
+			elseif placed ~= expectedSegment then
+				fail(
+					string.format(
+						"the spine tunnel %s sits on guide run %d; the route must cross the spine once on run 1 and once on run 3",
+						pieceId,
+						placed
+					)
+				)
+			end
+		end
+	end
+
 	if routeLength < 800 or routeLength > 1000 then
 		fail(
 			string.format(
@@ -1185,6 +1343,8 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		HairpinFraction = hairpinFraction,
 		HairpinMidFraction = hairpinMidFraction,
 		HairpinExitFraction = hairpinExitFraction,
+		LoopClosureStuds = loopClosure,
+		LoopTotalTurnDegrees = loopTotalTurn,
 	}
 	return model, report
 end

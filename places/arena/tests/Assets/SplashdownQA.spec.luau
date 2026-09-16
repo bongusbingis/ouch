@@ -11,6 +11,8 @@ local CourseBuilder = require(Splashdown:WaitForChild("CourseBuilder"))
 local CourseQA = require(Splashdown:WaitForChild("CourseQA"))
 local SplashdownConfig = require(ReplicatedStorage:WaitForChild("Config").Gameplay.Splashdown)
 local DoorRows = require(game:GetService("ServerScriptService").Server.Modules.Splashdown.DoorRows)
+local BeachBalls = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.BeachBalls)
+local MapFeatures = require(ReplicatedStorage:WaitForChild("Config").Gameplay.MapFeatures)
 
 local function selectedIds(): { string }
 	local selection = ServerStorage:FindFirstChild("SplashdownQASelection")
@@ -220,6 +222,53 @@ return function()
 				else
 					expect(#rows).to.equal(if slabs > 0 then #rows else 0)
 				end
+			end)
+
+			-- The door defect above was silent: the build succeeded, the audit passed,
+			-- and the kit still could not see a single slab. Beach balls have exactly the
+			-- same failure mode, so this drives the REAL BeachBalls kit over the built
+			-- model and checks what the kit ends up owning, rather than trusting that a
+			-- ball looks present in a preview.
+			it("hands its beach balls to the kit as real unanchored server-owned physics", function()
+				local scriptables = model:FindFirstChild("Scriptables")
+				local rotating = scriptables and scriptables:FindFirstChild("Rotating")
+				local groups = {}
+				for _, group in (rotating and rotating:GetChildren() or {}) do
+					table.insert(groups, group)
+				end
+
+				local authored = {}
+				for _, instance in model:GetDescendants() do
+					if instance:IsA("BasePart") and instance:GetAttribute(MapFeatures.Attributes.BeachBall) == true then
+						table.insert(authored, instance)
+						-- HANDOFF 8.1: no unanchored template asset; the live ball is the
+						-- runtime exception, so the authored one must still be anchored.
+						expect(instance.Anchored).to.equal(true)
+						-- 02-kits.md: "do not also give them a kinematic motion owner."
+						expect(instance:GetAttribute(MapFeatures.Attributes.Rotor)).to.equal(nil)
+						-- The kit walks Rotating/<group>/Assembly descendants, so a ball
+						-- parked anywhere else is invisible to it however present it looks.
+						local assembly = instance:FindFirstAncestor("Assembly")
+						expect(assembly ~= nil and assembly:IsA("Model")).to.equal(true)
+						expect(assembly.Parent ~= nil and assembly.Parent.Parent == rotating).to.equal(true)
+					end
+				end
+
+				BeachBalls.forget(nil)
+				BeachBalls.tickWorld({ instances = groups, now = os.clock(), deltaTime = 1 / 60 })
+				local live = BeachBalls.active()
+				expect(#live).to.equal(#authored)
+				for _, ball in live do
+					expect(ball.Anchored).to.equal(false)
+					expect(ball.CanCollide).to.equal(true)
+					-- SetNetworkOwner(nil) is server ownership; GetNetworkOwner returns nil
+					-- for it AND for an anchored part, so the unanchored assertion above is
+					-- what makes this one mean something.
+					expect(ball:GetNetworkOwner()).to.equal(nil)
+					expect(ball.Parent ~= nil and ball.Parent.Name).to.equal("BeachBalls")
+					expect(ball:IsDescendantOf(model)).to.equal(true)
+				end
+				BeachBalls.forget(nil)
 			end)
 		end)
 	end
