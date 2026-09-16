@@ -429,3 +429,81 @@
   change that put `PistonPeak` into `CourseOrder`; the template is promoted and
   `ReplicatedStorage.Assets.Maps.Splashdown` matches `CourseOrder` exactly at six models. Headless
   suite: 984 tests, zero failures.
+
+## 2026-09-16 — Summit Splash hardened (HANDOFF section 7.7), the seventh course
+
+- **New layout kind `SourcePatch`**, HANDOFF section 11 step 2's "Summit uses source-plus-patch". It
+  is the only course that is not walked out along a guide: `CourseBuilder.build` dispatches it to
+  `buildSourcePatch`, which clones the authored course from
+  `ServerStorage.SplashdownAuthoringSources.SummitSource`, re-bases it on its own `Origin`, verifies
+  the preserved contract (258 BaseParts, 30 start pads, 4 checkpoints, one Finish, the 24-wall ring
+  at r 390, and the liquid's own `RiseStuds`/`RiseDelaySeconds`/`RiseSeconds`), applies a named
+  removal set, re-tags and relocates the hazards it keeps, mounts the new ones in the course's own
+  polar frame, and lays the route on the preserved centreline. The six built courses go through
+  byte-identical code; nothing on their path changed.
+- **Measured, on the source, before anything was changed.** Every arc sector is a walkable annulus
+  from r 156.0 to r 200.0 — 44 studs wide — with the route on r 180. A windmill bar sweeps
+  r 167.18..192.82 and a chain mace (an 11.42-stud arm, 50 degrees, a 6.33-stud ball) sweeps
+  r 168.10..191.90, so the inner strip 156.0..167.2 and the outer 192.8..200.0 were a free bypass of
+  every encounter. The nine `wall_003` chicane walls stood 11.57 studs over the deck against a
+  measured 11.5-stud step-up — rail tops, not enclosure. The inward bridge was 46.25 studs wide with
+  nothing on it.
+- **The patch.** 38 named instances / 113 BaseParts removed (5 of 8 windmills, 7 of 9 maces, 11 of 16
+  bumpers, all 9 chicane walls, 6 of 9 bridge slabs); 5 RotorBumps and 5 Bumpers retained and
+  relocated inside their own original route sections; two seesaw boards, one sliding sweeper, one
+  fan, one jump pad and one foam lane added; 29 guard walls placed. Built template **199 BaseParts,
+  spec hash `dcece9ec`**, route **1662.33 studs** over 177 steps, beats 0.999-1.002 of their
+  preserved targets, zero attribute, route and bounds errors, identical hash and part count across a
+  double build.
+- **Anti-skip is a measurement, not an assertion.** Each encounter sits in a *gate*: `wall_001` guard
+  walls laid radially across the deck at the encounter's own angle. The builder unions what a gate's
+  pieces block (from placed geometry) with what they sweep (measured radial reach) and reports the
+  arc's **edge gap** and its **interior gap** separately, because they answer different rules. All 13
+  gates measure an edge gap of **0.00**; every swept gate closes its passage to within 0.50 studs.
+  The inner wall deliberately overhangs the deck edge to r 152.44: a 22-stud jump between two points
+  on the inner edge bows inward to 155.61 at worst, so a wall reaching 152.44 is under every jump a
+  runner can make.
+- **Audited at full resolution:** 108,149 surface cells, 103,720 nodes, 6,603,327 edges. Zero errors,
+  49 findings PASS, all seven gate cut sets hold (0 of 30 spawn cells bypass any gate), the ordered
+  route is proved from all 30 spawns, 16 encounters over six types with RotorBump at 37.5%, and all
+  twelve cross-course checks pass over seven staged specs.
+- **Two audit defects this course exposed, both fixed.** `auditCoverage` exempted start and finish
+  plazas by the NEW builder's own names (`startplaza`/`finishplaza`), so the authored plaza
+  `sd_plaza.001` was scored as a 120 x 120 breather square; it now matches on `plaza`, which changes
+  nothing for the six built courses. And the in-engine `SplashdownQA.spec` re-ran the full 6.66
+  million-edge audit inside one TestEZ node and died on "exhausted allowed execution time"; a
+  SourcePatch course is now audited in-engine at 2-stud sampling, with the full-resolution audit
+  living in `evidence/courses/SummitSplash/qa.json` and the resolution recorded in both.
+- **Override 2's three-course cap is now scored over the six NEW courses only.** Its own wording is
+  "at most three of the six new courses", and 7.7.4 instructs Summit to add two seesaw boards and one
+  fan on top of a set already at three courses for both. `auditCrossCourse` excludes a `SourcePatch`
+  course from the cap and says so in the finding's own text; rules 1 and 3 still score it in full.
+  **This is a judgement call about a rule, not a measurement, and it is reversible in one line.**
+- **Two of 7.7's own clauses are NOT met, and are escalated rather than exempted.** 7.7.8's "each
+  remaining shove must reach liquid" holds on the narrowed bridge (16.25 studs wide, both edges lava,
+  43.2-stud sweep) but cannot hold on the arc: the preserved deck is 44 studs wide and the narrowest
+  continuous enclosure that does not cut the authored 30-pad start grid or a 32-stud checkpoint pad
+  is r 163/197, still far wider than any measured shove. And 8.4's no-breather rule is measured
+  against the same preserved deck. Both are recorded with numbers in
+  `docs/splashdown/courses/summit-splash.md`.
+- Scripted trials, the interactive keyboard run, the deliberate missed-timing contacts and the
+  checkpoint-recovery run are **NOT RUN**, per the standing 2026-09-16 decision. `SummitSplash` is
+  **staged and promoted but deliberately NOT added to `CourseOrder`** — that registration is section
+  12.1's transaction and needs the user's own go-ahead.
+- Two defects the in-engine pass then caught, after the numbers above were first recorded:
+  retained windmills and maces were being re-seated at their declared gate angle, which threw away
+  the authored 8.3-stud post sink and lifted all three windmill bars to deck +9.29..+14.93, clean
+  over a runner's head; a retained piece now moves only when it says `Relocate`, which only the five
+  bumpers do. And an assertion written for the flood (`every pad submerges after Par`) was simply
+  false of the preserved schedule — Checkpoint01 goes under at 104 s against a Par of 115 — so it is
+  replaced by the property that IS true and worth asserting: the flood stops below the highest pad,
+  so there is always a dry pad to respawn on. The submersion times are reported, not asserted; when
+  a lower pad going under actually strands a racer is the driven checkpoint-recovery run, which is
+  NOT RUN.
+- A third defect, caught by the same regression on the next pass: the Retain path tagged only the
+  root of a retained assembly, while `CoursePresets.clonePiece` tags every descendant, so the rotor
+  on a windmill's BAR resolved to a nil BeatId and the swept-reach audit reported it sweeping "over a
+  lane deck at Y 0.00..0.00". Every part of a retained assembly is now tagged. Final template
+  **`dcece9ec`**, Studio TestEZ **24 passed, 0 failed, 0 skipped**, headless **984 tests, 0
+  failures**. Promoted: `ReplicatedStorage.Assets.Maps.Splashdown` now holds seven models, one more
+  than `CourseOrder` lists, which is the state section 12.1 starts from.

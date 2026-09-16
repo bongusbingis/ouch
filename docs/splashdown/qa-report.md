@@ -21,9 +21,15 @@ fell from 156 to 143 and from 151 to 142. Every other figure in their columns is
 | WhirlpoolWaltz | **YES** | `CourseQA` BLOCKED, zero errors | **NO — and its scripted trials FAILED 0 of 8.** Every run stalls on the first ride deck in `02_WedgeWake`, about 32 falls per 150 s run. Needs the interactive keyboard run before its difficulty can be judged. |
 | DoorDash | **YES** | `CourseQA` BLOCKED, zero errors, zero warnings | **NO** — every static and graph check passes and both fixed-camera captures are done; **its scripted trials FAILED 0 of 8**, the best run reaching 2 of 5 checkpoints. Needs the interactive keyboard run before its difficulty can be judged. |
 | TumbleTunnels | **YES** | `CourseQA` BLOCKED, zero errors, zero warnings | **NO** — every static and graph check passes, both fixed-camera captures are done, and the beach balls are verified against the real kit; **its scripted trials did NOT COMPLETE** — the harness ran for 3.5 hours without writing a result, against its own 8-trial / 150-second-per-trial budget, so no trial numbers are claimed. Needs the interactive keyboard run before its difficulty can be judged. |
-| TiptoeTrials | NOT BUILT | NOT RUN | NO |
-| PistonPeak | NOT BUILT | NOT RUN | NO |
-| SummitSplash | NOT HARDENED | NOT RUN | NO |
+| TiptoeTrials | **YES** | `CourseQA` BLOCKED, zero errors, zero warnings | **NO** — every static and graph check passes and both fixed-camera captures are done; **scripted trials NOT COMPLETED** (standing 2026-09-16 decision). Needs the interactive keyboard run. |
+| PistonPeak | **YES** | `CourseQA` BLOCKED, zero errors, zero warnings | **NO** — every static and graph check passes, both captures are done, and its rising liquid is measured against its own checkpoints; **scripted trials NOT COMPLETED**. Needs the interactive keyboard run. |
+| SummitSplash | **YES — hardened 2026-09-16** | `CourseQA` BLOCKED, zero errors, one warning, spec hash `dcece9ec` | **NO** — all seven gate cut sets hold, all 13 gates seal both arc edges to 0.00, Studio TestEZ 24/0, both captures done; but **two of 7.7's own clauses are NOT met** (7.7.8's shove-reaches-liquid on the arc, and 8.4's no-breather square) and are escalated under 7.7.10 rather than exempted. See `docs/splashdown/courses/summit-splash.md`. |
+
+**This report's per-check matrix below predates Tiptoe Trials, Piston Peak and Summit Splash and has
+only four columns.** It is left as it stands rather than half-updated: the current per-course record
+is each course's own `docs/splashdown/evidence/courses/<Id>/qa.json` and its document under
+`docs/splashdown/courses/`. Rebuilding this matrix across all seven is set-wide work and belongs with
+HANDOFF section 12, not with one course's hardening pass.
 
 `CourseQA.check` never returns PASS while any live-playtest check is outstanding, so **BLOCKED with
 zero errors is the best an automated run can currently report**, and that is deliberate

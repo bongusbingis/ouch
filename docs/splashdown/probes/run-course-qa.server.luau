@@ -14,11 +14,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
-local SELECTED_IDS = { "PistonPeak" }
+local SELECTED_IDS = { "SummitSplash" }
 -- Cross-course checks (HANDOFF 8.4 override 2) are scored over every staged
 -- spec, not just the selected one, so a violation fails the set rather than one
 -- course. These are the specs that exist.
-local ALL_IDS = { "BallBarrage", "WhirlpoolWaltz", "DoorDash", "TumbleTunnels", "TiptoeTrials", "PistonPeak" }
+local ALL_IDS =
+	{ "BallBarrage", "WhirlpoolWaltz", "DoorDash", "TumbleTunnels", "TiptoeTrials", "PistonPeak", "SummitSplash" }
 
 -- See run-course-routes.server.luau for why this sink exists: a Script in Play
 -- has the Network capability the Assistant's execute_luau VM does not, so it can
@@ -62,7 +63,9 @@ local function sources()
 	local arena = root:FindFirstChild("ArenaSources")
 	local wall = arena and arena:FindFirstChild("BoundaryWall")
 	assert(kit and wall, "[run-course-qa] SplashdownAuthoringSources is incomplete")
-	return { Kit = kit, BoundaryWall = wall }
+	-- The export root itself goes through as well: HANDOFF 7.7's SourcePatch layout
+	-- patches the authored SummitSource that lives beside the kit.
+	return { Kit = kit, BoundaryWall = wall, AuthoringRoot = root }
 end
 
 local function specFor(id: string)

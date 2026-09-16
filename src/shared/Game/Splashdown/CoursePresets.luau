@@ -463,8 +463,13 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 	elseif spec.Preset == "Sweeper" then
 		root:SetAttribute(A.Rotor, "slide")
 		root:SetAttribute(A.RotorAxis, "X")
-		root:SetAttribute(A.RotorAmplitude, 4)
-		root:SetAttribute(A.RotorPeriod, 3.2)
+		-- A slide's amplitude is STUDS along the axis (Rotation.slideAt), so the swept
+		-- span is the frame's own length plus twice this. Ball Barrage's 4 sweeps a
+		-- lane it shares with two conveyors; Summit's narrowed inward bridge needs the
+		-- sweep to cover the whole crossing, so the amplitude is a per-course number
+		-- with the default preserved.
+		root:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 4)
+		root:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 3.2)
 		root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
 		local drum = sub("obstacle_2_002")
 		drum:SetAttribute(A.Rotor, "spin")

@@ -51,7 +51,13 @@ export type PieceSpec = {
 	-- cursor onto the declared anchor of the next island, keeping the heading it
 	-- arrived with, and the distance it crossed is MEASURED and classified as the
 	-- beat's launch or its tile group -- never assumed.
-	Kind: "Chain" | "Corner" | "Mount" | "Advance" | "Ride" | "Flank" | "Island",
+	-- "Retain" exists only on a SourcePatch layout: it names a hazard that is ALREADY
+	-- in the cloned source and keeps it, optionally moving it to a declared polar
+	-- anchor inside its own original route section (HANDOFF 7.7.3 "retain/relocate").
+	-- It places nothing, so it can never invent an encounter that is not really there;
+	-- the named instance must exist after the removal set has been applied or the
+	-- build fails.
+	Kind: "Chain" | "Corner" | "Mount" | "Advance" | "Ride" | "Flank" | "Island" | "Retain",
 	Preset: CoursePresets.PresetName?,
 	Source: string?,
 	Scale: number?,
@@ -119,6 +125,32 @@ export type PieceSpec = {
 	-- and then proves, pair by pair, that no ordinary jump between two different runs
 	-- gets past one. A wall is never an encounter; it is stock enclosure in Geometry.
 	GuardWall: boolean?,
+	-- SourcePatch only. A patched course has no cursor to offset from -- its route is
+	-- the preserved arc -- so a piece is anchored in the course's own polar frame
+	-- instead: where round it sits, how far out, and which way it faces. `Facing`
+	-- picks the yaw convention: "Tangential" points along the route at that angle,
+	-- "Radial" lays the piece's own long (local X) axis along the radius, and
+	-- "Absolute" uses FacingOffsetDegrees as the yaw outright. DeckY is the measured
+	-- top of the arc sector the piece stands on; OffsetUp is applied on top of it.
+	SourceInstance: string?,
+	-- Retain pieces only. A retained hazard declares its AngleDegrees so the gate
+	-- audit knows which cross-section it belongs to; that is NOT permission to move
+	-- it. Only a piece that says Relocate is picked up and re-seated, because moving
+	-- one re-seats it by its bounding-box bottom and would throw away whatever
+	-- mounting height the authored course gave it -- the windmills, for instance,
+	-- have their posts sunk a measured 8.3 studs so the bar sweeps at hip height.
+	Relocate: boolean?,
+	AngleDegrees: number?,
+	Radius: number?,
+	DeckY: number?,
+	Facing: ("Tangential" | "Radial" | "Absolute")?,
+	-- SourcePatch only. Pieces sharing a GateId are audited together: at their common
+	-- angle the union of what they block (measured from placed geometry) and what they
+	-- sweep (SweepHalfWidth, the measured radial reach of a moving hazard) must leave
+	-- no strip of deck a character could walk through. That union IS 7.7.7's
+	-- enclosure check.
+	GateId: string?,
+	SweepHalfWidth: number?,
 }
 
 export type BeatSpec = {
@@ -127,6 +159,11 @@ export type BeatSpec = {
 	Mechanic: string,
 	LengthTarget: number,
 	Pieces: { PieceSpec },
+	-- SourcePatch only: which slice of the preserved route this beat owns. An arc
+	-- beat runs up to EndAngleDegrees; the last two beats own the inward bridge and
+	-- the summit plaza instead, because those are not on the arc at all.
+	EndAngleDegrees: number?,
+	Segment: ("Arc" | "Bridge" | "Plaza")?,
 }
 
 export type StartSpec = {
@@ -305,9 +342,61 @@ export type StackedSwitchbackSpec = {
 	MinBypassStuds: number,
 }
 
+-- HANDOFF 7.7 / section 11 step 2: "Summit uses source-plus-patch". A SourcePatch
+-- layout has no guide and no cursor. Its geometry is the authored course exported at
+-- section 4, and everything here is a MEASUREMENT of that course that the patch is
+-- held to: remove exactly this set, keep the arc between these radii, keep the
+-- sectors at these tops, and lay the route on the original centreline. Nothing in
+-- this table may be "designed" -- if a number here disagrees with the source, the
+-- build fails rather than moving the course.
+export type ArcSector = {
+	SpanDegrees: number,
+	TopY: number,
+}
+
+export type SourcePatchSpec = {
+	-- Child of ServerStorage.SplashdownAuthoringSources holding the authored course.
+	SourceName: string,
+	ExpectedBaseParts: number,
+	-- Instance names to delete from the clone. Every one must resolve, exactly once.
+	Remove: { string },
+	-- The preserved arc, measured.
+	SectorStartDegrees: number,
+	Sectors: { ArcSector },
+	RouteStartDegrees: number,
+	RouteRadius: number,
+	InnerRadius: number,
+	OuterRadius: number,
+	SampleDegrees: number,
+	-- Vertical clearance measured between a sector deck and the underside of the
+	-- sector stacked above it. Every guard wall must clear the first number above its
+	-- own deck and stay under this one.
+	GuardWallMinAboveDeck: number,
+	StackedClearanceStuds: number,
+	-- The widest strip of open deck a gate may leave. HANDOFF 3.2's measured
+	-- character envelope is what sets it: anything a runner cannot fit through is
+	-- sealed, anything wider is an inside shortcut.
+	MaxUnsealedStuds: number,
+	-- The inward road bridge, after narrowing: same centreline, same top, same radial
+	-- span, fewer slabs.
+	BridgeAngleDegrees: number,
+	BridgeOuterRadius: number,
+	BridgeInnerRadius: number,
+	BridgeDeckY: number,
+	BridgeHalfWidth: number,
+	-- The summit plaza and its finish.
+	PlazaRadius: number,
+	PlazaTopY: number,
+	-- The preserved liquid, in the ORIGINAL course's own attribute vocabulary
+	-- (RisingLiquid.resolve keeps interpreting these exactly as it always did).
+	LiquidRiseStuds: number,
+	LiquidRiseDelaySeconds: number,
+	LiquidRiseSeconds: number,
+}
+
 export type LayoutSpec = {
 	Kind: string,
-	LanePitch: number,
+	LanePitch: number?,
 	BoundsRadius: number,
 	LiquidY: number,
 	-- HANDOFF 5.2 guide polyline in local X/Z. The route never leaves it: every
@@ -320,14 +409,17 @@ export type LayoutSpec = {
 	Loop: LoopSpec?,
 	Archipelago: ArchipelagoSpec?,
 	StackedSwitchback: StackedSwitchbackSpec?,
+	SourcePatch: SourcePatchSpec?,
 	Rise: RisingLiquidSpec?,
 	-- Spiral only: how far a chained run may drift from the parametric guide
 	-- before the build fails. A straight slab chord always sits slightly outside
 	-- the arc it approximates; this is the measured budget for that, not licence
 	-- to wander.
 	GuideTolerance: number?,
-	Corner: { Source: string, Scale: number },
-	Fill: { Source: string, Scale: number },
+	-- Every layout that chains pieces along a guide needs both; a SourcePatch chains
+	-- nothing, because its floor is the course it patches.
+	Corner: { Source: string, Scale: number }?,
+	Fill: { Source: string, Scale: number }?,
 }
 
 export type CourseSpec = {
@@ -344,13 +436,18 @@ export type CourseSpec = {
 	CapSeconds: number,
 	CloseWindowSeconds: number,
 	Layout: LayoutSpec,
-	Start: StartSpec,
+	-- A SourcePatch keeps the authored course's own 30 start pads, so it declares no
+	-- start grid of its own.
+	Start: StartSpec?,
 	Beats: { BeatSpec },
 }
 
 export type Sources = {
 	Kit: Instance,
 	BoundaryWall: BasePart,
+	-- ServerStorage.SplashdownAuthoringSources itself, so a SourcePatch layout can
+	-- find the authored course it patches. Only that layout needs it.
+	AuthoringRoot: Instance?,
 }
 
 export type RouteStep = {
@@ -462,6 +559,24 @@ export type BuildReport = {
 	FloodTopY: number,
 	LowestCheckpointY: number,
 	FloodClearance: number,
+	-- SourcePatch only (HANDOFF 7.7). What the patch inherited, what it deleted, what
+	-- it kept, whether every gate is really sealed, and when the preserved flood
+	-- reaches each preserved checkpoint pad. Empty/zero for every built course.
+	SourceBaseParts: number,
+	Removed: { string },
+	Retained: { string },
+	GateSeals: {
+		{
+			Id: string,
+			AngleDegrees: number,
+			MustSeal: boolean,
+			EdgeGapStuds: number,
+			InteriorGapStuds: number,
+			GapFrom: number,
+			GapTo: number,
+		}
+	},
+	CheckpointFloodTimes: { { Id: string, PadY: number, SubmergedAtSeconds: number } },
 }
 
 local function forward(headingDegrees: number): Vector3
@@ -515,7 +630,7 @@ local function buildPlaza(sources: Sources, courseId: string, center: Vector3, d
 end
 
 local function buildStartPads(spec: CourseSpec, sources: Sources, startFolder: Folder, geometry: Folder): Cursor
-	local start = spec.Start
+	local start = assert(spec.Start, "[CourseBuilder] buildStartPads needs a declared Start grid")
 	-- Grid footprint is (columns-1)*spacing by (rows-1)*spacing; HANDOFF 5.1.9
 	-- requires at least 36x30 clear, so the inscribed rectangle must clear that
 	-- with margin. Diameter = diagonal of the required rectangle plus a
@@ -703,6 +818,15 @@ local function auditBounds(
 			-- extent is measured and reported below rather than dropped, and they stay
 			-- inside the 600-corner rule with everything else.
 			local isGate = descendant:GetAttribute("QAOnly") == true
+			-- Same reasoning as the gate carve-out, applied to the other thing that is
+			-- measurably not the static ROUTE envelope: a part a runner can never
+			-- stand on or be stopped by. Summit's two authored flagpoles are 83.78
+			-- studs tall and noncolliding, and they say nothing about where the
+			-- course's floor is. Every such part is still held to the 600-corner rule
+			-- and still measured into MinY/MaxY below; only the -30..90 band skips it,
+			-- and the band still covers every walkable surface, because a walkable
+			-- surface collides by definition.
+			local isDecor = not descendant.CanCollide
 			local half = descendant.Size / 2
 			for _, sx in { -1, 1 } do
 				for _, sy in { -1, 1 } do
@@ -718,7 +842,7 @@ local function auditBounds(
 						if isGate then
 							report.GateMinY = math.min(report.GateMinY, corner.Y)
 							report.GateMaxY = math.max(report.GateMaxY, corner.Y)
-						elseif not isPerimeter then
+						elseif not isPerimeter and not isDecor then
 							if corner.Y < report.RouteMinY or corner.Y > report.RouteMaxY then
 								worstRoute = descendant
 							end
@@ -1072,10 +1196,824 @@ local function buildSpiralGuide(spiral: SpiralSpec): GuideCurve
 	return curve :: GuideCurve
 end
 
+-- ===========================================================================
+-- SourcePatch: HANDOFF 7.7, the seventh course
+-- ===========================================================================
+-- Course polar frame. The authored course lays every sector, hazard, checkpoint
+-- and start pad at polar(angle, radius) = (sin*r, y, cos*r) about its own Origin,
+-- so the patch works in exactly the same frame rather than re-deriving Cartesian
+-- guide points that would only approximate it.
+local function polarPoint(angleDegrees: number, radius: number, y: number): Vector3
+	local radians = math.rad(angleDegrees)
+	return Vector3.new(math.sin(radians) * radius, y, math.cos(radians) * radius)
+end
+
+-- A yaw whose forward() runs along the route in the +angle direction, which also
+-- puts the piece's own local +X (its right) radially OUTWARD. Every radial guard
+-- wall uses this, because wall_001's long axis is its local X.
+local function tangentialYaw(angleDegrees: number): number
+	return angleDegrees - 90
+end
+
+-- A yaw whose forward() runs radially INWARD, used on the inward bridge: the
+-- piece's local +X is then across the bridge, which is the axis the sweeper slides
+-- along.
+local function radialYaw(angleDegrees: number): number
+	return angleDegrees
+end
+
+local function collectParts(root: Instance): { BasePart }
+	local parts: { BasePart } = {}
+	if root:IsA("BasePart") then
+		table.insert(parts, root)
+	end
+	for _, descendant in root:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			table.insert(parts, descendant)
+		end
+	end
+	return parts
+end
+
+-- World-space bounding box of an assembly, over every BasePart it owns.
+local function assemblyBounds(root: Instance): (Vector3, Vector3)
+	local min = Vector3.new(math.huge, math.huge, math.huge)
+	local max = Vector3.new(-math.huge, -math.huge, -math.huge)
+	for _, part in collectParts(root) do
+		local half = part.Size / 2
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local corner = part.CFrame:PointToWorldSpace(Vector3.new(half.X * sx, half.Y * sy, half.Z * sz))
+					min = Vector3.new(math.min(min.X, corner.X), math.min(min.Y, corner.Y), math.min(min.Z, corner.Z))
+					max = Vector3.new(math.max(max.X, corner.X), math.max(max.Y, corner.Y), math.max(max.Z, corner.Z))
+				end
+			end
+		end
+	end
+	return min, max
+end
+
+-- The radial band an already-placed assembly occupies, measured from its own
+-- transformed corners rather than from its declared size. This is what the gate
+-- seal audit unions, so "the inner strip is closed" is a statement about geometry.
+local function radialSpan(root: Instance): (number, number)
+	local low, high = math.huge, -math.huge
+	for _, part in collectParts(root) do
+		local half = part.Size / 2
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local corner = part.CFrame:PointToWorldSpace(Vector3.new(half.X * sx, half.Y * sy, half.Z * sz))
+					local radius = Vector3.new(corner.X, 0, corner.Z).Magnitude
+					low = math.min(low, radius)
+					high = math.max(high, radius)
+				end
+			end
+		end
+	end
+	return low, high
+end
+
+-- Moves a retained source assembly rigidly: yaw it about its own root, then drop
+-- its bounding-box bottom centre onto `position`. That is the same contract the
+-- original authoring script placed it with (bottom centre at the target), so a
+-- relocated hazard sits on the deck exactly as its siblings do.
+local function relocateAssembly(root: BasePart, position: Vector3, yawDegrees: number?)
+	local parts = collectParts(root)
+	if yawDegrees then
+		local _, currentYaw = root.CFrame:ToEulerAnglesYXZ()
+		local pivot = root.CFrame.Position
+		local rotation = CFrame.new(pivot) * CFrame.Angles(0, math.rad(yawDegrees) - currentYaw, 0) * CFrame.new(-pivot)
+		for _, part in parts do
+			part.CFrame = rotation * part.CFrame
+		end
+	end
+	local min, max = assemblyBounds(root)
+	local bottomCentre = Vector3.new((min.X + max.X) / 2, min.Y, (min.Z + max.Z) / 2)
+	local delta = position - bottomCentre
+	for _, part in parts do
+		part.CFrame = part.CFrame + delta
+	end
+end
+
+type GateCoverage = { Low: number, High: number, By: string }
+
+local function buildSourcePatch(spec: CourseSpec, sources: Sources, startClock: number): (Model, BuildReport)
+	local layout = spec.Layout
+	local patch = assert(layout.SourcePatch, "[CourseBuilder] a SourcePatch layout needs Layout.SourcePatch")
+	local authoring = assert(
+		sources.AuthoringRoot,
+		"[CourseBuilder] a SourcePatch layout needs Sources.AuthoringRoot (ServerStorage.SplashdownAuthoringSources)"
+	)
+	local sourceModel = authoring:FindFirstChild(patch.SourceName)
+	assert(
+		sourceModel and sourceModel:IsA("Model"),
+		`[CourseBuilder] SplashdownAuthoringSources.{patch.SourceName} is missing or is not a Model`
+	)
+
+	local routeErrors: { string } = {}
+	local function fail(message: string)
+		table.insert(routeErrors, message)
+	end
+
+	-- 1. Clone the authored course and re-base it on its own Origin, so the patched
+	-- template lives in the same local frame every built course does.
+	local model = (sourceModel :: Model):Clone()
+	model.Name = spec.Id
+	local origin = model:FindFirstChild("Origin")
+	assert(origin and origin:IsA("BasePart"), `[CourseBuilder] {patch.SourceName} has no Origin part`)
+	local rebase = CFrame.new(-(origin :: BasePart).CFrame.Position)
+	for _, part in collectParts(model) do
+		part.CFrame = rebase * part.CFrame
+	end
+	model.PrimaryPart = origin :: BasePart
+
+	local sourceParts = countParts(model)
+	if sourceParts ~= patch.ExpectedBaseParts then
+		fail(
+			string.format(
+				"the authored source has %d BaseParts, not the %d this patch was measured against",
+				sourceParts,
+				patch.ExpectedBaseParts
+			)
+		)
+	end
+
+	model:SetAttribute("DisplayName", spec.DisplayName)
+	model:SetAttribute("Difficulty", spec.Difficulty)
+	model:SetAttribute("ParSeconds", spec.ParSeconds)
+	model:SetAttribute("CapSeconds", spec.CapSeconds)
+	model:SetAttribute("CloseWindowSeconds", spec.CloseWindowSeconds)
+	model:SetAttribute("BuildVersion", 1)
+
+	-- 2. The preserved contract. These are the parts of the course 7.7 forbids
+	-- redesigning, so the patch verifies them instead of rebuilding them.
+	local geometry = assert(model:FindFirstChild("Geometry"), "[CourseBuilder] source has no Geometry folder") :: Folder
+	local scriptables =
+		assert(model:FindFirstChild("Scriptables"), "[CourseBuilder] source has no Scriptables folder") :: Folder
+	local rotating =
+		assert(scriptables:FindFirstChild("Rotating"), "[CourseBuilder] source has no Scriptables.Rotating") :: Folder
+	local jumpPadsFolder =
+		assert(scriptables:FindFirstChild("JumpPads"), "[CourseBuilder] source has no Scriptables.JumpPads") :: Folder
+	local doorsFolder =
+		assert(scriptables:FindFirstChild("Doors"), "[CourseBuilder] source has no Scriptables.Doors") :: Folder
+	local hazardsFolder =
+		assert(model:FindFirstChild("Hazards"), "[CourseBuilder] source has no Hazards folder") :: Folder
+	local checkpointsFolder =
+		assert(model:FindFirstChild("Checkpoints"), "[CourseBuilder] source has no Checkpoints folder") :: Folder
+	local boundaryFolder =
+		assert(model:FindFirstChild("Boundary"), "[CourseBuilder] source has no Boundary folder") :: Folder
+
+	local foamPitsFolder = scriptables:FindFirstChild("FoamPits")
+	if not foamPitsFolder then
+		local created = Instance.new("Folder")
+		created.Name = "FoamPits"
+		created.Parent = scriptables
+		foamPitsFolder = created
+	end
+
+	-- The preserved rising liquid, in the ORIGINAL course's attribute vocabulary.
+	local liquidPart: BasePart? = nil
+	for _, part in collectParts(hazardsFolder) do
+		if part:GetAttribute("RiseStuds") ~= nil then
+			liquidPart = part
+		end
+	end
+	local liquid = assert(liquidPart, "[CourseBuilder] the source has no rising-liquid Hazards part")
+	local liquidTopY = liquid.Position.Y
+	for attribute, expected in
+		{
+			RiseStuds = patch.LiquidRiseStuds,
+			RiseDelaySeconds = patch.LiquidRiseDelaySeconds,
+			RiseSeconds = patch.LiquidRiseSeconds,
+		} :: { [string]: number }
+	do
+		local actual = liquid:GetAttribute(attribute)
+		if actual ~= expected then
+			fail(
+				string.format(
+					"the preserved liquid schedule moved: %s is %s, not the recorded %s",
+					attribute,
+					tostring(actual),
+					tostring(expected)
+				)
+			)
+		end
+	end
+
+	-- 3. The removal set. Every name must resolve exactly once, so a typo can never
+	-- quietly leave an avoidable prop standing.
+	local removed: { string } = {}
+	for _, name in patch.Remove do
+		local matches = 0
+		local found: Instance? = nil
+		for _, descendant in model:GetDescendants() do
+			if descendant.Name == name then
+				matches += 1
+				found = descendant
+			end
+		end
+		if matches ~= 1 or not found then
+			fail(string.format("removal target %q matched %d instances, not exactly 1", name, matches))
+		else
+			(found :: Instance):Destroy()
+			table.insert(removed, name)
+		end
+	end
+
+	-- 4. The preserved route, sampled on the original centreline.
+	local sectorBounds: { { Start: number, Finish: number, TopY: number } } = {}
+	do
+		local angle = patch.SectorStartDegrees
+		for _, sector in patch.Sectors do
+			table.insert(sectorBounds, { Start = angle, Finish = angle + sector.SpanDegrees, TopY = sector.TopY })
+			angle += sector.SpanDegrees
+		end
+	end
+	local arcEndDegrees = sectorBounds[#sectorBounds].Finish
+	local function deckYAt(angleDegrees: number): number
+		local chosen = sectorBounds[1].TopY
+		for _, sector in sectorBounds do
+			if angleDegrees >= sector.Start - 1e-6 then
+				chosen = sector.TopY
+			end
+		end
+		return chosen
+	end
+
+	local arcHalfWidth = (patch.OuterRadius - patch.InnerRadius) / 2
+	local route: { RouteStep } = {}
+	local routeLength = 0
+	local beatMeasures: { BeatMeasure } = {}
+
+	local function pushStep(
+		beatId: string,
+		pieceId: string,
+		kind: string,
+		position: Vector3,
+		yaw: number,
+		halfWidth: number
+	)
+		local previous = route[#route]
+		local travelled = 0
+		if previous then
+			local delta = position - previous.Position
+			travelled = Vector3.new(delta.X, 0, delta.Z).Magnitude
+			routeLength += travelled
+		end
+		table.insert(route, {
+			BeatId = beatId,
+			PieceId = pieceId,
+			Kind = kind,
+			Position = position,
+			Yaw = yaw,
+			Segment = 1,
+			SegmentTravel = travelled,
+			ArcLength = routeLength,
+			Island = 0,
+			HalfWidth = halfWidth,
+		})
+	end
+
+	-- 5. Beats: gates, per-beat hazard groups, retained and new pieces.
+	local beatsFolder = Instance.new("Folder")
+	beatsFolder.Name = "Beats"
+	beatsFolder.Parent = model
+	local qaRoot = Instance.new("Folder")
+	qaRoot.Name = "QA"
+	qaRoot.Parent = model
+	local qaGates = Instance.new("Folder")
+	qaGates.Name = "Gates"
+	qaGates.Parent = qaRoot
+
+	local pieceIndex = 0
+	local gateCoverage: { [string]: { GateCoverage } } = {}
+	local gateAngles: { [string]: number } = {}
+	local gateSweeps: { [string]: boolean } = {}
+	local retained: { string } = {}
+	local guardWalls: { { PieceId: string, TopAboveDeck: number, HalfLength: number } } = {}
+
+	for beatIndex, beat in spec.Beats do
+		local segment = beat.Segment or "Arc"
+		local beatStartLength = routeLength
+		local beatIndexFolder = Instance.new("Folder")
+		beatIndexFolder.Name = beat.Id
+		beatIndexFolder.Parent = beatsFolder
+
+		-- Route samples this beat owns, laid before its pieces so the gate volume can
+		-- sit on the beat's real entrance.
+		local beatStartY, beatEndY
+		if segment == "Arc" then
+			local from = if beatIndex == 1
+				then patch.RouteStartDegrees
+				else assert(
+					spec.Beats[beatIndex - 1].EndAngleDegrees,
+					"[CourseBuilder] arc beat needs a predecessor angle"
+				)
+			local to = assert(beat.EndAngleDegrees, `[CourseBuilder] arc beat {beat.Id} needs EndAngleDegrees`)
+			beatStartY = deckYAt(from)
+			beatEndY = deckYAt(to - 1e-6)
+			local angle = from
+			while angle < to - 1e-6 do
+				pushStep(
+					beat.Id,
+					beat.Id .. "_route",
+					"Arc",
+					polarPoint(angle, patch.RouteRadius, deckYAt(angle)),
+					tangentialYaw(angle),
+					arcHalfWidth
+				)
+				angle = math.min(angle + patch.SampleDegrees, to)
+			end
+			pushStep(
+				beat.Id,
+				beat.Id .. "_route",
+				"Arc",
+				polarPoint(to, patch.RouteRadius, deckYAt(to - 1e-6)),
+				tangentialYaw(to),
+				arcHalfWidth
+			)
+		elseif segment == "Bridge" then
+			beatStartY = deckYAt(arcEndDegrees - 1e-6)
+			beatEndY = patch.BridgeDeckY
+			local radius = patch.BridgeOuterRadius
+			while radius > patch.BridgeInnerRadius + 1e-6 do
+				pushStep(
+					beat.Id,
+					beat.Id .. "_route",
+					"Bridge",
+					polarPoint(patch.BridgeAngleDegrees, radius, patch.BridgeDeckY),
+					radialYaw(patch.BridgeAngleDegrees),
+					patch.BridgeHalfWidth
+				)
+				radius = math.max(radius - 10, patch.BridgeInnerRadius)
+			end
+			pushStep(
+				beat.Id,
+				beat.Id .. "_route",
+				"Bridge",
+				polarPoint(patch.BridgeAngleDegrees, patch.BridgeInnerRadius, patch.BridgeDeckY),
+				radialYaw(patch.BridgeAngleDegrees),
+				patch.BridgeHalfWidth
+			)
+		else
+			beatStartY = patch.BridgeDeckY
+			beatEndY = patch.PlazaTopY
+			local radius = patch.PlazaRadius
+			while radius > 1e-6 do
+				pushStep(
+					beat.Id,
+					beat.Id .. "_route",
+					"Plaza",
+					polarPoint(patch.BridgeAngleDegrees, radius, patch.PlazaTopY),
+					radialYaw(patch.BridgeAngleDegrees),
+					patch.PlazaRadius / 2
+				)
+				radius = math.max(radius - 20, 0)
+			end
+			pushStep(
+				beat.Id,
+				beat.Id .. "_route",
+				"Plaza",
+				Vector3.new(0, patch.PlazaTopY, 0),
+				radialYaw(patch.BridgeAngleDegrees),
+				patch.PlazaRadius / 2
+			)
+		end
+
+		-- QA gate volume at this beat's entrance, on the same 60 x 60 x 2 contract
+		-- every built course uses (HANDOFF 8.2).
+		local entrance = route[1]
+		for _, step in route do
+			if step.BeatId == beat.Id then
+				entrance = step
+				break
+			end
+		end
+		local gate = marker(
+			beat.Id,
+			Vector3.new(60, 60, 2),
+			CFrame.new(entrance.Position + Vector3.new(0, 8, 0)) * CFrame.Angles(0, math.rad(entrance.Yaw), 0),
+			qaGates
+		)
+		gate.CanTouch = true
+		gate.CanQuery = true
+		gate:SetAttribute("GateId", beat.Id)
+		gate:SetAttribute("QAOnly", true)
+		gate:SetAttribute("CourseId", spec.Id)
+		gate:SetAttribute("BeatId", beat.Id)
+
+		-- New hazards go into their own per-beat rotating group, exactly as a built
+		-- course's do; retained hazards stay in the source's own group.
+		local beatGroup = Instance.new("Model")
+		beatGroup.Name = "Assembly"
+		local rotatingGroup = Instance.new("Folder")
+		rotatingGroup.Name = string.format("%s__hazards", beat.Id)
+		rotatingGroup.Parent = rotating
+		local groupOrigin = Instance.new("Part")
+		groupOrigin.Name = "Origin"
+		groupOrigin.Size = Vector3.new(4, 1, 2)
+		groupOrigin.Anchored = true
+		groupOrigin.CanCollide = false
+		groupOrigin.CanTouch = false
+		groupOrigin.CanQuery = false
+		groupOrigin.Transparency = 1
+		groupOrigin.CFrame = CFrame.new(entrance.Position)
+		groupOrigin:SetAttribute("RotationSpeed", 0)
+		groupOrigin.Parent = rotatingGroup
+		beatGroup.Parent = rotatingGroup
+
+		local context: CoursePresets.BuildContext = {
+			Sources = sources.Kit,
+			Assembly = beatGroup,
+			JumpPadsFolder = jumpPadsFolder,
+			DoorsFolder = doorsFolder,
+			FoamPitsFolder = foamPitsFolder :: Instance,
+			Geometry = geometry,
+			CourseId = spec.Id,
+			BeatId = beat.Id,
+			BeatIndex = beatIndex,
+			NextIndex = function()
+				pieceIndex += 1
+				return pieceIndex
+			end,
+		}
+
+		for _, piece in beat.Pieces do
+			local deckY = piece.DeckY or (if segment == "Bridge" then patch.BridgeDeckY else patch.PlazaTopY)
+			local angle = piece.AngleDegrees or patch.BridgeAngleDegrees
+			local radius = piece.Radius or patch.RouteRadius
+			local facing = piece.Facing or "Tangential"
+			local yaw = if facing == "Radial"
+				then radialYaw(angle)
+				elseif facing == "Absolute" then (piece.FacingOffsetDegrees or 0)
+				else tangentialYaw(angle)
+			if facing ~= "Absolute" then
+				yaw += piece.FacingOffsetDegrees or 0
+			end
+			local anchorPosition = polarPoint(angle, radius, deckY + (piece.OffsetUp or 0))
+
+			local placed: Instance? = nil
+			if piece.Kind == "Retain" then
+				local wanted =
+					assert(piece.SourceInstance, `[CourseBuilder] {piece.Id}: a Retain piece needs SourceInstance`)
+				local found: Instance? = nil
+				local matches = 0
+				for _, descendant in model:GetDescendants() do
+					if descendant.Name == wanted then
+						matches += 1
+						found = descendant
+					end
+				end
+				if matches ~= 1 or not found or not found:IsA("BasePart") then
+					fail(
+						string.format(
+							"%s: retained instance %q matched %d BaseParts, not exactly 1",
+							piece.Id,
+							wanted,
+							matches
+						)
+					)
+				else
+					local root = found :: BasePart
+					if piece.Relocate then
+						relocateAssembly(root, anchorPosition, yaw)
+					end
+					-- EVERY part of the assembly, exactly as CoursePresets.clonePiece tags
+					-- the pieces it builds. The rotor on a retained windmill lives on its
+					-- BAR, not on the post that is the root, and an audit that resolves a
+					-- moving part to its beat by reading the part's own BeatId finds
+					-- nothing if only the root carries it -- which is precisely how the
+					-- swept-reach regression reported three bars sweeping "over a lane
+					-- deck at Y 0.00..0.00".
+					for _, part in collectParts(root) do
+						part:SetAttribute("CourseId", spec.Id)
+						part:SetAttribute("BeatId", beat.Id)
+						part:SetAttribute("PieceId", piece.Id)
+					end
+					placed = root
+					table.insert(retained, string.format("%s=%s", piece.Id, wanted))
+				end
+			elseif piece.Kind == "Mount" or piece.Kind == "Chain" then
+				local presetSpec: CoursePresets.PieceSpec = {
+					Id = piece.Id,
+					Preset = assert(piece.Preset, `[CourseBuilder] {piece.Id} needs a Preset`),
+					Source = piece.Source,
+					Scale = assert(piece.Scale, `[CourseBuilder] {piece.Id} needs a Scale`),
+					Reversed = piece.Reversed,
+					Direction = piece.Direction,
+					ConveyorSpeed = piece.ConveyorSpeed,
+					RotorAmplitude = piece.RotorAmplitude,
+					RotorPeriod = piece.RotorPeriod,
+					RotorPhase = piece.RotorPhase,
+					ShoveSpeed = piece.ShoveSpeed,
+					LaunchSpeed = piece.LaunchSpeed,
+					FloatFactor = piece.FloatFactor,
+					FanAxis = piece.FanAxis,
+					FanDirection = piece.FanDirection,
+					FanColumnHeight = piece.FanColumnHeight,
+					RotorSpeed = piece.RotorSpeed,
+					RotorAxis = piece.RotorAxis,
+					VolumeSize = piece.VolumeSize,
+					SpeedMultiplier = piece.SpeedMultiplier,
+					MaxTiltDegrees = piece.MaxTiltDegrees,
+					WindupSeconds = piece.WindupSeconds,
+					StrikeSeconds = piece.StrikeSeconds,
+					FanBallSpeed = piece.FanBallSpeed,
+					DropDelaySeconds = piece.DropDelaySeconds,
+					RespawnSeconds = piece.RespawnSeconds,
+				}
+				if piece.Kind == "Chain" then
+					-- A chained surface on a patched course is entered at a declared
+					-- polar anchor rather than at a running cursor: the arc it sits on
+					-- is already the floor, so there is no chain to continue. The
+					-- anchor is the piece's own Entry socket, which is why the seesaw
+					-- spec states the board's measured top height rather than the
+					-- pedestal's base.
+					local result =
+						CoursePresets.buildChainPiece(context, presetSpec, { Position = anchorPosition, Yaw = yaw })
+					placed = result.Model
+				else
+					local frame = CFrame.new(anchorPosition) * CFrame.Angles(0, math.rad(yaw), 0)
+					if piece.PitchDegrees then
+						frame *= CFrame.Angles(math.rad(piece.PitchDegrees), 0, 0)
+					end
+					local result = CoursePresets.buildMountPiece(context, presetSpec, frame)
+					placed = result.Model
+				end
+			else
+				fail(
+					string.format(
+						"%s: a SourcePatch beat supports Retain, Mount and Chain pieces, not %s",
+						piece.Id,
+						piece.Kind
+					)
+				)
+			end
+
+			if placed then
+				local value = Instance.new("ObjectValue")
+				value.Name = piece.Id
+				value.Value = placed
+				value.Parent = beatIndexFolder
+				if piece.GuardWall then
+					local low, high = radialSpan(placed)
+					local _, max = assemblyBounds(placed)
+					table.insert(guardWalls, {
+						PieceId = piece.Id,
+						TopAboveDeck = max.Y - deckY,
+						HalfLength = (high - low) / 2,
+					})
+					if max.Y - deckY < patch.GuardWallMinAboveDeck then
+						fail(
+							string.format(
+								"%s: guard wall top is %.2f studs above its deck, under the %.2f minimum (HANDOFF 7.7.7)",
+								piece.Id,
+								max.Y - deckY,
+								patch.GuardWallMinAboveDeck
+							)
+						)
+					end
+					if max.Y - deckY > patch.StackedClearanceStuds then
+						fail(
+							string.format(
+								"%s: guard wall top is %.2f studs above its deck, over the %.2f measured clearance to the sector stacked above it",
+								piece.Id,
+								max.Y - deckY,
+								patch.StackedClearanceStuds
+							)
+						)
+					end
+				end
+				if piece.GateId then
+					local low, high = radialSpan(placed)
+					if piece.SweepHalfWidth then
+						low = math.min(low, radius - piece.SweepHalfWidth)
+						high = math.max(high, radius + piece.SweepHalfWidth)
+						gateSweeps[piece.GateId] = true
+					end
+					gateCoverage[piece.GateId] = gateCoverage[piece.GateId] or {}
+					table.insert(gateCoverage[piece.GateId], { Low = low, High = high, By = piece.Id })
+					gateAngles[piece.GateId] = angle
+				end
+			end
+		end
+
+		-- HANDOFF 3.3: rides carry riders on the server, so the group Origin says so.
+		for _, descendant in beatGroup:GetDescendants() do
+			if descendant:GetAttribute("RotorCarries") == true or descendant:GetAttribute("Seesaw") == true then
+				groupOrigin:SetAttribute("ServerCarries", true)
+				break
+			end
+		end
+
+		local measured = routeLength - beatStartLength
+		local ratio = measured / beat.LengthTarget
+		if ratio < 0.85 or ratio > 1.15 then
+			fail(
+				string.format(
+					"%s: measured arclength %.2f is %.3f of its %d preserved target",
+					beat.Id,
+					measured,
+					ratio,
+					beat.LengthTarget
+				)
+			)
+		end
+		table.insert(beatMeasures, {
+			Id = beat.Id,
+			ArcLength = measured,
+			LengthTarget = beat.LengthTarget,
+			Ratio = ratio,
+			ElevationChange = beatEndY - beatStartY,
+		})
+	end
+
+	-- 6. The anti-skip measurement (HANDOFF 7.7.7): at every gate angle, union what
+	-- the walls block with what the hazard sweeps and report the widest strip of deck
+	-- that is neither. Anything a character could stand in is a failure, not a note.
+	-- Two different questions, measured separately, because they are two different
+	-- rules:
+	--
+	--   EDGE gap  -- open deck between the arc's own inner edge and the first thing
+	--                the gate covers, or between the last thing and the outer edge.
+	--                This is 7.7.7's "inside shortcut"/"outer rail-top highway", and
+	--                it must be closed at EVERY gate, sweeping hazard or not.
+	--   INTERIOR  -- open deck inside the gate's passage. For a sweeping hazard this
+	--     gap        must also be closed, because 8.4 wants every escape strip
+	--                hazard-covered across a cycle. For a bumper it must NOT be: a
+	--                forced bumper that fills its own passage is a wall of mesh, and
+	--                8.4 asks instead that a runner cannot avoid it "without slowing
+	--                or making the required precision manoeuvre". So a gate is held
+	--                to its interior only when one of its own pieces declares a
+	--                measured sweep, and the slot is reported either way.
+	local gateSeals: {
+		{
+			Id: string,
+			AngleDegrees: number,
+			MustSeal: boolean,
+			EdgeGapStuds: number,
+			InteriorGapStuds: number,
+			GapFrom: number,
+			GapTo: number,
+		}
+	} =
+		{}
+	local gateIds: { string } = {}
+	for id in gateCoverage do
+		table.insert(gateIds, id)
+	end
+	table.sort(gateIds)
+	for _, id in gateIds do
+		local spans = gateCoverage[id]
+		table.sort(spans, function(left, right2)
+			return left.Low < right2.Low
+		end)
+		local mustSeal = gateSweeps[id] == true
+		local innerEdgeGap = math.max(spans[1].Low - patch.InnerRadius, 0)
+		local cursorRadius = spans[1].High
+		local interiorGap, gapFrom, gapTo = 0, 0, 0
+		for index = 2, #spans do
+			local span = spans[index]
+			if span.Low > cursorRadius then
+				local gap = math.min(span.Low, patch.OuterRadius) - cursorRadius
+				if gap > interiorGap then
+					interiorGap, gapFrom, gapTo = gap, cursorRadius, math.min(span.Low, patch.OuterRadius)
+				end
+			end
+			cursorRadius = math.max(cursorRadius, span.High)
+		end
+		local outerEdgeGap = math.max(patch.OuterRadius - cursorRadius, 0)
+		local edgeGap = math.max(innerEdgeGap, outerEdgeGap)
+		table.insert(gateSeals, {
+			Id = id,
+			AngleDegrees = gateAngles[id] or 0,
+			MustSeal = mustSeal,
+			EdgeGapStuds = edgeGap,
+			InteriorGapStuds = interiorGap,
+			GapFrom = gapFrom,
+			GapTo = gapTo,
+		})
+		if edgeGap > patch.MaxUnsealedStuds then
+			fail(
+				string.format(
+					"gate %s at angle %.2f leaves %.2f studs of open deck at the arc's own edge (inner %.2f, outer %.2f), over the %.2f a character cannot fit through (HANDOFF 7.7.7)",
+					id,
+					gateAngles[id] or 0,
+					edgeGap,
+					innerEdgeGap,
+					outerEdgeGap,
+					patch.MaxUnsealedStuds
+				)
+			)
+		end
+		if mustSeal and interiorGap > patch.MaxUnsealedStuds then
+			fail(
+				string.format(
+					"gate %s at angle %.2f has a measured sweep but still leaves %.2f studs of open deck between r %.2f and r %.2f (HANDOFF 8.4)",
+					id,
+					gateAngles[id] or 0,
+					interiorGap,
+					gapFrom,
+					gapTo,
+					patch.MaxUnsealedStuds
+				)
+			)
+		end
+	end
+
+	-- 7. The preserved flood against the preserved checkpoints. 7.7.9 keeps the
+	-- schedule even when it is difficult, so this REPORTS submersion times instead of
+	-- failing the build the way a new course's rising liquid does.
+	local checkpointCount = 0
+	local lowestCheckpointY = math.huge
+	local floodTopY = liquidTopY + patch.LiquidRiseStuds
+	local riseRate = patch.LiquidRiseStuds / patch.LiquidRiseSeconds
+	local floodTimes: { { Id: string, PadY: number, SubmergedAtSeconds: number } } = {}
+	for _, checkpoint in checkpointsFolder:GetChildren() do
+		checkpointCount += 1
+		local pad = checkpoint:FindFirstChild("Pad")
+		if pad and pad:IsA("BasePart") then
+			local padTop = pad.Position.Y + pad.Size.Y / 2
+			lowestCheckpointY = math.min(lowestCheckpointY, padTop)
+			local neededRise = padTop - liquidTopY
+			table.insert(floodTimes, {
+				Id = checkpoint.Name,
+				PadY = padTop,
+				SubmergedAtSeconds = if neededRise > patch.LiquidRiseStuds
+					then -1
+					else patch.LiquidRiseDelaySeconds + neededRise / riseRate,
+			})
+		end
+	end
+	table.sort(floodTimes, function(left, right2)
+		return left.Id < right2.Id
+	end)
+	model:SetAttribute("CheckpointCount", checkpointCount)
+
+	local bounds = auditBounds(model, geometry, { boundaryFolder, hazardsFolder }, route, layout.BoundsRadius)
+	local attributeErrors = AttributeAudit.check(scriptables, METADATA_ALLOWLIST)
+	for _, message in AttributeAudit.check(geometry, METADATA_ALLOWLIST) do
+		table.insert(attributeErrors, message)
+	end
+	local specHash = computeSpecHash(model)
+	model:SetAttribute("SpecHash", specHash)
+
+	local report: BuildReport = {
+		Ok = #attributeErrors == 0 and #routeErrors == 0 and #bounds.Violations == 0,
+		Id = spec.Id,
+		PartCount = countParts(model),
+		BuildSeconds = os.clock() - startClock,
+		AttributeErrors = attributeErrors,
+		RouteErrors = routeErrors,
+		SpecHash = specHash,
+		RouteLength = routeLength,
+		Beats = beatMeasures,
+		Route = route,
+		Bounds = bounds,
+		CheckpointCount = checkpointCount,
+		GuideDeviation = 0,
+		GuideLength = 0,
+		HairpinFraction = 0,
+		HairpinMidFraction = 0,
+		HairpinExitFraction = 0,
+		LoopClosureStuds = 0,
+		LoopTotalTurnDegrees = 0,
+		IslandLinks = {},
+		WorstIslandSeparation = 0,
+		WorstIslandSeparationPair = "",
+		MaxLaunchReach = 0,
+		Runs = {},
+		GuardWalls = guardWalls,
+		WorstStackClearance = patch.StackedClearanceStuds,
+		WorstStackPair = "",
+		WorstCrossRunMargin = 0,
+		WorstCrossRunPair = "",
+		WalledCrossRunPairs = 0,
+		FloodTopY = floodTopY,
+		LowestCheckpointY = if lowestCheckpointY < math.huge then lowestCheckpointY else 0,
+		FloodClearance = (if lowestCheckpointY < math.huge then lowestCheckpointY else 0) - floodTopY,
+		SourceBaseParts = sourceParts,
+		Removed = removed,
+		Retained = retained,
+		GateSeals = gateSeals,
+		CheckpointFloodTimes = floodTimes,
+	}
+	return model, report
+end
+
 function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildReport)
 	local startClock = os.clock()
 	local layout = spec.Layout
 	local liquidY = layout.LiquidY
+	-- HANDOFF section 11 step 2: the seventh course is a patch of an authored course,
+	-- not a guide walked by a cursor, so it takes its own path and shares only the
+	-- audit, hash and report machinery below. Dispatching here keeps the six built
+	-- courses on byte-identical code.
+	if layout.Kind == "SourcePatch" then
+		return buildSourcePatch(spec, sources, startClock)
+	end
 	assert(
 		layout.Kind == "Serpentine"
 			or layout.Kind == "Spiral"
@@ -1085,6 +2023,10 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			or layout.Kind == "StackedSwitchback",
 		`[CourseBuilder] unknown Layout.Kind "{layout.Kind}"`
 	)
+	local lanePitch = assert(layout.LanePitch, `[CourseBuilder] a {layout.Kind} layout needs Layout.LanePitch`)
+	local cornerLayout = assert(layout.Corner, `[CourseBuilder] a {layout.Kind} layout needs Layout.Corner`)
+	local fillLayout = assert(layout.Fill, `[CourseBuilder] a {layout.Kind} layout needs Layout.Fill`)
+	local startSpec = assert(spec.Start, `[CourseBuilder] a {layout.Kind} layout needs Start`)
 	local isSpiral = layout.Kind == "Spiral"
 	local isChute = layout.Kind == "Chute"
 	local isLoop = layout.Kind == "Loop"
@@ -1114,20 +2056,20 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			)
 		)
 		assert(
-			math.abs(segments[2].Length - layout.LanePitch) < 1e-3,
+			math.abs(segments[2].Length - lanePitch) < 1e-3,
 			string.format(
 				"[CourseBuilder] the Chute's cross segment is %.2f studs but LanePitch is %.2f; the pitch IS the separation between the two runs",
 				segments[2].Length,
-				layout.LanePitch
+				lanePitch
 			)
 		)
 		local ratio = chute.MinRunToPitchRatio
 		assert(
-			segments[1].Length >= layout.LanePitch * ratio and segments[3].Length >= layout.LanePitch * ratio,
+			segments[1].Length >= lanePitch * ratio and segments[3].Length >= lanePitch * ratio,
 			string.format(
 				"[CourseBuilder] a Chute's runs must each be at least %.1f x its %.1f-stud pitch; they are %.2f and %.2f",
 				ratio,
-				layout.LanePitch,
+				lanePitch,
 				segments[1].Length,
 				segments[3].Length
 			)
@@ -1155,12 +2097,12 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		end
 		for _, index in { 2, 4 } do
 			assert(
-				math.abs(segments[index].Length - layout.LanePitch) < 1e-3,
+				math.abs(segments[index].Length - lanePitch) < 1e-3,
 				string.format(
 					"[CourseBuilder] a Loop's cross segment %d is %.2f studs but LanePitch is %.2f; the pitch IS the separation between the two runs",
 					index,
 					segments[index].Length,
-					layout.LanePitch
+					lanePitch
 				)
 			)
 		end
@@ -1200,10 +2142,10 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		-- circuit's own centre line, which for a run/cross/run guide is exactly half
 		-- the lane pitch away from it.
 		assert(
-			layout.LanePitch / 2 <= loop.SpineHalfWidth,
+			lanePitch / 2 <= loop.SpineHalfWidth,
 			string.format(
 				"[CourseBuilder] a Loop's runs sit %.2f studs off its centre line, outside the declared %.2f-stud spine (HANDOFF 5.2 wants a CENTRAL tunnel spine)",
-				layout.LanePitch / 2,
+				lanePitch / 2,
 				loop.SpineHalfWidth
 			)
 		)
@@ -1220,10 +2162,10 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			`[CourseBuilder] a StackedSwitchback guide alternates run/cross and ends on a run: an odd count of at least 5 segments, not {#segments} (HANDOFF 5.2)`
 		)
 		assert(
-			layout.LanePitch >= stacked.MinPitchStuds and layout.LanePitch <= stacked.MaxPitchStuds,
+			lanePitch >= stacked.MinPitchStuds and lanePitch <= stacked.MaxPitchStuds,
 			string.format(
 				"[CourseBuilder] a StackedSwitchback's run centrelines sit %.2f studs apart, outside the declared %.1f-%.1f band (HANDOFF 5.2 wants 30-40)",
-				layout.LanePitch,
+				lanePitch,
 				stacked.MinPitchStuds,
 				stacked.MaxPitchStuds
 			)
@@ -1266,12 +2208,12 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		end
 		for index = 2, #segments, 2 do
 			assert(
-				math.abs(segments[index].Length - layout.LanePitch) < 1e-3,
+				math.abs(segments[index].Length - lanePitch) < 1e-3,
 				string.format(
 					"[CourseBuilder] a StackedSwitchback's cross segment %d is %.2f studs but LanePitch is %.2f; the pitch IS the gap between the two stacked columns",
 					index,
 					segments[index].Length,
-					layout.LanePitch
+					lanePitch
 				)
 			)
 		end
@@ -1871,8 +2813,8 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 					not isSpiral and not isArchipelago,
 					`[CourseBuilder] {piece.Id}: a {layout.Kind} layout turns on round decks, not on Corner slabs`
 				)
-				local cornerSource = layout.Corner.Source
-				local cornerScale = layout.Corner.Scale
+				local cornerSource = cornerLayout.Source
+				local cornerScale = cornerLayout.Scale
 				local direction = assert(piece.Direction, `[CourseBuilder] {piece.Id} corner needs Direction`)
 				local along, lateral = CourseBuilder.cornerRun(cornerSource, cornerScale, direction)
 				local remaining = segments[segmentIndex].Length - along - segmentTravel
@@ -1892,14 +2834,14 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				-- vertex exactly (HANDOFF 5.1.6). One shared scale per run keeps
 				-- every filler slab a uniform scale of the source, never a stretch.
 				if remaining > 1e-3 then
-					local unit = CoursePresets.travelLength(layout.Fill.Source, layout.Fill.Scale)
+					local unit = CoursePresets.travelLength(fillLayout.Source, fillLayout.Scale)
 					local count = math.max(1, math.ceil(remaining / unit))
-					local tileScale = layout.Fill.Scale * remaining / (count * unit)
+					local tileScale = fillLayout.Scale * remaining / (count * unit)
 					for tile = 1, count do
 						local fillSpec = {
 							Id = string.format("%s_fill%d", piece.Id, tile),
 							Preset = "Fill",
-							Source = layout.Fill.Source,
+							Source = fillLayout.Source,
 							Scale = tileScale,
 						}
 						local filled = CoursePresets.buildChainPiece(context, fillSpec :: any, cursor)
@@ -2095,7 +3037,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 
 	local loopClosure = 0
 	if loop then
-		local closure = cursor.Position - spec.Start.Position
+		local closure = cursor.Position - startSpec.Position
 		loopClosure = Vector3.new(closure.X, 0, closure.Z).Magnitude
 		if loopClosure < loop.ClosureMinStuds or loopClosure > loop.ClosureMaxStuds then
 			fail(
@@ -2425,6 +3367,11 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		FloodTopY = floodTopY,
 		LowestCheckpointY = if lowestCheckpointY < math.huge then lowestCheckpointY else 0,
 		FloodClearance = floodClearance,
+		SourceBaseParts = 0,
+		Removed = {},
+		Retained = {},
+		GateSeals = {},
+		CheckpointFloodTimes = {},
 	}
 	return model, report
 end

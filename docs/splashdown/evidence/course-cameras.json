@@ -102,6 +102,52 @@
    },
    "specHash": "e164c528"
   },
+  "SummitSplash": {
+   "badMapRefComparison": "Inspected against bad-map-refs/1, 2, 9, 10 and 11. Reference 2 IS the pre-hardening Summit and is 8.6's readability bar for this course, so the comparison is a before/after rather than an avoid-this. NOT a flat sprinkled field (ref 1): the route is an eight-storey climbing arc, and the hazards are grouped into 13 walled gates instead of the even scatter ref 2 shows. No repeated narrow swing-panel bypass: there is no swing panel, and every gate is a different recipe. No lone open spinner (ref 10): every windmill and mace now stands inside a measured wall pair that closes both edge strips at its own angle. No avoidable or floating bumpers (ref 11): all five bumpers sit on the deck at a measured +0.00 and every one of them spans the route centreline at rest. WHERE IT IS STILL CLOSEST TO THE BAD REFERENCES, stated plainly: the preserved 44-stud arc deck between gates is open coloured slab with nothing on it, which is ref 10 and 11's empty-slab look. That is the same preserved geometry the NoBreatherSquare finding measures and the same geometry 7.7 forbids redesigning. Readability itself is better than ref 2: the green gate walls punctuate the lane into readable doorways, and the narrowed inward bridge reads as a real crossing instead of the 46-stud free walk in ref 2's foreground.",
+   "cameras": {
+    "three-quarter": {
+     "eye": [
+      -237.767,
+      9720.777,
+      245.686
+     ],
+     "file": "courses/SummitSplash/three-quarter.png",
+     "lookAt": [
+      -537.767,
+      9480.777,
+      -54.314
+     ]
+    },
+    "top-down": {
+     "eye": [
+      -537.767,
+      9980.777,
+      -53.314
+     ],
+     "file": "courses/SummitSplash/top-down.png",
+     "lookAt": [
+      -537.767,
+      9480.777,
+      -54.314
+     ]
+    }
+   },
+   "fieldOfView": 70,
+   "previewOrigin": [
+    -537.7670288085938,
+    9460.77734375,
+    -54.31404495239258
+   ],
+   "restoredAfterwards": {
+    "workspace.Assets.Arena.Map.Model": [
+     -537.766602,
+     519.175659,
+     -54.3143196
+    ],
+    "workspace.SplashdownPreview": "cleared; the arena itself was never moved"
+   },
+   "specHash": "dcece9ec"
+  },
   "TumbleTunnels": {
    "cameras": {
     "three-quarter": {

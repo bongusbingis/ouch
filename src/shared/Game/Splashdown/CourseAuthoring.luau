@@ -44,7 +44,10 @@ local function sources(): CourseBuilder.Sources
 	local wall = arena and arena:FindFirstChild("BoundaryWall")
 	assert(kit, "[CourseAuthoring] SplashdownAuthoringSources.Kit is missing")
 	assert(wall and wall:IsA("BasePart"), "[CourseAuthoring] ArenaSources.BoundaryWall is missing")
-	return { Kit = kit, BoundaryWall = wall :: BasePart }
+	-- The whole export root goes through as well, because HANDOFF 7.7's SourcePatch
+	-- layout patches an AUTHORED COURSE that lives beside the kit (SummitSource) and
+	-- has to be able to find it without reaching into ServerStorage itself.
+	return { Kit = kit, BoundaryWall = wall :: BasePart, AuthoringRoot = root }
 end
 
 -- Parks a named StringValue in ServerStorage, reusing one that is already there.
@@ -187,6 +190,14 @@ function CourseAuthoring.stage(ids: { string }): StageResult
 			FloodTopY = report.FloodTopY,
 			LowestCheckpointY = report.LowestCheckpointY,
 			FloodClearance = report.FloodClearance,
+			-- SourcePatch measurements (HANDOFF 7.7): what the patch inherited,
+			-- deleted and kept, every gate's measured worst unsealed strip, and when
+			-- the preserved flood reaches each preserved checkpoint pad.
+			SourceBaseParts = report.SourceBaseParts,
+			Removed = report.Removed,
+			Retained = report.Retained,
+			GateSeals = report.GateSeals,
+			CheckpointFloodTimes = report.CheckpointFloodTimes,
 			RouteSteps = #report.Route,
 		}
 		parkedValue(string.format("%s_%s_Route", REPORT_NAME, id)).Value = HttpService:JSONEncode(report.Route)

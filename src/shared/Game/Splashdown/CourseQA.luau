@@ -953,7 +953,15 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 				if not preset then
 					continue
 				end
-				if NON_GLUE_PRESETS[preset] then
+				-- Override 2's cap is worded "at most three of THE SIX NEW COURSES",
+				-- and the seventh course is not one of them: Summit Splash is the
+				-- authored course HANDOFF 0.6 keeps and 7.7 patches, and 7.7.4 itself
+				-- instructs it to add two seesaw boards and one fan on top of a set
+				-- that already stands at three courses for both. Scoped structurally
+				-- rather than by name: a SourcePatch layout IS the retained
+				-- source-plus-patch course. Rules 1 and 3 still score it in full.
+				local countsTowardCap = (spec.Layout == nil or spec.Layout.Kind ~= "SourcePatch")
+				if NON_GLUE_PRESETS[preset] and countsTowardCap then
 					presetCourses[preset] = presetCourses[preset] or {}
 					presetCourses[preset][id] = true
 				end
@@ -1057,7 +1065,11 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 		expect(
 			string.format("NonGlueCap<=3:%s", preset),
 			#users <= 3,
-			string.format("used by %d courses: %s", #users, table.concat(users, ", "))
+			string.format(
+				"used by %d of the new courses: %s (scored over the NEW courses only; a SourcePatch course is the retained one override 2's wording excludes)",
+				#users,
+				table.concat(users, ", ")
+			)
 		)
 	end
 
@@ -1092,7 +1104,12 @@ function CourseQA.auditCoverage(model: Model, cells: { SurfaceCell }): ({ Findin
 	local exempt: { BasePart } = {}
 	local geometry = model:FindFirstChild("Geometry")
 	for _, child in (geometry and geometry:GetChildren() or {}) do
-		if child:IsA("BasePart") and (child.Name:find("startplaza") or child.Name:find("finishplaza")) then
+		-- Matched on "plaza" rather than on the builder's own "startplaza"/"finishplaza"
+		-- names, because the SEVENTH course's start and finish plaza is the authored
+		-- one and is called sd_plaza.001. 8.4 exempts "start and finish" whoever built
+		-- them; the built courses' names both still contain "plaza", so nothing about
+		-- their results changes.
+		if child:IsA("BasePart") and child.Name:find("plaza") then
 			table.insert(exempt, child)
 		end
 	end
