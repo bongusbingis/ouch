@@ -56,6 +56,7 @@ local phaseEndsAt = 0
 local phaseGeneration = 0
 local raceStartedAt = 0
 local lavaRiseStartsAt = 0
+local RisingLiquid = require(ReplicatedStorage.Shared.Game.MapFeatures.RisingLiquid)
 local holds: { [Model]: Hold } = {}
 local pendingRespawns: { [Player]: Pending } = {}
 local respawnGeneration = 0
@@ -293,8 +294,7 @@ local function stepLava(now: number)
 		return
 	end
 	local rise = course.lavaRise
-	local progress = math.clamp((now - lavaRiseStartsAt) / rise.seconds, 0, 1)
-	local target = course.lavaBase + Vector3.new(0, rise.studs * progress, 0)
+	local target = course.lavaBase + Vector3.new(0, RisingLiquid.heightAt(now - lavaRiseStartsAt, rise), 0)
 	if (course.lava.CFrame.Position - target.Position).Magnitude > 1e-3 then
 		course.lava.CFrame = target
 	end
