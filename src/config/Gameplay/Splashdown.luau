@@ -47,6 +47,7 @@ return {
 		"WhirlpoolWaltz",
 		"DoorDash",
 		"TumbleTunnels",
+		"TiptoeTrials",
 	},
 	Courses = {
 		BallBarrage = {
@@ -76,6 +77,13 @@ return {
 		},
 		TumbleTunnels = {
 			DisplayName = "TUMBLE TUNNELS",
+			Difficulty = 3,
+			ParSeconds = 75,
+			CapSeconds = 180,
+			CloseWindowSeconds = 60,
+		},
+		TiptoeTrials = {
+			DisplayName = "TIPTOE TRIALS",
 			Difficulty = 3,
 			ParSeconds = 75,
 			CapSeconds = 180,

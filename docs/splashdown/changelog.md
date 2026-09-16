@@ -283,3 +283,78 @@
   change that put `TumbleTunnels` into `CourseOrder`; the template is promoted and
   `ReplicatedStorage.Assets.Maps.Splashdown` again matches `CourseOrder` exactly. Headless suite:
   984 tests, zero failures.
+
+## 2026-09-16 — Section 11 / Tiptoe Trials
+
+- Built `TiptoeTrials` from `src/shared/Game/Splashdown/CourseSpecs/TiptoeTrials.luau`, documented in
+  `docs/splashdown/courses/tiptoe-trials.md`, evidenced in
+  `docs/splashdown/evidence/courses/TiptoeTrials/{build,qa}.json` and two fixed-camera captures.
+  **Spec hash `0f8e9510`, 160 BaseParts, 880.406 measured studs of route** against the 880 set-wide
+  target, five ordered checkpoints, beats 0.929-1.106 of their scaled section 7.5 targets, elevation
+  +12/-6/+6/+12/0/-6 matching section 7.5 exactly, zero attribute errors, zero route errors, zero
+  bounds violations, identical hashes and part counts across a double build.
+- `CourseQA.check` returns **zero errors and ZERO WARNINGS** (Status BLOCKED only because ten
+  live-playtest items are outstanding): 45 findings PASS, 10 NOT RUN with reasons. All six gate cut
+  sets hold (0 of 30 spawn cells bypass any gate) over a 14,680-node / 1,309,689-edge graph from
+  16,171 sampled surface cells, all twelve cross-course checks pass over the five staged specs, and
+  the largest flat square is 23 x 23. Studio TestEZ: **17 passed, 0 failed, 0 skipped.**
+- New in the builder: **`Layout.Kind = "Archipelago"`**, the first layout with no guide polyline at
+  all. An archipelago's guide IS its island list: each island declares a polar anchor the route must
+  arrive at, and the builder enforces six invariants — at least five islands entered once each in
+  order, strictly monotone anchor radii from perimeter to centre, every island after the first
+  entered by a measured launch or tile-group crossing, every island beginning on a round landing
+  deck, every heading change on such a deck within `MaxTurnDegrees`, and non-consecutive islands
+  separated by more than the worst launch the course can produce. New `Island` piece kind; `Ride`
+  extended to turn on a declared `TurnDegrees` outside a Spiral; `RouteStep` gained `Island` and a
+  MEASURED `HalfWidth` (the oriented support width of every part the piece placed, projected onto the
+  route's right vector), which is what the separation audit subtracts instead of a declared budget.
+- **Reaches are derived, never declared.** The spec states HANDOFF 3.2's measured constants (gravity
+  120, WalkSpeed 26, JumpHeight 10) and the builder solves the ballistic problem for each crossing's
+  own rise, calibrated by the measured 22-stud flat gap against the model's own 21.23 prediction. A
+  crossing an ordinary jump could make is rejected as a decorative launch; one past the tool's reach
+  is rejected as unreachable. Measured: worst launch reach 38.89 studs, worst non-consecutive island
+  separation 53.02 studs.
+- **`CourseQA.buildGraph` now models launch edges (HANDOFF 8.2.5), for every course.** It previously
+  built only Walk and ordinary Jump edges, so this course's 26- and 27.5-stud pad launches did not
+  exist in the graph and the first audit reported the Checkpoint05-to-Finish leg unreachable. The
+  audit now reads each launch tool off the BUILT model — its own LaunchSpeed, FloatFactor and
+  measured footprint — recomputes the reach for every candidate landing height, and adds Launch edges
+  about the tool's own axis; a horizontal ball-pushing fan is excluded and reported by name.
+  `ENCOUNTER_TYPES` also gained `FallingTile`, without which the variety audit scored this course at
+  11 encounters and five types instead of the 16 and six section 7.5 specifies.
+- **Falling tiles are verified at the kit, not in a preview.** A new regression in
+  `places/arena/tests/Assets/SplashdownQA.spec.luau` drives the real `FallingTiles` kit over the
+  built model: it asserts every tile is authored anchored and colliding with `CriticalRoute`, a
+  positive `RespawnSeconds`, a numeric `DropDelaySeconds` and no competing motion owner, sitting
+  under `Rotating/<group>/Assembly` at the depth `FeatureParts.collect` scans; then it registers the
+  tiles, arms one through the kit's own downward support raycast, confirms the tile is still solid
+  halfway through its countdown, loses collision/query/visibility when it expires, and comes back
+  after `RespawnSeconds`. Third kit given this treatment after doors and beach balls.
+- Measurement that the build forced, all in the course document: obstacle_11's plank clears its own
+  fulcrum bar only within 4.253 * scale studs of the axle, so it stands on a single 1.69-stud-thick
+  door panel instead of a platform plinth; both hammers are axle housings with their heads suspended
+  beneath them, so mounting them on the deck the way the pilot does puts the head entirely below the
+  lane, and they hang instead under HANDOFF 8.3's suspended-pendulum exemption; the beat 01 fan
+  stands IN the water seven studs past the shore, because mounted on the deck its 6.19-stud column
+  would fire the launch before the island's edge and the flight would need 26.69 studs of reach
+  against the 22.96 it makes.
+- `AssetManifest` is version 5 with three measured sources added: `color_box_001..008` (one mesh in
+  eight colours, all three sampled variants returning identical extents), `trampoline_5_001` with its
+  real `trampoline_6_001` inner child, and `obstacle_11_001` with measured fulcrum and plank roles.
+  `CoursePresets` gained the `FallingTile` preset, generalised its `Seesaw` branch to the manifest's
+  declared board sub-part so it drives both board forms, and now resolves a sub-part by its whole
+  declared name before splitting on dots — obstacle_11's plank is literally called
+  "obstacle_9_001.001" and the old split would have cloned the unrelated top-level conveyor in.
+- **Its scripted trials were NOT COMPLETED**, per the user's standing 2026-09-16 decision that this
+  category is reported plainly and not chased. No trial numbers are claimed. The two bounded guards
+  HANDOFF 1.4 recommended were applied to `run-course-routes.server.luau` and are UNEXERCISED: the
+  engine rig is now fetched once and cloned for later trials instead of one
+  `CreateHumanoidModelFromDescription` web call per trial, and the pass has a 2,400-second wall clock
+  of its own that stops it starting new trials and reports `abandonedTrials` rather than hanging.
+  The interactive keyboard run, the deliberate missed-timing contacts and the checkpoint-recovery run
+  are outstanding for this course exactly as they are for the other four.
+- Added `src/config/Gameplay/Splashdown.luau`'s `Courses.TiptoeTrials` entry and
+  `src/config/Interface/SplashdownIntro.luau`'s `Intro.Courses.TiptoeTrials` entry in the same change
+  that put `TiptoeTrials` into `CourseOrder`; the template is promoted and
+  `ReplicatedStorage.Assets.Maps.Splashdown` again matches `CourseOrder` exactly. Headless suite:
+  984 tests, zero failures.

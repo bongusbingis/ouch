@@ -9,6 +9,18 @@ local CourseGraph = require(script.Parent.CourseGraph)
 
 local CourseQA = {}
 
+-- MapFeatures is loaded lazily on purpose. The pure parts of this module -- the
+-- variety and cross-course audits -- run in the headless Lune suite, which has no
+-- DataModel at all; only the launch-envelope scan needs the kit's attribute names,
+-- and that only ever runs against a real built model in Studio.
+local configCache: any = nil
+local function mapFeatures(): any
+	if configCache == nil then
+		configCache = require(game:GetService("ReplicatedStorage").Config.Gameplay.MapFeatures)
+	end
+	return configCache
+end
+
 export type Calibration = {
 	-- docs/splashdown/evidence/movement-final.json: 22-stud flat gap succeeds and
 	-- 22.25 fails; an 11.5-stud ledge succeeds and 11.75 fails. HANDOFF 3.2.
@@ -175,7 +187,95 @@ end
 -- 8.2.3-8.2.5: nodes are real support cells; walk edges need a climbable measured
 -- step, jump edges need the measured 22-stud/11.5-step envelope. Ballistic
 -- clearance is sampled along the arc rather than assumed from Euclidean distance.
-function CourseQA.buildGraph(cells: { SurfaceCell }, calibration: Calibration): CourseGraph.Graph
+-- 8.2.5: "Launch edges use individually measured fan/pad/ball trajectories and
+-- maximum reachable envelope." A launch tool is read off the BUILT model rather
+-- than off the spec: its own LaunchSpeed and FloatFactor attributes are what the
+-- runtime kit will use, and its measured footprint is the volume that triggers it.
+export type LaunchSource = {
+	Id: string,
+	Origin: Vector3,
+	TriggerRadius: number,
+	LaunchSpeed: number,
+	FloatFactor: number,
+}
+
+-- Horizontal reach of a launch that leaves at `speed` straight up against
+-- `gravity * (1 - float)` while the runner keeps steering at WalkSpeed, landing
+-- `rise` studs above the tool. The later root is the descending crossing; a negative
+-- discriminant means that landing is simply unreachable. Calibrated the same way the
+-- ordinary jump is: HANDOFF 3.2's measured 22-stud flat gap against this model's own
+-- 21.23-stud prediction for an ordinary jump.
+local function launchReach(calibration: Calibration, speed: number, float: number, rise: number): number
+	local gravity = calibration.Gravity * (1 - float)
+	local discriminant = speed * speed - 2 * gravity * rise
+	if discriminant < 0 then
+		return -1
+	end
+	local jumpVelocity = math.sqrt(2 * calibration.Gravity * calibration.JumpHeight)
+	local bodyStuds = calibration.MaxGapStuds - calibration.WalkSpeed * (2 * jumpVelocity / calibration.Gravity)
+	return calibration.WalkSpeed * (speed + math.sqrt(discriminant)) / gravity + bodyStuds
+end
+
+function CourseQA.launchSources(model: Model): ({ LaunchSource }, { string })
+	local Config = mapFeatures()
+	local sources: { LaunchSource } = {}
+	local skipped: { string } = {}
+	local scriptables = model:FindFirstChild("Scriptables")
+
+	local pads = scriptables and scriptables:FindFirstChild("JumpPads")
+	for _, pad in (pads and pads:GetChildren() or {}) do
+		local outer = pad:FindFirstChild("Outer")
+		if pad:GetAttribute(Config.Attributes.JumpPad) == true and outer and outer:IsA("BasePart") then
+			table.insert(sources, {
+				Id = pad.Name,
+				Origin = outer.Position + Vector3.new(0, outer.Size.Y / 2, 0),
+				TriggerRadius = math.max(outer.Size.X, outer.Size.Z) / 2,
+				LaunchSpeed = tonumber(pad:GetAttribute(Config.Attributes.LaunchSpeed)) or Config.JumpPad.BouncePower,
+				FloatFactor = tonumber(pad:GetAttribute(Config.Attributes.FloatFactor)) or Config.JumpPad.FloatFactor,
+			})
+		end
+	end
+
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part:GetAttribute(Config.Attributes.Fan) == true then
+			local axisName = part:GetAttribute(Config.Attributes.FanAxis)
+			local localAxis = if axisName == "X"
+				then Vector3.xAxis
+				elseif axisName == "Z" then Vector3.zAxis
+				else Vector3.yAxis
+			local direction = part.CFrame:VectorToWorldSpace(localAxis)
+				* (tonumber(part:GetAttribute(Config.Attributes.FanDirection)) or 1)
+			-- A horizontal fan pushes balls down a corridor; it is not a ballistic
+			-- launcher and this envelope does not describe it. It is reported rather
+			-- than silently ignored.
+			if direction.Y < 0.7 then
+				table.insert(
+					skipped,
+					string.format("%s is a %.2f-Y fan, not a ballistic launcher", part.Name, direction.Y)
+				)
+				continue
+			end
+			local half = part.Size:Dot(localAxis) / 2
+			table.insert(sources, {
+				Id = part.Name,
+				Origin = part.Position + direction * half,
+				TriggerRadius = (if axisName == "X"
+					then math.min(part.Size.Y, part.Size.Z)
+					elseif axisName == "Z" then math.min(part.Size.X, part.Size.Y)
+					else math.min(part.Size.X, part.Size.Z)) / 2 * Config.Fan.RadiusScale,
+				LaunchSpeed = tonumber(part:GetAttribute(Config.Attributes.LaunchSpeed)) or Config.Fan.LaunchSpeed,
+				FloatFactor = tonumber(part:GetAttribute(Config.Attributes.FloatFactor)) or Config.Fan.FloatFactor,
+			})
+		end
+	end
+	return sources, skipped
+end
+
+function CourseQA.buildGraph(
+	cells: { SurfaceCell },
+	calibration: Calibration,
+	launches: { LaunchSource }?
+): CourseGraph.Graph
 	local graph = CourseGraph.new()
 	local standable: { SurfaceCell } = {}
 	for _, cell in cells do
@@ -267,6 +367,50 @@ function CourseQA.buildGraph(cells: { SurfaceCell }, calibration: Calibration): 
 		if processed % 200 == 0 then
 			task.wait()
 		end
+	end
+
+	-- 8.2.5's launch edges. A runner is launched from the tool, not from the cell they
+	-- left, so the envelope is measured about the tool's own axis and widened by its
+	-- trigger radius: that is where a pad's jumper or a fan's column can actually
+	-- release them. The reach is recomputed for every candidate landing height, so a
+	-- launch that would have to climb further than its own apex simply has no edge.
+	for _, launch in launches or {} do
+		local entry: { SurfaceCell } = {}
+		local triggerSquared = launch.TriggerRadius * launch.TriggerRadius
+		local entrySquared = (launch.TriggerRadius + calibration.MaxGapStuds) ^ 2
+		local best = launchReach(calibration, launch.LaunchSpeed, launch.FloatFactor, -60) + launch.TriggerRadius
+		local bestSquared = best * best
+		local candidates: { SurfaceCell } = {}
+		for _, cell in standable do
+			local dx = cell.Position.X - launch.Origin.X
+			local dz = cell.Position.Z - launch.Origin.Z
+			local flatSquared = dx * dx + dz * dz
+			if flatSquared <= entrySquared and math.abs(cell.Position.Y - launch.Origin.Y) <= 8 then
+				table.insert(entry, cell)
+			end
+			if flatSquared > triggerSquared and flatSquared <= bestSquared then
+				table.insert(candidates, cell)
+			end
+		end
+		for _, target in candidates do
+			local dx = target.Position.X - launch.Origin.X
+			local dz = target.Position.Z - launch.Origin.Z
+			local flightReach =
+				launchReach(calibration, launch.LaunchSpeed, launch.FloatFactor, target.Position.Y - launch.Origin.Y)
+			if flightReach < 0 then
+				continue
+			end
+			local envelope = flightReach + launch.TriggerRadius
+			if dx * dx + dz * dz > envelope * envelope then
+				continue
+			end
+			for _, source in entry do
+				if source.Key ~= target.Key then
+					CourseGraph.addEdge(graph, { From = source.Key, To = target.Key, Kind = "Launch" })
+				end
+			end
+		end
+		task.wait()
 	end
 	return graph
 end
@@ -554,6 +698,11 @@ local ENCOUNTER_TYPES: { [string]: string } = {
 	-- ball ("BeachBall: each ball"), exactly as section 7's counting rule lists them.
 	Seesaw = "Seesaw",
 	BeachBall = "BeachBall",
+	-- Section 7's counting rule scores a falling tile group, not a tile: "FallingTile
+	-- (each tile group between two stable landings)". Each tile is still a piece and is
+	-- still reported per instance; the group shares one EncounterGroup, which is what
+	-- collapses it to a single encounter.
+	FallingTile = "FallingTile",
 	-- Deliberately absent, because they are support geometry and never an
 	-- encounter: Platform, Ramp, Slide, Corner, Fill, Prop and RoundLanding.
 }
@@ -1143,7 +1292,33 @@ function CourseQA.check(model: Model, spec: any, calibration: Calibration?, cont
 
 	local cells = CourseQA.sampleSurfaces(model, cal)
 	counts.SurfaceCells = #cells
-	local graph = CourseQA.buildGraph(cells, cal)
+	local launches, skippedLaunches = CourseQA.launchSources(model)
+	counts.LaunchSources = #launches
+	local graph = CourseQA.buildGraph(cells, cal, launches)
+	local launchDetail = {}
+	for _, launch in launches do
+		table.insert(
+			launchDetail,
+			string.format(
+				"%s reaches %.2f studs level (%.1f/%.2f, trigger radius %.2f)",
+				launch.Id,
+				launchReach(cal, launch.LaunchSpeed, launch.FloatFactor, 0),
+				launch.LaunchSpeed,
+				launch.FloatFactor,
+				launch.TriggerRadius
+			)
+		)
+	end
+	for _, message in skippedLaunches do
+		table.insert(launchDetail, "excluded: " .. message)
+	end
+	table.insert(findings, {
+		Check = "LaunchEnvelopes",
+		Status = if #launches > 0 then "PASS" else "NOT RUN",
+		Detail = if #launches > 0
+			then table.concat(launchDetail, "; ")
+			else "this course places no ballistic launch tool",
+	})
 	local nodeCount = 0
 	for _ in graph.Nodes do
 		nodeCount += 1

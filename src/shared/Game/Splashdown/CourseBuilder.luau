@@ -45,7 +45,11 @@ export type PieceSpec = {
 	-- WITHOUT advancing it: the side tiles that widen a lane into a door-row
 	-- corridor, and visible stock enclosure. It is listed before the Chain piece
 	-- it sits beside, so both share the same entry line.
-	Kind: "Chain" | "Corner" | "Mount" | "Advance" | "Ride" | "Flank",
+	-- "Island" is an Archipelago layout's only way between two islands: it moves the
+	-- cursor onto the declared anchor of the next island, keeping the heading it
+	-- arrived with, and the distance it crossed is MEASURED and classified as the
+	-- beat's launch or its tile group -- never assumed.
+	Kind: "Chain" | "Corner" | "Mount" | "Advance" | "Ride" | "Flank" | "Island",
 	Preset: CoursePresets.PresetName?,
 	Source: string?,
 	Scale: number?,
@@ -92,6 +96,18 @@ export type PieceSpec = {
 	WindupSeconds: number?,
 	StrikeSeconds: number?,
 	FanBallSpeed: number?,
+	DropDelaySeconds: number?,
+	RespawnSeconds: number?,
+	-- Island pieces only: which declared island this arrival lands on, and what the
+	-- beat uses to get there. HANDOFF 5.2 allows exactly two links between
+	-- consecutive islands -- "the beat's launch or tile group" -- so a third kind of
+	-- crossing cannot be spelled at all. "Start" is the first island, walked onto
+	-- from the start plaza.
+	Island: number?,
+	Link: ("Start" | "Launch" | "Tiles")?,
+	-- Ride pieces only, on an Archipelago: the heading change the route makes across
+	-- this round deck. A Spiral reads the same turn off its parametric guide.
+	TurnDegrees: number?,
 }
 
 export type BeatSpec = {
@@ -166,6 +182,56 @@ export type LoopSpec = {
 	ReturnTunnelPieceId: string,
 }
 
+-- HANDOFF 5.2's Archipelago: "Islands placed radially around the origin; start at
+-- the perimeter and finish at the centre island (or the reverse if the measured
+-- launch envelopes fit better); consecutive islands are linked only by the beat's
+-- launch or tile group; non-consecutive islands are separated by more than the
+-- maximum measured launch reach."
+--
+-- There is no polyline guide, because an archipelago's guide IS its island list:
+-- every island declares its own polar anchor, and the route is required to arrive
+-- exactly there. That is a strictly stronger statement than "stay under a
+-- polyline's length", which is why an Archipelago does not cap segment travel the
+-- way a Serpentine or a Spiral does. The enforced invariants are:
+--   1. at least five islands, entered once each in declared order;
+--   2. anchor radii strictly monotone, from PerimeterRadius out at the start to
+--      CentreRadius in at the finish (or the reverse);
+--   3. every island after the first is entered by a measured crossing that is
+--      either a LAUNCH (longer than the measured ordinary jump, no longer than the
+--      measured launch reach, and preceded by this beat's own fan or pad) or a TILE
+--      GROUP (a flush arrival at the far end of at least two chained falling tiles);
+--   4. every island after the first begins on a round landing deck, because a round
+--      deck is what absorbs a heading change without a wedge seam;
+--   5. every heading change happens on such a deck and is no larger than
+--      MaxTurnDegrees; and
+--   6. the route on any two NON-consecutive islands stays further apart than the
+--      measured launch reach, measured polyline to polyline and reduced by both
+--      islands' half-widths -- so no launch anywhere can skip the chain.
+export type ArchipelagoIsland = {
+	Id: string,
+	AngleDegrees: number,
+	Radius: number,
+	Y: number,
+}
+
+export type ArchipelagoSpec = {
+	Islands: { ArchipelagoIsland },
+	-- The measured movement constants from HANDOFF 3.2, so every reach in this
+	-- layout is DERIVED from them rather than declared per crossing: gravity 120,
+	-- WalkSpeed 26, JumpHeight 10 with UseJumpPower=false. JumpReachCalibration is
+	-- the measured 22-stud flat gap minus this model's own flat prediction, which is
+	-- the avatar's body extent; it is added to every reach.
+	Gravity: number,
+	WalkSpeed: number,
+	JumpHeight: number,
+	JumpReachCalibration: number,
+	MaxTurnDegrees: number,
+	-- How far a launch's flight may point away from the heading it took off on.
+	MaxFlightDeviationDegrees: number,
+	PerimeterRadius: number,
+	CentreRadius: number,
+}
+
 export type LayoutSpec = {
 	Kind: string,
 	LanePitch: number,
@@ -179,6 +245,7 @@ export type LayoutSpec = {
 	Spiral: SpiralSpec?,
 	Chute: ChuteSpec?,
 	Loop: LoopSpec?,
+	Archipelago: ArchipelagoSpec?,
 	-- Spiral only: how far a chained run may drift from the parametric guide
 	-- before the build fails. A straight slab chord always sits slightly outside
 	-- the arc it approximates; this is the measured budget for that, not licence
@@ -220,6 +287,17 @@ export type RouteStep = {
 	Segment: number,
 	SegmentTravel: number,
 	ArcLength: number,
+	-- Archipelago only: which island this step stands on. Zero means the step is part
+	-- of a LINK between two islands -- a tile group bridging open water -- and is
+	-- therefore excluded from the island separation audit, which is about the islands
+	-- themselves.
+	Island: number,
+	-- The piece's MEASURED lateral half-extent about the route line: the oriented
+	-- support width of every part it placed, projected onto the route's own right
+	-- vector. The island separation audit subtracts this rather than a declared
+	-- budget, so "these islands are 45 studs apart" is a statement about real
+	-- geometry.
+	HalfWidth: number,
 }
 
 export type BeatMeasure = {
@@ -272,6 +350,23 @@ export type BuildReport = {
 	-- other layout.
 	LoopClosureStuds: number,
 	LoopTotalTurnDegrees: number,
+	-- Archipelago only. Every measured island crossing, and the worst measured
+	-- separation between two non-consecutive islands. Empty/zero elsewhere.
+	IslandLinks: {
+		{
+			Island: number,
+			Link: string,
+			GapStuds: number,
+			RiseStuds: number,
+			FlightDeviationDegrees: number,
+		}
+	},
+	WorstIslandSeparation: number,
+	WorstIslandSeparationPair: string,
+	-- The worst horizontal reach any launch tool this course places can achieve over
+	-- the largest drop between any two of its islands: the number the separation rule
+	-- is scored against, derived rather than declared.
+	MaxLaunchReach: number,
 }
 
 local function forward(headingDegrees: number): Vector3
@@ -640,6 +735,105 @@ local function headingOf(direction: Vector3): number
 	return math.deg(math.atan2(-direction.X, -direction.Z))
 end
 
+-- Shortest horizontal distance from a point to a segment, and between two
+-- segments. Used only by the Archipelago separation audit, where "how far apart are
+-- these two islands" has to mean the closest approach of the route on each of them,
+-- not the distance between two chosen anchors.
+local function pointToSegment(point: Vector3, a: Vector3, b: Vector3): number
+	local ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+	local ap = Vector3.new(point.X - a.X, 0, point.Z - a.Z)
+	local lengthSquared = ab:Dot(ab)
+	local t = if lengthSquared > 1e-9 then math.clamp(ap:Dot(ab) / lengthSquared, 0, 1) else 0
+	return (ap - ab * t).Magnitude
+end
+
+local function segmentDistance(a1: Vector3, a2: Vector3, b1: Vector3, b2: Vector3): number
+	return math.min(
+		pointToSegment(a1, b1, b2),
+		pointToSegment(a2, b1, b2),
+		pointToSegment(b1, a1, a2),
+		pointToSegment(b2, a1, a2)
+	)
+end
+
+-- Horizontal reach of a ballistic hop that leaves at `launchSpeed` straight up,
+-- falls under `gravity` (reduced by a kit float factor), steers at `walkSpeed` for
+-- the whole flight, and has to land `rise` studs above its takeoff. It is the
+-- LATER root of rise = v*t - g*t^2/2, because that is the descending crossing; a
+-- negative discriminant means the landing is simply out of reach. HANDOFF 3.2's
+-- measured numbers feed it, and the measured 22-stud flat gap calibrates it: the
+-- model predicts 21.23 for an ordinary jump, so the difference is the avatar's own
+-- body extent and is added back.
+local function ballisticReach(
+	launchSpeed: number,
+	gravity: number,
+	walkSpeed: number,
+	rise: number,
+	calibration: number
+): number
+	local discriminant = launchSpeed * launchSpeed - 2 * gravity * rise
+	if discriminant < 0 then
+		return 0
+	end
+	local seconds = (launchSpeed + math.sqrt(discriminant)) / gravity
+	return walkSpeed * seconds + calibration
+end
+
+local function jumpReach(archipelago: ArchipelagoSpec, rise: number): number
+	local velocity = math.sqrt(2 * archipelago.Gravity * archipelago.JumpHeight)
+	return ballisticReach(velocity, archipelago.Gravity, archipelago.WalkSpeed, rise, archipelago.JumpReachCalibration)
+end
+
+local function launchReach(archipelago: ArchipelagoSpec, rise: number, speed: number, floatFactor: number): number
+	return ballisticReach(
+		speed,
+		archipelago.Gravity * (1 - floatFactor),
+		archipelago.WalkSpeed,
+		rise,
+		archipelago.JumpReachCalibration
+	)
+end
+
+local function islandAnchor(island: ArchipelagoIsland): Vector3
+	local radians = math.rad(island.AngleDegrees)
+	return Vector3.new(island.Radius * math.cos(radians), island.Y, island.Radius * math.sin(radians))
+end
+
+-- How far a placed piece really reaches sideways from the route line, measured as
+-- the oriented-bounding-box support width of each of its parts along the route's own
+-- right vector, plus that part's own sideways offset. This is the standard OBB
+-- support function, so a slab rotated against the route is measured at its true
+-- extent rather than at half of one named dimension.
+local function lateralHalfWidth(model: Instance, origin: Vector3, yaw: number): number
+	local side = right(yaw)
+	local widest = 0
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			local frame = descendant.CFrame
+			local size = descendant.Size
+			local support = 0.5
+				* (
+					math.abs(size.X * frame.RightVector:Dot(side))
+					+ math.abs(size.Y * frame.UpVector:Dot(side))
+					+ math.abs(size.Z * frame.LookVector:Dot(side))
+				)
+			widest = math.max(widest, math.abs((descendant.Position - origin):Dot(side)) + support)
+		end
+	end
+	if model:IsA("BasePart") then
+		local frame = (model :: BasePart).CFrame
+		local size = (model :: BasePart).Size
+		local support = 0.5
+			* (
+				math.abs(size.X * frame.RightVector:Dot(side))
+				+ math.abs(size.Y * frame.UpVector:Dot(side))
+				+ math.abs(size.Z * frame.LookVector:Dot(side))
+			)
+		widest = math.max(widest, math.abs(((model :: BasePart).Position - origin):Dot(side)) + support)
+	end
+	return widest
+end
+
 local function buildSpiralGuide(spiral: SpiralSpec): GuideCurve
 	local samples = math.max(16, math.floor(spiral.Samples))
 	local points: { Vector3 } = {}
@@ -708,16 +902,21 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local layout = spec.Layout
 	local liquidY = layout.LiquidY
 	assert(
-		layout.Kind == "Serpentine" or layout.Kind == "Spiral" or layout.Kind == "Chute" or layout.Kind == "Loop",
+		layout.Kind == "Serpentine"
+			or layout.Kind == "Spiral"
+			or layout.Kind == "Chute"
+			or layout.Kind == "Loop"
+			or layout.Kind == "Archipelago",
 		`[CourseBuilder] unknown Layout.Kind "{layout.Kind}"`
 	)
 	local isSpiral = layout.Kind == "Spiral"
 	local isChute = layout.Kind == "Chute"
 	local isLoop = layout.Kind == "Loop"
+	local isArchipelago = layout.Kind == "Archipelago"
 	local curve: GuideCurve? = if isSpiral
 		then buildSpiralGuide(assert(layout.Spiral, "[CourseBuilder] a Spiral layout needs Layout.Spiral"))
 		else nil
-	local segments = if isSpiral
+	local segments = if isSpiral or isArchipelago
 		then {} :: { Segment }
 		else buildSegments(assert(layout.Guide, `[CourseBuilder] a {layout.Kind} layout needs Layout.Guide`))
 	local guideTolerance = layout.GuideTolerance or 12
@@ -832,6 +1031,73 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			)
 		)
 	end
+	local archipelago = if isArchipelago
+		then assert(layout.Archipelago, "[CourseBuilder] an Archipelago layout needs Layout.Archipelago")
+		else nil
+	local islandLinks: { { Island: number, Link: string, GapStuds: number, RiseStuds: number, FlightDeviationDegrees: number } } =
+		{}
+	local islandPolylines: { { { Position: Vector3, HalfWidth: number } } } = {}
+	local currentIsland = 0
+	local tilesSinceIsland = 0
+	local launchToolsSinceIsland = 0
+	local landingDeckDue = false
+	local lastLaunchSpeed = 0
+	local lastLaunchFloat = 0
+	-- The worst launch reach this course can produce anywhere, derived from the
+	-- launch tools it actually places and the largest drop between any two of its
+	-- islands. This is the "maximum measured launch reach" HANDOFF 5.2's separation
+	-- rule is written against, so it is computed rather than declared.
+	local worstDrop = 0
+	local maxLaunchReach = 0
+	if archipelago then
+		for _, left in archipelago.Islands do
+			for _, rightIsland in archipelago.Islands do
+				worstDrop = math.min(worstDrop, rightIsland.Y - left.Y)
+			end
+		end
+	end
+	if archipelago then
+		local islands = archipelago.Islands
+		assert(
+			#islands >= 5,
+			`[CourseBuilder] an Archipelago needs at least five islands, not {#islands} (HANDOFF 5.2)`
+		)
+		local inward = islands[#islands].Radius < islands[1].Radius
+		for index = 2, #islands do
+			local previous, island = islands[index - 1], islands[index]
+			assert(
+				(inward and island.Radius < previous.Radius) or (not inward and island.Radius > previous.Radius),
+				string.format(
+					"[CourseBuilder] Archipelago island radii must run monotonically from the perimeter to the centre; %s sits at %.2f against %s's %.2f (HANDOFF 5.2)",
+					island.Id,
+					island.Radius,
+					previous.Id,
+					previous.Radius
+				)
+			)
+		end
+		local outer = if inward then islands[1] else islands[#islands]
+		local inner = if inward then islands[#islands] else islands[1]
+		assert(
+			outer.Radius >= archipelago.PerimeterRadius,
+			string.format(
+				"[CourseBuilder] the Archipelago's outer island sits at radius %.2f, inside its declared %.2f perimeter",
+				outer.Radius,
+				archipelago.PerimeterRadius
+			)
+		)
+		assert(
+			inner.Radius <= archipelago.CentreRadius,
+			string.format(
+				"[CourseBuilder] the Archipelago's inner island sits at radius %.2f, outside its declared %.2f centre",
+				inner.Radius,
+				archipelago.CentreRadius
+			)
+		)
+		for _ in islands do
+			table.insert(islandPolylines, {})
+		end
+	end
 	local hairpinEnterLength = 0
 	local hairpinExitLength = 0
 
@@ -882,8 +1148,12 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	-- offset is already travel along segment 1 (Serpentine) or arclength along
 	-- the parametric curve (Spiral).
 	local segmentIndex = 1
-	local guideStart = if curve
-		then (curve :: GuideCurve).Points[1]
+	-- An Archipelago has no polyline: its first island's own Island piece measures
+	-- the walk off the start plaza, so the route's arclength starts at zero and the
+	-- plaza-to-shore distance is counted there rather than assumed here.
+	local guideStart = if isArchipelago
+		then cursor.Position
+		elseif curve then (curve :: GuideCurve).Points[1]
 		else (assert(layout.Guide, "[CourseBuilder] a Serpentine layout needs Layout.Guide"))[1]
 	-- Guide travel is horizontal arclength, so the start plaza's own height above
 	-- the guide plane must not count towards it. Ball Barrage starts at Y 0 on a
@@ -905,7 +1175,14 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local function advanceTravel(beatId: string, pieceId: string, distance: number)
 		segmentTravel += distance
 		routeLength += distance
-		local cap = if curve then (curve :: GuideCurve).Length else segments[segmentIndex].Length
+		-- An Archipelago is bounded by its declared island anchors instead: every
+		-- island states where it is in polar coordinates and the route has to arrive
+		-- exactly there, which constrains the route far more tightly than a length cap
+		-- along a polyline would.
+		local cap = if isArchipelago
+			then math.huge
+			elseif curve then (curve :: GuideCurve).Length
+			else segments[segmentIndex].Length
 		if segmentTravel > cap + 1e-3 then
 			fail(
 				string.format(
@@ -963,8 +1240,20 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		}
 	end
 
-	local function record(beatId: string, pieceId: string, kind: string, arcLength: number)
-		table.insert(route, {
+	-- `spine` marks the pieces the route actually travels along. A Mount or a Flank
+	-- sits beside the route instead, so it never adds a polyline vertex -- it only
+	-- widens the vertex it stands next to, which is what stops a hazard that
+	-- overhangs the water from being invisible to the island separation audit.
+	local function record(
+		beatId: string,
+		pieceId: string,
+		kind: string,
+		arcLength: number,
+		halfWidth: number?,
+		spine: boolean?
+	)
+		local island = currentIsland
+		local step: RouteStep = {
 			BeatId = beatId,
 			PieceId = pieceId,
 			Kind = kind,
@@ -973,7 +1262,22 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			Segment = segmentIndex,
 			SegmentTravel = segmentTravel,
 			ArcLength = arcLength,
-		})
+			Island = island,
+			HalfWidth = halfWidth or 0,
+		}
+		table.insert(route, step)
+		local polyline = if island > 0 then islandPolylines[island] else nil
+		if polyline == nil then
+			return
+		end
+		if spine == false then
+			local last = polyline[#polyline]
+			if last then
+				last.HalfWidth = math.max(last.HalfWidth, step.HalfWidth)
+			end
+			return
+		end
+		table.insert(polyline, { Position = cursor.Position, HalfWidth = step.HalfWidth })
 	end
 
 	for beatIndex, beat in spec.Beats do
@@ -1048,34 +1352,228 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		end
 
 		for _, piece in beat.Pieces do
+			-- HANDOFF 5.2: consecutive islands are linked ONLY by the beat's launch or
+			-- its tile group. The tiles are therefore not part of either island -- they
+			-- are the bridge -- so they are recorded against island 0 and excluded from
+			-- the island separation audit.
+			local isLinkTile = isArchipelago and piece.Preset == "FallingTile"
+			local homeIsland = currentIsland
+			if isLinkTile then
+				currentIsland = 0
+				tilesSinceIsland += 1
+			end
+			if landingDeckDue and piece.Kind ~= "Ride" then
+				fail(
+					string.format(
+						"%s/%s: an island is entered onto a round landing deck, not a %s piece (HANDOFF 5.2)",
+						beat.Id,
+						piece.Id,
+						piece.Kind
+					)
+				)
+				landingDeckDue = false
+			end
+			if piece.Preset == "Fan" or piece.Preset == "JumpPad" then
+				launchToolsSinceIsland += 1
+				lastLaunchSpeed = piece.LaunchSpeed or 48
+				lastLaunchFloat = piece.FloatFactor or 0.2
+				if archipelago then
+					maxLaunchReach = math.max(
+						maxLaunchReach,
+						launchReach(archipelago :: ArchipelagoSpec, worstDrop, lastLaunchSpeed, lastLaunchFloat)
+					)
+				end
+			end
 			if piece.Kind == "Chain" then
 				local result = CoursePresets.buildChainPiece(context, piece :: any, cursor)
 				cursor = result.ExitCursor
 				advanceTravel(beat.Id, piece.Id, result.ArcLength)
 				checkGuideDeviation(beat.Id, piece.Id)
-				record(beat.Id, piece.Id, piece.Kind, result.ArcLength)
+				record(
+					beat.Id,
+					piece.Id,
+					piece.Kind,
+					result.ArcLength,
+					lateralHalfWidth(result.Model, cursor.Position, cursor.Yaw)
+				)
 				indexPiece(piece.Id, result.Model)
+			elseif piece.Kind == "Island" then
+				local island = assert(archipelago, `[CourseBuilder] {piece.Id}: Island needs an Archipelago layout`)
+				local index = assert(piece.Island, `[CourseBuilder] {piece.Id} needs Island`)
+				assert(
+					index == currentIsland + 1,
+					`[CourseBuilder] {piece.Id}: islands are entered once each in order; expected {currentIsland + 1}, got {index}`
+				)
+				local declared = assert(island.Islands[index], `[CourseBuilder] {piece.Id}: no island {index} declared`)
+				local link = assert(piece.Link, `[CourseBuilder] {piece.Id} needs Link`)
+				assert(
+					(index == 1) == (link == "Start"),
+					`[CourseBuilder] {piece.Id}: only the first island is entered from the start plaza`
+				)
+				local anchor = islandAnchor(declared)
+				local flat = Vector3.new(anchor.X - cursor.Position.X, 0, anchor.Z - cursor.Position.Z)
+				local gap = flat.Magnitude
+				local rise = anchor.Y - cursor.Position.Y
+				local deviation = 0
+				if gap > 1 then
+					local bearing = normalizeDegrees(headingOf(flat.Unit) - cursor.Yaw)
+					deviation = math.abs(if bearing > 180 then bearing - 360 else bearing)
+				end
+				local walkable = jumpReach(island, rise)
+				if link == "Start" then
+					if gap > walkable then
+						fail(
+							string.format(
+								"%s/%s: the start plaza is %.2f studs from island %s, past the %.2f-stud ordinary jump for a %.1f-stud rise",
+								beat.Id,
+								piece.Id,
+								gap,
+								declared.Id,
+								walkable,
+								rise
+							)
+						)
+					end
+				elseif link == "Launch" then
+					local reach = launchReach(island, rise, lastLaunchSpeed, lastLaunchFloat)
+					if launchToolsSinceIsland == 0 then
+						fail(
+							string.format(
+								"%s/%s: island %s is declared launch-linked but no fan or pad was placed on the island before it",
+								beat.Id,
+								piece.Id,
+								declared.Id
+							)
+						)
+					end
+					if gap <= walkable then
+						fail(
+							string.format(
+								"%s/%s: the %.2f-stud crossing to island %s is inside the %.2f-stud ordinary jump for its %.1f-stud rise, so its launch is decorative (HANDOFF 8.4)",
+								beat.Id,
+								piece.Id,
+								gap,
+								declared.Id,
+								walkable,
+								rise
+							)
+						)
+					end
+					if gap > reach then
+						fail(
+							string.format(
+								"%s/%s: the %.2f-stud crossing to island %s is past the %.2f studs a %.1f/%.2f launch reaches over a %.1f-stud rise",
+								beat.Id,
+								piece.Id,
+								gap,
+								declared.Id,
+								reach,
+								lastLaunchSpeed,
+								lastLaunchFloat,
+								rise
+							)
+						)
+					end
+					if deviation > island.MaxFlightDeviationDegrees then
+						fail(
+							string.format(
+								"%s/%s: the flight to island %s leaves %.1f degrees off its own takeoff heading (limit %.1f)",
+								beat.Id,
+								piece.Id,
+								declared.Id,
+								deviation,
+								island.MaxFlightDeviationDegrees
+							)
+						)
+					end
+				else
+					if tilesSinceIsland < 2 then
+						fail(
+							string.format(
+								"%s/%s: island %s is declared tile-linked but only %d falling tiles bridge to it",
+								beat.Id,
+								piece.Id,
+								declared.Id,
+								tilesSinceIsland
+							)
+						)
+					end
+					if gap > 0.1 or math.abs(rise) > 0.1 then
+						fail(
+							string.format(
+								"%s/%s: a tile group lands flush on its island; island %s sits %.3f studs across and %.3f up from the last tile",
+								beat.Id,
+								piece.Id,
+								declared.Id,
+								gap,
+								rise
+							)
+						)
+					end
+				end
+				table.insert(islandLinks, {
+					Island = index,
+					Link = link,
+					GapStuds = gap,
+					RiseStuds = rise,
+					FlightDeviationDegrees = deviation,
+				})
+				currentIsland = index
+				homeIsland = index
+				launchToolsSinceIsland = 0
+				tilesSinceIsland = 0
+				landingDeckDue = index > 1
+				cursor = { Position = anchor, Yaw = cursor.Yaw }
+				advanceTravel(beat.Id, piece.Id, gap)
+				record(beat.Id, piece.Id, piece.Kind, gap, 0)
 			elseif piece.Kind == "Ride" then
-				assert(curve ~= nil, `[CourseBuilder] {piece.Id}: Ride pieces need a Spiral layout`)
+				assert(
+					curve ~= nil or isArchipelago,
+					`[CourseBuilder] {piece.Id}: Ride pieces need a Spiral or Archipelago layout`
+				)
 				local radius = CoursePresets.rideRadius(
 					assert(piece.Source, `[CourseBuilder] {piece.Id} needs Source`),
 					piece.Scale or 1
 				)
 				-- Enter at the near rim, centre one radius along, leave at the far
-				-- rim: the deck is round, so the guide's heading change across it
-				-- costs no seam at all. The exit cursor is the deck's PHYSICAL rim
-				-- in the outgoing direction, not the guide point, so whatever
-				-- follows chains onto real plate; the guide re-anchor happens at
-				-- the next Advance, which is where the offset is measured as part
-				-- of that gap.
+				-- rim: the deck is round, so the heading change across it costs no seam
+				-- at all. A Spiral reads the outgoing heading off its parametric guide;
+				-- an Archipelago has no guide, so the turn is declared on the piece and
+				-- capped at MaxTurnDegrees. The exit cursor is the deck's PHYSICAL rim
+				-- in the outgoing direction, so whatever follows chains onto real plate.
 				advanceTravel(beat.Id, piece.Id, radius)
-				anchorToGuide()
-				local centre = cursor.Position + Vector3.new(0, piece.OffsetUp or 0, 0)
-				local result = CoursePresets.buildRidePiece(context, piece :: any, centre, cursor.Yaw)
+				local centre
+				if isArchipelago then
+					centre = cursor.Position + forward(cursor.Yaw) * radius + Vector3.new(0, piece.OffsetUp or 0, 0)
+				else
+					anchorToGuide()
+					centre = cursor.Position + Vector3.new(0, piece.OffsetUp or 0, 0)
+				end
+				local entryYaw = cursor.Yaw
+				local result = CoursePresets.buildRidePiece(context, piece :: any, centre, entryYaw)
 				advanceTravel(beat.Id, piece.Id, radius)
-				local exitYaw = (curve :: GuideCurve).YawAt(segmentTravel)
+				local exitYaw
+				if isArchipelago then
+					local turn = piece.TurnDegrees or 0
+					local limit = (archipelago :: ArchipelagoSpec).MaxTurnDegrees
+					if math.abs(turn) > limit + 1e-6 then
+						fail(
+							string.format(
+								"%s/%s: a %.1f-degree turn across one round deck, past the declared %.1f limit",
+								beat.Id,
+								piece.Id,
+								turn,
+								limit
+							)
+						)
+					end
+					exitYaw = entryYaw + turn
+				else
+					exitYaw = (curve :: GuideCurve).YawAt(segmentTravel)
+				end
+				landingDeckDue = false
 				cursor = { Position = centre + forward(exitYaw) * radius, Yaw = exitYaw }
-				record(beat.Id, piece.Id, piece.Kind, radius * 2)
+				record(beat.Id, piece.Id, piece.Kind, radius * 2, lateralHalfWidth(result.Model, centre, entryYaw))
 				indexPiece(piece.Id, result.Model)
 			elseif piece.Kind == "Flank" then
 				local flankCursor = {
@@ -1086,12 +1584,19 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 					Yaw = cursor.Yaw + (piece.FacingOffsetDegrees or 0),
 				}
 				local result = CoursePresets.buildChainPiece(context, piece :: any, flankCursor)
-				record(beat.Id, piece.Id, piece.Kind, 0)
+				record(
+					beat.Id,
+					piece.Id,
+					piece.Kind,
+					0,
+					lateralHalfWidth(result.Model, cursor.Position, cursor.Yaw),
+					false
+				)
 				indexPiece(piece.Id, result.Model)
 			elseif piece.Kind == "Corner" then
 				assert(
-					not isSpiral,
-					`[CourseBuilder] {piece.Id}: a Spiral layout turns on its guide, not on Corner slabs`
+					not isSpiral and not isArchipelago,
+					`[CourseBuilder] {piece.Id}: a {layout.Kind} layout turns on round decks, not on Corner slabs`
 				)
 				local cornerSource = layout.Corner.Source
 				local cornerScale = layout.Corner.Scale
@@ -1175,7 +1680,14 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			elseif piece.Kind == "Mount" then
 				local targetCFrame = offsetCFrame(cursor, piece, liquidY)
 				local result = CoursePresets.buildMountPiece(context, piece :: any, targetCFrame)
-				record(beat.Id, piece.Id, piece.Kind, 0)
+				record(
+					beat.Id,
+					piece.Id,
+					piece.Kind,
+					0,
+					lateralHalfWidth(result.Model, cursor.Position, cursor.Yaw),
+					false
+				)
 				indexPiece(piece.Id, result.Model)
 			else
 				local before = cursor.Position
@@ -1205,6 +1717,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				end
 				record(beat.Id, piece.Id, piece.Kind, distance)
 			end
+			currentIsland = homeIsland
 		end
 
 		-- HANDOFF 3.3: "Origin.ServerCarries=true for RotorCarries or Seesaw
@@ -1307,6 +1820,61 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		end
 	end
 
+	local worstIslandSeparation = 0
+	local worstIslandSeparationPair = ""
+	if archipelago then
+		local islands = archipelago.Islands
+		if #islandLinks ~= #islands then
+			fail(string.format("%d of the %d declared islands are entered by the route", #islandLinks, #islands))
+		end
+		-- HANDOFF 5.2's separation rule, measured rather than declared: the closest
+		-- approach between the ROUTE on two non-consecutive islands, reduced by the
+		-- measured lateral half-width of the pieces at that approach, must beat the
+		-- launch reach. Tile groups are excluded because they are the links
+		-- themselves; the sampled cut-set graph is what proves nothing can be
+		-- launched off one of them.
+		worstIslandSeparation = math.huge
+		for left = 1, #islandPolylines do
+			for rightIndex = left + 2, #islandPolylines do
+				local a, b = islandPolylines[left], islandPolylines[rightIndex]
+				if #a == 0 or #b == 0 then
+					continue
+				end
+				local closest = math.huge
+				for i = 1, math.max(#a - 1, 1) do
+					local a1 = a[i]
+					local a2 = a[math.min(i + 1, #a)]
+					for j = 1, math.max(#b - 1, 1) do
+						local b1 = b[j]
+						local b2 = b[math.min(j + 1, #b)]
+						local clear = segmentDistance(a1.Position, a2.Position, b1.Position, b2.Position)
+							- math.max(a1.HalfWidth, a2.HalfWidth)
+							- math.max(b1.HalfWidth, b2.HalfWidth)
+						closest = math.min(closest, clear)
+					end
+				end
+				if closest < worstIslandSeparation then
+					worstIslandSeparation = closest
+					worstIslandSeparationPair = string.format("%s/%s", islands[left].Id, islands[rightIndex].Id)
+				end
+				if closest <= maxLaunchReach then
+					fail(
+						string.format(
+							"islands %s and %s are not consecutive but come within %.2f studs of each other, inside the %.2f-stud worst launch reach this course can produce (HANDOFF 5.2)",
+							islands[left].Id,
+							islands[rightIndex].Id,
+							closest,
+							maxLaunchReach
+						)
+					)
+				end
+			end
+		end
+		if worstIslandSeparation == math.huge then
+			worstIslandSeparation = 0
+		end
+	end
+
 	if routeLength < 800 or routeLength > 1000 then
 		fail(
 			string.format(
@@ -1345,6 +1913,10 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		HairpinExitFraction = hairpinExitFraction,
 		LoopClosureStuds = loopClosure,
 		LoopTotalTurnDegrees = loopTotalTurn,
+		IslandLinks = islandLinks,
+		WorstIslandSeparation = worstIslandSeparation,
+		WorstIslandSeparationPair = worstIslandSeparationPair,
+		MaxLaunchReach = maxLaunchReach,
 	}
 	return model, report
 end

@@ -30,6 +30,12 @@ local STUCK_SECONDS = 8
 -- hits it has genuinely failed rather than been cut short, but not so high that
 -- eight resets of a course the proxy cannot clear cost forty minutes.
 local RUN_CEILING_SECONDS = 150
+-- RUN_CEILING_SECONDS bounds ONE trial, not the pass. On Tumble Tunnels the pass
+-- ran 3.5 hours without returning against its own 8-trial / 150-second budget,
+-- which should have bounded it at about 25 minutes, so the whole pass now has a
+-- wall clock of its own: when it expires the harness stops starting trials and
+-- publishes what it has, clearly marked incomplete, instead of hanging.
+local PASS_DEADLINE_SECONDS = 2400
 local RESPAWN_SECONDS = 0.8
 local MID_SEEDS = { 101, 102, 103, 104, 105 }
 local EXPERT_RESETS = 3
@@ -141,9 +147,24 @@ end
 -- HumanoidDescription gives the default R15 body with a real HipHeight, real
 -- limb collision and the real state machine. Movement is then set to this
 -- project's measured configuration (HANDOFF 3.2), never engine defaults.
+-- CreateHumanoidModelFromDescription is an async web call with no timeout of its
+-- own, and it was the prime suspect for the Tumble Tunnels pass never returning:
+-- it was being made once per trial, eight times. The engine rig is fetched ONCE
+-- and every later trial clones that template, so the pass makes one web call
+-- whatever it costs instead of eight.
+local rigTemplate: Model? = nil
+
 local function buildRig(): (Model, Humanoid, BasePart)
-	local rig =
-		Players:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
+	local cached = rigTemplate
+	local rig: Model
+	if cached then
+		rig = cached:Clone()
+	else
+		rig = Players:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
+		local template = rig:Clone()
+		template.Parent = nil
+		rigTemplate = template
+	end
 	rig.Name = "SplashdownRouteRig"
 	local humanoid = rig:FindFirstChildOfClass("Humanoid") :: Humanoid
 	humanoid.WalkSpeed = 26
@@ -791,11 +812,21 @@ local ok, answer = xpcall(function()
 	task.wait(1)
 
 	local runs = {}
+	local passDeadline = os.clock() + PASS_DEADLINE_SECONDS
+	local abandoned = {}
 	for trial = 1, EXPERT_RESETS do
+		if os.clock() > passDeadline then
+			table.insert(abandoned, string.format("expert trial %d", trial))
+			continue
+		end
 		table.insert(runs, runTrial(model, waypoints, "expert", 0.05, 0, 900 + trial))
 		task.wait(0.25)
 	end
 	for _, seed in MID_SEEDS do
+		if os.clock() > passDeadline then
+			table.insert(abandoned, string.format("mid seed %d", seed))
+			continue
+		end
 		table.insert(runs, runTrial(model, waypoints, "mid", 0.25, 0.2, seed))
 		task.wait(0.25)
 	end
@@ -833,6 +864,11 @@ local ok, answer = xpcall(function()
 	return {
 		courseId = COURSE_ID,
 		placeId = game.PlaceId,
+		-- Non-empty when the pass ran out of its own wall clock: those trials were
+		-- never started, so the timings below are a PARTIAL pass and must be read
+		-- and reported as one.
+		abandonedTrials = abandoned,
+		passDeadlineSeconds = PASS_DEADLINE_SECONDS,
 		specHash = report.SpecHash,
 		rebuildHashMatches = hashesMatch,
 		partCount = report.PartCount,

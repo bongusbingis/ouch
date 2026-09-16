@@ -7,7 +7,7 @@
 
 local AssetManifest = {}
 
-AssetManifest.Version = 4
+AssetManifest.Version = 5
 AssetManifest.SourceHash = "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec"
 AssetManifest.SourcePath = { "ServerStorage", "SplashdownAuthoringSources", "Kit" }
 
@@ -839,8 +839,113 @@ AssetManifest.Assets = (
 			},
 			ContactRadius = 12.6,
 		} :: AssetEntry,
+
+		-- Tiptoe Trials sources, swept on 2026-09-16 with the same disposable-clone
+		-- raycast rig the earlier courses used; the raw sweeps are in
+		-- docs/splashdown/evidence/course-sockets-tiptoetrials.json.
+		--
+		-- The eight rainbow tiles are one mesh in eight colours: color_box_002, 005
+		-- and 008 were swept independently and returned byte-identical extents to
+		-- color_box_001, so every tile shares this entry's measurements. The tile is a
+		-- flat-topped bevelled box: 7,241 of 8,070 standable returns sit on a plateau
+		-- at exactly +4.6592 across |x| <= 8.50 and |z| <= 13.00, and the remaining
+		-- returns run down the bevel to the measured footprint at |x| <= 9.00,
+		-- |z| <= 13.75. Entry/Exit therefore sit on the measured long-axis extremes,
+		-- giving 27.5 studs of travel and an 18-stud walkable width at scale 1 -- 6.875
+		-- and 4.5 at section 6's fixed 0.25.
+		color_box_001 = {
+			Role = "FallingTile",
+			Kind = "Surface",
+			Size = Vector3.new(18.636573791503906, 9.318291664123535, 27.954883575439453),
+			ForwardAxis = "Z",
+			ForwardHeadingDegrees = 180,
+			Sockets = {
+				Entry = socket(0, 4.6592, -13.75, 0, 0, -1),
+				Exit = socket(0, 4.6592, 13.75, 0, 0, 1),
+				Support = socket(0, -4.6592, 0, 0, -1, 0),
+			},
+			Measurement = {
+				RayStep = 0.25,
+				Hits = 8070,
+				Misses = 2555,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-tiptoetrials.json",
+			},
+		} :: AssetEntry,
+
+		-- trampoline_5, section 7.5's pad for this course. Its inner child really is
+		-- trampoline_6_001 (HANDOFF 13), and unlike trampoline_1/3/4 it is a low domed
+		-- pad only 2.996 studs tall, so its Support socket sits barely below the deck
+		-- it stands on. Upward rays bottomed out at exactly -1.4980, which is -Size.Y/2.
+		trampoline_5_001 = {
+			Role = "JumpPadOuterDomed",
+			Kind = "Mount",
+			Size = Vector3.new(14.243146896362305, 2.996173620223999, 14.242964744567871),
+			Sockets = { Support = socket(0, -1.498, 0, 0, -1, 0) },
+			SubParts = {
+				{
+					Name = "trampoline_6_001",
+					RelativeCFrame = CFrame.new(0, 1.3956466913223267, 0),
+					Size = Vector3.new(9.012530326843262, 1.2804462909698486, 9.012348175048828),
+				},
+			},
+			Measurement = {
+				RayStep = 0.25,
+				Hits = 1032,
+				Misses = 3839,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-tiptoetrials.json",
+			},
+		} :: AssetEntry,
+
+		-- The alternate seesaw (section 6: "Alternate seesaw / obstacle_11_001 assembly
+		-- ... used in Tiptoe and Piston Peak"). Roles measured, not assumed: the ROOT is
+		-- a 38.73-stud bar long in X whose top ridge returned between 1.5566 and 2.3896
+		-- over |z| <= 1.50 -- that is the fulcrum, so the tested axle is local X exactly
+		-- as obstacle_25's is. The child is a plank (a second, larger casting of the
+		-- conveyor mesh, id ...982207, NOT the 27.95 x 55.91 obstacle_9_001 belt) whose
+		-- ribbed top returned 0.4199 to 0.9482 across |x| <= 17.00 and |z| <= 37.50, so
+		-- Entry/Exit ride the ridge at +0.9482 on the measured long-axis extremes: 75
+		-- studs of travel and a 34.68-stud plank at scale 1.
+		--
+		-- The assembly's lowest collision point is the bar's underside at -2.3896, only
+		-- 3.3378 studs below the plank's own top, so unlike obstacle_25 this seesaw
+		-- cannot stand on a broad plinth: at MaxTilt 22 the plank's underside clears the
+		-- bar's base only within |z| <= 4.253 * scale, which is why tiptoe-trials.md
+		-- stands it on a single thin door panel instead.
+		obstacle_11_001 = {
+			Role = "SeesawPlank",
+			Kind = "Surface",
+			Size = Vector3.new(38.73276901245117, 4.778872489929199, 4.778852462768555),
+			ForwardAxis = "Z",
+			ForwardHeadingDegrees = 180,
+			Sockets = {
+				Entry = socket(0, 0.9482, -37.5, 0, 0, -1),
+				Exit = socket(0, 0.9482, 37.5, 0, 0, 1),
+				Support = socket(0, -2.3896, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 1, 0, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_9_001.001",
+					RelativeCFrame = CFrame.new(-0.00927734375, 0.0759633257985115, 0),
+					Size = Vector3.new(34.684410095214844, 1.7447608709335327, 75.9059066772461),
+				},
+			},
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 10335,
+				Misses = 2706,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-tiptoetrials.json",
+			},
+		} :: AssetEntry,
 	} :: any
 ) :: { [string]: AssetEntry }
+
+-- The other seven rainbow tiles are the same mesh in different colours: their
+-- independent sweeps returned identical extents, so they share color_box_001's
+-- measured entry rather than repeating it seven times.
+for index = 2, 8 do
+	AssetManifest.Assets[string.format("color_box_%03d", index)] = AssetManifest.Assets.color_box_001
+end
 
 function AssetManifest.get(id: string): AssetEntry
 	local entry = AssetManifest.Assets[id]

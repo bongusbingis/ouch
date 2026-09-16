@@ -1,0 +1,442 @@
+{
+  "testTime": "2026-09-16T13:42:49Z",
+  "crossCourseSpecs": [
+    "BallBarrage",
+    "WhirlpoolWaltz",
+    "DoorDash",
+    "TumbleTunnels",
+    "TiptoeTrials"
+  ],
+  "buildSummary": {
+    "routeLength": 880.4056305539513,
+    "attributeErrors": [],
+    "partCount": 160,
+    "routeErrors": [],
+    "boundsViolations": [],
+    "guideLength": 0,
+    "guideDeviation": 0,
+    "checkpointCount": 5
+  },
+  "errors": [],
+  "courseId": "TiptoeTrials",
+  "placeId": 121997450145716,
+  "sourceHash": "",
+  "status": "BLOCKED",
+  "counts": {
+    "SurfaceCells": 16171,
+    "Checkpoints": 5,
+    "LaunchSources": 3,
+    "BaseParts": 160,
+    "StartPads": 30,
+    "CrossCourseSpecs": 5,
+    "GraphEdges": 1309689,
+    "Encounters": 16,
+    "BoundaryWalls": 24,
+    "Beats": 6,
+    "GraphNodes": 14680
+  },
+  "sampleResolution": {
+    "Coarse": 1,
+    "Refined": 0.25
+  },
+  "method": "CourseQA.check against a real Workspace clone built from the declarative spec in a Studio Play session, by run-course-qa.server.luau",
+  "calibration": {
+    "MaxStepStuds": 11.5,
+    "JumpHeight": 10,
+    "RootOffsetStuds": 3.5,
+    "Gravity": 120,
+    "SlopeLimitDegrees": 45,
+    "MaxGapStuds": 22,
+    "RefineStep": 0.25,
+    "WalkSpeed": 26,
+    "SampleStep": 1
+  },
+  "warnings": [],
+  "specHash": "0f8e9510",
+  "encounters": [
+    {
+      "Id": "Fan01",
+      "Type": "Fan",
+      "Family": "Launch",
+      "Beat": "01_FloatFlight"
+    },
+    {
+      "Id": "Bumper01",
+      "Type": "Bumper",
+      "Family": "Launch",
+      "Beat": "01_FloatFlight"
+    },
+    {
+      "Id": "Seesaw01",
+      "Type": "Seesaw",
+      "Family": "Ride",
+      "Beat": "02_BalanceBay"
+    },
+    {
+      "Id": "Seesaw02",
+      "Type": "Seesaw",
+      "Family": "Ride",
+      "Beat": "02_BalanceBay"
+    },
+    {
+      "Id": "TileA",
+      "Type": "FallingTile",
+      "Family": "Precision",
+      "Beat": "03_IslandHop"
+    },
+    {
+      "Id": "TwoArm01",
+      "Type": "RotorBump",
+      "Family": "Precision",
+      "Beat": "03_IslandHop"
+    },
+    {
+      "Id": "TileB",
+      "Type": "FallingTile",
+      "Family": "Precision",
+      "Beat": "03_IslandHop"
+    },
+    {
+      "Id": "Mace01",
+      "Type": "RotorBump",
+      "Family": "Climb/Descend",
+      "Beat": "04_StepSpire"
+    },
+    {
+      "Id": "TileC",
+      "Type": "FallingTile",
+      "Family": "Precision",
+      "Beat": "05_FadeFooting"
+    },
+    {
+      "Id": "HammerLarge",
+      "Type": "RotorBump",
+      "Family": "Precision",
+      "Beat": "05_FadeFooting"
+    },
+    {
+      "Id": "TileD",
+      "Type": "FallingTile",
+      "Family": "Precision",
+      "Beat": "05_FadeFooting"
+    },
+    {
+      "Id": "HammerSmall",
+      "Type": "RotorBump",
+      "Family": "Precision",
+      "Beat": "05_FadeFooting"
+    },
+    {
+      "Id": "TileE",
+      "Type": "FallingTile",
+      "Family": "Precision",
+      "Beat": "05_FadeFooting"
+    },
+    {
+      "Id": "SwingPanel01",
+      "Type": "RotorBump",
+      "Family": "Precision",
+      "Beat": "05_FadeFooting"
+    },
+    {
+      "Id": "Pad01",
+      "Type": "JumpPad",
+      "Family": "Launch",
+      "Beat": "06_LastDash"
+    },
+    {
+      "Id": "Pad02",
+      "Type": "JumpPad",
+      "Family": "Launch",
+      "Beat": "06_LastDash"
+    }
+  ],
+  "findings": [
+    {
+      "Check": "StartPads==30",
+      "Status": "PASS",
+      "Detail": "30 immediate Start/Pads BaseParts"
+    },
+    {
+      "Check": "Checkpoints>=1",
+      "Status": "PASS",
+      "Detail": "5 ordered checkpoints"
+    },
+    {
+      "Check": "CheckpointCountAttributeExact",
+      "Status": "PASS",
+      "Detail": "attribute 5 vs 5 actual"
+    },
+    {
+      "Check": "Checkpoint:Checkpoint01",
+      "Status": "PASS",
+      "Detail": "needs both Pad and Trigger"
+    },
+    {
+      "Check": "Checkpoint:Checkpoint02",
+      "Status": "PASS",
+      "Detail": "needs both Pad and Trigger"
+    },
+    {
+      "Check": "Checkpoint:Checkpoint03",
+      "Status": "PASS",
+      "Detail": "needs both Pad and Trigger"
+    },
+    {
+      "Check": "Checkpoint:Checkpoint04",
+      "Status": "PASS",
+      "Detail": "needs both Pad and Trigger"
+    },
+    {
+      "Check": "Checkpoint:Checkpoint05",
+      "Status": "PASS",
+      "Detail": "needs both Pad and Trigger"
+    },
+    {
+      "Check": "ExactlyOneFinish",
+      "Status": "PASS",
+      "Detail": "1 triggers, 1 decks"
+    },
+    {
+      "Check": "Boundary24At390",
+      "Status": "PASS",
+      "Detail": "24 anchored colliding invisible walls, worst radius error 0.00"
+    },
+    {
+      "Check": "LaunchEnvelopes",
+      "Status": "PASS",
+      "Detail": "sd_TiptoeTrials_06_jumppad_56 reaches 28.40 studs level (51.0/0.20, trigger radius 3.56); sd_TiptoeTrials_06_jumppad_58 reaches 30.02 studs level (54.0/0.20, trigger radius 3.56); sd_TiptoeTrials_01_fan_4 reaches 26.77 studs level (48.0/0.20, trigger radius 6.19)"
+    },
+    {
+      "Check": "OrderedRouteFromEverySpawn",
+      "Status": "PASS",
+      "Detail": "30 spawn cells, 6 ordered waypoints, 0 failing legs"
+    },
+    {
+      "Check": "GateCutSet:01_FloatFlight",
+      "Status": "PASS",
+      "Detail": "0 of 30 spawn cells bypass this gate"
+    },
+    {
+      "Check": "GateCutSet:02_BalanceBay",
+      "Status": "PASS",
+      "Detail": "0 of 30 spawn cells bypass this gate"
+    },
+    {
+      "Check": "GateCutSet:03_IslandHop",
+      "Status": "PASS",
+      "Detail": "0 of 30 spawn cells bypass this gate"
+    },
+    {
+      "Check": "GateCutSet:04_StepSpire",
+      "Status": "PASS",
+      "Detail": "0 of 30 spawn cells bypass this gate"
+    },
+    {
+      "Check": "GateCutSet:05_FadeFooting",
+      "Status": "PASS",
+      "Detail": "0 of 30 spawn cells bypass this gate"
+    },
+    {
+      "Check": "GateCutSet:06_LastDash",
+      "Status": "PASS",
+      "Detail": "0 of 30 spawn cells bypass this gate"
+    },
+    {
+      "Check": "CrossPieceBoundingOverlap",
+      "Status": "NOT RUN",
+      "Detail": "48 oriented-box overlaps between different PieceIds (e.g. sd_TiptoeTrials_00_startplaza_1 vs sd_TiptoeTrials_01_platform_1); a box test cannot decide mesh penetration (8.3), so the seams need the visual inspection pass"
+    },
+    {
+      "Check": "NoBreatherSquare",
+      "Status": "PASS",
+      "Detail": "largest flat hazard-free square on the route is 23 x 23 studs (limit 24)"
+    },
+    {
+      "Check": "EncounterTypes>=6",
+      "Status": "PASS",
+      "Detail": "6 distinct encounter types"
+    },
+    {
+      "Check": "Families>=4",
+      "Status": "PASS",
+      "Detail": "4 distinct families"
+    },
+    {
+      "Check": "DominantType<=40%",
+      "Status": "PASS",
+      "Detail": "FallingTile is 5 of 16 (31.2%)"
+    },
+    {
+      "Check": "SameTypeRun<=3",
+      "Status": "PASS",
+      "Detail": "longest same-type run is 2"
+    },
+    {
+      "Check": "HeadlineNotAnotherClimax:BallBarrage",
+      "Status": "PASS",
+      "Detail": "headline BigBall; clashes: "
+    },
+    {
+      "Check": "HeadlineDominantOutside<=1:BallBarrage",
+      "Status": "PASS",
+      "Detail": "headline BigBall dominates 0 beats outside BallBarrage"
+    },
+    {
+      "Check": "HeadlineNotAnotherClimax:DoorDash",
+      "Status": "PASS",
+      "Detail": "headline Door; clashes: "
+    },
+    {
+      "Check": "HeadlineDominantOutside<=1:DoorDash",
+      "Status": "PASS",
+      "Detail": "headline Door dominates 1 beats outside DoorDash"
+    },
+    {
+      "Check": "HeadlineNotAnotherClimax:TiptoeTrials",
+      "Status": "PASS",
+      "Detail": "headline FallingTile; clashes: "
+    },
+    {
+      "Check": "HeadlineDominantOutside<=1:TiptoeTrials",
+      "Status": "PASS",
+      "Detail": "headline FallingTile dominates 0 beats outside TiptoeTrials"
+    },
+    {
+      "Check": "HeadlineNotAnotherClimax:TumbleTunnels",
+      "Status": "PASS",
+      "Detail": "headline BeachBall; clashes: "
+    },
+    {
+      "Check": "HeadlineDominantOutside<=1:TumbleTunnels",
+      "Status": "PASS",
+      "Detail": "headline BeachBall dominates 0 beats outside TumbleTunnels"
+    },
+    {
+      "Check": "HeadlineNotAnotherClimax:WhirlpoolWaltz",
+      "Status": "PASS",
+      "Detail": "headline RotatingPlatforms; clashes: "
+    },
+    {
+      "Check": "HeadlineDominantOutside<=1:WhirlpoolWaltz",
+      "Status": "PASS",
+      "Detail": "headline RotatingPlatforms dominates 0 beats outside WhirlpoolWaltz"
+    },
+    {
+      "Check": "NonGlueCap<=3:BeachBall",
+      "Status": "PASS",
+      "Detail": "used by 1 courses: TumbleTunnels"
+    },
+    {
+      "Check": "NonGlueCap<=3:BigBall",
+      "Status": "PASS",
+      "Detail": "used by 1 courses: BallBarrage"
+    },
+    {
+      "Check": "NonGlueCap<=3:Conveyor",
+      "Status": "PASS",
+      "Detail": "used by 2 courses: BallBarrage, DoorDash"
+    },
+    {
+      "Check": "NonGlueCap<=3:Door",
+      "Status": "PASS",
+      "Detail": "used by 2 courses: DoorDash, WhirlpoolWaltz"
+    },
+    {
+      "Check": "NonGlueCap<=3:FallingTile",
+      "Status": "PASS",
+      "Detail": "used by 1 courses: TiptoeTrials"
+    },
+    {
+      "Check": "NonGlueCap<=3:Fan",
+      "Status": "PASS",
+      "Detail": "used by 3 courses: BallBarrage, TiptoeTrials, TumbleTunnels"
+    },
+    {
+      "Check": "NonGlueCap<=3:PaddleWheel",
+      "Status": "PASS",
+      "Detail": "used by 2 courses: DoorDash, TumbleTunnels"
+    },
+    {
+      "Check": "NonGlueCap<=3:Piston",
+      "Status": "PASS",
+      "Detail": "used by 1 courses: BallBarrage"
+    },
+    {
+      "Check": "NonGlueCap<=3:RidePlatform",
+      "Status": "PASS",
+      "Detail": "used by 1 courses: WhirlpoolWaltz"
+    },
+    {
+      "Check": "NonGlueCap<=3:Seesaw",
+      "Status": "PASS",
+      "Detail": "used by 2 courses: TiptoeTrials, TumbleTunnels"
+    },
+    {
+      "Check": "NonGlueCap<=3:Sweeper",
+      "Status": "PASS",
+      "Detail": "used by 1 courses: BallBarrage"
+    },
+    {
+      "Check": "NoSharedBeatRecipe",
+      "Status": "PASS",
+      "Detail": "no beat recipe repeats across courses"
+    },
+    {
+      "Check": "8.2.6 time-expanded dynamic-state graph (periodic sampling every .1s across one common cycle)",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.4 lane cross-section hazard coverage and blocked-fraction >= .4 per pendulum/hammer crossing",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.4 measured shove travel from five real-player contacts per hazard and direction",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.4 bumper chicane centreline/edge/slalom avoidance probes",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.4 cross-course auditVariety over all six staged specs",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.5 scripted expert/mid policy route trials and the interactive keyboard run",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.5 thirty-rider start load test and the Studio local multi-client session",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    },
+    {
+      "Check": "8.6 fixed-camera captures and the bad-map-refs comparison",
+      "Status": "NOT RUN",
+      "Detail": "requires a live driven playtest or the full course set"
+    }
+  ],
+  "notRun": [
+    "8.2.6 time-expanded dynamic-state graph (periodic sampling every .1s across one common cycle)",
+    "8.4 lane cross-section hazard coverage and blocked-fraction >= .4 per pendulum/hammer crossing",
+    "8.4 measured shove travel from five real-player contacts per hazard and direction",
+    "8.4 bumper chicane centreline/edge/slalom avoidance probes",
+    "8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
+    "8.4 cross-course auditVariety over all six staged specs",
+    "8.5 scripted expert/mid policy route trials and the interactive keyboard run",
+    "8.5 thirty-rider start load test and the Studio local multi-client session",
+    "8.6 fixed-camera captures and the bad-map-refs comparison"
+  ]
+}

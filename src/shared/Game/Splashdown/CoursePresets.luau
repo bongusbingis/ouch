@@ -58,6 +58,12 @@ export type PresetName =
 	-- so a spiral can change direction across one without the wedge seam two
 	-- straight slabs meeting at an angle would open.
 	| "RoundLanding"
+	-- Tiptoe Trials addition. FallingTile is one rainbow tile of a tile group: a
+	-- CHAINED surface, because the tile IS the route's floor for its own length,
+	-- and the group between two stable landings is the encounter. It always ships
+	-- with CriticalRoute and a positive RespawnSeconds (section 7.5 / HANDOFF 13:
+	-- "No permanent critical falling tiles").
+	| "FallingTile"
 
 export type PieceSpec = {
 	Id: string,
@@ -89,6 +95,8 @@ export type PieceSpec = {
 	WindupSeconds: number?,
 	StrikeSeconds: number?,
 	FanBallSpeed: number?,
+	DropDelaySeconds: number?,
+	RespawnSeconds: number?,
 }
 
 export type BuildContext = {
@@ -170,9 +178,17 @@ local function clonePiece(
 				table.insert(segments, segment)
 			end
 
-			local found: Instance? = root
-			for _, segment in segments do
-				found = if found then found:FindFirstChild(segment) else nil
+			-- A dot is the path separator here, but one kit child really is called
+			-- "obstacle_9_001.001" (obstacle_11's plank), so the WHOLE declared name is
+			-- tried as a single child first. Splitting that one on dots would look for a
+			-- child "obstacle_9_001" that does not exist and then clone the unrelated
+			-- top-level conveyor of that name in beside it.
+			local found: Instance? = root:FindFirstChild(sub.Name)
+			if found == nil then
+				found = root
+				for _, segment in segments do
+					found = if found then found:FindFirstChild(segment) else nil
+				end
 			end
 			if found == nil then
 				-- Not inside the root's own subtree: a sibling asset the manifest pairs
@@ -291,8 +307,31 @@ end
 
 -- Route pieces (Conveyor / Platform / Ramp / Slide / Fill): chained by Entry socket.
 local function buildChainPiece(context: BuildContext, spec: PieceSpec, cursor: Cursor): ChainResult
-	local holder, root, _, byPath, exitLocal = placeTravelPiece(context, spec, cursor, spec.Preset)
+	local holder, root, manifest, byPath, exitLocal = placeTravelPiece(context, spec, cursor, spec.Preset)
 	local exitWorldPosition = root.CFrame:PointToWorldSpace(exitLocal)
+
+	if spec.Preset == "FallingTile" then
+		-- 02-kits.md: "Mark a rainbow tile FallingTile=true. First support contact arms
+		-- one shared countdown ... Existing Splashdown uses checkpoints, so critical
+		-- route tiles must respawn; the validator rejects zero when CriticalRoute=true."
+		-- The tile lives in the Assembly rather than Geometry because FeatureParts.collect
+		-- only ever scans <group>/Assembly descendants; a tile left in Geometry is
+		-- walkable scenery that never drops.
+		root:SetAttribute(A.FallingTile, true)
+		root:SetAttribute(A.DropDelaySeconds, spec.DropDelaySeconds or 0.65)
+		local respawn = spec.RespawnSeconds or 3
+		assert(respawn > 0, `[CoursePresets] {spec.Id}: a CriticalRoute tile must respawn (HANDOFF 13)`)
+		root:SetAttribute(A.RespawnSeconds, respawn)
+		root:SetAttribute("CriticalRoute", true)
+		holder.Parent = context.Assembly
+		local tileDelta = exitWorldPosition - cursor.Position
+		return {
+			Model = holder,
+			ExitCursor = { Position = exitWorldPosition, Yaw = cursor.Yaw },
+			PartCount = partCount(holder),
+			ArcLength = Vector3.new(tileDelta.X, 0, tileDelta.Z).Magnitude,
+		}
+	end
 
 	if spec.Preset == "Seesaw" then
 		-- obstacle_25: a fixed pedestal carrying a rider-weighted board. The board is
@@ -304,8 +343,17 @@ local function buildChainPiece(context: BuildContext, spec: PieceSpec, cursor: C
 		-- pivot, SeesawAxis X or Z ... obstacle_25_002 is long in Z, so its tested axle
 		-- is X." clonePiece has already cleared the board's imported PivotOffset, so the
 		-- kit's GetPivot() base is the board's own centre, which is the axle.
-		local board = byPath["obstacle_25_002"]
-		assert(board ~= nil, `[CoursePresets] {spec.Id} missing cloned seesaw board obstacle_25_002`)
+		--
+		-- The board is the manifest's single declared sub-part, not a hard-coded id, so
+		-- the same preset drives obstacle_25's short board and obstacle_11's long plank.
+		-- Both pedestals are measured long in local X and both boards long in local Z,
+		-- so both tilt about X.
+		local boardPath = (assert(
+			manifest.SubParts,
+			`[CoursePresets] {spec.Id}: a seesaw source needs a declared board sub-part`
+		)[1]).Name
+		local board = byPath[boardPath]
+		assert(board ~= nil, `[CoursePresets] {spec.Id} missing cloned seesaw board {boardPath}`)
 		board:SetAttribute(A.Seesaw, true)
 		board:SetAttribute(A.SeesawAxis, "X")
 		board:SetAttribute(A.MaxTiltDegrees, spec.MaxTiltDegrees or 24)

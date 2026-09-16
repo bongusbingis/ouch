@@ -169,6 +169,10 @@ function CourseAuthoring.stage(ids: { string }): StageResult
 			HairpinExitFraction = report.HairpinExitFraction,
 			LoopClosureStuds = report.LoopClosureStuds,
 			LoopTotalTurnDegrees = report.LoopTotalTurnDegrees,
+			IslandLinks = report.IslandLinks,
+			WorstIslandSeparation = report.WorstIslandSeparation,
+			WorstIslandSeparationPair = report.WorstIslandSeparationPair,
+			MaxLaunchReach = report.MaxLaunchReach,
 			RouteSteps = #report.Route,
 		}
 		parkedValue(string.format("%s_%s_Route", REPORT_NAME, id)).Value = HttpService:JSONEncode(report.Route)

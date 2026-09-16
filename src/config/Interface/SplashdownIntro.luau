@@ -49,6 +49,19 @@ return {
 				{ Eye = { -150, 66, 130 }, Look = { -20, 22, 49 }, FieldOfView = 60 },
 			},
 		},
+		TiptoeTrials = {
+			Description = "Nine islands, and the only way across is a fan, a trail of tiles that drops away, and two trampolines!",
+			Shots = {
+				-- Straight down over the middle of the archipelago: the shape of the
+				-- course IS the shot, nine rocks spiralling in from the perimeter.
+				{ Eye = { -100, 320, -50 }, Look = { -100, 10, -50 }, FieldOfView = 74 },
+				-- Low across the climax, where three tile bridges and two hammers run
+				-- between the inner rocks.
+				{ Eye = { -40, 46, 175 }, Look = { -110, 22, 140 }, FieldOfView = 62 },
+				-- The centre island, from outside the last pad hop.
+				{ Eye = { 40, 52, -30 }, Look = { -13, 18, 16 }, FieldOfView = 60 },
+			},
+		},
 		TiltTrip = {
 			Description = "Keep your balance on tilting decks and dodge the swinging obstacles. Next stop: the finish!",
 			Shots = {

@@ -12,6 +12,7 @@ local CourseQA = require(Splashdown:WaitForChild("CourseQA"))
 local SplashdownConfig = require(ReplicatedStorage:WaitForChild("Config").Gameplay.Splashdown)
 local DoorRows = require(game:GetService("ServerScriptService").Server.Modules.Splashdown.DoorRows)
 local BeachBalls = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.BeachBalls)
+local FallingTiles = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.FallingTiles)
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config").Gameplay.MapFeatures)
 
 local function selectedIds(): { string }
@@ -269,6 +270,101 @@ return function()
 					expect(ball:IsDescendantOf(model)).to.equal(true)
 				end
 				BeachBalls.forget(nil)
+			end)
+
+			-- Same reasoning as the beach-ball test above, for the other kit whose parts
+			-- are the route's own FLOOR: a falling tile that the kit cannot see is a
+			-- permanently solid platform, which looks perfect in a preview and in the
+			-- audit and quietly removes the whole mechanic. This drives the REAL
+			-- FallingTiles kit over the built model: it registers the tiles, arms one
+			-- through the kit's own support raycast, lets its countdown expire, and
+			-- checks the tile actually loses collision and then comes back.
+			it("hands its falling tiles to the kit as real armable, droppable, respawning tiles", function()
+				local scriptables = model:FindFirstChild("Scriptables")
+				local rotating = scriptables and scriptables:FindFirstChild("Rotating")
+				local groups = {}
+				for _, group in (rotating and rotating:GetChildren() or {}) do
+					table.insert(groups, group)
+				end
+
+				local authored = {}
+				for _, instance in model:GetDescendants() do
+					if
+						instance:IsA("BasePart")
+						and instance:GetAttribute(MapFeatures.Attributes.FallingTile) == true
+					then
+						table.insert(authored, instance)
+						expect(instance.Anchored).to.equal(true)
+						expect(instance.CanCollide).to.equal(true)
+						-- HANDOFF 13 and AttributeAudit: a CriticalRoute tile that never
+						-- respawns strands every racer behind it.
+						expect(instance:GetAttribute("CriticalRoute")).to.equal(true)
+						expect(instance:GetAttribute(MapFeatures.Attributes.RespawnSeconds) > 0).to.equal(true)
+						expect(typeof(instance:GetAttribute(MapFeatures.Attributes.DropDelaySeconds))).to.equal(
+							"number"
+						)
+						-- 02-kits: a stateful surface must not also inherit a moving owner.
+						expect(instance:GetAttribute(MapFeatures.Attributes.Rotor)).to.equal(nil)
+						-- FeatureParts.collect only ever walks Rotating/<group>/Assembly.
+						local assembly = instance:FindFirstAncestor("Assembly")
+						expect(assembly ~= nil and assembly:IsA("Model")).to.equal(true)
+						expect(assembly.Parent ~= nil and assembly.Parent.Parent == rotating).to.equal(true)
+					end
+				end
+
+				if #authored == 0 then
+					-- Only Tiptoe Trials uses falling tiles (override 2 keeps them its
+					-- headline), so every other course legitimately has none.
+					expect(#authored).to.equal(0)
+					return
+				end
+
+				local probe = Instance.new("Model")
+				probe.Name = "FallingTileProbe"
+				local humanoid = Instance.new("Humanoid")
+				humanoid.HipHeight = 2
+				humanoid.Parent = probe
+				local root = Instance.new("Part")
+				root.Name = "HumanoidRootPart"
+				root.Size = Vector3.new(2, 2, 1)
+				root.Anchored = false
+				root.CanCollide = false
+				root.Parent = probe
+				probe.PrimaryPart = root
+				probe.Parent = Workspace
+
+				local tile = authored[1]
+				local delay = tile:GetAttribute(MapFeatures.Attributes.DropDelaySeconds)
+				local respawn = tile:GetAttribute(MapFeatures.Attributes.RespawnSeconds)
+				root.CFrame = CFrame.new(
+					tile.Position + Vector3.new(0, tile.Size.Y / 2 + humanoid.HipHeight + root.Size.Y / 2, 0)
+				)
+
+				FallingTiles.forget(nil)
+				local now = os.clock()
+				FallingTiles.tickWorld({ instances = groups, now = now, deltaTime = 1 / 60 })
+				FallingTiles.tickPlayer({ instances = groups, now = now, deltaTime = 1 / 60 }, nil, root)
+				-- Still solid while the countdown runs: the warning is visible, the
+				-- collision is authoritative.
+				FallingTiles.tickWorld({ instances = groups, now = now + delay / 2, deltaTime = 1 / 60 })
+				expect(tile.CanCollide).to.equal(true)
+				FallingTiles.tickWorld({ instances = groups, now = now + delay + 0.05, deltaTime = 1 / 60 })
+				expect(tile.CanCollide).to.equal(false)
+				expect(tile.CanQuery).to.equal(false)
+				expect(tile.Transparency).to.equal(1)
+				-- And it comes back, which is the whole reason CriticalRoute tiles are
+				-- allowed on this route at all.
+				FallingTiles.tickWorld({
+					instances = groups,
+					now = now + delay + respawn + 0.1,
+					deltaTime = 1 / 60,
+				})
+				expect(tile.CanCollide).to.equal(true)
+				expect(tile.CanQuery).to.equal(true)
+				expect(tile.Transparency).to.equal(0)
+
+				FallingTiles.forget(nil)
+				probe:Destroy()
 			end)
 		end)
 	end
