@@ -21,6 +21,26 @@ Evidence: `docs/splashdown/evidence/courses/DoorDash/qa.json`,
 `docs/splashdown/evidence/courses/DoorDash/routes.json`,
 `docs/splashdown/evidence/course-sockets-doordash.json`.
 
+## Fix (2026-09-16) — HammerLarge was inert, exactly as Ball Barrage's two were
+
+Found by the swept-reach regression added while fixing Ball Barrage, and measured on the promoted
+`8c00a748` template rather than inferred. `obstacle_3_001` is an axle housing with its head
+suspended a measured **8.925 studs beneath it** at scale 0.6, so the `OffsetUp`-0 mounting put the
+head at **Y 5.694..24.456 under a deck at Y 23.997** — only the top **0.46 studs** of an 18.76-stud
+head ever reached deck level, and its full ±55° swing lifted that to just 1.97 studs. Nothing a
+runner's body occupies was ever in the head's path, and neither the build, the bounds audit, the
+walkable graph nor the cut sets noticed: the hazard's attributes, motion profile and kit
+registration were all correct.
+
+`OffsetUp` is now `8.925 + hypot(11.115/2, 18.761/2) + 0.6 = 20.428` — the hang distance, plus the
+head's maximum swept vertical half-extent (the head rocks about its OWN centre, so that maximum is
+`hypot(halfX, halfY)` at 30.7°, not `halfY`), plus 0.6 studs of deck clearance. Measured after the
+rebuild: the head spans **Y 26.122..44.883 at rest** and sweeps **24.600..46.406**, i.e. deck
+**+0.600..+22.406**, with **±5.558 studs of lane at rest and ±10.872 at full swing** across an
+18.22-stud slab, so it seals the lane on the strike and leaves 3.55 studs of corridor on each side
+between strikes. HANDOFF 8.3's suspended-pendulum exemption covers the housing, which is the same
+rule this course's two maces already use at `OffsetUp` 21.
+
 ## Concept and headline
 
 Thirty racers leave a 48-stud plaza through a single 15-stud slab and fan out into a five-channel
@@ -169,7 +189,7 @@ finishing sprint is short and easier as section 3.2 requires.
 | Pad01/02/03 | `trampoline_4_001`, 0.6 | 8.9 across | on 10.5-stud launch decks, launch speeds 48 / 50 / 52 |
 | BasinRamp/Deck + Foam01 | `box_011` 0.4211, `platform_002` 0.3 | 84 studs of gutter 12 below the route | the only way out is back up to the beat entrance |
 | Mace01/02 | `obstacle_5_001`, 0.7 | ball hangs 14.53 below the axle | axle 21 studs above the deck; the ball's underside sweeps 2.89 above it |
-| HammerLarge | `obstacle_3_001`, 0.6 | head 18.5 x 31.3 | on the beat's widest slab, readable from the ramp below |
+| HammerLarge | `obstacle_3_001`, 0.6 | head 18.5 x 31.3 | on the beat's widest slab, readable from the ramp below; hung at `OffsetUp` 20.428 — see the fix below |
 | TwoArm01 | `obstacle_27_001`, 0.5 | 29.04 across, two arms | half the circle is open at any moment: the easiest window in the course |
 
 ### Speeds, all from the section 6 formulas at measured radii

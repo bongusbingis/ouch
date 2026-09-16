@@ -30,6 +30,26 @@ local RAMP_6 = 0.2105
 local RAMP_12 = 0.4211
 local SLIDE_12 = 0.2317
 
+-- The hammer hangs. obstacle_3_001 is an axle housing with its head suspended a
+-- measured 8.925 studs BENEATH it at scale 0.6, so the original OffsetUp-0 mounting
+-- swept the head under the floor: measured on the promoted `8c00a748` template the
+-- head spanned Y 5.694..24.456 under a deck at Y 23.997, putting only its top 0.46
+-- studs at deck level and never reaching a runner at all. This is the same defect
+-- Ball Barrage carried and is fixed the same way, from the same measurement.
+-- HANDOFF 8.3 exempts a suspended pendulum from the support rule, which is what
+-- this course's own maces already rely on at OffsetUp 21.
+--
+-- The height comes from the SWING, not the rest pose. CoursePresets clears every
+-- display pivot, so the head rocks about its own centre through +-55 degrees about
+-- the route axis and its vertical half-extent is halfY*cos(t) + halfX*sin(t), whose
+-- maximum over the amplitude is hypot(halfX, halfY) = 10.903 studs at 30.7 degrees.
+-- Hanging the head so that maximum clears the deck by 0.6 studs keeps it out of the
+-- floor at mid-swing and leaves the resting head bottom 2.12 studs up, inside a
+-- runner's body band. Across the 18.22-stud Floor09 slab the head spans +-5.558 at
+-- rest and a measured +-10.872 at full swing, so it seals the lane on the strike and
+-- leaves 3.55 studs of corridor on each side between strikes.
+local HAMMER_LARGE_UP = 8.925 + math.sqrt((11.115 / 2) ^ 2 + (18.761 / 2) ^ 2) + 0.6
+
 -- The door corridor. Channels are uniformly scaled platform slabs 19.62 studs
 -- wide, so no single channel can hold the 24x24 breather square section 8.4
 -- forbids, and they sit at 0 / -1 / -2 studs from the centre outward: the crown
@@ -1101,6 +1121,7 @@ local DoorDash: CourseBuilder.CourseSpec = {
 					Source = "obstacle_3_001",
 					Scale = 0.6,
 					OffsetAlong = -11,
+					OffsetUp = HAMMER_LARGE_UP,
 					RotorAmplitude = 55,
 					RotorPhase = 0,
 				},
