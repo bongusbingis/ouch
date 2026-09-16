@@ -12,6 +12,11 @@ local RotorBump = require(script.Parent.RotorBump)
 local Bumpers = require(script.Parent.Bumpers)
 local BeachBalls = require(script.Parent.BeachBalls)
 local Doors = require(script.Parent.Doors)
+local ServerRiders = require(script.Parent.ServerRiders)
+local Conveyors = require(script.Parent.Conveyors)
+local BigBalls = require(script.Parent.BigBalls)
+local FallingTiles = require(script.Parent.FallingTiles)
+local Seesaws = require(script.Parent.Seesaws)
 
 local kits: { MapFeatureKit.MapFeatureKit } = {
 	ElimZones,
@@ -23,6 +28,11 @@ local kits: { MapFeatureKit.MapFeatureKit } = {
 	Bumpers,
 	BeachBalls,
 	Doors,
+	Conveyors,
+	BigBalls,
+	FallingTiles,
+	Seesaws,
+	ServerRiders,
 }
 
 local MapFeatureRegistry = {}
