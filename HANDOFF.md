@@ -24,7 +24,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | the hazard-reach fix pass of 2026-09-16: `c74a288` (Ball Barrage + the new regression), `2dcaa8a` (Door Dash) and `5115e68` (the four-course re-audit and this refresh), on top of `dc6051f`, the Piston Peak handoff note |
+| HEAD now | **`68fe7ca`, `fix(splashdown): harden Summit Splash`** — section 11's last item, on top of the hazard-reach pass (`c74a288`, `2dcaa8a`, `5115e68`). `3d61e3d` sits between them and is the USER's own unrelated `GestureHint.luau` work; do not touch it. |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. **Two incarnations of the hazard-reach task ran CONCURRENTLY against this one checkout and this one Studio on 2026-09-16**, after the session restarted without its predecessor stopping. They did the same work from the same measurements, so `c74a288`, `2dcaa8a` and `5115e68` are correct and consistent — but one of them staged and promoted Door Dash while the other was still waiting to, and both edited this file. Nothing was lost, and every hash below was re-verified against the live templates afterwards. The lesson for a successor: this checkout and the Match Place are shared resources. Re-run `git status` before every `git add`, re-read this file before editing it, and re-check `ServerStorage.SplashdownStaging` immediately before `promote`. |
@@ -36,6 +36,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
+68fe7ca   fix(splashdown): harden Summit Splash
 5115e68   test(splashdown): re-audit four courses under the corrected surface sampler
 2dcaa8a   fix(splashdown): hang Door Dash's inert hammer in reach
 c74a288   fix(splashdown): mount Ball Barrage's hammers and pistons in reach
