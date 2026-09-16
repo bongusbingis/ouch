@@ -26,6 +26,25 @@ export type PresetName =
 	| "Hammer"
 	| "Fan"
 	| "JumpPad"
+	-- Whirlpool Waltz additions. Spinner covers every single-mesh Y-spin shove
+	-- silhouette (dumbbell, cross, two-arm); RidePlatform is a hub-and-plate
+	-- rotating deck the route crosses; SwingPanel is obstacle_8's rocking panel
+	-- (NOT obstacle_24, the paddlewheel); Door is one slab of a door row;
+	-- FoamPit is an authored volume rather than a kit mesh.
+	| "Spinner"
+	| "RidePlatform"
+	| "SwingPanel"
+	| "Door"
+	| "FoamPit"
+	-- A mounted piece of visible stock geometry with no kit attributes at all:
+	-- arch frames around a landing mouth, enclosure. It lives in Geometry like
+	-- any other static piece and is never an encounter.
+	| "Prop"
+	-- A static round deck placed by the Ride kind. It carries no attributes and
+	-- does not turn; it exists because a round platform has no preferred heading,
+	-- so a spiral can change direction across one without the wedge seam two
+	-- straight slabs meeting at an angle would open.
+	| "RoundLanding"
 
 export type PieceSpec = {
 	Id: string,
@@ -48,12 +67,19 @@ export type PieceSpec = {
 	FanAxis: ("X" | "Y" | "Z")?,
 	FanDirection: number?,
 	FanColumnHeight: number?,
+	RotorSpeed: number?,
+	DoorRow: number?,
+	DoorIndex: number?,
+	VolumeSize: Vector3?,
+	SpeedMultiplier: number?,
 }
 
 export type BuildContext = {
 	Sources: Instance,
 	Assembly: Instance,
 	JumpPadsFolder: Instance,
+	DoorsFolder: Instance,
+	FoamPitsFolder: Instance,
 	Geometry: Instance,
 	CourseId: string,
 	BeatId: string,
@@ -154,6 +180,13 @@ end
 local function placeByPart(holder: Model, rootLike: BasePart, targetCFrame: CFrame)
 	holder.WorldPivot = rootLike.CFrame
 	holder:PivotTo(targetCFrame)
+end
+
+-- HANDOFF 6: spin speed in degrees/s is ceil((33.8 * 180 / (pi * r)) / 5) * 5,
+-- computed at the radius the runner actually crosses. 33.8 is 1.3 * the 26-stud
+-- walk speed, which is what makes a sweep read as a hazard rather than a nudge.
+local function spinDegreesPerSecond(contactRadius: number): number
+	return math.ceil((33.8 * 180 / (math.pi * contactRadius)) / 5) * 5
 end
 
 local function partCount(holder: Model): number
@@ -353,20 +386,146 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 	elseif spec.Preset == "JumpPad" then
 		-- Outer/Inner are required by the runtime pad contract (HANDOFF 3.3
 		-- Scriptables/JumpPads/<model>/Outer, Inner), so they keep those names
-		-- while the holder carries the sd_ course name.
+		-- while the holder carries the sd_ course name. The inner child is read
+		-- from the manifest rather than hard-coded, because trampoline_5's inner
+		-- is trampoline_6 and trampoline_3's is trampoline_3_002.
 		root.Name = "Outer"
-		sub("trampoline_1_002").Name = "Inner"
+		local subParts = assert(manifest.SubParts, `[CoursePresets] {sourceId} has no pad inner sub-part`)
+		sub(subParts[1].Name).Name = "Inner"
 		holder:SetAttribute(A.JumpPad, true)
 		holder:SetAttribute(A.LaunchSpeed, spec.LaunchSpeed or 51)
 		holder:SetAttribute(A.FloatFactor, spec.FloatFactor or 0.2)
+	elseif spec.Preset == "Spinner" then
+		-- One preset for every single-mesh Y-spin shove silhouette: the dumbbell
+		-- bar, the four-arm cross and the two-arm cross. Speed comes from the
+		-- section 6 formula at the measured contact radius, never a chosen number.
+		local contactRadius = assert(
+			manifest.ContactRadius,
+			`[CoursePresets] {sourceId} has no measured ContactRadius for a Spinner`
+		) * spec.Scale
+		root:SetAttribute(A.Rotor, "spin")
+		root:SetAttribute(A.RotorAxis, "Y")
+		root:SetAttribute(A.RotorSpeed, spec.RotorSpeed or spinDegreesPerSecond(contactRadius))
+		root:SetAttribute(A.RotorPhaseDegrees, (spec.RotorPhase or 0) * 60)
+		root:SetAttribute(A.Shove, true)
+		root:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 48)
+		root:SetAttribute(A.ShoveUpwardSpeed, 20)
+		root:SetAttribute(A.ShoveSeconds, 0.24)
+		root:SetAttribute(A.ShoveContact, "mesh")
+		root:SetAttribute(A.ImpactVisual, true)
+		root:SetAttribute(A.RetriggerCooldown, 0.8)
+		root:SetAttribute(A.GuardSeconds, 1.0)
+	elseif spec.Preset == "SwingPanel" then
+		-- obstacle_8: a fixed axle with a rocking panel a rider stands on. The
+		-- axle never moves; the panel both carries and shoves (section 6).
+		local panel = sub("obstacle_8_002")
+		panel:SetAttribute(A.Rotor, "rock")
+		panel:SetAttribute(A.RotorAxis, "X")
+		panel:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 28)
+		panel:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 2.8)
+		panel:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
+		panel:SetAttribute(A.RotorCarries, true)
+		panel:SetAttribute(A.Shove, true)
+		panel:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 48)
+		panel:SetAttribute(A.ShoveUpwardSpeed, 20)
+		panel:SetAttribute(A.ShoveSeconds, 0.24)
+		panel:SetAttribute(A.ShoveContact, "mesh")
+		panel:SetAttribute(A.ImpactVisual, true)
+		panel:SetAttribute(A.RetriggerCooldown, 0.8)
+		panel:SetAttribute(A.GuardSeconds, 1.0)
+	elseif spec.Preset == "Door" then
+		-- One slab of a door row. DoorRows.resolve requires DoorRow and DoorIndex
+		-- to be unique contiguous positive integers within the Doors folder.
+		root:SetAttribute(A.DoorRow, assert(spec.DoorRow, `[CoursePresets] {spec.Id} needs DoorRow`))
+		root:SetAttribute(A.DoorIndex, assert(spec.DoorIndex, `[CoursePresets] {spec.Id} needs DoorIndex`))
 	end
 
-	holder.Parent = if spec.Preset == "JumpPad" then context.JumpPadsFolder else context.Assembly
+	holder.Parent = if spec.Preset == "JumpPad"
+		then context.JumpPadsFolder
+		elseif spec.Preset == "Door" then context.DoorsFolder
+		elseif spec.Preset == "Prop" then context.Geometry
+		else context.Assembly
 	return { Model = holder, PartCount = partCount(holder) }
+end
+
+-- A round rotating deck the route crosses (pizza, carousel, disc). It is placed
+-- by its rotation axis, not by an Entry socket: the deck turns, so only the hub
+-- axis and the measured usable radius are stable. CourseBuilder advances the
+-- cursor one radius in and one radius out, which is what lets a spiral change
+-- heading across it without opening a wedge seam between straight slabs.
+local function buildRidePiece(context: BuildContext, spec: PieceSpec, centre: Vector3, yaw: number): MountResult
+	local sourceId = assert(spec.Source, `[CoursePresets] {spec.Id} needs Source`)
+	local holder, root, manifest, byPath = clonePiece(context, spec, sourceId, "ride")
+	local ride = assert(manifest.Ride, `[CoursePresets] {sourceId} has no measured Ride deck`)
+
+	local plate = if ride.Plate then byPath[ride.Plate] else root
+	assert(plate ~= nil, `[CoursePresets] {spec.Id} missing cloned ride plate {tostring(ride.Plate)}`)
+
+	-- Root-local position of the deck's walkable top, on the hub axis: the
+	-- plate's own measured top lifted by wherever the plate sits under the hub.
+	local plateOffset = if ride.Plate
+		then (assert(manifest.SubParts, "[CoursePresets] ride plate needs a SubPart entry")[1]).RelativeCFrame.Position
+		else Vector3.zero
+	local topLocal = Vector3.new(0, plateOffset.Y + ride.PlateTopLocalY, 0) * spec.Scale
+	local rotation = CFrame.Angles(0, math.rad(yaw), 0)
+	placeByPart(holder, root, CFrame.new(centre) * rotation * CFrame.new(-topLocal))
+
+	if spec.Preset == "RoundLanding" then
+		holder.Parent = context.Geometry
+		return { Model = holder, PartCount = partCount(holder) }
+	end
+
+	plate:SetAttribute(A.Rotor, "spin")
+	plate:SetAttribute(A.RotorAxis, "Y")
+	plate:SetAttribute(A.RotorSpeed, assert(spec.RotorSpeed, `[CoursePresets] {spec.Id} needs RotorSpeed`))
+	plate:SetAttribute(A.RotorPhaseDegrees, (spec.RotorPhase or 0) * 60)
+	-- Ride-only platforms carry and do not shove: their hazard is lost support
+	-- and real holes, not a knockback (HANDOFF section 6).
+	plate:SetAttribute(A.RotorCarries, true)
+
+	holder.Parent = context.Assembly
+	return { Model = holder, PartCount = partCount(holder) }
+end
+
+-- A foam penalty volume. HANDOFF 3.3 allows invisible markers and test volumes
+-- as ordinary Parts; a foam pit is the existing volume pattern, not a new
+-- visual asset, and it lives in Scriptables/FoamPits with FoamPit = true.
+local function buildFoamPit(context: BuildContext, spec: PieceSpec, targetCFrame: CFrame): BasePart
+	local size = assert(spec.VolumeSize, `[CoursePresets] {spec.Id} needs VolumeSize`)
+	-- The volume is an IMMEDIATE child of Scriptables/FoamPits, not wrapped in a
+	-- holder: AttributeAudit resolves a foam pit by its parent folder and rejects
+	-- one nested a level deeper.
+	local volume = Instance.new("Part")
+	volume.Name = pieceName(context, "foampit")
+	volume.Size = size
+	volume.CFrame = targetCFrame * CFrame.new(0, size.Y / 2, 0)
+	volume.Anchored = true
+	volume.CanCollide = false
+	volume.CanTouch = true
+	volume.CanQuery = true
+	volume.Transparency = 0.55
+	volume.Color = Color3.fromRGB(255, 240, 202)
+	volume:SetAttribute(A.FoamPit, true)
+	volume:SetAttribute("CourseId", context.CourseId)
+	volume:SetAttribute("BeatId", context.BeatId)
+	volume:SetAttribute("PieceId", spec.Id)
+	volume.Parent = context.FoamPitsFolder
+	return volume
 end
 
 function CoursePresets.buildChainPiece(context: BuildContext, spec: PieceSpec, cursor: Cursor): ChainResult
 	return buildChainPiece(context, spec, cursor)
+end
+
+function CoursePresets.buildRidePiece(context: BuildContext, spec: PieceSpec, centre: Vector3, yaw: number): MountResult
+	return buildRidePiece(context, spec, centre, yaw)
+end
+
+-- The measured usable crossing radius of a ride deck at this scale.
+function CoursePresets.rideRadius(sourceId: string, scale: number): number
+	local manifest = AssetManifest.get(sourceId)
+	local ride = assert(manifest.Ride, `[CoursePresets] {sourceId} has no measured Ride deck`)
+	return ride.Radius * scale
 end
 
 function CoursePresets.buildCornerPiece(context: BuildContext, spec: PieceSpec, cursor: Cursor): ChainResult
@@ -374,6 +533,12 @@ function CoursePresets.buildCornerPiece(context: BuildContext, spec: PieceSpec, 
 end
 
 function CoursePresets.buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFrame: CFrame): MountResult
+	-- A foam pit is an authored volume rather than a cloned kit mesh, so it does
+	-- not go through the source/socket path at all.
+	if spec.Preset == "FoamPit" then
+		local volume = buildFoamPit(context, spec, targetCFrame)
+		return { Model = volume :: any, PartCount = 1 }
+	end
 	return buildMountPiece(context, spec, targetCFrame)
 end
 

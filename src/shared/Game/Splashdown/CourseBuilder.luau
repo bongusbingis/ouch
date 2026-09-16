@@ -37,7 +37,15 @@ export type PieceSpec = {
 	-- "Advance" moves the cursor with no geometry: the intended route crosses
 	-- open air/liquid here (e.g. between BigBalls, which must sit over liquid
 	-- with no walkable bypass slab underneath per HANDOFF 5.1/7.1).
-	Kind: "Chain" | "Corner" | "Mount" | "Advance",
+	-- "Ride" places a rotating round ride platform the route crosses: the cursor
+	-- enters at the rim, the centre sits one radius along, and it leaves at the
+	-- opposite rim. Only a Spiral layout uses it, because a round deck is what
+	-- absorbs a heading change without an illegal wedge seam (HANDOFF 5.2).
+	-- "Flank" places a chained-preset piece beside, behind or above the cursor
+	-- WITHOUT advancing it: the side tiles that widen a lane into a door-row
+	-- corridor, and visible stock enclosure. It is listed before the Chain piece
+	-- it sits beside, so both share the same entry line.
+	Kind: "Chain" | "Corner" | "Mount" | "Advance" | "Ride" | "Flank",
 	Preset: CoursePresets.PresetName?,
 	Source: string?,
 	Scale: number?,
@@ -67,6 +75,11 @@ export type PieceSpec = {
 	FanAxis: ("X" | "Y" | "Z")?,
 	FanDirection: number?,
 	FanColumnHeight: number?,
+	RotorSpeed: number?,
+	DoorRow: number?,
+	DoorIndex: number?,
+	VolumeSize: Vector3?,
+	SpeedMultiplier: number?,
 }
 
 export type BeatSpec = {
@@ -85,6 +98,21 @@ export type StartSpec = {
 	Position: Vector3,
 }
 
+-- HANDOFF 5.2's other permitted guide form: "a parametric curve in local X/Z
+-- with a Y profile". Angles are degrees measured so that a point sits at
+-- (Radius * cos(angle), Radius * sin(angle)) in local X/Z, and the radius
+-- interpolates linearly in angle. FinishRadius appends the section 5.2 "radial
+-- finish to the hub" as a straight run inward from the spiral's last point, so
+-- one arclength parametrization covers the whole route.
+export type SpiralSpec = {
+	AngleStartDegrees: number,
+	AngleEndDegrees: number,
+	RadiusStart: number,
+	RadiusEnd: number,
+	Samples: number,
+	FinishRadius: number?,
+}
+
 export type LayoutSpec = {
 	Kind: string,
 	LanePitch: number,
@@ -93,7 +121,14 @@ export type LayoutSpec = {
 	-- HANDOFF 5.2 guide polyline in local X/Z. The route never leaves it: every
 	-- straight run is capped by its segment length and every turn happens at a
 	-- vertex, which is what bounds the course rather than trusting the spec.
-	Guide: { Vector3 },
+	-- Serpentine uses Guide; Spiral uses Spiral instead. Exactly one is required.
+	Guide: { Vector3 }?,
+	Spiral: SpiralSpec?,
+	-- Spiral only: how far a chained run may drift from the parametric guide
+	-- before the build fails. A straight slab chord always sits slightly outside
+	-- the arc it approximates; this is the measured budget for that, not licence
+	-- to wander.
+	GuideTolerance: number?,
 	Corner: { Source: string, Scale: number },
 	Fill: { Source: string, Scale: number },
 }
@@ -102,6 +137,11 @@ export type CourseSpec = {
 	Version: number,
 	Id: string,
 	DisplayName: string,
+	-- The encounter type section 7 names as this course's headline. It is
+	-- declared rather than inferred, because the most frequent encounter in a
+	-- course is usually its glue, not the thing the course is about; the
+	-- cross-course rules in override 2 are scored against this.
+	Headline: string,
 	Difficulty: number,
 	ParSeconds: number,
 	CapSeconds: number,
@@ -163,6 +203,10 @@ export type BuildReport = {
 	Route: { RouteStep },
 	Bounds: BoundsReport,
 	CheckpointCount: number,
+	-- Spiral only: the worst measured distance between the built route and the
+	-- parametric guide, and the guide's own total arclength.
+	GuideDeviation: number,
+	GuideLength: number,
 }
 
 local function forward(headingDegrees: number): Vector3
@@ -511,11 +555,101 @@ local function buildSegments(guide: { Vector3 }): { Segment }
 	return segments
 end
 
+-- A guide sampled densely enough that arclength, position and tangent can all be
+-- read at any distance along it. Serpentine does not use this: its straight runs
+-- and 90-degree corner slabs already bound the route exactly, and reusing this
+-- for it would change the pilot's build.
+type GuideCurve = {
+	Length: number,
+	Points: { Vector3 },
+	Cumulative: { number },
+	PointAt: (number) -> Vector3,
+	YawAt: (number) -> number,
+}
+
+local function headingOf(direction: Vector3): number
+	return math.deg(math.atan2(-direction.X, -direction.Z))
+end
+
+local function buildSpiralGuide(spiral: SpiralSpec): GuideCurve
+	local samples = math.max(16, math.floor(spiral.Samples))
+	local points: { Vector3 } = {}
+	for index = 0, samples do
+		local t = index / samples
+		local angle = math.rad(spiral.AngleStartDegrees + (spiral.AngleEndDegrees - spiral.AngleStartDegrees) * t)
+		local radius = spiral.RadiusStart + (spiral.RadiusEnd - spiral.RadiusStart) * t
+		table.insert(points, Vector3.new(radius * math.cos(angle), 0, radius * math.sin(angle)))
+	end
+
+	local finishRadius = spiral.FinishRadius
+	if finishRadius ~= nil then
+		assert(finishRadius < spiral.RadiusEnd, "[CourseBuilder] Spiral.FinishRadius must be inside RadiusEnd")
+		local endAngle = math.rad(spiral.AngleEndDegrees)
+		local outward = Vector3.new(math.cos(endAngle), 0, math.sin(endAngle))
+		local steps = math.max(2, math.ceil((spiral.RadiusEnd - finishRadius) / 8))
+		for index = 1, steps do
+			local radius = spiral.RadiusEnd + (finishRadius - spiral.RadiusEnd) * (index / steps)
+			table.insert(points, outward * radius)
+		end
+	end
+
+	local cumulative: { number } = { 0 }
+	for index = 2, #points do
+		local delta = points[index] - points[index - 1]
+		cumulative[index] = cumulative[index - 1] + Vector3.new(delta.X, 0, delta.Z).Magnitude
+	end
+	local length = cumulative[#cumulative]
+
+	local function locate(distance: number): (number, number)
+		local clamped = math.clamp(distance, 0, length)
+		local low, high = 1, #cumulative
+		while low < high do
+			local middle = (low + high + 1) // 2
+			if cumulative[middle] <= clamped then
+				low = middle
+			else
+				high = middle - 1
+			end
+		end
+		local index = math.min(low, #points - 1)
+		local span = cumulative[index + 1] - cumulative[index]
+		local fraction = if span > 1e-9 then (clamped - cumulative[index]) / span else 0
+		return index, fraction
+	end
+
+	local curve = {
+		Length = length,
+		Points = points,
+		Cumulative = cumulative,
+		PointAt = function(distance: number): Vector3
+			local index, fraction = locate(distance)
+			return points[index]:Lerp(points[index + 1], fraction)
+		end,
+		YawAt = function(distance: number): number
+			local index = locate(distance)
+			local delta = points[index + 1] - points[index]
+			return headingOf(Vector3.new(delta.X, 0, delta.Z).Unit)
+		end,
+	}
+	return curve :: GuideCurve
+end
+
 function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildReport)
 	local startClock = os.clock()
 	local layout = spec.Layout
 	local liquidY = layout.LiquidY
-	local segments = buildSegments(layout.Guide)
+	assert(
+		layout.Kind == "Serpentine" or layout.Kind == "Spiral",
+		`[CourseBuilder] unknown Layout.Kind "{layout.Kind}"`
+	)
+	local isSpiral = layout.Kind == "Spiral"
+	local curve: GuideCurve? = if isSpiral
+		then buildSpiralGuide(assert(layout.Spiral, "[CourseBuilder] a Spiral layout needs Layout.Spiral"))
+		else nil
+	local segments = if isSpiral
+		then {} :: { Segment }
+		else buildSegments(assert(layout.Guide, "[CourseBuilder] a Serpentine layout needs Layout.Guide"))
+	local guideTolerance = layout.GuideTolerance or 12
 	local routeErrors: { string } = {}
 
 	local model = Instance.new("Model")
@@ -555,19 +689,31 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local scriptables = folder("Scriptables", model)
 	local rotating = folder("Rotating", scriptables)
 	local jumpPadsFolder = folder("JumpPads", scriptables)
-	folder("Doors", scriptables)
+	local doorsFolder = folder("Doors", scriptables)
+	local foamPitsFolder = folder("FoamPits", scriptables)
 	local boundaryFolder = folder("Boundary", model)
 	local qaGates = folder("Gates", folder("QA", model))
 
 	local cursor = buildStartPads(spec, sources, startFolder, geometry)
 	-- The route starts on the guide's first vertex, so the start plaza's exit
-	-- offset is already travel along segment 1.
+	-- offset is already travel along segment 1 (Serpentine) or arclength along
+	-- the parametric curve (Spiral).
 	local segmentIndex = 1
-	local segmentTravel = (cursor.Position - layout.Guide[1]).Magnitude
+	local guideStart = if curve
+		then (curve :: GuideCurve).Points[1]
+		else (assert(layout.Guide, "[CourseBuilder] a Serpentine layout needs Layout.Guide"))[1]
+	-- Guide travel is horizontal arclength, so the start plaza's own height above
+	-- the guide plane must not count towards it. Ball Barrage starts at Y 0 on a
+	-- Y 0 guide and is unaffected; a course that starts elevated (Whirlpool Waltz
+	-- starts at 36) would otherwise begin the route tens of studs further along
+	-- its own guide than it really is.
+	local startDelta = cursor.Position - guideStart
+	local segmentTravel = Vector3.new(startDelta.X, 0, startDelta.Z).Magnitude
 	local route: { RouteStep } = {}
 	local beatMeasures: { BeatMeasure } = {}
 	local routeLength = segmentTravel
 	local pieceIndex = 0
+	local maxGuideDeviation = 0
 
 	local function fail(message: string)
 		table.insert(routeErrors, message)
@@ -576,19 +722,62 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local function advanceTravel(beatId: string, pieceId: string, distance: number)
 		segmentTravel += distance
 		routeLength += distance
-		local cap = segments[segmentIndex].Length
+		local cap = if curve then (curve :: GuideCurve).Length else segments[segmentIndex].Length
 		if segmentTravel > cap + 1e-3 then
 			fail(
 				string.format(
-					"%s/%s: guide segment %d travel %.2f exceeds its %.2f length",
+					"%s/%s: guide %s travel %.2f exceeds its %.2f length",
 					beatId,
 					pieceId,
-					segmentIndex,
+					if curve then "curve" else string.format("segment %d", segmentIndex),
 					segmentTravel,
 					cap
 				)
 			)
 		end
+	end
+
+	-- Spiral only. A chained straight slab is a chord of the arc it approximates,
+	-- so its exit always sits a little outside the guide. This measures that
+	-- offset after every chained piece and fails the build when the run has
+	-- wandered further than the declared tolerance, which is what keeps the
+	-- spiral a spiral rather than a drifting polygon.
+	local function checkGuideDeviation(beatId: string, pieceId: string)
+		if not curve then
+			return
+		end
+		local expected = (curve :: GuideCurve).PointAt(segmentTravel)
+		local delta = cursor.Position - expected
+		local deviation = Vector3.new(delta.X, 0, delta.Z).Magnitude
+		maxGuideDeviation = math.max(maxGuideDeviation, deviation)
+		if deviation > guideTolerance then
+			fail(
+				string.format(
+					"%s/%s: route sits %.2f studs off the spiral guide at arclength %.2f (tolerance %.2f)",
+					beatId,
+					pieceId,
+					deviation,
+					segmentTravel,
+					guideTolerance
+				)
+			)
+		end
+	end
+
+	-- Spiral only. Re-anchors the cursor onto the guide: X/Z come from the curve
+	-- at the current arclength and the heading from its tangent there, while Y
+	-- stays whatever the ramps have built. Every heading change on a spiral
+	-- happens here -- across a declared gap or a round ride deck -- so chained
+	-- slabs stay collinear and no joint opens a wedge seam.
+	local function anchorToGuide()
+		if not curve then
+			return
+		end
+		local point = (curve :: GuideCurve).PointAt(segmentTravel)
+		cursor = {
+			Position = Vector3.new(point.X, cursor.Position.Y, point.Z),
+			Yaw = (curve :: GuideCurve).YawAt(segmentTravel),
+		}
 	end
 
 	local function record(beatId: string, pieceId: string, kind: string, arcLength: number)
@@ -625,6 +814,8 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			Sources = sources.Kit,
 			Assembly = beatGroup,
 			JumpPadsFolder = jumpPadsFolder,
+			DoorsFolder = doorsFolder,
+			FoamPitsFolder = foamPitsFolder,
 			Geometry = geometry,
 			CourseId = spec.Id,
 			BeatId = beat.Id,
@@ -641,10 +832,18 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		-- QA gate volume at every beat entrance: an invisible, noncolliding but
 		-- queryable/touchable plane the cut-set audit uses to prove the route
 		-- actually passes through this beat (HANDOFF 3.3 QA/Gates, 8.2).
+		-- The gate must catch every legal way INTO the beat, including a runner who
+		-- arrives low. A gate reaching only 2 studs below the entrance was measured
+		-- being passed underneath on Whirlpool Waltz: a 22-stud jump off the
+		-- previous beat's last slab crossed the gate plane at 7 studs below the
+		-- entrance and landed past it, and all 30 spawn cells still reached Finish
+		-- with the gate removed. It now spans 22 studs below the entrance to 38
+		-- above, still only 2 studs thick along the route and 60 wide, which stays
+		-- well inside both the serpentine lane pitch and the spiral's radial pitch.
 		local gate = marker(
 			beat.Id,
-			Vector3.new(60, 40, 2),
-			CFrame.new(cursor.Position + Vector3.new(0, 18, 0)) * CFrame.Angles(0, math.rad(cursor.Yaw), 0),
+			Vector3.new(60, 60, 2),
+			CFrame.new(cursor.Position + Vector3.new(0, 8, 0)) * CFrame.Angles(0, math.rad(cursor.Yaw), 0),
 			qaGates
 		)
 		gate.CanTouch = true
@@ -670,9 +869,47 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				local result = CoursePresets.buildChainPiece(context, piece :: any, cursor)
 				cursor = result.ExitCursor
 				advanceTravel(beat.Id, piece.Id, result.ArcLength)
+				checkGuideDeviation(beat.Id, piece.Id)
 				record(beat.Id, piece.Id, piece.Kind, result.ArcLength)
 				indexPiece(piece.Id, result.Model)
+			elseif piece.Kind == "Ride" then
+				assert(curve ~= nil, `[CourseBuilder] {piece.Id}: Ride pieces need a Spiral layout`)
+				local radius = CoursePresets.rideRadius(
+					assert(piece.Source, `[CourseBuilder] {piece.Id} needs Source`),
+					piece.Scale or 1
+				)
+				-- Enter at the near rim, centre one radius along, leave at the far
+				-- rim: the deck is round, so the guide's heading change across it
+				-- costs no seam at all. The exit cursor is the deck's PHYSICAL rim
+				-- in the outgoing direction, not the guide point, so whatever
+				-- follows chains onto real plate; the guide re-anchor happens at
+				-- the next Advance, which is where the offset is measured as part
+				-- of that gap.
+				advanceTravel(beat.Id, piece.Id, radius)
+				anchorToGuide()
+				local centre = cursor.Position + Vector3.new(0, piece.OffsetUp or 0, 0)
+				local result = CoursePresets.buildRidePiece(context, piece :: any, centre, cursor.Yaw)
+				advanceTravel(beat.Id, piece.Id, radius)
+				local exitYaw = (curve :: GuideCurve).YawAt(segmentTravel)
+				cursor = { Position = centre + forward(exitYaw) * radius, Yaw = exitYaw }
+				record(beat.Id, piece.Id, piece.Kind, radius * 2)
+				indexPiece(piece.Id, result.Model)
+			elseif piece.Kind == "Flank" then
+				local flankCursor = {
+					Position = cursor.Position
+						+ forward(cursor.Yaw) * (piece.OffsetAlong or 0)
+						+ right(cursor.Yaw) * (piece.OffsetSide or 0)
+						+ Vector3.new(0, piece.OffsetUp or 0, 0),
+					Yaw = cursor.Yaw + (piece.FacingOffsetDegrees or 0),
+				}
+				local result = CoursePresets.buildChainPiece(context, piece :: any, flankCursor)
+				record(beat.Id, piece.Id, piece.Kind, 0)
+				indexPiece(piece.Id, result.Model)
 			elseif piece.Kind == "Corner" then
+				assert(
+					not isSpiral,
+					`[CourseBuilder] {piece.Id}: a Spiral layout turns on its guide, not on Corner slabs`
+				)
 				local cornerSource = layout.Corner.Source
 				local cornerScale = layout.Corner.Scale
 				local direction = assert(piece.Direction, `[CourseBuilder] {piece.Id} corner needs Direction`)
@@ -748,11 +985,43 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				record(beat.Id, piece.Id, piece.Kind, 0)
 				indexPiece(piece.Id, result.Model)
 			else
+				local before = cursor.Position
 				local advanced = offsetCFrame(cursor, piece, liquidY)
 				cursor = { Position = advanced.Position, Yaw = cursor.Yaw + (piece.FacingOffsetDegrees or 0) }
 				local distance = piece.OffsetAlong or 0
 				advanceTravel(beat.Id, piece.Id, distance)
+				if isSpiral then
+					-- On a spiral an Advance is where the route re-anchors: the
+					-- declared distance is arclength along the guide, and the
+					-- runner's actual gap is the straight line between the two
+					-- anchored points, which is what gets measured and reported.
+					cursor = { Position = Vector3.new(before.X, cursor.Position.Y, before.Z), Yaw = cursor.Yaw }
+					anchorToGuide()
+					local gap = cursor.Position - before
+					local measuredGap = Vector3.new(gap.X, 0, gap.Z).Magnitude
+					if measuredGap > 19.8 then
+						fail(
+							string.format(
+								"%s/%s: the spiral gap measures %.2f studs, past the 19.8 ordinary-jump ceiling (HANDOFF 8.3)",
+								beat.Id,
+								piece.Id,
+								measuredGap
+							)
+						)
+					end
+				end
 				record(beat.Id, piece.Id, piece.Kind, distance)
+			end
+		end
+
+		-- HANDOFF 3.3: "Origin.ServerCarries=true for RotorCarries or Seesaw
+		-- rides", which also disables the old client carry solver for the group.
+		-- It is set only on beats that actually carry a rider, so a beat of pure
+		-- shove hazards keeps exactly the attributes it had.
+		for _, descendant in beatGroup:GetDescendants() do
+			if descendant:GetAttribute("RotorCarries") == true or descendant:GetAttribute("Seesaw") == true then
+				groupOrigin:SetAttribute("ServerCarries", true)
+				break
 			end
 		end
 
@@ -816,6 +1085,8 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		Route = route,
 		Bounds = bounds,
 		CheckpointCount = checkpointCount,
+		GuideDeviation = maxGuideDeviation,
+		GuideLength = if curve then (curve :: GuideCurve).Length else 0,
 	}
 	return model, report
 end

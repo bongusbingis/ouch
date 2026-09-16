@@ -89,6 +89,22 @@ T.describe("CourseGraph", function()
 		T.expect(leaks[1]):toEqual("Spawn")
 	end)
 
+	T.it("catches an edge that only clips a corner of the gate between coarse samples", function()
+		-- Regression for a measured Whirlpool Waltz bypass: a 22-stud jump crossed
+		-- a gate's corner over about 0.3 studs of travel, and a fixed twelve-sample
+		-- edge test stepped straight over it. This fixture is arranged so no
+		-- twelfth of the segment lands inside the box while the segment genuinely
+		-- passes through it.
+		local graph = CourseGraph.new()
+		CourseGraph.addNode(graph, node("Spawn", -10, 10.5, 0))
+		CourseGraph.addNode(graph, node("Finish", 10, -9.5, 0))
+		CourseGraph.addEdge(graph, { From = "Spawn", To = "Finish", Kind = "Jump" })
+
+		local gate = { Min = Vector3.new(0.5, -0.5, -1), Max = Vector3.new(1.5, 0.5, 1) }
+		local leaks = CourseGraph.gateCutsAllRoutes(graph, { "Spawn" }, "Finish", gate)
+		T.expect(#leaks):toEqual(0)
+	end)
+
 	T.it("catches a long edge that tunnels through the gate without either endpoint sitting inside it", function()
 		local graph = CourseGraph.new()
 		CourseGraph.addNode(graph, node("Spawn", -50, 0, 0))

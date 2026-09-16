@@ -53,7 +53,13 @@ end
 local function edgeCutByGate(graph: Graph, edge: Edge, gate: { Min: Vector3, Max: Vector3 }): boolean
 	local a = graph.Nodes[edge.From].Position
 	local b = graph.Nodes[edge.To].Position
-	local samples = 12
+	-- Sample by DISTANCE, not by a fixed count. A fixed twelve samples is 2-stud
+	-- resolution on a 22-stud jump, and a Whirlpool Waltz jump was measured
+	-- threading a gate's corner over about 0.3 studs of travel without a single
+	-- sample landing inside it. Half a stud is finer than any gate dimension.
+	local dx, dy, dz = b.X - a.X, b.Y - a.Y, b.Z - a.Z
+	local length = math.sqrt(dx * dx + dy * dy + dz * dz)
+	local samples = math.max(12, math.ceil(length / 0.5))
 	for i = 0, samples do
 		local t = i / samples
 		local x = a.X + (b.X - a.X) * t
@@ -195,6 +201,79 @@ function CourseGraph.reachingNodes(graph: Graph, targets: { NodeId }, options: R
 		end
 	end
 	return visited
+end
+
+-- One concrete path from `from` to `to` under the same blocking/gate/state rules,
+-- as node ids in order, or nil when none exists. A cut-set failure that only says
+-- "30 spawns still reach Finish" cannot be acted on; the actual route the audit
+-- found is what tells an author which edge to close.
+function CourseGraph.tracePath(graph: Graph, from: NodeId, to: NodeId, options: ReachOptions?): { NodeId }?
+	local opts = options or {}
+	local blocked = opts.BlockedNodes or {}
+	local gates = opts.Gates or {}
+	local activeState = opts.ActiveState
+
+	local adjacency: { [NodeId]: { Edge } } = {}
+	for _, edge in graph.Edges do
+		if edge.RequiresState ~= nil and edge.RequiresState ~= activeState then
+			continue
+		end
+		local cut = false
+		for _, gate in gates do
+			if edgeCutByGate(graph, edge, gate) then
+				cut = true
+				break
+			end
+		end
+		if cut then
+			continue
+		end
+		if not adjacency[edge.From] then
+			adjacency[edge.From] = {}
+		end
+		table.insert(adjacency[edge.From], edge)
+	end
+
+	local startNode = graph.Nodes[from]
+	if
+		not startNode
+		or blocked[from]
+		or (startNode.RequiresState ~= nil and startNode.RequiresState ~= activeState)
+	then
+		return nil
+	end
+
+	local parent: { [NodeId]: NodeId } = {}
+	local visited: { [NodeId]: boolean } = { [from] = true }
+	local queue: { NodeId } = { from }
+	local head = 1
+	while head <= #queue do
+		local current = queue[head]
+		head += 1
+		if current == to then
+			local path: { NodeId } = { to }
+			local walker = to
+			while walker ~= from do
+				walker = parent[walker]
+				table.insert(path, 1, walker)
+			end
+			return path
+		end
+		for _, edge in adjacency[current] or {} do
+			local targetNode = graph.Nodes[edge.To]
+			if
+				targetNode
+				and not blocked[edge.To]
+				and not visited[edge.To]
+				and (targetNode.RequiresState == nil or targetNode.RequiresState == activeState)
+			then
+				visited[edge.To] = true
+				parent[edge.To] = current
+				table.insert(queue, edge.To)
+			end
+		end
+	end
+	return nil
 end
 
 function CourseGraph.canReach(graph: Graph, from: NodeId, to: NodeId, options: ReachOptions?): boolean

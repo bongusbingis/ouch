@@ -416,16 +416,71 @@ function CourseQA.checkCutSets(model: Model, graph: CourseGraph.Graph): ({ Findi
 						leaks += 1
 					end
 				end
+				local bypass = ""
 				if leaks > 0 then
+					-- Trace one actual bypass so the failure names the route rather
+					-- than just its existence.
+					local leaking: CourseGraph.NodeId? = nil
+					for _, node in spawnNodes do
+						if reaching[node] then
+							leaking = node
+							break
+						end
+					end
+					local path = if leaking
+						then CourseGraph.tracePath(graph, leaking, finishNode, { Gates = { gate.Box } })
+						else nil
+					if path then
+						-- Report the hops that actually matter: every edge that
+						-- changes beat, or that is not a plain Walk, with both
+						-- endpoints and the edge kind. That is the edge to close.
+						local kindOf: { [string]: string } = {}
+						for _, edge in graph.Edges do
+							kindOf[edge.From .. ">" .. edge.To] = edge.Kind
+						end
+						local steps: { string } = {}
+						for step = 2, #path do
+							local fromNode = graph.Nodes[path[step - 1]]
+							local toNode = graph.Nodes[path[step]]
+							local kind = kindOf[path[step - 1] .. ">" .. path[step]] or "?"
+							if fromNode.Beat ~= toNode.Beat or kind ~= "Walk" then
+								table.insert(
+									steps,
+									string.format(
+										"%s(%.0f,%.0f,%.0f) -%s-> %s(%.0f,%.0f,%.0f)",
+										fromNode.Beat,
+										fromNode.Position.X,
+										fromNode.Position.Y,
+										fromNode.Position.Z,
+										kind,
+										toNode.Beat,
+										toNode.Position.X,
+										toNode.Position.Y,
+										toNode.Position.Z
+									)
+								)
+							end
+						end
+						bypass = string.format(
+							"; bypass is %d cells, non-walk or beat-changing hops: %s",
+							#path,
+							table.concat(steps, " | ")
+						)
+					end
 					table.insert(
 						errors,
-						string.format("gate %s is not a cut set: %d spawn cells still reach Finish", gate.Id, leaks)
+						string.format(
+							"gate %s is not a cut set: %d spawn cells still reach Finish%s",
+							gate.Id,
+							leaks,
+							bypass
+						)
 					)
 				end
 				table.insert(findings, {
 					Check = "GateCutSet:" .. gate.Id,
 					Status = if leaks == 0 then "PASS" else "FAIL",
-					Detail = string.format("%d of %d spawn cells bypass this gate", leaks, #spawnNodes),
+					Detail = string.format("%d of %d spawn cells bypass this gate%s", leaks, #spawnNodes, bypass),
 				})
 				task.wait()
 			end
@@ -485,6 +540,33 @@ local ENCOUNTER_TYPES: { [string]: string } = {
 	Hammer = "RotorBump",
 	Fan = "Fan",
 	JumpPad = "JumpPad",
+	-- A Rotor plus a Shove is one RotorBump, never two kits (section 7 override 3),
+	-- which is why every single-mesh spinner and the swing panel land here.
+	Spinner = "RotorBump",
+	SwingPanel = "RotorBump",
+	RidePlatform = "RotatingPlatforms",
+	Door = "Door",
+	FoamPit = "FoamPit",
+	-- Deliberately absent, because they are support geometry and never an
+	-- encounter: Platform, Ramp, Slide, Corner, Fill, Prop and RoundLanding.
+}
+
+-- HANDOFF section 7 override 2 caps each NON-GLUE mechanic at three of the six
+-- new courses. Glue -- pendulum and spinner RotorBumps, bumpers, jump pads, foam
+-- pits, static ramps, slides and tunnels -- may appear anywhere, so the cap is
+-- keyed on the preset rather than the encounter type: a piston and a pendulum
+-- both score as RotorBump, but only the piston is capped.
+local NON_GLUE_PRESETS: { [string]: boolean } = {
+	Conveyor = true,
+	Fan = true,
+	Seesaw = true,
+	FallingTile = true,
+	Door = true,
+	Piston = true,
+	Sweeper = true,
+	BeachBall = true,
+	RidePlatform = true,
+	BigBall = true,
 }
 
 function CourseQA.auditVariety(spec: any): ({ Finding }, { string }, { string }, {
@@ -600,6 +682,179 @@ function CourseQA.auditVariety(spec: any): ({ Finding }, { string }, { string },
 		)
 	end
 	return findings, errors, warnings, encounters
+end
+
+-- 8.4 / section 7 override 2: the three cross-course rules, scored over every
+-- spec that exists rather than over one course. A violation fails the set, so
+-- the findings and errors are returned into the selected course's report.
+function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, { string })
+	local findings: { Finding } = {}
+	local errors: { string } = {}
+
+	local ids: { string } = {}
+	for id in allSpecs do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	if #ids < 2 then
+		table.insert(findings, {
+			Check = "CrossCourse",
+			Status = "NOT RUN",
+			Detail = string.format("only %d spec exists; the cross-course rules need at least two", #ids),
+		})
+		return findings, errors
+	end
+
+	local function expect(check: string, ok: boolean, detail: string)
+		table.insert(findings, { Check = check, Status = if ok then "PASS" else "FAIL", Detail = detail })
+		if not ok then
+			table.insert(errors, check .. ": " .. detail)
+		end
+	end
+
+	-- Per course: the encounter type of every beat, the beat's dominant type, the
+	-- course's DECLARED headline and the presets it uses. The headline is read
+	-- from the spec, never inferred from frequency: section 7 names it per course
+	-- ("Headline: three Big Balls over liquid; Big Balls appear nowhere else"),
+	-- and the most frequent type is usually the glue instead -- RotorBump is the
+	-- commonest encounter in four of the six courses and is nobody's headline.
+	local courseHeadline: { [string]: string } = {}
+	local beatDominant: { [string]: { [string]: string } } = {}
+	local courseRecipes: { [string]: { [string]: string } } = {}
+	local presetCourses: { [string]: { [string]: boolean } } = {}
+
+	for _, id in ids do
+		local spec = allSpecs[id]
+		local courseCounts: { [string]: number } = {}
+		beatDominant[id] = {}
+		courseRecipes[id] = {}
+		for _, beat in spec.Beats do
+			local counts: { [string]: number } = {}
+			local recipe: { string } = {}
+			local seenGroups: { [string]: boolean } = {}
+			for _, piece in beat.Pieces do
+				local preset = piece.Preset
+				if not preset then
+					continue
+				end
+				if NON_GLUE_PRESETS[preset] then
+					presetCourses[preset] = presetCourses[preset] or {}
+					presetCourses[preset][id] = true
+				end
+				local encounterType = ENCOUNTER_TYPES[preset]
+				if not encounterType then
+					continue
+				end
+				local group = piece.EncounterGroup
+				if group then
+					local groupKey = beat.Id .. "/" .. group
+					if seenGroups[groupKey] then
+						continue
+					end
+					seenGroups[groupKey] = true
+				end
+				counts[encounterType] = (counts[encounterType] or 0) + 1
+				courseCounts[encounterType] = (courseCounts[encounterType] or 0) + 1
+				table.insert(recipe, encounterType)
+			end
+			local dominant, best = "", 0
+			for encounterType, count in counts do
+				if count > best or (count == best and encounterType < dominant) then
+					dominant, best = encounterType, count
+				end
+			end
+			beatDominant[id][beat.Id] = dominant
+			table.sort(recipe)
+			courseRecipes[id][beat.Id] =
+				string.format("%s|%s|%s", beat.Family, beat.Mechanic, table.concat(recipe, ","))
+		end
+		local declared = spec.Headline
+		if typeof(declared) ~= "string" or declared == "" then
+			table.insert(errors, string.format("CrossCourse:%s: the spec declares no Headline encounter type", id))
+			declared = ""
+		elseif courseCounts[declared] == nil then
+			table.insert(
+				errors,
+				string.format("CrossCourse:%s: declared headline %s does not occur in the course", id, declared)
+			)
+		end
+		courseHeadline[id] = declared
+	end
+
+	-- Rule 1: a course's headline is not the dominant mechanic of another
+	-- course's climax (second-to-last) beat, and is dominant in at most one beat
+	-- outside its own course.
+	for _, id in ids do
+		local headline = courseHeadline[id]
+		local outsideDominant = 0
+		local climaxClash: { string } = {}
+		for _, other in ids do
+			if other == id then
+				continue
+			end
+			local spec = allSpecs[other]
+			local climax = spec.Beats[#spec.Beats - 1]
+			if climax and beatDominant[other][climax.Id] == headline then
+				table.insert(climaxClash, other .. "/" .. climax.Id)
+			end
+			for _, beat in spec.Beats do
+				if beatDominant[other][beat.Id] == headline then
+					outsideDominant += 1
+				end
+			end
+		end
+		expect(
+			string.format("HeadlineNotAnotherClimax:%s", id),
+			#climaxClash == 0,
+			string.format("headline %s; clashes: %s", headline, table.concat(climaxClash, ", "))
+		)
+		expect(
+			string.format("HeadlineDominantOutside<=1:%s", id),
+			outsideDominant <= 1,
+			string.format("headline %s dominates %d beats outside %s", headline, outsideDominant, id)
+		)
+	end
+
+	-- Rule 2: at most three of the six new courses use any one non-glue mechanic.
+	local presets: { string } = {}
+	for preset in presetCourses do
+		table.insert(presets, preset)
+	end
+	table.sort(presets)
+	for _, preset in presets do
+		local users: { string } = {}
+		for id in presetCourses[preset] do
+			table.insert(users, id)
+		end
+		table.sort(users)
+		expect(
+			string.format("NonGlueCap<=3:%s", preset),
+			#users <= 3,
+			string.format("used by %d courses: %s", #users, table.concat(users, ", "))
+		)
+	end
+
+	-- Rule 3: no two beats in different courses share family + mechanic +
+	-- encounter recipe.
+	local seenRecipes: { [string]: string } = {}
+	local clashes: { string } = {}
+	for _, id in ids do
+		for beatId, recipe in courseRecipes[id] do
+			local owner = seenRecipes[recipe]
+			if owner and string.sub(owner, 1, #id + 1) ~= id .. "/" then
+				table.insert(clashes, string.format("%s/%s == %s (%s)", id, beatId, owner, recipe))
+			else
+				seenRecipes[recipe] = id .. "/" .. beatId
+			end
+		end
+	end
+	expect(
+		"NoSharedBeatRecipe",
+		#clashes == 0,
+		if #clashes == 0 then "no beat recipe repeats across courses" else table.concat(clashes, " ; ")
+	)
+
+	return findings, errors
 end
 
 -- 8.4: no hazard/gap/elevation-free 24x24 breather square on the route. Start and
@@ -849,7 +1104,7 @@ local NOT_RUN = {
 	"8.4 measured shove travel from five real-player contacts per hazard and direction",
 	"8.4 bumper chicane centreline/edge/slalom avoidance probes",
 	"8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
-	"8.4 cross-course auditVariety over all six staged specs (only the pilot exists)",
+	"8.4 cross-course auditVariety over all six staged specs",
 	"8.5 scripted expert/mid policy route trials and the interactive keyboard run",
 	"8.5 thirty-rider start load test and the Studio local multi-client session",
 	"8.6 fixed-camera captures and the bad-map-refs comparison",
@@ -901,7 +1156,28 @@ function CourseQA.check(model: Model, spec: any, calibration: Calibration?, cont
 	end
 	counts.Encounters = #encounters
 
+	-- The cross-course rules run as soon as more than one spec exists, and they
+	-- stop being a NOT RUN item once every course in the set has been built.
+	local allSpecs = ctx.AllSpecs
+	local crossCourseRan = false
+	if typeof(allSpecs) == "table" then
+		local specCount = 0
+		for _ in allSpecs do
+			specCount += 1
+		end
+		counts.CrossCourseSpecs = specCount
+		if specCount >= 2 then
+			absorb(CourseQA.auditCrossCourse(allSpecs))
+			crossCourseRan = specCount >= 6
+		end
+	end
+
+	local notRun: { string } = {}
 	for _, item in NOT_RUN do
+		if crossCourseRan and string.find(item, "cross-course", 1, true) then
+			continue
+		end
+		table.insert(notRun, item)
 		table.insert(
 			findings,
 			{ Check = item, Status = "NOT RUN", Detail = "requires a live driven playtest or the full course set" }
@@ -921,7 +1197,7 @@ function CourseQA.check(model: Model, spec: any, calibration: Calibration?, cont
 		Status = if #errors > 0 then "FAIL" else "BLOCKED",
 		Errors = errors,
 		Warnings = warnings,
-		NotRun = NOT_RUN,
+		NotRun = notRun,
 		Counts = counts,
 		Findings = findings,
 		Encounters = encounters,

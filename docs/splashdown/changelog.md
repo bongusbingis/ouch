@@ -66,3 +66,63 @@
 - Section 4 (Gate 2 closure and Gate 3 prerequisites) is complete: exports, hashes, reimport
   verification and screenshot are all real, checked-in evidence. No course, spec or QA module has
   been built yet; that is section 5 onward.
+
+## 2026-09-16 — Section 11: pace target fixed, Whirlpool Waltz built
+
+- **Committed the pilot's post-approval tuning pass** (`4c040b6`): `Ball01`/`02`/`03` in
+  `CourseSpecs/BallBarrage.luau` each gained `OffsetUp = -6`, submerging the mounting pole six studs
+  deeper so contact lands in the `CapDegrees` top cone instead of glancing off as `RollOff`. The
+  temporary local-test `CourseOrder` override was reverted first; it was making the headless suite
+  fail, because `SplashdownIntroModel` iterates `CourseOrder` and requires a matching entry in
+  `src/config/Interface/SplashdownIntro.luau`. **Every new course ID will need one of those entries
+  at the section 12 swap.**
+- **Executed `run-course-routes.server.luau` for the first time** and fixed three bugs it exposed,
+  each of which had been silently producing wrong results rather than no results: jumping was gated
+  behind the policy decision interval (so a mid runner had a quarter-second reflex floor and stalled
+  at every gap); contacts could never fire, because `CoursePresets` builds pieces with
+  `CanTouch = false` and a `Touched` connection on the rig is therefore dead; and
+  `Workspace.Baseplate` sits at Y 0 under an isolated course, so falls landed on it and eight runs
+  recorded zero falls. The harness now resolves jumping, falling and contact every frame inside the
+  policy interval, samples contacts by overlap query against the `Scriptables` tree, and lifts the
+  isolated clone to Y 20000 first.
+- Added door handling to the harness, as HANDOFF 8.5 prescribes: nothing calls `Doors.setPlan` in an
+  isolated clone and `Doors.tickPlayer` selects Players, so a door row is otherwise impassable to a
+  scripted rig. The harness now carries a seeded per-trial door plan, expert aims at the slab that
+  gives, mid works the row centre-out and pays for wrong guesses, and slabs are restored between
+  resets.
+- **Fixed the set-wide route-length target at 880 measured studs** with the section 7 beat targets
+  unchanged, recorded with its full derivation in `03-overrides.md`. With the baseplate fixed, the
+  pilot re-measured at a mid-policy median of **63.66 s** (5 of 5 resets cleared) against a clean
+  expert time of 38.35 s (3 of 3) -- inside section 8.5's 60-90 s window, with an expert/mid ratio
+  of 0.6024 against a 0.60 bar. The earlier 40.18 s median was the baseplate artefact and is
+  superseded. `01_Countercurrent/Bumper01` was contacted in none of the runs and is flagged.
+- **Built Whirlpool Waltz** (`CourseSpecs/WhirlpoolWaltz.luau`, doc
+  `courses/whirlpool-waltz.md`): a clockwise descending spiral, route 884.78 studs on an 896.04-stud
+  guide with a worst deviation of 7.07 against a 12-stud tolerance, six beats all inside their
+  length bands, elevation matching the section 7.2 Y column exactly, 17 encounters over six types
+  with a 35.3% maximum, and all 23 spiral gaps inside the authorised 13.5-19.5 band.
+- Extended the builder and the audit to make that possible: a parametric `Spiral` layout kind, new
+  `Ride` and `Flank` piece kinds, new `Spinner` / `RidePlatform` / `RoundLanding` / `SwingPanel` /
+  `Door` / `FoamPit` / `Prop` presets, 18 new measured `AssetManifest` sources (walkable ones
+  raycast-measured into `evidence/course-sockets-whirlpoolwaltz.json`), a declared `Headline` field,
+  and `CourseQA.auditCrossCourse` scoring override 2's three cross-course rules over every spec that
+  exists. Two builder fixes with wider reach: guide travel is measured horizontally, so a course
+  starting elevated no longer begins tens of studs along its own guide, and a beat whose pieces
+  carry riders gets `ServerCarries = true` on its group Origin.
+- **The cut-set audit had two real defects and the new course found both.**
+  `GateCutSet:05_DiscDive` failed with all 30 spawn cells still reaching Finish; the traced bypass
+  was a 22-stud jump that crossed the gate plane seven studs BELOW the beat entrance, because gates
+  reached only two studs below it, and the fixed twelve-sample edge test was 2-stud resolution on a
+  22-stud jump so even the 0.3 studs where it did clip the gate fell between samples. Gates now span
+  22 below to 38 above, edges are sampled every 0.5 studs, and `CourseGraph.spec` carries a seeded
+  corner-clip fixture the old test provably missed. **Ball Barrage was re-audited under the stricter
+  gate and still passes all six of its own cut sets.** Whirlpool Waltz now returns zero errors and
+  zero non-PASS findings over a 12,181-node / 383,518-edge graph from 14,844 sampled cells.
+- Headless suite: 975 to 984 tests, 0 failures, with a new `CourseVariety.spec` proving each
+  cross-course rule fires against a seeded violation.
+- **Whirlpool Waltz is NOT certified.** Its scripted trials, fixed-camera captures, interactive
+  keyboard run, deliberate missed-timing contacts and checkpoint-recovery checks are all NOT RUN,
+  and its `CourseQA` status is BLOCKED by design while they are. A measured note for whoever runs
+  them: a rider standing still on `Pizza01` is carried into one of the plate's real missing wedges
+  and falls in about one second, which is the headline mechanic working, but it also means a
+  straight-line `Humanoid:MoveTo` proxy cannot reliably cross a ride deck.

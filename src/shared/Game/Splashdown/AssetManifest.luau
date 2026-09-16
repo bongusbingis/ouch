@@ -7,7 +7,7 @@
 
 local AssetManifest = {}
 
-AssetManifest.Version = 1
+AssetManifest.Version = 2
 AssetManifest.SourceHash = "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec"
 AssetManifest.SourcePath = { "ServerStorage", "SplashdownAuthoringSources", "Kit" }
 
@@ -25,11 +25,28 @@ export type Sockets = {
 	SidePositiveX: Socket?,
 	SideNegativeX: Socket?,
 }
+-- A rotating deck the route crosses. Plate is the SubPart path of the walkable
+-- plate, or nil when the root itself is the plate. PlateTopLocalY is the
+-- measured walkable surface in the PLATE's own local frame. Radius is the
+-- conservative usable crossing radius about the hub's rotation axis: the
+-- smallest measured half-extent, reduced by any measured plate eccentricity, so
+-- the entry and exit rim points are on real plate at every rotation.
+export type RideDeck = {
+	Plate: string?,
+	PlateTopLocalY: number,
+	Radius: number,
+}
+
 export type AssetEntry = {
 	Role: string,
 	Kind: "Surface" | "Mount",
 	Size: Vector3,
 	ForwardAxis: ("X" | "Z")?,
+	Ride: RideDeck?,
+	-- Measured distance from a spin hazard's axis to the surface a runner
+	-- actually crosses, at scale 1. The section 6 spin-speed formula is computed
+	-- at this radius, never at a decorative tip.
+	ContactRadius: number?,
 	-- Heading (old-script convention: yaw 0 faces world -Z, matching
 	-- CFrame.Angles identity) that a Surface piece's own Entry->Exit local
 	-- forward direction represents. CoursePresets uses this scalar instead of
@@ -316,6 +333,257 @@ AssetManifest.Assets = (
 					Size = Vector3.new(7.510320663452148, 1.0670387744903564, 7.510275363922125),
 				},
 			},
+		} :: AssetEntry,
+
+		-- Whirlpool Waltz sources. Walkable ride plates are raycast-measured in
+		-- course-sockets-whirlpoolwaltz.json; mounted mechanisms take their
+		-- Support contact and sub-part poses from inventory.json exactly as the
+		-- pilot's hazards did (see that file's hazardPieceSupportSource note).
+		obstacle_16_001 = {
+			Role = "PizzaHub",
+			Kind = "Mount",
+			Size = Vector3.new(28.005094528198242, 6.287460803985596, 28.004690170288086),
+			Sockets = {
+				Support = socket(0, -3.1437, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_16_002",
+					RelativeCFrame = CFrame.new(0.0000, -0.4916, 2.7767),
+					Size = Vector3.new(77.84992218017578, 2.7612698078155519, 72.43607330322266),
+				},
+			},
+			-- Measured half-extents 38.42/38.58/36.22/35.78 give a 35.78 minimum;
+			-- the plate's own mesh origin sits 2.7767 off the hub axis in Z, so the
+			-- usable radius about the axis is 35.78 - 2.78 = 33.0.
+			Ride = { Plate = "obstacle_16_002", PlateTopLocalY = 1.380859375, Radius = 33.0 },
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 8507,
+				Misses = 14581,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+		obstacle_13_001 = {
+			Role = "CarouselDeck",
+			Kind = "Mount",
+			Size = Vector3.new(52.55149841308594, 11.25034236907959, 52.55122375488281),
+			Sockets = {
+				Support = socket(0, -5.6252, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_13_002",
+					RelativeCFrame = CFrame.new(0.0000, 16.1007, 3.2943),
+					Size = Vector3.new(48.798709869384766, 29.75558090209961, 42.21034240722656),
+				},
+			},
+			-- The deck IS the root here and the canopy is the sub-part, so Plate is
+			-- nil. Solid measured top at 5.625; smallest half-extent 25.78.
+			Ride = { PlateTopLocalY = 5.625, Radius = 25.5 },
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 8890,
+				Misses = 2664,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+		obstacle_14_001 = {
+			Role = "DiscHubSmall",
+			Kind = "Mount",
+			Size = Vector3.new(9.857699394226074, 5.109390258789063, 9.857500076293945),
+			Sockets = {
+				Support = socket(0, -2.5547, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_14_002",
+					RelativeCFrame = CFrame.new(0.0000, 0.5598, 0.0000),
+					Size = Vector3.new(39.61509704589844, 2.339428663253784, 39.61509704589844),
+				},
+			},
+			Ride = { Plate = "obstacle_14_002", PlateTopLocalY = 1.169921875, Radius = 19.3 },
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 4801,
+				Misses = 1839,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+		obstacle_15_001 = {
+			Role = "DiscHubLarge",
+			Kind = "Mount",
+			Size = Vector3.new(14.441194534301758, 14.440902709960938, 14.441002845764161),
+			Sockets = {
+				Support = socket(0, -7.2205, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_15_002",
+					RelativeCFrame = CFrame.new(0.0000, 0.0000, 0.0000),
+					Size = Vector3.new(66.49325561523438, 4.039005756378174, 66.49325561523438),
+				},
+			},
+			Ride = { Plate = "obstacle_15_002", PlateTopLocalY = 2.01953125, Radius = 32.7 },
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 13703,
+				Misses = 4385,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+		obstacle_26_001 = {
+			Role = "DiscHubLargeVariant",
+			Kind = "Mount",
+			Size = Vector3.new(14.441194534301758, 14.440902709960938, 14.441002845764161),
+			Sockets = {
+				Support = socket(0, -7.2205, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_26_002",
+					RelativeCFrame = CFrame.new(0.0000, 0.0000, 0.0000),
+					Size = Vector3.new(66.49325561523438, 4.039005756378174, 66.49325561523438),
+				},
+			},
+			Ride = { Plate = "obstacle_26_002", PlateTopLocalY = 2.01953125, Radius = 32.7 },
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 13703,
+				Misses = 4385,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+		obstacle_8_001 = {
+			Role = "SwingPanelAxle",
+			Kind = "Mount",
+			Size = Vector3.new(41.12499618530273, 5.523500919342041, 5.523500919342041),
+			Sockets = {
+				Support = socket(0, -2.7617, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 1, 0, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_8_002",
+					RelativeCFrame = CFrame.new(0.0000, 0.0000, -17.5898),
+					Size = Vector3.new(39.25255584716797, 4.186964988708496, 39.36662292480469),
+				},
+			},
+		} :: AssetEntry,
+		obstacle_27_001 = {
+			Role = "TwoArmCross",
+			Kind = "Mount",
+			Size = Vector3.new(6.2458, 12.349800109863281, 58.07600021362305),
+			Sockets = {
+				Support = socket(0, -6.1749, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			ContactRadius = 29.038,
+		} :: AssetEntry,
+		obstacle_12_001 = {
+			Role = "CrossSpinner",
+			Kind = "Mount",
+			Size = Vector3.new(58.075901031494144, 12.349800109863281, 58.07600021362305),
+			Sockets = {
+				Support = socket(0, -6.1749, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			ContactRadius = 29.038,
+		} :: AssetEntry,
+		obstacle_6_001 = {
+			Role = "Dumbbell",
+			Kind = "Mount",
+			Size = Vector3.new(38.35390090942383, 11.098400115966797, 4.976399898529053),
+			Sockets = {
+				Support = socket(0, -5.5492, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 1, 0),
+			},
+			ContactRadius = 19.177,
+		} :: AssetEntry,
+		trampoline_3_001 = {
+			Role = "JumpPadOuterStriped",
+			Kind = "Mount",
+			Size = Vector3.new(27.002599716186523, 4.770599842071533, 27.002300262451172),
+			Sockets = { Support = socket(0, -2.3853, 0, 0, -1, 0) },
+			SubParts = {
+				{
+					Name = "trampoline_3_002",
+					RelativeCFrame = CFrame.new(0.0000, 2.2315, 0.0001),
+					Size = Vector3.new(18.082199096679688, 0.788900017738342, 18.082300186157227),
+				},
+			},
+		} :: AssetEntry,
+		arch_003 = {
+			Role = "ArchFrame",
+			Kind = "Mount",
+			Size = Vector3.new(29.510601043701172, 12.846099853515625, 7.790400028228760),
+			Sockets = { Support = socket(0, -6.4230, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		water_platform_001 = {
+			Role = "RoundLanding",
+			Kind = "Surface",
+			Size = Vector3.new(37.27314758300781, 9.406586647033692, 37.27314758300781),
+			ForwardAxis = "Z",
+			ForwardHeadingDegrees = 180,
+			Sockets = {
+				Entry = socket(0, 4.703125, -18.6366, 0, 0, -1),
+				Exit = socket(0, 4.703125, 18.3634, 0, 0, 1),
+				Support = socket(0, -4.7033, 0, 0, -1, 0),
+				SidePositiveX = socket(18.3634, 4.703125, 0, 1, 0, 0),
+				SideNegativeX = socket(-18.6361, 4.703125, 0, -1, 0, 0),
+			},
+			-- Also usable as a static round deck the route turns across: the
+			-- measured top is solid (84 misses in 5,850 rays, all bevel) and the
+			-- smallest measured half-extent is 18.36.
+			Ride = { PlateTopLocalY = 4.703125, Radius = 18.36 },
+			Measurement = {
+				RayStep = 0.5,
+				Hits = 5766,
+				Misses = 84,
+				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+
+		door_002 = {
+			Role = "DoorSlab",
+			Kind = "Mount",
+			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
+			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		door_003 = {
+			Role = "DoorSlab",
+			Kind = "Mount",
+			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
+			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		door_004 = {
+			Role = "DoorSlab",
+			Kind = "Mount",
+			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
+			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		door_005 = {
+			Role = "DoorSlab",
+			Kind = "Mount",
+			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
+			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		door_006 = {
+			Role = "DoorSlab",
+			Kind = "Mount",
+			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
+			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		door_007 = {
+			Role = "DoorSlab",
+			Kind = "Mount",
+			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
+			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
 		} :: AssetEntry,
 	} :: any
 ) :: { [string]: AssetEntry }

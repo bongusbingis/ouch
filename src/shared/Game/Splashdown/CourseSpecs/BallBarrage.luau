@@ -36,6 +36,9 @@ local BallBarrage: CourseBuilder.CourseSpec = {
 	Version = 1,
 	Id = "BallBarrage",
 	DisplayName = "Ball Barrage",
+	-- HANDOFF 7.1: "Headline: three Big Balls over liquid; Big Balls appear
+	-- nowhere else."
+	Headline = "BigBall",
 	Difficulty = 3,
 	ParSeconds = 75,
 	CapSeconds = 180,
