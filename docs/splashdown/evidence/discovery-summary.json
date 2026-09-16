@@ -1,0 +1,56 @@
+{
+  "date": "2026-09-15",
+  "placeId": 121997450145716,
+  "phase": "0 discovery; Gate 1 awaiting approval",
+  "headless": {
+    "command": "lune run src/scripts/lune/run-tests.luau",
+    "passed": 960,
+    "failed": 0
+  },
+  "studioTestEZ": {
+    "asOpened": {
+      "passed": 0,
+      "failed": 16
+    },
+    "withTemporarySevenLegacyCopies": {
+      "passed": 14,
+      "failed": 2,
+      "missing": "CrossCurrent"
+    }
+  },
+  "physics": {
+    "totalRecordedTrials": 123,
+    "finalCorrectedInputTrials": 33,
+    "flatGapBracket": [
+      22,
+      22.25
+    ],
+    "stepBracket": [
+      11.5,
+      11.75
+    ],
+    "nominalWalkSpeed": 26,
+    "gravity": 120,
+    "jumpHeight": 10,
+    "useJumpPower": false,
+    "limits": "One R15 avatar and material; finite input policy; not global avatar-envelope certification"
+  },
+  "assets": {
+    "roots": 176,
+    "parts": 222,
+    "parkedCourses": 7,
+    "activeTemplates": 0,
+    "registeredCourseIds": 8
+  },
+  "cleanup": {
+    "playStopped": true,
+    "temporaryEditBootstrapRemoved": true,
+    "originalCoursesModified": false,
+    "gameplayOrTuningChanged": false
+  },
+  "courseTraversal": {
+    "newCoursesBuilt": 0,
+    "manualPlaythroughs": 0,
+    "endToEndClearTimesMeasured": false
+  }
+}

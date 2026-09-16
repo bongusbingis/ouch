@@ -1,0 +1,240 @@
+{
+  "placeId": 121997450145716,
+  "datamodel": "Edit",
+  "shots": [
+    {
+      "file": "kit-lineup.jpg",
+      "camera": [
+        -4380,
+        105,
+        665
+      ],
+      "lookAt": [
+        -4490,
+        5,
+        550
+      ]
+    },
+    {
+      "file": "panels.jpg",
+      "camera": [
+        -4510,
+        70,
+        425
+      ],
+      "lookAt": [
+        -4500,
+        2,
+        494
+      ]
+    },
+    {
+      "file": "swing.jpg",
+      "camera": [
+        -4228,
+        35,
+        460
+      ],
+      "lookAt": [
+        -4276,
+        2,
+        493
+      ]
+    },
+    {
+      "file": "halfpipe.jpg",
+      "camera": [
+        -4600,
+        28,
+        620
+      ],
+      "lookAt": [
+        -4585,
+        7,
+        578
+      ]
+    },
+    {
+      "file": "bars.jpg",
+      "camera": [
+        -4370,
+        48,
+        530
+      ],
+      "lookAt": [
+        -4380,
+        6,
+        490
+      ]
+    },
+    {
+      "file": "frames.jpg",
+      "camera": [
+        -4710,
+        62,
+        643
+      ],
+      "lookAt": [
+        -4650,
+        18,
+        555
+      ]
+    },
+    {
+      "file": "tiles.jpg",
+      "camera": [
+        -3695,
+        100,
+        440
+      ],
+      "lookAt": [
+        -3635,
+        5,
+        340
+      ]
+    },
+    {
+      "file": "ramps.jpg",
+      "camera": [
+        -3730,
+        135,
+        410
+      ],
+      "lookAt": [
+        -3680,
+        10,
+        250
+      ]
+    },
+    {
+      "file": "gates.jpg",
+      "camera": [
+        -3810,
+        110,
+        475
+      ],
+      "lookAt": [
+        -3970,
+        15,
+        345
+      ]
+    },
+    {
+      "file": "baseline-WhirlPool.jpg",
+      "camera": [
+        0,
+        650,
+        -1911.5736
+      ],
+      "lookAt": [
+        0,
+        0,
+        -1912.5736
+      ]
+    },
+    {
+      "file": "baseline-BumperBay.jpg",
+      "camera": [
+        -568.9722,
+        650,
+        -2459.3105
+      ],
+      "lookAt": [
+        -568.9722,
+        0,
+        -2460.3105
+      ]
+    },
+    {
+      "file": "baseline-SummitSplash.jpg",
+      "camera": [
+        -1054.8724,
+        650,
+        -1674.974
+      ],
+      "lookAt": [
+        -1054.8724,
+        0,
+        -1675.974
+      ]
+    },
+    {
+      "file": "baseline-KnockKnock.jpg",
+      "camera": [
+        901.4742,
+        650,
+        -2855.092
+      ],
+      "lookAt": [
+        901.4742,
+        0,
+        -2856.092
+      ]
+    },
+    {
+      "file": "baseline-Downpour.jpg",
+      "camera": [
+        949.34,
+        650,
+        -1911.5736
+      ],
+      "lookAt": [
+        949.34,
+        0,
+        -1912.5736
+      ]
+    },
+    {
+      "file": "baseline-DiscJockey.jpg",
+      "camera": [
+        81.5006,
+        650,
+        -2855.8931
+      ],
+      "lookAt": [
+        81.5006,
+        0,
+        -2856.8931
+      ]
+    },
+    {
+      "file": "baseline-TiltTrip.jpg",
+      "camera": [
+        -1729.4473,
+        650,
+        -2296.5767
+      ],
+      "lookAt": [
+        -1729.4473,
+        0,
+        -2297.5767
+      ]
+    },
+    {
+      "file": "balloons.jpg",
+      "camera": [
+        -3910,
+        140,
+        695
+      ],
+      "lookAt": [
+        -4016,
+        35,
+        575
+      ]
+    },
+    {
+      "file": "doors.jpg",
+      "camera": [
+        -3135,
+        85,
+        440
+      ],
+      "lookAt": [
+        -3135,
+        17,
+        512
+      ]
+    }
+  ]
+}
