@@ -11,10 +11,14 @@ for anyone auditing the record, not as open blockers.
 
 - Spec: `src/shared/Game/Splashdown/CourseSpecs/BallBarrage.luau`
 - Measured build/route evidence: `docs/splashdown/evidence/courses/BallBarrage/build.json`
-  (pre-tuning build; the tuning pass below was not re-exported to this file)
-- Measured audit evidence: `docs/splashdown/evidence/courses/BallBarrage/qa.json` (pre-tuning)
+  (pre-tuning build; neither tuning pass below was re-exported to this file)
+- Measured audit evidence: `docs/splashdown/evidence/courses/BallBarrage/qa.json` — **current, and
+  re-run 2026-09-16 after tuning pass 2 under the corrected surface sampler.**
 - Pre-tuning SpecHash `020c7854`, 158 BaseParts, built twice with identical hashes on place
-  121997450145716.
+  121997450145716. **Current SpecHash `7a46da9c`, 143 BaseParts, 881.053 measured studs of route,
+  promoted 2026-09-16.** The part count fell from 158 because a `CoursePresets` fix stopped every
+  piston cloning a second copy of its own spring; the hash also moved through `ca5e95b4` (that fix)
+  and `943e493c` before it.
 
 ## Tuning pass 1 (2026-09-15, post-approval)
 
@@ -26,6 +30,56 @@ mostly lateral (triggering `RollOff`) instead of landing within the `CapDegrees`
 promoted through the real `CourseAuthoring.stage`/`promote` pipeline; the three sphere world
 positions measured Y 19.20 post-fix (were ~25.2). Not yet re-exported to `build.json`/`qa.json` —
 those still reflect the pre-tuning geometry.
+
+## Tuning pass 2 (2026-09-16) — the pistons and hammers now reach the lane
+
+Both of this course's timing beats shipped with hazards that moved correctly and never touched a
+runner. Measured on the promoted `ca5e95b4` template, not inferred:
+
+| Hazard | Before | After |
+|---|---|---|
+| `Piston01` head | side +16.30..+24.02 across a lane whose half-width is 10.51 — 5.79 to 13.51 studs PAST the edge, over open water | side **+2.484..+10.198** at rest, **−3.516..+10.198** swept, crossing the centreline by 3.52 studs on the punch |
+| `Piston02` head | mirrored, side −24.02..−16.30 | side **−10.197..−2.483** at rest, **−10.197..+3.517** swept |
+| `HammerLarge` head | Y 5.694..24.456 under a deck at Y 24.000 — only the top **0.46 studs** ever reached deck level | Y **26.122..44.883** at rest, **24.600..46.406** swept: deck **+0.600..+22.406** |
+| `HammerSmall` head | Y 5.804..25.356 — top 1.36 studs | Y 25.431..44.984 at rest, **24.600..45.815** swept: deck **+0.600..+21.815** |
+
+**The pistons were a mounting-sign bug.** `obstacle_22`'s head lies along the piece's own forward
+axis at a measured 13.160 studs from the base at scale 0.5, with a 3.857-stud half-length and a
+6-stud punch. A base placed INSIDE the lane facing outward therefore throws the head away from the
+runner. The bases now stand OUTSIDE at `OffsetSide` ±19.5 with the heads reaching IN, which is how
+Piston Peak mounts its three. A 21.02-stud lane cannot be sealed by a 7.71-stud head on a 6-stud
+punch without the REST pose already covering the centreline (the failure Piston Peak measured at
+side 17), so this is a pass to time rather than a wall: 12.99 studs of corridor down the far side at
+rest, and 3.52 studs past the centreline for the 0.6-second hold. Both also moved 6 studs further
+along (`OffsetAlong` −24 and −8, keeping their 16-stud spacing) so they stand over Floor04's flat
+deck instead of hanging off its end over Ramp04's slope. The base (side 14.420..24.581) is clear of
+the deck; the spring (side 9.495..20.445 at deck +3.99..+6.82) overhangs the lane edge by 1.02 studs,
+so the outside is not a quiet walk-around.
+
+**The hammers were a mount-height bug.** `obstacle_3_001` and `obstacle_4_001` are axle housings
+with their heads suspended a measured 8.925 and 8.420 studs BENEATH them at scale 0.6, so the
+pilot's `OffsetUp`-0 mounting swept both heads under the floor. HANDOFF 8.3 exempts a suspended
+pendulum from the support rule and Tiptoe Trials already hangs both of these on that basis. The
+height here is derived from the SWING, not from the rest pose: `CoursePresets` clears every display
+pivot, so the head rocks about its OWN centre through ±55° about the route axis and its vertical
+half-extent is `halfY·cos θ + halfX·sin θ`, whose maximum over the amplitude is `hypot(halfX, halfY)`
+— 10.903 and 10.607 studs, reached at 30.7° and 22.8°, both inside 55°. Hanging the head so that
+maximum clears the deck by 0.6 studs is what stops it ploughing through the floor at mid-swing, and
+it leaves the resting head bottom 2.12 and 1.43 studs up, inside a runner's body band.
+`OffsetUp` is therefore 20.428 and 19.627, written in the spec as that measured expression.
+
+The dodge is lateral and timed: `HammerLarge` spans side ±5.558 at rest and a measured ±10.872 at
+full swing, so it seals the ±10.51 lane on the strike and leaves a 4.95-stud corridor on each side
+between strikes; `HammerSmall` is ±4.117 and ±10.370.
+
+Rebuilt, re-staged and re-promoted through the real `CourseAuthoring.stage`/`promote` pipeline. The
+Edit-mode stage and the independent Play-mode build agreed on SpecHash `7a46da9c` and 143 BaseParts.
+`CourseQA.check` afterwards: **zero errors, zero warnings, 48 findings PASS, 14 NOT RUN, 0 FAIL**,
+all six gate cut sets holding (0 of 30 spawn cells bypass any gate) over a 14,977-node /
+2,392,356-edge graph from 18,548 real surface cells, and all twelve cross-course checks passing over
+the six staged specs. Studio TestEZ: **21 passed, 0 failed** — the 20 existing assertions, which now
+include "mounts every piston head where it can actually strike a runner" (written generically by the
+Piston Peak session and failing here until this pass), plus the new swept-reach regression.
 
 ## Concept and headline
 

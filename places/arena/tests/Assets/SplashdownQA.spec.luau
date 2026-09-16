@@ -15,6 +15,66 @@ local BeachBalls = require(game:GetService("ServerScriptService").Server.Modules
 local FallingTiles = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.FallingTiles)
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config").Gameplay.MapFeatures)
 local RisingLiquid = require(ReplicatedStorage:WaitForChild("Shared").Game.MapFeatures.RisingLiquid)
+local RotatingPlatforms = require(ReplicatedStorage:WaitForChild("Shared").Game.MapFeatures.RotatingPlatforms)
+
+-- Swept-reach constants for the hazard-reach regression below. The window is long
+-- enough to cover several turns of every profile the kits use (a hammer cycles in
+-- windup+strike = 2.1 s, a piston in its 3.2-second period, a rock in its own
+-- period and a spin in 360/RotorSpeed), and the step is fine enough that the
+-- fastest measured spin -- 195 degrees/s on the smallest contact radius in the kit
+-- -- turns under 10 degrees between samples.
+local SWEEP_SECONDS = 12
+local SWEEP_SAMPLES = 240
+-- Lane sampling: one station per stud along the route and one stud across it. The
+-- thinnest hazard in the set is the large hammer head at 1.92 studs through the
+-- route, so a 1-stud station cannot pass through it unsampled.
+local LANE_STATION_STUDS = 1
+local LANE_LATERAL_STUDS = 1
+
+-- The route's own measured lane, rebuilt from the BuildReport rather than from a
+-- raycast: each step records where the cursor stood, which way it faced and the
+-- MEASURED lateral half-extent of the piece it placed. Mount and Flank steps are
+-- excluded from the polyline because their half-extent is the HAZARD's reach, not
+-- the deck's -- a piston mounted 19.5 studs off the centreline would otherwise
+-- declare a 24-stud-wide lane and make this check vacuous.
+local function laneForBeat(route: { any }, beatId: string): { any }
+	local lane = {}
+	for index, step in route do
+		if step.Kind == "Mount" or step.Kind == "Flank" then
+			continue
+		end
+		if step.BeatId == beatId then
+			if #lane == 0 then
+				-- One step back so the lane covers the beat's own entrance, which is
+				-- where a hazard mounted at a negative OffsetAlong can stand.
+				for back = index - 1, 1, -1 do
+					local previous = route[back]
+					if previous.Kind ~= "Mount" and previous.Kind ~= "Flank" then
+						table.insert(lane, previous)
+						break
+					end
+				end
+			end
+			table.insert(lane, step)
+		end
+	end
+	return lane
+end
+
+local function worldBox(part: BasePart, cf: CFrame): (Vector3, Vector3)
+	local half = part.Size / 2
+	local min, max = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+	for _, sx in { -1, 1 } do
+		for _, sy in { -1, 1 } do
+			for _, sz in { -1, 1 } do
+				local corner = cf:PointToWorldSpace(Vector3.new(half.X * sx, half.Y * sy, half.Z * sz))
+				min = Vector3.new(math.min(min.X, corner.X), math.min(min.Y, corner.Y), math.min(min.Z, corner.Z))
+				max = Vector3.new(math.max(max.X, corner.X), math.max(max.Y, corner.Y), math.max(max.Z, corner.Z))
+			end
+		end
+	end
+	return min, max
+end
 
 local function selectedIds(): { string }
 	local selection = ServerStorage:FindFirstChild("SplashdownQASelection")
@@ -45,14 +105,14 @@ end
 return function()
 	for _, courseId in selectedIds() do
 		describe(courseId, function()
-			local container, model, report, qa
+			local container, model, report, qa, spec
 
 			beforeAll(function()
 				local sources = authoringSources()
 				-- Without the section 4 source export there is nothing to build
 				-- from. Fail loudly rather than reporting an empty pass.
 				assert(sources, "ServerStorage.SplashdownAuthoringSources is missing; run the section 4 export first")
-				local spec = require(Splashdown:WaitForChild("CourseSpecs"):WaitForChild(courseId))
+				spec = require(Splashdown:WaitForChild("CourseSpecs"):WaitForChild(courseId))
 				model, report = CourseBuilder.build(spec, sources)
 				container = Instance.new("Folder")
 				container.Name = "SplashdownQAIsolation_" .. courseId
@@ -104,7 +164,6 @@ return function()
 			end)
 
 			it("rebuilds deterministically to the same spec hash", function()
-				local spec = require(Splashdown:WaitForChild("CourseSpecs"):WaitForChild(courseId))
 				local second, secondReport = CourseBuilder.build(spec, authoringSources())
 				expect(secondReport.SpecHash).to.equal(report.SpecHash)
 				second:Destroy()
@@ -173,17 +232,25 @@ return function()
 
 			it("clones each declared sub-part once instead of doubling a nested assembly", function()
 				-- A duplicated sub-part lands exactly on top of the original, so two
-				-- parts of one piece sharing a position is the signature to catch.
+				-- parts of one piece sharing a position is the signature to catch --
+				-- but position ALONE is not that signature. A disc is a hub with a
+				-- concentric plate: Whirlpool Waltz's obstacle_15 and obstacle_26 rides
+				-- put a 29.9-stud plate and a 6.5-stud hub on exactly the same centre,
+				-- and reported them as doubled. A real duplicate is the SAME geometry
+				-- twice, so the size is part of the key.
 				local seen: { [string]: string } = {}
 				local doubled = {}
 				for _, instance in model:GetDescendants() do
 					if instance:IsA("BasePart") and instance:GetAttribute("PieceId") then
 						local key = string.format(
-							"%s|%d|%d|%d",
+							"%s|%d|%d|%d|%d|%d|%d",
 							tostring(instance:GetAttribute("PieceId")),
 							math.round(instance.Position.X * 100),
 							math.round(instance.Position.Y * 100),
-							math.round(instance.Position.Z * 100)
+							math.round(instance.Position.Z * 100),
+							math.round(instance.Size.X * 100),
+							math.round(instance.Size.Y * 100),
+							math.round(instance.Size.Z * 100)
 						)
 						if seen[key] then
 							table.insert(doubled, `{instance.Name} over {seen[key]}`)
@@ -428,7 +495,202 @@ return function()
 					end
 					expect(reached).to.equal(true)
 				end
-				expect(heads > 0).to.equal(true)
+				-- Count what the SPEC declares rather than asserting "more than none".
+				-- Four of the six courses place no piston at all, and a bare
+				-- `heads > 0` failed every one of them while saying nothing about the
+				-- courses that do place them. Matching the declared count also catches
+				-- a head the builder silently dropped.
+				local declared = 0
+				for _, beat in spec.Beats do
+					for _, piece in beat.Pieces do
+						if piece.Preset == "Piston" then
+							declared += 1
+						end
+					end
+				end
+				expect(heads).to.equal(declared)
+			end)
+
+			-- The general form of the piston defect above, and of the hammer defect
+			-- beside it: a hazard whose motion, attributes and kit registration are all
+			-- correct and whose geometry never meets a runner. Ball Barrage shipped its
+			-- two pistons sweeping 5.79 to 13.51 studs PAST the lane edge over open
+			-- water, and its two hammers hanging with only the top 0.46 studs of the
+			-- head at deck level -- one defect lateral, one vertical, both invisible to
+			-- every other check here. So this measures the volume each shoving hazard
+			-- REALLY sweeps, through the production motion profile over a full cycle,
+			-- and requires it to reach the lane at the height a runner's body is.
+			--
+			-- The bar is the calibration's own measured root offset: somewhere in its
+			-- own beat's lane, the hazard must sweep through the plane 3.5 studs above
+			-- the deck. That is where the character's root sits, so a hazard that never
+			-- crosses it is decoration however impressive its arc looks. Hazards that
+			-- CARRY riders (the swing panels and the log-rolls) are exempt and reported:
+			-- their contract is to be a surface at deck height in the lane, which the
+			-- log-roll test above already measures.
+			it("sweeps every shoving hazard through its own beat's lane", function()
+				local rotating = model:FindFirstChild("Scriptables")
+				rotating = rotating and rotating:FindFirstChild("Rotating")
+				expect(rotating ~= nil).to.equal(true)
+
+				local rootHeight = CourseQA.DefaultCalibration.RootOffsetStuds
+				local checked, carried = 0, 0
+				local failures: { string } = {}
+				local lines: { string } = {}
+
+				for _, group in rotating:GetChildren() do
+					local origin = group:FindFirstChild("Origin")
+					local assembly = group:FindFirstChild("Assembly")
+					if not (origin and origin:IsA("BasePart") and assembly and assembly:IsA("Model")) then
+						continue
+					end
+					local platform = RotatingPlatforms.build(origin, assembly)
+					for _, rotor in platform.localRotors do
+						if not rotor.shove then
+							continue
+						end
+						local pieceId = tostring(rotor.part:GetAttribute("PieceId"))
+						local beatId = tostring(rotor.part:GetAttribute("BeatId"))
+						if rotor.carriesRiders then
+							carried += 1
+							table.insert(lines, string.format("%s/%s carries riders; exempt", beatId, pieceId))
+							continue
+						end
+						checked += 1
+
+						-- Everything the rotor moves: the rotor part and every follower
+						-- beneath it. RotorBump shoves the whole set, so a mace's reach is
+						-- its ball's and a piston's is its head's, not the top link's or
+						-- the spring's.
+						local moving: { { part: BasePart, offset: CFrame } } = {
+							{ part = rotor.part, offset = rotor.centerToPart },
+						}
+						for _, follower in rotor.followers do
+							table.insert(moving, { part = follower.part, offset = follower.centerToPart })
+						end
+
+						-- Pass one: the swept axis-aligned envelope, which bounds where any
+						-- lane point worth testing can be.
+						local poses: { { { part: BasePart, cf: CFrame } } } = {}
+						local sweptMin = Vector3.new(math.huge, math.huge, math.huge)
+						local sweptMax = Vector3.new(-math.huge, -math.huge, -math.huge)
+						for sample = 0, SWEEP_SAMPLES - 1 do
+							local now = sample * (SWEEP_SECONDS / SWEEP_SAMPLES)
+							local centre = RotatingPlatforms.rotorPoseAt(platform, rotor, now)
+							local frame = {}
+							for _, piece in moving do
+								local cf = centre * piece.offset
+								table.insert(frame, { part = piece.part, cf = cf })
+								local min, max = worldBox(piece.part, cf)
+								sweptMin = Vector3.new(
+									math.min(sweptMin.X, min.X),
+									math.min(sweptMin.Y, min.Y),
+									math.min(sweptMin.Z, min.Z)
+								)
+								sweptMax = Vector3.new(
+									math.max(sweptMax.X, max.X),
+									math.max(sweptMax.Y, max.Y),
+									math.max(sweptMax.Z, max.Z)
+								)
+							end
+							table.insert(poses, frame)
+						end
+
+						-- Pass two: lane points at root height under the swept envelope.
+						local lane = laneForBeat(report.Route, beatId)
+						local points: { Vector3 } = {}
+						local deckMin, deckMax = math.huge, -math.huge
+						for index = 1, #lane - 1 do
+							local a, b = lane[index], lane[index + 1]
+							local delta = b.Position - a.Position
+							local flat = Vector3.new(delta.X, 0, delta.Z)
+							local span = flat.Magnitude
+							local halfWidth = math.max(a.HalfWidth, b.HalfWidth)
+							if span < 1e-3 or halfWidth <= 0 then
+								continue
+							end
+							local along = flat.Unit
+							local side = Vector3.new(along.Z, 0, -along.X)
+							local station = 0
+							while station <= span do
+								local t = station / span
+								local centre = a.Position + delta * t
+								local lateral = -halfWidth
+								while lateral <= halfWidth do
+									local spot = centre + side * lateral + Vector3.new(0, rootHeight, 0)
+									if
+										spot.X >= sweptMin.X
+										and spot.X <= sweptMax.X
+										and spot.Z >= sweptMin.Z
+										and spot.Z <= sweptMax.Z
+										and spot.Y >= sweptMin.Y
+										and spot.Y <= sweptMax.Y
+									then
+										table.insert(points, spot)
+										deckMin = math.min(deckMin, centre.Y)
+										deckMax = math.max(deckMax, centre.Y)
+									end
+									lateral += LANE_LATERAL_STUDS
+								end
+								station += LANE_STATION_STUDS
+							end
+						end
+
+						local struck = false
+						for _, frame in poses do
+							for _, spot in points do
+								for _, placed in frame do
+									local localSpot = placed.cf:PointToObjectSpace(spot)
+									local half = placed.part.Size / 2
+									if
+										math.abs(localSpot.X) <= half.X
+										and math.abs(localSpot.Y) <= half.Y
+										and math.abs(localSpot.Z) <= half.Z
+									then
+										struck = true
+										break
+									end
+								end
+								if struck then
+									break
+								end
+							end
+							if struck then
+								break
+							end
+						end
+
+						local detail = string.format(
+							"%s/%s sweeps Y %.2f..%.2f over a lane deck at Y %.2f..%.2f; %d lane points at root height %.1f fall inside its swept envelope",
+							beatId,
+							pieceId,
+							sweptMin.Y,
+							sweptMax.Y,
+							if deckMin < math.huge then deckMin else 0,
+							if deckMax > -math.huge then deckMax else 0,
+							#points,
+							rootHeight
+						)
+						table.insert(lines, detail .. (if struck then " -- STRIKES" else " -- NEVER STRIKES"))
+						if not struck then
+							table.insert(failures, detail)
+						end
+					end
+				end
+
+				print(string.format("[HazardReach] %s\n  %s", courseId, table.concat(lines, "\n  ")))
+				expect(checked > 0).to.equal(true)
+				if #failures > 0 then
+					error(
+						string.format(
+							"%d shoving hazard(s) never reach their own lane: %s",
+							#failures,
+							table.concat(failures, " | ")
+						),
+						0
+					)
+				end
+				expect(carried >= 0).to.equal(true)
 			end)
 
 			-- A log-roll is a rolling surface, and on a stacked course it is also the
