@@ -24,10 +24,10 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | the hazard-reach fix pass of 2026-09-16: `c74a288` (Ball Barrage + the new regression), `2dcaa8a` (Door Dash) and this refresh, on top of `dc6051f`, the Piston Peak handoff note |
+| HEAD now | the hazard-reach fix pass of 2026-09-16: `c74a288` (Ball Barrage + the new regression), `2dcaa8a` (Door Dash) and `5115e68` (the four-course re-audit and this refresh), on top of `dc6051f`, the Piston Peak handoff note |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
-| Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
+| Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. **A parallel agent also COMMITTED into this checkout mid-task on 2026-09-16**, authoring `c74a288` and `2dcaa8a` from this session's uncommitted working tree while it was still being edited. The content was correct, but assume the index and HEAD can move under you: re-run `git status` before every `git add`, and check `git log` before assuming your own work is uncommitted. |
 | Remote delivery | No push or PR performed |
 | New courses built | **ALL SIX.** Ball Barrage (Gate 3 APPROVED; **hammers and pistons remounted 2026-09-16, hash now `7a46da9c`**), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (scripted trials FAILED 0 of 8; **large hammer rehung 2026-09-16, hash now `aae4c298`**), Tumble Tunnels, Tiptoe Trials and **Piston Peak**. All six are LIVE in `CourseOrder`, promoted, and re-audited under the corrected surface sampler. |
 | Summit layout hardened | No -- **this is the next item, and section 12's replacement transaction is the one after it. Both need the user, not a successor's initiative.** |
@@ -36,6 +36,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
+5115e68   test(splashdown): re-audit four courses under the corrected surface sampler
 2dcaa8a   fix(splashdown): hang Door Dash's inert hammer in reach
 c74a288   fix(splashdown): mount Ball Barrage's hammers and pistons in reach
 dc6051f   docs(splashdown): record the Piston Peak commit id in the handoff
