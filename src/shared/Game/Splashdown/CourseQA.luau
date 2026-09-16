@@ -111,6 +111,28 @@ function CourseQA.sampleSurfaces(model: Model, calibration: Calibration, step: n
 	local columns: { [string]: boolean } = {}
 	local budget = 0
 
+	-- A column is sampled once, which is what keeps the pass tractable -- but that
+	-- means the window it is sampled over has to cover the WHOLE model, not the part
+	-- that happened to claim the column first. On a StackedSwitchback the runs
+	-- deliberately share an X/Z column at five different heights, and a per-part
+	-- window meant the first run's slab claimed the column and every surface above
+	-- it -- four more storeys, including the climax ledge -- was never sampled at
+	-- all. The audit then reported the route unreachable because the cells simply
+	-- did not exist. HANDOFF 8.2.1 asks to "iteratively continue rays below each hit
+	-- to collect stacked surfaces"; this is the window that lets it.
+	local modelTop, modelBottom = -math.huge, math.huge
+	for _, container in include do
+		for _, part in container:GetDescendants() do
+			if part:IsA("BasePart") and part.CanCollide then
+				local reach = (part.Size / 2).Magnitude
+				modelTop = math.max(modelTop, part.Position.Y + reach)
+				modelBottom = math.min(modelBottom, part.Position.Y - reach)
+			end
+		end
+	end
+	modelTop += 6
+	modelBottom -= 6
+
 	local function sampleColumn(x: number, z: number, top: number, bottom: number)
 		local columnKey = string.format("%d,%d", math.round(x / spacing), math.round(z / spacing))
 		if columns[columnKey] then
@@ -119,7 +141,10 @@ function CourseQA.sampleSurfaces(model: Model, calibration: Calibration, step: n
 		columns[columnKey] = true
 		local rayY = top
 		local guard = 0
-		while rayY > bottom and guard < 12 do
+		-- Stacked-surface budget per column. A five-storey tower puts five walkable
+		-- decks plus their hazards in one column, so the old 12 is no longer a
+		-- generous ceiling; 24 still bounds the pass and covers every course built.
+		while rayY > bottom and guard < 24 do
 			guard += 1
 			budget += 1
 			if budget % 4000 == 0 then
@@ -168,8 +193,7 @@ function CourseQA.sampleSurfaces(model: Model, calibration: Calibration, step: n
 					end
 				end
 			end
-			local top = part.Position.Y + half.Magnitude + 6
-			local bottom = part.Position.Y - half.Magnitude - 6
+			local top, bottom = modelTop, modelBottom
 			local x = part.Position.X - extentX
 			while x <= part.Position.X + extentX do
 				local z = part.Position.Z - extentZ
@@ -462,6 +486,13 @@ end
 
 -- 8.2.7-8.2.8: an intended path from every spawn cell through the ordered
 -- checkpoints to Finish, and every beat gate must be a true cut set.
+-- Cooperative yield for the traversals below: a stacked course's graph runs to
+-- millions of edges and Studio caps a single resumption, so the reachability passes
+-- hand this to CourseGraph rather than the pure module reaching for task itself.
+local function yieldNow()
+	task.wait()
+end
+
 function CourseQA.checkCutSets(model: Model, graph: CourseGraph.Graph): ({ Finding }, { string })
 	local findings: { Finding } = {}
 	local errors: { string } = {}
@@ -512,7 +543,7 @@ function CourseQA.checkCutSets(model: Model, graph: CourseGraph.Graph): ({ Findi
 		local previous: { CourseGraph.NodeId } = spawnNodes
 		local previousLabel = "spawn cells"
 		for _, waypoint in waypoints do
-			local reaching = CourseGraph.reachingNodes(graph, { waypoint })
+			local reaching = CourseGraph.reachingNodes(graph, { waypoint }, { Yield = yieldNow })
 			local missing = 0
 			for _, node in previous do
 				if not reaching[node] then
@@ -553,7 +584,11 @@ function CourseQA.checkCutSets(model: Model, graph: CourseGraph.Graph): ({ Findi
 				spawnSet[node] = true
 			end
 			for _, gate in gateBoxes(model) do
-				local reaching = CourseGraph.reachingNodes(graph, { finishNode }, { Gates = { gate.Box } })
+				local reaching = CourseGraph.reachingNodes(
+					graph,
+					{ finishNode },
+					{ Gates = { gate.Box }, Yield = yieldNow }
+				)
 				local leaks = 0
 				for node in spawnSet do
 					if reaching[node] then
@@ -691,6 +726,9 @@ local ENCOUNTER_TYPES: { [string]: string } = {
 	Mace = "RotorBump",
 	PaddleWheel = "RotorBump",
 	Mallet = "RotorBump",
+	-- Section 7's counting rule lists "log-roll" inside RotorBump, beside the
+	-- sweepers and spinners.
+	LogRoll = "RotorBump",
 	RidePlatform = "RotatingPlatforms",
 	Door = "Door",
 	FoamPit = "FoamPit",
@@ -720,6 +758,10 @@ local NON_GLUE_PRESETS: { [string]: boolean } = {
 	Door = true,
 	Piston = true,
 	Sweeper = true,
+	-- Override 2 names "sweepers/log-rolls" as one capped mechanic; the cap is keyed
+	-- on the preset here, and the two presets together are still used by only two of
+	-- the six courses.
+	LogRoll = true,
 	BeachBall = true,
 	RidePlatform = true,
 	BigBall = true,
@@ -879,18 +921,31 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 	-- ("Headline: three Big Balls over liquid; Big Balls appear nowhere else"),
 	-- and the most frequent type is usually the glue instead -- RotorBump is the
 	-- commonest encounter in four of the six courses and is nobody's headline.
+	--
+	-- Override 2 calls it a headline MECHANIC, and some section 7 headlines are a
+	-- mechanic rather than a scoring type: Piston Peak's is "zigzag climb with
+	-- punches", and its punches score as RotorBump beside every pendulum in the set.
+	-- So each beat gets a dominant PRESET as well as a dominant type, and a declared
+	-- headline is scored at whichever granularity it names. That is strictly sharper
+	-- than type-only scoring -- a piston is compared against pistons, never against
+	-- hammers -- and it changes nothing for the five courses that name a type.
 	local courseHeadline: { [string]: string } = {}
+	local headlineIsPreset: { [string]: boolean } = {}
 	local beatDominant: { [string]: { [string]: string } } = {}
+	local beatDominantPreset: { [string]: { [string]: string } } = {}
 	local courseRecipes: { [string]: { [string]: string } } = {}
 	local presetCourses: { [string]: { [string]: boolean } } = {}
 
 	for _, id in ids do
 		local spec = allSpecs[id]
 		local courseCounts: { [string]: number } = {}
+		local coursePresetCounts: { [string]: number } = {}
 		beatDominant[id] = {}
+		beatDominantPreset[id] = {}
 		courseRecipes[id] = {}
 		for _, beat in spec.Beats do
 			local counts: { [string]: number } = {}
+			local presetCounts: { [string]: number } = {}
 			local recipe: { string } = {}
 			local seenGroups: { [string]: boolean } = {}
 			for _, piece in beat.Pieces do
@@ -916,6 +971,8 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 				end
 				counts[encounterType] = (counts[encounterType] or 0) + 1
 				courseCounts[encounterType] = (courseCounts[encounterType] or 0) + 1
+				presetCounts[preset] = (presetCounts[preset] or 0) + 1
+				coursePresetCounts[preset] = (coursePresetCounts[preset] or 0) + 1
 				table.insert(recipe, encounterType)
 			end
 			local dominant, best = "", 0
@@ -925,6 +982,13 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 				end
 			end
 			beatDominant[id][beat.Id] = dominant
+			local dominantPreset, bestPreset = "", 0
+			for preset, count in presetCounts do
+				if count > bestPreset or (count == bestPreset and preset < dominantPreset) then
+					dominantPreset, bestPreset = preset, count
+				end
+			end
+			beatDominantPreset[id][beat.Id] = dominantPreset
 			table.sort(recipe)
 			courseRecipes[id][beat.Id] =
 				string.format("%s|%s|%s", beat.Family, beat.Mechanic, table.concat(recipe, ","))
@@ -933,12 +997,13 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 		if typeof(declared) ~= "string" or declared == "" then
 			table.insert(errors, string.format("CrossCourse:%s: the spec declares no Headline encounter type", id))
 			declared = ""
-		elseif courseCounts[declared] == nil then
+		elseif courseCounts[declared] == nil and coursePresetCounts[declared] == nil then
 			table.insert(
 				errors,
 				string.format("CrossCourse:%s: declared headline %s does not occur in the course", id, declared)
 			)
 		end
+		headlineIsPreset[id] = declared ~= "" and courseCounts[declared] == nil and coursePresetCounts[declared] ~= nil
 		courseHeadline[id] = declared
 	end
 
@@ -947,6 +1012,7 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 	-- outside its own course.
 	for _, id in ids do
 		local headline = courseHeadline[id]
+		local dominantOf = if headlineIsPreset[id] then beatDominantPreset else beatDominant
 		local outsideDominant = 0
 		local climaxClash: { string } = {}
 		for _, other in ids do
@@ -955,11 +1021,11 @@ function CourseQA.auditCrossCourse(allSpecs: { [string]: any }): ({ Finding }, {
 			end
 			local spec = allSpecs[other]
 			local climax = spec.Beats[#spec.Beats - 1]
-			if climax and beatDominant[other][climax.Id] == headline then
+			if climax and dominantOf[other][climax.Id] == headline then
 				table.insert(climaxClash, other .. "/" .. climax.Id)
 			end
 			for _, beat in spec.Beats do
-				if beatDominant[other][beat.Id] == headline then
+				if dominantOf[other][beat.Id] == headline then
 					outsideDominant += 1
 				end
 			end

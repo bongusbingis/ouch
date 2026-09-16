@@ -53,6 +53,23 @@ end
 local function edgeCutByGate(graph: Graph, edge: Edge, gate: { Min: Vector3, Max: Vector3 }): boolean
 	local a = graph.Nodes[edge.From].Position
 	local b = graph.Nodes[edge.To].Position
+	-- Cheap exact reject first. The segment can only touch the gate if its own
+	-- axis-aligned bounding box overlaps the gate's, and on a stacked course almost
+	-- no edge is anywhere near any given gate: a five-storey tower's graph carries
+	-- millions of edges and the cut-set audit walks all of them once per gate, which
+	-- is what made it exhaust Studio's execution budget. This changes no verdict --
+	-- an edge outside the box cannot have a sample inside it -- it only skips the
+	-- half-stud walk for edges that could never have hit.
+	if
+		math.min(a.X, b.X) > gate.Max.X
+		or math.max(a.X, b.X) < gate.Min.X
+		or math.min(a.Y, b.Y) > gate.Max.Y
+		or math.max(a.Y, b.Y) < gate.Min.Y
+		or math.min(a.Z, b.Z) > gate.Max.Z
+		or math.max(a.Z, b.Z) < gate.Min.Z
+	then
+		return false
+	end
 	-- Sample by DISTANCE, not by a fixed count. A fixed twelve samples is 2-stud
 	-- resolution on a 22-stud jump, and a Whirlpool Waltz jump was measured
 	-- threading a gate's corner over about 0.3 studs of travel without a single
@@ -76,6 +93,11 @@ export type ReachOptions = {
 	BlockedNodes: { [NodeId]: boolean }?,
 	Gates: { { Min: Vector3, Max: Vector3 } }?,
 	ActiveState: string?,
+	-- Optional cooperative yield, called every few thousand edges. A stacked course
+	-- carries millions of edges and Studio caps a single resumption, so the engine
+	-- caller hands in task.wait; the headless graph tests pass nothing and the
+	-- traversal stays a pure function of the graph either way.
+	Yield: (() -> ())?,
 }
 
 -- BFS reachability under an optional set of blocked nodes and gate volumes. An edge
@@ -151,7 +173,13 @@ function CourseGraph.reachingNodes(graph: Graph, targets: { NodeId }, options: R
 	local activeState = opts.ActiveState
 
 	local incoming: { [NodeId]: { Edge } } = {}
+	local yield = opts.Yield
+	local scanned = 0
 	for _, edge in graph.Edges do
+		scanned += 1
+		if yield and scanned % 20000 == 0 then
+			yield()
+		end
 		if edge.RequiresState ~= nil and edge.RequiresState ~= activeState then
 			continue
 		end

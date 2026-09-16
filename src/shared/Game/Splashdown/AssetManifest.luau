@@ -7,7 +7,7 @@
 
 local AssetManifest = {}
 
-AssetManifest.Version = 5
+AssetManifest.Version = 6
 AssetManifest.SourceHash = "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec"
 AssetManifest.SourcePath = { "ServerStorage", "SplashdownAuthoringSources", "Kit" }
 
@@ -222,10 +222,21 @@ AssetManifest.Assets = (
 			},
 		} :: AssetEntry,
 
+		-- The spiked roller (01-asset-inventory.md line 159). Section 6 lists it for
+		-- BOTH the Sweeper (frame slides, drum spins) and the log-roll ("spiked roller
+		-- or uniformly scaled podium barrel"), which is why the drum's measured radius
+		-- lives here rather than staying hard-coded inside the Sweeper preset: the
+		-- LogRoll preset fixes the frame and drives the same drum, so both read the
+		-- same measured number. inventory.json gives the drum 12.2558 across, so the
+		-- crossing radius is 6.1279 at scale 1, and the drum's centre sits 2.0499
+		-- studs ABOVE the frame's Support contact (measured local y -14.0901 against
+		-- the -16.14 support): mounted flush, its top clears the deck by 8.1778 * scale
+		-- and its underside dips 4.0780 * scale into the slab it stands on.
 		obstacle_2_001 = {
 			Role = "SweeperFrame",
 			Kind = "Mount",
 			Size = Vector3.new(49.456443786621094, 32.287994384765625, 7.025842666625977),
+			ContactRadius = 6.1279,
 			Sockets = { Support = socket(0, -16.14, 0, 0, -1, 0) },
 			SubParts = {
 				{
@@ -694,6 +705,71 @@ AssetManifest.Assets = (
 			Kind = "Mount",
 			Size = Vector3.new(75.15200042724609, 45.78950119018555, 6.276500225067139),
 			Sockets = { Support = socket(0, -22.8948, 0, 0, -1, 0) },
+		} :: AssetEntry,
+
+		-- The kit's single-mesh roller (01-asset-inventory.md line 141: "small ribbed
+		-- pink/yellow cylinder stub ... log-roll candidate"). Section 6 allows a log-roll
+		-- to be "spiked roller or uniformly scaled podium barrel"; this is the one
+		-- rolling shape in the kit with NO frame, and on a stacked course that matters
+		-- more than its silhouette. obstacle_2_001's cradle is 32.284 studs tall above
+		-- its own mount, and a cut-set audit measured runners climbing one from run 2
+		-- and jumping straight into beat 06, skipping three beats -- a 32-stud structure
+		-- standing on a lower storey of a tower is a ladder, not a hazard frame.
+		--
+		-- The barrel is long in local Y (13.9774) and 6.1188 across, so it lies on its
+		-- side with a PitchDegrees quarter turn and still spins about its own local Y.
+		-- Its Support socket is its AXLE rather than an underside, because a roller
+		-- lying on its side has no underside: the mount point is the axis the course
+		-- places, and OffsetUp then reads directly as "how far the axle sits above the
+		-- deck".
+		obstacle_10_001 = {
+			Role = "LogRollBarrel",
+			Kind = "Mount",
+			Size = Vector3.new(6.118765830993652, 13.97743034362793, 6.118765830993652),
+			ContactRadius = 3.0594,
+			Sockets = { Support = socket(0, 0, 0, 0, -1, 0) },
+		} :: AssetEntry,
+
+		-- Piston Peak sources. Both are single-part meshes whose collision box IS the
+		-- part (inventory.json records one part each with identity rotation), so the
+		-- Support socket is the measured half-height and nothing else has to be
+		-- derived.
+		--
+		-- wall_001 is 01-asset-inventory.md's "tall inflatable wall/endcap": 18.8965
+		-- long, 22.9403 tall, 7.7135 thick, which is the one stock piece in the kit
+		-- whose own proportions reach HANDOFF 5.2's 14-stud guard-wall height at a
+		-- uniform scale that still leaves it shorter than a stacked-run clearance.
+		-- Tumble Tunnels' lesson ("never stack stock slabs to make a wall") is about
+		-- stacking slabs VERTICALLY to fake height; these are tiled side by side at one
+		-- height, so no intermediate top is ever created.
+		wall_001 = {
+			Role = "GuardWall",
+			Kind = "Mount",
+			Size = Vector3.new(18.896467208862305, 22.940324783325195, 7.713475704193115),
+			Sockets = { Support = socket(0, -11.4702, 0, 0, -1, 0) },
+		} :: AssetEntry,
+		wall_002 = {
+			Role = "GuardWall",
+			Kind = "Mount",
+			Size = Vector3.new(18.896467208862305, 22.940324783325195, 7.713475704193115),
+			Sockets = { Support = socket(0, -11.4702, 0, 0, -1, 0) },
+		} :: AssetEntry,
+
+		-- Section 7.6: "Pads: trampoline_2." The inner disc is trampoline_2_002, 5.855
+		-- studs above the outer's centre, measured against the root's own frame exactly
+		-- as trampoline_1/3/4/5 were.
+		trampoline_2_001 = {
+			Role = "JumpPadOuterRinged",
+			Kind = "Mount",
+			Size = Vector3.new(12.383130073547363, 11.1846923828125, 12.382993698120117),
+			Sockets = { Support = socket(0, -5.5923, 0, 0, -1, 0) },
+			SubParts = {
+				{
+					Name = "trampoline_2_002",
+					RelativeCFrame = CFrame.new(0.0005, 5.855, 0.0),
+					Size = Vector3.new(7.510320663452148, 1.0670387744903564, 7.510275363922119),
+				},
+			},
 		} :: AssetEntry,
 		door_003 = {
 			Role = "DoorSlab",

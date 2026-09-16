@@ -48,6 +48,7 @@ return {
 		"DoorDash",
 		"TumbleTunnels",
 		"TiptoeTrials",
+		"PistonPeak",
 	},
 	Courses = {
 		BallBarrage = {
@@ -88,6 +89,24 @@ return {
 			ParSeconds = 75,
 			CapSeconds = 180,
 			CloseWindowSeconds = 60,
+		},
+		PistonPeak = {
+			DisplayName = "PISTON PEAK",
+			-- HANDOFF 12.1's difficulty list for the final seven is 3, 3, 2, 3, 3, 4 and
+			-- Summit's existing 3, so Piston Peak is the one 4 in the set.
+			Difficulty = 4,
+			ParSeconds = 75,
+			CapSeconds = 180,
+			CloseWindowSeconds = 60,
+			-- The only new course with HANDOFF section 6's rising liquid. The runtime
+			-- reads the schedule off the course's own Hazards part (RisingLiquid.resolve
+			-- over SplashdownCourses.resolve), which CourseBuilder writes from the
+			-- spec's Layout.Rise; this block is the same authoring-side record Summit
+			-- keeps, in Summit's Studs/DelaySeconds/Seconds form. Section 7.6's seed of
+			-- 60 studs drowned the Y 12 and Y 24 checkpoints, so it is lowered to 38:
+			-- the flood stops at world-local Y +8, four studs under the lowest pad, and
+			-- finishes rising at 115 s against the 180-second cap.
+			LavaRise = { Studs = 38, DelaySeconds = 20, Seconds = 95 },
 		},
 		WhirlPool = {
 			DisplayName = "WHIRL POOL",

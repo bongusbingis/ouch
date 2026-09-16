@@ -53,6 +53,14 @@ export type PresetName =
 	-- arch frames around a landing mouth, enclosure. It lives in Geometry like
 	-- any other static piece and is never an encounter.
 	| "Prop"
+	-- Piston Peak addition. A log-roll turns about its own measured long axis and
+	-- both carries and shoves (section 6: "Log-roll ... Spin along long axis + Shove
+	-- + Carries on actual ride surface; not an unanchored physics barrel"). Section 6
+	-- allows either of the kit's rolling shapes, so the preset drives whichever the
+	-- manifest declares: a framed roller turns only its declared drum and holds the
+	-- cradle fixed (unlike the Sweeper, whose frame slides), and a single-mesh barrel
+	-- turns on its own root.
+	| "LogRoll"
 	-- A static round deck placed by the Ride kind. It carries no attributes and
 	-- does not turn; it exists because a round platform has no preferred heading,
 	-- so a spiral can change direction across one without the wedge seam two
@@ -87,6 +95,9 @@ export type PieceSpec = {
 	FanDirection: number?,
 	FanColumnHeight: number?,
 	RotorSpeed: number?,
+	-- LogRoll only: which of the barrel's own local axes is its long axis. The kit's
+	-- two rolling shapes differ, so it is declared rather than guessed.
+	RotorAxis: ("X" | "Y" | "Z")?,
 	DoorRow: number?,
 	DoorIndex: number?,
 	VolumeSize: Vector3?,
@@ -463,6 +474,35 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		drum:SetAttribute(A.RotorSpeed, degreesPerSecond)
 		drum:SetAttribute(A.Shove, true)
 		drum:SetAttribute(A.ShoveSpeed, 48)
+		drum:SetAttribute(A.ShoveUpwardSpeed, 20)
+		drum:SetAttribute(A.ShoveSeconds, 0.24)
+		drum:SetAttribute(A.ShoveContact, "mesh")
+		drum:SetAttribute(A.ImpactVisual, true)
+		drum:SetAttribute(A.RetriggerCooldown, 0.8)
+		drum:SetAttribute(A.GuardSeconds, 1.0)
+	elseif spec.Preset == "LogRoll" then
+		-- Section 6: "Log-roll ... Spin along long axis + Shove + Carries on actual ride
+		-- surface; not an unanchored physics barrel." Two source shapes qualify, so the
+		-- preset drives whichever the manifest declares: a framed roller turns only its
+		-- declared drum and leaves the cradle fixed (unlike the Sweeper, whose frame
+		-- slides), and a single-mesh barrel turns on its own root. Speed comes from the
+		-- section 6 formula at the MEASURED crossing radius, and the sign is the
+		-- caller's, because consecutive rollers spin opposite ways.
+		local drum = if manifest.SubParts then sub((manifest.SubParts :: any)[1].Name) else root
+		local contactRadius = assert(
+			manifest.ContactRadius,
+			`[CoursePresets] {sourceId} has no measured ContactRadius for a LogRoll`
+		) * spec.Scale
+		drum:SetAttribute(A.Rotor, "spin")
+		-- The barrel's own long axis, which the caller declares because the two source
+		-- shapes differ: obstacle_2_002's drum is long in local X, obstacle_10_001 is
+		-- long in local Y and is laid on its side by the mount's PitchDegrees.
+		drum:SetAttribute(A.RotorAxis, spec.RotorAxis or "X")
+		drum:SetAttribute(A.RotorSpeed, spec.RotorSpeed or spinDegreesPerSecond(contactRadius))
+		drum:SetAttribute(A.RotorPhaseDegrees, (spec.RotorPhase or 0) * 60)
+		drum:SetAttribute(A.RotorCarries, true)
+		drum:SetAttribute(A.Shove, true)
+		drum:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 48)
 		drum:SetAttribute(A.ShoveUpwardSpeed, 20)
 		drum:SetAttribute(A.ShoveSeconds, 0.24)
 		drum:SetAttribute(A.ShoveContact, "mesh")

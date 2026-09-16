@@ -173,6 +173,20 @@ function CourseAuthoring.stage(ids: { string }): StageResult
 			WorstIslandSeparation = report.WorstIslandSeparation,
 			WorstIslandSeparationPair = report.WorstIslandSeparationPair,
 			MaxLaunchReach = report.MaxLaunchReach,
+			-- StackedSwitchback measurements: per-run climb, every measured guard
+			-- wall, the tightest vertical clearance between two runs sharing a
+			-- centreline, the tightest cross-run edge margin against the ordinary
+			-- jump, and the rising-liquid flood line against the lowest checkpoint.
+			Runs = report.Runs,
+			GuardWalls = report.GuardWalls,
+			WorstStackClearance = report.WorstStackClearance,
+			WorstStackPair = report.WorstStackPair,
+			WorstCrossRunMargin = report.WorstCrossRunMargin,
+			WorstCrossRunPair = report.WorstCrossRunPair,
+			WalledCrossRunPairs = report.WalledCrossRunPairs,
+			FloodTopY = report.FloodTopY,
+			LowestCheckpointY = report.LowestCheckpointY,
+			FloodClearance = report.FloodClearance,
 			RouteSteps = #report.Route,
 		}
 		parkedValue(string.format("%s_%s_Route", REPORT_NAME, id)).Value = HttpService:JSONEncode(report.Route)

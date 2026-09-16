@@ -50,6 +50,58 @@
    },
    "specHash": "8c00a748"
   },
+  "PistonPeak": {
+   "badMapRefComparison": "Inspected against bad-map-refs/1, 9, 10 and 11. Not a flat sprinkled field: the route is two 8.8-17.4 stud columns stacked five deep, not a wide open deck. No repeated narrow swing-panel bypass and no lone open spinner: each of the seven beats carries a different mechanic and the coverage audit found no hazard-free 24x24 square. No empty slabs: the only unhazarded runs are the box_011 climbs, which are the course's own elevation change. No avoidable or floating bumpers: all nine bumper slabs stagger across their own deck and are scored as three chicane encounters.",
+   "cameras": {
+    "three-quarter": {
+     "eye": [
+      -237.767,
+      9720.777,
+      245.686
+     ],
+     "file": "courses/PistonPeak/three-quarter.png",
+     "lookAt": [
+      -537.767,
+      9480.777,
+      -54.314
+     ]
+    },
+    "top-down": {
+     "eye": [
+      -537.767,
+      9980.777,
+      -53.314
+     ],
+     "file": "courses/PistonPeak/top-down.png",
+     "lookAt": [
+      -537.767,
+      9480.777,
+      -54.314
+     ]
+    }
+   },
+   "fieldOfView": 70,
+   "mapOrigin": [
+    -537.7670288085938,
+    460.77728271484375,
+    -54.31404495239258
+   ],
+   "method": "CourseAuthoring.preview put an unregistered clone at the live MapOrigin; the clone alone was lifted 9,000 studs, the camera was posed through workspace.CurrentCamera at FieldOfView 70, and the viewport was grabbed to a real PNG. clearPreview() removed the clone afterwards; workspace.Assets.Arena.Map.Model was never moved and is still at its recorded pivot.",
+   "previewOrigin": [
+    -537.7670288085938,
+    9460.77734375,
+    -54.31404495239258
+   ],
+   "restoredAfterwards": {
+    "workspace.Assets.Arena.Map.Model": [
+     -537.766602,
+     519.175659,
+     -54.3143196
+    ],
+    "workspace.SplashdownPreview": "cleared through CourseAuthoring.clearPreview(); nothing else in the place was moved"
+   },
+   "specHash": "e164c528"
+  },
   "TumbleTunnels": {
    "cameras": {
     "three-quarter": {

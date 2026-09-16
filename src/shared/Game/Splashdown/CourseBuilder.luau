@@ -9,6 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local AssetManifest = require(script.Parent.AssetManifest)
 local CoursePresets = require(script.Parent.CoursePresets)
 local AttributeAudit = require(ReplicatedStorage.Shared.Game.MapFeatures.AttributeAudit)
+local MapFeatures = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
+local A = MapFeatures.Attributes
 
 local CourseBuilder = {}
 
@@ -88,6 +90,9 @@ export type PieceSpec = {
 	FanDirection: number?,
 	FanColumnHeight: number?,
 	RotorSpeed: number?,
+	-- LogRoll only: which of the barrel's own local axes is its long axis. The kit's
+	-- two rolling shapes differ, so it is declared rather than guessed.
+	RotorAxis: ("X" | "Y" | "Z")?,
 	DoorRow: number?,
 	DoorIndex: number?,
 	VolumeSize: Vector3?,
@@ -108,6 +113,12 @@ export type PieceSpec = {
 	-- Ride pieces only, on an Archipelago: the heading change the route makes across
 	-- this round deck. A Spiral reads the same turn off its parametric guide.
 	TurnDegrees: number?,
+	-- StackedSwitchback only. Marks a Mount as one of HANDOFF 5.2's guard walls
+	-- between two stacked runs. The builder measures the placed wall -- its top above
+	-- the surface it stands on, its centre and its own half-length along the route --
+	-- and then proves, pair by pair, that no ordinary jump between two different runs
+	-- gets past one. A wall is never an encounter; it is stock enclosure in Geometry.
+	GuardWall: boolean?,
 }
 
 export type BeatSpec = {
@@ -232,6 +243,68 @@ export type ArchipelagoSpec = {
 	CentreRadius: number,
 }
 
+-- HANDOFF 5.2's StackedSwitchback: "Short runs stacked above each other with a
+-- small horizontal pitch (30-40 studs between run centrelines) so the course reads
+-- as a climbing tower that the rising liquid follows. Each run rises per section
+-- 7.6. Guard walls between stacked runs are measured 14 above the lower run's
+-- takeoff surfaces."
+--
+-- The guide IS a polyline, unlike an Archipelago's island list, but it is a
+-- polyline that deliberately retraces itself: a switchback staircase in plan view
+-- is a rectangle walked in ONE rotational direction, so runs 1/3/5 share a
+-- centreline and runs 2/4/6 share the other, one lane pitch away. What makes it a
+-- tower rather than a Loop is that the route comes back over its own runs at a
+-- measured height instead of closing a circuit. Enforced invariants:
+--   1. an odd number of segments, at least five: runs on the odd ones, one
+--      lane-pitch cross on every even one;
+--   2. every turn is a right angle and they all turn the same way, which is what
+--      keeps the runs in exactly TWO columns rather than fanning outwards;
+--   3. runs alternate through 180 degrees and crosses alternate through 180, so
+--      run k and run k+2 really are stacked on the same centreline;
+--   4. every run's MEASURED elevation change climbs;
+--   5. two runs sharing a centreline are separated vertically by more than
+--      MinStackClearanceStuds at every measured route step, and that clearance is
+--      itself larger than the measured step-up limit, so an upper run is never a
+--      shortcut off a lower one; and
+--   6. no measured pair of route steps on DIFFERENT runs that would save at least
+--      MinBypassStuds of route is inside the ordinary jump reach for its own rise
+--      unless a declared guard wall stands across the line between them, and every
+--      guard wall's top is at least GuardWallStuds above the surface it stands on.
+-- HANDOFF section 6's rising-liquid twist, declared on the layout because it is a
+-- property of the course's own liquid plane. Section 7.6 is the only new course
+-- allowed to carry one. MaxHeight is a rise ABOVE Layout.LiquidY.
+export type RisingLiquidSpec = {
+	MaxHeight: number,
+	RiseStudsPerSecond: number,
+	StartDelaySeconds: number,
+	-- HANDOFF 7.6: "Every checkpoint required by a racer must remain earnable after a
+	-- respawn; if flooding strands credit, lower MaxHeight in 2-stud increments until
+	-- the flood regression passes." A respawn pad under the finished flood line is
+	-- exactly that strand -- the racer splashes, respawns on the same drowned pad and
+	-- never leaves -- so the builder measures the lowest checkpoint the route actually
+	-- places and fails if the liquid's final top comes within this margin of it.
+	CheckpointClearanceStuds: number,
+}
+
+export type StackedSwitchbackSpec = {
+	MinPitchStuds: number,
+	MaxPitchStuds: number,
+	-- HANDOFF 5.2/9.2's measured 14.
+	GuardWallStuds: number,
+	MinStackClearanceStuds: number,
+	-- HANDOFF 3.2's measured 11.5-stud ledge: 11.5 succeeds, 11.75 fails.
+	StepLimitStuds: number,
+	-- HANDOFF 3.2's measured movement constants, so every reach here is derived
+	-- rather than declared, exactly as an Archipelago derives its launches.
+	Gravity: number,
+	WalkSpeed: number,
+	JumpHeight: number,
+	JumpReachCalibration: number,
+	-- How much route a hop between two runs has to save before it counts as a
+	-- bypass worth walling. Below this it is the switchback's own legal crossing.
+	MinBypassStuds: number,
+}
+
 export type LayoutSpec = {
 	Kind: string,
 	LanePitch: number,
@@ -246,6 +319,8 @@ export type LayoutSpec = {
 	Chute: ChuteSpec?,
 	Loop: LoopSpec?,
 	Archipelago: ArchipelagoSpec?,
+	StackedSwitchback: StackedSwitchbackSpec?,
+	Rise: RisingLiquidSpec?,
 	-- Spiral only: how far a chained run may drift from the parametric guide
 	-- before the build fails. A straight slab chord always sits slightly outside
 	-- the arc it approximates; this is the measured budget for that, not licence
@@ -318,6 +393,10 @@ export type BoundsReport = {
 	-- and reported but not held to the route band.
 	RouteMinY: number,
 	RouteMaxY: number,
+	-- QA gate volumes, measured and reported but held to the 600-corner rule only
+	-- (see auditBounds).
+	GateMinY: number,
+	GateMaxY: number,
 	MinY: number,
 	MaxY: number,
 	Violations: { string },
@@ -367,6 +446,22 @@ export type BuildReport = {
 	-- the largest drop between any two of its islands: the number the separation rule
 	-- is scored against, derived rather than declared.
 	MaxLaunchReach: number,
+	-- StackedSwitchback only. One row per run with its measured climb, every
+	-- measured guard wall, and the two numbers the tower is scored on: the tightest
+	-- vertical clearance between two runs sharing a centreline, and the tightest
+	-- measured edge gap between two runs that a guard wall has to close.
+	Runs: { { Index: number, RiseStuds: number, StartY: number, EndY: number, Steps: number } },
+	GuardWalls: { { PieceId: string, TopAboveDeck: number, HalfLength: number } },
+	WorstStackClearance: number,
+	WorstStackPair: string,
+	WorstCrossRunMargin: number,
+	WorstCrossRunPair: string,
+	WalledCrossRunPairs: number,
+	-- Rising-liquid courses only: where the flood stops, the lowest checkpoint pad
+	-- the route placed, and the measured gap between them.
+	FloodTopY: number,
+	LowestCheckpointY: number,
+	FloodClearance: number,
 }
 
 local function forward(headingDegrees: number): Vector3
@@ -510,7 +605,7 @@ local function buildBoundary(
 	end
 end
 
-local function buildHazardLiquid(boundsRadius: number, liquidY: number, hazardsFolder: Folder)
+local function buildHazardLiquid(boundsRadius: number, liquidY: number, hazardsFolder: Folder, rise: RisingLiquidSpec?)
 	local liquid = Instance.new("Part")
 	liquid.Name = "Liquid"
 	liquid.Shape = Enum.PartType.Block
@@ -522,6 +617,20 @@ local function buildHazardLiquid(boundsRadius: number, liquidY: number, hazardsF
 	liquid.CanQuery = true
 	liquid.Transparency = 0.3
 	liquid.Color = Color3.fromRGB(60, 140, 220)
+	-- HANDOFF section 6's reusable rising-liquid twist, which only Piston Peak may
+	-- reuse among the new courses. SplashdownCourses.resolve finds the schedule by
+	-- running RisingLiquid.resolve over every Hazards BasePart, so the attributes go
+	-- on the liquid itself; MaxHeight is a RELATIVE rise above the authored plane
+	-- (HANDOFF 13), never an absolute world Y.
+	if rise then
+		assert(rise.MaxHeight > 0, "[CourseBuilder] Layout.Rise.MaxHeight must be positive")
+		assert(rise.RiseStudsPerSecond > 0, "[CourseBuilder] Layout.Rise.RiseStudsPerSecond must be positive")
+		assert(rise.StartDelaySeconds >= 0, "[CourseBuilder] Layout.Rise.StartDelaySeconds must not be negative")
+		liquid:SetAttribute(A.RisingLiquid, true)
+		liquid:SetAttribute(A.MaxHeight, rise.MaxHeight)
+		liquid:SetAttribute(A.RiseStudsPerSecond, rise.RiseStudsPerSecond)
+		liquid:SetAttribute(A.StartDelaySeconds, rise.StartDelaySeconds)
+	end
 	liquid.Parent = hazardsFolder
 end
 
@@ -567,6 +676,8 @@ local function auditBounds(
 		MaxRouteRadius = 0,
 		RouteMinY = math.huge,
 		RouteMaxY = -math.huge,
+		GateMinY = math.huge,
+		GateMaxY = -math.huge,
 		MinY = math.huge,
 		MaxY = -math.huge,
 		Violations = {},
@@ -583,6 +694,15 @@ local function auditBounds(
 					break
 				end
 			end
+			-- A QA gate is a MEASUREMENT volume, not route: an invisible plane spanning
+			-- 22 studs below a beat entrance to 38 above it, sized to catch a runner who
+			-- arrives low or lands from a launch. HANDOFF 5.1.10 scopes the -30..90 band
+			-- to the "static ROUTE envelope" -- which is why the perimeter ring and the
+			-- liquid plane are already outside it -- and a gate that reaches 38 studs
+			-- over a 66-stud climb says nothing about where the course's floor is. Their
+			-- extent is measured and reported below rather than dropped, and they stay
+			-- inside the 600-corner rule with everything else.
+			local isGate = descendant:GetAttribute("QAOnly") == true
 			local half = descendant.Size / 2
 			for _, sx in { -1, 1 } do
 				for _, sy in { -1, 1 } do
@@ -595,7 +715,10 @@ local function auditBounds(
 						end
 						report.MinY = math.min(report.MinY, corner.Y)
 						report.MaxY = math.max(report.MaxY, corner.Y)
-						if not isPerimeter then
+						if isGate then
+							report.GateMinY = math.min(report.GateMinY, corner.Y)
+							report.GateMaxY = math.max(report.GateMaxY, corner.Y)
+						elseif not isPerimeter then
 							if corner.Y < report.RouteMinY or corner.Y > report.RouteMaxY then
 								worstRoute = descendant
 							end
@@ -794,6 +917,58 @@ local function launchReach(archipelago: ArchipelagoSpec, rise: number, speed: nu
 	)
 end
 
+-- The ordinary jump reach a StackedSwitchback is scored against, from the same
+-- measured constants an Archipelago uses.
+local function switchbackJumpReach(spec: StackedSwitchbackSpec, rise: number): number
+	local velocity = math.sqrt(2 * spec.Gravity * spec.JumpHeight)
+	return ballisticReach(velocity, spec.Gravity, spec.WalkSpeed, rise, spec.JumpReachCalibration)
+end
+
+-- Do the horizontal segments a1-a2 and b1-b2 cross? Used only to decide whether a
+-- guard wall really stands ACROSS the line a hop between two runs would fly along,
+-- rather than merely being somewhere nearby.
+local function segmentsCross(a1: Vector3, a2: Vector3, b1: Vector3, b2: Vector3): boolean
+	local function crossZ(p: Vector3, q: Vector3, r: Vector3): number
+		return (q.X - p.X) * (r.Z - p.Z) - (q.Z - p.Z) * (r.X - p.X)
+	end
+	local d1 = crossZ(a1, a2, b1)
+	local d2 = crossZ(a1, a2, b2)
+	local d3 = crossZ(b1, b2, a1)
+	local d4 = crossZ(b1, b2, a2)
+	return ((d1 > 0) ~= (d2 > 0)) and ((d3 > 0) ~= (d4 > 0))
+end
+
+-- Highest world Y any part of a placed piece reaches. A guard wall is measured, not
+-- declared: this is what "14 studs above the lower run's takeoff surfaces" is
+-- checked against.
+local function modelTopY(model: Instance): number
+	local top = -math.huge
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			local size, frame = descendant.Size, descendant.CFrame
+			local half = 0.5
+				* (
+					math.abs(size.X * frame.RightVector.Y)
+					+ math.abs(size.Y * frame.UpVector.Y)
+					+ math.abs(size.Z * frame.LookVector.Y)
+				)
+			top = math.max(top, descendant.Position.Y + half)
+		end
+	end
+	if model:IsA("BasePart") then
+		local part = model :: BasePart
+		local size, frame = part.Size, part.CFrame
+		local half = 0.5
+			* (
+				math.abs(size.X * frame.RightVector.Y)
+				+ math.abs(size.Y * frame.UpVector.Y)
+				+ math.abs(size.Z * frame.LookVector.Y)
+			)
+		top = math.max(top, part.Position.Y + half)
+	end
+	return top
+end
+
 local function islandAnchor(island: ArchipelagoIsland): Vector3
 	local radians = math.rad(island.AngleDegrees)
 	return Vector3.new(island.Radius * math.cos(radians), island.Y, island.Radius * math.sin(radians))
@@ -906,13 +1081,15 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			or layout.Kind == "Spiral"
 			or layout.Kind == "Chute"
 			or layout.Kind == "Loop"
-			or layout.Kind == "Archipelago",
+			or layout.Kind == "Archipelago"
+			or layout.Kind == "StackedSwitchback",
 		`[CourseBuilder] unknown Layout.Kind "{layout.Kind}"`
 	)
 	local isSpiral = layout.Kind == "Spiral"
 	local isChute = layout.Kind == "Chute"
 	local isLoop = layout.Kind == "Loop"
 	local isArchipelago = layout.Kind == "Archipelago"
+	local isStacked = layout.Kind == "StackedSwitchback"
 	local curve: GuideCurve? = if isSpiral
 		then buildSpiralGuide(assert(layout.Spiral, "[CourseBuilder] a Spiral layout needs Layout.Spiral"))
 		else nil
@@ -1031,6 +1208,100 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			)
 		)
 	end
+	local stacked = if isStacked
+		then assert(
+			layout.StackedSwitchback,
+			"[CourseBuilder] a StackedSwitchback layout needs Layout.StackedSwitchback"
+		)
+		else nil
+	if stacked then
+		assert(
+			#segments >= 5 and #segments % 2 == 1,
+			`[CourseBuilder] a StackedSwitchback guide alternates run/cross and ends on a run: an odd count of at least 5 segments, not {#segments} (HANDOFF 5.2)`
+		)
+		assert(
+			layout.LanePitch >= stacked.MinPitchStuds and layout.LanePitch <= stacked.MaxPitchStuds,
+			string.format(
+				"[CourseBuilder] a StackedSwitchback's run centrelines sit %.2f studs apart, outside the declared %.1f-%.1f band (HANDOFF 5.2 wants 30-40)",
+				layout.LanePitch,
+				stacked.MinPitchStuds,
+				stacked.MaxPitchStuds
+			)
+		)
+		assert(
+			stacked.MinStackClearanceStuds > stacked.StepLimitStuds,
+			string.format(
+				"[CourseBuilder] MinStackClearanceStuds %.2f must beat the measured %.2f-stud step-up, or an upper run is a shortcut off the one below it",
+				stacked.MinStackClearanceStuds,
+				stacked.StepLimitStuds
+			)
+		)
+		-- Runs alternate through 180 degrees; crosses alternate through 180 as well,
+		-- which is exactly what puts run k and run k+2 back on one centreline.
+		for index = 3, #segments, 2 do
+			local drift = normalizeDegrees(segments[index].Heading - segments[index - 2].Heading - 180)
+			assert(
+				math.min(drift, 360 - drift) < 1e-3,
+				string.format(
+					"[CourseBuilder] a StackedSwitchback's runs double back on each other; run segment %d heads %.1f against segment %d's %.1f",
+					index,
+					segments[index].Heading,
+					index - 2,
+					segments[index - 2].Heading
+				)
+			)
+		end
+		for index = 4, #segments, 2 do
+			local drift = normalizeDegrees(segments[index].Heading - segments[index - 2].Heading - 180)
+			assert(
+				math.min(drift, 360 - drift) < 1e-3,
+				string.format(
+					"[CourseBuilder] a StackedSwitchback's crosses must alternate so runs return to one of two centrelines; cross %d heads %.1f against cross %d's %.1f",
+					index,
+					segments[index].Heading,
+					index - 2,
+					segments[index - 2].Heading
+				)
+			)
+		end
+		for index = 2, #segments, 2 do
+			assert(
+				math.abs(segments[index].Length - layout.LanePitch) < 1e-3,
+				string.format(
+					"[CourseBuilder] a StackedSwitchback's cross segment %d is %.2f studs but LanePitch is %.2f; the pitch IS the gap between the two stacked columns",
+					index,
+					segments[index].Length,
+					layout.LanePitch
+				)
+			)
+		end
+		local firstSign = 0
+		for index = 2, #segments do
+			local delta = normalizeDegrees(segments[index].Heading - segments[index - 1].Heading)
+			local signed = if delta > 180 then delta - 360 else delta
+			assert(
+				math.abs(math.abs(signed) - 90) < 1e-3,
+				string.format(
+					"[CourseBuilder] a StackedSwitchback turns in right angles; turn %d is %.1f",
+					index - 1,
+					signed
+				)
+			)
+			local sign = if signed > 0 then 1 else -1
+			if firstSign == 0 then
+				firstSign = sign
+			end
+			assert(
+				sign == firstSign,
+				string.format(
+					"[CourseBuilder] a StackedSwitchback's turns all go the same way, which is what keeps it two columns; turn %d reverses",
+					index - 1
+				)
+			)
+		end
+	end
+	local guardWalls: { { PieceId: string, TopAboveDeck: number, HalfLength: number, A: Vector3, B: Vector3, Top: number } } =
+		{}
 	local archipelago = if isArchipelago
 		then assert(layout.Archipelago, "[CourseBuilder] an Archipelago layout needs Layout.Archipelago")
 		else nil
@@ -1163,6 +1434,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local startDelta = cursor.Position - guideStart
 	local segmentTravel = Vector3.new(startDelta.X, 0, startDelta.Z).Magnitude
 	local route: { RouteStep } = {}
+	local lowestCheckpointY = math.huge
 	local beatMeasures: { BeatMeasure } = {}
 	local routeLength = segmentTravel
 	local pieceIndex = 0
@@ -1315,6 +1587,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 
 		if beatIndex > 1 then
 			buildCheckpoint(beatIndex - 1, cursor, checkpointsFolder)
+			lowestCheckpointY = math.min(lowestCheckpointY, cursor.Position.Y)
 		end
 		-- QA gate volume at every beat entrance: an invisible, noncolliding but
 		-- queryable/touchable plane the cut-set audit uses to prove the route
@@ -1675,11 +1948,47 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				if chute and segmentIndex == 3 then
 					hairpinExitLength = routeLength
 				end
-				record(beat.Id, piece.Id, piece.Kind, along + lateral)
+				record(
+					beat.Id,
+					piece.Id,
+					piece.Kind,
+					along + lateral,
+					lateralHalfWidth(result.Model, cursor.Position, cursor.Yaw)
+				)
 				indexPiece(piece.Id, result.Model)
 			elseif piece.Kind == "Mount" then
 				local targetCFrame = offsetCFrame(cursor, piece, liquidY)
 				local result = CoursePresets.buildMountPiece(context, piece :: any, targetCFrame)
+				if piece.GuardWall then
+					-- Measured, never declared: where the wall really stands, how far it
+					-- really reaches along the run, and how high its real top sits above
+					-- the run surface it was mounted on.
+					local base = targetCFrame.Position
+					local halfLength = lateralHalfWidth(result.Model, base, cursor.Yaw + 90)
+					local along = forward(cursor.Yaw)
+					local top = modelTopY(result.Model)
+					local deck = cursor.Position.Y
+					local wanted = if stacked then (stacked :: StackedSwitchbackSpec).GuardWallStuds else 14
+					if top - deck < wanted - 1e-3 then
+						fail(
+							string.format(
+								"%s/%s: the guard wall tops out %.2f studs above the run it stands on, under HANDOFF 5.2's measured %.1f",
+								beat.Id,
+								piece.Id,
+								top - deck,
+								wanted
+							)
+						)
+					end
+					table.insert(guardWalls, {
+						PieceId = piece.Id,
+						TopAboveDeck = top - deck,
+						HalfLength = halfLength,
+						A = base - along * halfLength,
+						B = base + along * halfLength,
+						Top = top,
+					})
+				end
 				record(
 					beat.Id,
 					piece.Id,
@@ -1754,7 +2063,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	end
 
 	buildFinish(sources, spec.Id, cursor, finishFolder, geometry)
-	buildHazardLiquid(layout.BoundsRadius, liquidY, hazards)
+	buildHazardLiquid(layout.BoundsRadius, liquidY, hazards, layout.Rise)
 	buildBoundary(390, 24, liquidY, sources.BoundaryWall, boundaryFolder)
 
 	local checkpointCount = #checkpointsFolder:GetChildren()
@@ -1817,6 +2126,168 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 					)
 				)
 			end
+		end
+	end
+
+	-- StackedSwitchback: everything below is read off the BUILT route rather than
+	-- the spec, so "these runs are stacked 24 studs apart and nothing can hop
+	-- between them" is a statement about real geometry.
+	local runRows: { { Index: number, RiseStuds: number, StartY: number, EndY: number, Steps: number } } = {}
+	local worstStackClearance = 0
+	local worstStackPair = ""
+	local worstCrossRunMargin = 0
+	local worstCrossRunPair = ""
+	local walledCrossRunPairs = 0
+	if stacked then
+		local switchback = stacked :: StackedSwitchbackSpec
+		-- Runs live on the ODD guide segments; the even ones are the crosses, which are
+		-- the switchback's own legal link between two runs and are therefore not part of
+		-- either.
+		local function runOf(step: RouteStep): number
+			return if step.Segment % 2 == 1 then (step.Segment + 1) // 2 else 0
+		end
+		local walkable: { RouteStep } = {}
+		local reachedAt: { [RouteStep]: number } = {}
+		local travelled = 0
+		for _, step in route do
+			travelled += step.ArcLength
+			if (step.Kind == "Chain" or step.Kind == "Corner") and runOf(step) > 0 then
+				table.insert(walkable, step)
+				reachedAt[step] = travelled
+			end
+		end
+		local byRun: { [number]: { RouteStep } } = {}
+		for _, step in walkable do
+			local index = runOf(step)
+			byRun[index] = byRun[index] or {}
+			table.insert(byRun[index], step)
+		end
+		local runCount = (#segments + 1) // 2
+		for index = 1, runCount do
+			local steps = byRun[index] or {}
+			local startY, endY = 0, 0
+			if #steps > 0 then
+				startY, endY = steps[1].Position.Y, steps[#steps].Position.Y
+			end
+			table.insert(runRows, {
+				Index = index,
+				RiseStuds = endY - startY,
+				StartY = startY,
+				EndY = endY,
+				Steps = #steps,
+			})
+			if #steps > 0 and endY - startY <= 0 then
+				fail(
+					string.format(
+						"run %d measures %.2f studs of climb; a StackedSwitchback's runs all rise (HANDOFF 5.2/7.6)",
+						index,
+						endY - startY
+					)
+				)
+			end
+		end
+		-- Runs two apart share a centreline, so their vertical separation is the whole
+		-- reason an upper run is not a shortcut off the one below.
+		worstStackClearance = math.huge
+		for lower = 1, runCount - 2 do
+			local a, b = byRun[lower], byRun[lower + 2]
+			if a == nil or b == nil then
+				continue
+			end
+			for _, stepA in a do
+				for _, stepB in b do
+					local delta = stepB.Position - stepA.Position
+					local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
+					-- Only where they really overlap in plan: the two runs need not cover
+					-- the same span of the tower.
+					if horizontal > stepA.HalfWidth + stepB.HalfWidth then
+						continue
+					end
+					local clearance = stepB.Position.Y - stepA.Position.Y
+					if clearance < worstStackClearance then
+						worstStackClearance = clearance
+						worstStackPair = string.format("run%d/run%d @ %s", lower, lower + 2, stepB.PieceId)
+					end
+				end
+			end
+		end
+		if worstStackClearance == math.huge then
+			worstStackClearance = 0
+		elseif worstStackClearance < switchback.MinStackClearanceStuds then
+			fail(
+				string.format(
+					"stacked runs come within %.2f studs vertically at %s, under the declared %.2f-stud clearance (HANDOFF 5.2)",
+					worstStackClearance,
+					worstStackPair,
+					switchback.MinStackClearanceStuds
+				)
+			)
+		end
+		-- HANDOFF 5.2: "adjacent runs and islands are separated so that no launch
+		-- envelope reaches them, and the launch-envelope QA proves it -- spacing alone
+		-- is not proof." Every pair of walkable steps on DIFFERENT runs that would skip
+		-- real route is measured edge to edge against the ordinary jump reach for its
+		-- own rise, and anything inside that reach has to have a guard wall standing
+		-- across the line it would fly along.
+		worstCrossRunMargin = math.huge
+		for i = 1, #walkable do
+			for j = 1, #walkable do
+				if i == j then
+					continue
+				end
+				local from, to = walkable[i], walkable[j]
+				if runOf(from) == runOf(to) then
+					continue
+				end
+				-- Only a FORWARD hop that skips real route is a bypass; anything shorter
+				-- than MinBypassStuds is the switchback's own legal crossing at the turn.
+				if reachedAt[to] - reachedAt[from] < switchback.MinBypassStuds then
+					continue
+				end
+				local delta = to.Position - from.Position
+				local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
+				local gap = horizontal - from.HalfWidth - to.HalfWidth
+				local reach = switchbackJumpReach(switchback, delta.Y)
+				if reach <= 0 then
+					continue
+				end
+				local margin = gap - reach
+				local blocked = false
+				for _, wall in guardWalls do
+					if
+						wall.Top >= math.min(from.Position.Y, to.Position.Y) + switchback.GuardWallStuds - 1e-3
+						and segmentsCross(from.Position, to.Position, wall.A, wall.B)
+					then
+						blocked = true
+						break
+					end
+				end
+				if blocked then
+					walledCrossRunPairs += 1
+					continue
+				end
+				if margin < worstCrossRunMargin then
+					worstCrossRunMargin = margin
+					worstCrossRunPair = string.format("%s -> %s", from.PieceId, to.PieceId)
+				end
+				if margin < 0 then
+					fail(
+						string.format(
+							"%s on run %d reaches %s on run %d: a %.2f-stud edge gap over a %.2f-stud rise is inside the %.2f-stud ordinary jump, and no guard wall stands across it (HANDOFF 5.2)",
+							from.PieceId,
+							runOf(from),
+							to.PieceId,
+							runOf(to),
+							gap,
+							delta.Y,
+							reach
+						)
+					)
+				end
+			end
+		end
+		if worstCrossRunMargin == math.huge then
+			worstCrossRunMargin = 0
 		end
 	end
 
@@ -1884,6 +2355,33 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		)
 	end
 
+	local floodTopY = liquidY
+	local floodClearance = 0
+	if layout.Rise then
+		local rise = layout.Rise :: RisingLiquidSpec
+		floodTopY = liquidY + rise.MaxHeight
+		floodClearance = lowestCheckpointY - floodTopY
+		if lowestCheckpointY < math.huge and floodClearance < rise.CheckpointClearanceStuds then
+			fail(
+				string.format(
+					"the liquid finishes at Y %.2f, only %.2f studs under the lowest checkpoint pad at Y %.2f; HANDOFF 7.6 wants %.2f, so lower MaxHeight in 2-stud steps",
+					floodTopY,
+					floodClearance,
+					lowestCheckpointY,
+					rise.CheckpointClearanceStuds
+				)
+			)
+		end
+	end
+
+	local reportedWalls: { { PieceId: string, TopAboveDeck: number, HalfLength: number } } = {}
+	for _, wall in guardWalls do
+		table.insert(
+			reportedWalls,
+			{ PieceId = wall.PieceId, TopAboveDeck = wall.TopAboveDeck, HalfLength = wall.HalfLength }
+		)
+	end
+
 	local bounds = auditBounds(model, geometry, { boundaryFolder, hazards }, route, layout.BoundsRadius)
 
 	local attributeErrors = AttributeAudit.check(scriptables, METADATA_ALLOWLIST)
@@ -1917,6 +2415,16 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		WorstIslandSeparation = worstIslandSeparation,
 		WorstIslandSeparationPair = worstIslandSeparationPair,
 		MaxLaunchReach = maxLaunchReach,
+		Runs = runRows,
+		GuardWalls = reportedWalls,
+		WorstStackClearance = worstStackClearance,
+		WorstStackPair = worstStackPair,
+		WorstCrossRunMargin = worstCrossRunMargin,
+		WorstCrossRunPair = worstCrossRunPair,
+		WalledCrossRunPairs = walledCrossRunPairs,
+		FloodTopY = floodTopY,
+		LowestCheckpointY = if lowestCheckpointY < math.huge then lowestCheckpointY else 0,
+		FloodClearance = floodClearance,
 	}
 	return model, report
 end

@@ -14,6 +14,7 @@ local DoorRows = require(game:GetService("ServerScriptService").Server.Modules.S
 local BeachBalls = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.BeachBalls)
 local FallingTiles = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.FallingTiles)
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config").Gameplay.MapFeatures)
+local RisingLiquid = require(ReplicatedStorage:WaitForChild("Shared").Game.MapFeatures.RisingLiquid)
 
 local function selectedIds(): { string }
 	local selection = ServerStorage:FindFirstChild("SplashdownQASelection")
@@ -365,6 +366,168 @@ return function()
 
 				FallingTiles.forget(nil)
 				probe:Destroy()
+			end)
+
+			-- Third instance of the same class of silent defect, and the one that has
+			-- actually shipped: a hazard whose motion is perfect and whose geometry
+			-- never reaches the lane. Ball Barrage's two pistons mount base-inwards and
+			-- their heads sweep 5.8 to 9.7 studs BEYOND the lane edge over open water,
+			-- so no runner can ever be struck by them, and neither the build nor the
+			-- audit noticed. This drives the measured head, not the attributes: cast
+			-- down from where the head really sits at rest and at full extension, and
+			-- require that at least one of those columns lands on this course's own
+			-- geometry with the head spanning a runner's body above it.
+			it("mounts every piston head where it can actually strike a runner", function()
+				local geometry = model:FindFirstChild("Geometry")
+				local solids = {}
+				for _, instance in (geometry and geometry:GetDescendants() or {}) do
+					if instance:IsA("BasePart") and instance.CanCollide then
+						table.insert(solids, instance)
+					end
+				end
+
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Include
+				params.FilterDescendantsInstances = solids
+
+				local heads = 0
+				for _, instance in model:GetDescendants() do
+					-- The head is the piston's grandchild: the spring carries the slide
+					-- rotor and the head hangs off it, so it is the only piston part with
+					-- no motion owner of its own under a part that has one.
+					if not instance:IsA("BasePart") or instance:GetAttribute("SourceAsset") ~= "obstacle_22_001" then
+						continue
+					end
+					local parent = instance.Parent
+					local isHead = parent ~= nil
+						and parent:IsA("BasePart")
+						and parent:GetAttribute(MapFeatures.Attributes.Rotor) ~= nil
+						and instance:GetAttribute(MapFeatures.Attributes.Rotor) == nil
+					if not isHead then
+						continue
+					end
+					heads += 1
+
+					local extend = parent:GetAttribute(MapFeatures.Attributes.PistonExtendStuds) or 0
+					local punch = instance.CFrame.LookVector * extend
+					local reached = false
+					for _, centre in { instance.Position, instance.Position + punch } do
+						local hit = Workspace:Raycast(centre, Vector3.new(0, -200, 0), params)
+						if hit == nil then
+							continue
+						end
+						local bottom = instance.Position.Y - instance.Size.Y / 2
+						local top = instance.Position.Y + instance.Size.Y / 2
+						-- A runner's body occupies roughly the first 5.5 studs above the
+						-- surface they stand on; the head has to overlap that band, not
+						-- sweep under the floor like a suspended hammer or over their head.
+						if bottom <= hit.Position.Y + 5.5 and top >= hit.Position.Y then
+							reached = true
+							break
+						end
+					end
+					expect(reached).to.equal(true)
+				end
+				expect(heads > 0).to.equal(true)
+			end)
+
+			-- A log-roll is a rolling surface, and on a stacked course it is also the
+			-- piece most likely to become a ladder: the framed roller's cradle stands
+			-- 32 studs above its own mount, and a cut-set audit measured runners
+			-- climbing one from a lower run straight into a beat three ahead. So this
+			-- checks both halves on the built model -- that the kit really sees a
+			-- turning, carrying, shoving drum, and that whatever carries it is not tall
+			-- enough to climb.
+			it("turns its log-rolls without leaving a climbable frame", function()
+				local rotating = model:FindFirstChild("Scriptables")
+				rotating = rotating and rotating:FindFirstChild("Rotating")
+				local drums = 0
+				for _, instance in model:GetDescendants() do
+					if not instance:IsA("BasePart") or instance:GetAttribute("PieceId") == nil then
+						continue
+					end
+					local pieceId = instance:GetAttribute("PieceId") :: string
+					if not pieceId:match("^Roll") or instance:GetAttribute(MapFeatures.Attributes.Rotor) == nil then
+						continue
+					end
+					drums += 1
+					expect(instance:GetAttribute(MapFeatures.Attributes.Rotor)).to.equal("spin")
+					expect(instance:GetAttribute(MapFeatures.Attributes.RotorCarries)).to.equal(true)
+					expect(instance:GetAttribute(MapFeatures.Attributes.Shove)).to.equal(true)
+					expect(math.abs(instance:GetAttribute(MapFeatures.Attributes.RotorSpeed)) > 0).to.equal(true)
+					-- The kit only ever walks Rotating/<group>/Assembly, so a drum parked
+					-- anywhere else is invisible to it however present it looks.
+					local assembly = instance:FindFirstAncestor("Assembly")
+					expect(assembly ~= nil and assembly:IsA("Model")).to.equal(true)
+					expect(assembly.Parent ~= nil and assembly.Parent.Parent == rotating).to.equal(true)
+
+					-- Nothing in the roller's own holder may stand more than a jump above
+					-- the tread it sits on, or the hazard is a staircase to the storey
+					-- above. Measured against the deck under the drum's own centre.
+					local params = RaycastParams.new()
+					params.FilterType = Enum.RaycastFilterType.Exclude
+					params.FilterDescendantsInstances = { assembly }
+					local ground = Workspace:Raycast(instance.Position, Vector3.new(0, -60, 0), params)
+					if ground then
+						local holder = instance.Parent
+						local tallest = 0
+						for _, sibling in (holder and holder:GetDescendants() or { instance }) do
+							if sibling:IsA("BasePart") then
+								tallest = math.max(tallest, sibling.Position.Y + sibling.Size.Y / 2 - ground.Position.Y)
+							end
+						end
+						tallest = math.max(tallest, instance.Position.Y + instance.Size.Y / 2 - ground.Position.Y)
+						expect(tallest < 10).to.equal(true)
+					end
+				end
+				expect(drums >= 0).to.equal(true)
+			end)
+
+			-- HANDOFF 7.6's flood regression, driven through the REAL RisingLiquid
+			-- resolver rather than the spec: SplashdownCourses.resolve finds a course's
+			-- schedule by running exactly this over every Hazards BasePart, so a liquid
+			-- the resolver cannot read has no rise at all, and a flood that finishes
+			-- above a checkpoint pad strands any racer who respawns on it.
+			it("resolves its rising liquid and leaves every checkpoint above the flood", function()
+				local hazards = model:FindFirstChild("Hazards")
+				local liquid, config
+				for _, part in (hazards and hazards:GetChildren() or {}) do
+					if part:IsA("BasePart") then
+						local resolved = RisingLiquid.resolve(part:GetAttributes())
+						if resolved then
+							liquid, config = part, resolved
+							break
+						end
+					end
+				end
+				if liquid == nil then
+					-- Only Piston Peak reuses the twist (HANDOFF section 6), so a course
+					-- without one is reported rather than failed.
+					expect(config).to.equal(nil)
+					return
+				end
+
+				expect(config.studs > 0).to.equal(true)
+				expect(config.seconds > 0).to.equal(true)
+				-- The flood must still be rising when a normal run ends and must have
+				-- stopped by the cap, or it is either decorative or unbounded.
+				local cap = SplashdownConfig.Courses[courseId].CapSeconds
+				expect(config.delaySeconds + config.seconds <= cap).to.equal(true)
+				expect(RisingLiquid.heightAt(0, config)).to.equal(0)
+				expect(RisingLiquid.heightAt(config.seconds * 2, config)).to.equal(config.studs)
+
+				local surface = liquid.Position.Y + liquid.Size.Y / 2
+				local floodTop = surface + config.studs
+				local checkpoints = model:FindFirstChild("Checkpoints")
+				local pads = 0
+				for _, checkpoint in (checkpoints and checkpoints:GetChildren() or {}) do
+					local pad = checkpoint:FindFirstChild("Pad")
+					if pad and pad:IsA("BasePart") then
+						pads += 1
+						expect(pad.Position.Y + pad.Size.Y / 2 > floodTop).to.equal(true)
+					end
+				end
+				expect(pads > 0).to.equal(true)
 			end)
 		end)
 	end

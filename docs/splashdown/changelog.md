@@ -358,3 +358,74 @@
   that put `TiptoeTrials` into `CourseOrder`; the template is promoted and
   `ReplicatedStorage.Assets.Maps.Splashdown` again matches `CourseOrder` exactly. Headless suite:
   984 tests, zero failures.
+
+## 2026-09-16 — Piston Peak (HANDOFF section 7.6), the sixth and last new course
+
+- **StackedSwitchback**, the sixth layout kind. Five short runs stacked over two centrelines 40 studs
+  apart, joined by four switchback landings, climbing 66 studs. Its guide IS a polyline — unlike an
+  Archipelago's island list — but one that deliberately retraces itself, because a switchback
+  staircase in plan view is a rectangle walked in one rotational direction. Six enforced invariants:
+  an odd segment count of at least five with runs on the odd segments and one lane pitch on every
+  even one; `LanePitch` inside a declared 30-40 band; runs and crosses each alternating through 180
+  degrees with every turn a same-handed right angle; every run's MEASURED elevation climbing; two
+  runs sharing a centreline separated by more than a declared clearance that must itself beat the
+  measured 11.5-stud step-up; and no measured pair of route steps on different runs saving at least
+  `MinBypassStuds` of route inside the ordinary jump reach for its own rise unless a declared guard
+  wall stands across the line between them.
+- Spec hash **`e164c528`**, 162 BaseParts, **880.000 measured studs** of route, six ordered
+  checkpoints, beats 0.909-1.050 of their scaled section 7.6 targets, elevation
+  +12/+12/+6/+6/+12/+12/+6 matching section 7.6 exactly, StartY 0 and finishY 66. Identical hash and
+  part count across a double build. `CourseQA.check`: zero errors, ZERO WARNINGS, 50 findings PASS,
+  11 NOT RUN with reasons, 0 FAIL, over a 13,886-node / 1,854,187-edge graph from 15,945 real surface
+  cells, with all twelve cross-course checks passing over the six staged specs. Studio TestEZ: 20
+  passed, 0 failed.
+- **The only new course with section 6's rising liquid.** Section 7.6's seed (baseY -30, delay 20,
+  0.4 studs/s, MaxHeight 60) stops the flood at world-local +30 and drowns the checkpoints at Y 12
+  and Y 24 — a racer respawning on a submerged pad splashes and respawns on it again. 7.6's own
+  remedy is to lower MaxHeight in 2-stud steps; 60 down to 38 stops it at +8, four studs under the
+  lowest pad. `CourseBuilder` now writes the schedule onto the course's own Hazards part from a new
+  `Layout.Rise`, and measures the lowest checkpoint the route places against the finished flood line.
+- **Ball Barrage's two pistons are inert, measured on the promoted template.** Piston01's head spans
+  world Z 72.30-80.02 while its beat-03 lane spans Z 45.49-66.51: the head sweeps 5.8 to 9.7 studs
+  beyond the lane edge over open water, and Piston02 is the same mirrored. The head lies along the
+  piece's own forward, so a base placed inside the lane facing outward throws the head away from the
+  runner. Its two hammers are effectively inert too — HammerLarge's head spans Y 5.70-24.46 under a
+  lane whose top is Y 24.00. Neither was fixed: Gate 3 was approved with them and that is the user's
+  call. The new generic `SplashdownQA.spec` assertion would fail against BallBarrage, which is the
+  evidence.
+- **Two real bugs found in shared QA code, both invisible until a course stacked itself.**
+  `CourseQA.sampleSurfaces` sampled each X/Z column once but over the vertical window of whichever
+  part claimed it first, so four of this tower's five storeys were never sampled and the audit
+  reported the route unreachable; the window is now the whole model's extent and the per-column
+  stacked budget went from 12 to 24 hits. That made the graph five times denser and
+  `CourseGraph.edgeCutByGate`, which walked every edge at half-stud resolution once per gate,
+  exhausted Studio's execution budget; it now rejects on an axis-aligned bounding box first (which
+  cannot change a verdict) and `reachingNodes` takes an optional cooperative yield the engine caller
+  supplies while the headless graph tests pass nothing.
+- **A tall stock frame on a lower storey of a tower is a ladder.** The log-rolls were `obstacle_2_001`,
+  whose cradle stands 32.284 studs above its own mount; the cut-set audit measured standable cells on
+  the frame at Y 28 and Y 41 above a run-2 deck at Y 24 and then a jump onto beat 06's ramp at Y 53,
+  skipping three beats. Replaced with `obstacle_10_001`, the kit's single-mesh barrel laid on its
+  side, whose own crest is 4.67 studs above the deck. Tumble Tunnels' staircase lesson in a fourth
+  form.
+- Three pistons alternating sides at mount distance 17 each reached 0.02 studs past the ledge
+  centreline at rest, and between them their rest poses sealed the corridor so no standable cell
+  survived. At 19.5 each head leaves a measured 4.96-stud corridor at rest and still seals the ledge
+  edge to edge when it fires.
+- `CourseBuilder.cornerRun` leaves a RIGHT turn through `SideNegativeX`, not `SidePositiveX`; using
+  the wrong socket put a hairpin 0.11 studs past its vertex. `auditBounds` now reports QA gate
+  extents separately and holds them to the 600-corner rule only, on the same reasoning that already
+  excluded the perimeter ring and the liquid plane from the -30..90 route band.
+- New in `CoursePresets`: the `LogRoll` preset (drives a declared drum on a framed roller, or the
+  root on a single-mesh barrel) and a `RotorAxis` piece field. `AssetManifest` is version 6 with
+  `wall_001`, `wall_002`, `trampoline_2_001`, `obstacle_10_001` and a measured `ContactRadius` on
+  `obstacle_2_001`. `auditCrossCourse` now scores a declared headline at preset granularity when it
+  names a preset, which is what lets Piston Peak declare `"Piston"` without colliding with every
+  pendulum in the set; the five type-named courses are scored exactly as before.
+- **Its scripted trials were NOT COMPLETED**, per the user's standing 2026-09-16 decision. No trial
+  numbers are claimed. The interactive keyboard run, the deliberate missed-timing contacts and the
+  checkpoint-recovery run are outstanding for this course exactly as for the other five.
+- Added `Courses.PistonPeak` (with its `LavaRise` record) and `Intro.Courses.PistonPeak` in the same
+  change that put `PistonPeak` into `CourseOrder`; the template is promoted and
+  `ReplicatedStorage.Assets.Maps.Splashdown` matches `CourseOrder` exactly at six models. Headless
+  suite: 984 tests, zero failures.

@@ -62,6 +62,18 @@ return {
 				{ Eye = { 40, 52, -30 }, Look = { -13, 18, 16 }, FieldOfView = 60 },
 			},
 		},
+		PistonPeak = {
+			Description = "Climb the tower before the water does! Ride the belts, dodge the rollers and time the punches at the top.",
+			Shots = {
+				-- High and back along the tower's long axis: five stacked runs and the
+				-- four switchback landings read as one climbing staircase from here.
+				{ Eye = { 0, 260, 120 }, Look = { 0, 24, -10 }, FieldOfView = 70 },
+				-- Low off the start plaza, looking up the stack, so the storeys separate.
+				{ Eye = { -160, 40, -90 }, Look = { 0, 30, -20 }, FieldOfView = 62 },
+				-- The peak: the three-piston ledge and the arch finish above the flood.
+				{ Eye = { 40, 78, -60 }, Look = { 10, 60, -20 }, FieldOfView = 58 },
+			},
+		},
 		TiltTrip = {
 			Description = "Keep your balance on tilting decks and dodge the swinging obstacles. Next stop: the finish!",
 			Shots = {
