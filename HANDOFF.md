@@ -24,7 +24,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | the Tumble Tunnels build, on top of `ca4d6bd` (the Door Dash handoff note) |
+| HEAD now | `1ead82a`, the Tumble Tunnels build, on top of `ca4d6bd` (the Door Dash handoff note) |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
@@ -36,6 +36,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
+1ead82a   feat(splashdown): build Tumble Tunnels
 1859788   feat(splashdown): build Door Dash
 cea63ab   feat(splashdown): put Ball Barrage and Whirlpool Waltz into rotation
 a916bbe   test(splashdown): record Whirlpool Waltz's failed scripted trials
