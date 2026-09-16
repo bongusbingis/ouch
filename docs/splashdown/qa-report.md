@@ -12,7 +12,7 @@ Snapshot: 2026-09-16, branch `feature/splashdown-hazard-kits`, place 12199745014
 | Course | Built | Independent audit | Certified |
 |---|---|---|---|
 | BallBarrage | **YES** | `CourseQA` BLOCKED, zero errors | **Gate 3 APPROVED by the user (2026-09-15) after an interactive Studio playtest.** Not certified by the automated suite, which still reports BLOCKED on its own NOT RUN list. |
-| WhirlpoolWaltz | **YES** | `CourseQA` BLOCKED, zero errors | **NO** |
+| WhirlpoolWaltz | **YES** | `CourseQA` BLOCKED, zero errors | **NO — and its scripted trials FAILED 0 of 8.** Every run stalls on the first ride deck in `02_WedgeWake`, about 32 falls per 150 s run. Needs the interactive keyboard run before its difficulty can be judged. |
 | DoorDash | NOT BUILT | NOT RUN | NO |
 | TumbleTunnels | NOT BUILT | NOT RUN | NO |
 | TiptoeTrials | NOT BUILT | NOT RUN | NO |
@@ -52,11 +52,11 @@ Sources: `evidence/courses/<Id>/build.json`, `evidence/courses/<Id>/qa.json`,
 | No hazard-free 24x24 breather square (8.4) | PASS | PASS |
 | Encounter variety: >=6 types, <=40%, >=4 families, run <=3 (8.4) | PASS — 16 encounters, 6 types, 31.3% max | PASS — 17 encounters, 6 types, 35.3% max |
 | Cross-course rules over every existing spec (8.4 override 2) | PASS — all 12 findings | PASS — all 12 findings |
-| Scripted expert trials (8.5) | PASS — 3 of 3 cleared, clean 38.35 s | NOT RUN |
-| Scripted mid trials (8.5) | PASS — 5 of 5 cleared, median 63.66 s | NOT RUN |
-| Pace: mid median 60-90 s (8.5) | PASS — 63.66 s | NOT RUN |
-| Pace: clean expert <= 0.6 * mid median (8.5) | **FAIL by 0.004** — ratio 0.6024 | NOT RUN |
-| Every hazard contacted by a normal runner (8.5) | **FAIL** — `01_Countercurrent/Bumper01` contacted in none of 8 runs; other 16 pieces all contacted | NOT RUN |
+| Scripted expert trials (8.5) | PASS — 3 of 3 cleared, clean 38.35 s | **FAIL** — 0 of 3 cleared, all hit the 150 s ceiling |
+| Scripted mid trials (8.5) | PASS — 5 of 5 cleared, median 63.66 s | **FAIL** — 0 of 5 cleared, all hit the 150 s ceiling |
+| Pace: mid median 60-90 s (8.5) | PASS — 63.66 s | **FAIL** — no completed run to take a median from |
+| Pace: clean expert <= 0.6 * mid median (8.5) | **FAIL by 0.004** — ratio 0.6024 | **FAIL** — no completed run |
+| Every hazard contacted by a normal runner (8.5) | **FAIL** — `01_Countercurrent/Bumper01` contacted in none of 8 runs; other 16 pieces all contacted | **FAIL** — only 5 of 17 pieces ever contacted, because no run passed `02_WedgeWake` |
 
 ## Outstanding for every course
 

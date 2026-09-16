@@ -132,8 +132,8 @@ Still NOT verified or implemented:
 **Gate 3 remains approved** (user, 2026-09-15, interactive Studio playtest of Ball Barrage). The
 pilot's post-approval tuning pass is now committed (`4c040b6`), together with the corrected
 loophole table, and `6fffdcc` recorded the approval itself. Section 11's first course,
-**Whirlpool Waltz, is built and statically clean but NOT certified** — read "Where Whirlpool Waltz
-actually stands" below before touching it.
+**Whirlpool Waltz, is built and statically clean but NOT certified, and its scripted trials failed
+0 of 8** — read "Where Whirlpool Waltz actually stands" below before touching it.
 
 **The temporary local-test override is reverted.** `src/config/Gameplay/Splashdown.luau` is back to
 its committed 8-entry `CourseOrder` with no `BallBarrage` entry, and the headless suite went from 1
@@ -213,16 +213,26 @@ the stricter gate and still passes all six of its own cut sets**, so the pilot h
 loophole; the tightened audit confirms it rather than contradicting it. Both SpecHashes changed
 because the gate is part of the model: Ball Barrage `943e493c`, Whirlpool Waltz `2fbc899c`.
 
-Never executed for this course: the scripted expert/mid trials (a first attempt ran for about half
-an hour without clearing beat 02 and the Play session ended before it wrote a file), the fixed-camera
-captures and `bad-map-refs` comparison, the interactive keyboard run, deliberate missed-timing
-contacts, checkpoint-recovery checks, and every measurement listed under "NOT RUN" in the course doc.
+**Its scripted trials FAILED, and that is the open question on this course.** Executed against the
+built model with the harness fully fixed: **0 of 8 runs cleared**, every one hitting the 150 s
+ceiling with 31-32 falls and only checkpoint 1 earned, and only 5 of the course's 17 hazard pieces
+ever contacted. Every run dies on `Pizza01`, the first ride deck in `02_WedgeWake`.
 
-One measured finding worth keeping: a rider standing still on `Pizza01` is carried into one of the
-plate's real missing wedges and falls in about one second. That is the headline mechanic working,
-not a defect — but crossing a 26.4-stud deck takes a runner about a second at WalkSpeed 26, so the
-margin is thin and a `Humanoid:MoveTo` proxy that walks a straight line falls repeatedly. Whether
-that reads as fair is a question for the interactive run, not for the proxy.
+The mechanism is measured, not guessed: a rider standing still on `Pizza01` stands safely for 1.0 s
+and is then carried into one of the plate's real missing wedges and falls. That is the headline
+mechanic working. But crossing the 26.4-stud deck also takes about 1.0 s at WalkSpeed 26, so a
+`Humanoid:MoveTo` proxy walking a straight line meets the sweeping hole about half the time. **This
+does not prove the course is fine and it does not prove it is broken.** A proxy that cannot time a
+hole would fail here whether or not a human can, and 32 consecutive failures is also exactly what an
+unclearable second beat looks like. HANDOFF 8.5's own resolution applies: get a user mid-skill
+calibration run before approval, and do not relabel the proxy. **The interactive keyboard run is the
+blocking evidence.** If a human cannot cross the ride decks at a reasonable rate either, beat 02
+needs a section 9 decision with no in-bounds knob left: `Pizza01` is already at the slowest speed on
+section 6's ride ladder and section 6 fixes its uniform scale at 0.4.
+
+Also never executed for this course: the fixed-camera captures and `bad-map-refs` comparison, the
+interactive keyboard run, deliberate missed-timing contacts, checkpoint-recovery checks, and every
+measurement listed under "NOT RUN" in the course doc.
 
 #### What the builder and QA can now do that they could not
 

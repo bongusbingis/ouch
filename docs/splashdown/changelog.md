@@ -120,9 +120,15 @@
   zero non-PASS findings over a 12,181-node / 383,518-edge graph from 14,844 sampled cells.
 - Headless suite: 975 to 984 tests, 0 failures, with a new `CourseVariety.spec` proving each
   cross-course rule fires against a seeded violation.
-- **Whirlpool Waltz is NOT certified.** Its scripted trials, fixed-camera captures, interactive
-  keyboard run, deliberate missed-timing contacts and checkpoint-recovery checks are all NOT RUN,
-  and its `CourseQA` status is BLOCKED by design while they are. A measured note for whoever runs
-  them: a rider standing still on `Pizza01` is carried into one of the plate's real missing wedges
-  and falls in about one second, which is the headline mechanic working, but it also means a
-  straight-line `Humanoid:MoveTo` proxy cannot reliably cross a ride deck.
+- **Whirlpool Waltz is NOT certified and its scripted trials FAILED: 0 of 8 runs cleared.** Every
+  run hit the 150 s ceiling with 31-32 falls and only checkpoint 1 earned, all of them dying on
+  `Pizza01`, the first ride deck. The mechanism is measured: a rider standing still on that plate
+  stands safely for 1.0 s and is then carried into one of its real missing wedges, and crossing the
+  26.4-stud deck also takes about 1.0 s at WalkSpeed 26. That is the headline mechanic working, and
+  it is also exactly what an unclearable beat would look like — a straight-line proxy cannot
+  distinguish them. HANDOFF 8.5's resolution applies: the interactive keyboard run is the blocking
+  evidence, and beat 02's difficulty is an open question until it happens. Its fixed-camera
+  captures, deliberate missed-timing contacts and checkpoint-recovery checks are also NOT RUN, and
+  `CourseQA` reports BLOCKED by design while they are.
+- Added `docs/splashdown/qa-report.md`, the per-course acceptance matrix HANDOFF section 5 requires
+  and which did not exist.

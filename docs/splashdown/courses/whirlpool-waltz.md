@@ -1,9 +1,13 @@
 # Whirlpool Waltz
 
-Status: **BUILT AND STATICALLY AUDITED — not certified.** Written before the build as HANDOFF
-section 7 requires, then updated in place with measured results. Every figure below is marked
-either as a design input or as a measurement with the file it came from. Nothing is a measured
-claim unless it says so.
+Status: **BUILT AND STATICALLY AUDITED — NOT CERTIFIED, and its scripted trials FAILED.** The static
+audit is clean (zero errors, all six beat gates proved true cut sets), but **0 of 8 scripted trials
+cleared the course**: every run stalls on the first ride deck in `02_WedgeWake`. Read "Scripted
+trials" under Measured results before doing anything else with this course.
+
+This document was written before the build, as HANDOFF section 7 requires, then updated in place
+with measured results. Every figure below is marked either as a design input or as a measurement
+with the file it came from. Nothing is a measured claim unless it says so.
 
 - Spec: `src/shared/Game/Splashdown/CourseSpecs/WhirlpoolWaltz.luau`
 - Measured build evidence: `docs/splashdown/evidence/courses/WhirlpoolWaltz/build.json`. Its route,
@@ -308,7 +312,7 @@ The table is filled in from `qa.json` and `routes.json` in the Measured results 
 | Every beat gate proved a true cut set | **PASS** — all six, after the gate and sampling fixes |
 | Cross-course rules over every existing spec | **PASS** — all twelve findings |
 | No hazard-free 24x24 square on the route | **PASS** — coverage audit reports no error |
-| Scripted expert/mid trials | NOT RUN — see Measured results |
+| Scripted expert/mid trials | **FAIL** — 0 of 8 cleared, all stalled in `02_WedgeWake` |
 | Ride decks: measured transfer window at each rim, at every rotation phase | NOT RUN |
 | Launch envelopes from Pad01/Pad02 measured against the neighbouring turn | NOT RUN |
 | Blocked fraction >= 0.4 for each spinner crossing | NOT RUN |
@@ -371,20 +375,45 @@ A third change came out of the same failure and is a course change, not an audit
 comes **before** `Slide01` in beat 05. With the slide first, its exit sat almost directly beneath the
 beat gate, because `slide_001` drops 10 studs in 4.83 studs of forward travel.
 
-### Scripted trials — `routes.json`
+### Scripted trials — `routes.json`. **FAIL: 0 of 8 runs cleared.**
 
-NOT RUN for this course. A first attempt ran for roughly half an hour without clearing
-`02_WedgeWake` and its Play session ended before a result file was written. The diagnosed cause is
-a proxy limitation rather than a course defect, and it is worth recording precisely:
+Executed against SpecHash `2fbc899c` with the harness fully fixed (frame-level jumping, overlap
+contact sampling, the isolated clone lifted clear of the baseplate, and a seeded door plan). The
+result is unambiguous and is recorded as a failure, not explained away:
 
-A rider standing still on `Pizza01` was measured standing safely for 1.0 s and then falling —
-carried by the plate into one of its real missing wedges. That is the headline mechanic working
-exactly as section 7.2 intends. But crossing a 26.4-stud deck takes about 1.0 s at WalkSpeed 26, so
-a `Humanoid:MoveTo` proxy walking a straight line meets the sweeping hole about as often as not,
-falls, respawns at the previous checkpoint and repeats. A human reads the hole and times the
-crossing; the proxy cannot. HANDOFF 8.5 anticipates exactly this — "if proxy results and interactive
-experience disagree, obtain a user mid-skill calibration run before approval" — so the interactive
-run is the evidence this course still needs, not a softer proxy.
+| Policy | Resets | Cleared | Time | Falls per run | Checkpoints earned | Outcome |
+|---|---|---|---|---|---|---|
+| expert | 3 (seeds 901-903) | **0** | 150.0 s each | 31-32 | 1 of 5 | hit the 150 s ceiling |
+| mid | 5 (seeds 101-105) | **0** | 150.0-150.1 s each | 32 | 1 of 5 | hit the 150 s ceiling |
+
+Only **five** hazard pieces were ever contacted — `TwoArm01`, `Bumper01`, `Bumper02`, `Foam01` and
+`Pizza01` — because no run got past `02_WedgeWake`. No door was ever reached, so the door-plan half
+of the harness is exercised but unproven here.
+
+**Where it fails and why.** Every run dies on the first ride deck. A rider standing still on
+`Pizza01` was measured standing safely for 1.0 s and then falling, carried by the plate into one of
+its real missing wedges — the headline mechanic working exactly as section 7.2 intends. Crossing the
+26.4-stud deck takes about 1.0 s at WalkSpeed 26, so a runner that walks a straight line meets the
+sweeping hole about as often as not. A `Humanoid:MoveTo` proxy has no way to read the hole and time
+the crossing, so it falls, respawns at checkpoint 1, and repeats about 32 times in 150 seconds.
+
+**This does NOT establish that the course is fine.** It establishes two things and leaves the
+important question open:
+
+1. The proxy cannot traverse a rotating holed deck, which is a harness limit HANDOFF 8.5 anticipates
+   ("a scripted policy is a reproducible proxy, not proof of human skill classification").
+2. Nothing here has shown a human can cross `02_WedgeWake` at a reasonable rate either. Thirty-two
+   consecutive failures is a lot of failures, and a course whose second beat is unclearable would
+   look exactly like this.
+
+Section 8.5's own resolution applies: "If proxy results and interactive experience disagree, obtain
+a user mid-skill calibration run before approval; do not rename the proxy to claim human
+performance." **The interactive keyboard run is therefore the blocking evidence for this course**,
+and until it happens `02_WedgeWake`'s difficulty is an open question, not a settled one. If it turns
+out a human cannot cross the ride decks at a reasonable rate either, the fix is a section 9 tuning
+decision on beat 02 that needs to be made with the section 6 fixed scales in view: the pizza is
+already at the slowest speed on the ride ladder (+-45 deg/s) and section 6 fixes its uniform scale
+at 0.4, so there is no in-bounds knob left without a scope decision.
 
 ### The five loophole questions
 
