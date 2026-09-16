@@ -7,6 +7,25 @@ return {
 	ReferenceAspect = 16 / 9,
 	MaxFieldOfView = 95,
 	Courses = {
+		-- Approximate compositions from the measured course geometry (HANDOFF.md
+		-- section 11), not yet dialed in against an actual Studio capture; revisit
+		-- once the fixed-camera pass (section 8.6) runs for these two courses.
+		BallBarrage = {
+			Description = "Three Big Balls wait over open water. Bounce your way across, then hammer through to the finish!",
+			Shots = {
+				{ Eye = { -60, 260, 60 }, Look = { -60, 0, 60 }, FieldOfView = 72 },
+				{ Eye = { -40, 60, 130 }, Look = { -40, 10, 90 }, FieldOfView = 60 },
+				{ Eye = { -100, 40, -40 }, Look = { -140, 0, -56 }, FieldOfView = 62 },
+			},
+		},
+		WhirlpoolWaltz = {
+			Description = "Spiral down through the ride decks and doorways, and don't slip off the spinning platforms!",
+			Shots = {
+				{ Eye = { 0, 280, 0 }, Look = { 0, 20, 0 }, FieldOfView = 74 },
+				{ Eye = { 140, 70, 100 }, Look = { 80, 20, 60 }, FieldOfView = 60 },
+				{ Eye = { 90, 50, -40 }, Look = { 40, 5, -10 }, FieldOfView = 62 },
+			},
+		},
 		TiltTrip = {
 			Description = "Keep your balance on tilting decks and dodge the swinging obstacles. Next stop: the finish!",
 			Shots = {

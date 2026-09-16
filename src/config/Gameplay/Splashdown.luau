@@ -34,17 +34,33 @@ return {
 	-- always scores the same number; last place scores 1 and a DNF scores 0.
 	PointsForFirst = 30,
 	-- A DNF is charged the round cap in the cumulative-time tiebreak.
+	-- Interim pool (2026-09-16): only the two Splashdown rebuild courses that
+	-- exist as real, staged, zero-error templates so far (HANDOFF.md section
+	-- 11). CourseSequence.draw tolerates fewer than RoundCount distinct
+	-- entries (it reuses without immediate repeats), so a 2-course pool plays
+	-- a normal 3-round match. The eight legacy IDs below are kept out of
+	-- rotation because their templates were relocated to Workspace.LegacyCourses
+	-- and were never repopulated (a pre-existing condition, not something this
+	-- change caused); their Courses config stays for section 12's final swap.
 	CourseOrder = {
-		"WhirlPool",
-		"DiscJockey",
-		"KnockKnock",
-		"BumperBay",
-		"SummitSplash",
-		"TiltTrip",
-		"CrossCurrent",
-		"Downpour",
+		"BallBarrage",
+		"WhirlpoolWaltz",
 	},
 	Courses = {
+		BallBarrage = {
+			DisplayName = "BALL BARRAGE",
+			Difficulty = 3,
+			ParSeconds = 75,
+			CapSeconds = 180,
+			CloseWindowSeconds = 60,
+		},
+		WhirlpoolWaltz = {
+			DisplayName = "WHIRLPOOL WALTZ",
+			Difficulty = 3,
+			ParSeconds = 75,
+			CapSeconds = 180,
+			CloseWindowSeconds = 60,
+		},
 		WhirlPool = {
 			DisplayName = "WHIRL POOL",
 			Difficulty = 1,
