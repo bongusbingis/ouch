@@ -24,7 +24,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | ce2a010 (course), on top of 81a8cbe (builder/QA infra) and 0494b88 |
+| HEAD now | 0198708 (course), on top of 81a8cbe (builder/QA infra) and 0494b88 |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean for this task. `src/shared/UI/Components/Onboarding/GestureHint.luau` is modified by a PARALLEL session; it is not part of this task and was deliberately not staged. |
@@ -36,7 +36,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
-ce2a010   feat(splashdown): build the Ball Barrage pilot course
+0198708   feat(splashdown): build the Ball Barrage pilot course
 81a8cbe   feat(splashdown): add guide-driven course builder and independent QA
 0494b88   docs(splashdown): refresh handoff state after section 4 completion
 cfe33e3   feat(splashdown): export and verify source-only kit/Summit/arena assets
