@@ -44,6 +44,29 @@ The hardened guard was proved live before the destroys: `retireLegacy({"NotACour
 `NotACourse is not a retireable legacy course; nothing was destroyed` rather than silently doing
 nothing, which is also what confirmed the freshly synced module was the one running.
 
+## 12.1.4 — recipes and registrations removed
+
+Eight imperative recipes were deleted from `src/scripts/studio/author-splashdown-courses.luau`, with
+the whole course DSL and templates-folder helper that fed them:
+
+~~~text
+recipes.WhirlPool     recipes.DiscJockey    recipes.KnockKnock    recipes.BumperBay
+recipes.TiltTrip      recipes.CrossCurrent  recipes.Downpour      recipes.SummitSplash
+~~~
+
+12.1.4 says "all seven old imperative recipes". The file held **eight**: the seven legacy courses
+plus `recipes.SummitSplash`, which would have rebuilt the UN-hardened original Summit. It is just as
+superseded as the rest — the hardened course is built by the declarative `SourcePatch` layout from
+`ServerStorage.SplashdownAuthoringSources.SummitSource` — so it went with them. `Author.build`,
+`Author.preview` and `Author.restore` now raise and point at `author-splashdown-v2`.
+
+Eight registrations were removed from `Splashdown.Courses`: `WhirlPool`, `DiscJockey`, `KnockKnock`,
+`BumperBay`, `TiltTrip`, `CrossCurrent`, `Downpour` — and `SummitSplash` was not removed but kept
+verbatim and added to `CourseOrder`. Two stale references to retired ids were corrected: the
+`sb-race-course` Cmdr help text and the README's authoring paragraph. `SplashdownIntro.Courses`
+was NOT touched: it still holds the legacy entries, which the headless
+`SplashdownIntroModel.spec` uses as fixtures, and 12.1.1 scopes the change to `CourseOrder`/`Courses`.
+
 ## 12.1.5 — templates and previews
 
 `ReplicatedStorage.Assets.Maps.Splashdown` held exactly the seven new ids before and after; no

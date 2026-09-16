@@ -543,7 +543,9 @@ only its code and config references retired. **No Deprecated folder, archive or 
 created**, per section 0.6: recovery would need external place history, not an in-project archive.
 
 **12.1.4 — the old recipes are gone.** `src/scripts/studio/author-splashdown-courses.luau` kept all
-seven imperative course recipes and the DSL that built them. They are removed outright rather than
+imperative course recipes and the DSL that built them -- **eight of them**, the seven legacy ones
+plus `recipes.SummitSplash`, which would have rebuilt the UN-hardened original Summit and is just as
+superseded as the rest. They are removed outright rather than
 left behind a flag, because 12.1.4 forbids any executable path that recreates a retired course; the
 three public entry points (`Author.build`, `.preview`, `.restore`) now raise and point at
 `author-splashdown-v2`. `sb-race-course`'s help text and the README's authoring paragraph no longer

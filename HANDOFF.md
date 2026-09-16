@@ -31,7 +31,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 | Remote delivery | No push or PR performed |
 | New courses built | **ALL SIX, plus Summit hardened: all seven templates now exist.** Ball Barrage (Gate 3 APPROVED; **hammers and pistons remounted 2026-09-16, hash now `7a46da9c`**), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (scripted trials FAILED 0 of 8; **large hammer rehung 2026-09-16, hash now `aae4c298`**), Tumble Tunnels, Tiptoe Trials and **Piston Peak**. All six are LIVE in `CourseOrder`, promoted, and re-audited under the corrected surface sampler. |
 | Summit layout hardened | **YES, 2026-09-16.** Spec hash `dcece9ec`, 199 BaseParts, staged, promoted and **now registered in `CourseOrder` by the section 12.1 transaction.** See 1.4. |
-| Deprecated courses removed | **YES, 2026-09-16, permanently and with no archive.** `Workspace.LegacyCourses.WhirlPool`, `.DiscJockey`, `.KnockKnock`, `.BumperBay`, `.TiltTrip` and `.Downpour` destroyed; `CrossCurrent` had no parked model and retired by config only; all eight legacy ids removed from `Splashdown.Courses`; the seven imperative recipes deleted from `author-splashdown-courses.luau`. `SummitSplash`'s parked model, the 90 Keyframes and `Workspace.LegacyCourses` itself are untouched. |
+| Deprecated courses removed | **YES, 2026-09-16, permanently and with no archive.** `Workspace.LegacyCourses.WhirlPool`, `.DiscJockey`, `.KnockKnock`, `.BumperBay`, `.TiltTrip` and `.Downpour` destroyed; `CrossCurrent` had no parked model and retired by config only; all eight legacy ids removed from `Splashdown.Courses`; all **eight** imperative recipes deleted from `author-splashdown-courses.luau` (the seven legacy ones plus `recipes.SummitSplash`, which would have rebuilt the UN-hardened original). `SummitSplash`'s parked model, the 90 Keyframes and `Workspace.LegacyCourses` itself are untouched. |
 
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
@@ -180,7 +180,8 @@ children to 91 — the 90 Keyframes and the preserved `SummitSplash` source, bot
 folder itself and `ServerStorage.SplashdownAuthoringSources.SummitSource`. `CrossCurrent` never had a
 parked model and retired by config alone. `retireLegacy` now refuses any id outside an explicit
 six-id allow list and class-checks every target before destroying any of them.
-`author-splashdown-courses.luau`'s seven imperative recipes are deleted outright; its three entry
+`author-splashdown-courses.luau`'s **eight** imperative recipes are deleted outright -- the seven
+legacy ones plus `recipes.SummitSplash`, which would have rebuilt the un-hardened original; its three entry
 points raise and point at `author-splashdown-v2`.
 
 #### What section 12.3 measured
@@ -688,7 +689,7 @@ ceiling.
 1. **DONE 2026-09-16, on the user's explicit authorisation.** Section 12's replacement transaction
    was executed in full: `CourseOrder` is the final seven, all seven templates are promoted under a
    set-equality assertion, the six parked LegacyCourses models are permanently destroyed with no
-   archive, and the seven imperative recipes are gone. The **three Summit judgement calls were
+   archive, and all eight imperative recipes are gone. The **three Summit judgement calls were
    answered by the user in the same message**: the override 2 cap stays scoped to the six new courses
    (already implemented, confirmed correct), and 7.7.8's shove-reaches-liquid clause and 8.4's
    no-breather rule are **accepted as documented limitations** on the preserved arc. Do not redesign
