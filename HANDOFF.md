@@ -24,7 +24,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | the Door Dash build commit, on top of `cea63ab` (both earlier courses into rotation) |
+| HEAD now | `1859788`, the Door Dash build, on top of `cea63ab` (both earlier courses into rotation) |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
@@ -36,7 +36,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
-<this session>  feat(splashdown): build Door Dash
+1859788   feat(splashdown): build Door Dash
 cea63ab   feat(splashdown): put Ball Barrage and Whirlpool Waltz into rotation
 a916bbe   test(splashdown): record Whirlpool Waltz's failed scripted trials
 2bc53e3   docs(splashdown): add the per-course QA acceptance matrix
