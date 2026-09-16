@@ -6,7 +6,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 ## 0. Read this first: authority and next action
 
 1. This file is an implementation specification for a successor. Writing this file did NOT execute Gate 3 or any later work.
-2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval. Section 11 has built Whirlpool Waltz, Door Dash, Tumble Tunnels and Tiptoe Trials; the next work is PistonPeak and Summit hardening — read section 1.4 before touching Splashdown code.
+2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval. **Sections 11 and 12 are COMPLETE: all seven courses are built and registered, and the 12.1 replacement transaction was executed on the user's explicit authorisation on 2026-09-16.** Read section 1.4 first — it says exactly what was executed and exactly what is still not done.
 3. Run the read-only health checks in section 2 first, same as always.
 4. The original brief has Gates 1, 2 and 3. The work after Gate 3 is the remaining-course stage and final verification, not an already-approved extra gate.
 5. Do not publish, deploy, push a branch, or open a PR without explicit user authorization. Local commits are part of the requested workflow.
@@ -24,18 +24,21 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | **`68fe7ca`, `fix(splashdown): harden Summit Splash`** — section 11's last item, on top of the hazard-reach pass (`c74a288`, `2dcaa8a`, `5115e68`). `3d61e3d` sits between them and is the USER's own unrelated `GestureHint.luau` work; do not touch it. |
+| HEAD now | **`5f870d0` / `9971f3c` and the docs commit after them — section 12 is DONE.** `5f870d0` is the 12.1 replacement transaction, `9971f3c` the 12.3 verification bootstrap and fixtures. They sit on `34be9fc`, which sits on `68fe7ca` (Summit hardening) and the hazard-reach pass (`c74a288`, `2dcaa8a`, `5115e68`). `3d61e3d` is the USER's own unrelated `GestureHint.luau` work; do not touch it. |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
-| Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. **Two incarnations of the hazard-reach task ran CONCURRENTLY against this one checkout and this one Studio on 2026-09-16**, after the session restarted without its predecessor stopping. They did the same work from the same measurements, so `c74a288`, `2dcaa8a` and `5115e68` are correct and consistent — but one of them staged and promoted Door Dash while the other was still waiting to, and both edited this file. Nothing was lost, and every hash below was re-verified against the live templates afterwards. The lesson for a successor: this checkout and the Match Place are shared resources. Re-run `git status` before every `git add`, re-read this file before editing it, and re-check `ServerStorage.SplashdownStaging` immediately before `promote`. |
+| Worktree now | Clean. (`GestureHint.luau`, the parallel session's file, was committed by the user as `3d61e3d`.) Historical note kept because its lesson still stands: Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. **Two incarnations of the hazard-reach task ran CONCURRENTLY against this one checkout and this one Studio on 2026-09-16**, after the session restarted without its predecessor stopping. They did the same work from the same measurements, so `c74a288`, `2dcaa8a` and `5115e68` are correct and consistent — but one of them staged and promoted Door Dash while the other was still waiting to, and both edited this file. Nothing was lost, and every hash below was re-verified against the live templates afterwards. The lesson for a successor: this checkout and the Match Place are shared resources. Re-run `git status` before every `git add`, re-read this file before editing it, and re-check `ServerStorage.SplashdownStaging` immediately before `promote`. |
 | Remote delivery | No push or PR performed |
 | New courses built | **ALL SIX, plus Summit hardened: all seven templates now exist.** Ball Barrage (Gate 3 APPROVED; **hammers and pistons remounted 2026-09-16, hash now `7a46da9c`**), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (scripted trials FAILED 0 of 8; **large hammer rehung 2026-09-16, hash now `aae4c298`**), Tumble Tunnels, Tiptoe Trials and **Piston Peak**. All six are LIVE in `CourseOrder`, promoted, and re-audited under the corrected surface sampler. |
-| Summit layout hardened | **YES, 2026-09-16.** Spec hash `dcece9ec`, 199 BaseParts, staged and promoted, and deliberately NOT registered in `CourseOrder` -- that is section 12's job. See 1.4. |
-| Deprecated courses removed | No |
+| Summit layout hardened | **YES, 2026-09-16.** Spec hash `dcece9ec`, 199 BaseParts, staged, promoted and **now registered in `CourseOrder` by the section 12.1 transaction.** See 1.4. |
+| Deprecated courses removed | **YES, 2026-09-16, permanently and with no archive.** `Workspace.LegacyCourses.WhirlPool`, `.DiscJockey`, `.KnockKnock`, `.BumperBay`, `.TiltTrip` and `.Downpour` destroyed; `CrossCurrent` had no parked model and retired by config only; all eight legacy ids removed from `Splashdown.Courses`; the seven imperative recipes deleted from `author-splashdown-courses.luau`. `SummitSplash`'s parked model, the 90 Keyframes and `Workspace.LegacyCourses` itself are untouched. |
 
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
+9971f3c   test(splashdown): add the section 12.3 final verification bootstrap and fixtures
+5f870d0   feat(splashdown): swap the registry to the final seven and retire the originals
+34be9fc   docs(splashdown): record the Summit hardening commit id in the handoff
 68fe7ca   fix(splashdown): harden Summit Splash
 5115e68   test(splashdown): re-audit four courses under the corrected surface sampler
 2dcaa8a   fix(splashdown): hang Door Dash's inert hammer in reach
@@ -139,33 +142,87 @@ diagnostic: BitBlt failures, `capture_studio.py` "window not found", zero-window
 
 Still NOT verified or implemented:
 
-- The active template folder (ReplicatedStorage.Assets.Maps.Splashdown) was empty because the user moved the original course contents into Workspace.LegacyCourses. That is expected, not a baseline defect. Eight legacy IDs were registered; seven parked models exist in LegacyCourses; CrossCurrent has none. The old asset TestEZ suite was 0/16 as opened and 14/16 with temporary legacy copies; those numbers reflect the empty folder, not successful tests. You may copy the parked models into the templates folder whenever a working baseline is needed for lifecycle/regression tests.
+- HISTORICAL, resolved: the active template folder was empty because the user had moved the original course contents into Workspace.LegacyCourses. It now holds the seven promoted templates and the old asset suite passes 14/14 against them.
 - The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports (now done) were required.
-- Every section 5 interface now exists and has been executed at least once: AssetManifest, CoursePresets, CourseBuilder, CourseAuthoring, CourseGraph, CourseQA, the CourseSpecs for BallBarrage and WhirlpoolWaltz, `places/arena/tests/Assets/SplashdownQA.spec.luau`, `src/shared/Tests/CourseGraph.spec.luau` and `CourseVariety.spec.luau`, all three Play probes under `docs/splashdown/probes/`, and `src/scripts/studio/author-splashdown-v2.luau`. **`docs/splashdown/qa-report.md` is the one listed artefact that still does not exist.** Section 1.4 is the current state.
+- Every section 5 interface exists and has been executed: AssetManifest, CoursePresets, CourseBuilder, CourseAuthoring, CourseGraph, CourseQA, all seven CourseSpecs, `places/arena/tests/Assets/SplashdownQA.spec.luau`, `src/shared/Tests/CourseGraph.spec.luau` and `CourseVariety.spec.luau`, the Play probes under `docs/splashdown/probes/`, `src/scripts/studio/author-splashdown-v2.luau` and **`docs/splashdown/qa-report.md`, whose per-check matrix now covers all seven courses.** Section 1.4 is the current state.
 
-### 1.4 ALL SEVEN courses now exist. Section 11 is COMPLETE. The only item left is section 12's transaction, and it needs the user.
+### 1.4 SECTION 12 IS DONE. The Splashdown rebuild is complete; what remains is the playtest category the user chose not to chase.
 
-**Gate 3 remains approved** (user, 2026-09-15, interactive Studio playtest of Ball Barrage). Section
-11 built its five remaining courses — **Whirlpool Waltz** (its 8.5 blocker intentionally SKIPPED per
-the user's 2026-09-16 decision), **Door Dash**, **Tumble Tunnels**, **Tiptoe Trials** and **Piston
-Peak** — and **Summit Splash is now hardened** (2026-09-16, the session the next subsection
-describes). Section 11's ordered list has nothing left in it.
+**Gate 3 approved** (user, 2026-09-15, interactive Studio playtest of Ball Barrage). Section 11 built
+its five remaining courses — **Whirlpool Waltz** (its 8.5 blocker intentionally SKIPPED per the
+user's 2026-09-16 decision), **Door Dash**, **Tumble Tunnels**, **Tiptoe Trials** and **Piston
+Peak** — **Summit Splash was hardened** (2026-09-16), and **section 12's replacement transaction was
+executed on the user's explicit authorisation on 2026-09-16.**
 
-**The one remaining item is section 12's final replacement transaction, and it is a real production
-cutover.** It puts all seven courses into `CourseOrder`, promotes the seven templates, permanently
-deletes six parked `LegacyCourses` models and retires seven recipes **with no archive**. It has NOT
-been started and must not start on a successor's initiative: section 0.5 forbids deploying anything
-without explicit authorisation, and 12.1's deletions are genuinely hard to reverse.
+#### The section 12 transaction, as executed
 
-`src/config/Gameplay/Splashdown.luau`'s `CourseOrder` is still the six-course
-`{"BallBarrage", "WhirlpoolWaltz", "DoorDash", "TumbleTunnels", "TiptoeTrials", "PistonPeak"}`.
-`ReplicatedStorage.Assets.Maps.Splashdown` holds **seven** promoted templates — those six plus
-`SummitSplash`, which is promoted but deliberately **out of rotation** until section 12 registers it.
-That mismatch is intentional and is the state section 12.1 starts from. **Every course that enters
-`CourseOrder` needs its `Intro.Courses` entry in `src/config/Interface/SplashdownIntro.luau` in the
-SAME change** — `SplashdownIntroModel.spec.luau` asserts it and the headless suite fails otherwise.
-All seven entries already exist, including Summit's (three valid shots, 90-character description),
-so **section 12 needs no intro change at all**. Headless is **984 tests, 0 failures**.
+`src/config/Gameplay/Splashdown.luau`'s `CourseOrder` is now the final seven in route order:
+`{"BallBarrage", "WhirlpoolWaltz", "DoorDash", "TumbleTunnels", "TiptoeTrials", "PistonPeak",
+"SummitSplash"}`. Difficulties 3, 3, 2, 3, 3, 4 plus Summit's preserved 3; the six new courses run
+ParSeconds 75 / CapSeconds 180 / CloseWindowSeconds 60; `Doors` exists on exactly two courses,
+Whirlpool Waltz 3/1 and Door Dash 5/2; Summit keeps Par 115 / Cap 210 / Close 45 and
+`LavaRise {60, 20, 140}` byte-for-byte. **Three things were wrong against 12.1's own list and all
+three moved with the swap:** Door Dash's Difficulty was 3, Whirlpool Waltz had no `Doors` block at
+all despite its one authored three-slab row, and the eight legacy ids were still registered. All
+eight are gone from `Courses`. `SplashdownIntro.Courses` needed no change; all seven entries already
+existed, which is what `SplashdownIntroModel.spec` asserts.
+
+`ReplicatedStorage.Assets.Maps.Splashdown` holds the seven promoted templates and nothing else:
+BallBarrage `7a46da9c` (143 BaseParts), WhirlpoolWaltz `78e562b8` (142), DoorDash `aae4c298` (221),
+TumbleTunnels `d390ff50` (163), TiptoeTrials `0f8e9510` (160), PistonPeak `e164c528` (162),
+SummitSplash `dcece9ec` (199). `promote` now asserts exact set equality with `CourseOrder` in both
+directions.
+
+**Six parked models were permanently destroyed with no archive**: `Workspace.LegacyCourses.WhirlPool`,
+`.DiscJockey`, `.KnockKnock`, `.BumperBay`, `.TiltTrip` and `.Downpour`. `LegacyCourses` went from 97
+children to 91 — the 90 Keyframes and the preserved `SummitSplash` source, both untouched, as is the
+folder itself and `ServerStorage.SplashdownAuthoringSources.SummitSource`. `CrossCurrent` never had a
+parked model and retired by config alone. `retireLegacy` now refuses any id outside an explicit
+six-id allow list and class-checks every target before destroying any of them.
+`author-splashdown-courses.luau`'s seven imperative recipes are deleted outright; its three entry
+points raise and point at `author-splashdown-v2`.
+
+#### What section 12.3 measured
+
+- Headless **984 tests, 0 failures**; `git diff --check` clean.
+- Studio TestEZ, four batched Play sessions: **239 passed, 0 failed, 0 skipped** — 25 kit assertions,
+  **14 contract assertions over the seven courses**, 24 QA assertions per course (168) and 8 new
+  set-wide lifecycle/malformed fixtures. The old asset spec's stale "five" wording was left alone.
+- **The real three-course match flow through the existing admin seams**: Summit Splash (199 live
+  parts), Door Dash (221) and Piston Peak (162), rounds 2 and 3 chosen with
+  `setNextCourseForAdmin`. No completed run was claimed — each racing phase closed through the seam's
+  own DNF close. `setNextCourseForAdmin("CrossCurrent")` returns `false, "unknown_course"`. All seven
+  templates boot with no missing-template error.
+- **Default-arena regression passes**: every `MapFeatures` exact name resolves, 65 of 94 sampled
+  hazard parts move, shared values and the client carry path unchanged, and every file in section
+  3.1's frozen list is unchanged by diff.
+- **All seven rebuild from the section 4 source exports to identical hashes and part counts**, and
+  the three `.rbxmx` exports still hash to their recorded values.
+- **All fourteen fixed-camera images now exist.** Ball Barrage's and Whirlpool Waltz's were captured
+  in this session (they had never had any) and Tiptoe Trials' were recaptured at the prescribed
+  offsets so its `evidence/course-cameras.json` row could record real poses.
+- `docs/splashdown/qa-report.md`'s per-check matrix is rebuilt across all seven courses.
+
+Full measured record: `docs/splashdown/evidence/retirement-pre-mutation.md` and
+`retirement-transaction.md`; the changelog's 2026-09-16 section 12 entry.
+
+#### Exactly what is still not done
+
+1. **The scripted-trial and interactive-playtest category, for six of seven courses.** Ball Barrage
+   has the only interactive run and it predates the hazard-reach change to its hammers and pistons,
+   so its beats 03 and 05 are worth one pass. Whirlpool Waltz and Door Dash have FAILED scripted
+   trials on record (0 of 8 each); Tumble Tunnels' harness never returned. This is the user's
+   standing 2026-09-16 decision, not an oversight.
+2. **The Studio local multi-client session and the 30-rig start load test have NEVER been run**, for
+   any course, at any point in this project. Appendix B item 4 substituted them for a real 30-player
+   session and neither half happened. No figure anywhere claims them.
+3. **Summit's two accepted limitations**: 7.7.8's shove-reaches-liquid clause and 8.4's no-breather
+   square both fail on the preserved 44-stud arc deck. The user accepted both on 2026-09-16 as
+   documented limitations; do not redesign the arc to fix them.
+4. **The section 7 palette is still not applied by the builder** for any course. `CoursePresets`
+   clones sources without recolouring, so all six new courses ship in the kit's own source colours.
+5. **The mesh-level seam pass.** `auditGeometry` compares oriented extents and HANDOFF 8.3 says a box
+   test cannot decide mesh penetration; per-course overlap counts are in the qa-report matrix.
 
 #### Summit Splash hardening, 2026-09-16 — HANDOFF 7.7, done
 
@@ -627,24 +684,23 @@ ceiling.
 
 #### Exact next actions
 
-1. **STOP and get the user's direction. Section 11 is finished; the ONLY item left is section 12's
-   final replacement transaction.** 12.1 puts all seven courses into `CourseOrder`, promotes the
-   seven templates, permanently deletes six parked LegacyCourses models and retires seven recipes
-   **with no archive**. It must not start on a successor's initiative: section 0.5 forbids deploying
-   anything without explicit authorisation and 12.1's deletions are genuinely hard to reverse.
-   Alongside that decision, 1.4 lists **three Summit questions that are judgement calls rather than
-   measurements** (the override 2 cap scoping, 7.7.8's shove-reaches-liquid clause, and 8.4's
-   no-breather rule against the preserved 44-stud arc deck). Answer those in the same conversation.
+1. **DONE 2026-09-16, on the user's explicit authorisation.** Section 12's replacement transaction
+   was executed in full: `CourseOrder` is the final seven, all seven templates are promoted under a
+   set-equality assertion, the six parked LegacyCourses models are permanently destroyed with no
+   archive, and the seven imperative recipes are gone. The **three Summit judgement calls were
+   answered by the user in the same message**: the override 2 cap stays scoped to the six new courses
+   (already implemented, confirmed correct), and 7.7.8's shove-reaches-liquid clause and 8.4's
+   no-breather rule are **accepted as documented limitations** on the preserved arc. Do not redesign
+   Summit's arc to fix them.
 2. **DONE 2026-09-16.** All five earlier courses' cut sets were re-audited under the fixed
    `sampleSurfaces`; every one still holds, with the before/after counts in the hazard-reach pass
    above. `qa.json` is current for all six courses.
-3. Section 12.1's difficulty list is `3, 3, 2, 3, 3, 4` plus Summit's 3. `Courses.DoorDash` currently
-   carries **Difficulty 3, not the 2 that list wants** — carried over from when it was added. Fix it
-   in the 12.1 change, not before, so it moves with the rest of the registry. `Courses.SummitSplash`
-   already carries the correct preserved Difficulty 3 / Par 115 / Cap 210 / Close 45 /
-   `LavaRise {60, 20, 140}` and was NOT touched by the hardening pass, so 12.1 only has to add it to
-   `CourseOrder`. `Intro.Courses.SummitSplash` already exists and is valid, so 12.1 needs no intro
-   change for it either.
+3. **DONE at the 12.1 change.** `Courses.DoorDash`'s Difficulty moved 3 to 2, and `WhirlpoolWaltz`
+   gained the `Doors {PerRow = 3, BreakablePerRow = 1}` block section 6 gives it — it had none at
+   all, which nothing had caught because `SplashdownCourses.resolve` only checks a course that
+   declares one. `Courses.SummitSplash`'s preserved Difficulty 3 / Par 115 / Cap 210 / Close 45 /
+   `LavaRise {60, 20, 140}` were not touched; only its `CourseOrder` membership changed, and
+   `Intro.Courses` needed no change for any of the seven.
 4. **DONE 2026-09-16**, on the user's explicit instruction. Ball Barrage's two pistons and two
    hammers, and Door Dash's large hammer (the same defect, found by the new regression), now measure
    into their own lanes. Ball Barrage is `7a46da9c` and Door Dash is `aae4c298`; both are re-staged,
@@ -657,18 +713,26 @@ ceiling.
 6. Delete any `places/arena/server/Scripts/Temp*Probe.server.luau` before any commit; they are
    Rojo-synced scratch copies of the checked-in probes and must never be committed. This session's
    was removed.
-7. `docs/splashdown/qa-report.md` EXISTS (the 1.2 line claiming otherwise was stale). Its **set
-   status table is current for all seven courses**; its per-check matrix still has only four columns
-   and predates Tiptoe Trials, Piston Peak and Summit Splash. Rebuilding that matrix across seven
-   courses is set-wide work that belongs with section 12, and each course's own `qa.json` plus its
-   document under `docs/splashdown/courses/` is the current per-course record.
-8. The palette in section 7 (one hue family per course) is still **not applied by the builder** for
-   any of the courses: `CoursePresets` clones sources without recolouring. It is a set-wide open
-   item, recorded in each course doc, and belongs with the section 12 work rather than one course.
-   Summit is the one course with no palette to apply -- 7.7 preserves its existing sector colours.
-9. **Delete `places/arena/server/Scripts/Temp*Probe.server.luau` and the temporary
-   `ServerStorage.SummitTool` / `ServerStorage.SummitStage` ModuleScripts before any commit.** The
-   Summit session used both; they are Studio-side scratch and are not checked in.
+7. **DONE at the section 12 docs commit.** `docs/splashdown/qa-report.md`'s per-check matrix is
+   rebuilt across all seven courses, alongside a set-wide coverage table, a Summit before/after
+   comparison and an explicit multiplayer-evidence section that records the local multi-client and
+   30-rig tests as NOT RUN. Each course's own `qa.json` and its document under
+   `docs/splashdown/courses/` remain the per-course record.
+8. **STILL OPEN.** The palette in section 7 (one hue family per course) is **not applied by the
+   builder** for any of the courses: `CoursePresets` clones sources without recolouring. It is a
+   set-wide open item recorded in each course doc and in the qa-report. Summit is the one course with
+   no palette to apply -- 7.7 preserves its existing sector colours.
+9. **Delete `places/arena/server/Scripts/Temp*Probe.server.luau` and any temporary
+   `ServerStorage.Summit*` / `TxProbe` / `Splashdown*Results` values before any commit.** The section
+   12 session used three Temp*Probe scripts and a TxProbe StringValue; all were removed and the place
+   was verified clean afterwards (`ServerScriptService` holds only `Server`, `Server.Scripts` only
+   `SimulationServer`).
+10. **STILL OPEN, and the biggest gap in the whole project.** The Studio local multi-client session
+    (2-4 clients) and the 30-rig start load test that Appendix B item 4 substituted for a real
+    30-player session have **never been run, for any course**. Neither is claimed anywhere. The
+    static evidence that bears on a 30-racer start is that every course exposes exactly 30 start pads
+    and the ordered-route audit proves a legal route from all 30 spawn cells — a reachability proof,
+    not a load test.
 
 ### 1.3 Studio
 
@@ -688,9 +752,9 @@ Do NOT edit lobby place 130584867985467, previously studio_id 89fa3e46-0f1a-4be4
 Recorded Edit state:
 
 - Workspace.battle_stadium: original source gallery; preserve it.
-- Workspace.LegacyCourses: **97 immediate children: seven course Models plus ninety Keyframes**. The seven Models are the user's copies of the original courses (see 1.2).
-- ReplicatedStorage.Assets.Maps.Splashdown: **seven models, `BallBarrage`, `WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials`, `PistonPeak` and `SummitSplash`.** The first six match `CourseOrder`; `SummitSplash` is promoted but deliberately OUT of rotation until section 12 registers it, so the folder intentionally holds one more model than `CourseOrder` lists. The `WhirlPool`/`KnockKnock` local-test fixtures have been destroyed; do not recreate them unless testing an isolated config again, and destroy them again afterward. The folder is no longer expected to be empty.
-- ServerStorage.SplashdownStaging holds `BallBarrage`, `WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials` and `PistonPeak`, all staged and promoted on 2026-09-16 with hashes **Ball Barrage `7a46da9c` (143 BaseParts), Whirlpool Waltz `78e562b8` (142), Door Dash `aae4c298` (221), Tumble Tunnels `d390ff50` (163), Tiptoe Trials `0f8e9510` (160), Piston Peak `e164c528` (162)**. Ball Barrage moved `943e493c` → `ca5e95b4` (the two CoursePresets fixes in 1.4, which also dropped its part count from 158 to 143 by ending the doubled piston spring) → `7a46da9c` (the hazard-reach pass); Whirlpool Waltz moved `2fbc899c` → `78e562b8` the same way; Door Dash moved `8c00a748` → `aae4c298` (the hazard-reach pass). Re-stage before relying on any of them if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
+- Workspace.LegacyCourses: **91 immediate children after the section 12.1 retirement: the single preserved `SummitSplash` Model plus ninety Keyframes.** The other six course Models were permanently destroyed on 2026-09-16 with no archive. Never Destroy the folder itself or the Keyframes.
+- ReplicatedStorage.Assets.Maps.Splashdown: **exactly the seven registered models, `BallBarrage`, `WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials`, `PistonPeak` and `SummitSplash`** — the same set as `CourseOrder`, which `CourseAuthoring.promote` now asserts in both directions. No legacy fixture remains; do not recreate one unless testing an isolated config again, and remove it afterward.
+- ServerStorage.SplashdownStaging holds all **seven**, re-staged from the section 4 source exports after the transaction as the 12.3 rebuild-parity check, with hashes **Ball Barrage `7a46da9c` (143 BaseParts), Whirlpool Waltz `78e562b8` (142), Door Dash `aae4c298` (221), Tumble Tunnels `d390ff50` (163), Tiptoe Trials `0f8e9510` (160), Piston Peak `e164c528` (162), Summit Splash `dcece9ec` (199)** — every one identical to its promoted template, which is the "no untracked Studio-only nudges" result. Ball Barrage moved `943e493c` → `ca5e95b4` (the two CoursePresets fixes in 1.4, which also dropped its part count from 158 to 143 by ending the doubled piston spring) → `7a46da9c` (the hazard-reach pass); Whirlpool Waltz moved `2fbc899c` → `78e562b8` the same way; Door Dash moved `8c00a748` → `aae4c298` (the hazard-reach pass). Re-stage before relying on any of them if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
 - `workspace.Assets.Arena.Map.Model` is at its correct original pivot (verified, see the tooling note above); do not need to re-check this unless something else reports it looks wrong.
 - The evidence sink on `http://127.0.0.1:34875/` is a scratchpad script (not checked in); rewrite it in ten lines when needed. The Command Bar's Run button measured at desktop (1884, 1033) this session and the text field at (840, 1030); clicking Run while Play is RUNNING does nothing, so stop Play first. Temporary kit probes, observer and review gallery removed. A Rojo-synced probe under `places/arena/server/Scripts/` (Temp*Probe) may be present while section 11 work is in progress; delete it before any commit.
 - The source gallery is unanchored and disappears from Workspace in Play. Export its source in Edit before testing.
@@ -1459,32 +1523,33 @@ A STOP is not task completion. Leave report rows BLOCKED/FAIL/NOT RUN and state 
 
 ## 15. Final completion checklist
 
-All boxes must be true before declaring completion:
+All boxes must be true before declaring completion. Ticked 2026-09-16 at the end of section 12;
+an unticked box is a real gap, not an oversight, and says why.
 
-- [ ] Gate 2 (2026-09-15) and Gate 3 approvals recorded with date/message reference.
-- [ ] Appendix B recorded in docs/splashdown/03-overrides.md and the changelog; the scaled route-length targets recorded after the pilot.
-- [ ] Six new declarative courses plus hardened Summit; correct final seven registered IDs.
-- [ ] Source-only kit/Summit/arena exports and measured socket manifest checked in and hash verified.
-- [ ] Builder rebuilds deterministically from a fresh source import; no hand-placed-only changes.
-- [ ] Seven docs written before their builds; palette, layout kind, beats, actual tuning, layouts and five-question loophole tables complete.
-- [ ] Attributes/name/authority/cooldown/guard constraints pass; no existing arena name-list/default regressions.
-- [ ] Every course passes bounds, 30 spawns, checkpoints/finish, independent graph/cut sets, gap, support/seam/intersection, full-width/density/variety checks.
-- [ ] On encounters: at least six primary hazard types/course, maximum 40%, four families, three elevation changes, ≤3 same-type run; full set-wide source coverage; section 7 cross-course rules pass over the whole set.
-- [ ] Second-to-last climax and short readable finish verified; no decorative avoidable bumpers.
-- [ ] Measured 60–90-second mid-policy median; clean expert ≤60%; actual interactive run per course; proxy/human limits stated.
-- [ ] Every hazard's effectiveness challenged; falling-tile recovery and flood/checkpoint regression pass.
-- [ ] Fourteen real fixed-camera images inspected and compared with refs 1/9/10/11; no capture claim without file.
-- [ ] Studio local multi-client plus 30-rig load evidence; no single-rig result misrepresented.
-- [ ] Headless tests 967+ with zero failures; Studio kit tests and 14 legacy-contract assertions plus all new QA tests pass, zero skipped.
-- [ ] Normal arena behavior and three-course mode flow regression pass in the connected arena place after the 12.1 transaction.
-- [ ] Six retiring parked models and seven old recipes/configs removed; no Deprecated archive; 90 Keyframes and original kit preserved.
-- [ ] Summit route/checkpoints/rise schedule preserved and documented.
-- [ ] No temporary probes, ghosts, fixtures, live courses or detached balls left in the connected place.
-- [ ] No publishing, deployment or CD build performed.
-- [ ] One local commit per course/Summit, separate infrastructure/integration/docs-QA commits; no unrelated files staged.
-- [ ] qa-report.md and changelog state actual evidence, limitations, counts, commands and final commit IDs; no unreported failure.
-- [ ] Section 1 of this file refreshed at the final commit.
-- [ ] Final git status contains only explicitly explained user changes.
+- [x] Gate 2 (2026-09-15) and Gate 3 approvals recorded with date/message reference.
+- [x] Appendix B recorded in docs/splashdown/03-overrides.md and the changelog; the scaled route-length targets recorded after the pilot.
+- [x] Six new declarative courses plus hardened Summit; correct final seven registered IDs.
+- [x] Source-only kit/Summit/arena exports and measured socket manifest checked in and hash verified (re-verified at the transaction).
+- [x] Builder rebuilds deterministically from a fresh source import; no hand-placed-only changes — all seven rebuilt to identical hashes and part counts after the swap.
+- [x] Seven docs written before their builds; layout kind, beats, actual tuning, layouts and five-question loophole tables complete. **Palette is declared in every doc but NOT applied by the builder** (see the next-actions item 8).
+- [x] Attributes/name/authority/cooldown/guard constraints pass; no existing arena name-list/default regressions (measured, section 12.3 arena regression).
+- [x] Every course passes bounds, 30 spawns, checkpoints/finish, independent graph/cut sets, gap, full-width/density/variety checks. **The mesh-level seam/intersection pass is NOT RUN** — `auditGeometry` is a box test and 8.3 says so; per-course overlap counts are in the qa-report.
+- [x] On encounters: at least six primary hazard types/course, maximum 40%, four families, ≤3 same-type run; full set-wide source coverage; section 7 cross-course rules pass over the whole set (all twelve, over all seven staged specs).
+- [x] Second-to-last climax and short readable finish verified; no decorative avoidable bumpers.
+- [ ] **NOT MET.** Measured 60–90-second mid-policy median and clean expert ≤60% exist for Ball Barrage only, and its expert ratio FAILED by 0.004. Whirlpool Waltz and Door Dash FAILED 0 of 8; Tumble Tunnels' harness never returned; the other three were never run. An actual interactive run exists for Ball Barrage only, on geometry that has since changed. Standing user decision, 2026-09-16.
+- [ ] **PARTIAL.** Falling-tile recovery and the flood/checkpoint regression pass as kit-level and measurement assertions, but "every hazard's effectiveness challenged" needs the driven contacts, which are NOT RUN.
+- [x] Fourteen real fixed-camera images inspected; every one is a file on disk at 1180 × 864 with its poses recorded in `evidence/course-cameras.json`. The `bad-map-refs` comparison is written for the courses whose documents carry one.
+- [ ] **NOT RUN, and never was, for any course.** The Studio local multi-client session and the 30-rig load test have not happened. No single-rig result is presented as either.
+- [x] Headless tests 984 with zero failures; Studio kit tests (25) and 14 contract assertions plus all new QA tests pass — 239 passed, 0 failed, **0 skipped**.
+- [x] Normal arena behavior and three-course mode flow regression pass in the connected arena place after the 12.1 transaction.
+- [x] Six retiring parked models and the old recipes/configs removed; no Deprecated archive; 90 Keyframes and original kit preserved.
+- [x] Summit route/checkpoints/rise schedule preserved and documented; its two failing clauses reported, not exempted, and accepted by the user.
+- [x] No temporary probes, ghosts, fixtures, live courses or detached balls left in the connected place (verified instance-by-instance after the last session).
+- [x] No publishing, deployment or CD build performed.
+- [x] One local commit per course/Summit, separate infrastructure/integration/docs-QA commits; no unrelated files staged.
+- [x] qa-report.md and changelog state actual evidence, limitations, counts, commands and final commit IDs; no unreported failure.
+- [x] Section 1 of this file refreshed at the final commit.
+- [x] Final git status contains only explicitly explained user changes.
 
 ## Appendix A — exact files changed in Gates 1–2
 

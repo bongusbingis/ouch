@@ -507,3 +507,102 @@
   **`dcece9ec`**, Studio TestEZ **24 passed, 0 failed, 0 skipped**, headless **984 tests, 0
   failures**. Promoted: `ReplicatedStorage.Assets.Maps.Splashdown` now holds seven models, one more
   than `CourseOrder` lists, which is the state section 12.1 starts from.
+
+## 2026-09-16 — Section 12: the final replacement transaction and full verification
+
+The user authorised the transaction explicitly, including the six permanent deletions, and resolved
+the three Summit judgement calls in the same message: the cross-course cap stays scoped to the six
+new courses, and 7.7.8's shove-reach-liquid clause plus 8.4's no-breather square are accepted as
+documented limitations on the preserved arc rather than something to redesign.
+
+**12.1.1 — the registry.** `CourseOrder` is now the final seven in route order: `BallBarrage`,
+`WhirlpoolWaltz`, `DoorDash`, `TumbleTunnels`, `TiptoeTrials`, `PistonPeak`, `SummitSplash`. Three
+things in `Courses` were wrong against 12.1's own list and all three moved with the swap rather than
+before it: **Door Dash's Difficulty was 3 and 12.1 wants 2**; **Whirlpool Waltz carried no `Doors`
+block at all** although section 6 gives it 3/1 and its spec places exactly one row of three slabs;
+and the eight superseded ids were still registered. Difficulties are now 3, 3, 2, 3, 3, 4 plus
+Summit's preserved 3, the six new courses run 75/180/60, and `Doors` exists on exactly two courses —
+Whirlpool Waltz 3/1 and Door Dash 5/2, verified against the slab counts in their specs. Summit's
+Par 115 / Cap 210 / Close 45 and its `LavaRise {60, 20, 140}` are byte-for-byte unchanged; only its
+membership in `CourseOrder` changed. `SplashdownIntro.Courses` needed no change — all seven entries
+already existed, which is what `SplashdownIntroModel.spec` asserts.
+
+**12.1.2 — promote.** `promote` now asserts exact set equality with `CourseOrder` in both directions
+and names the offenders: a template with no registry entry and a registry entry with no template are
+both transaction failures. It ran over all seven with their re-verified hashes and installed seven
+models whose BasePart counts equal their staged originals exactly.
+
+**12.1.3 — retirement, with no archive.** `retireLegacy` now checks every id against an explicit
+six-id allow list BEFORE resolving anything, then resolves and class-checks every target before it
+destroys any of them, so a typo cannot reach `SummitSplash`, the ninety Keyframes or the container.
+The guard was proved live first: `retireLegacy({"NotACourse"})` raised rather than silently doing
+nothing. **`Workspace.LegacyCourses.WhirlPool`, `.DiscJockey`, `.KnockKnock`, `.BumperBay`,
+`.TiltTrip` and `.Downpour` were permanently destroyed** — 97 children down to 91, being the 90
+Keyframes and the preserved `SummitSplash` source. `CrossCurrent` had no parked model, as 12.1 says;
+only its code and config references retired. **No Deprecated folder, archive or source export was
+created**, per section 0.6: recovery would need external place history, not an in-project archive.
+
+**12.1.4 — the old recipes are gone.** `src/scripts/studio/author-splashdown-courses.luau` kept all
+seven imperative course recipes and the DSL that built them. They are removed outright rather than
+left behind a flag, because 12.1.4 forbids any executable path that recreates a retired course; the
+three public entry points (`Author.build`, `.preview`, `.restore`) now raise and point at
+`author-splashdown-v2`. `sb-race-course`'s help text and the README's authoring paragraph no longer
+name courses that do not exist.
+
+**12.3 — the verification, and the two pieces of it that did not exist.** The final bootstrap needed
+lifecycle/reset/clone tests and malformed-course mutation fixtures, and neither had ever been
+written. `SplashdownQA.spec` gains eight set-wide assertions: every registered template boots through
+the real validator and nothing unregistered sits in the templates folder; two independently cloned
+courses coexist without sharing one Instance; a destroy/re-clone cycle leaves no tagged root,
+constraint, joint, detached part or ghost; and five malformed fixtures drive the REAL boot validator
+(a CheckpointCount that disagrees with its folder, a start grid one pad short of the queue capacity,
+no hazard, an emptied boundary ring, and a door row one slab short of its configured quota — the one
+case only a config-against-model cross-check can catch). Each mutates the live Play template, asserts
+`instantiate` throws, reverses it and asserts the course resolves again.
+
+Results, all measured:
+
+- Headless **984 tests, 0 failures**; `git diff --check` clean.
+- Studio TestEZ over four Play sessions, batched because seven full course audits in one session is
+  tens of millions of graph edges: **239 passed, 0 failed, 0 skipped**. That is 25 kit assertions,
+  **14 contract assertions** (two per course over the seven in `CourseOrder`), 24 QA assertions per
+  course for 168, and the 8 new set-wide fixtures. `SplashdownCourses.spec`'s stale "five"
+  description and its behaviour were deliberately left alone.
+- **The three-course match flow ran end to end through the existing admin seams** —
+  `MatchService.restartForAdmin("Splashdown")`, then `stateForAdmin`, `setNextCourseForAdmin` and
+  `advanceForAdmin`. Round 1 stood `SummitSplash` (199 live BaseParts, hash `dcece9ec`, 4 of 4
+  checkpoints) from the draw; rounds 2 and 3 were chosen through the seam and stood `DoorDash` (221,
+  `aae4c298`, 5/5) and `PistonPeak` (162, `e164c528`, 6/6). Every live model's part count equals its
+  template's. **No completed run is claimed**: each racing phase was closed through the seam's own
+  DNF close with zero racers credited. `setNextCourseForAdmin("CrossCurrent")` returned
+  `false, "unknown_course"`, and no retired id has a template.
+- **All seven templates boot with no CrossCurrent or missing-template error.**
+- One warning class appeared in the compressed run and is explained rather than waved away:
+  `Infinite yield possible on ...__hazards:WaitForChild("Origin")` for a course destroyed about 1.5
+  seconds after standing. `RotatingPlatforms.trackGroup` deliberately waits off the main thread for
+  `Origin` and `Assembly`, and a destroyed folder leaves that wait pending forever. A normal
+  untouched session with Door Dash standing for 60 s produced **zero such warnings and zero
+  Splashdown errors**, with all six rotating groups present and the kits measurably driving geometry.
+- **Default-arena regression passes.** Measured at server boot, before the Splashdown venue parks the
+  arena: `Assets.Arena.Scriptables` tagged, `missingExactNames` EMPTY (every name in
+  `MapFeatures.Fan.EnabledNames` and `Spinner.EnabledNames` resolves), Fan 4 / Spinner 6 / Disc 9+9 /
+  SwingPanel 6+6 / Bumper 54, 65 of 94 sampled hazard parts moving within 1.5 s, and gravity 120 with
+  every shared MapFeatures value unchanged. The arena's own `InnerRing`/`OuterRing` Origins still
+  carry no `ServerCarries`, so the client carry path is untouched; every Splashdown rotating group
+  carries `RotationSpeed = 0` and `ServerCarries` only where riders are actually carried. Every file
+  in section 3.1's frozen list is unchanged by diff against the pre-transaction HEAD.
+- **Rebuild-from-source hash parity: all seven rebuild from the section 4 exports to byte-identical
+  spec hashes and part counts**, with zero attribute, route and bounds errors. The three `.rbxmx`
+  exports still hash to their recorded SHA-256 values. There are no untracked Studio-only nudges.
+- **The last four of the fourteen fixed-camera images were captured.** Ball Barrage and Whirlpool
+  Waltz had never had theirs; Tiptoe Trials had files but no recorded camera poses, so it was
+  recaptured at the prescribed offsets. All seven courses now have both shots at 1180 x 864 and a
+  complete row in `evidence/course-cameras.json`.
+- `docs/splashdown/qa-report.md`'s per-check matrix is **rebuilt across all seven courses**; it had
+  only four columns and predated Tiptoe Trials, Piston Peak and Summit Splash.
+
+**Still NOT RUN, recorded rather than quietly dropped:** the whole scripted-trial and interactive
+playtest category for six of seven courses (Ball Barrage has the only interactive run, and it
+predates the hazard-reach change to its hammers and pistons); the Studio local multi-client session
+and the 30-rig start load test, which have never been run for any course at any point in this
+project; the mesh-level seam pass; and the section 7 palette, which the builder still does not apply.
