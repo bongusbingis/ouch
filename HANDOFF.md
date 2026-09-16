@@ -6,8 +6,8 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 ## 0. Read this first: authority and next action
 
 1. This file is an implementation specification for a successor. Writing this file did NOT execute Gate 3 or any later work.
-2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 approval has NOT been received.**
-3. First run the read-only health checks in section 2. Then complete the section 4 prerequisites (source exports, hashes, one capture) and build **Ball Barrage only** per section 10. Submit Gate 3 with actual evidence and wait. Do not build the other five courses or harden Summit before Gate 3 approval.
+2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval (section 1.4). The next work is section 11 (the remaining five courses plus Summit hardening) — read section 1.4 before touching Splashdown code.
+3. Run the read-only health checks in section 2 first, same as always.
 4. The original brief has Gates 1, 2 and 3. The work after Gate 3 is the remaining-course stage and final verification, not an already-approved extra gate.
 5. Do not publish, deploy, push a branch, or open a PR without explicit user authorization. Local commits are part of the requested workflow.
 6. The user explicitly rejected preserving deprecated courses. At the validated replacement swap, delete the six superseded parked course models and retire all seven old recipes/registrations. Do not make a Deprecated folder, model archive, or old-course source export. Keep Summit Splash.
@@ -123,11 +123,46 @@ Still NOT verified or implemented:
 - The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports (now done) were required.
 - CourseAuthoring, CourseQA, the Studio TestEZ suite, both Play probes, author-splashdown-v2.luau, and the course doc do not exist yet (section 1.4 below is exactly where the section-5 interface work stands).
 
-### 1.4 Section 5/10 progress (2026-09-16, committed)
+### 1.4 Section 5/10 progress — Gate 3 APPROVED, section 11 is next
 
-Gate 3 pilot work is SUBMITTED but NOT approved, and the pilot is **BLOCKED, not certified**.
-Commits `81a8cbe` (builder/QA infrastructure) and the course commit that follows it carry
-everything below. A fresh session resumes from here.
+**Gate 3 is approved.** The user played Ball Barrage interactively in Studio (via the local test
+override described below) and approved it, with one correction. Section 11 (WhirlpoolWaltz,
+DoorDash, TumbleTunnels, TiptoeTrials, PistonPeak, then Summit hardening, in that order) is the
+next work. Commits `81a8cbe` (builder/QA infrastructure) and the course commit that follows it
+carry the pilot itself; the tuning pass and the loophole-question correction below are NOT yet
+committed.
+
+**Tuning pass 1 (post-approval, uncommitted).** Live playtest finding: the three BigBall caps sat
+too high, so contact was mostly lateral (`RollOff`) instead of landing in the `CapDegrees` top
+cone (`BounceSpeed`). Fix: `Ball01`/`02`/`03` in `CourseSpecs/BallBarrage.luau` each gained
+`OffsetUp = -6` (submerges the mounting pole 6 studs deeper below the liquid; no mesh/scale/
+attribute change). Rebuilt and promoted through the real `CourseAuthoring.stage`/`promote`
+pipeline via the Studio Command Bar (desktop automation — the Assistant `execute_luau` VM still
+cannot `require()`; see the tooling note below); the three sphere world Y measured 19.20 post-fix
+(were ~25.2). `docs/splashdown/courses/ball-barrage.md` records this; `build.json`/`qa.json` under
+`docs/splashdown/evidence/courses/BallBarrage/` were NOT re-exported and still reflect the
+pre-tuning geometry — regenerate them before the section 11 loop reuses this pattern.
+
+**The five loophole questions are RESOLVED, with an exact citation.** They are not in
+00-findings.md/01-asset-inventory.md/02-kits.md/gate-1-plan.md, but they ARE written down verbatim
+in **this file's own section 11, step 1**: walk-around, edge-hug, bypass-jump, launched-past,
+safe-wait, with the same asymmetric pass rule (first four must be NO; safe-wait YES only if it
+costs time) already stated there. Section 11 postdates when Ball Barrage's course doc was first
+written, which is why the original search missed it. `ball-barrage.md`'s loophole table has been
+corrected to the real five and cites section 11 directly. **Reuse section 11 step 1's wording
+as-is for every remaining course doc — do not re-derive or re-search for it.**
+
+**Local test setup, currently live in Studio (uncommitted).** To let the user actually play the
+pilot (the production `Splashdown.CourseOrder` boot-fails on empty templates for its real 8
+entries, a pre-existing baseline issue, not something this work caused), `src/config/Gameplay/
+Splashdown.luau` currently has `CourseOrder = {"BallBarrage", "WhirlPool", "KnockKnock"}` and a
+matching `Courses.BallBarrage` entry, both marked TEMPORARY in comments. `WhirlPool`/`KnockKnock`
+were cloned as-is from `Workspace.LegacyCourses` into `ReplicatedStorage.Assets.Maps.Splashdown`
+as fixtures. **Revert both the CourseOrder/Courses edit and remove the two fixture clones before
+any production-facing commit or before section 12's final transaction** — they were never meant to
+persist, only to unblock local Play testing. Section 11's own per-course loop needs the same kind
+of local override to test each new course as it's built; reuse this pattern rather than reinventing
+it, and revert it the same way afterward.
 
 **Built and verified in real Studio Play on place 121997450145716:**
 
@@ -174,26 +209,29 @@ beat 06 so all 30 spawns reached Finish with that gate removed (fixed: 34-stud p
 two-slab run-out); and beat 01's single scale-0.92 slab was a 49×49 breather square (fixed: every
 route platform capped at scale 0.3, 20.7 studs wide, largest square now 21×21).
 
-**Five loophole questions — DEFINED, not cited.** They are enumerated nowhere in the checked-in
-docs. `docs/splashdown/courses/ball-barrage.md` defines five (bypass, waiting, escape reach,
-readability, stranding) from the fairness language in 3.2/8.2/8.4/9/13 and says plainly that it is
-defining them. **Ask the user whether these are the intended five**; if not, that table must be
-redone.
-
-**What remains for Gate 3, all honestly NOT RUN:**
+**What was still NOT RUN when Gate 3 was submitted, superseded by the user's direct approval
+rather than individually completed — do not treat this as reopened, but do reuse the same rigor
+for section 11's six remaining courses, where nobody is going to hand-playtest all six the way
+they did the pilot:**
 
 - 8.5 scripted expert/mid route trials (`run-course-routes.server.luau` is written but has never
-  been executed), the interactive keyboard run, the thirty-rider load test and the local
-  multi-client session.
+  been executed), the thirty-rider load test and the local multi-client session. (The interactive
+  keyboard run itself DID happen — that's what produced the Gate 3 approval and the ball-height
+  finding — just not the scripted proxies alongside it.)
 - 8.6 fixed-camera captures and the `bad-map-refs` comparison.
-- 8.2.6 time-expanded dynamic-state graph; 8.4 coverage, blocked-fraction, shove-travel, chicane and
-  readability measurements; 8.4 cross-course variety (only the pilot exists).
+- 8.2.6 time-expanded dynamic-state graph; 8.2.5 `Launch` edges from Pad01/Pad02/Fan01's measured
+  trajectories are not in `CourseQA.buildGraph`'s graph at all, so loophole question 4
+  (launched-past) is genuinely unproven, not just unmeasured; 8.4 coverage, blocked-fraction,
+  shove-travel, chicane and readability measurements; 8.4 cross-course variety (only the pilot
+  exists).
 - The mesh-level seam pass: 50 oriented-box overlaps exist between socket-joined pieces, and 8.3
   says outright that a box test cannot decide mesh penetration.
 - `qa-report.md` has not been written.
 
-`CourseQA.check` returns BLOCKED, never PASS, while any check is outstanding. That is enforced in
-code and asserted by `SplashdownQA.spec.luau`.
+`CourseQA.check` still returns BLOCKED, never PASS, while any of the above is outstanding — that
+remains enforced in code and asserted by `SplashdownQA.spec.luau`, and section 11's per-course loop
+should still drive every course toward an honest PASS. Gate 3 itself is approved because the user
+made that call directly after playing the pilot, not because the code returned PASS.
 
 **Tooling notes that still hold:** headless Lune fakes `CFrame` entirely, so CourseBuilder /
 CoursePresets / CourseQA can only be verified by real Studio Play; the Assistant `execute_luau` VM
