@@ -6,7 +6,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 ## 0. Read this first: authority and next action
 
 1. This file is an implementation specification for a successor. Writing this file did NOT execute Gate 3 or any later work.
-2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval (section 1.4). The next work is section 11 (the remaining five courses plus Summit hardening) — read section 1.4 before touching Splashdown code.
+2. Gate 1 is approved. Gate 2 is approved (user, 2026-09-15). **Gate 3 is APPROVED (user, 2026-09-15, after an interactive Studio playtest)**, with one tuning correction applied post-approval. Section 11 has built Whirlpool Waltz and Door Dash; the next work is TumbleTunnels, TiptoeTrials, PistonPeak and Summit hardening — read section 1.4 before touching Splashdown code.
 3. Run the read-only health checks in section 2 first, same as always.
 4. The original brief has Gates 1, 2 and 3. The work after Gate 3 is the remaining-course stage and final verification, not an already-approved extra gate.
 5. Do not publish, deploy, push a branch, or open a PR without explicit user authorization. Local commits are part of the requested workflow.
@@ -24,18 +24,24 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | 6fffdcc, on top of 4c040b6 (pilot tuning fix), f0a3121, 0198708 (pilot course), 81a8cbe (builder/QA infra) |
+| HEAD now | the Door Dash build commit, on top of `cea63ab` (both earlier courses into rotation) |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
-| Worktree now | Section 11 work in progress, uncommitted (see 1.4). `src/shared/UI/Components/Onboarding/GestureHint.luau` is modified by a PARALLEL session; it is not part of this task and has never been staged. |
+| Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
 | Remote delivery | No push or PR performed |
-| New courses built | Ball Barrage (Gate 3 APPROVED). Whirlpool Waltz built and statically clean, NOT certified. |
+| New courses built | Ball Barrage (Gate 3 APPROVED), Whirlpool Waltz (8.5 blocker intentionally SKIPPED per user decision), Door Dash (built 2026-09-16; statically clean, captures done, scripted trials FAILED 0 of 8). All three are LIVE in `CourseOrder`. |
 | Summit layout hardened | No |
 | Deprecated courses removed | No |
 
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
+<this session>  feat(splashdown): build Door Dash
+cea63ab   feat(splashdown): put Ball Barrage and Whirlpool Waltz into rotation
+a916bbe   test(splashdown): record Whirlpool Waltz's failed scripted trials
+2bc53e3   docs(splashdown): add the per-course QA acceptance matrix
+3594537   docs(splashdown): correct the stale section 5 interface status
+17ccec7   feat(splashdown): build Whirlpool Waltz
 6fffdcc   docs(splashdown): record Gate 3 approval and the pilot tuning pass
 4c040b6   fix(splashdown): lower Ball Barrage BigBall mount height
 f0a3121   docs(splashdown): record the Gate 3 pilot commit ids in the handoff
@@ -47,10 +53,10 @@ cfe33e3   feat(splashdown): export and verify source-only kit/Summit/arena asset
 ~~~
 
 `04ced53` copied Appendix B into `docs/splashdown/03-overrides.md` and the changelog (no code).
-`cfe33e3` completed section 4: source-only exports, hashes, reimport verification and an actual
-screenshot. `81a8cbe`/`0198708` are the builder/QA infrastructure and the pilot itself; `4c040b6`
-is the pilot's post-approval BigBall tuning pass. Do not reset any of them. Section 11's work on
-Whirlpool Waltz is uncommitted at the time of writing; see 1.4.
+`cfe33e3` completed section 4. `81a8cbe`/`0198708` are the builder/QA infrastructure and the Ball
+Barrage pilot; `4c040b6` is its post-approval BigBall tuning pass. `17ccec7` plus three follow-up
+doc/test commits are Whirlpool Waltz. `cea63ab` puts both into the live `CourseOrder` and adds
+their intro-camera entries. Do not reset any of them.
 
 Gate 1 delivered:
 
@@ -94,7 +100,7 @@ facc358 feat(splashdown): compose nested rotors and authoritative course rides
 
 | Evidence | Actual result | Do not infer |
 |---|---|---|
-| Headless runner at recorded HEAD | 967 tests, 0 failures | Full Studio or course acceptance |
+| Headless runner at recorded HEAD | 984 tests, 0 failures (2026-09-16) | Full Studio or course acceptance |
 | Changed Luau formatting/lint | StyLua pass; runtime-source Selene 0 errors/warnings/parse errors | Unchanged whole-repo files were all linted |
 | Studio isolated kit TestEZ | 25 passed, 0 failed, 0 skipped | Existing course contract passed |
 | Original-mesh R15 physics | 18 trials: nine scenarios twice | Multiplayer/latency/60 Hz certification |
@@ -127,167 +133,139 @@ Still NOT verified or implemented:
 - The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports (now done) were required.
 - Every section 5 interface now exists and has been executed at least once: AssetManifest, CoursePresets, CourseBuilder, CourseAuthoring, CourseGraph, CourseQA, the CourseSpecs for BallBarrage and WhirlpoolWaltz, `places/arena/tests/Assets/SplashdownQA.spec.luau`, `src/shared/Tests/CourseGraph.spec.luau` and `CourseVariety.spec.luau`, all three Play probes under `docs/splashdown/probes/`, and `src/scripts/studio/author-splashdown-v2.luau`. **`docs/splashdown/qa-report.md` is the one listed artefact that still does not exist.** Section 1.4 is the current state.
 
-### 1.4 Section 11 progress — pace target fixed, Whirlpool Waltz built and NOT certified
+### 1.4 Section 11 progress — Ball Barrage, Whirlpool Waltz and Door Dash are the LIVE production pool
 
-**Gate 3 remains approved** (user, 2026-09-15, interactive Studio playtest of Ball Barrage). The
-pilot's post-approval tuning pass is now committed (`4c040b6`), together with the corrected
-loophole table, and `6fffdcc` recorded the approval itself. Section 11's first course,
-**Whirlpool Waltz, is built and statically clean but NOT certified, and its scripted trials failed
-0 of 8** — read "Where Whirlpool Waltz actually stands" below before touching it.
+**Gate 3 remains approved** (user, 2026-09-15, interactive Studio playtest of Ball Barrage). Section
+11 has built two of its five courses: **Whirlpool Waltz** (2026-09-15; its 8.5 blocker is
+intentionally SKIPPED per the user's 2026-09-16 decision, see "Where Whirlpool Waltz stands") and
+**Door Dash** (2026-09-16, the session this section describes). Next in section 11's order:
+**TumbleTunnels**, then TiptoeTrials, PistonPeak, then Summit hardening.
 
-**The temporary local-test override is reverted.** `src/config/Gameplay/Splashdown.luau` is back to
-its committed 8-entry `CourseOrder` with no `BallBarrage` entry, and the headless suite went from 1
-failure back to 0 the moment it was (the failure was `SplashdownIntroModel`, which iterates
-`CourseOrder` and requires a matching entry in `src/config/Interface/SplashdownIntro.luau`).
-**That is a real prerequisite for the section 12 swap that nobody has recorded before: every one of
-the seven new course IDs needs an intro-camera entry in `SplashdownIntro.luau`, or the headless
-suite fails.** The `WhirlPool` and `KnockKnock` fixture clones are still sitting in
-`ReplicatedStorage.Assets.Maps.Splashdown` alongside a promoted `BallBarrage`; they are local Play
-scaffolding, in no commit, and section 12.1.5 removes them.
+`src/config/Gameplay/Splashdown.luau`'s `CourseOrder` is `{"BallBarrage", "WhirlpoolWaltz",
+"DoorDash"}` and `ReplicatedStorage.Assets.Maps.Splashdown` holds exactly those three promoted
+templates. **Every course that enters `CourseOrder` needs its `Intro.Courses` entry in
+`src/config/Interface/SplashdownIntro.luau` in the SAME change** — `SplashdownIntroModel.spec.luau`
+asserts it and the headless suite fails otherwise. Door Dash's entry is in place, and its
+`Splashdown.Courses.DoorDash` config carries `Doors = { PerRow = 5, BreakablePerRow = 2 }` because
+`SplashdownCourses.resolve` asserts every resolved row holds exactly `PerRow` slabs once that block
+exists. Headless is **984 tests, 0 failures**.
+
+#### Door Dash, as built
+
+- Spec `src/shared/Game/Splashdown/CourseSpecs/DoorDash.luau`; doc
+  `docs/splashdown/courses/door-dash.md`; evidence
+  `docs/splashdown/evidence/courses/DoorDash/{build,qa,routes}.json`, its two fixed-camera captures,
+  `evidence/course-cameras.json` and `evidence/course-sockets-doordash.json`.
+- **Spec hash `8c00a748`, 221 BaseParts, 882.07 measured studs of route** against the 880 target,
+  five ordered checkpoints, beats 0.935-1.112 of their section 7.3 targets, elevation
+  0/-12/+6/+12/0/-6 matching section 7.3 exactly, zero attribute errors, zero route errors, zero
+  bounds violations, identical hashes across a double build.
+- `CourseQA.check` returns **zero errors and zero warnings**; 37 of 50 findings PASS and the other
+  13 are NOT RUN with reasons. All six gate cut sets hold (0 of 30 spawn cells bypass any gate) over
+  a 28,121-node / 1,272,671-edge graph sampled from 38,241 real surface cells, all twelve
+  cross-course checks pass over the three staged specs, and the largest flat square on the route is
+  16 x 16. Studio TestEZ: 12 passed, 0 failed.
+- New in the builder: **`Layout.Kind = "Chute"`**, with five enforced invariants — three segments,
+  the second run doubling back on the first, the cross segment exactly `LanePitch`, both runs at
+  least twice the pitch, and the hairpin turning inside a declared window. Door Dash's hairpin
+  enters the turn at 53.19% of the route, reverses at 60.09% and rejoins at 66.98%. New presets
+  `Mace` and `PaddleWheel`; `AssetManifest` is version 3 with three measured sources added.
+- **Its scripted trials FAILED, 0 of 8**, and that is reported as a measured FAIL. Best run: 2 of 5
+  checkpoints over the 150 s ceiling with 11 checkpoint respawns; 15 distinct pieces contacted
+  (eight door slabs, both beat-02 hazards, all three belts, the paddle wheel, the foam pit). The
+  straight-line proxy has no steering and a five-slab door row is a wall with one hole in it; seven
+  harness defects were found and fixed along the way (changelog) and the runs went from "stuck at
+  row 1 every trial" to crossing all three rows, the slide, the belts and the hairpin approach.
+  **HANDOFF 8.5's resolution applies: the interactive keyboard run, and a user mid-skill calibration
+  run if it disagrees with the proxy. Both are outstanding.**
+
+#### Four real defects this course exposed — carry these forward
+
+1. **A jumping character climbs a flat wall far higher than the 11.5-stud ledge calibration.** A
+   plain R15 rig walking into a 14.65-stud door slab and jumping rose **13.6 studs onto its top in
+   about 0.6 s**, reproducibly. `CourseQA`'s graph caps a jump's rise at the calibration, so it does
+   not model this: **any later course that relies on a wall's height to stop a climb is relying on
+   something that does not hold.** Door Dash closes it with a stock roof (section 6's own remedy) set
+   INTO the door tops; the same test against the shipped build reaches +6.64 studs and ends on the
+   floor. The roof took three passes, and the cut-set audit caught each wrong one: flush undersides
+   left a gap the rig jammed in; undersides that left the outer tops 0.46 studs proud made a
+   staircase onto the roof past five gates; and a roof wider than the corridor was itself a bridge to
+   the second run.
+2. **Doors must be scaled against the floor, not on their own.** The first build's 24.05-stud slabs
+   over 19.62-stud channels overhung the corridor by 11 studs a side, and the outermost door's
+   opening then led half over open water. One slab is now exactly one channel wide.
+3. **Door slabs were invisible to the door kit.** `CoursePresets` parented each slab inside a holder
+   Model, and both `DoorRows.resolve` and `MapFeatureService` walk IMMEDIATE BasePart children, so
+   every row resolved as zero rows and every slab would have stayed permanently solid. Whirlpool
+   Waltz's row was affected too.
+4. **Every nested assembly was built twice.** Cloning a root brings its whole source subtree, and the
+   code then cloned each declared sub-part from the source on top of it: the pilot's pistons carried
+   a duplicate spring and head, and a mace would have carried a duplicate ten-part chain. Sub-parts
+   now resolve inside the root clone first, and any descendant the manifest does not name is renamed
+   out of its source name (several MapFeatures kits select by name prefix).
+
+Fixes 3 and 4 changed the other two courses, so **both were re-staged and re-promoted**: Ball Barrage
+156 to 143 BaseParts (`ca5e95b4`), Whirlpool Waltz 151 to 142 (`78e562b8`). Regression tests for both
+are in `places/arena/tests/Assets/SplashdownQA.spec.luau`.
+
+#### Where Whirlpool Waltz stands
+
+Unchanged from the previous session except for the re-promote above. Built from
+`CourseSpecs/WhirlpoolWaltz.luau`; doc `docs/splashdown/courses/whirlpool-waltz.md`. Statically clean
+(route 884.78 studs, six beats 1.031-1.104 of target, zero attribute/bounds errors, all six cut sets,
+all twelve cross-course checks). **Its scripted trials failed 0 of 8** on `Pizza01`, the first ride
+deck in `02_WedgeWake`: a rider standing still is carried into one of the plate's real missing wedges
+after 1.0 s, and crossing the 26.4-stud deck also takes about 1.0 s at WalkSpeed 26, so a straight-line
+proxy meets the sweeping hole about half the time. **The user decided on 2026-09-16 to skip resolving
+that rather than treat it as a blocker.** Do not spend a session re-litigating it. Its fixed-camera
+captures, deliberate missed-timing contacts, interactive run and checkpoint-recovery checks are all
+still NOT RUN.
 
 #### The set-wide route-length target is fixed (section 11's prerequisite)
 
-Recorded in `docs/splashdown/03-overrides.md` with its full derivation:
-**880 measured studs of route arclength per course, and the section 7 beat targets are unchanged.**
-The pilot measures 881.05 studs of route from 800 studs of beat targets and a mid-policy median of
-63.66 s, an effective 13.84 studs/s, so section 8.5's 60-90 s window is 831-1,246 studs and the
-mandatory 800-1,000 window sits inside it. The scale factor is 880/881.05 = 0.9988, so the section 7
-targets stay exactly as written. `run-course-routes.server.luau` had never been executed before this
-session.
-
-#### Three real harness bugs, found only by executing the probe
-
-All three made earlier results wrong rather than merely missing, and all three are fixed:
-
-1. **Jumping was gated behind the policy decision interval**, giving a mid runner a quarter-second
-   reflex floor. Every run stalled at the first gap. Jumping, falling and contact are now resolved
-   every frame inside the policy interval, and the policy interval only re-aims.
-2. **Contacts could never fire.** `CoursePresets` builds every course piece with `CanTouch = false`
-   so the kits own touch detection, so a `Touched` connection on the rig is dead. Contacts are now
-   sampled by an overlap query against the `Scriptables` tree. Ball Barrage went from 0 recorded
-   contacts to 19-26 per run covering 16 of its 17 hazard pieces.
-3. **`Workspace.Baseplate` sits at Y 0 under the isolated course**, so a runner who fell off landed
-   on it a few studs down instead of passing the liquid plane: eight Ball Barrage runs recorded
-   **zero falls**, which is why their timings looked like pure walking pace. The isolated clone is
-   now lifted to Y 20000 first, and the pilot was re-measured: the mid-policy median moved from
-   40.18 s to **63.66 s**, inside section 8.5's 60-90 s window, with 5 of 5 mid resets and 3 of 3
-   expert resets cleared and an expert/mid ratio of 0.6024 against a 0.60 bar. Falls now cluster at
-   `Step01` and `Gap01`, the Big Ball chain, which is where the design puts the difficulty.
-
-A fourth, structural: **a door row is impassable to a scripted rig by design.** Nothing calls
-`Doors.setPlan` in an isolated clone, so no slab is breakable, and `Doors.tickPlayer` selects
-Players, which a rig is not. The harness now carries the door plan itself, exactly as HANDOFF 8.5
-prescribes — seeded `DoorPlan`-style choice per trial, expert aims at the slab that gives, mid works
-the row centre-out (2,1,3 for three) and pays for wrong guesses, and every slab is restored between
-resets.
-
-#### Where Whirlpool Waltz actually stands
-
-Built from `src/shared/Game/Splashdown/CourseSpecs/WhirlpoolWaltz.luau`. Doc:
-`docs/splashdown/courses/whirlpool-waltz.md`. Evidence:
-`docs/splashdown/evidence/courses/WhirlpoolWaltz/{build,qa}.json` and
-`docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json`.
-
-Measured and passing: route 884.78 studs against the 880 target, guide 896.04 with the worst
-route-to-guide deviation 7.07 of a 12-stud tolerance, 151-154 BaseParts, 30 start pads, 5 ordered
-checkpoints, 24 boundary walls, 17 encounters over six types with a 35.3% maximum, all six beats
-between 1.031 and 1.104 of their targets, elevation -6/-6/-4/-6/-10/-4 summing to the section 7.2 Y
-column exactly, zero attribute errors, zero bounds violations, identical hashes across a double
-build, and all 23 spiral gaps inside the 13.5-19.5 band. **All twelve cross-course checks pass**
-(`CourseQA.auditCrossCourse`, new).
-
-**`CourseQA.check` now returns zero errors and zero non-PASS findings for this course**, with all
-six beat gates proved true cut sets over a 12,181-node / 383,518-edge graph sampled from 14,844
-real surface cells. Its status is still BLOCKED, which is correct and deliberate: nine live-playtest
-checks remain NOT RUN and the module never reports PASS while any of them is outstanding.
-
-Getting there found **a real hole in the audit itself, not just in the course**. `GateCutSet:05_DiscDive`
-failed with all 30 spawn cells still reaching Finish, and the traced bypass showed why: a 22-stud
-jump off the previous beat's last slab crossed the gate plane 7 studs BELOW the beat entrance and
-landed past it, because the gate reached only 2 studs below the entrance; and the fixed twelve-sample
-edge-versus-gate test was 2-stud resolution on a 22-stud jump, so even the 0.3 studs where that jump
-did clip the gate's corner fell between samples. Both are fixed — the gate now spans 22 studs below
-the entrance to 38 above, and edges are sampled every 0.5 studs — and `CourseGraph.spec` gained a
-seeded corner-clip fixture that the old test provably missed. **Ball Barrage was re-audited under
-the stricter gate and still passes all six of its own cut sets**, so the pilot had no hidden
-loophole; the tightened audit confirms it rather than contradicting it. Both SpecHashes changed
-because the gate is part of the model: Ball Barrage `943e493c`, Whirlpool Waltz `2fbc899c`.
-
-**Its scripted trials FAILED, and that is the open question on this course.** Executed against the
-built model with the harness fully fixed: **0 of 8 runs cleared**, every one hitting the 150 s
-ceiling with 31-32 falls and only checkpoint 1 earned, and only 5 of the course's 17 hazard pieces
-ever contacted. Every run dies on `Pizza01`, the first ride deck in `02_WedgeWake`.
-
-The mechanism is measured, not guessed: a rider standing still on `Pizza01` stands safely for 1.0 s
-and is then carried into one of the plate's real missing wedges and falls. That is the headline
-mechanic working. But crossing the 26.4-stud deck also takes about 1.0 s at WalkSpeed 26, so a
-`Humanoid:MoveTo` proxy walking a straight line meets the sweeping hole about half the time. **This
-does not prove the course is fine and it does not prove it is broken.** A proxy that cannot time a
-hole would fail here whether or not a human can, and 32 consecutive failures is also exactly what an
-unclearable second beat looks like. HANDOFF 8.5's own resolution applies: get a user mid-skill
-calibration run before approval, and do not relabel the proxy. **The interactive keyboard run is the
-blocking evidence.** If a human cannot cross the ride decks at a reasonable rate either, beat 02
-needs a section 9 decision with no in-bounds knob left: `Pizza01` is already at the slowest speed on
-section 6's ride ladder and section 6 fixes its uniform scale at 0.4.
-
-Also never executed for this course: the fixed-camera captures and `bad-map-refs` comparison, the
-interactive keyboard run, deliberate missed-timing contacts, checkpoint-recovery checks, and every
-measurement listed under "NOT RUN" in the course doc.
-
-#### What the builder and QA can now do that they could not
-
-- **`Layout.Kind = "Spiral"`**: a parametric guide (angle, radius, samples, radial finish) sampled
-  to a polyline with arclength, position and tangent lookup. Chain pieces stay collinear so joints
-  never open a wedge; every heading change happens at a declared `Advance` or across a round deck;
-  the build fails past `GuideTolerance` and past a 19.8-stud measured gap. Serpentine is untouched.
-- New piece kinds **`Ride`** (a round deck the route crosses, entering and leaving at measured rim
-  points) and **`Flank`** (a chained piece placed beside the cursor without advancing it, which is
-  what makes a wide door corridor out of narrow slabs).
-- New presets **`Spinner`**, **`RidePlatform`**, **`RoundLanding`**, **`SwingPanel`**, **`Door`**,
-  **`FoamPit`** and **`Prop`**, with the section 6 formulas applied at measured contact radii.
-- `AssetManifest` gained 18 measured sources (ride decks, spinners, doors, the striped pad, the
-  round landing) at Version 2, with the walkable ones raycast-measured into
-  `course-sockets-whirlpoolwaltz.json`.
-- Specs now declare **`Headline`**; `CourseQA.auditCrossCourse` scores override 2's three rules over
-  every spec that exists, and `src/shared/Tests/CourseVariety.spec.luau` proves each rule fires
-  against a seeded violation (headless suite now 983 tests, 0 failures).
-- `CourseGraph.tracePath` returns a concrete path, so a cut-set failure names the route it found
-  instead of only its existence.
-- Two builder fixes with wider consequences: guide travel is measured horizontally (a course that
-  starts elevated, as this one does at Y 36, otherwise begins tens of studs further along its own
-  guide), and a beat whose pieces carry riders now gets `ServerCarries = true` on its group Origin,
-  which `AttributeAudit` requires and which no previous course needed.
+Recorded in `docs/splashdown/03-overrides.md` with its full derivation: **880 measured studs of route
+arclength per course, and the section 7 beat targets are unchanged.** Ball Barrage measures 881.05,
+Whirlpool Waltz 884.78, Door Dash 882.07.
 
 #### Tooling notes that save a successor real time
 
-- **A probe can write straight into the repository.** `scratchpad/evidence_sink.py` serves
-  `http://127.0.0.1:34875/`; a Script in Play has the Network capability and POSTs
-  `{path, data}`, which lands in `docs/splashdown/evidence/`. The Assistant's own `execute_luau`
-  VM does NOT have that capability ("lacking capability Network"), nor can it `require()` synced
-  modules or reparent a rig containing an `Animate` script into Workspace. Probes under
-  `places/arena/server/Scripts/` (Rojo-synced) have all of it.
-- **`StringValue.Value` is capped at 200,000 characters.** A full eight-run record is larger and the
-  assignment fails with a warning, losing the whole measurement. Results are written as numbered
-  chunks.
-- `Players:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), R15)` gives a
-  real 16-part R15 rig with a measured HipHeight of 2.192, which is what the route probe drives.
-- Hazards genuinely run in an isolated clone once `ScriptableRoots.tag` is called on its
-  `Scriptables` folder: a spinner commanded 135 deg/s measured 81.12 degrees in 0.6 s. Lifting the
-  clone to Y 20000 does put it outside the client's replication range, so the Output fills with
-  `Infinite yield possible on ...__hazards:WaitForChild("Origin")` from the CLIENT copy of
-  `RotatingPlatforms`. That is expected and harmless for a server-side measurement; do not chase it.
-- The Studio **Command Bar is visible at the bottom of the window**; at a 1600x900 screenshot of a
-  1920x1080 desktop it is at image (700, 857), so click (840, 1028) after the 1.2 scale factor.
-- `arch_003` is not a usable gateway: a raycast section shows about 4 studs of passage headroom at
-  scale 1, so clearing a 5-stud character needs scale ~1.8, at which its legs land 23 studs off the
-  lane centreline over open water.
+- **The Assistant's `execute_luau` cannot `require()` synced modules** ("has additional values for
+  the Capabilities property: LoadUnownedAsset"), in Edit OR in Play, for ReplicatedStorage AND
+  ServerScriptService modules. Anything needing a require runs from the **Studio Command Bar** (Edit)
+  or a Rojo-synced probe Script (Play). It CAN read and write instances freely, create parts, clone
+  models, drive a `Players:CreateHumanoidModelFromDescription` rig and raycast — which is enough for
+  most measurements.
+- **Edit-mode's `require()` cache does not invalidate when Rojo syncs a changed module.** Clone the
+  whole `ReplicatedStorage.Shared.Game.Splashdown` folder to a temp sibling, `require()` the CLONE's
+  `CourseAuthoring`, then set the clone's `Parent = nil`. Use `Parent = nil` rather than `Destroy()`:
+  **any Command Bar text containing the literal word `Destroy` pops a blocking "Dangerous Command
+  Detected" dialog** that silently swallows the command until a human clicks through it.
+- `CourseAuthoring.stage` now parks the full `BuildReport` for every staged course in
+  `ServerStorage.SplashdownStageReport` (and each route trace beside it), because the Command Bar's
+  Output cannot be read back reliably; read it with an ordinary instance read afterwards.
+- The Command Bar is at image (700, 857) on a 1600x900 screenshot of a 1920x1080 desktop, so click
+  (840, 1028) after the 1.2 scale; the Run button is at (1888, 1028).
+- **For fixed-camera captures, lift the PREVIEW, not the arena.** `workspace.Assets.Arena` keeps its
+  own hazard ring and PvP floor at MapOrigin and they fill the frame; moving the preview 9,000 studs
+  up gives an empty background and leaves every user model untouched. Camera writes from
+  `execute_luau` do reach the Edit viewport, but the viewport can lag a screenshot: take one
+  `Roblox_Studio.screen_capture` at the target camera first, then grab the window with
+  `scratchpad/capture_viewport.py` (crop 0,142-1180,1006). `workspace.Assets.Arena.Map.Model`'s exact
+  pivot is `CFrame.new(-537.766602, 519.175659, -54.3143196)`.
+- A probe in Play can POST evidence straight into the repository through
+  `scratchpad/evidence_sink.py` on `http://127.0.0.1:34875/`; `{path, data}` lands under
+  `docs/splashdown/evidence/`.
+- `StringValue.Value` caps at 200,000 characters; the route harness writes numbered chunks.
 
 #### Exact next actions
 
-1. Run the Whirlpool trials to completion, the two fixed-camera captures, the interactive run and
-   the remaining section 8 measurements listed in the course doc.
-2. Delete `places/arena/server/Scripts/TempQAProbe.server.luau` (and any Temp*Probe) before any
-   commit; they are Rojo-synced scratch copies of the checked-in probes.
+1. Build **TumbleTunnels** next, per section 11's per-course loop, and add its `SplashdownIntro`
+   entry in the same change that puts it in `CourseOrder`.
+2. Read "Four real defects" above before designing it: the wall-climb finding changes how any
+   anti-jump geometry must be built, and the two builder fixes changed every course's hashes.
+3. The Whirlpool Waltz 8.5 blocker is intentionally NOT being chased (user decision, 2026-09-16).
+4. Delete any `places/arena/server/Scripts/Temp*Probe.server.luau` before any commit; they are
+   Rojo-synced scratch copies of the checked-in probes and must never be committed.
 
 ### 1.3 Studio
 
@@ -299,9 +277,10 @@ Recorded Edit state:
 
 - Workspace.battle_stadium: original source gallery; preserve it.
 - Workspace.LegacyCourses: **97 immediate children: seven course Models plus ninety Keyframes**. The seven Models are the user's copies of the original courses (see 1.2).
-- ReplicatedStorage.Assets.Maps.Splashdown: **three models — `WhirlPool` and `KnockKnock` copied from LegacyCourses as local Play fixtures, and a promoted `BallBarrage`.** None of the three is in any commit; section 12.1.5 removes them. The folder being otherwise empty is still the expected baseline (see 1.2).
-- ServerStorage.SplashdownStaging.BallBarrage exists from the Gate 3 session and carries SpecHash `020c7854`, which no longer matches a fresh build of the committed spec. Re-stage before relying on it; `CourseAuthoring.promote` asserts hash equality and would refuse it.
-- Temporary kit probes, observer and review gallery removed. A Rojo-synced probe under `ServerScriptService.Server.Scripts` (Temp*Probe) may be present while section 11 work is in progress; delete it before any commit.
+- ReplicatedStorage.Assets.Maps.Splashdown: **exactly three models, `BallBarrage`, `WhirlpoolWaltz` and `DoorDash`, all real promoted templates matching `CourseOrder`.** The `WhirlPool`/`KnockKnock` local-test fixtures have been destroyed; do not recreate them unless testing an isolated config again, and destroy them again afterward. This matches `Splashdown.CourseOrder` exactly as of commit `cea63ab` — the folder is no longer expected to be empty.
+- ServerStorage.SplashdownStaging holds `BallBarrage`, `WhirlpoolWaltz` and `DoorDash`, all staged and promoted on 2026-09-16 with hashes Ball Barrage `ca5e95b4`, Whirlpool Waltz `78e562b8`, Door Dash `8c00a748`. The first two changed from their earlier recorded values (`943e493c`, `2fbc899c`) when the two CoursePresets fixes in 1.4 touched every model. Re-stage before relying on either if the specs change again; `CourseAuthoring.promote` asserts hash equality and refuses a stale one.
+- `workspace.Assets.Arena.Map.Model` is at its correct original pivot (verified, see the tooling note above); do not need to re-check this unless something else reports it looks wrong.
+- Temporary kit probes, observer and review gallery removed. A Rojo-synced probe under `places/arena/server/Scripts/` (Temp*Probe) may be present while section 11 work is in progress; delete it before any commit.
 - The source gallery is unanchored and disappears from Workspace in Play. Export its source in Edit before testing.
 
 ## 2. Startup and repeatable command recipes

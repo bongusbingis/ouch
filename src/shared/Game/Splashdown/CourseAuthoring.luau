@@ -15,6 +15,12 @@ local CourseBuilder = require(script.Parent.CourseBuilder)
 local CourseAuthoring = {}
 
 local STAGING_NAME = "SplashdownStaging"
+-- 5.1.12 has stage() print its JSON summary, but the Studio Command Bar is the
+-- only place stage() can run and its Output cannot be read back reliably from an
+-- assistant session. The FULL BuildReport for every staged course is therefore
+-- also parked in this StringValue, where a plain instance read can collect it:
+-- beat arclengths and ratios, bounds, route steps, guide/hairpin measurements.
+local REPORT_NAME = "SplashdownStageReport"
 local PREVIEW_NAME = "SplashdownPreview"
 local OWNER_MARKER = "BuildVersion"
 local TEMPLATES_PATH = { "Assets", "Maps", "Splashdown" }
@@ -39,6 +45,20 @@ local function sources(): CourseBuilder.Sources
 	assert(kit, "[CourseAuthoring] SplashdownAuthoringSources.Kit is missing")
 	assert(wall and wall:IsA("BasePart"), "[CourseAuthoring] ArenaSources.BoundaryWall is missing")
 	return { Kit = kit, BoundaryWall = wall :: BasePart }
+end
+
+-- Parks a named StringValue in ServerStorage, reusing one that is already there.
+-- Edit-mode results have to survive the Command Bar call that produced them so an
+-- ordinary instance read can collect them afterwards.
+local function parkedValue(name: string): StringValue
+	local existing = ServerStorage:FindFirstChild(name)
+	if existing and existing:IsA("StringValue") then
+		return existing
+	end
+	local made = Instance.new("StringValue")
+	made.Name = name
+	made.Parent = ServerStorage
+	return made
 end
 
 local function stagingFolder(): Folder
@@ -94,9 +114,11 @@ function CourseAuthoring.stage(ids: { string }): StageResult
 		specHashes = {},
 	}
 
+	local reports: { [string]: CourseBuilder.BuildReport } = {}
 	for _, id in ids do
 		local spec = specFor(id)
 		local model, report = CourseBuilder.build(spec, injected)
+		reports[id] = report
 		claimStagingSlot(folder, id)
 		model.Name = id
 		model:SetAttribute(OWNER_MARKER, 1)
@@ -124,6 +146,33 @@ function CourseAuthoring.stage(ids: { string }): StageResult
 	-- 5.1.12 prints the JSON summary; elapsed build time is deliberately outside
 	-- the deterministic hash, so the hashes alone are what a rebuild compares.
 	print(HttpService:JSONEncode(result))
+
+	-- A StringValue caps at 200,000 characters and silently drops a longer
+	-- assignment, so the route step list -- by far the largest field, and the one
+	-- that grows with the course -- is written per course under its own name.
+	local summary: { [string]: any } = {}
+	for id, report in reports do
+		summary[id] = {
+			Ok = report.Ok,
+			PartCount = report.PartCount,
+			SpecHash = report.SpecHash,
+			RouteLength = report.RouteLength,
+			CheckpointCount = report.CheckpointCount,
+			Beats = report.Beats,
+			Bounds = report.Bounds,
+			AttributeErrors = report.AttributeErrors,
+			RouteErrors = report.RouteErrors,
+			GuideDeviation = report.GuideDeviation,
+			GuideLength = report.GuideLength,
+			HairpinFraction = report.HairpinFraction,
+			HairpinMidFraction = report.HairpinMidFraction,
+			HairpinExitFraction = report.HairpinExitFraction,
+			RouteSteps = #report.Route,
+		}
+		parkedValue(string.format("%s_%s_Route", REPORT_NAME, id)).Value = HttpService:JSONEncode(report.Route)
+	end
+	parkedValue(REPORT_NAME).Value = HttpService:JSONEncode(summary)
+
 	return result
 end
 

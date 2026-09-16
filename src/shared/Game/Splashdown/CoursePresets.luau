@@ -36,6 +36,11 @@ export type PresetName =
 	| "SwingPanel"
 	| "Door"
 	| "FoamPit"
+	-- Door Dash additions. Mace is the hanging chain-and-ball pendulum whose top
+	-- link is the axle; PaddleWheel is obstacle_24's four-cradle wheel spinning on
+	-- its measured X axle (NOT obstacle_8, the swing panel).
+	| "Mace"
+	| "PaddleWheel"
 	-- A mounted piece of visible stock geometry with no kit attributes at all:
 	-- arch frames around a landing mouth, enclosure. It lives in Geometry like
 	-- any other static piece and is never an encounter.
@@ -138,17 +143,44 @@ local function clonePiece(
 
 	local byPath: { [string]: BasePart } = { [id] = root }
 	if manifest.SubParts then
+		-- Cloning the root brings its WHOLE source subtree with it, so a declared
+		-- sub-part is normally already present inside the clone: the piston's spring
+		-- and head are nested under its base, and the mace's nine links and ball
+		-- chain one inside the next. Resolving the declared paths against the clone
+		-- first is what stops a second copy of that geometry being cloned in on top
+		-- of the first (which is what previously gave every piston a doubled spring).
+		-- Resolution happens for every path BEFORE anything is renamed, because the
+		-- paths are source names and renaming as we go would break the later walks.
+		local resolved: { BasePart } = {}
 		for index, sub in manifest.SubParts do
-			local subSource = source
+			local segments: { string } = {}
 			for segment in sub.Name:gmatch("[^.]+") do
-				subSource = subSource:FindFirstChild(segment) :: Instance
-				assert(subSource ~= nil, `[CoursePresets] sub-part "{sub.Name}" missing from source "{id}"`)
+				table.insert(segments, segment)
 			end
-			assert(subSource:IsA("BasePart"), `[CoursePresets] sub-part "{sub.Name}" is not a BasePart`)
-			local clone = (subSource :: BasePart):Clone()
-			clone.Name = string.format("%s_%d", name, index)
-			clone.Parent = root
-			byPath[sub.Name] = clone
+
+			local found: Instance? = root
+			for _, segment in segments do
+				found = if found then found:FindFirstChild(segment) else nil
+			end
+			if found == nil then
+				-- Not inside the root's own subtree: a sibling asset the manifest pairs
+				-- with this root, so it is cloned in and parented under it.
+				local subSource: Instance? = source
+				for _, segment in segments do
+					subSource = if subSource then subSource:FindFirstChild(segment) else nil
+					assert(subSource ~= nil, `[CoursePresets] sub-part "{sub.Name}" missing from source "{id}"`)
+				end
+				local made = (subSource :: Instance):Clone()
+				made.Parent = root
+				found = made
+			end
+			assert((found :: Instance):IsA("BasePart"), `[CoursePresets] sub-part "{sub.Name}" is not a BasePart`)
+			resolved[index] = found :: BasePart
+		end
+		for index, sub in manifest.SubParts do
+			local part = resolved[index]
+			part.Name = string.format("%s_%d", name, index)
+			byPath[sub.Name] = part
 		end
 	end
 
@@ -157,8 +189,18 @@ local function clonePiece(
 	holder:SetAttribute("CourseId", context.CourseId)
 	holder:SetAttribute("BeatId", context.BeatId)
 	holder:SetAttribute("PieceId", spec.Id)
+	local undeclared = 0
 	for _, descendant in holder:GetDescendants() do
 		if descendant:IsA("BasePart") then
+			-- HANDOFF 3.3: no original source name survives into a course. A nested
+			-- child that the manifest does not name still arrives inside its parent's
+			-- clone, and MapFeatures selects several kits by name prefix
+			-- (obstacle_18_001, obstacle_8_002, obstacle_6_001.00x), so an unrenamed
+			-- descendant could be driven twice.
+			if descendant.Name:sub(1, #name) ~= name then
+				undeclared += 1
+				descendant.Name = string.format("%s_x%d", name, undeclared)
+			end
 			descendant.Anchored = true
 			descendant.CanCollide = true
 			descendant.CanTouch = false
@@ -433,6 +475,52 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		panel:SetAttribute(A.ImpactVisual, true)
 		panel:SetAttribute(A.RetriggerCooldown, 0.8)
 		panel:SetAttribute(A.GuardSeconds, 1.0)
+	elseif spec.Preset == "Mace" then
+		-- Section 6: "top-link axle, rock Z amplitude 45 period 3.2; Shove owner
+		-- includes moving chain/ball". The rotor lives on the top link, which is both
+		-- the axle and the shove owner: RotorBump tests the rotor part AND every
+		-- follower beneath it, so the links and the ball all shove without needing
+		-- their own motion owners (which AttributeAudit would reject as competing).
+		root:SetAttribute(A.Rotor, "rock")
+		root:SetAttribute(A.RotorAxis, "Z")
+		root:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 45)
+		root:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 3.2)
+		root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
+		root:SetAttribute(A.Shove, true)
+		root:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 54)
+		root:SetAttribute(A.ShoveUpwardSpeed, 20)
+		root:SetAttribute(A.ShoveSeconds, 0.24)
+		root:SetAttribute(A.ShoveContact, "mesh")
+		root:SetAttribute(A.ImpactVisual, true)
+		root:SetAttribute(A.RetriggerCooldown, 0.8)
+		root:SetAttribute(A.GuardSeconds, 1.0)
+	elseif spec.Preset == "PaddleWheel" then
+		-- An attribute rotor turns about its own pivot, and CoursePresets clears every
+		-- imported display pivot, so the wheel would otherwise spin about the root
+		-- mesh's bounding centre -- 4.25 studs (at scale 1) off the axle its four
+		-- cradles actually orbit, which reads as a wobble rather than a wheel. 02-kits
+		-- ("attribute rotors turn around explicit mechanical pivots; an imported
+		-- display pivot is not necessarily an axle. Change pivots, never distort the
+		-- mesh") is exactly this case: the authored mechanical axle is set back as a
+		-- PivotOffset after scaling.
+		local axle = assert(manifest.Sockets.Axle, `[CoursePresets] {sourceId} has no measured Axle socket`)
+		root.PivotOffset = CFrame.new(axle.Position * spec.Scale)
+		local contactRadius = assert(
+			manifest.ContactRadius,
+			`[CoursePresets] {sourceId} has no measured ContactRadius for a PaddleWheel`
+		) * spec.Scale
+		root:SetAttribute(A.Rotor, "spin")
+		root:SetAttribute(A.RotorAxis, "X")
+		root:SetAttribute(A.RotorSpeed, spec.RotorSpeed or spinDegreesPerSecond(contactRadius))
+		root:SetAttribute(A.RotorPhaseDegrees, (spec.RotorPhase or 0) * 60)
+		root:SetAttribute(A.Shove, true)
+		root:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 48)
+		root:SetAttribute(A.ShoveUpwardSpeed, 20)
+		root:SetAttribute(A.ShoveSeconds, 0.24)
+		root:SetAttribute(A.ShoveContact, "mesh")
+		root:SetAttribute(A.ImpactVisual, true)
+		root:SetAttribute(A.RetriggerCooldown, 0.8)
+		root:SetAttribute(A.GuardSeconds, 1.0)
 	elseif spec.Preset == "Door" then
 		-- One slab of a door row. DoorRows.resolve requires DoorRow and DoorIndex
 		-- to be unique contiguous positive integers within the Doors folder.
@@ -440,9 +528,25 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		root:SetAttribute(A.DoorIndex, assert(spec.DoorIndex, `[CoursePresets] {spec.Id} needs DoorIndex`))
 	end
 
+	if spec.Preset == "Door" then
+		-- Doors are the one kit selected by IMMEDIATE children of its folder:
+		-- DoorRows.resolve walks Scriptables.Doors:GetChildren() for BaseParts, and
+		-- MapFeatureService collects the same way, so a slab left inside a holder
+		-- Model is invisible to both -- the row resolves as zero rows and every slab
+		-- stays permanently solid. The slab is therefore parented straight into the
+		-- Doors folder, exactly as a foam volume is, and the now-empty holder is
+		-- discarded.
+		assert(
+			manifest.SubParts == nil,
+			`[CoursePresets] {spec.Id}: a door slab must be a single part, not an assembly`
+		)
+		root.Parent = context.DoorsFolder
+		holder:Destroy()
+		return { Model = root :: any, PartCount = 1 }
+	end
+
 	holder.Parent = if spec.Preset == "JumpPad"
 		then context.JumpPadsFolder
-		elseif spec.Preset == "Door" then context.DoorsFolder
 		elseif spec.Preset == "Prop" then context.Geometry
 		else context.Assembly
 	return { Model = holder, PartCount = partCount(holder) }

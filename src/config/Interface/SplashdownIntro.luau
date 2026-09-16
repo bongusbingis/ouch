@@ -26,6 +26,17 @@ return {
 				{ Eye = { 90, 50, -40 }, Look = { 40, 5, -10 }, FieldOfView = 62 },
 			},
 		},
+		DoorDash = {
+			Description = "Five doors, three rows, and only two of each row give way. Pick a lane and dash!",
+			Shots = {
+				{ Eye = { -40, 300, 40 }, Look = { 0, 10, 0 }, FieldOfView = 74 },
+				-- Down the corridor's own axis and UNDER its roof: the door rows are the
+				-- shot, and an overhead angle would only show the roof that stops them
+				-- being climbed.
+				{ Eye = { -238, 27, 56 }, Look = { -150, 22, 56 }, FieldOfView = 62 },
+				{ Eye = { -10, 55, -105 }, Look = { -60, 18, -42 }, FieldOfView = 60 },
+			},
+		},
 		TiltTrip = {
 			Description = "Keep your balance on tilting decks and dodge the swinging obstacles. Next stop: the finish!",
 			Shots = {

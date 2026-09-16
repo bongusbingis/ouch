@@ -113,6 +113,23 @@ export type SpiralSpec = {
 	FinishRadius: number?,
 }
 
+-- HANDOFF 5.2's Chute: "One wide straight run, one hairpin, a second wide
+-- straight run ... The hairpin sits at roughly 55-60% of the route (between beats
+-- 03 and 04)." The guide is an ordinary three-segment polyline -- run, cross,
+-- run -- and these are the invariants that make it a chute rather than a
+-- serpentine: the second run doubles back on the first, the cross segment IS the
+-- lane pitch that separates them, and the turn lands in the declared window of
+-- the finished route. The window is checked at the hairpin's MIDDLE -- the point
+-- the route actually reverses -- because the cross segment is a lane pitch long
+-- and the entry and exit fractions straddle it; all three are reported.
+export type ChuteSpec = {
+	HairpinFractionMin: number,
+	HairpinFractionMax: number,
+	-- Both runs must be at least this multiple of the cross segment, which is what
+	-- keeps the shape two long straights joined by one short turn.
+	MinRunToPitchRatio: number,
+}
+
 export type LayoutSpec = {
 	Kind: string,
 	LanePitch: number,
@@ -124,6 +141,7 @@ export type LayoutSpec = {
 	-- Serpentine uses Guide; Spiral uses Spiral instead. Exactly one is required.
 	Guide: { Vector3 }?,
 	Spiral: SpiralSpec?,
+	Chute: ChuteSpec?,
 	-- Spiral only: how far a chained run may drift from the parametric guide
 	-- before the build fails. A straight slab chord always sits slightly outside
 	-- the arc it approximates; this is the measured budget for that, not licence
@@ -207,6 +225,11 @@ export type BuildReport = {
 	-- parametric guide, and the guide's own total arclength.
 	GuideDeviation: number,
 	GuideLength: number,
+	-- Chute only: the route fractions at which the route leaves the first run,
+	-- turns, and lands on the second. Zero for every other layout.
+	HairpinFraction: number,
+	HairpinMidFraction: number,
+	HairpinExitFraction: number,
 }
 
 local function forward(headingDegrees: number): Vector3
@@ -639,18 +662,56 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local layout = spec.Layout
 	local liquidY = layout.LiquidY
 	assert(
-		layout.Kind == "Serpentine" or layout.Kind == "Spiral",
+		layout.Kind == "Serpentine" or layout.Kind == "Spiral" or layout.Kind == "Chute",
 		`[CourseBuilder] unknown Layout.Kind "{layout.Kind}"`
 	)
 	local isSpiral = layout.Kind == "Spiral"
+	local isChute = layout.Kind == "Chute"
 	local curve: GuideCurve? = if isSpiral
 		then buildSpiralGuide(assert(layout.Spiral, "[CourseBuilder] a Spiral layout needs Layout.Spiral"))
 		else nil
 	local segments = if isSpiral
 		then {} :: { Segment }
-		else buildSegments(assert(layout.Guide, "[CourseBuilder] a Serpentine layout needs Layout.Guide"))
+		else buildSegments(assert(layout.Guide, `[CourseBuilder] a {layout.Kind} layout needs Layout.Guide`))
 	local guideTolerance = layout.GuideTolerance or 12
 	local routeErrors: { string } = {}
+	local chute = if isChute then assert(layout.Chute, "[CourseBuilder] a Chute layout needs Layout.Chute") else nil
+	if chute then
+		assert(
+			#segments == 3,
+			`[CourseBuilder] a Chute guide is run/cross/run: 3 segments, not {#segments} (HANDOFF 5.2)`
+		)
+		local doubleBack = normalizeDegrees(segments[3].Heading - segments[1].Heading)
+		assert(
+			math.abs(doubleBack - 180) < 1e-3,
+			string.format(
+				"[CourseBuilder] a Chute's second run must double back on the first: runs head %.1f and %.1f",
+				segments[1].Heading,
+				segments[3].Heading
+			)
+		)
+		assert(
+			math.abs(segments[2].Length - layout.LanePitch) < 1e-3,
+			string.format(
+				"[CourseBuilder] the Chute's cross segment is %.2f studs but LanePitch is %.2f; the pitch IS the separation between the two runs",
+				segments[2].Length,
+				layout.LanePitch
+			)
+		)
+		local ratio = chute.MinRunToPitchRatio
+		assert(
+			segments[1].Length >= layout.LanePitch * ratio and segments[3].Length >= layout.LanePitch * ratio,
+			string.format(
+				"[CourseBuilder] a Chute's runs must each be at least %.1f x its %.1f-stud pitch; they are %.2f and %.2f",
+				ratio,
+				layout.LanePitch,
+				segments[1].Length,
+				segments[3].Length
+			)
+		)
+	end
+	local hairpinEnterLength = 0
+	local hairpinExitLength = 0
 
 	local model = Instance.new("Model")
 	model.Name = spec.Id
@@ -946,6 +1007,11 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 						advanceTravel(beat.Id, fillSpec.Id, filled.ArcLength)
 					end
 				end
+				-- The last point of the first run: the route has been filled up to the
+				-- corner slab's entry and has not yet turned.
+				if chute and segmentIndex == 1 then
+					hairpinEnterLength = routeLength
+				end
 				local cornerSpec = {
 					Id = piece.Id,
 					Preset = "Corner",
@@ -977,6 +1043,11 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 				end
 				cursor = result.ExitCursor
 				advanceTravel(beat.Id, piece.Id, lateral)
+				-- The first point of the second run, once the hairpin's second turn is
+				-- complete.
+				if chute and segmentIndex == 3 then
+					hairpinExitLength = routeLength
+				end
 				record(beat.Id, piece.Id, piece.Kind, along + lateral)
 				indexPiece(piece.Id, result.Model)
 			elseif piece.Kind == "Mount" then
@@ -1054,6 +1125,30 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local checkpointCount = #checkpointsFolder:GetChildren()
 	model:SetAttribute("CheckpointCount", checkpointCount)
 
+	local hairpinFraction = if chute and routeLength > 0 then hairpinEnterLength / routeLength else 0
+	local hairpinExitFraction = if chute and routeLength > 0 then hairpinExitLength / routeLength else 0
+	-- "The hairpin sits at roughly 55-60% of the route" is measured at the turn
+	-- itself -- the middle of the cross run, where the route actually reverses --
+	-- because the hairpin is a lane pitch long and its entry and exit fractions
+	-- straddle that point by design.
+	local hairpinMidFraction = (hairpinFraction + hairpinExitFraction) / 2
+	if chute then
+		if hairpinEnterLength <= 0 or hairpinExitLength <= 0 then
+			fail("a Chute needs both hairpin corners on its route; the guide was never turned twice")
+		elseif hairpinMidFraction < chute.HairpinFractionMin or hairpinMidFraction > chute.HairpinFractionMax then
+			fail(
+				string.format(
+					"the hairpin turns at %.1f%% of the route (entering at %.1f%%, rejoining at %.1f%%), outside the declared %.1f-%.1f%% window (HANDOFF 5.2)",
+					hairpinMidFraction * 100,
+					hairpinFraction * 100,
+					hairpinExitFraction * 100,
+					chute.HairpinFractionMin * 100,
+					chute.HairpinFractionMax * 100
+				)
+			)
+		end
+	end
+
 	if routeLength < 800 or routeLength > 1000 then
 		fail(
 			string.format(
@@ -1087,6 +1182,9 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		CheckpointCount = checkpointCount,
 		GuideDeviation = maxGuideDeviation,
 		GuideLength = if curve then (curve :: GuideCurve).Length else 0,
+		HairpinFraction = hairpinFraction,
+		HairpinMidFraction = hairpinMidFraction,
+		HairpinExitFraction = hairpinExitFraction,
 	}
 	return model, report
 end

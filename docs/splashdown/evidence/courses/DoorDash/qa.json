@@ -1,0 +1,432 @@
+{
+ "testTime": "2026-09-16T10:28:16Z",
+ "crossCourseSpecs": [
+  "BallBarrage",
+  "WhirlpoolWaltz",
+  "DoorDash"
+ ],
+ "buildSummary": {
+  "routeLength": 882.066502380371,
+  "attributeErrors": [],
+  "partCount": 221,
+  "routeErrors": [],
+  "boundsViolations": [],
+  "guideLength": 0,
+  "guideDeviation": 0,
+  "checkpointCount": 5
+ },
+ "errors": [],
+ "courseId": "DoorDash",
+ "placeId": 121997450145716,
+ "sourceHash": "",
+ "status": "BLOCKED",
+ "counts": {
+  "SurfaceCells": 38241,
+  "Checkpoints": 5,
+  "BaseParts": 221,
+  "StartPads": 30,
+  "CrossCourseSpecs": 3,
+  "BoundaryWalls": 24,
+  "Encounters": 19,
+  "GraphEdges": 1272671,
+  "Beats": 6,
+  "GraphNodes": 28121
+ },
+ "sampleResolution": {
+  "Coarse": 1,
+  "Refined": 0.25
+ },
+ "method": "CourseQA.check against a real Workspace clone built from the declarative spec in a Studio Play session, by run-course-qa.server.luau",
+ "calibration": {
+  "MaxStepStuds": 11.5,
+  "JumpHeight": 10,
+  "RootOffsetStuds": 3.5,
+  "Gravity": 120,
+  "SlopeLimitDegrees": 45,
+  "MaxGapStuds": 22,
+  "RefineStep": 0.25,
+  "WalkSpeed": 26,
+  "SampleStep": 1
+ },
+ "warnings": [],
+ "specHash": "8c00a748",
+ "encounters": [
+  {
+   "Id": "DoorRow01",
+   "Type": "Door",
+   "Family": "Crowd",
+   "Beat": "01_DoorDrama"
+  },
+  {
+   "Id": "DoorRow02",
+   "Type": "Door",
+   "Family": "Crowd",
+   "Beat": "01_DoorDrama"
+  },
+  {
+   "Id": "DoorRow03",
+   "Type": "Door",
+   "Family": "Crowd",
+   "Beat": "01_DoorDrama"
+  },
+  {
+   "Id": "Cross01",
+   "Type": "RotorBump",
+   "Family": "ClimbDescend",
+   "Beat": "02_SlideSwipe"
+  },
+  {
+   "Id": "Bumper01",
+   "Type": "Bumper",
+   "Family": "ClimbDescend",
+   "Beat": "02_SlideSwipe"
+  },
+  {
+   "Id": "Belt01",
+   "Type": "Conveyor",
+   "Family": "Ride",
+   "Beat": "03_BeltBrawl"
+  },
+  {
+   "Id": "Belt02",
+   "Type": "Conveyor",
+   "Family": "Ride",
+   "Beat": "03_BeltBrawl"
+  },
+  {
+   "Id": "PaddleWheel01",
+   "Type": "RotorBump",
+   "Family": "Ride",
+   "Beat": "03_BeltBrawl"
+  },
+  {
+   "Id": "Belt03",
+   "Type": "Conveyor",
+   "Family": "Ride",
+   "Beat": "03_BeltBrawl"
+  },
+  {
+   "Id": "Foam01",
+   "Type": "FoamPit",
+   "Family": "Launch",
+   "Beat": "04_PadParade"
+  },
+  {
+   "Id": "Pad01",
+   "Type": "JumpPad",
+   "Family": "Launch",
+   "Beat": "04_PadParade"
+  },
+  {
+   "Id": "Pad02",
+   "Type": "JumpPad",
+   "Family": "Launch",
+   "Beat": "04_PadParade"
+  },
+  {
+   "Id": "Pad03",
+   "Type": "JumpPad",
+   "Family": "Launch",
+   "Beat": "04_PadParade"
+  },
+  {
+   "Id": "Bumper03",
+   "Type": "Bumper",
+   "Family": "Launch",
+   "Beat": "04_PadParade"
+  },
+  {
+   "Id": "Mace01",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "05_MaceMarch"
+  },
+  {
+   "Id": "Bumper02",
+   "Type": "Bumper",
+   "Family": "Timing",
+   "Beat": "05_MaceMarch"
+  },
+  {
+   "Id": "Mace02",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "05_MaceMarch"
+  },
+  {
+   "Id": "HammerLarge",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "05_MaceMarch"
+  },
+  {
+   "Id": "TwoArm01",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "06_CrossFinish"
+  }
+ ],
+ "findings": [
+  {
+   "Check": "StartPads==30",
+   "Status": "PASS",
+   "Detail": "30 immediate Start/Pads BaseParts"
+  },
+  {
+   "Check": "Checkpoints>=1",
+   "Status": "PASS",
+   "Detail": "5 ordered checkpoints"
+  },
+  {
+   "Check": "CheckpointCountAttributeExact",
+   "Status": "PASS",
+   "Detail": "attribute 5 vs 5 actual"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint01",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint02",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint03",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint04",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint05",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "ExactlyOneFinish",
+   "Status": "PASS",
+   "Detail": "1 triggers, 1 decks"
+  },
+  {
+   "Check": "Boundary24At390",
+   "Status": "PASS",
+   "Detail": "24 anchored colliding invisible walls, worst radius error 0.00"
+  },
+  {
+   "Check": "OrderedRouteFromEverySpawn",
+   "Status": "PASS",
+   "Detail": "30 spawn cells, 6 ordered waypoints, 0 failing legs"
+  },
+  {
+   "Check": "GateCutSet:01_DoorDrama",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:02_SlideSwipe",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:03_BeltBrawl",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:04_PadParade",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:05_MaceMarch",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:06_CrossFinish",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "Gap:04_PadParade/Gap01",
+   "Status": "NOT RUN",
+   "Detail": "14.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "Gap:04_PadParade/Gap02",
+   "Status": "NOT RUN",
+   "Detail": "14.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "Gap:04_PadParade/Gap03",
+   "Status": "NOT RUN",
+   "Detail": "14.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "CrossPieceBoundingOverlap",
+   "Status": "NOT RUN",
+   "Detail": "138 oriented-box overlaps between different PieceIds (e.g. sd_DoorDash_00_startplaza_1 vs sd_DoorDash_01_platform_1); a box test cannot decide mesh penetration (8.3), so the seams need the visual inspection pass"
+  },
+  {
+   "Check": "NoBreatherSquare",
+   "Status": "PASS",
+   "Detail": "largest flat hazard-free square on the route is 16 x 16 studs (limit 24)"
+  },
+  {
+   "Check": "EncounterTypes>=6",
+   "Status": "PASS",
+   "Detail": "6 distinct encounter types"
+  },
+  {
+   "Check": "Families>=4",
+   "Status": "PASS",
+   "Detail": "5 distinct families"
+  },
+  {
+   "Check": "DominantType<=40%",
+   "Status": "PASS",
+   "Detail": "RotorBump is 6 of 19 (31.6%)"
+  },
+  {
+   "Check": "SameTypeRun<=3",
+   "Status": "PASS",
+   "Detail": "longest same-type run is 3"
+  },
+  {
+   "Check": "HeadlineNotAnotherClimax:BallBarrage",
+   "Status": "PASS",
+   "Detail": "headline BigBall; clashes: "
+  },
+  {
+   "Check": "HeadlineDominantOutside<=1:BallBarrage",
+   "Status": "PASS",
+   "Detail": "headline BigBall dominates 0 beats outside BallBarrage"
+  },
+  {
+   "Check": "HeadlineNotAnotherClimax:DoorDash",
+   "Status": "PASS",
+   "Detail": "headline Door; clashes: "
+  },
+  {
+   "Check": "HeadlineDominantOutside<=1:DoorDash",
+   "Status": "PASS",
+   "Detail": "headline Door dominates 1 beats outside DoorDash"
+  },
+  {
+   "Check": "HeadlineNotAnotherClimax:WhirlpoolWaltz",
+   "Status": "PASS",
+   "Detail": "headline RotatingPlatforms; clashes: "
+  },
+  {
+   "Check": "HeadlineDominantOutside<=1:WhirlpoolWaltz",
+   "Status": "PASS",
+   "Detail": "headline RotatingPlatforms dominates 0 beats outside WhirlpoolWaltz"
+  },
+  {
+   "Check": "NonGlueCap<=3:BigBall",
+   "Status": "PASS",
+   "Detail": "used by 1 courses: BallBarrage"
+  },
+  {
+   "Check": "NonGlueCap<=3:Conveyor",
+   "Status": "PASS",
+   "Detail": "used by 2 courses: BallBarrage, DoorDash"
+  },
+  {
+   "Check": "NonGlueCap<=3:Door",
+   "Status": "PASS",
+   "Detail": "used by 2 courses: DoorDash, WhirlpoolWaltz"
+  },
+  {
+   "Check": "NonGlueCap<=3:Fan",
+   "Status": "PASS",
+   "Detail": "used by 1 courses: BallBarrage"
+  },
+  {
+   "Check": "NonGlueCap<=3:PaddleWheel",
+   "Status": "PASS",
+   "Detail": "used by 1 courses: DoorDash"
+  },
+  {
+   "Check": "NonGlueCap<=3:Piston",
+   "Status": "PASS",
+   "Detail": "used by 1 courses: BallBarrage"
+  },
+  {
+   "Check": "NonGlueCap<=3:RidePlatform",
+   "Status": "PASS",
+   "Detail": "used by 1 courses: WhirlpoolWaltz"
+  },
+  {
+   "Check": "NonGlueCap<=3:Sweeper",
+   "Status": "PASS",
+   "Detail": "used by 1 courses: BallBarrage"
+  },
+  {
+   "Check": "NoSharedBeatRecipe",
+   "Status": "PASS",
+   "Detail": "no beat recipe repeats across courses"
+  },
+  {
+   "Check": "8.2.6 time-expanded dynamic-state graph (periodic sampling every .1s across one common cycle)",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 lane cross-section hazard coverage and blocked-fraction >= .4 per pendulum/hammer crossing",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 measured shove travel from five real-player contacts per hazard and direction",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 bumper chicane centreline/edge/slalom avoidance probes",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 cross-course auditVariety over all six staged specs",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.5 scripted expert/mid policy route trials and the interactive keyboard run",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.5 thirty-rider start load test and the Studio local multi-client session",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.6 fixed-camera captures and the bad-map-refs comparison",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  }
+ ],
+ "notRun": [
+  "8.2.6 time-expanded dynamic-state graph (periodic sampling every .1s across one common cycle)",
+  "8.4 lane cross-section hazard coverage and blocked-fraction >= .4 per pendulum/hammer crossing",
+  "8.4 measured shove travel from five real-player contacts per hazard and direction",
+  "8.4 bumper chicane centreline/edge/slalom avoidance probes",
+  "8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
+  "8.4 cross-course auditVariety over all six staged specs",
+  "8.5 scripted expert/mid policy route trials and the interactive keyboard run",
+  "8.5 thirty-rider start load test and the Studio local multi-client session",
+  "8.6 fixed-camera captures and the bad-map-refs comparison"
+ ]
+}

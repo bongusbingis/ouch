@@ -1,0 +1,53 @@
+{
+ "note": "Fixed-camera captures for HANDOFF 8.6. The prescribed offsets are relative to the course's own origin: top-down eye (0,520,1) looking at (0,20,0); three-quarter eye (300,260,300) looking at (0,20,0), both at 70 degrees. The preview was lifted 9,000 studs above MapOrigin for the shots, because the arena's own hazard ring and PvP floor sit at MapOrigin and filled the frame; the camera offsets are unchanged, so the framing is the prescribed one with an empty background. The three-quarter shot is taken at 620 studs along the same (300,260,300) direction so the whole 482-stud route fits.",
+ "placeId": 121997450145716,
+ "courseId": "DoorDash",
+ "specHash": "8c00a748",
+ "fieldOfView": 70,
+ "previewOrigin": [
+  -537.7670288085938,
+  9460.77734375,
+  -54.31404495239258
+ ],
+ "cameras": {
+  "top-down": {
+   "eye": [
+    -537.767,
+    9980.777,
+    -53.314
+   ],
+   "lookAt": [
+    -537.767,
+    9480.777,
+    -54.314
+   ],
+   "file": "courses/DoorDash/top-down.png"
+  },
+  "three-quarter": {
+   "eye": [
+    -163.97,
+    9797.84,
+    346.1
+   ],
+   "lookAt": [
+    -537.77,
+    9473.88,
+    -27.69
+   ],
+   "file": "courses/DoorDash/three-quarter.png"
+  }
+ },
+ "restoredAfterwards": {
+  "workspace.Assets.Arena.Map.Model": [
+   -537.766602,
+   519.175659,
+   -54.3143196
+  ],
+  "workspace.battle_stadium": [
+   -24.34833526611328,
+   0,
+   -9.39068603515625
+  ],
+  "workspace.LegacyCourses": "seven models restored to their recorded Y 0 pivots (ServerStorage.LegacyCourseParkRecord)"
+ }
+}

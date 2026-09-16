@@ -45,6 +45,7 @@ return {
 	CourseOrder = {
 		"BallBarrage",
 		"WhirlpoolWaltz",
+		"DoorDash",
 	},
 	Courses = {
 		BallBarrage = {
@@ -60,6 +61,17 @@ return {
 			ParSeconds = 75,
 			CapSeconds = 180,
 			CloseWindowSeconds = 60,
+		},
+		DoorDash = {
+			DisplayName = "DOOR DASH",
+			Difficulty = 3,
+			ParSeconds = 75,
+			CapSeconds = 180,
+			CloseWindowSeconds = 60,
+			-- HANDOFF section 6: "Three Door Dash rows use PerRow 5/BreakablePerRow 2
+			-- for the whole course." SplashdownCourses.resolve asserts every resolved
+			-- row holds exactly PerRow slabs once this block exists.
+			Doors = { PerRow = 5, BreakablePerRow = 2 },
 		},
 		WhirlPool = {
 			DisplayName = "WHIRL POOL",

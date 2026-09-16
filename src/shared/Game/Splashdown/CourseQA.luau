@@ -544,6 +544,8 @@ local ENCOUNTER_TYPES: { [string]: string } = {
 	-- which is why every single-mesh spinner and the swing panel land here.
 	Spinner = "RotorBump",
 	SwingPanel = "RotorBump",
+	Mace = "RotorBump",
+	PaddleWheel = "RotorBump",
 	RidePlatform = "RotatingPlatforms",
 	Door = "Door",
 	FoamPit = "FoamPit",
@@ -567,6 +569,11 @@ local NON_GLUE_PRESETS: { [string]: boolean } = {
 	BeachBall = true,
 	RidePlatform = true,
 	BigBall = true,
+	-- A mace is a pendulum and stays glue; a paddle wheel is a distinct rolling
+	-- drum rather than a swinging bar, so it is capped with the sweepers/log-rolls
+	-- section 7's override 2 names. Section 7's own tables use it twice (Door Dash
+	-- 03, Tumble Tunnels 06), inside the three-course cap either way.
+	PaddleWheel = true,
 }
 
 function CourseQA.auditVariety(spec: any): ({ Finding }, { string }, { string }, {

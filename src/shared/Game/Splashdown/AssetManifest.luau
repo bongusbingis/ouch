@@ -7,7 +7,7 @@
 
 local AssetManifest = {}
 
-AssetManifest.Version = 2
+AssetManifest.Version = 3
 AssetManifest.SourceHash = "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec"
 AssetManifest.SourcePath = { "ServerStorage", "SplashdownAuthoringSources", "Kit" }
 
@@ -546,6 +546,138 @@ AssetManifest.Assets = (
 				Hits = 5766,
 				Misses = 84,
 				EvidencePath = "docs/splashdown/evidence/course-sockets-whirlpoolwaltz.json",
+			},
+		} :: AssetEntry,
+
+		-- Door Dash sources. Poses come from the live Kit hierarchy dump recorded in
+		-- docs/splashdown/evidence/course-sockets-doordash.json, which agrees with
+		-- evidence/inventory.json to the fourth decimal; RelativeCFrame is measured
+		-- against each root part's own frame, exactly as the Whirlpool Waltz mounts
+		-- were.
+		obstacle_5_001 = {
+			Role = "MaceTopLink",
+			Kind = "Mount",
+			Size = Vector3.new(1.7010, 3.8185, 2.4847),
+			Sockets = {
+				-- A mace hangs: HANDOFF 8.3 is explicit that "suspended mace links are
+				-- supported by their chain and axle, not required to touch a floor", so
+				-- the Support socket IS the axle at the top link's centre and the mount
+				-- offset places the axle above the lane rather than a pole on it.
+				Support = socket(0, 0, 0, 0, -1, 0),
+				Axle = socket(0, 0, 0, 0, 0, 1),
+			},
+			-- The nine links and the ball are nested one inside the next in the source,
+			-- so cloning the first brings the whole chain; every path below is still
+			-- declared so each link is renamed, attributed and measured rather than
+			-- surviving as an original source name (HANDOFF 3.3).
+			SubParts = {
+				{
+					Name = "obstacle_5_002",
+					RelativeCFrame = CFrame.new(0.0195, -2.0121, 0.0001),
+					Size = Vector3.new(2.1468, 3.1170, 0.6931),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003",
+					RelativeCFrame = CFrame.new(0.0195, -3.6956, 0.0001),
+					Size = Vector3.new(0.6930, 3.1170, 2.1467),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004",
+					RelativeCFrame = CFrame.new(0.0195, -5.3569, 0.0001),
+					Size = Vector3.new(2.1468, 3.1170, 0.6931),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005",
+					RelativeCFrame = CFrame.new(0.0195, -7.0404, 0.0001),
+					Size = Vector3.new(0.6930, 3.1170, 2.1467),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005.obstacle_5_006",
+					RelativeCFrame = CFrame.new(0.0195, -8.7018, 0.0001),
+					Size = Vector3.new(2.1468, 3.1170, 0.6931),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005.obstacle_5_006.obstacle_5_007",
+					RelativeCFrame = CFrame.new(0.0195, -10.3853, 0.0001),
+					Size = Vector3.new(0.6930, 3.1170, 2.1467),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005.obstacle_5_006.obstacle_5_007.obstacle_5_008",
+					RelativeCFrame = CFrame.new(0.0195, -12.0466, 0.0001),
+					Size = Vector3.new(2.1468, 3.1170, 0.6931),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005.obstacle_5_006.obstacle_5_007.obstacle_5_008.obstacle_5_009",
+					RelativeCFrame = CFrame.new(0.0195, -13.7301, 0.0001),
+					Size = Vector3.new(0.6930, 3.1170, 2.1467),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005.obstacle_5_006.obstacle_5_007.obstacle_5_008.obstacle_5_009.obstacle_5_010",
+					RelativeCFrame = CFrame.new(0.0195, -15.3915, 0.0001),
+					Size = Vector3.new(2.1468, 3.1170, 0.6931),
+				},
+				{
+					Name = "obstacle_5_002.obstacle_5_003.obstacle_5_004.obstacle_5_005.obstacle_5_006.obstacle_5_007.obstacle_5_008.obstacle_5_009.obstacle_5_010.obstacle_5_011",
+					RelativeCFrame = CFrame.new(0.0000, -20.7559, 0.0000),
+					Size = Vector3.new(9.9658, 10.2346, 11.5074),
+				},
+			},
+			-- The ball centre hangs 20.7559 below the axle at scale 1; that is the
+			-- swing radius the course doc quotes, not a spin contact radius, because a
+			-- mace is a rock profile and takes its speed from section 6's fixed
+			-- amplitude/period rather than the spin formula.
+			ContactRadius = 20.7559,
+		} :: AssetEntry,
+		obstacle_24_001 = {
+			Role = "PaddleWheel",
+			Kind = "Mount",
+			Size = Vector3.new(59.8161, 43.8710, 43.8710),
+			Sockets = {
+				-- The four cradles orbit a point 4.2481 BELOW the root mesh's own
+				-- centre (measured: the four relative Y/Z poses are symmetric about
+				-- (-4.2481, 0.0665) at a common 15.4862 radius), so the wheel's real
+				-- axle is not its display pivot. Support is the lowest point the
+				-- cradles sweep through -- axle minus the orbit radius minus the
+				-- cradle's own half height -- so mounting at a deck puts the blades
+				-- exactly at deck level and a positive OffsetUp lifts them clear.
+				Support = socket(0, -26.1015, 0.0665, 0, -1, 0),
+				Axle = socket(0, -4.2481, 0.0665, 1, 0, 0),
+			},
+			SubParts = {
+				{
+					Name = "obstacle_24_002",
+					RelativeCFrame = CFrame.new(0.0000, 11.2381, 0.0665),
+					Size = Vector3.new(33.2637, 12.7341, 11.2431),
+				},
+				{
+					Name = "obstacle_24_003",
+					RelativeCFrame = CFrame.new(0.0000, -4.2481, 15.5527),
+					Size = Vector3.new(33.2637, 12.7341, 11.2431),
+				},
+				{
+					Name = "obstacle_24_004",
+					RelativeCFrame = CFrame.new(0.0000, -4.2481, -15.4198),
+					Size = Vector3.new(33.2637, 12.7341, 11.2431),
+				},
+				{
+					Name = "obstacle_24_005",
+					RelativeCFrame = CFrame.new(0.0000, -19.7344, 0.0665),
+					Size = Vector3.new(33.2637, 12.7341, 11.2431),
+				},
+			},
+			ContactRadius = 15.4862,
+		} :: AssetEntry,
+		trampoline_4_001 = {
+			Role = "JumpPadOuterRibbed",
+			Kind = "Mount",
+			Size = Vector3.new(14.8598, 12.7562, 14.8595),
+			Sockets = { Support = socket(0, -6.3781, 0, 0, -1, 0) },
+			SubParts = {
+				{
+					Name = "trampoline_4_002",
+					RelativeCFrame = CFrame.new(0.0000, 6.2757, 0.0000),
+					Size = Vector3.new(9.0125, 1.2804, 9.0123),
+				},
 			},
 		} :: AssetEntry,
 

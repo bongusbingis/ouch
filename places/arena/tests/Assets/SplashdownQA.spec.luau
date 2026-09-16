@@ -9,6 +9,8 @@ local Workspace = game:GetService("Workspace")
 local Splashdown = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Splashdown")
 local CourseBuilder = require(Splashdown:WaitForChild("CourseBuilder"))
 local CourseQA = require(Splashdown:WaitForChild("CourseQA"))
+local SplashdownConfig = require(ReplicatedStorage:WaitForChild("Config").Gameplay.Splashdown)
+local DoorRows = require(game:GetService("ServerScriptService").Server.Modules.Splashdown.DoorRows)
 
 local function selectedIds(): { string }
 	local selection = ServerStorage:FindFirstChild("SplashdownQASelection")
@@ -130,6 +132,94 @@ return function()
 			it("never reports an overall PASS while live-playtest checks are outstanding", function()
 				expect(#qa.NotRun > 0).to.equal(true)
 				expect(qa.Status).never.to.equal("PASS")
+			end)
+
+			-- Regression for two CoursePresets defects the Door Dash build exposed.
+			it("leaves no original source name on any part", function()
+				local leaked = {}
+				for _, instance in model:GetDescendants() do
+					if instance:IsA("BasePart") then
+						local name = instance.Name
+						for _, prefix in
+							{
+								"obstacle_",
+								"platform_",
+								"door_",
+								"trampoline_",
+								"box_",
+								"slide_",
+								"arch_",
+								"propeller_",
+								"water_platform_",
+								"octagon_",
+								"ball_",
+							}
+						do
+							if string.sub(name, 1, #prefix) == prefix then
+								table.insert(leaked, instance:GetFullName())
+							end
+						end
+					end
+				end
+				if #leaked > 0 then
+					error(`{#leaked} parts kept a source name, e.g. {leaked[1]}`, 0)
+				end
+				expect(#leaked).to.equal(0)
+			end)
+
+			it("clones each declared sub-part once instead of doubling a nested assembly", function()
+				-- A duplicated sub-part lands exactly on top of the original, so two
+				-- parts of one piece sharing a position is the signature to catch.
+				local seen: { [string]: string } = {}
+				local doubled = {}
+				for _, instance in model:GetDescendants() do
+					if instance:IsA("BasePart") and instance:GetAttribute("PieceId") then
+						local key = string.format(
+							"%s|%d|%d|%d",
+							tostring(instance:GetAttribute("PieceId")),
+							math.round(instance.Position.X * 100),
+							math.round(instance.Position.Y * 100),
+							math.round(instance.Position.Z * 100)
+						)
+						if seen[key] then
+							table.insert(doubled, `{instance.Name} over {seen[key]}`)
+						end
+						seen[key] = instance.Name
+					end
+				end
+				if #doubled > 0 then
+					error(`{#doubled} coincident sub-parts, e.g. {doubled[1]}`, 0)
+				end
+				expect(#doubled).to.equal(0)
+			end)
+
+			it("puts door slabs where the door kit can actually see them", function()
+				-- DoorRows.resolve and MapFeatureService both walk the folder's
+				-- IMMEDIATE BasePart children: a slab inside a holder Model resolves as
+				-- no rows at all, and every door would stay permanently solid.
+				local doors = model:FindFirstChild("Scriptables") and model.Scriptables:FindFirstChild("Doors")
+				local slabs = 0
+				local nested = 0
+				for _, child in (doors and doors:GetChildren() or {}) do
+					if child:IsA("BasePart") then
+						slabs += 1
+						expect(typeof(child:GetAttribute("DoorRow"))).to.equal("number")
+						expect(typeof(child:GetAttribute("DoorIndex"))).to.equal("number")
+					else
+						nested += 1
+					end
+				end
+				expect(nested).to.equal(0)
+				local rows = DoorRows.resolve(doors)
+				local configured = SplashdownConfig.Courses[courseId] and SplashdownConfig.Courses[courseId].Doors
+				if configured then
+					expect(#rows > 0).to.equal(true)
+					for _, row in rows do
+						expect(#row).to.equal(configured.PerRow)
+					end
+				else
+					expect(#rows).to.equal(if slabs > 0 then #rows else 0)
+				end
 			end)
 		end)
 	end

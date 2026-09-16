@@ -20,7 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
-local COURSE_ID = "WhirlpoolWaltz"
+local COURSE_ID = "DoorDash"
 -- Set true to stop after the deterministic double build and its published
 -- build.json. A build that fails its route, bounds or attribute checks is worth
 -- knowing in ten seconds rather than after eight scripted trials.
@@ -46,11 +46,19 @@ local CONTACT_BOX = Vector3.new(4, 7, 4)
 -- what the first two executions of this probe actually measured. The isolated
 -- clone is therefore lifted clear of everything before anyone runs on it.
 local ISOLATION_OFFSET = Vector3.new(0, 20000, 0)
--- Splashdown.Courses.<Id>.Doors.BreakablePerRow for the course under test. It is
--- read from the spec's own course config at the section 12 swap; until then the
--- harness carries it, because the isolated clone has no mode running to set a
--- door plan for it.
-local BREAKABLE_PER_ROW = 1
+-- Splashdown.Courses.<Id>.Doors.BreakablePerRow for the course under test. The
+-- isolated clone has no mode running to set a door plan, so the harness carries
+-- the quota -- but it READS it from the same course config production does
+-- instead of carrying a hand-set number. It was hand-set to 1 while Whirlpool
+-- Waltz (3/1) was the only course with doors, and would have measured Door Dash
+-- (5/2) against a quota the real round never uses.
+local BREAKABLE_PER_ROW = (function(): number
+	local config =
+		require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Splashdown")) :: any
+	local course = config.Courses[COURSE_ID]
+	local doors = course and course.Doors
+	return if doors and doors.BreakablePerRow then doors.BreakablePerRow else 1
+end)()
 -- MapFeatures.Door.ContactPadding / VerticalPadding: the same reach the real
 -- Doors kit uses to decide an approaching root has broken a breakable slab.
 local DOOR_CONTACT_PADDING = 3
@@ -358,6 +366,21 @@ local function runTrial(
 	local doorPlan: { [BasePart]: boolean } = {}
 	local doorAttempts: { [number]: number } = {}
 	local doorEvents = {}
+	-- A row this runner has already opened is behind it. Without this the target
+	-- stays locked on the slab it just broke -- the row is still within the 36-stud
+	-- approach radius -- so the runner walks back into the doorway, makes no
+	-- forward progress, and the stall logic then sends it sideways along a row it
+	-- has already passed. Measured on Door Dash's three rows before the fix: every
+	-- trial parked at row 1.
+	-- The slab the runner actually opened, and whether it has walked through it
+	-- yet. Aiming at the NEXT row the moment a slab gives sends the runner
+	-- diagonally into the solid slabs beside its own hole; a player walks through
+	-- the hole it just made first.
+	local openedSlab: { [number]: BasePart } = {}
+	-- Which side of the slab the runner was on when it gave way, in the slab's own
+	-- local Z. The row is not behind the runner until that sign flips.
+	local openedSide: { [number]: number } = {}
+	local rowCleared: { [number]: boolean } = {}
 	local planRandom = Random.new(seed)
 	for rowIndex, slabs in doorRows do
 		local pool = {}
@@ -423,6 +446,8 @@ local function runTrial(
 				then
 					slab.CanCollide = false
 					slab.CanQuery = false
+					openedSlab[rowIndex] = slab
+					openedSide[rowIndex] = if offset.Z >= 0 then 1 else -1
 					table.insert(doorEvents, {
 						row = rowIndex,
 						door = slab.Name,
@@ -439,8 +464,22 @@ local function runTrial(
 	-- advance knowledge, which is what makes a wrong first guess cost time.
 	local function doorTarget(position: Vector3): Vector3?
 		for rowIndex, slabs in doorRows do
-			if #slabs == 0 then
+			if #slabs == 0 or rowCleared[rowIndex] then
 				continue
+			end
+			local opened = openedSlab[rowIndex]
+			if opened then
+				local side = openedSide[rowIndex] or 1
+				if opened.CFrame:PointToObjectSpace(position).Z * side < 0 then
+					-- Out the other side: this row is behind the runner now. Releasing
+					-- it on proximity alone released it while the runner was still in
+					-- front of the slab, and it then walked diagonally into the solid
+					-- slab beside its own opening.
+					rowCleared[rowIndex] = true
+					continue
+				end
+				-- Aim THROUGH the hole, eight studs past it, not at the slab itself.
+				return opened.CFrame:PointToWorldSpace(Vector3.new(0, 0, -8 * side))
 			end
 			local centre = slabs[math.ceil(#slabs / 2)]
 			if (position - centre.Position).Magnitude > 36 then
@@ -462,7 +501,7 @@ local function runTrial(
 
 	local function nextDoorAttempt(position: Vector3)
 		for rowIndex, slabs in doorRows do
-			if #slabs == 0 then
+			if #slabs == 0 or rowCleared[rowIndex] or openedSlab[rowIndex] then
 				continue
 			end
 			local centre = slabs[math.ceil(#slabs / 2)]
@@ -491,6 +530,7 @@ local function runTrial(
 	local trajectory, falls, splits = {}, {}, {}
 	local liquidY = liquidTop(model)
 	local lastProgress = started
+	local lastDoorNudge = started
 	local lastTrajectoryAt = -1
 	local lastDistance = math.huge
 	local index = 1
@@ -503,9 +543,26 @@ local function runTrial(
 	started = os.clock()
 	lastProgress = started
 
+	local doorAim: Vector3? = nil
+	local lastAim: Vector3? = nil
 	while index <= #waypoints do
 		local waypoint = waypoints[index]
-		humanoid:MoveTo(doorTarget(root.Position) or waypoint.Position)
+		doorAim = doorTarget(root.Position)
+		local aim = doorAim or waypoint.Position
+		-- Progress is measured against whatever the runner is actually walking at.
+		-- A door row is worked sideways, so the distance to the NEXT WAYPOINT does
+		-- not fall while the runner tries slabs, and a stuck detector keyed on the
+		-- waypoint alone recorded a FAIL in the middle of the runner doing exactly
+		-- the right thing: measured on Door Dash, an expert trial broke row 1 at
+		-- 5.66 s and row 2 at 9.22 s and was then failed at 19.2 s for "no progress".
+		if lastAim == nil or (aim - lastAim).Magnitude > 1 then
+			-- Only the distance baseline resets. Rewinding lastProgress here let a
+			-- runner sitting on the 36-stud door-approach boundary flicker between
+			-- two aims and never record a stuck FAIL at all.
+			lastAim = aim
+			lastDistance = math.huge
+		end
+		humanoid:MoveTo(aim)
 		-- The policy interval is how often the runner re-reads the course and
 		-- re-aims (8.5). Jumping, falling and contact are resolved every frame
 		-- inside it: a quarter-second reflex floor would be a harness artefact,
@@ -552,6 +609,12 @@ local function runTrial(
 				-- relocation; it is paid for in the clock and logged, never skipped.
 				task.wait(RESPAWN_SECONDS)
 				placeAt(lastCheckpointPosition, "checkpoint respawn after fall at " .. waypoint.Id)
+				-- A respawn puts the runner back BEFORE rows it had already crossed.
+				-- The holes it made stay open (that is what the real kit does for the
+				-- rest of the round), but the rows are ahead of it again, so it has to
+				-- walk through those openings rather than beeline past them into the
+				-- solid slab beside one.
+				table.clear(rowCleared)
 				-- Falling back to a checkpoint means re-walking from that beat: the
 				-- cursor rewinds to the route waypoint nearest the pad it respawned on.
 				local nearest, nearestDistance = index, math.huge
@@ -570,19 +633,26 @@ local function runTrial(
 				table.insert(splits, { id = waypoint.Id, beat = waypoint.Beat, t = elapsed, arc = waypoint.ArcLength })
 				index += 1
 				lastProgress = now
+				lastDoorNudge = now
 				lastDistance = math.huge
 				settled = true
 			else
-				if distance < lastDistance - 0.5 then
+				local aimDistance = (position * Vector3.new(1, 0, 1) - aim * Vector3.new(1, 0, 1)).Magnitude
+				if aimDistance < lastDistance - 0.5 then
 					lastProgress = now
-					lastDistance = distance
+					lastDistance = aimDistance
 				end
 				-- Jump from the ground when the floor runs out just ahead: a
 				-- measured gap detector standing in for the takeoff markers. The
 				-- probe sits close to the body so the takeoff is at the edge and
 				-- the full measured 22-stud envelope is available, and a stalled
 				-- runner also tries a jump before it is recorded as stuck.
-				local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
+				-- Never jump at a door row. The stall-jump below is a gap heuristic,
+				-- and a door slab is a wall: measured on Door Dash, jumping into one
+				-- repeatedly climbs it -- the rig reached the top of a 14.65-stud slab
+				-- in about 0.6 s and then stood there for the rest of the run. A runner
+				-- walks into a door; it either gives or it does not.
+				local grounded = humanoid.FloorMaterial ~= Enum.Material.Air and doorAim == nil
 				if grounded then
 					local heading = (waypoint.Position - position) * Vector3.new(1, 0, 1)
 					if heading.Magnitude > 0.1 then
@@ -596,9 +666,14 @@ local function runTrial(
 				-- A stalled mid runner in front of a door row has guessed the wrong
 				-- channel; it moves to the next one in centre-out order and pays
 				-- for the mistake in the clock.
-				if now - lastProgress > 1.5 then
+				-- A stalled mid runner in front of a door row guesses again, but the
+				-- retry must NOT reset the progress clock past the stuck detector:
+				-- rewinding lastProgress every 1.5 s kept `now - lastProgress` under
+				-- 2.25 s forever, so a runner jammed at a row never recorded a stuck
+				-- FAIL and burned the whole 150 s ceiling instead.
+				if now - lastDoorNudge > 1.5 then
+					lastDoorNudge = now
 					nextDoorAttempt(position)
-					lastProgress = now - 0.75
 				end
 				if now - lastProgress > STUCK_SECONDS then
 					-- 8.5: a stuck state is a recorded FAIL, never a forced move.
