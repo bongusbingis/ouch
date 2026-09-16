@@ -24,15 +24,26 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
+| HEAD now | cfe33e3 (docs 04ced53, then feat cfe33e3) |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
-| Worktree before this handoff | Clean |
+| Worktree now | Clean |
 | Remote delivery | No push or PR performed |
 | New courses built | Zero |
 | Summit layout hardened | No |
 | Deprecated courses removed | No |
 
-Expected changes since the recorded HEAD: HANDOFF.md (this revision) only. If the branch has advanced, inspect its diff against the recorded HEAD; preserve unrelated work. Do not reset it.
+Changes since the recorded HEAD (both are real, evidenced commits, not just this file):
+
+~~~text
+cfe33e3 feat(splashdown): export and verify source-only kit/Summit/arena assets
+04ced53 docs(splashdown): record Gate 2 approval and revised handoff overrides
+~~~
+
+`04ced53` copied Appendix B into `docs/splashdown/03-overrides.md` and the changelog (no code).
+`cfe33e3` completed section 4: source-only exports, hashes, reimport verification and an actual
+screenshot — see the refreshed section 4 status below. Section 5 onward (interfaces, BallBarrage
+spec, Gate 3 pilot build) has NOT started. Do not reset either commit.
 
 Gate 1 delivered:
 
@@ -93,13 +104,22 @@ facc358 feat(splashdown): compose nested rotors and authoritative course rides
 
 Physics was measured on one machine, server-owned R15, often approximately 400 Hz. Record that limitation unchanged. Source measurements are in evidence/movement*.json and evidence/kit-*.json.
 
+Section 4 status (2026-09-15, commit cfe33e3): COMPLETE. `ServerStorage.SplashdownAuthoringSources`
+(Kit/SummitSource/ArenaSources) staged live in the connected place; exported to
+`assets/splashdown/{kit,summit,arena}-source*.rbxmx`; SHA256 hashes and counts in
+`docs/splashdown/evidence/source-hashes.json`; round-trip reimport verified 222/222 BaseParts with
+zero diffs (path/ClassName/Size/MeshId/CanCollide); actual fixed-camera screenshot saved to
+`docs/splashdown/evidence/kit-source-capture.png`. `.gitattributes` marks `*.rbxmx` as `-text` so
+CRLF normalization never invalidates the recorded hashes. Desktop UI automation needed a real
+window, which this session lacked until a computer restart (see the changelog entry for the exact
+diagnostic: BitBlt failures, `capture_studio.py` "window not found", zero-window Win32 EnumWindows).
+
 Still NOT verified or implemented:
 
 - Any new course, socket manifest, gate-cut graph, gap/coverage/density test, end-to-end clear time, manual full-course playthrough, final 30-rig test or seven-course visual report.
 - The active template folder (ReplicatedStorage.Assets.Maps.Splashdown) was empty because the user moved the original course contents into Workspace.LegacyCourses. That is expected, not a baseline defect. Eight legacy IDs were registered; seven parked models exist in LegacyCourses; CrossCurrent has none. The old asset TestEZ suite was 0/16 as opened and 14/16 with temporary legacy copies; those numbers reflect the empty folder, not successful tests. You may copy the parked models into the templates folder whenever a working baseline is needed for lifecycle/regression tests.
-- Phase 0 captured screenshots successfully. Gate 2 screen_capture stalled and was cancelled; no Gate 2 screenshot exists. The user repaired the capture tooling on 2026-09-15; section 4 step 6 still requires an actual image file.
-- The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports remain required.
-- No current source-only model export exists. inventory.json contains metadata, not a complete reconstructable mesh/collision model package.
+- The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports (now done) were required.
+- None of section 5's required interfaces (AssetManifest, CoursePresets, CourseBuilder, CourseAuthoring, CourseSpecs/BallBarrage, CourseQA, CourseGraph, tests, probes, author-splashdown-v2) exist yet. This is the next work.
 
 ### 1.3 Studio
 
