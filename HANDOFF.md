@@ -24,7 +24,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | the Piston Peak build, on top of `0dead56` (the Tiptoe Trials handoff note) |
+| HEAD now | `f76b621`, the Piston Peak build, on top of `0dead56` (the Tiptoe Trials handoff note) |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
 | Worktree now | Clean except `src/shared/UI/Components/Onboarding/GestureHint.luau`, modified by a PARALLEL session — not part of this task, never staged, do not touch it. |
@@ -36,7 +36,7 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
-<this commit> feat(splashdown): build Piston Peak
+f76b621   feat(splashdown): build Piston Peak
 0dead56   docs(splashdown): record the Tiptoe Trials commit id in the handoff
 3e62299   feat(splashdown): build Tiptoe Trials
 159bedb   docs(splashdown): record the Tumble Tunnels commit id in the handoff
