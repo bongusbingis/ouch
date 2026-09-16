@@ -4,7 +4,7 @@
 
 return {
 	Name = "sb-race-course",
-	Description = "Names the course the next Splashdown round runs on (WhirlPool, DiscJockey, KnockKnock, BumperBay, SummitSplash).",
+	Description = "Names the course the next Splashdown round runs on (BallBarrage, WhirlpoolWaltz, DoorDash, TumbleTunnels, TiptoeTrials, PistonPeak, SummitSplash).",
 	Group = "Splat Brawl | Gameplay",
 	Args = {
 		{

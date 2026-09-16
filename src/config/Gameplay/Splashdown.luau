@@ -34,14 +34,14 @@ return {
 	-- always scores the same number; last place scores 1 and a DNF scores 0.
 	PointsForFirst = 30,
 	-- A DNF is charged the round cap in the cumulative-time tiebreak.
-	-- Interim pool (2026-09-16): only the two Splashdown rebuild courses that
-	-- exist as real, staged, zero-error templates so far (HANDOFF.md section
-	-- 11). CourseSequence.draw tolerates fewer than RoundCount distinct
-	-- entries (it reuses without immediate repeats), so a 2-course pool plays
-	-- a normal 3-round match. The eight legacy IDs below are kept out of
-	-- rotation because their templates were relocated to Workspace.LegacyCourses
-	-- and were never repopulated (a pre-existing condition, not something this
-	-- change caused); their Courses config stays for section 12's final swap.
+	-- The final seven (HANDOFF.md section 12.1, the replacement transaction of
+	-- 2026-09-16): the six declarative rebuild courses in route order plus the
+	-- hardened Summit Splash. The eight superseded legacy IDs are gone from this
+	-- registry entirely -- six of their parked models were destroyed at the same
+	-- swap and CrossCurrent never had one. Every id here has a promoted template
+	-- under ReplicatedStorage.Assets.Maps.Splashdown and an Intro.Courses entry
+	-- in Config.Interface.SplashdownIntro; SplashdownIntroModel.spec asserts the
+	-- second of those, so the two lists move together.
 	CourseOrder = {
 		"BallBarrage",
 		"WhirlpoolWaltz",
@@ -49,6 +49,7 @@ return {
 		"TumbleTunnels",
 		"TiptoeTrials",
 		"PistonPeak",
+		"SummitSplash",
 	},
 	Courses = {
 		BallBarrage = {
@@ -64,10 +65,17 @@ return {
 			ParSeconds = 75,
 			CapSeconds = 180,
 			CloseWindowSeconds = 60,
+			-- HANDOFF section 6: "Whirlpool Waltz uses 3/1; no other course has
+			-- doors" besides Door Dash. Its spec places exactly one row of three
+			-- door slabs (DoorRow 1, DoorIndex 1..3), which is what
+			-- SplashdownCourses.resolve checks this block against.
+			Doors = { PerRow = 3, BreakablePerRow = 1 },
 		},
 		DoorDash = {
 			DisplayName = "DOOR DASH",
-			Difficulty = 3,
+			-- HANDOFF 12.1's difficulty list for the final seven is 3, 3, 2, 3, 3, 4
+			-- plus Summit's existing 3, so Door Dash is the one 2 in the set.
+			Difficulty = 2,
 			ParSeconds = 75,
 			CapSeconds = 180,
 			CloseWindowSeconds = 60,
@@ -108,35 +116,11 @@ return {
 			-- finishes rising at 115 s against the 180-second cap.
 			LavaRise = { Studs = 38, DelaySeconds = 20, Seconds = 95 },
 		},
-		WhirlPool = {
-			DisplayName = "WHIRL POOL",
-			Difficulty = 1,
-			ParSeconds = 60,
-			CapSeconds = 120,
-			CloseWindowSeconds = 30,
-		},
-		DiscJockey = {
-			DisplayName = "DISC JOCKEY",
-			Difficulty = 2,
-			ParSeconds = 70,
-			CapSeconds = 135,
-			CloseWindowSeconds = 30,
-		},
-		KnockKnock = {
-			DisplayName = "KNOCK KNOCK",
-			Difficulty = 2,
-			ParSeconds = 70,
-			CapSeconds = 135,
-			CloseWindowSeconds = 30,
-			Doors = { PerRow = 5, BreakablePerRow = 2 },
-		},
-		BumperBay = {
-			DisplayName = "BUMPER BAY",
-			Difficulty = 3,
-			ParSeconds = 85,
-			CapSeconds = 150,
-			CloseWindowSeconds = 35,
-		},
+		-- The one preserved original. HANDOFF 12.1 keeps Summit's existing timing
+		-- and rise fields exactly as authored -- Par 115 / Cap 210 / Close 45 and
+		-- the 60-stud, 20-second-delay, 140-second rise -- because the hardening
+		-- pass preserved its route, checkpoint order and liquid schedule. Only its
+		-- membership in CourseOrder above changed.
 		SummitSplash = {
 			DisplayName = "SUMMIT SPLASH",
 			Difficulty = 3,
@@ -144,27 +128,6 @@ return {
 			CapSeconds = 210,
 			CloseWindowSeconds = 45,
 			LavaRise = { Studs = 60, DelaySeconds = 20, Seconds = 140 },
-		},
-		TiltTrip = {
-			DisplayName = "TILT TRIP",
-			Difficulty = 2,
-			ParSeconds = 120,
-			CapSeconds = 210,
-			CloseWindowSeconds = 45,
-		},
-		CrossCurrent = {
-			DisplayName = "CROSS CURRENT",
-			Difficulty = 3,
-			ParSeconds = 145,
-			CapSeconds = 240,
-			CloseWindowSeconds = 55,
-		},
-		Downpour = {
-			DisplayName = "DOWNPOUR",
-			Difficulty = 2,
-			ParSeconds = 115,
-			CapSeconds = 210,
-			CloseWindowSeconds = 45,
 		},
 	},
 	-- Every course carries its own invisible boundary ring, wider than the

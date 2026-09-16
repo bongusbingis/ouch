@@ -32,11 +32,13 @@ presentation code lives under `places/lobby`.
 
 The lobby offers two matchmaking queues (`src/config/Gameplay/Queues.luau`):
 `Arena` votes between the brawl modes, and `Splashdown` runs a fixed
-Fall Guys-style race of three rounds over three of five obstacle courses. Both
+Fall Guys-style race of three rounds over three of seven obstacle courses. Both
 play in the Match Place; a Splashdown server parks the arena interior and
 stands the round's course inside the stadium bowl. The course templates are
-authored into `ReplicatedStorage.Assets.Maps.Splashdown` by
-`src/scripts/studio/author-splashdown-courses.luau` (run in Studio Edit mode),
+authored into `ReplicatedStorage.Assets.Maps.Splashdown` from the declarative
+specs in `src/shared/Game/Splashdown/CourseSpecs/`, through the Command Bar
+lines documented in `src/scripts/studio/author-splashdown-v2.luau` (run in
+Studio Edit mode),
 the race is owned by `places/arena/server/Modules/Splashdown/`, and
 `Debug.StudioQueue` in `src/config/Infra/Debug.luau` picks which queue a Studio
 play session pretends it came from.

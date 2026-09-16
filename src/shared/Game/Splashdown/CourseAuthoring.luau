@@ -25,6 +25,16 @@ local PREVIEW_NAME = "SplashdownPreview"
 local OWNER_MARKER = "BuildVersion"
 local TEMPLATES_PATH = { "Assets", "Maps", "Splashdown" }
 
+-- Required lazily and never cached: Edit mode holds a require() cache that does
+-- not invalidate when Rojo syncs a changed module, and promote() is the one call
+-- that has to read the registry as it stands at the moment of the swap.
+local function Splashdown()
+	return require(ReplicatedStorage.Config.Gameplay.Splashdown) :: {
+		CourseOrder: { string },
+		Courses: { [string]: { [string]: any } },
+	}
+end
+
 local function specFor(id: string)
 	local specs = script.Parent:FindFirstChild("CourseSpecs")
 	assert(specs, "[CourseAuthoring] CourseSpecs folder is missing")
@@ -294,24 +304,87 @@ function CourseAuthoring.promote(ids: { string }, expectedHashes: { [string]: st
 		clone.Parent = root
 		table.insert(promoted, id)
 	end
+
+	-- 12.1.2: the promoted set must equal the registry exactly. A template with
+	-- no CourseOrder entry never loads and a CourseOrder entry with no template
+	-- boots into a missing-template error, so both directions are failures and
+	-- both are reported by name rather than by count.
+	local registered: { [string]: boolean } = {}
+	local missing: { string } = {}
+	for _, id in Splashdown().CourseOrder do
+		registered[id] = true
+		local model = root:FindFirstChild(id)
+		if not (model and model:IsA("Model")) then
+			table.insert(missing, id)
+		end
+	end
+	local unregistered: { string } = {}
+	for _, child in root:GetChildren() do
+		if not registered[child.Name] then
+			table.insert(unregistered, `{child.Name}[{child.ClassName}]`)
+		end
+	end
+	assert(#missing == 0, `[CourseAuthoring] CourseOrder ids with no promoted template: {table.concat(missing, ", ")}`)
+	assert(
+		#unregistered == 0,
+		`[CourseAuthoring] templates that are not in CourseOrder: {table.concat(unregistered, ", ")}`
+	)
 	return promoted
 end
 
 -- The user rejected preserving deprecated courses (HANDOFF section 0.6): the
 -- superseded parked models are deleted outright at the validated swap, with no
 -- Deprecated folder, archive or source export.
+-- The exact six 12.1.3 authorises, and nothing else. SummitSplash is the
+-- preserved original, CrossCurrent never had a parked model, and the ninety
+-- Keyframes beside them are unrelated animation data (section 14.12).
+local RETIREABLE: { [string]: boolean } = {
+	WhirlPool = true,
+	DiscJockey = true,
+	KnockKnock = true,
+	BumperBay = true,
+	TiltTrip = true,
+	Downpour = true,
+}
+
 function CourseAuthoring.retireLegacy(ids: { string }): { string }
+	-- Every id is checked against the allow list BEFORE anything is resolved, so
+	-- a typo that would otherwise hit SummitSplash aborts the whole call instead
+	-- of destroying part of the set.
+	for _, id in ids do
+		assert(RETIREABLE[id], `[CourseAuthoring] {id} is not a retireable legacy course; nothing was destroyed`)
+	end
+
 	local legacy = Workspace:FindFirstChild("LegacyCourses")
 	local removed: { string } = {}
 	if not legacy then
 		return removed
 	end
+	assert(legacy:IsA("Folder") or legacy:IsA("Model"), "[CourseAuthoring] Workspace.LegacyCourses is not a container")
+
+	-- Resolve and class-check every target first; only then destroy. A parked
+	-- course that is not a Model is not the thing 12.1.3 names, and guessing at
+	-- it is how a Keyframe or the container itself gets deleted by accident.
+	local targets: { Model } = {}
 	for _, id in ids do
 		local model = legacy:FindFirstChild(id)
-		if model then
-			model:Destroy()
-			table.insert(removed, id)
+		if model ~= nil then
+			assert(
+				model:IsA("Model"),
+				`[CourseAuthoring] Workspace.LegacyCourses.{id} is a {model.ClassName}, not a Model; nothing was destroyed`
+			)
+			assert(
+				model.Parent == legacy,
+				`[CourseAuthoring] {id} did not resolve directly under Workspace.LegacyCourses; nothing was destroyed`
+			)
+			table.insert(targets, model :: Model)
 		end
+	end
+
+	for _, model in targets do
+		local id = model.Name
+		model:Destroy()
+		table.insert(removed, id)
 	end
 	return removed
 end
