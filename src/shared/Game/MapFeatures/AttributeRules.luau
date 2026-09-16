@@ -124,6 +124,18 @@ function Rules.validate(
 	if a.BigBall and (a.BeachBall or a.Bumper) then
 		fail("conflicting ball contact kits")
 	end
+	local primaryCount = 0
+	for _, key in { "Bumper", "Fan", "BigBall", "BeachBall", "Conveyor", "FallingTile", "Seesaw" } do
+		if a[key] == true then
+			primaryCount += 1
+		end
+	end
+	if primaryCount > 1 then
+		fail("multiple contact/state kits on one part")
+	end
+	if a.Shove and (a.Bumper or a.BigBall) then
+		fail("two shove owners on one part")
+	end
 	if a.FallingTile and a.Seesaw then
 		fail("conflicting stateful supports")
 	end

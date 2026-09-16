@@ -258,6 +258,9 @@ return function()
 					{ TypoSpeed = 7 },
 					{ DoorRow = 0, DoorIndex = 1 },
 					{ FanDirection = 0 },
+					{ Bumper = true, Shove = true, Rotor = "spin" },
+					{ Seesaw = true, Conveyor = true },
+					{ FallingTile = true, Fan = true },
 				}
 			do
 				expect(#Rules.validate(a, Attributes) > 0).to.equal(true)

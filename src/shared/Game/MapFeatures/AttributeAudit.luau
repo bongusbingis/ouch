@@ -39,6 +39,11 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 		local assembly = part:FindFirstAncestor("Assembly")
 		local group = assembly and assembly.Parent
 		local origin = group and group:FindFirstChild("Origin")
+		if part.Name == "Origin" and part.Parent and part.Parent:FindFirstChild("Assembly") then
+			if a.RotationSpeed ~= 0 then
+				fail("course Origins use RotationSpeed=0; put motion on attribute Rotors")
+			end
+		end
 		local rotating = false
 		for _, key in rotatingMarkers do
 			if a[key] then
