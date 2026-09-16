@@ -11,6 +11,8 @@ local CourseBuilder = require(Splashdown:WaitForChild("CourseBuilder"))
 local CourseQA = require(Splashdown:WaitForChild("CourseQA"))
 local SplashdownConfig = require(ReplicatedStorage:WaitForChild("Config").Gameplay.Splashdown)
 local DoorRows = require(game:GetService("ServerScriptService").Server.Modules.Splashdown.DoorRows)
+local SplashdownCourses = require(game:GetService("ServerScriptService").Server.Modules.Splashdown.SplashdownCourses)
+local ScriptableRoots = require(ReplicatedStorage:WaitForChild("Shared").Game.MapFeatures.ScriptableRoots)
 local BeachBalls = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.BeachBalls)
 local FallingTiles = require(game:GetService("ServerScriptService").Server.Modules.MapFeatures.FallingTiles)
 local MapFeatures = require(ReplicatedStorage:WaitForChild("Config").Gameplay.MapFeatures)
@@ -937,4 +939,275 @@ return function()
 			end)
 		end)
 	end
+
+	-- HANDOFF 12.3's final bootstrap also carries the set-wide lifecycle and
+	-- malformed-course fixtures. They are course-independent, so they run once
+	-- rather than per selected id, and they drive the REAL boot-time validator
+	-- in SplashdownCourses rather than a copy of its rules: a fixture that only
+	-- re-implements the assertion it is testing proves nothing.
+	--
+	-- Every mutation below is applied to the live template inside a Play session
+	-- and reversed in the same test. Play's DataModel is a throwaway copy, so the
+	-- authored Edit-mode template is never at risk, and each test re-instantiates
+	-- successfully after the reversal so a fixture cannot leave the set broken
+	-- for the one after it.
+	describe("course lifecycle and malformed-course rejection", function()
+		local FIXTURE_ID = "BallBarrage"
+		local FIXTURE_ORIGIN_A = CFrame.new(0, 20000, 0)
+		local FIXTURE_ORIGIN_B = CFrame.new(3000, 20000, 0)
+
+		local holder
+
+		local function container(name: string): Folder
+			local made = Instance.new("Folder")
+			made.Name = name
+			made.Parent = holder
+			return made
+		end
+
+		-- Applies a reversible mutation, asserts the validator rejects the course
+		-- through the real instantiate() path, reverses it and asserts the course
+		-- resolves again.
+		local function rejects(mutate: () -> () -> ())
+			local undo = mutate()
+			local parent = container("Rejected")
+			local ok = pcall(function()
+				SplashdownCourses.instantiate(FIXTURE_ID, parent, FIXTURE_ORIGIN_A)
+			end)
+			undo()
+			-- A half-built clone must not be left standing when resolve throws.
+			for _, child in parent:GetChildren() do
+				child:Destroy()
+			end
+			expect(ok).to.equal(false)
+
+			local restored = SplashdownCourses.instantiate(FIXTURE_ID, parent, FIXTURE_ORIGIN_A)
+			SplashdownCourses.destroy(restored)
+			parent:Destroy()
+		end
+
+		beforeAll(function()
+			holder = Instance.new("Folder")
+			holder.Name = "SplashdownLifecycleFixtures"
+			holder.Parent = Workspace
+			SplashdownCourses.start()
+		end)
+
+		afterAll(function()
+			if holder then
+				holder:Destroy()
+				holder = nil
+			end
+		end)
+
+		it("boots every registered template through the real course validator", function()
+			-- start() resolves every CourseOrder id at boot, so reaching here at
+			-- all is the no-missing-template assertion. The ids are re-read so a
+			-- registry with a stale entry cannot pass by resolving fewer.
+			expect(#SplashdownConfig.CourseOrder).to.equal(7)
+			local templates = SplashdownCourses.templatesFolder()
+			for _, courseId in SplashdownConfig.CourseOrder do
+				local template = SplashdownCourses.template(courseId)
+				expect(template).to.be.ok()
+				expect(template.Parent).to.equal(templates)
+				expect(SplashdownCourses.checkpointCount(courseId) > 0).to.equal(true)
+			end
+			-- And nothing that is not registered is sitting in the folder.
+			local registered = {}
+			for _, courseId in SplashdownConfig.CourseOrder do
+				registered[courseId] = true
+			end
+			for _, child in templates:GetChildren() do
+				expect(registered[child.Name]).to.equal(true)
+			end
+		end)
+
+		it("lets two independently cloned courses coexist without sharing anything", function()
+			local a, b = container("LifecycleA"), container("LifecycleB")
+			local liveA = SplashdownCourses.instantiate(FIXTURE_ID, a, FIXTURE_ORIGIN_A)
+			local liveB = SplashdownCourses.instantiate(FIXTURE_ID, b, FIXTURE_ORIGIN_B)
+
+			expect(liveA.model).never.to.equal(liveB.model)
+			expect(liveA.scriptables).never.to.equal(liveB.scriptables)
+			expect(ScriptableRoots.isRoot(liveA.scriptables)).to.equal(true)
+			expect(ScriptableRoots.isRoot(liveB.scriptables)).to.equal(true)
+
+			-- Not one instance is shared: a cross-owned ball or effect would show
+			-- up here as the same Instance under both clones.
+			local seen = {}
+			for _, descendant in liveA.model:GetDescendants() do
+				seen[descendant] = true
+			end
+			for _, descendant in liveB.model:GetDescendants() do
+				expect(seen[descendant]).to.equal(nil)
+			end
+
+			expect(#liveA.pads).to.equal(#liveB.pads)
+			expect(#liveA.checkpoints).to.equal(#liveB.checkpoints)
+			expect(#liveA.hazards).to.equal(#liveB.hazards)
+			expect(#liveA.boundary).to.equal(#liveB.boundary)
+			expect(#liveA.doorRows).to.equal(#liveB.doorRows)
+
+			SplashdownCourses.destroy(liveA)
+			SplashdownCourses.destroy(liveB)
+			a:Destroy()
+			b:Destroy()
+		end)
+
+		it("leaves no root, constraint, detached part or ghost behind after a destroy and re-clone", function()
+			local before = #Workspace:GetChildren()
+			local rootsBefore = #ScriptableRoots.all()
+
+			for _ = 1, 2 do
+				local parent = container("LifecycleCycle")
+				local live = SplashdownCourses.instantiate(FIXTURE_ID, parent, FIXTURE_ORIGIN_A)
+				local constraints, welds = 0, 0
+				for _, descendant in live.model:GetDescendants() do
+					if descendant:IsA("Constraint") then
+						constraints += 1
+					elseif descendant:IsA("JointInstance") then
+						welds += 1
+					end
+				end
+				SplashdownCourses.destroy(live)
+				expect(live.model.Parent).to.equal(nil)
+				expect(#parent:GetChildren()).to.equal(0)
+				expect(ScriptableRoots.isRoot(live.scriptables)).to.equal(false)
+				-- The template itself never grows a joint or constraint from a
+				-- clone/destroy cycle, which is what a leaked weld would look like.
+				expect(constraints).to.equal(0)
+				expect(welds).to.equal(0)
+				parent:Destroy()
+			end
+
+			-- Nothing detached itself into the Workspace, and no tagged root
+			-- survived the cycle.
+			expect(#Workspace:GetChildren()).to.equal(before)
+			expect(#ScriptableRoots.all()).to.equal(rootsBefore)
+		end)
+
+		it("rejects a course whose declared CheckpointCount disagrees with its folder", function()
+			rejects(function()
+				local template = SplashdownCourses.template(FIXTURE_ID)
+				local declared = template:GetAttribute("CheckpointCount")
+				template:SetAttribute("CheckpointCount", (declared :: number) + 1)
+				return function()
+					template:SetAttribute("CheckpointCount", declared)
+				end
+			end)
+		end)
+
+		it("rejects a course that cannot seat a full queue on its start pads", function()
+			rejects(function()
+				local template = SplashdownCourses.template(FIXTURE_ID)
+				local pads = template.Start.Pads
+				local moved = {}
+				-- One pad short of the queue capacity is the interesting case: a
+				-- course that seats 29 of 30 racers fails silently at round start.
+				local kept = 0
+				for _, pad in pads:GetChildren() do
+					if pad:IsA("BasePart") then
+						kept += 1
+						if kept > 29 then
+							table.insert(moved, pad)
+						end
+					end
+				end
+				expect(#moved > 0).to.equal(true)
+				for _, pad in moved do
+					pad.Parent = nil
+				end
+				return function()
+					for _, pad in moved do
+						pad.Parent = pads
+					end
+				end
+			end)
+		end)
+
+		it("rejects a course with no hazard at all", function()
+			rejects(function()
+				local template = SplashdownCourses.template(FIXTURE_ID)
+				local hazards = template.Hazards
+				local moved = {}
+				for _, hazard in hazards:GetChildren() do
+					if hazard:IsA("BasePart") then
+						table.insert(moved, hazard)
+					end
+				end
+				expect(#moved > 0).to.equal(true)
+				for _, hazard in moved do
+					hazard.Parent = nil
+				end
+				return function()
+					for _, hazard in moved do
+						hazard.Parent = hazards
+					end
+				end
+			end)
+		end)
+
+		it("rejects a course whose boundary ring has been emptied", function()
+			rejects(function()
+				local template = SplashdownCourses.template(FIXTURE_ID)
+				local boundary = template.Boundary
+				local moved = {}
+				for _, wall in boundary:GetChildren() do
+					if wall:IsA("BasePart") then
+						table.insert(moved, wall)
+					end
+				end
+				expect(#moved > 0).to.equal(true)
+				for _, wall in moved do
+					wall.Parent = nil
+				end
+				return function()
+					for _, wall in moved do
+						wall.Parent = boundary
+					end
+				end
+			end)
+		end)
+
+		it("rejects a door course whose row is one slab short of its configured quota", function()
+			-- The door quota lives in config and the slabs live in the model, so
+			-- this is the one malformed case that only a cross-check can catch.
+			local doorCourse = nil
+			for _, courseId in SplashdownConfig.CourseOrder do
+				if SplashdownConfig.Courses[courseId].Doors then
+					doorCourse = courseId
+					break
+				end
+			end
+			expect(doorCourse).to.be.ok()
+
+			local template = SplashdownCourses.template(doorCourse)
+			local doors = template.Scriptables.Doors
+			local victim = nil
+			for _, slab in doors:GetDescendants() do
+				if slab:IsA("BasePart") and slab:GetAttribute(MapFeatures.Attributes.DoorRow) ~= nil then
+					victim = slab
+					break
+				end
+			end
+			expect(victim).to.be.ok()
+
+			local parent = victim.Parent
+			victim.Parent = nil
+			local target = container("RejectedDoors")
+			local ok = pcall(function()
+				SplashdownCourses.instantiate(doorCourse, target, FIXTURE_ORIGIN_A)
+			end)
+			victim.Parent = parent
+			for _, child in target:GetChildren() do
+				child:Destroy()
+			end
+			expect(ok).to.equal(false)
+
+			local restored = SplashdownCourses.instantiate(doorCourse, target, FIXTURE_ORIGIN_A)
+			expect(#restored.doorRows > 0).to.equal(true)
+			SplashdownCourses.destroy(restored)
+			target:Destroy()
+		end)
+	end)
 end
