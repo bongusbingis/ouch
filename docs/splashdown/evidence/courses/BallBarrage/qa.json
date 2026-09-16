@@ -1,0 +1,336 @@
+{
+ "TestTime": "2026-09-16T05:11:35Z",
+ "SampleResolution": {
+  "Coarse": 1,
+  "Refined": 0.25
+ },
+ "Errors": [],
+ "CourseId": "BallBarrage",
+ "PlaceId": 121997450145716,
+ "Status": "BLOCKED",
+ "SourceHash": "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec",
+ "Warnings": [],
+ "SpecHash": "020c7854",
+ "Counts": {
+  "SurfaceCells": 18446,
+  "Checkpoints": 5,
+  "BaseParts": 158,
+  "StartPads": 30,
+  "BoundaryWalls": 24,
+  "Encounters": 16,
+  "GraphEdges": 336488,
+  "Beats": 6,
+  "GraphNodes": 14883,
+  "HazardInstances": 17
+ },
+ "Calibration": {
+  "MaxStepStuds": 11.5,
+  "JumpHeight": 10,
+  "RootOffsetStuds": 3.5,
+  "Gravity": 120,
+  "SlopeLimitDegrees": 45,
+  "MaxGapStuds": 22,
+  "RefineStep": 0.25,
+  "WalkSpeed": 26,
+  "SampleStep": 1
+ },
+ "Encounters": [
+  {
+   "Id": "Belt01",
+   "Type": "Conveyor",
+   "Family": "Ride",
+   "Beat": "01_Countercurrent"
+  },
+  {
+   "Id": "Belt02",
+   "Type": "Conveyor",
+   "Family": "Ride",
+   "Beat": "01_Countercurrent"
+  },
+  {
+   "Id": "Sweeper01",
+   "Type": "RotorBump",
+   "Family": "Ride",
+   "Beat": "01_Countercurrent"
+  },
+  {
+   "Id": "Chicane01",
+   "Type": "Bumper",
+   "Family": "Ride",
+   "Beat": "01_Countercurrent",
+   "Note": "cube+triangle chicane: two slabs, scored as one encounter (section 7 override 3)"
+  },
+  {
+   "Id": "Ball01",
+   "Type": "BigBall",
+   "Family": "Precision",
+   "Beat": "02_RedRebound"
+  },
+  {
+   "Id": "Ball02",
+   "Type": "BigBall",
+   "Family": "Precision",
+   "Beat": "02_RedRebound"
+  },
+  {
+   "Id": "Ball03",
+   "Type": "BigBall",
+   "Family": "Precision",
+   "Beat": "02_RedRebound"
+  },
+  {
+   "Id": "Piston01",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "03_PunchPass"
+  },
+  {
+   "Id": "Piston02",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "03_PunchPass"
+  },
+  {
+   "Id": "Pad01",
+   "Type": "JumpPad",
+   "Family": "Launch",
+   "Beat": "04_SkyThread"
+  },
+  {
+   "Id": "Fan01",
+   "Type": "Fan",
+   "Family": "Launch",
+   "Beat": "04_SkyThread"
+  },
+  {
+   "Id": "Pad02",
+   "Type": "JumpPad",
+   "Family": "Launch",
+   "Beat": "04_SkyThread"
+  },
+  {
+   "Id": "Bumper03",
+   "Type": "Bumper",
+   "Family": "Launch",
+   "Beat": "04_SkyThread"
+  },
+  {
+   "Id": "HammerLarge",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "05_HammerHour"
+  },
+  {
+   "Id": "HammerSmall",
+   "Type": "RotorBump",
+   "Family": "Timing",
+   "Beat": "05_HammerHour"
+  },
+  {
+   "Id": "Bumper04",
+   "Type": "Bumper",
+   "Family": "ClimbDescend",
+   "Beat": "06_SplashSprint"
+  }
+ ],
+ "Findings": [
+  {
+   "Check": "StartPads==30",
+   "Status": "PASS",
+   "Detail": "30 immediate Start/Pads BaseParts"
+  },
+  {
+   "Check": "Checkpoints>=1",
+   "Status": "PASS",
+   "Detail": "5 ordered checkpoints"
+  },
+  {
+   "Check": "CheckpointCountAttributeExact",
+   "Status": "PASS",
+   "Detail": "attribute 5 vs 5 actual"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint01",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint02",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint03",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint04",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "Checkpoint:Checkpoint05",
+   "Status": "PASS",
+   "Detail": "needs both Pad and Trigger"
+  },
+  {
+   "Check": "ExactlyOneFinish",
+   "Status": "PASS",
+   "Detail": "1 triggers, 1 decks"
+  },
+  {
+   "Check": "Boundary24At390",
+   "Status": "PASS",
+   "Detail": "24 anchored colliding invisible walls, worst radius error 0.00"
+  },
+  {
+   "Check": "OrderedRouteFromEverySpawn",
+   "Status": "PASS",
+   "Detail": "30 spawn cells, 6 ordered waypoints, 0 failing legs"
+  },
+  {
+   "Check": "GateCutSet:01_Countercurrent",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:02_RedRebound",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:03_PunchPass",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:04_SkyThread",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:05_HammerHour",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "GateCutSet:06_SplashSprint",
+   "Status": "PASS",
+   "Detail": "0 of 30 spawn cells bypass this gate"
+  },
+  {
+   "Check": "Gap:02_RedRebound/Gap01",
+   "Status": "NOT RUN",
+   "Detail": "16.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "Gap:02_RedRebound/Gap02",
+   "Status": "NOT RUN",
+   "Detail": "16.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "Gap:02_RedRebound/Gap03",
+   "Status": "NOT RUN",
+   "Detail": "14.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "Gap:04_SkyThread/Gap04",
+   "Status": "NOT RUN",
+   "Detail": "18.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "Gap:04_SkyThread/Gap05",
+   "Status": "NOT RUN",
+   "Detail": "18.00 studs (launch/ball transfer: needs a measured reach window, not the 13.2-19.8 rule)"
+  },
+  {
+   "Check": "CrossPieceBoundingOverlap",
+   "Status": "NOT RUN",
+   "Detail": "50 oriented-box overlaps between different PieceIds (e.g. sd_BallBarrage_01_ramp_4 vs sd_BallBarrage_01_platform_5); a box test cannot decide mesh penetration (8.3), so the seams need the visual inspection pass"
+  },
+  {
+   "Check": "NoBreatherSquare",
+   "Status": "PASS",
+   "Detail": "largest flat hazard-free square on the route is 21 x 21 studs (limit 24)"
+  },
+  {
+   "Check": "EncounterTypes>=6",
+   "Status": "PASS",
+   "Detail": "6 distinct encounter types"
+  },
+  {
+   "Check": "Families>=4",
+   "Status": "PASS",
+   "Detail": "5 distinct families"
+  },
+  {
+   "Check": "DominantType<=40%",
+   "Status": "PASS",
+   "Detail": "RotorBump is 5 of 16 (31.2%)"
+  },
+  {
+   "Check": "SameTypeRun<=3",
+   "Status": "PASS",
+   "Detail": "longest same-type run is 3"
+  },
+  {
+   "Check": "8.2.6 time-expanded dynamic-state graph (periodic sampling every .1s across one common cycle)",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 lane cross-section hazard coverage and blocked-fraction >= .4 per pendulum/hammer crossing",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 measured shove travel from five real-player contacts per hazard and direction",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 bumper chicane centreline/edge/slalom avoidance probes",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.4 cross-course auditVariety over all six staged specs (only the pilot exists)",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.5 scripted expert/mid policy route trials and the interactive keyboard run",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.5 thirty-rider start load test and the Studio local multi-client session",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  },
+  {
+   "Check": "8.6 fixed-camera captures and the bad-map-refs comparison",
+   "Status": "NOT RUN",
+   "Detail": "requires a live driven playtest or the full course set"
+  }
+ ],
+ "NotRun": [
+  "8.2.6 time-expanded dynamic-state graph (periodic sampling every .1s across one common cycle)",
+  "8.4 lane cross-section hazard coverage and blocked-fraction >= .4 per pendulum/hammer crossing",
+  "8.4 measured shove travel from five real-player contacts per hazard and direction",
+  "8.4 bumper chicane centreline/edge/slalom avoidance probes",
+  "8.4 line-of-sight readability (>= 15 studs of approach) corroborated by screenshots",
+  "8.4 cross-course auditVariety over all six staged specs (only the pilot exists)",
+  "8.5 scripted expert/mid policy route trials and the interactive keyboard run",
+  "8.5 thirty-rider start load test and the Studio local multi-client session",
+  "8.6 fixed-camera captures and the bad-map-refs comparison"
+ ],
+ "GitCommit": "0494b88 plus the uncommitted Gate 3 working tree",
+ "Note": "Produced by CourseQA.check on a real Studio Play build of the staged model. Status is BLOCKED, not PASS: every executed check passed but nine section 8 checks remain NOT RUN and require a live driven playtest."
+}

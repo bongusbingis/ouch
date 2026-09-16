@@ -24,20 +24,23 @@ Revised 2026-09-15 after user review. Appendix B lists every change from the ori
 |---|---|
 | Branch | feature/splashdown-hazard-kits |
 | HEAD before this handoff | f866f7fa8cda958792f588dbcdc605e6161ed3f2 |
-| HEAD now | cfe33e3 (docs 04ced53, then feat cfe33e3) |
+| HEAD now | ce2a010 (course), on top of 81a8cbe (builder/QA infra) and 0494b88 |
 | Discovery/Gate 1 commit | 7209026 |
 | Baseline before discovery | 059e509 |
-| Worktree now | Clean |
+| Worktree now | Clean for this task. `src/shared/UI/Components/Onboarding/GestureHint.luau` is modified by a PARALLEL session; it is not part of this task and was deliberately not staged. |
 | Remote delivery | No push or PR performed |
-| New courses built | Zero |
+| New courses built | Ball Barrage, built and statically audited, NOT certified (Gate 3 not approved) |
 | Summit layout hardened | No |
 | Deprecated courses removed | No |
 
-Changes since the recorded HEAD (both are real, evidenced commits, not just this file):
+Changes since the recorded HEAD (all real, evidenced commits, not just this file):
 
 ~~~text
-cfe33e3 feat(splashdown): export and verify source-only kit/Summit/arena assets
-04ced53 docs(splashdown): record Gate 2 approval and revised handoff overrides
+ce2a010   feat(splashdown): build the Ball Barrage pilot course
+81a8cbe   feat(splashdown): add guide-driven course builder and independent QA
+0494b88   docs(splashdown): refresh handoff state after section 4 completion
+cfe33e3   feat(splashdown): export and verify source-only kit/Summit/arena assets
+04ced53   docs(splashdown): record Gate 2 approval and revised handoff overrides
 ~~~
 
 `04ced53` copied Appendix B into `docs/splashdown/03-overrides.md` and the changelog (no code).
@@ -116,14 +119,95 @@ diagnostic: BitBlt failures, `capture_studio.py` "window not found", zero-window
 
 Still NOT verified or implemented:
 
-- Any new course, socket manifest, gate-cut graph, gap/coverage/density test, end-to-end clear time, manual full-course playthrough, final 30-rig test or seven-course visual report.
 - The active template folder (ReplicatedStorage.Assets.Maps.Splashdown) was empty because the user moved the original course contents into Workspace.LegacyCourses. That is expected, not a baseline defect. Eight legacy IDs were registered; seven parked models exist in LegacyCourses; CrossCurrent has none. The old asset TestEZ suite was 0/16 as opened and 14/16 with temporary legacy copies; those numbers reflect the empty folder, not successful tests. You may copy the parked models into the templates folder whenever a working baseline is needed for lifecycle/regression tests.
 - The repository has no Studio-authored places/arena/*.rbxl base, so the CD build script cannot complete. By user decision (2026-09-15) that base and the CD build are out of scope for this task; section 12.2 is withdrawn. Rojo code synchronization is still not an authored-model backup, which is why the section 4 source exports (now done) were required.
-- None of section 5's required interfaces (AssetManifest, CoursePresets, CourseBuilder, CourseAuthoring, CourseSpecs/BallBarrage, CourseQA, CourseGraph, tests, probes, author-splashdown-v2) exist yet. This is the next work.
+- CourseAuthoring, CourseQA, the Studio TestEZ suite, both Play probes, author-splashdown-v2.luau, and the course doc do not exist yet (section 1.4 below is exactly where the section-5 interface work stands).
+
+### 1.4 Section 5/10 progress (2026-09-16, committed)
+
+Gate 3 pilot work is SUBMITTED but NOT approved, and the pilot is **BLOCKED, not certified**.
+Commits `81a8cbe` (builder/QA infrastructure) and the course commit that follows it carry
+everything below. A fresh session resumes from here.
+
+**Built and verified in real Studio Play on place 121997450145716:**
+
+- `AssetManifest.luau` — measured sockets for every Ball Barrage source, now including the
+  `SidePositiveX` / `SideNegativeX` walkable edge centres used by corner slabs (measured
+  footprintX `[-34.035, 34.965]` from `course-sockets-ballbarrage.json`).
+- `CourseGraph.luau` + spec — pure graph module, plus `reachingNodes` (reverse reachability), which
+  is what makes the cut-set proof affordable: one traversal per gate instead of one per
+  (spawn, gate) pair. 975 headless tests pass.
+- `CoursePresets.luau` — `Reversed` chaining (the kit has no ascending ramp mesh; a climb is a
+  measured descending ramp entered from its low end), corner placement through a measured side
+  socket, and the section 3.3 naming plus SourceAsset/CourseId/BeatId/PieceId contract.
+- `CourseBuilder.luau` — beats packed along `Layout.Guide`, the section 5.2 polyline. The build
+  FAILS rather than leaving the guide, and returns the full route cursor trace, per-beat arclength
+  ratios and an eight-corner bounds audit.
+- `CourseQA.luau`, `CourseAuthoring.luau`, `SplashdownQA.spec.luau`, both probes,
+  `author-splashdown-v2.luau`, `docs/splashdown/courses/ball-barrage.md`.
+
+**Measured pilot result** (`docs/splashdown/evidence/courses/BallBarrage/{build,qa}.json`):
+SpecHash `020c7854`, 158 parts, staged twice with identical hashes, route 881.05 studs, 5
+checkpoints, 16 encounters (RotorBump 5 = 31.2%, matching section 7.1 exactly). Bounds: max part
+corner 494.8/600, geometry centre radius 246.2/380, route radius 211.2/300, route envelope Y
+−20.0..62.0 inside −30..90. All six beats between 1.02 and 1.10 of their targets, elevation
+0/+6/0/+6/+6/+6/−12 exactly as section 7.1 specifies. Zero attribute, route and bounds errors.
+QA: 18,446 sampled surface cells, 14,883 graph nodes, 336,488 edges, ordered route proved from all
+30 spawn cells, all six beat gates proved to be true cut sets.
+
+**The three bugs from the previous session's 1.4, all fixed:**
+
+1. The `X ≈ -493` overrun was NOT a turn-direction bug — the turns landed on the right rows. The
+   turns were zero-geometry instantaneous side-steps, so nothing capped a run's length and beats
+   02–04 packed 510 studs into a 240-stud guide run. Fixed by making the guide an enforced envelope.
+2. The boundary wall is NOT a bug and was NOT scaled down. Section 8.1 requires the ring be "copied
+   from the existing boundary contract", and `author-splashdown-courses.luau` clones the same arena
+   wall unscaled. Its corners reach 494.8 of the 600 limit. Section 5.1.10 scopes the −30..90 band
+   to the static ROUTE envelope and extends only the ≤600 rule to the boundary, so the audit now
+   measures the route band separately from the whole-model band. Both are reported.
+3. A third bug the previous session had not found: every ramp descended (`box_011`/`box_013` are
+   descending assets chained forward), so the route ended at Y −67.9, outside the −30..90 envelope
+   and inverting section 7.1's elevation column. Fixed by `Reversed` chaining.
+
+**Two loopholes the QA found that inspection had not:** a 40-stud finish plaza reached back under
+beat 06 so all 30 spawns reached Finish with that gate removed (fixed: 34-stud plaza plus a
+two-slab run-out); and beat 01's single scale-0.92 slab was a 49×49 breather square (fixed: every
+route platform capped at scale 0.3, 20.7 studs wide, largest square now 21×21).
+
+**Five loophole questions — DEFINED, not cited.** They are enumerated nowhere in the checked-in
+docs. `docs/splashdown/courses/ball-barrage.md` defines five (bypass, waiting, escape reach,
+readability, stranding) from the fairness language in 3.2/8.2/8.4/9/13 and says plainly that it is
+defining them. **Ask the user whether these are the intended five**; if not, that table must be
+redone.
+
+**What remains for Gate 3, all honestly NOT RUN:**
+
+- 8.5 scripted expert/mid route trials (`run-course-routes.server.luau` is written but has never
+  been executed), the interactive keyboard run, the thirty-rider load test and the local
+  multi-client session.
+- 8.6 fixed-camera captures and the `bad-map-refs` comparison.
+- 8.2.6 time-expanded dynamic-state graph; 8.4 coverage, blocked-fraction, shove-travel, chicane and
+  readability measurements; 8.4 cross-course variety (only the pilot exists).
+- The mesh-level seam pass: 50 oriented-box overlaps exist between socket-joined pieces, and 8.3
+  says outright that a box test cannot decide mesh penetration.
+- `qa-report.md` has not been written.
+
+`CourseQA.check` returns BLOCKED, never PASS, while any check is outstanding. That is enforced in
+code and asserted by `SplashdownQA.spec.luau`.
+
+**Tooling notes that still hold:** headless Lune fakes `CFrame` entirely, so CourseBuilder /
+CoursePresets / CourseQA can only be verified by real Studio Play; the Assistant `execute_luau` VM
+cannot `require()` synced modules or reparent into ServerScriptService/Workspace, so drive Studio by
+writing a temporary `.server.luau` under `places/arena/server/Scripts/`, Play, and read results from
+a ServerStorage StringValue (the probe used for all of the above has been deleted, as required
+before commit); CourseQA must yield and must not grid the boundary ring, or it exhausts the Studio
+script budget. `ServerStorage.SplashdownAuthoringSources.Kit` is the correct `Sources.Kit`.
+`AssetManifest` sockets are relative to each source's own root CFrame, which `CoursePresets`
+reconciles by setting `holder.WorldPivot = rootLike.CFrame` before `PivotTo`.
 
 ### 1.3 Studio
 
-Last connected arena: place ID **121997450145716**, title Match Place, studio_id 678ffc4f-39f1-48b9-be3e-f2b54a54e984. Rediscover the ID before use.
+Last connected arena: place ID **121997450145716**, title Match Place, studio_id f2e79758-7afe-47ea-8efc-85035edf8307 (2026-09-15, this session). Rediscover the ID before use — it changes every session.
 
 Do NOT edit lobby place 130584867985467, previously studio_id 89fa3e46-0f1a-4be4-a47a-e97b7066a656.
 

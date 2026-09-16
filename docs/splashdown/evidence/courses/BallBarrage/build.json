@@ -1,0 +1,682 @@
+{
+ "checkpointCount": 5,
+ "courseId": "BallBarrage",
+ "placeId": 121997450145716,
+ "routeLength": 881.0531158447266,
+ "partCount": 158,
+ "specHash": "020c7854",
+ "bounds": {
+  "MaxCornerDistance": 494.7834167480469,
+  "MaxY": 285.1180419921875,
+  "RouteMinY": -20.002910614013672,
+  "RouteMaxY": 61.99985122680664,
+  "MaxRouteRadius": 211.23635864257812,
+  "Violations": [],
+  "MinY": -21,
+  "MaxGeometryCenterRadius": 246.21942138671875
+ },
+ "beats": [
+  {
+   "ArcLength": 164.14900970458984,
+   "Id": "01_Countercurrent",
+   "Ratio": 1.0943267313639322,
+   "LengthTarget": 150,
+   "ElevationChange": 5.9992499351501465
+  },
+  {
+   "ArcLength": 150.58947982788084,
+   "Id": "02_RedRebound",
+   "Ratio": 1.0756391416277202,
+   "LengthTarget": 140,
+   "ElevationChange": 9.5367431640625e-07
+  },
+  {
+   "ArcLength": 132.00056304931638,
+   "Id": "03_PunchPass",
+   "Ratio": 1.0153889465332029,
+   "LengthTarget": 130,
+   "ElevationChange": 5.9992499351501465
+  },
+  {
+   "ArcLength": 160.52153930664065,
+   "Id": "04_SkyThread",
+   "Ratio": 1.0701435953776044,
+   "LengthTarget": 150,
+   "ElevationChange": 6.002101898193359
+  },
+  {
+   "ArcLength": 164.80001220703127,
+   "Id": "05_HammerHour",
+   "Ratio": 1.0986667480468753,
+   "LengthTarget": 150,
+   "ElevationChange": 5.999248504638672
+  },
+  {
+   "ArcLength": 84.99251174926758,
+   "Id": "06_SplashSprint",
+   "Ratio": 1.0624063968658448,
+   "LengthTarget": 80,
+   "ElevationChange": -12.002058029174805
+  }
+ ],
+ "route": [
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Belt01",
+   "kind": "Chain",
+   "x": -128.05,
+   "y": 0,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 51.95,
+   "arcLength": 27.95
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Belt02",
+   "kind": "Chain",
+   "x": -100.1,
+   "y": 0,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 79.9,
+   "arcLength": 27.95
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Sweeper01",
+   "kind": "Mount",
+   "x": -100.1,
+   "y": 0,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 79.9,
+   "arcLength": 0
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Ramp01",
+   "kind": "Chain",
+   "x": -71.051,
+   "y": 5.999,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 108.949,
+   "arcLength": 29.049
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Floor01",
+   "kind": "Chain",
+   "x": -44.651,
+   "y": 5.999,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 135.349,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Floor02",
+   "kind": "Chain",
+   "x": -18.251,
+   "y": 5.999,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 161.749,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Floor03",
+   "kind": "Chain",
+   "x": 8.149,
+   "y": 5.999,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 188.149,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Bumper01",
+   "kind": "Mount",
+   "x": 8.149,
+   "y": 5.999,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 188.149,
+   "arcLength": 0
+  },
+  {
+   "beat": "01_Countercurrent",
+   "piece": "Bumper02",
+   "kind": "Mount",
+   "x": 8.149,
+   "y": 5.999,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 188.149,
+   "arcLength": 0
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Ramp02",
+   "kind": "Chain",
+   "x": 37.198,
+   "y": 11.998,
+   "z": 168,
+   "yaw": -90,
+   "segment": 1,
+   "segmentTravel": 217.198,
+   "arcLength": 29.049
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "CornerA",
+   "kind": "Corner",
+   "x": 60.0,
+   "y": 11.998,
+   "z": 157.51,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 10.49,
+   "arcLength": 23.667
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Gap01",
+   "kind": "Advance",
+   "x": 60.0,
+   "y": 11.998,
+   "z": 141.51,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 26.49,
+   "arcLength": 16.0
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Ball01",
+   "kind": "Mount",
+   "x": 60.0,
+   "y": 11.998,
+   "z": 141.51,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 26.49,
+   "arcLength": 0
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Step01",
+   "kind": "Chain",
+   "x": 60.0,
+   "y": 11.999,
+   "z": 128.311,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 39.689,
+   "arcLength": 13.2
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Gap02",
+   "kind": "Advance",
+   "x": 60.0,
+   "y": 11.999,
+   "z": 112.311,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 55.689,
+   "arcLength": 16.0
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Ball02",
+   "kind": "Mount",
+   "x": 60.0,
+   "y": 11.999,
+   "z": 112.311,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 55.689,
+   "arcLength": 0
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Ramp03",
+   "kind": "Chain",
+   "x": 60.0,
+   "y": 5.999,
+   "z": 83.262,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 84.738,
+   "arcLength": 29.049
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Gap03",
+   "kind": "Advance",
+   "x": 60.0,
+   "y": 5.999,
+   "z": 69.262,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 98.738,
+   "arcLength": 14.0
+  },
+  {
+   "beat": "02_RedRebound",
+   "piece": "Ball03",
+   "kind": "Mount",
+   "x": 60.0,
+   "y": 5.999,
+   "z": 69.262,
+   "yaw": 0,
+   "segment": 2,
+   "segmentTravel": 98.738,
+   "arcLength": 0
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "CornerB",
+   "kind": "Corner",
+   "x": 49.51,
+   "y": 5.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 10.49,
+   "arcLength": 23.667
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "Ramp04",
+   "kind": "Chain",
+   "x": 20.462,
+   "y": 11.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 39.538,
+   "arcLength": 29.049
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "Floor04",
+   "kind": "Chain",
+   "x": -5.939,
+   "y": 11.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 65.938,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "Piston01",
+   "kind": "Mount",
+   "x": -5.939,
+   "y": 11.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 65.938,
+   "arcLength": 0
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "Piston02",
+   "kind": "Mount",
+   "x": -5.939,
+   "y": 11.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 65.938,
+   "arcLength": 0
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "Floor05",
+   "kind": "Chain",
+   "x": -32.339,
+   "y": 11.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 92.339,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "03_PunchPass",
+   "piece": "Floor06",
+   "kind": "Chain",
+   "x": -58.739,
+   "y": 11.999,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 118.739,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Ramp05",
+   "kind": "Chain",
+   "x": -116.85,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 176.85,
+   "arcLength": 58.112
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Pad01",
+   "kind": "Mount",
+   "x": -116.85,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 176.85,
+   "arcLength": 0
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Fan01",
+   "kind": "Mount",
+   "x": -116.85,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 176.85,
+   "arcLength": 0
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Gap04",
+   "kind": "Advance",
+   "x": -134.85,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 194.85,
+   "arcLength": 18.0
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Land01",
+   "kind": "Chain",
+   "x": -148.05,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 208.05,
+   "arcLength": 13.2
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Pad02",
+   "kind": "Mount",
+   "x": -148.05,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 208.05,
+   "arcLength": 0
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Gap05",
+   "kind": "Advance",
+   "x": -166.05,
+   "y": 24.0,
+   "z": 55.999,
+   "yaw": 90,
+   "segment": 3,
+   "segmentTravel": 226.05,
+   "arcLength": 18.0
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "CornerC",
+   "kind": "Corner",
+   "x": -180.001,
+   "y": 24.0,
+   "z": 45.789,
+   "yaw": 0,
+   "segment": 4,
+   "segmentTravel": 10.21,
+   "arcLength": 23.388
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Bumper03",
+   "kind": "Mount",
+   "x": -180.001,
+   "y": 24.0,
+   "z": 45.789,
+   "yaw": 0,
+   "segment": 4,
+   "segmentTravel": 10.21,
+   "arcLength": 0
+  },
+  {
+   "beat": "04_SkyThread",
+   "piece": "Ramp06",
+   "kind": "Chain",
+   "x": -180.001,
+   "y": 18.001,
+   "z": 16.74,
+   "yaw": 0,
+   "segment": 4,
+   "segmentTravel": 39.259,
+   "arcLength": 29.049
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "Floor07",
+   "kind": "Chain",
+   "x": -180.001,
+   "y": 18.001,
+   "z": -9.66,
+   "yaw": 0,
+   "segment": 4,
+   "segmentTravel": 65.66,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "CornerD",
+   "kind": "Corner",
+   "x": -169.79,
+   "y": 18.001,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 10.21,
+   "arcLength": 23.388
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "Ramp07",
+   "kind": "Chain",
+   "x": -140.741,
+   "y": 24.0,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 39.26,
+   "arcLength": 29.049
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "Floor08",
+   "kind": "Chain",
+   "x": -114.341,
+   "y": 24.0,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 65.66,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "Floor09",
+   "kind": "Chain",
+   "x": -87.941,
+   "y": 24.0,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 92.06,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "HammerLarge",
+   "kind": "Mount",
+   "x": -87.941,
+   "y": 24.0,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 92.06,
+   "arcLength": 0
+  },
+  {
+   "beat": "05_HammerHour",
+   "piece": "HammerSmall",
+   "kind": "Mount",
+   "x": -87.941,
+   "y": 24.0,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 92.06,
+   "arcLength": 0
+  },
+  {
+   "beat": "06_SplashSprint",
+   "piece": "Floor10",
+   "kind": "Chain",
+   "x": -61.541,
+   "y": 24.0,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 118.46,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "06_SplashSprint",
+   "piece": "Slide01",
+   "kind": "Chain",
+   "x": -55.749,
+   "y": 11.998,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 124.252,
+   "arcLength": 5.793
+  },
+  {
+   "beat": "06_SplashSprint",
+   "piece": "RunOut01",
+   "kind": "Chain",
+   "x": -29.349,
+   "y": 11.998,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 150.652,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "06_SplashSprint",
+   "piece": "RunOut02",
+   "kind": "Chain",
+   "x": -2.949,
+   "y": 11.998,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 177.052,
+   "arcLength": 26.4
+  },
+  {
+   "beat": "06_SplashSprint",
+   "piece": "Bumper04",
+   "kind": "Mount",
+   "x": -2.949,
+   "y": 11.998,
+   "z": -56.001,
+   "yaw": -90,
+   "segment": 5,
+   "segmentTravel": 177.052,
+   "arcLength": 0
+  }
+ ],
+ "guide": {
+  "kind": "Serpentine",
+  "polylineXZ": [
+   [
+    -180,
+    168
+   ],
+   [
+    60,
+    168
+   ],
+   [
+    60,
+    56
+   ],
+   [
+    -180,
+    56
+   ],
+   [
+    -180,
+    -56
+   ],
+   [
+    60,
+    -56
+   ],
+   [
+    60,
+    -168
+   ],
+   [
+    -180,
+    -168
+   ]
+  ],
+  "segmentsUsed": 5,
+  "lanePitch": 112,
+  "note": "HANDOFF 5.2. Every Corner piece lands exactly on a guide vertex; the builder fails the build if a run exceeds its segment length."
+ },
+ "method": "Read directly off CourseBuilder.build's BuildReport during a real Studio Play session on the Match Place. Route positions are the running cursor after each piece is placed, which is the instrumentation added to diagnose the earlier X=-493 overrun.",
+ "gitCommit": "0494b88 plus the uncommitted Gate 3 working tree"
+}
