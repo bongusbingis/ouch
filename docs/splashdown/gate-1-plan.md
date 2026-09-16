@@ -1,10 +1,10 @@
 # Gate 1 — proposed scope and approval
 
-Discovery is complete in [00-findings.md](00-findings.md) and [01-asset-inventory.md](01-asset-inventory.md). **No kit or course implementation has begun.** Numbers below are intended coverage, not measured performance promises.
+Discovery is complete in [00-findings.md](00-findings.md) and [01-asset-inventory.md](01-asset-inventory.md). **Gate 1 approved by the user on 2026-09-15, with no Deprecated archive. Phase 1 is ready for Gate 2 review in [02-kits.md](02-kits.md).** Numbers below are intended coverage, not measured performance promises.
 
-## Preserve and stage
+## Replace and stage
 
-Keep every existing source course and recipe. Preserve the seven parked models in an approved Deprecated archive; do not delete them. Keep the existing registration until a validated replacement set can be swapped safely. First establish an authored arena asset snapshot/manifest: the current template folder is empty and the repo lacks the base arena place needed by the normal build script. CrossCurrent's missing template remains an explicit failure, not a silently skipped test.
+The user's approval explicitly rejects retaining deprecated courses. Remove the six superseded parked models (WhirlPool, DiscJockey, KnockKnock, BumperBay, TiltTrip, Downpour) and retire their recipes/registrations plus the absent CrossCurrent recipe when the replacement swap is validated; do not create a Deprecated folder or copies. SummitSplash is retained for the requested hardening pass. Discovery evidence remains historical QA, not an authored-course archive. First establish a kit/Summit source snapshot and manifest: the current template folder is empty and the repo lacks the base arena place needed by the normal build script. CrossCurrent's missing template remains an explicit baseline failure until retirement, not a silently skipped test.
 
 Build a declarative spec + socket/asset manifest adapter around the existing author conventions. New IDs never overwrite legacy IDs. Specs own numbered beats, palette, asset scales, entry/exit sockets, support mounts, hazard attributes, gates and route nodes; generated runtime markers retain the mode's contract. No gameplay UI work, new meshes or name-list additions.
 
@@ -57,12 +57,12 @@ Luau course-QA module: bounds/spawns/finish; strict attributes; intended-route a
 
 Every final course, including Summit: top-down + three-quarter fixed cameras; compare explicitly with bad references1/9/10/11; route-driving Humanoid trials (times, falls, hit rate); Studio keyboard-controlled run; expected-fall/timing/fairness checklist. Teleports between test cases are allowed, never counted as a traversal. Never mark estimated pars or an unrun manual checklist as passed.
 
-## Approval requested
+## Approval recorded
 
 1. Approve the additive kit plan and six proposed course headlines, with Ball Barrage as the pilot?
-2. Approve retaining the parked courses as Deprecated and disabling their old registrations only during a validated replacement swap?
+2. User override: **do not preserve old deprecated courses**. Delete superseded course content at replacement; retain Summit only. Original archive recommendation is rejected.
 3. Approve the compatibility decisions: positive respawn for critical falling tiles; three-ball pilot; timed jumping through a hazard is allowed but bypassing its gate is not; existing lifecycle folders retained through the builder adapter; opt-in server-authoritative course carry/ball behaviour; uniform scaled disc variants?
 
 Open technical limits remain explicit in the findings: authored base place missing from repo, CrossCurrent absent, desktop helper unavailable (Studio input tools are an alternative), no new course timings yet. If any decision is rejected, revise specs before implementation.
 
-**WAITING FOR GATE 1 APPROVAL.**
+**GATE 1 APPROVED. NEXT STOP: GATE 2 (kits and smoke tests), BEFORE COURSE BUILDING.**
