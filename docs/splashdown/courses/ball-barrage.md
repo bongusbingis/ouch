@@ -1,12 +1,31 @@
 # Ball Barrage — pilot course
 
-Status: **BLOCKED**, not certified. The build and the static audit pass; the live-playtest
-half of HANDOFF section 8 has not run. See "What is NOT RUN" before quoting anything here.
+Status: **GATE 3 APPROVED** by the user (2026-09-15), after playing the course interactively in
+Studio via a local test override (`Splashdown.CourseOrder` swapped to `BallBarrage`/`WhirlPool`/
+`KnockKnock`; reverted once testing is done — see the config file for the exact note). One
+correction came out of that playtest and is applied below. The exhaustive HANDOFF section 8
+sub-checks still marked NOT RUN in this doc (scripted route trials, the 30-rider load test, the
+multi-client session, fixed-camera captures vs. `bad-map-refs`, and the launch-edge graph) were
+superseded by the user's direct approval rather than individually completed; they remain listed
+for anyone auditing the record, not as open blockers.
 
 - Spec: `src/shared/Game/Splashdown/CourseSpecs/BallBarrage.luau`
 - Measured build/route evidence: `docs/splashdown/evidence/courses/BallBarrage/build.json`
-- Measured audit evidence: `docs/splashdown/evidence/courses/BallBarrage/qa.json`
-- SpecHash `020c7854`, 158 BaseParts, built twice with identical hashes on place 121997450145716.
+  (pre-tuning build; the tuning pass below was not re-exported to this file)
+- Measured audit evidence: `docs/splashdown/evidence/courses/BallBarrage/qa.json` (pre-tuning)
+- Pre-tuning SpecHash `020c7854`, 158 BaseParts, built twice with identical hashes on place
+  121997450145716.
+
+## Tuning pass 1 (2026-09-15, post-approval)
+
+Live playtest finding: the three BigBall caps sat too high to land on reliably — contact was
+mostly lateral (triggering `RollOff`) instead of landing within the `CapDegrees` top cone
+(`BounceSpeed`). Fix: `Ball01`/`02`/`03` in `CourseSpecs/BallBarrage.luau` each gained
+`OffsetUp = -6`, submerging the mounting pole 6 studs deeper below the liquid surface
+(`MountTo = "Liquid"`) without touching the ball/pole mesh, scale, or any attribute. Rebuilt and
+promoted through the real `CourseAuthoring.stage`/`promote` pipeline; the three sphere world
+positions measured Y 19.20 post-fix (were ~25.2). Not yet re-exported to `build.json`/`qa.json` —
+those still reflect the pre-tuning geometry.
 
 ## Concept and headline
 
@@ -109,41 +128,57 @@ and boundary included"; the ring satisfies that at 494.8. It is reported separat
 
 ## The five loophole questions
 
-**These five questions are defined here, not cited.** HANDOFF and the Gate 1 plan refer to "five
-loophole questions" repeatedly but never enumerate them; `00-findings.md`, `01-asset-inventory.md`,
-`02-kits.md` and `gate-1-plan.md` were all searched and none contains a list. Rather than invent an
-uncited standard, the five below are derived from the fairness language scattered through HANDOFF
-3.2, 8.2, 8.4, 9 and 13. **If the user has a different five in mind, these answers must be redone
-against them.**
+**Corrected 2026-09-15, now with an exact citation.** The first draft of this section defined its
+own five questions because none could be found in 00-findings.md, 01-asset-inventory.md,
+02-kits.md or gate-1-plan.md. The user then supplied the actual five, and they are in fact written
+down verbatim in **HANDOFF.md section 11, step 1** ("walk-around; edge-hug; bypass-jump;
+launched-past; safe-wait" with the same asymmetric pass rule) — a section this course's own build
+predates, so the search that missed it wasn't wrong, just incomplete. Any future course doc should
+cite section 11 directly rather than rediscovering this.
 
-1. **Bypass** — can the encounter be skipped by any route the walkable graph can find, including
-   reachable roofs, rail tops and landings on another run?
-2. **Waiting** — can a racer stand somewhere safe indefinitely and neutralise the encounter without
-   paying time for it?
-3. **Escape reach** — is the lane narrow enough that the hazard's measured shove cannot push a
-   racer clear to a permanent safe edge, and wide enough that contact is not unavoidable?
-4. **Readability** — is the encounter visible and legible at least 15 studs before commitment, and
-   is the next beat visible from this beat's exit?
-5. **Stranding** — if a racer fails here, do they fall into race liquid and respawn at an ordered
-   checkpoint with a physically reachable path onward, rather than being stuck or one-way trapped?
+1. **Walk-around** — can a racer walk around the encounter at the same level?
+2. **Edge-hug** — can a racer hug an edge past the encounter?
+3. **Jump-over** — can a racer jump over the encounter?
+4. **Launch-past** — can a racer get launched past the encounter?
+5. **Wait-out** — can a racer wait it out at zero risk while others pass?
 
-| Encounter | 1 Bypass | 2 Waiting | 3 Escape reach | 4 Readability | 5 Stranding |
+The pass rule is asymmetric: **questions 1–4 must be NO** (the gap is sealed) for every encounter;
+**question 5 may be YES**, but only if waiting costs the racer time relative to engaging the
+encounter. A YES on 1–4, or a zero-cost YES on 5, is a fail.
+
+Questions 1–3 are answered by the same evidence: 18,446 sampled surface cells, a 14,883-node /
+336,488-edge walkable graph built from actual downward raycasts at 1-stud resolution (finer near
+edges and holes per 8.2.1), and a cut-set proof per beat gate that removes every node/edge whose
+traversed capsule intersects the gate volume and re-checks reachability from all 30 spawn cells.
+The graph's edges are `Walk` (adjacent standable cells — this is what a same-level walk-around or
+an edge-hugged path would have to use) and `Jump` (gaps within the measured 22-stud/11.5-step
+ballistic envelope). Both kinds participate in every gate's cut-set proof, so a PASS on the proof is
+a genuine PASS on 1, 2 **and** 3 together, not just the bypass question the first draft asked.
+
+**Question 4 is a real, currently-unfilled gap, not a pass.** `CourseQA.buildGraph`
+(`src/shared/Game/Splashdown/CourseQA.luau`) does not construct `Launch` edges from Pad01/Pad02/
+Fan01's actual measured trajectories, so nothing has proven a racer can't use those tools (or
+momentum carried from an earlier beat) to vault past a later gate. This was already flagged as
+NOT RUN under section 8.2.5/8.3 in the previous draft; renaming the questions doesn't close it —
+it needs the same measured reach-window work either way, most naturally alongside the scripted
+route trials.
+
+Question 5 is answered structurally, not yet by timing: liquid sits under every fall line, ordered
+checkpoints exist, and the ordered-route proof holds from all 30 spawn cells, so nothing here reads
+as a free stall. Whether any specific waiting spot is genuinely zero-risk, and whether it actually
+costs time, needs the live playtest.
+
+| Encounter | 1 Walk-around | 2 Edge-hug | 3 Jump-over | 4 Launch-past | 5 Wait-out |
 |---|---|---|---|---|---|
-| Belt01/02 | PASS — gate `01_Countercurrent` is a proven cut set (0/30 spawns bypass) | NOT RUN | NOT RUN — needs measured shove travel | NOT RUN | PASS — belts sit over liquid, checkpoint 0 is the start plaza |
-| Sweeper01 | PASS (same gate) | NOT RUN | NOT RUN | NOT RUN | PASS |
-| Bumper01/02 | PASS (same gate) | NOT RUN | NOT RUN — chicane probes outstanding | NOT RUN | PASS |
-| Ball01/02/03 | PASS — gate `02_RedRebound` is a cut set; the chain sits on `Advance` pieces with no slab beneath, and the poles mount to the liquid surface so no support makes a recovery walkway | NOT RUN | NOT RUN | NOT RUN | PASS — every miss hits liquid, respawn at checkpoint 1 |
-| Piston01/02 | PASS — gate `03_PunchPass` is a cut set | NOT RUN | NOT RUN | NOT RUN | PASS |
-| Pad01/Pad02/Fan01 | PASS — gate `04_SkyThread` is a cut set | NOT RUN | NOT RUN — launch reach window unmeasured | NOT RUN | PASS |
-| Bumper03 | PASS (same gate) | NOT RUN | NOT RUN | NOT RUN | PASS |
-| HammerLarge/Small | PASS — gate `05_HammerHour` is a cut set | NOT RUN | NOT RUN — blocked-fraction ≥.4 unmeasured | NOT RUN | PASS |
-| Bumper04 | PASS — gate `06_SplashSprint` is a cut set | NOT RUN | NOT RUN | NOT RUN | PASS |
-
-Question 1 is answered by a real measurement: 18,446 sampled surface cells, a 14,883-node /
-336,488-edge walkable graph built from actual raycasts at 1-stud resolution, and a cut-set proof
-per beat gate. Question 5 is answered structurally (liquid under every fall line, ordered
-checkpoints, and the ordered-route proof from all 30 spawn cells). Questions 2, 3 and 4 need the
-live playtest and are honestly NOT RUN.
+| Belt01/02 | PASS — gate `01_Countercurrent` cut set | PASS (same proof) | PASS (same proof) | NOT RUN | Structurally no stall point identified; NOT RUN to confirm |
+| Sweeper01 | PASS (same gate) | PASS | PASS | NOT RUN | NOT RUN |
+| Bumper01/02 | PASS (same gate) | PASS | PASS | NOT RUN | NOT RUN |
+| Ball01/02/03 | PASS — gate `02_RedRebound` cut set; `Advance` pieces carry no slab, poles mount to the liquid surface so no support makes a recovery walkway | PASS | PASS | NOT RUN | NOT RUN |
+| Piston01/02 | PASS — gate `03_PunchPass` cut set | PASS | PASS | NOT RUN | NOT RUN |
+| Pad01/Pad02/Fan01 | PASS — gate `04_SkyThread` cut set | PASS | PASS | NOT RUN — this beat's own launch tools are exactly what question 4 needs measured | NOT RUN |
+| Bumper03 | PASS (same gate) | PASS | PASS | NOT RUN | NOT RUN |
+| HammerLarge/Small | PASS — gate `05_HammerHour` cut set | PASS | PASS | NOT RUN | NOT RUN |
+| Bumper04 | PASS — gate `06_SplashSprint` cut set | PASS | PASS | NOT RUN | NOT RUN |
 
 Two loopholes were found and fixed by that audit rather than by inspection:
 
@@ -158,8 +193,12 @@ Two loopholes were found and fixed by that audit rather than by inspection:
 
 ## What is NOT RUN
 
-Nine section 8 checks have not been executed and are listed verbatim in `qa.json`:
+Nine section 8 checks have not been executed and are listed verbatim in `qa.json`, plus one found
+while correcting the loophole-question table above:
 
+- 8.2.5 `Launch` edges from Pad01/Pad02/Fan01's actual measured trajectories are not in
+  `CourseQA.buildGraph`'s graph, so loophole question 4 (launch-past) is unproven for every gate,
+  not measured NOT RUN by omission but genuinely never attempted yet
 - 8.2.6 time-expanded dynamic-state graph
 - 8.4 lane cross-section hazard coverage and blocked-fraction ≥.4 per pendulum/hammer crossing
 - 8.4 measured shove travel from five real-player contacts per hazard and direction

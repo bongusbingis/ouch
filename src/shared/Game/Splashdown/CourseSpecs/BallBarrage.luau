@@ -133,6 +133,12 @@ local BallBarrage: CourseBuilder.CourseSpec = {
 					OffsetAlong = -8,
 					OffsetSide = 0,
 					MountTo = "Liquid",
+					-- Tuning pass 1 (2026-09-15, live playtest): the cap sat too
+					-- high for a reliable top-down landing, so contact was
+					-- mostly lateral (RollOff) instead of a clean bounce.
+					-- Submerging the pole 6 studs deeper lowers the cap by the
+					-- same amount without touching ball/pole geometry.
+					OffsetUp = -6,
 				},
 				{ Id = "Step01", Kind = "Chain", Preset = "Platform", Source = "platform_002", Scale = 0.15 },
 				{ Id = "Gap02", Kind = "Advance", OffsetAlong = 16 },
@@ -145,6 +151,7 @@ local BallBarrage: CourseBuilder.CourseSpec = {
 					OffsetAlong = -8,
 					OffsetSide = 4,
 					MountTo = "Liquid",
+					OffsetUp = -6, -- tuning pass 1, see Ball01
 					RotorAmplitude = 5,
 					RotorPeriod = 3.4,
 					RotorPhase = 0.6,
@@ -160,6 +167,7 @@ local BallBarrage: CourseBuilder.CourseSpec = {
 					OffsetAlong = -7,
 					OffsetSide = -4,
 					MountTo = "Liquid",
+					OffsetUp = -6, -- tuning pass 1, see Ball01
 					RotorAmplitude = 8,
 					RotorPeriod = 2.8,
 					RotorPhase = 1.3,
