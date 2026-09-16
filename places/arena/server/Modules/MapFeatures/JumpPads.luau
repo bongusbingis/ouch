@@ -61,13 +61,17 @@ end
 
 local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: Model)
 	local settings = config()
+	local launchSpeed =
+		math.clamp(tonumber(pad:GetAttribute(MapFeatures.Attributes.LaunchSpeed)) or settings.BouncePower, 1, 160)
+	local floatFactor =
+		math.clamp(tonumber(pad:GetAttribute(MapFeatures.Attributes.FloatFactor)) or settings.FloatFactor, 0, 0.9)
 
 	clearBounce(player)
 
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	local velocity = root.AssemblyLinearVelocity
-	root.AssemblyLinearVelocity = Vector3.new(velocity.X, settings.BouncePower, velocity.Z)
-	MovementGuard.allow(root, "JumpPad", settings.MaxFloatSeconds + 1, 0, settings.BouncePower * 1.3)
+	root.AssemblyLinearVelocity = Vector3.new(velocity.X, launchSpeed, velocity.Z)
+	MovementGuard.allow(root, "JumpPad", settings.MaxFloatSeconds + 1, 0, launchSpeed * 1.3)
 
 	local attachment = Instance.new("Attachment")
 	attachment.Name = ATTACHMENT_NAME
@@ -78,7 +82,7 @@ local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: M
 	force.Attachment0 = attachment
 	force.ApplyAtCenterOfMass = true
 	force.RelativeTo = Enum.ActuatorRelativeTo.World
-	force.Force = Vector3.new(0, root.AssemblyMass * Workspace.Gravity * settings.FloatFactor, 0)
+	force.Force = Vector3.new(0, root.AssemblyMass * Workspace.Gravity * floatFactor, 0)
 	force.Parent = root
 
 	bounces[player] = {
