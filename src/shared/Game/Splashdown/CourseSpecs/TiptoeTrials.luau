@@ -497,6 +497,10 @@ local TiptoeTrials: CourseBuilder.CourseSpec = {
 					OffsetAlong = -10,
 					OffsetUp = HAMMER_LARGE_UP,
 					RotorAmplitude = 55,
+					-- Retuned from the windup/strike hammer profile (cycle 2.1s) to a
+					-- symmetric rock at period 3.6s; phases rescaled to keep the same
+					-- 1/3-cycle stagger between the two hammers (0.7/2.1 -> 1.2/3.6).
+					RotorPeriod = 3.6,
 					RotorPhase = 0,
 				},
 				{ Id = "Lane07", Kind = "Chain", Preset = "Platform", Source = "platform_002", Scale = 0.18 },
@@ -548,7 +552,8 @@ local TiptoeTrials: CourseBuilder.CourseSpec = {
 					OffsetAlong = -10,
 					OffsetUp = HAMMER_SMALL_UP,
 					RotorAmplitude = 55,
-					RotorPhase = 0.7,
+					RotorPeriod = 3.6,
+					RotorPhase = 1.2,
 				},
 				{ Id = "Lane08", Kind = "Chain", Preset = "Platform", Source = "platform_002", Scale = 0.14 },
 				{

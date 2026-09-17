@@ -93,9 +93,6 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 		if a.JumpPad and (not part:IsA("Model") or not part.Parent or part.Parent.Name ~= "JumpPads") then
 			fail("JumpPad model must be in Scriptables/JumpPads")
 		end
-		if a.FoamPit and (not part:IsA("BasePart") or not part.Parent or part.Parent.Name ~= "FoamPits") then
-			fail("FoamPit volume must be in Scriptables/FoamPits")
-		end
 		if a.FallingTile and a.RespawnSeconds == 0 and a.CriticalRoute == true then
 			fail("never-respawn tile would strand checkpoint runners")
 		end

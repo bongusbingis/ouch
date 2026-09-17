@@ -29,13 +29,11 @@ export type PresetName =
 	-- Whirlpool Waltz additions. Spinner covers every single-mesh Y-spin shove
 	-- silhouette (dumbbell, cross, two-arm); RidePlatform is a hub-and-plate
 	-- rotating deck the route crosses; SwingPanel is obstacle_8's rocking panel
-	-- (NOT obstacle_24, the paddlewheel); Door is one slab of a door row;
-	-- FoamPit is an authored volume rather than a kit mesh.
+	-- (NOT obstacle_24, the paddlewheel); Door is one slab of a door row.
 	| "Spinner"
 	| "RidePlatform"
 	| "SwingPanel"
 	| "Door"
-	| "FoamPit"
 	-- Door Dash additions. Mace is the hanging chain-and-ball pendulum whose top
 	-- link is the axle; PaddleWheel is obstacle_24's four-cradle wheel spinning on
 	-- its measured X axle (NOT obstacle_8, the swing panel).
@@ -89,6 +87,13 @@ export type PieceSpec = {
 	RotorPeriod: number?,
 	RotorPhase: number?,
 	ShoveSpeed: number?,
+	-- Piston only: the spring's extend distance (studs), its extend/retract cycle
+	-- period, and how long it holds fully extended before retracting. B4: the old
+	-- hardcoded 6/3.2/0.6 could not reach some lanes' decks; declared here so a
+	-- course can tune a specific piston the same way Sweeper tunes RotorAmplitude.
+	PistonExtendStuds: number?,
+	PistonPeriod: number?,
+	HoldSeconds: number?,
 	LaunchSpeed: number?,
 	FloatFactor: number?,
 	FanAxis: ("X" | "Y" | "Z")?,
@@ -115,7 +120,6 @@ export type BuildContext = {
 	Assembly: Instance,
 	JumpPadsFolder: Instance,
 	DoorsFolder: Instance,
-	FoamPitsFolder: Instance,
 	Geometry: Instance,
 	CourseId: string,
 	BeatId: string,
@@ -367,7 +371,10 @@ local function buildChainPiece(context: BuildContext, spec: PieceSpec, cursor: C
 		assert(board ~= nil, `[CoursePresets] {spec.Id} missing cloned seesaw board {boardPath}`)
 		board:SetAttribute(A.Seesaw, true)
 		board:SetAttribute(A.SeesawAxis, "X")
-		board:SetAttribute(A.MaxTiltDegrees, spec.MaxTiltDegrees or 24)
+		-- B6: the shipped courses measure 18-24 degrees, which does not read as
+		-- dangerous. Raised to 34, still overridable by spec.MaxTiltDegrees exactly
+		-- as before.
+		board:SetAttribute(A.MaxTiltDegrees, spec.MaxTiltDegrees or 34)
 		board:SetAttribute(A.SeesawResponse, 3)
 		holder.Parent = context.Assembly
 		local delta = exitWorldPosition - cursor.Position
@@ -461,16 +468,20 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 			root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
 		end
 	elseif spec.Preset == "Sweeper" then
-		root:SetAttribute(A.Rotor, "slide")
-		root:SetAttribute(A.RotorAxis, "X")
-		-- A slide's amplitude is STUDS along the axis (Rotation.slideAt), so the swept
-		-- span is the frame's own length plus twice this. Ball Barrage's 4 sweeps a
-		-- lane it shares with two conveyors; Summit's narrowed inward bridge needs the
-		-- sweep to cover the whole crossing, so the amplitude is a per-course number
-		-- with the default preserved.
-		root:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 4)
-		root:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 3.2)
-		root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
+		-- The frame's own "slide" rotor is OPT-IN: it is written only when the caller
+		-- declares RotorAmplitude, and there is deliberately no default. A spiked
+		-- roller that also translates side to side reads as wrong, which is why the
+		-- courses that just wanted a spinning drum must say nothing and get a static
+		-- frame. Summit's 06_FinalFooting is the one place the travel is the point --
+		-- 27.20 studs of frame plus 2 x 8 of sweep covers a 16.25-stud bridge end to
+		-- end -- so it declares the amplitude and keeps the slide.
+		if spec.RotorAmplitude then
+			root:SetAttribute(A.Rotor, "slide")
+			root:SetAttribute(A.RotorAxis, "X")
+			root:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude)
+			root:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 3.2)
+			root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
+		end
 		local drum = sub("obstacle_2_002")
 		drum:SetAttribute(A.Rotor, "spin")
 		drum:SetAttribute(A.RotorAxis, "X")
@@ -489,8 +500,8 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		-- Section 6: "Log-roll ... Spin along long axis + Shove + Carries on actual ride
 		-- surface; not an unanchored physics barrel." Two source shapes qualify, so the
 		-- preset drives whichever the manifest declares: a framed roller turns only its
-		-- declared drum and leaves the cradle fixed (unlike the Sweeper, whose frame
-		-- slides), and a single-mesh barrel turns on its own root. Speed comes from the
+		-- declared drum and leaves the cradle fixed (unlike a Sweeper that has opted
+		-- into a sliding frame), and a single-mesh barrel turns on its own root. Speed comes from the
 		-- section 6 formula at the MEASURED crossing radius, and the sign is the
 		-- caller's, because consecutive rollers spin opposite ways.
 		local drum = if manifest.SubParts then sub((manifest.SubParts :: any)[1].Name) else root
@@ -515,16 +526,21 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		drum:SetAttribute(A.RetriggerCooldown, 0.8)
 		drum:SetAttribute(A.GuardSeconds, 1.0)
 	elseif spec.Preset == "Piston" then
+		-- B4: measured on the shipped courses, the gap from a piston body to the
+		-- nearest deck edge runs 9.0-15.1 studs, so the old 6-stud throw physically
+		-- could not reach some lanes, and the old cycle read as slow. All four are
+		-- now spec-driven with new defaults: a longer, faster throw (18 studs,
+		-- 1.9s period), a shorter hold (0.35s) and a faster shove (54).
 		local spring = sub("obstacle_22_002")
 		spring:SetAttribute(A.Rotor, "slide")
 		spring:SetAttribute(A.RotorProfile, "piston")
 		spring:SetAttribute(A.RotorAxis, "Z")
-		spring:SetAttribute(A.PistonPeriod, 3.2)
+		spring:SetAttribute(A.PistonPeriod, spec.PistonPeriod or 1.9)
 		spring:SetAttribute(A.PistonPhase, spec.RotorPhase or 0)
-		spring:SetAttribute(A.PistonExtendStuds, 6)
-		spring:SetAttribute(A.HoldSeconds, 0.6)
+		spring:SetAttribute(A.PistonExtendStuds, spec.PistonExtendStuds or 18)
+		spring:SetAttribute(A.HoldSeconds, spec.HoldSeconds or 0.35)
 		spring:SetAttribute(A.Shove, true)
-		spring:SetAttribute(A.ShoveSpeed, 44)
+		spring:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 54)
 		spring:SetAttribute(A.ShoveUpwardSpeed, 20)
 		spring:SetAttribute(A.ShoveSeconds, 0.24)
 		spring:SetAttribute(A.ShoveContact, "mesh")
@@ -534,11 +550,13 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 	elseif spec.Preset == "Hammer" then
 		local head = sub(if sourceId == "obstacle_3_001" then "obstacle_3_002" else "obstacle_4_002")
 		head:SetAttribute(A.Rotor, "rock")
-		head:SetAttribute(A.RotorProfile, "hammer")
 		head:SetAttribute(A.RotorAxis, "Z")
 		head:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 55)
-		head:SetAttribute(A.WindupSeconds, 1.8)
-		head:SetAttribute(A.StrikeSeconds, 0.3)
+		-- Retuned: the "hammer" windup/strike profile (rise 1.8s, drop .3s) read as a
+		-- slow lift snapping shut, not a pendulum. The plain rock is the same symmetric
+		-- sinusoid Mace and SwingPanel already swing on -- equal time each way, fastest
+		-- at the bottom of the arc -- just slower than the old 2.1s cycle.
+		head:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 3.6)
 		head:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
 		head:SetAttribute(A.Shove, true)
 		head:SetAttribute(A.ShoveSpeed, 58)
@@ -576,11 +594,12 @@ local function buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFr
 		local axle = assert(manifest.Sockets.Axle, `[CoursePresets] {sourceId} has no measured Axle socket`)
 		root.PivotOffset = CFrame.new(axle.Position * spec.Scale)
 		root:SetAttribute(A.Rotor, "rock")
-		root:SetAttribute(A.RotorProfile, "hammer")
 		root:SetAttribute(A.RotorAxis, "Z")
 		root:SetAttribute(A.RotorAmplitude, spec.RotorAmplitude or 55)
-		root:SetAttribute(A.WindupSeconds, spec.WindupSeconds or 1.8)
-		root:SetAttribute(A.StrikeSeconds, spec.StrikeSeconds or 0.3)
+		-- Retuned: dropped the windup/strike hammer profile for the same symmetric
+		-- rock every other pendulum in the kit uses (see the Hammer preset above),
+		-- at a slower period.
+		root:SetAttribute(A.RotorPeriod, spec.RotorPeriod or 3.6)
 		root:SetAttribute(A.RotorPhase, spec.RotorPhase or 0)
 		root:SetAttribute(A.Shove, true)
 		root:SetAttribute(A.ShoveSpeed, spec.ShoveSpeed or 58)
@@ -756,32 +775,6 @@ local function buildRidePiece(context: BuildContext, spec: PieceSpec, centre: Ve
 	return { Model = holder, PartCount = partCount(holder) }
 end
 
--- A foam penalty volume. HANDOFF 3.3 allows invisible markers and test volumes
--- as ordinary Parts; a foam pit is the existing volume pattern, not a new
--- visual asset, and it lives in Scriptables/FoamPits with FoamPit = true.
-local function buildFoamPit(context: BuildContext, spec: PieceSpec, targetCFrame: CFrame): BasePart
-	local size = assert(spec.VolumeSize, `[CoursePresets] {spec.Id} needs VolumeSize`)
-	-- The volume is an IMMEDIATE child of Scriptables/FoamPits, not wrapped in a
-	-- holder: AttributeAudit resolves a foam pit by its parent folder and rejects
-	-- one nested a level deeper.
-	local volume = Instance.new("Part")
-	volume.Name = pieceName(context, "foampit")
-	volume.Size = size
-	volume.CFrame = targetCFrame * CFrame.new(0, size.Y / 2, 0)
-	volume.Anchored = true
-	volume.CanCollide = false
-	volume.CanTouch = true
-	volume.CanQuery = true
-	volume.Transparency = 0.55
-	volume.Color = Color3.fromRGB(255, 240, 202)
-	volume:SetAttribute(A.FoamPit, true)
-	volume:SetAttribute("CourseId", context.CourseId)
-	volume:SetAttribute("BeatId", context.BeatId)
-	volume:SetAttribute("PieceId", spec.Id)
-	volume.Parent = context.FoamPitsFolder
-	return volume
-end
-
 function CoursePresets.buildChainPiece(context: BuildContext, spec: PieceSpec, cursor: Cursor): ChainResult
 	return buildChainPiece(context, spec, cursor)
 end
@@ -802,12 +795,6 @@ function CoursePresets.buildCornerPiece(context: BuildContext, spec: PieceSpec, 
 end
 
 function CoursePresets.buildMountPiece(context: BuildContext, spec: PieceSpec, targetCFrame: CFrame): MountResult
-	-- A foam pit is an authored volume rather than a cloned kit mesh, so it does
-	-- not go through the source/socket path at all.
-	if spec.Preset == "FoamPit" then
-		local volume = buildFoamPit(context, spec, targetCFrame)
-		return { Model = volume :: any, PartCount = 1 }
-	end
 	return buildMountPiece(context, spec, targetCFrame)
 end
 

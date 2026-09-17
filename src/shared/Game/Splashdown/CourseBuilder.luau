@@ -29,6 +29,14 @@ local METADATA_ALLOWLIST = {
 	SpecHash = true,
 	SourceHash = true,
 	QAOnly = true,
+	-- G2b: buildCheckpoint's Arch sets SourceAsset directly (it is built by this
+	-- file, not cloned through CoursePresets.clonePiece, which is the only other
+	-- place that attribute gets written). AttributeAudit's own internal
+	-- vocabulary already happens to permit SourceAsset everywhere, but it is
+	-- declared here too so this file's own allowlist stays a complete record of
+	-- every attribute it authors directly, rather than depending on a fact about
+	-- a module it does not own.
+	SourceAsset = true,
 }
 
 export type PieceSpec = {
@@ -90,6 +98,13 @@ export type PieceSpec = {
 	RotorPeriod: number?,
 	RotorPhase: number?,
 	ShoveSpeed: number?,
+	-- Piston only, mirrored from CoursePresets.PieceSpec: the spring's extend
+	-- distance (studs), its extend/retract cycle period, and how long it holds
+	-- fully extended before retracting. B4: the old hardcoded 6/3.2/0.6 could not
+	-- reach some lanes' decks.
+	PistonExtendStuds: number?,
+	PistonPeriod: number?,
+	HoldSeconds: number?,
 	LaunchSpeed: number?,
 	FloatFactor: number?,
 	FanAxis: ("X" | "Y" | "Z")?,
@@ -662,10 +677,56 @@ local function buildStartPads(spec: CourseSpec, sources: Sources, startFolder: F
 	return { Position = exitPosition, Yaw = start.Heading }
 end
 
+-- G2b: nothing in this repository used to build the visible checkpoint arch --
+-- it was added by an uncommitted promotion step, and four checkpoints across
+-- three courses shipped with no arch at all: an invisible checkpoint the racer
+-- can neither see nor aim at, which silently kills every later checkpoint
+-- because progress is strictly sequential. Built here instead, from the same
+-- checkpoint_001 kit source the shipped courses' arches already are, following
+-- buildPlaza's direct sources.Kit lookup rather than AssetManifest's
+-- socket-driven path: checkpoint_001, like octagon_002, is not a registered
+-- manifest entry, only a named part under the injected Kit.
+-- Idempotent: the uncommitted promotion tool may still run, and would double
+-- the arch up if this did not check for one first.
+local function buildCheckpointArch(sources: Sources, courseId: string, checkpoint: Model, cframe: CFrame)
+	if checkpoint:FindFirstChild("Arch") then
+		return
+	end
+	local source = sources.Kit:FindFirstChild("checkpoint_001")
+	assert(source and source:IsA("BasePart"), "[CourseBuilder] checkpoint_001 missing from injected Kit sources")
+	local arch = (source :: BasePart):Clone()
+	arch.Name = "Arch"
+	-- checkpoint_001 is unscaled 45.6 x 34.9 x 9.9 (01-asset-inventory.md line
+	-- 104). The shipped courses' checkpoint arches measure 11.0 x 8.4 x 2.4, so
+	-- the scale factor is derived from that ratio rather than the finished size
+	-- being hardcoded.
+	local scale = 11.0 / 45.6
+	arch.Size = arch.Size * scale
+	arch.PivotOffset = CFrame.identity
+	arch.Anchored = true
+	arch.CanCollide = true
+	arch.CanTouch = false
+	arch.CanQuery = true
+	arch:SetAttribute("SourceAsset", "checkpoint_001")
+	arch:SetAttribute("CourseId", courseId)
+	arch:SetAttribute("PieceId", "Arch")
+	-- Centred on the trigger's own X/Z and yawed to the cursor heading exactly
+	-- like the Pad and Trigger (cframe carries both already), but standing
+	-- upright ON the deck rather than floated at the trigger's mid-height.
+	arch.CFrame = cframe * CFrame.new(0, arch.Size.Y / 2, 0)
+	arch.Parent = checkpoint
+end
+
 -- Checkpoint pads sit BEFORE the beat's first hazard (HANDOFF 5.1.8), so the pad
 -- is pulled back onto the previous beat's last stable slab rather than balanced
 -- on its exit edge.
-local function buildCheckpoint(index: number, cursor: Cursor, checkpointsFolder: Folder)
+local function buildCheckpoint(
+	sources: Sources,
+	courseId: string,
+	index: number,
+	cursor: Cursor,
+	checkpointsFolder: Folder
+)
 	local checkpoint = Instance.new("Model")
 	checkpoint.Name = string.format("Checkpoint%02d", index)
 	checkpoint.Parent = checkpointsFolder
@@ -673,7 +734,16 @@ local function buildCheckpoint(index: number, cursor: Cursor, checkpointsFolder:
 	local center = cursor.Position - forward(cursor.Yaw) * (padDepth / 2)
 	local cframe = CFrame.new(center) * CFrame.Angles(0, math.rad(cursor.Yaw), 0)
 	marker("Pad", Vector3.new(12, 1, padDepth), cframe, checkpoint)
-	marker("Trigger", Vector3.new(12, 8, 2), cframe * CFrame.new(0, 4, 0), checkpoint)
+	-- G2: a 12-stud-wide trigger on decks that run 19-21 studs wide let a racer
+	-- running the side of the platform pass beside it and never get counted
+	-- (detection in SplashdownService is a per-frame point-in-box test against
+	-- the racer's root position). Widened to 56x24 -- comfortably wider and
+	-- taller than any deck the route crosses -- and raised to 12 studs so the
+	-- taller box is still centred on the deck instead of half-buried in it.
+	-- Depth stays 2: the trigger is a thin plane the route crosses, not a
+	-- volume to linger in.
+	marker("Trigger", Vector3.new(56, 24, 2), cframe * CFrame.new(0, 12, 0), checkpoint)
+	buildCheckpointArch(sources, courseId, checkpoint, cframe)
 end
 
 local function buildFinish(sources: Sources, courseId: string, cursor: Cursor, finishFolder: Folder, geometry: Folder)
@@ -686,7 +756,10 @@ local function buildFinish(sources: Sources, courseId: string, cursor: Cursor, f
 	plaza.Parent = geometry
 	local cframe = CFrame.new(cursor.Position) * CFrame.Angles(0, math.rad(cursor.Yaw), 0)
 	marker("Deck", Vector3.new(24, 1, 20), cframe, finishFolder)
-	marker("Trigger", Vector3.new(24, 8, 2), cframe * CFrame.new(0, 4, 0), finishFolder)
+	-- G2: widened and raised exactly as buildCheckpoint's Trigger is, and for the
+	-- same reason -- a racer finishing along the side of the deck must still
+	-- cross the plane.
+	marker("Trigger", Vector3.new(56, 24, 2), cframe * CFrame.new(0, 12, 0), finishFolder)
 end
 
 -- 24 invisible colliding walls at radius 390, the existing boundary contract
@@ -720,18 +793,47 @@ local function buildBoundary(
 	end
 end
 
-local function buildHazardLiquid(boundsRadius: number, liquidY: number, hazardsFolder: Folder, rise: RisingLiquidSpec?)
-	local liquid = Instance.new("Part")
+-- G1: six of the seven courses shipped a clear blue "water" Part fall zone,
+-- which reads wrong for this game. Summit Splash -- the one legacy course --
+-- already has the correct look: a textured MeshPart (rbxassetid://112354510422105,
+-- texture rbxassetid://83918297212907), Transparency 0, Material Plastic.
+-- Hazard detection (inHazard in SplashdownService) is a pure CFrame/Size box
+-- test that never inspects ClassName, so a MeshPart is exactly as safe here as
+-- Summit already proves it is in a Hazards folder.
+-- A MeshPart cannot be built with Instance.new("MeshPart") and then given an
+-- arbitrary MeshId at runtime in every context, so -- exactly like buildPlaza's
+-- octagon_002 and buildCheckpointArch's checkpoint_001 -- this clones an
+-- authored source instead of constructing one. The source is not under Kit:
+-- it is ArenaSources.LiquidMesh, the same lava plane the arena's own boundary
+-- wall is authored beside, found via sources.BoundaryWall.Parent rather than a
+-- new Sources field so every existing caller that already threads BoundaryWall
+-- through keeps working unchanged.
+local function buildHazardLiquid(
+	sources: Sources,
+	boundsRadius: number,
+	liquidY: number,
+	hazardsFolder: Folder,
+	rise: RisingLiquidSpec?
+)
+	local arenaSources = sources.BoundaryWall.Parent
+	local lavaSource = arenaSources and arenaSources:FindFirstChild("LiquidMesh")
+	assert(
+		lavaSource and lavaSource:IsA("MeshPart"),
+		"[CourseBuilder] ArenaSources.LiquidMesh missing from injected sources"
+	)
+	local liquid = (lavaSource :: MeshPart):Clone()
 	liquid.Name = "Liquid"
-	liquid.Shape = Enum.PartType.Block
+	liquid.MeshId = "rbxassetid://112354510422105"
+	liquid.TextureID = "rbxassetid://83918297212907"
 	liquid.Size = Vector3.new(boundsRadius * 2 + 40, 1, boundsRadius * 2 + 40)
 	liquid.CFrame = CFrame.new(0, liquidY - 0.5, 0)
+	liquid.PivotOffset = CFrame.identity
 	liquid.Anchored = true
 	liquid.CanCollide = false
 	liquid.CanTouch = true
 	liquid.CanQuery = true
-	liquid.Transparency = 0.3
-	liquid.Color = Color3.fromRGB(60, 140, 220)
+	liquid.Transparency = 0
+	liquid.Material = Enum.Material.Plastic
 	-- HANDOFF section 6's reusable rising-liquid twist, which only Piston Peak may
 	-- reuse among the new courses. SplashdownCourses.resolve finds the schedule by
 	-- running RisingLiquid.resolve over every Hazards BasePart, so the attributes go
@@ -1365,14 +1467,6 @@ local function buildSourcePatch(spec: CourseSpec, sources: Sources, startClock: 
 	local boundaryFolder =
 		assert(model:FindFirstChild("Boundary"), "[CourseBuilder] source has no Boundary folder") :: Folder
 
-	local foamPitsFolder = scriptables:FindFirstChild("FoamPits")
-	if not foamPitsFolder then
-		local created = Instance.new("Folder")
-		created.Name = "FoamPits"
-		created.Parent = scriptables
-		foamPitsFolder = created
-	end
-
 	-- The preserved rising liquid, in the ORIGINAL course's attribute vocabulary.
 	local liquidPart: BasePart? = nil
 	for _, part in collectParts(hazardsFolder) do
@@ -1629,7 +1723,6 @@ local function buildSourcePatch(spec: CourseSpec, sources: Sources, startClock: 
 			Assembly = beatGroup,
 			JumpPadsFolder = jumpPadsFolder,
 			DoorsFolder = doorsFolder,
-			FoamPitsFolder = foamPitsFolder :: Instance,
 			Geometry = geometry,
 			CourseId = spec.Id,
 			BeatId = beat.Id,
@@ -1708,6 +1801,9 @@ local function buildSourcePatch(spec: CourseSpec, sources: Sources, startClock: 
 					RotorPeriod = piece.RotorPeriod,
 					RotorPhase = piece.RotorPhase,
 					ShoveSpeed = piece.ShoveSpeed,
+					PistonExtendStuds = piece.PistonExtendStuds,
+					PistonPeriod = piece.PistonPeriod,
+					HoldSeconds = piece.HoldSeconds,
 					LaunchSpeed = piece.LaunchSpeed,
 					FloatFactor = piece.FloatFactor,
 					FanAxis = piece.FanAxis,
@@ -2352,7 +2448,6 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	local rotating = folder("Rotating", scriptables)
 	local jumpPadsFolder = folder("JumpPads", scriptables)
 	local doorsFolder = folder("Doors", scriptables)
-	local foamPitsFolder = folder("FoamPits", scriptables)
 	local boundaryFolder = folder("Boundary", model)
 	local qaGates = folder("Gates", folder("QA", model))
 
@@ -2516,7 +2611,6 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 			Assembly = beatGroup,
 			JumpPadsFolder = jumpPadsFolder,
 			DoorsFolder = doorsFolder,
-			FoamPitsFolder = foamPitsFolder,
 			Geometry = geometry,
 			CourseId = spec.Id,
 			BeatId = beat.Id,
@@ -2528,7 +2622,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 		}
 
 		if beatIndex > 1 then
-			buildCheckpoint(beatIndex - 1, cursor, checkpointsFolder)
+			buildCheckpoint(sources, spec.Id, beatIndex - 1, cursor, checkpointsFolder)
 			lowestCheckpointY = math.min(lowestCheckpointY, cursor.Position.Y)
 		end
 		-- QA gate volume at every beat entrance: an invisible, noncolliding but
@@ -3005,7 +3099,7 @@ function CourseBuilder.build(spec: CourseSpec, sources: Sources): (Model, BuildR
 	end
 
 	buildFinish(sources, spec.Id, cursor, finishFolder, geometry)
-	buildHazardLiquid(layout.BoundsRadius, liquidY, hazards, layout.Rise)
+	buildHazardLiquid(sources, layout.BoundsRadius, liquidY, hazards, layout.Rise)
 	buildBoundary(390, 24, liquidY, sources.BoundaryWall, boundaryFolder)
 
 	local checkpointCount = #checkpointsFolder:GetChildren()

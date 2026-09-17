@@ -353,11 +353,16 @@ local function build(origin: BasePart, assembly: Model): Platform
 			})
 		end
 		if isFan(base) then
+			local fanAxis = base:GetAttribute(Attributes.FanAxis)
+			local axis: Axis = if fanAxis == "X" or fanAxis == "Z" then fanAxis else "Y"
 			for _, blade in base:GetChildren() do
 				if blade:IsA("BasePart") and isFanBlade(blade) then
-					local center = CFrame.new(blade.CFrame:PointToWorldSpace(blade.PivotOffset.Position))
+					-- Carry the fan's own rotation into the centre so the blade spins about
+					-- the fan's local axis, matching FanUpdraft's local-axis airflow, instead
+					-- of always turning about world Y regardless of how the fan is pitched.
+					local center = base.CFrame.Rotation + blade.CFrame:PointToWorldSpace(blade.PivotOffset.Position)
 					addRotor(blade, center, {
-						axis = "Y",
+						axis = axis,
 						mode = "spin",
 						degreesPerSecond = MapFeatures.Fan.BladeDegreesPerSecond,
 						carriesRiders = false,

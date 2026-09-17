@@ -9,7 +9,6 @@ local booleans = {
 	Fan = true,
 	FanBlade = true,
 	JumpPad = true,
-	FoamPit = true,
 	BeachBall = true,
 	BigBall = true,
 	Conveyor = true,

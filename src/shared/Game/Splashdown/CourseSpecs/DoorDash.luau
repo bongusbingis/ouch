@@ -1,6 +1,6 @@
 -- Name: DoorDash.luau
 -- Author: Jack C.
--- Description: Declarative spec for Door Dash (HANDOFF.md section 7.3): a Chute layout -- one wide five-channel door corridor, a hairpin at the route's 60% mark, and a second straight run back -- carrying three real 5-door rows at quota 2, counterbelts under a paddle wheel, a launch chain over a foam catch basin, and a mace gauntlet before one readable finishing sweep. Beat length targets are the section 7.3 targets, unchanged, because the set-wide route length is fixed at 880 measured studs and this build measures inside a stud of it (docs/splashdown/03-overrides.md). Every scale, speed and socket figure traces to AssetManifest or to the measured evidence cited in docs/splashdown/courses/door-dash.md.
+-- Description: Declarative spec for Door Dash (HANDOFF.md section 7.3): a Chute layout -- one wide five-channel door corridor, a hairpin at the route's 60% mark, and a second straight run back -- carrying three real 5-door rows at quota 2, counterbelts under a paddle wheel, a launch chain, and a mace gauntlet before one readable finishing sweep. Beat length targets are the section 7.3 targets, unchanged, because the set-wide route length is fixed at 880 measured studs and this build measures inside a stud of it (docs/splashdown/03-overrides.md). Every scale, speed and socket figure traces to AssetManifest or to the measured evidence cited in docs/splashdown/courses/door-dash.md.
 -- Created: 2026-09-16
 
 --!strict
@@ -963,14 +963,10 @@ local DoorDash: CourseBuilder.CourseSpec = {
 			Mechanic = "SuccessiveLaunches",
 			LengthTarget = 130,
 			Pieces = {
-				-- The foam catch basin, built first so it is measured from this beat's
-				-- entrance. Section 7.3 requires a missed landing to cost a foam slog of
-				-- at least five seconds rather than a splash: the basin is a ramp
-				-- dropping 12 studs under the launch chain and a flat deck at its foot,
-				-- both covered by foam, and its only way out is back UP to this beat's
-				-- entrance -- so a miss redoes the beat at 0.45 speed instead of
-				-- respawning at a checkpoint. It is a Flank pair: placed beside the
-				-- route without advancing it.
+				-- The catch basin, built first so it is measured from this beat's
+				-- entrance: a ramp dropping 12 studs under the launch chain and a flat
+				-- deck at its foot. It is a Flank pair: placed beside the route
+				-- without advancing it.
 				{
 					Id = "BasinRamp",
 					Kind = "Flank",
@@ -988,19 +984,6 @@ local DoorDash: CourseBuilder.CourseSpec = {
 					OffsetAlong = 58.11,
 					OffsetUp = -12.5,
 				},
-				-- The volume's top stays at +4.5 from this beat's entrance, below the
-				-- underside of the lowest launch deck (+7.72), so no racer standing on
-				-- the route is ever inside it.
-				{
-					Id = "Foam01",
-					Kind = "Mount",
-					Preset = "FoamPit",
-					Scale = 1,
-					OffsetAlong = 42,
-					OffsetUp = -12.5,
-					VolumeSize = Vector3.new(28, 4.5, 84),
-				},
-
 				{ Id = "Deck01", Kind = "Chain", Preset = "Platform", Source = "platform_001", Scale = LAUNCH_DECK },
 				{
 					Id = "Pad01",
@@ -1123,6 +1106,10 @@ local DoorDash: CourseBuilder.CourseSpec = {
 					OffsetAlong = -11,
 					OffsetUp = HAMMER_LARGE_UP,
 					RotorAmplitude = 55,
+					-- Retuned from the windup/strike hammer profile to a symmetric
+					-- rock at period 3.6s (see CoursePresets.luau); no neighbouring
+					-- hammer in this beat, so there is no stagger to rescale.
+					RotorPeriod = 3.6,
 					RotorPhase = 0,
 				},
 				{ Id = "Floor10", Kind = "Chain", Preset = "Platform", Source = "platform_003", Scale = 0.26 },

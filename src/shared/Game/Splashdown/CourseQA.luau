@@ -731,7 +731,6 @@ local ENCOUNTER_TYPES: { [string]: string } = {
 	LogRoll = "RotorBump",
 	RidePlatform = "RotatingPlatforms",
 	Door = "Door",
-	FoamPit = "FoamPit",
 	-- A seesaw is scored on its board ("Seesaw: each board") and a beach ball on the
 	-- ball ("BeachBall: each ball"), exactly as section 7's counting rule lists them.
 	Seesaw = "Seesaw",
@@ -1254,6 +1253,522 @@ function CourseQA.auditGeometry(model: Model): ({ Finding }, { string })
 	return findings, errors
 end
 
+-- T12 (docs/map-remediation.md): five build-time guards the section 8 audit above
+-- does not have. A read-only Studio playtest of all seven shipped courses found
+-- geometry defects in this class -- P1 clutter at the finish line, P2 hazards and
+-- travel pieces buried in the deck beside them, P6a a deck that turns a two-jump
+-- pad sequence into a walk-up, and P7a bumpers packed too close together to react
+-- to. These are expected to fail against the courses as they stand today; that is
+-- the point of adding them.
+local INTERPENETRATION_LIMIT_STUDS = 0.75
+local HAZARD_DECK_LIMIT_STUDS = 0.75
+local BUMPER_CLEARANCE_STUDS = 3.0
+local LAUNCH_PAIR_DECK_CLEARANCE_STUDS = 14
+local FINISH_APPROACH_CLEAR_STUDS = 12
+
+-- Gottschalk's 15-axis OBB separating-axis test: the three face normals of each
+-- box plus the nine cross products of their edge-direction pairs, which is the
+-- complete candidate set for two 3D oriented boxes (unlike the CrossPieceBounding
+-- Overlap scan above, this does not degrade on a yawed piece). One signed number
+-- carries both outcomes the checks below need:
+--
+-- * If every candidate axis still overlaps, no separating axis exists, so the
+--   boxes truly interpenetrate -- the candidate set is complete, so this is not a
+--   near miss -- and the MINIMUM overlap across axes is the standard SAT
+--   minimum-translation penetration depth (the same technique box-box physics
+--   engines use to resolve contacts).
+-- * If some axis separates them, its gap is a valid lower bound on the true
+--   surface distance (for any separating axis, the gap projected along it is at
+--   most the distance between the closest points, by Cauchy-Schwarz), so the
+--   MAXIMUM gap across axes is the tightest lower bound this candidate set can
+--   prove. It is exact whenever the closest features are a face or a pair of
+--   edges; on a vertex/vertex corner it can under-report the true clearance. It
+--   can never invent clearance that is not really there, so nothing here reports
+--   PASS on a pair that is actually closer than it looks.
+--
+-- Positive = a proven gap. Non-positive = the negated, exact penetration depth.
+local function obbSeparation(cframeA: CFrame, halfA: Vector3, cframeB: CFrame, halfB: Vector3): number
+	local axesA = { cframeA.RightVector, cframeA.UpVector, cframeA.LookVector }
+	local axesB = { cframeB.RightVector, cframeB.UpVector, cframeB.LookVector }
+	local extentA = { halfA.X, halfA.Y, halfA.Z }
+	local extentB = { halfB.X, halfB.Y, halfB.Z }
+	local delta = cframeB.Position - cframeA.Position
+
+	local best = -math.huge
+	local function testAxis(axis: Vector3)
+		if axis.Magnitude < 1e-6 then
+			-- Near-parallel edges: the cross product degenerates into no axis at
+			-- all, exactly the case the two boxes' own face normals already cover.
+			return
+		end
+		local unit = axis.Unit
+		local projA, projB = 0, 0
+		for i, a in axesA do
+			projA += math.abs(a:Dot(unit)) * extentA[i]
+		end
+		for i, b in axesB do
+			projB += math.abs(b:Dot(unit)) * extentB[i]
+		end
+		local separation = math.abs(delta:Dot(unit)) - projA - projB
+		best = math.max(best, separation)
+	end
+
+	for _, a in axesA do
+		testAxis(a)
+	end
+	for _, b in axesB do
+		testAxis(b)
+	end
+	for _, a in axesA do
+		for _, b in axesB do
+			testAxis(a:Cross(b))
+		end
+	end
+	return best
+end
+
+-- T12 check 1 (P2): no two BaseParts from different pieces may sit deeper than
+-- INTERPENETRATION_LIMIT_STUDS into one another, anywhere in the built model --
+-- not just Geometry, so a hazard buried in a travel piece or in another hazard is
+-- caught here too. "Different pieces" is PieceId, exactly as the box-overlap scan
+-- above reads it, plus the ancestor/descendant guard HANDOFF 8.3 never needed
+-- because that scan never left Geometry.
+function CourseQA.auditInterpenetration(model: Model): ({ Finding }, { string })
+	local findings: { Finding } = {}
+	local errors: { string } = {}
+
+	local boundary = model:FindFirstChild("Boundary")
+	local candidates: { BasePart } = {}
+	for _, part in model:GetDescendants() do
+		if not part:IsA("BasePart") then
+			continue
+		end
+		if part.Name == "Liquid" or part.Transparency >= 1 then
+			continue
+		end
+		if boundary and part:IsDescendantOf(boundary) then
+			continue
+		end
+		table.insert(candidates, part)
+	end
+
+	local overlapParams = OverlapParams.new()
+	overlapParams.FilterType = Enum.RaycastFilterType.Include
+	overlapParams.FilterDescendantsInstances = candidates
+	overlapParams.MaxParts = 64
+
+	-- Every genuinely overlapping pair is found from both sides (part's own query
+	-- and other's), so this remembers a reported pair by identity to print it once.
+	local reported: { [BasePart]: { [BasePart]: boolean } } = {}
+	local violations = 0
+	local scanned = 0
+	for _, part in candidates do
+		scanned += 1
+		if scanned % 50 == 0 then
+			task.wait()
+		end
+		local pieceId = part:GetAttribute("PieceId")
+		local probe = part.Size + Vector3.one
+		for _, other in workspace:GetPartBoundsInBox(part.CFrame, probe, overlapParams) do
+			if other == part then
+				continue
+			end
+			if (reported[part] and reported[part][other]) or (reported[other] and reported[other][part]) then
+				continue
+			end
+			local otherPieceId = other:GetAttribute("PieceId")
+			-- A shared PieceId only means "same piece" when both actually carry one;
+			-- two nil PieceIds (the start and finish plazas are the only such solid
+			-- parts) are two DIFFERENT unlabelled things, not one piece, so they are
+			-- still compared -- they simply never land close enough to matter.
+			local samePiece = pieceId ~= nil and pieceId == otherPieceId
+			if samePiece or part:IsDescendantOf(other) or other:IsDescendantOf(part) then
+				continue
+			end
+			local separation = obbSeparation(part.CFrame, part.Size / 2, other.CFrame, other.Size / 2)
+			if separation < -INTERPENETRATION_LIMIT_STUDS then
+				reported[part] = reported[part] or {}
+				reported[part][other] = true
+				violations += 1
+				local detail = string.format(
+					"%s (piece %s) interpenetrates %s (piece %s) by %.2f studs",
+					part:GetFullName(),
+					tostring(pieceId),
+					other:GetFullName(),
+					tostring(otherPieceId),
+					-separation
+				)
+				table.insert(findings, {
+					Check = string.format("Interpenetration:%s/%s", part.Name, other.Name),
+					Status = "FAIL",
+					Detail = detail,
+				})
+				table.insert(errors, detail)
+			end
+		end
+	end
+	if violations == 0 then
+		table.insert(findings, {
+			Check = "Interpenetration",
+			Status = "PASS",
+			Detail = string.format(
+				"%d candidate parts, no cross-piece OBB penetration over %.2f studs",
+				#candidates,
+				INTERPENETRATION_LIMIT_STUDS
+			),
+		})
+	end
+	return findings, errors
+end
+
+-- T12 check 2 (P2): a mounted hazard embedded in the deck beside it reads as
+-- fine in every existing check -- it has real geometry, real attributes and a
+-- real motion owner -- and is invisible until a runner walks into a wall that
+-- looks like a bumper. "Mounted hazard" is exactly CoursePresets.buildMountPiece's
+-- own boundary: every Mount piece except Preset "Prop" is routed to the hazard
+-- assembly or the JumpPads folder rather than Geometry, so that routing is reused
+-- here instead of re-deriving "hazard" from the built model's attribute soup.
+function CourseQA.auditHazardDeckEmbedding(model: Model, spec: any): ({ Finding }, { string })
+	local findings: { Finding } = {}
+	local errors: { string } = {}
+
+	local hazardPieceIds: { [string]: boolean } = {}
+	for _, beat in spec.Beats do
+		for _, piece in beat.Pieces do
+			if piece.Kind == "Mount" and piece.Preset ~= "Prop" then
+				hazardPieceIds[piece.Id] = true
+			end
+		end
+	end
+
+	local geometry = model:FindFirstChild("Geometry")
+	local hazardParts: { BasePart } = {}
+	local deckParts: { BasePart } = {}
+	for _, part in model:GetDescendants() do
+		if not part:IsA("BasePart") or part.Transparency >= 1 then
+			continue
+		end
+		local pieceId = part:GetAttribute("PieceId")
+		if pieceId ~= nil and hazardPieceIds[pieceId] then
+			table.insert(hazardParts, part)
+		elseif geometry and part.CanCollide and part:IsDescendantOf(geometry) then
+			table.insert(deckParts, part)
+		end
+	end
+
+	local overlapParams = OverlapParams.new()
+	overlapParams.FilterType = Enum.RaycastFilterType.Include
+	overlapParams.FilterDescendantsInstances = deckParts
+	overlapParams.MaxParts = 64
+
+	local violations = 0
+	local scanned = 0
+	for _, hazard in hazardParts do
+		scanned += 1
+		if scanned % 50 == 0 then
+			task.wait()
+		end
+		local probe = hazard.Size + Vector3.one
+		for _, deck in workspace:GetPartBoundsInBox(hazard.CFrame, probe, overlapParams) do
+			local separation = obbSeparation(hazard.CFrame, hazard.Size / 2, deck.CFrame, deck.Size / 2)
+			if separation < -HAZARD_DECK_LIMIT_STUDS then
+				violations += 1
+				local detail = string.format(
+					"hazard %s (piece %s) is embedded %.2f studs into deck %s",
+					hazard:GetFullName(),
+					tostring(hazard:GetAttribute("PieceId")),
+					-separation,
+					deck:GetFullName()
+				)
+				table.insert(findings, {
+					Check = string.format("HazardDeckEmbedding:%s/%s", hazard.Name, deck.Name),
+					Status = "FAIL",
+					Detail = detail,
+				})
+				table.insert(errors, detail)
+			end
+		end
+	end
+	if violations == 0 then
+		table.insert(findings, {
+			Check = "HazardDeckEmbedding",
+			Status = "PASS",
+			Detail = string.format(
+				"%d mounted hazards, %d deck parts, no OBB penetration over %.2f studs",
+				#hazardParts,
+				#deckParts,
+				HAZARD_DECK_LIMIT_STUDS
+			),
+		})
+	end
+	return findings, errors
+end
+
+-- T12 check 3 (P7a): two Bumper mounts packed closer than BUMPER_CLEARANCE_STUDS
+-- do not give a runner room to react between hits (Piston Peak's three pairs are
+-- the known case). Gap is the OBB surface separation, not centre distance -- a
+-- bumper is a wide frame, not a point, so a centre-to-centre reading would pass
+-- pairs that are actually shoulder to shoulder. Every course carries only a
+-- handful of bumpers, so the full pairwise scan needs no spatial broad phase.
+function CourseQA.auditBumperCrowding(model: Model): ({ Finding }, { string })
+	local findings: { Finding } = {}
+	local errors: { string } = {}
+
+	local bumpers: { BasePart } = {}
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part:GetAttribute("Bumper") == true then
+			table.insert(bumpers, part)
+		end
+	end
+
+	local violations = 0
+	for i = 1, #bumpers do
+		for j = i + 1, #bumpers do
+			local a, b = bumpers[i], bumpers[j]
+			local separation = obbSeparation(a.CFrame, a.Size / 2, b.CFrame, b.Size / 2)
+			if separation < BUMPER_CLEARANCE_STUDS then
+				violations += 1
+				local detail = string.format(
+					"%s and %s clear by %.2f studs, under the %.1f-stud minimum",
+					a:GetFullName(),
+					b:GetFullName(),
+					separation,
+					BUMPER_CLEARANCE_STUDS
+				)
+				table.insert(
+					findings,
+					{ Check = string.format("BumperCrowding:%s/%s", a.Name, b.Name), Status = "FAIL", Detail = detail }
+				)
+				table.insert(errors, detail)
+			end
+		end
+	end
+	if violations == 0 then
+		table.insert(findings, {
+			Check = "BumperCrowding",
+			Status = "PASS",
+			Detail = string.format("%d bumpers, all clear by at least %.1f studs", #bumpers, BUMPER_CLEARANCE_STUDS),
+		})
+	end
+	return findings, errors
+end
+
+-- T12 check 4 (P6a): where the route launches off one JumpPad straight at
+-- another, a chained deck left directly under the SECOND pad's footprint turns
+-- the intended two-bounce into a walk-up (Door Dash's Pad02/Pad03, both still
+-- preceded by a Deck/Tread Chain piece with zero offset in the CourseSpec, even
+-- though the in-Studio template had its decks removed separately). "In
+-- succession... crosses a gap between them" is read straight off the spec's own
+-- authored order: an Advance piece anywhere between two JumpPad Mount pieces,
+-- adjacent in JumpPad order, is the launch this course actually asks the runner
+-- to make (auditGaps above treats that same Advance as its own measured reach
+-- window rather than an ordinary walk, for the same reason). "Chained" scopes
+-- the deck side to Chain-kind pieces, never a Mount/Ride/Island, matching the
+-- word the check is named for.
+function CourseQA.auditLaunchPairDecks(model: Model, spec: any): ({ Finding }, { string })
+	local findings: { Finding } = {}
+	local errors: { string } = {}
+
+	local flat: { { Id: string, Kind: string, Preset: string? } } = {}
+	local chainPieceIds: { [string]: boolean } = {}
+	for _, beat in spec.Beats do
+		for _, piece in beat.Pieces do
+			table.insert(flat, { Id = piece.Id, Kind = piece.Kind, Preset = piece.Preset })
+			if piece.Kind == "Chain" then
+				chainPieceIds[piece.Id] = true
+			end
+		end
+	end
+
+	local secondPadIds: { [string]: boolean } = {}
+	local lastPadIndex: number? = nil
+	for index, piece in flat do
+		if piece.Kind == "Mount" and piece.Preset == "JumpPad" then
+			if lastPadIndex then
+				local sawGap = false
+				for between = lastPadIndex + 1, index - 1 do
+					if flat[between].Kind == "Advance" then
+						sawGap = true
+						break
+					end
+				end
+				if sawGap then
+					secondPadIds[piece.Id] = true
+				end
+			end
+			lastPadIndex = index
+		end
+	end
+
+	local secondPadCount = 0
+	for _ in secondPadIds do
+		secondPadCount += 1
+	end
+	if secondPadCount == 0 then
+		table.insert(findings, {
+			Check = "LaunchPairDeck",
+			Status = "NOT RUN",
+			Detail = "this course places no two JumpPads in succession across a gap",
+		})
+		return findings, errors
+	end
+
+	local geometry = model:FindFirstChild("Geometry")
+	local decks: { BasePart } = {}
+	for _, part in (geometry and geometry:GetDescendants() or {}) do
+		if part:IsA("BasePart") and part.CanCollide then
+			local pieceId = part:GetAttribute("PieceId")
+			if pieceId ~= nil and chainPieceIds[pieceId] then
+				table.insert(decks, part)
+			end
+		end
+	end
+
+	local scriptables = model:FindFirstChild("Scriptables")
+	local jumpPads = scriptables and scriptables:FindFirstChild("JumpPads")
+	local violations = 0
+	for _, pad in (jumpPads and jumpPads:GetChildren() or {}) do
+		local pieceId = pad:GetAttribute("PieceId")
+		local outer = pad:FindFirstChild("Outer")
+		if pieceId == nil or not secondPadIds[pieceId] or not (outer and outer:IsA("BasePart")) then
+			continue
+		end
+		local outerPart = outer :: BasePart
+		local padBaseY = outerPart.Position.Y - outerPart.Size.Y / 2
+		for _, deck in decks do
+			local local2 = deck.CFrame:PointToObjectSpace(outerPart.Position)
+			if math.abs(local2.X) > deck.Size.X / 2 or math.abs(local2.Z) > deck.Size.Z / 2 then
+				continue
+			end
+			local deckTop = (deck.CFrame * CFrame.new(0, deck.Size.Y / 2, 0)).Position.Y
+			local clearance = padBaseY - deckTop
+			if clearance >= 0 and clearance <= LAUNCH_PAIR_DECK_CLEARANCE_STUDS then
+				violations += 1
+				local detail = string.format(
+					"%s sits %.2f studs under the second pad %s's footprint, inside the %.0f-stud walk-up limit",
+					deck:GetFullName(),
+					clearance,
+					tostring(pieceId),
+					LAUNCH_PAIR_DECK_CLEARANCE_STUDS
+				)
+				table.insert(findings, {
+					Check = string.format("LaunchPairDeck:%s/%s", tostring(pieceId), deck.Name),
+					Status = "FAIL",
+					Detail = detail,
+				})
+				table.insert(errors, detail)
+			end
+		end
+	end
+	if violations == 0 then
+		table.insert(findings, {
+			Check = "LaunchPairDeck",
+			Status = "PASS",
+			Detail = string.format(
+				"%d second-of-a-pair pad(s) checked, no chained deck within %d studs beneath",
+				secondPadCount,
+				LAUNCH_PAIR_DECK_CLEARANCE_STUDS
+			),
+		})
+	end
+	return findings, errors
+end
+
+-- T12 check 5 (P1): z-clipping at the finish line, recurring across courses per
+-- the playtest notes. Nothing but the finish's own plaza, Line, Arch and flags
+-- may sit within FINISH_APPROACH_CLEAR_STUDS of the finish Deck marker, read as
+-- an OBB surface gap for the same reason check 3 does: the Deck is a fixed
+-- 24x20 marker, and the clutter that actually reads as clipping is large parts
+-- whose centre is far but whose edge is not. The Finish folder's own Deck and
+-- Trigger are the finish structure being measured FROM, not clutter sitting near
+-- it, so they are excluded by folder rather than by the named-exception list.
+function CourseQA.auditFinishApproach(model: Model): ({ Finding }, { string })
+	local findings: { Finding } = {}
+	local errors: { string } = {}
+
+	local finish = model:FindFirstChild("Finish")
+	local deck = finish and finish:FindFirstChild("Deck")
+	if not (deck and deck:IsA("BasePart")) then
+		table.insert(
+			findings,
+			{ Check = "FinishApproachClear", Status = "NOT RUN", Detail = "no Finish.Deck marker on this model" }
+		)
+		return findings, errors
+	end
+	local deckPart = deck :: BasePart
+
+	local boundary = model:FindFirstChild("Boundary")
+	local candidates: { BasePart } = {}
+	for _, part in model:GetDescendants() do
+		if not part:IsA("BasePart") or part == deckPart then
+			continue
+		end
+		if part.Name == "Liquid" or part.Transparency >= 1 then
+			continue
+		end
+		if boundary and part:IsDescendantOf(boundary) then
+			continue
+		end
+		if finish and part:IsDescendantOf(finish) then
+			continue
+		end
+		-- The plaza slab is never given a PieceId (buildPlaza only tags SourceAsset
+		-- and CourseId), so it is only ever findable by its own Name, exactly as
+		-- auditCoverage's plaza exemption already matches it above. A Prop piece
+		-- like Piston Peak's "FinishArch", though, is built through the ordinary
+		-- sd_<course>_<beat>_prop_<n> naming (nameFor keys off the PRESET, not the
+		-- authored piece Id), so its Name never says "arch" -- the author's intent
+		-- only survives on the PieceId attribute, which is checked as well.
+		local pieceId = part:GetAttribute("PieceId")
+		local haystack = string.lower(part.Name .. "|" .. tostring(pieceId))
+		if
+			string.find(haystack, "plaza", 1, true)
+			or string.find(haystack, "line", 1, true)
+			or string.find(haystack, "arch", 1, true)
+			or string.find(haystack, "flag", 1, true)
+		then
+			continue
+		end
+		table.insert(candidates, part)
+	end
+
+	local overlapParams = OverlapParams.new()
+	overlapParams.FilterType = Enum.RaycastFilterType.Include
+	overlapParams.FilterDescendantsInstances = candidates
+	overlapParams.MaxParts = 64
+	local probe = deckPart.Size + Vector3.one * (FINISH_APPROACH_CLEAR_STUDS * 2 + 0.5)
+
+	local violations = 0
+	for _, part in workspace:GetPartBoundsInBox(deckPart.CFrame, probe, overlapParams) do
+		local separation = obbSeparation(deckPart.CFrame, deckPart.Size / 2, part.CFrame, part.Size / 2)
+		if separation < FINISH_APPROACH_CLEAR_STUDS then
+			violations += 1
+			local detail = string.format(
+				"%s sits %.2f studs from the finish Deck, inside the %.0f-stud clear approach",
+				part:GetFullName(),
+				separation,
+				FINISH_APPROACH_CLEAR_STUDS
+			)
+			table.insert(
+				findings,
+				{ Check = string.format("FinishApproachClear:%s", part.Name), Status = "FAIL", Detail = detail }
+			)
+			table.insert(errors, detail)
+		end
+	end
+	if violations == 0 then
+		table.insert(findings, {
+			Check = "FinishApproachClear",
+			Status = "PASS",
+			Detail = string.format(
+				"no candidate part sits within %d studs of the finish Deck besides its own plaza/Line/Arch/flags",
+				FINISH_APPROACH_CLEAR_STUDS
+			),
+		})
+	end
+	return findings, errors
+end
+
 -- 8.1 structural contract: pads, checkpoints, finish, boundary ring.
 local function auditStructure(model: Model, spec: any): ({ Finding }, { string }, { [string]: number })
 	local findings: { Finding } = {}
@@ -1412,6 +1927,11 @@ function CourseQA.check(model: Model, spec: any, calibration: Calibration?, cont
 	absorb(CourseQA.checkCutSets(model, graph))
 	absorb(CourseQA.auditGaps(spec, ctx.Route or {}, cal))
 	absorb(CourseQA.auditGeometry(model))
+	absorb(CourseQA.auditInterpenetration(model))
+	absorb(CourseQA.auditHazardDeckEmbedding(model, spec))
+	absorb(CourseQA.auditBumperCrowding(model))
+	absorb(CourseQA.auditLaunchPairDecks(model, spec))
+	absorb(CourseQA.auditFinishApproach(model))
 
 	local coverageFindings, coverageWarnings = CourseQA.auditCoverage(model, cells)
 	absorb(coverageFindings)

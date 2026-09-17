@@ -7,7 +7,7 @@
 
 local AssetManifest = {}
 
-AssetManifest.Version = 6
+AssetManifest.Version = 7
 AssetManifest.SourceHash = "e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec"
 AssetManifest.SourcePath = { "ServerStorage", "SplashdownAuthoringSources", "Kit" }
 
@@ -166,6 +166,38 @@ AssetManifest.Assets = (
 			},
 		} :: AssetEntry,
 
+		-- The zigzag climb/descent ramp, and the one kit surface whose walkable ends are
+		-- NOT square to its own route axis. course-sockets-ballbarrage.json bins that
+		-- sweep into 20 equal 7.6531-stud slices along local X: eighteen return a 0.92
+		-- hit fraction (the 8 percent miss is the 2.4-stud bevel down each Z edge), but
+		-- the two END slices return 0.42 and 0.46, almost exactly half of 0.92. Losing
+		-- half of one whole slice is what an end face cut on the diagonal does, and no
+		-- rounded corner can account for it, so each end runs obliquely from local
+		-- x = +-68.878 -- the last X at which the deck is still its full 60.274 wide --
+		-- out to the bounding box at +-76.531: 7.653 studs of X across the whole width,
+		-- 7.24 degrees off square. Both screenshot ends read as one straight slanted
+		-- edge, and the two are parallel, so the walkable footprint is a sheared
+		-- parallelogram rather than a taper or a notch.
+		--
+		-- Entry/Exit were first taken at +-69, that INNER extreme, which is 3.827 studs
+		-- short of where the route centre line actually leaves the deck. Every chained
+		-- ramp therefore buried its own oblique nose 3.827 * scale studs into the deck
+		-- before and after it and under-declared its travel by 7.653 * scale. The
+		-- sockets now sit where the centre line crosses the end face,
+		-- (68.878 + 76.531) / 2 = 72.705, which is the convention platform_001's
+		-- Entry/Exit already use (its measured footprint extremes, not a bounds inset).
+		-- Y is untouched, because the sweep reads the same plateau tops right out to the
+		-- bounding box (26.927 at the high end, -1.573 at the low end), so the 28.5-stud
+		-- rise every beat solves its scale from is unchanged. An oblique face cannot be
+		-- flush against a square deck at every Z; this halves the worst deviation, to
+		-- +-3.827 * scale at the outer corners, and makes it zero on the line the runner
+		-- actually travels.
+		--
+		-- box_013 is the same mesh mirrored in X -- inventory.json gives it the same
+		-- pivot delta with only the X sign flipped (-2.180 against 2.180, Y and Z
+		-- identical) and the evidence file records that it was never swept
+		-- independently -- so its sockets are box_011's mirrored, and carried the same
+		-- 3.827-stud error.
 		box_011 = {
 			Role = "RampDescendingPositiveX",
 			Kind = "Surface",
@@ -173,8 +205,8 @@ AssetManifest.Assets = (
 			ForwardAxis = "X",
 			ForwardHeadingDegrees = -90,
 			Sockets = {
-				Entry = socket(-69, 26.9, 0, -1, 0, 0),
-				Exit = socket(69, -1.6, 0, 1, 0, 0),
+				Entry = socket(-72.705, 26.9, 0, -1, 0, 0),
+				Exit = socket(72.705, -1.6, 0, 1, 0, 0),
 				Support = socket(0, -26.9, 0, 0, -1, 0),
 			},
 			Measurement = {
@@ -191,8 +223,8 @@ AssetManifest.Assets = (
 			ForwardAxis = "X",
 			ForwardHeadingDegrees = 90,
 			Sockets = {
-				Entry = socket(69, 26.9, 0, 1, 0, 0),
-				Exit = socket(-69, -1.6, 0, -1, 0, 0),
+				Entry = socket(72.705, 26.9, 0, 1, 0, 0),
+				Exit = socket(-72.705, -1.6, 0, -1, 0, 0),
 				Support = socket(0, -26.9, 0, 0, -1, 0),
 			},
 			Measurement = {

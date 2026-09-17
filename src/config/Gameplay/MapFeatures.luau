@@ -32,10 +32,6 @@ return {
 		InnerImpulse = -1,
 		MinimumSquash = 0.5, -- floor on vertical scale, keeps the pad from inverting
 	},
-	FoamPit = {
-		WalkSpeedScale = 0.45,
-		VerticalPadding = 2,
-	},
 	ElimZone = {
 		VerticalPadding = 2,
 	},
@@ -208,7 +204,6 @@ return {
 		JumpPad = "JumpPad", -- marker on a model in Scriptables/JumpPads
 		LaunchSpeed = "LaunchSpeed",
 		FloatFactor = "FloatFactor",
-		FoamPit = "FoamPit", -- marker on a volume in Scriptables/FoamPits
 		BeachBall = "BeachBall",
 		FanAxis = "FanAxis", -- local X/Y/Z; omit for legacy world-up launch
 		FanDirection = "FanDirection", -- +1 or -1

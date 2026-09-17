@@ -119,7 +119,7 @@ local WhirlpoolWaltz: CourseBuilder.CourseSpec = {
 				{ Id = "Gap03", Kind = "Advance", OffsetAlong = 14 },
 				-- Deliberately shorter than the other floors: this slab and the
 				-- next beat's ramp are separated by a gap, but the slab still has
-				-- to carry the chicane and the foam basin's rejoin.
+				-- to carry the chicane.
 				{ Id = "Floor03", Kind = "Chain", Preset = "Platform", Source = "platform_003", Scale = 0.18 },
 				-- Section 7.2's "1 forced cube+triangle chicane": two slabs, one
 				-- encounter, so they share an EncounterGroup and score once.
@@ -142,19 +142,6 @@ local WhirlpoolWaltz: CourseBuilder.CourseSpec = {
 					OffsetAlong = -5,
 					OffsetSide = 4,
 					EncounterGroup = "Chicane01",
-				},
-				-- The foam basin catches a sideways knock off the chicane. It is
-				-- outboard: on this spiral a positive OffsetSide points at the hub,
-				-- so a negative one is the side with no neighbouring turn.
-				{
-					Id = "Foam01",
-					Kind = "Mount",
-					Preset = "FoamPit",
-					Scale = 1,
-					OffsetAlong = -9,
-					OffsetSide = -15,
-					OffsetUp = -3,
-					VolumeSize = Vector3.new(24, 10, 20),
 				},
 			},
 		},

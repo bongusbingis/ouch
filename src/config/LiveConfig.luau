@@ -80,7 +80,6 @@ local entries: { Entry } = {
 
 	{ Key = "MapFeatures.JumpPad.BouncePower", Type = "number", Minimum = 0, Maximum = 500 },
 	{ Key = "MapFeatures.JumpPad.FloatFactor", Type = "number", Minimum = 0, Maximum = 1 },
-	{ Key = "MapFeatures.FoamPit.WalkSpeedScale", Type = "number", Minimum = 0.05, Maximum = 1 },
 
 	-- Per-mode match rules. Each mode snapshots these at the match boundary, so an
 	-- override lands on the next match, never mid-match. Infection.ScoreTarget is

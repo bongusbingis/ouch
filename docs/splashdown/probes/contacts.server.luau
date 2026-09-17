@@ -4,7 +4,6 @@ local RS = game.ReplicatedStorage
 local K = game.ServerScriptService.Server.Modules.MapFeatures
 local Bumper = require(K.Bumpers)
 local Shove = require(K.RotorBump)
-local Foam = require(K.FoamPits)
 local R = require(RS.Shared.Game.MapFeatures.RotatingPlatforms)
 local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local Network = require(RS.Shared.Network)
@@ -145,26 +144,9 @@ local ok, err = xpcall(function()
 		platform = nil
 		model:Destroy()
 	end
-	local pit = Instance.new("Part")
-	pit.Name = "RenamedFoamVolume"
-	pit.Size = Vector3.new(30, 10, 30)
-	pit.Anchored = true
-	pit.CanCollide = false
-	pit.Position = origin.Position
-	pit:SetAttribute("FoamPit", true)
-	pit.Parent = folder
-	place(pit.Position)
-	context.instances = { pit }
-	Foam.tickPlayer(context, player, root)
-	MovementSpeed.step({ players = {} }, { [tostring(player.UserId)] = character }, {})
-	local scale = character:GetAttribute("mvEx")
-	Foam.forget(player)
-	MovementSpeed.step({ players = {} }, { [tostring(player.UserId)] = character }, {})
-	table.insert(rows, { name = "renamed_foam", scale = scale, cleared = character:GetAttribute("mvEx") == nil })
 end, debug.traceback)
 Bumper.forget(player)
 Shove.forget(player)
-Foam.forget(player)
 if platform then
 	local i = table.find(R.all(), platform)
 	if i then

@@ -91,6 +91,7 @@ local systems = {
 	{ name = "JumpPadVisuals", parent = Presentation, method = "start" },
 	{ name = "BumperVisuals", parent = Presentation, method = "start" },
 	{ name = "HazardVisuals", parent = Presentation, method = "start" },
+	{ name = "HazardCarriers", parent = Presentation, method = "start" },
 	{ name = "EmotePlayback", parent = Presentation, method = "start" },
 	{
 		name = "FanAirflow",

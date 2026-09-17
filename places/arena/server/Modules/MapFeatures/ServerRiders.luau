@@ -1,5 +1,5 @@
 -- Opt-in course carrying after the mover: actual support ray, all three axes,
--- no new airborne acquisition, and no second client-side character translation.
+-- no new airborne acquisition, and only for a character the server simulates.
 --!strict
 local RS = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -7,6 +7,7 @@ local Features = RS.Shared.Game.MapFeatures
 local MapFeatures = require(RS.Config.Gameplay.MapFeatures)
 local Rotating = require(Features.RotatingPlatforms)
 local Motion = require(Features.CarryMotion)
+local RiderSupport = require(Features.RiderSupport)
 local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local ServerRiders = { folderName = "Rotating", instanceClass = "Folder" }
@@ -50,7 +51,15 @@ function ServerRiders.tickPlayer(context: MapFeatureKit.Context, player: Player,
 		rides[player] = nil
 		return
 	end
-	if not previous and humanoid.FloorMaterial == Enum.Material.Air then
+	local owned, owner = pcall(root.GetNetworkOwner, root)
+	if
+		not RiderSupport.serverMayCarry({
+			serverOwnsRoot = owned and owner == nil,
+			seated = previous ~= nil,
+			airborne = humanoid.FloorMaterial == Enum.Material.Air,
+		})
+	then
+		rides[player] = nil
 		return
 	end
 	if

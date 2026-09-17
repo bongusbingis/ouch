@@ -1,6 +1,6 @@
 -- Name: PistonPeak.luau
 -- Author: Jack C.
--- Description: Declarative spec for Piston Peak (HANDOFF.md section 7.6): a StackedSwitchback layout -- five short runs stacked over two centrelines forty studs apart, joined by four switchback landings and climbing sixty-six studs -- and the only new course that reuses section 6's rising liquid. It carries three slope counterbelts, two fixed-frame log-rolls, an obstacle_11 seesaw spanning a switchback, a three-slab chicane with a foam gutter, two stacked pad launches and a three-piston cascade across the highest ledge. Beat length targets are the scaled section 7.6 targets recorded in docs/splashdown/03-overrides.md. Every scale, gap, speed and offset traces to AssetManifest or to the measured evidence cited in docs/splashdown/courses/piston-peak.md.
+-- Description: Declarative spec for Piston Peak (HANDOFF.md section 7.6): a StackedSwitchback layout -- five short runs stacked over two centrelines forty studs apart, joined by four switchback landings and climbing sixty-six studs -- and the only new course that reuses section 6's rising liquid. It carries three slope counterbelts, two fixed-frame log-rolls, an obstacle_11 seesaw spanning a switchback, a three-slab chicane, two stacked pad launches and a three-piston cascade across the highest ledge. Beat length targets are the scaled section 7.6 targets recorded in docs/splashdown/03-overrides.md. Every scale, gap, speed and offset traces to AssetManifest or to the measured evidence cited in docs/splashdown/courses/piston-peak.md.
 -- Created: 2026-09-16
 
 --!strict
@@ -496,18 +496,6 @@ local PistonPeak: CourseBuilder.CourseSpec = {
 					Source = "water_platform_001",
 					Scale = TREAD_SLOPE,
 				},
-				-- Section 7.6's "1 foam gutter catching missed chicanes". It spans the
-				-- whole 17.364-stud tread immediately past the chicane, so it is a FORCED
-				-- LANE in section 7's counting sense, not a penalty detour: HANDOFF 13's
-				-- "at least 5 extra seconds" applies to a detour a mistake sends you down,
-				-- and this one everybody wades.
-				{
-					Id = "Foam01",
-					Kind = "Mount",
-					Preset = "FoamPit",
-					OffsetAlong = -8.6,
-					VolumeSize = Vector3.new(17, 6, 17),
-				},
 				{
 					Id = "Tread08",
 					Kind = "Chain",
@@ -515,9 +503,6 @@ local PistonPeak: CourseBuilder.CourseSpec = {
 					Source = "water_platform_001",
 					Scale = TREAD_SLOPE,
 				},
-				-- Run 3's guard wall stands on the deck PAST the foam, not in it: a
-				-- non-colliding foam volume and a solid wall can share a footprint, but
-				-- the wall would then only slow a lane nobody can walk.
 				{
 					Id = "GuardWall03",
 					Kind = "Mount",

@@ -374,8 +374,8 @@ return {
 			EndAngleDegrees = 663,
 			Pieces = concat({
 				-- The fan stands on the inner lane boundary and blows radially OUTWARD
-				-- across the lane; the foam lane is the outer ledge it pushes toward,
-				-- and the pad in the foam is the marked, slow way back.
+				-- across the lane, toward the outer ledge; the pad there is the
+				-- marked, slow way back.
 				{
 					Id = "Fan01",
 					Kind = "Mount" :: "Mount",
@@ -390,17 +390,6 @@ return {
 					FanColumnHeight = 34,
 					LaunchSpeed = 40,
 					FloatFactor = 0.2,
-					GateId = "Gate12",
-				},
-				{
-					Id = "FoamPit01",
-					Kind = "Mount" :: "Mount",
-					Preset = "FoamPit" :: "FoamPit",
-					Scale = 1,
-					AngleDegrees = 582.0,
-					Radius = 195.5,
-					DeckY = 10,
-					VolumeSize = Vector3.new(15, 6, 68),
 					GateId = "Gate12",
 				},
 				{

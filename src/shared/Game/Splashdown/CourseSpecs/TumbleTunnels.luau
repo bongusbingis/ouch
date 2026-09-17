@@ -1,6 +1,6 @@
 -- Name: TumbleTunnels.luau
 -- Author: Jack C.
--- Description: Declarative spec for Tumble Tunnels (HANDOFF.md section 7.4): a Loop layout -- a closed circuit whose two long runs straddle the map's centre line and form the tunnel spine, crossed outbound through arch_004 and on the return through arch_006 -- carrying two real server-owned beach balls behind a horizontal opposing fan, two rider-weighted seesaw boards that ARE the route's floor, a single mallet at an arch-ramp crest, a forced bumper chicane, a fan gate, a paddle wheel and swing panel inside the return tunnel, and two measured foam penalty lanes. Beat length targets are the scaled section 7.4 targets recorded in docs/splashdown/03-overrides.md. Every scale, speed and socket figure traces to AssetManifest or to the measured evidence cited in docs/splashdown/courses/tumble-tunnels.md.
+-- Description: Declarative spec for Tumble Tunnels (HANDOFF.md section 7.4): a Loop layout -- a closed circuit whose two long runs straddle the map's centre line and form the tunnel spine, crossed outbound through arch_004 and on the return through arch_006 -- carrying two real server-owned beach balls behind a horizontal opposing fan, two rider-weighted seesaw boards that ARE the route's floor, a single mallet at an arch-ramp crest, a forced bumper chicane, a fan gate, and a paddle wheel and swing panel inside the return tunnel. Beat length targets are the scaled section 7.4 targets recorded in docs/splashdown/03-overrides.md. Every scale, speed and socket figure traces to AssetManifest or to the measured evidence cited in docs/splashdown/courses/tumble-tunnels.md.
 -- Created: 2026-09-16
 
 --!strict
@@ -82,13 +82,10 @@ local function plinthScale(boardTopY: number): number
 	return (boardTopY - SEESAW_DROP - LIQUID_Y) / 28.575
 end
 
--- Foam channels. Section 7.4 fixes the centreline at 112 studs and HANDOFF 13
--- requires five EXTRA seconds, not five total: at the kit's measured 0.45 multiplier
--- every stud of foam costs 1/11.7 - 1/26 = 0.04696 s, so 112 studs is +5.26 s. Six
+-- Foam channel decking. Section 7.4 fixes the centreline at 112 studs; six
 -- uniformly scaled slabs make exactly 111.99 studs of 14.86-stud-wide channel.
 local FOAM_SLAB = 0.2121
 local FOAM_STEP = 88 * FOAM_SLAB
-local FOAM_LENGTH = FOAM_STEP * 6
 
 local function foamDecks(idPrefix: string, firstOffsetAlong: number, side: number, up: number): { any }
 	local pieces = {}
@@ -345,8 +342,9 @@ local TumbleTunnels: CourseBuilder.CourseSpec = {
 				{ Id = "Lane08", Kind = "Chain", Preset = "Platform", Source = "platform_002", Scale = 0.16 },
 				-- The single mallet, standing on the right-hand edge of the crest deck. Its
 				-- head reaches 7.56 studs from the post, so at rest it covers the lane's
-				-- centre line; the hammer profile lifts it clear for 1.8 seconds and brings
-				-- it down in 0.3.
+				-- centre line; retuned from the windup/strike hammer profile to a
+				-- symmetric rock (period 3.6s) that clears the centre line for roughly
+				-- half of each cycle and lets it back down over the other half.
 				{
 					Id = "Mallet01",
 					Kind = "Mount",
@@ -356,8 +354,7 @@ local TumbleTunnels: CourseBuilder.CourseSpec = {
 					OffsetAlong = -7,
 					OffsetSide = 4.5,
 					RotorAmplitude = 55,
-					WindupSeconds = 1.8,
-					StrikeSeconds = 0.3,
+					RotorPeriod = 3.6,
 					ShoveSpeed = 58,
 				},
 			},
@@ -398,20 +395,6 @@ local TumbleTunnels: CourseBuilder.CourseSpec = {
 				},
 				foamDecks("FoamDeckA", -81.849, -17.94, -6),
 				{
-					-- The channel sits at a single height, six studs under the LOWEST point of
-					-- the lane it runs beside, so it is 12 studs down at the top of the beat and
-					-- six at the bottom -- never level with the route, which would have made it
-					-- a free parallel lane instead of a penalty.
-					{
-						Id = "Foam01",
-						Kind = "Mount",
-						Preset = "FoamPit",
-						Scale = 1,
-						OffsetAlong = -25.854,
-						OffsetSide = -17.94,
-						OffsetUp = -6,
-						VolumeSize = Vector3.new(15, 5, FOAM_LENGTH),
-					},
 					{ Id = "Lane11", Kind = "Chain", Preset = "Platform", Source = "platform_002", Scale = 0.28 },
 				}
 			),
@@ -505,18 +488,6 @@ local TumbleTunnels: CourseBuilder.CourseSpec = {
 				},
 				foamDecks("FoamDeckB", -49.641, -13.0, -6),
 				{
-					-- Tucked inside the arch's skirts: the channel's outer edge stops 0.1 studs
-					-- short of the measured leg face, so the tunnel still stands on solid deck.
-					{
-						Id = "Foam02",
-						Kind = "Mount",
-						Preset = "FoamPit",
-						Scale = 1,
-						OffsetAlong = 6.354,
-						OffsetSide = -13.0,
-						OffsetUp = -6,
-						VolumeSize = Vector3.new(15, 5, FOAM_LENGTH),
-					},
 					{ Id = "Lane16", Kind = "Chain", Preset = "Platform", Source = "platform_002", Scale = 0.33 },
 					-- Raised five studs and phased at 1.4, so it is posed differently from
 					-- Whirlpool Waltz's panel as override 2 requires.
