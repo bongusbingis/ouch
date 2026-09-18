@@ -46,11 +46,11 @@ Legend: `todo` / `wip` / `done` / `blocked` / `withdrawn`
 | T02 | Sonnet | G2 trigger width | **done** | `buildCheckpoint` 12x8x2 -> 56x24x2 |
 | T03 | Sonnet | G2b missing arches | **done** | builder places the arch with the trigger |
 | T04 | Sonnet | G1 lava | **done** | `buildHazardLiquid` emits the textured MeshPart |
-| T05 | Sonnet | G3 foam pits | dispatched | strip preset + folder + audit rule + config |
+| T05 | Sonnet | G3 foam pits | **done** | strip preset + folder + audit rule + config |
 | T06 | Sonnet | B4 punchers | **done** | spec-driven, new defaults |
 | T07 | Sonnet | B6 seesaw | **done** | MaxTiltDegrees default -> 34 |
 | T08 | Sonnet+lead | B7 spiky wheel | **done** | agent deleted it outright; lead reapplied as opt-in |
-| T09 | Opus | B1/B2 axe + panel | todo | needs T20 preview first |
+| T09 | lead | B1 axe blade roll | **done** | resolved visually; see T38 |
 | T10 | Sonnet | B5 beach balls | wip | add Shove, scale 2.2 |
 | T11 | Opus | P3 green ramp sockets | **done** | Entry/Exit +-69 -> +-72.705; junction now exactly 0 on the centre line |
 | T12 | Sonnet | P1/P2/P6a/P7a guards | **done** | 5 checks, 521 lines; WILL fail the Studio QA spec by design |
@@ -78,7 +78,7 @@ Legend: `todo` / `wip` / `done` / `blocked` / `withdrawn`
 | T35 | lead | BB/PP | B4 | **done** | moved inward to 6-stud gap; throw sized per lane (18 BB / 11 PP) |
 | T36 | lead | BallBarrage | B7 | **done** | Summit's sweeper restored after over-reach |
 | T37 | lead | Tumble | B5 | **done** | 4.6 -> 10.1 studs + Shove; 20 would not fit the tunnel |
-| T38 | Sonnet | 6 maps | B1/B2 | todo | apply T09 to 8 hammers + 3 panels |
+| T38 | lead | 4 maps | B1 | **done** | 4 hammer blades rolled 90deg, edge now leads |
 | T39 | — | all | P3 | **withdrawn** | premise was a measurement artifact - see below |
 | T40 | Sonnet | DoorDash | rename | todo | DoorDash -> KnockKnock, full ID rename |
 | T41 | lead | 4 hammers | B1 | **done** | NEW: mirror the uncommitted hammer retune onto shipped maps |
@@ -319,6 +319,29 @@ future builds.
   ramp's old far end. Becomes 61.23 if it meant "the ramp's far end"; unchanged if it meant an
   absolute distance. Needs a judgement call.
 - Stale comments quoting the old 138/29.05 figures in 5 CourseSpecs and the per-course docs.
+
+## Handoff
+
+A full, self-contained execution plan for everything remaining is at
+**`docs/map-remediation-plan.md`**. Scope changed 2026-09-17: the continuing agent works
+**via the Studio MCP only**. QA and the course-builder toolkit are FROZEN and out of scope —
+`CourseBuilder`, `CoursePresets`, `CourseSpecs/*`, `AssetManifest`, `CourseQA` and
+`SplashdownQA.spec` must not be touched. The only remaining git work is the Door Dash rename,
+scoped to config + tests + Studio, deliberately leaving `CourseSpecs/DoorDash.luau` stale.
+Consequently the two QA-related open decisions previously listed here are dropped, as are the
+CourseSpec follow-ups from the ramp socket fix. It is written for an agent picking the work up cold and
+includes the measurement traps that produced four false findings in the original audit.
+
+**T09 / T38 — the axe, resolved.** Measured from the runner's approach direction, the hammer
+head is a flat plate 11.12 x 18.76 x **1.92** — thin in local Z, so local Z is the blade's face
+normal. It read `|faceNormal . routeForward| = 1.00`, i.e. the blade presented its full broad
+face to the oncoming runner while rotating about that same axis — spinning like a propeller
+facing the player, so the edge could never lead. Exactly the owner's "the face swinging on the
+axis that the edge should". Fix: yaw each head 90 degrees about the vertical line through its own
+pivot, which turns the face normal across the lane and turns the axle across the lane with it.
+Verified numerically (`|face.fwd|` 1.00 -> 0.00 on all four, pivot moved <0.0001 studs so the
+head stays on its pole) and visually. Maces were excluded — they are spiked balls, rotationally
+symmetric, with no blade roll to correct.
 
 ## Playtest list
 
