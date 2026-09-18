@@ -320,6 +320,33 @@ future builds.
   absolute distance. Needs a judgement call.
 - Stale comments quoting the old 138/29.05 figures in 5 CourseSpecs and the per-course docs.
 
+## Incident 2026-09-17 — handoff agent made two unfounded edits
+
+The handoff agent was given task A2 as a *procedure* ("move the hazard backwards along its route
+heading until it is >=16 studs from the finish"). Both targets ended up hovering over open lava:
+
+- `sd_WhirlpoolWaltz_06_spinner_51` — the Whirlpool finish is on a small island and the spinner is
+  29x29, larger than any nearby surface. There was nowhere to move it to. Correct action: delete.
+- `sd_BallBarrage_06_bumper_48` — moved off the deck entirely.
+
+Root cause is the plan, not the agent: the procedure's correctness depended on a precondition
+(is there anywhere to move it to?) that the agent had to evaluate, and its verification step
+("check it is still over a deck") was easy to skip. Lesson recorded in the rewritten plan.
+
+Also found while investigating: **all three A1 swing-panel decks are load-bearing** — TipToe's is
+a `Ride` the route crosses, Tumble's a 29-stud `Chain`, and Whirlpool's sits between two 14-stud
+jump gaps. The original A1 instruction would have broken three courses. A1 is withdrawn and
+reclassified as design work.
+
+`docs/map-remediation-plan.md` was rewritten 2026-09-17 as a **literal instruction list** — every
+task is now an exact instance plus an exact value, with no conditionals and no procedures. Scope
+reduced to three repairs plus the restore. Everything needing judgement is explicitly marked
+do-not-touch.
+
+The courses now live in `Workspace.SplashdownPreview` (the owner moved them there to see live
+changes) and `ReplicatedStorage.Assets.Maps.Splashdown` is **empty**, so the game cannot boot
+until the final restore step runs.
+
 ## Handoff
 
 A full, self-contained execution plan for everything remaining is at

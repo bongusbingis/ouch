@@ -11,7 +11,7 @@ return {
 		-- section 11), not yet dialed in against an actual Studio capture; revisit
 		-- once the fixed-camera pass (section 8.6) runs for these two courses.
 		BallBarrage = {
-			Description = "Three Big Balls wait over open water. Bounce your way across, then hammer through to the finish!",
+			Description = "Bounce your way across, then hammer through to the finish!",
 			Shots = {
 				{ Eye = { -60, 260, 60 }, Look = { -60, 0, 60 }, FieldOfView = 72 },
 				{ Eye = { -40, 60, 130 }, Look = { -40, 10, 90 }, FieldOfView = 60 },

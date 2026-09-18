@@ -46,10 +46,10 @@ return {
 		"BallBarrage",
 		"WhirlpoolWaltz",
 		"DoorDash",
-		"TumbleTunnels",
-		"TiptoeTrials",
+		--"TumbleTunnels",
+		--"TiptoeTrials",
 		"PistonPeak",
-		"SummitSplash",
+		--"SummitSplash",
 	},
 	Courses = {
 		BallBarrage = {
@@ -82,22 +82,32 @@ return {
 			-- HANDOFF section 6: "Three Door Dash rows use PerRow 5/BreakablePerRow 2
 			-- for the whole course." SplashdownCourses.resolve asserts every resolved
 			-- row holds exactly PerRow slabs once this block exists.
-			Doors = { PerRow = 5, BreakablePerRow = 2 },
+			--Doors = { PerRow = 5, BreakablePerRow = 2 },
 		},
-		TumbleTunnels = {
-			DisplayName = "TUMBLE TUNNELS",
-			Difficulty = 3,
-			ParSeconds = 75,
-			CapSeconds = 180,
-			CloseWindowSeconds = 60,
-		},
-		TiptoeTrials = {
-			DisplayName = "TIPTOE TRIALS",
-			Difficulty = 3,
-			ParSeconds = 75,
-			CapSeconds = 180,
-			CloseWindowSeconds = 60,
-		},
+		-- TumbleTunnels = {
+		-- 	DisplayName = "TUMBLE TUNNELS",
+		-- 	Difficulty = 3,
+		-- 	CapSeconds = 180,
+		-- 	CloseWindowSeconds = 60,
+		-- 	-- HANDOFF section 6: "Three Door Dash rows use PerRow 5/BreakablePerRow 2
+		-- 	-- for the whole course." SplashdownCourses.resolve asserts every resolved
+		-- 	-- row holds exactly PerRow slabs once this block exists.
+		-- 	Doors = { PerRow = 5, BreakablePerRow = 2 },
+		-- },
+		-- TumbleTunnels = {
+		-- 	DisplayName = "TUMBLE TUNNELS",
+		-- 	Difficulty = 3,
+		-- 	ParSeconds = 75,
+		-- 	CapSeconds = 180,
+		-- 	CloseWindowSeconds = 60,
+		-- },
+		-- TiptoeTrials = {
+		-- 	DisplayName = "TIPTOE TRIALS",
+		-- 	Difficulty = 3,
+		-- 	ParSeconds = 75,
+		-- 	CapSeconds = 180,
+		-- 	CloseWindowSeconds = 60,
+		-- },
 		PistonPeak = {
 			DisplayName = "PISTON PEAK",
 			-- HANDOFF 12.1's difficulty list for the final seven is 3, 3, 2, 3, 3, 4 and
@@ -121,14 +131,14 @@ return {
 		-- the 60-stud, 20-second-delay, 140-second rise -- because the hardening
 		-- pass preserved its route, checkpoint order and liquid schedule. Only its
 		-- membership in CourseOrder above changed.
-		SummitSplash = {
-			DisplayName = "SUMMIT SPLASH",
-			Difficulty = 3,
-			ParSeconds = 115,
-			CapSeconds = 210,
-			CloseWindowSeconds = 45,
-			LavaRise = { Studs = 60, DelaySeconds = 20, Seconds = 140 },
-		},
+		-- SummitSplash = {
+		-- 	DisplayName = "SUMMIT SPLASH",
+		-- 	Difficulty = 3,
+		-- 	ParSeconds = 115,
+		-- 	CapSeconds = 210,
+		-- 	CloseWindowSeconds = 45,
+		-- 	LavaRise = { Studs = 60, DelaySeconds = 20, Seconds = 140 },
+		-- },
 	},
 	-- Every course carries its own invisible boundary ring, wider than the
 	-- arena's, so a racer stays inside the bowl without hitting a wall on the

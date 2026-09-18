@@ -90,6 +90,7 @@
           "TrainingHazards": {
             "$className": "Folder",
             "MapFeatureKit": { "$path": "places/arena/server/Modules/MapFeatures/MapFeatureKit.luau" },
+            "FeatureParts": { "$path": "places/arena/server/Modules/MapFeatures/FeatureParts.luau" },
             "Bumpers": { "$path": "places/arena/server/Modules/MapFeatures/Bumpers.luau" },
             "RotorBump": { "$path": "places/arena/server/Modules/MapFeatures/RotorBump.luau" }
           },

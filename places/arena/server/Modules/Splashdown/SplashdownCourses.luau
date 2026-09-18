@@ -102,6 +102,7 @@ end
 -- boot and binds the live clone, so nothing the race depends on can differ.
 local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local definition = Splashdown.Courses[courseId]
+	print(Splashdown.Courses, courseId, definition)
 	assert(definition, `[SplashdownCourses] no course config for {courseId}`)
 	local origin = requireChild(model, "Origin", `{path}.Origin`, "BasePart") :: BasePart
 	local scriptables = requireChild(model, "Scriptables", `{path}.Scriptables`, "Folder") :: Folder
