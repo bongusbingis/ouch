@@ -53,8 +53,14 @@ local function rebuild(kit: MapFeatureKit.MapFeatureKit)
 		end
 	end
 	partsByKit[kit.folderName] = collected
-	if #collected == 0 and kit.forget then
-		kit.forget(nil)
+	if #collected == 0 then
+		-- Several kits share Rotating, but the folder has only one listener.
+		-- Unloading its last group must release every kit's state/constraints.
+		for _, sibling in MapFeatureRegistry.all() do
+			if sibling.folderName == kit.folderName and sibling.forget then
+				sibling.forget(nil)
+			end
+		end
 	end
 end
 

@@ -1,0 +1,250 @@
+{
+ "note": "Measured poses for the three sources Door Dash adds to AssetManifest (version 3). Read from the live ServerStorage.SplashdownAuthoringSources.Kit hierarchy in the connected Match Place (placeId 121997450145716) on 2026-09-16; every figure agrees with evidence/inventory.json to four decimals. RelativeCFrame is each part's pose in its ROOT part's own frame; all rotations are identity.",
+ "placeId": 121997450145716,
+ "sources": {
+  "obstacle_5_001": {
+   "role": "MaceTopLink",
+   "rootSize": [
+    1.701,
+    3.8185,
+    2.4847
+   ],
+   "hierarchy": "nested: 001 > 002 > 003 > 004 > 005 > 006 > 007 > 008 > 009 > 010 > 011",
+   "support": "the top link's own centre: the mace hangs from its axle (HANDOFF 8.3)",
+   "swingRadiusAtScale1": 20.7559,
+   "children": [
+    {
+     "name": "obstacle_5_002",
+     "rel": [
+      0.0195,
+      -2.0121,
+      0.0001
+     ],
+     "size": [
+      2.1468,
+      3.117,
+      0.6931
+     ]
+    },
+    {
+     "name": "obstacle_5_003",
+     "rel": [
+      0.0195,
+      -3.6956,
+      0.0001
+     ],
+     "size": [
+      0.693,
+      3.117,
+      2.1467
+     ]
+    },
+    {
+     "name": "obstacle_5_004",
+     "rel": [
+      0.0195,
+      -5.3569,
+      0.0001
+     ],
+     "size": [
+      2.1468,
+      3.117,
+      0.6931
+     ]
+    },
+    {
+     "name": "obstacle_5_005",
+     "rel": [
+      0.0195,
+      -7.0404,
+      0.0001
+     ],
+     "size": [
+      0.693,
+      3.117,
+      2.1467
+     ]
+    },
+    {
+     "name": "obstacle_5_006",
+     "rel": [
+      0.0195,
+      -8.7018,
+      0.0001
+     ],
+     "size": [
+      2.1468,
+      3.117,
+      0.6931
+     ]
+    },
+    {
+     "name": "obstacle_5_007",
+     "rel": [
+      0.0195,
+      -10.3853,
+      0.0001
+     ],
+     "size": [
+      0.693,
+      3.117,
+      2.1467
+     ]
+    },
+    {
+     "name": "obstacle_5_008",
+     "rel": [
+      0.0195,
+      -12.0466,
+      0.0001
+     ],
+     "size": [
+      2.1468,
+      3.117,
+      0.6931
+     ]
+    },
+    {
+     "name": "obstacle_5_009",
+     "rel": [
+      0.0195,
+      -13.7301,
+      0.0001
+     ],
+     "size": [
+      0.693,
+      3.117,
+      2.1467
+     ]
+    },
+    {
+     "name": "obstacle_5_010",
+     "rel": [
+      0.0195,
+      -15.3915,
+      0.0001
+     ],
+     "size": [
+      2.1468,
+      3.117,
+      0.6931
+     ]
+    },
+    {
+     "name": "obstacle_5_011",
+     "rel": [
+      0.0,
+      -20.7559,
+      0.0
+     ],
+     "size": [
+      9.9658,
+      10.2346,
+      11.5074
+     ]
+    }
+   ]
+  },
+  "obstacle_24_001": {
+   "role": "PaddleWheel",
+   "rootSize": [
+    59.8161,
+    43.871,
+    43.871
+   ],
+   "hierarchy": "flat: 002, 003, 004, 005 are direct children of 001",
+   "measuredAxle": [
+    0.0,
+    -4.2481,
+    0.0665
+   ],
+   "measuredCradleOrbitRadius": 15.4862,
+   "lowestSweptPoint": -26.1015,
+   "axleDerivation": "the four cradle poses are symmetric about (Y -4.2481, Z 0.0665) at a common 15.4862 radius, which is 4.2481 studs below the root mesh's own centre; the display pivot is therefore NOT the axle",
+   "children": [
+    {
+     "name": "obstacle_24_002",
+     "rel": [
+      0.0,
+      11.2381,
+      0.0665
+     ],
+     "size": [
+      33.2637,
+      12.7341,
+      11.2431
+     ]
+    },
+    {
+     "name": "obstacle_24_003",
+     "rel": [
+      0.0,
+      -4.2481,
+      15.5527
+     ],
+     "size": [
+      33.2637,
+      12.7341,
+      11.2431
+     ]
+    },
+    {
+     "name": "obstacle_24_004",
+     "rel": [
+      0.0,
+      -4.2481,
+      -15.4198
+     ],
+     "size": [
+      33.2637,
+      12.7341,
+      11.2431
+     ]
+    },
+    {
+     "name": "obstacle_24_005",
+     "rel": [
+      0.0,
+      -19.7344,
+      0.0665
+     ],
+     "size": [
+      33.2637,
+      12.7341,
+      11.2431
+     ]
+    }
+   ]
+  },
+  "trampoline_4_001": {
+   "role": "JumpPadOuterRibbed",
+   "rootSize": [
+    14.8598,
+    12.7562,
+    14.8595
+   ],
+   "hierarchy": "flat: 002 is a direct child of 001",
+   "support": [
+    0.0,
+    -6.3781,
+    0.0
+   ],
+   "children": [
+    {
+     "name": "trampoline_4_002",
+     "rel": [
+      0.0,
+      6.2757,
+      0.0
+     ],
+     "size": [
+      9.0125,
+      1.2804,
+      9.0123
+     ]
+    }
+   ]
+  }
+ },
+ "builderFixesThisFoundNote": "Resolving these three sources exposed that CoursePresets cloned every declared SubPart from the source on top of the root clone's own subtree, so any nested assembly was built twice: the pilot's pistons carried a duplicate spring and head, and a mace would have carried a duplicate ten-part chain. Sub-parts are now resolved inside the root clone first. Part counts fell from 156 to 143 (Ball Barrage) and 151 to 142 (Whirlpool Waltz); both spec hashes changed as a result."
+}

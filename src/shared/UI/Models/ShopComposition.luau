@@ -98,6 +98,9 @@ function Composition.span(width, wanted, minimum, gap, wideMin, mediumMin)
 		return 12
 	end
 	if width < wideMin then
+		if wanted >= 12 then
+			return 12
+		end
 		return if unit * 6 - gap >= minimum then 6 else 12
 	end
 	for _, span in { 4, 6, 8, 12 } do

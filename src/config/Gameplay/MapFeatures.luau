@@ -32,10 +32,6 @@ return {
 		InnerImpulse = -1,
 		MinimumSquash = 0.5, -- floor on vertical scale, keeps the pad from inverting
 	},
-	FoamPit = {
-		WalkSpeedScale = 0.45,
-		VerticalPadding = 2,
-	},
 	ElimZone = {
 		VerticalPadding = 2,
 	},
@@ -111,10 +107,24 @@ return {
 		SquashDampingRatio = 0.22,
 		SquashImpulse = -8,
 		BeatImpulse = -4,
+		-- The squash runs off a metronome locked to the track, not off whatever
+		-- is loud right now. Loudness only supplies the onsets the metronome
+		-- learns its tempo and phase from. BeatsPerPulse = 4 squashes on the
+		-- downbeat of each bar: impulse-2-3-4, impulse-2-3-4. Set it to 1 to
+		-- squash on every beat, or 2 for every other one.
+		BeatsPerPulse = 4,
+		BeatDefaultPeriodSeconds = 0.5, -- 120 BPM, used until the track is read
+		BeatMinPeriodSeconds = 0.3, -- 200 BPM
+		BeatMaxPeriodSeconds = 1.0, -- 60 BPM
 		BeatLoudnessFloor = 8,
 		BeatSensitivity = 1.35,
 		BeatEnvelopeResponseHz = 3,
-		BeatCooldownSeconds = 0.34,
+		BeatOnsetGapSeconds = 0.25, -- ignore rises closer than this so the tempo is learned from beats, not texture
+		BeatTempoSamples = 8,
+		BeatTempoAdaptRate = 0.35,
+		BeatPhaseCorrection = 0.12,
+		BeatPhaseWindow = 0.25, -- once locked, ignore onsets further than this fraction of a beat off the grid
+		BeatLockedScale = 0.25, -- how much of the tempo and phase correction survives locking
 		MinimumSquash = 0.6,
 		WidenScale = 0.35,
 	},
@@ -127,6 +137,48 @@ return {
 		ResetRadius = 420, -- studs from MapOrigin
 		CheckIntervalSeconds = 0.5,
 	},
+	-- Course platforms opt into server-applied three-dimensional carry. The
+	-- authored arena keeps its original client rider path unless explicitly set.
+	ServerCarry = {
+		ContactTolerance = 1,
+		MaxFrameSeconds = 0.2,
+		MaxCarryDelta = 4,
+		GuardSeconds = 0.4,
+	},
+	-- A hammer winds up slowly and strikes quickly. Opt into this rock profile;
+	-- ordinary Rotor rock keeps its original sinusoidal timing.
+	Hammer = { WindupSeconds = 1.8, StrikeSeconds = 0.3 },
+	-- Punch walls extend, hold, retract, then rest. Extent is measured from the
+	-- authored home position, not half the total travel as a sine slide would be.
+	Piston = { PeriodSeconds = 3.2, ExtendStuds = 12, HoldSeconds = 0.6 },
+	-- Only the marked sphere is a Big Ball. Its pole is ordinary geometry.
+	-- Top-cap landings bounce; side contacts roll outward once per visit.
+	BigBall = {
+		CapDegrees = 40,
+		BounceSpeed = 58,
+		FloatFactor = 0.25,
+		RollOffSpeed = 38,
+		UpwardSpeed = 6,
+		ShoveSeconds = 0.18,
+		RetriggerCooldown = 0.65,
+		GuardSeconds = 1,
+		MaxFloatSeconds = 3,
+		ContactPadding = 0.5,
+	},
+	-- Chevron direction is explicit because imported mesh pivots differ.
+	-- Anchored belts use surface velocity, carrying characters and physics balls.
+	Conveyor = { Speed = 15.6, Axis = "Z" },
+	-- Tiles stay anchored; the server removes collision after a visible warning.
+	-- RespawnSeconds = 0 means never; use a positive value on checkpoint routes.
+	FallingTile = { DropDelaySeconds = 0.65, RespawnSeconds = 5 },
+	-- Rider offsets drive a bounded kinematic tilt, not an unstable constraint.
+	Seesaw = { MaxTiltDegrees = 24, Response = 3, RiderWeight = 0.7, Axis = "Z" },
+	-- Attribute fans can face along an explicit local axis and push beach balls.
+	-- Unmarked fans keep the arena's upward-only launch and float behaviour.
+	CourseFan = { BallSpeed = 32, BallAcceleration = 45 },
+	-- Course-level liquid trajectory: height is an offset above its authored pose.
+	-- Start/stop still belongs to the race; pauses are "height:seconds,...".
+	RisingLiquid = { PauseFormat = "height:seconds,..." },
 	-- Authored arena pieces are matched by the name lists above. Splashdown
 	-- course clones carry these attributes instead, so the same kits drive both
 	-- without a course ever having to reuse an arena part name.
@@ -138,10 +190,52 @@ return {
 		RotorPeriod = "RotorPeriod", -- seconds per full swing
 		RotorPhase = "RotorPhase", -- seconds
 		RotorCarries = "RotorCarries", -- riders are carried with the part
+		ServerCarries = "ServerCarries", -- true on course Origin; client carry is disabled for this group
+		RotorProfile = "RotorProfile", -- "hammer" (rock) or "piston" (slide)
+		WindupSeconds = "WindupSeconds",
+		StrikeSeconds = "StrikeSeconds",
+		PistonPeriod = "PistonPeriod",
+		PistonPhase = "PistonPhase",
+		PistonExtendStuds = "PistonExtendStuds",
+		HoldSeconds = "HoldSeconds",
+		RotorAccel = "RotorAccel", -- degrees/s^2; requires MotionEpoch on Origin
+		RotorPhaseDegrees = "RotorPhaseDegrees", -- spin's initial angle, independent of rock/slide phase
+		MotionEpoch = "MotionEpoch", -- synchronized start time on Origin
+		JumpPad = "JumpPad", -- marker on a model in Scriptables/JumpPads
+		LaunchSpeed = "LaunchSpeed",
+		FloatFactor = "FloatFactor",
+		BeachBall = "BeachBall",
+		FanAxis = "FanAxis", -- local X/Y/Z; omit for legacy world-up launch
+		FanDirection = "FanDirection", -- +1 or -1
+		FanColumnHeight = "FanColumnHeight",
+		FanBallSpeed = "FanBallSpeed",
+		BigBall = "BigBall",
+		CapDegrees = "CapDegrees",
+		BounceSpeed = "BounceSpeed",
+		RollOffSpeed = "RollOffSpeed",
+		RetriggerCooldown = "RetriggerCooldown",
+		GuardSeconds = "GuardSeconds",
+		Conveyor = "Conveyor",
+		ConveyorSpeed = "ConveyorSpeed",
+		ConveyorAxis = "ConveyorAxis",
+		FallingTile = "FallingTile",
+		DropDelaySeconds = "DropDelaySeconds",
+		RespawnSeconds = "RespawnSeconds",
+		Seesaw = "Seesaw",
+		SeesawAxis = "SeesawAxis",
+		MaxTiltDegrees = "MaxTiltDegrees",
+		SeesawResponse = "SeesawResponse",
+		ImpactVisual = "ImpactVisual", -- opt-in client-only ghost pulse for Rotor shoves
+		RisingLiquid = "RisingLiquid",
+		StartDelaySeconds = "StartDelaySeconds",
+		RiseStudsPerSecond = "RiseStudsPerSecond",
+		MaxHeight = "MaxHeight",
+		PauseWaypoints = "PauseWaypoints",
 		Shove = "Shove", -- contact pushes the player along the surface motion
 		ShoveSpeed = "ShoveSpeed",
 		ShoveUpwardSpeed = "ShoveUpwardSpeed",
 		ShoveSeconds = "ShoveSeconds",
+		ShoveContact = "ShoveContact", -- "mesh" uses actual collision contact; omit for legacy padded bounds
 		Bumper = "Bumper",
 		Fan = "Fan",
 		FanBlade = "FanBlade",

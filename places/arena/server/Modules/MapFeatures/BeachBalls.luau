@@ -17,6 +17,10 @@ BeachBalls.instanceClass = "Folder"
 type BallInfo = {
 	homeRelative: CFrame,
 	assembly: Model,
+	parent: Instance,
+	anchored: boolean,
+	properties: PhysicalProperties?,
+	collide: boolean,
 }
 
 local balls: { [BasePart]: BallInfo } = {}
@@ -63,11 +67,21 @@ local function initGroup(assembly: Model)
 	local settings = MapFeatures.BeachBall
 	local folder = getRuntimeFolder(assembly)
 	local pivot = assembly:GetPivot()
-	for _, ball in assembly:GetChildren() do
-		if ball:IsA("BasePart") and ball.Name:find(settings.NamePrefix, 1, true) == 1 then
+	for _, ball in assembly:GetDescendants() do
+		if
+			ball:IsA("BasePart")
+			and (
+				ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true
+				or (ball.Parent == assembly and ball.Name:find(settings.NamePrefix, 1, true) == 1)
+			)
+		then
 			balls[ball] = {
 				homeRelative = pivot:ToObjectSpace(ball.CFrame),
 				assembly = assembly,
+				parent = ball.Parent :: Instance,
+				anchored = ball.Anchored,
+				properties = ball.CustomPhysicalProperties,
+				collide = ball.CanCollide,
 			}
 			-- Model:PivotTo in the ring mover would otherwise teleport an unanchored
 			-- ball every heartbeat and fight physics, so it moves under a runtime
@@ -75,6 +89,9 @@ local function initGroup(assembly: Model)
 			ball.Parent = folder
 			ball.Anchored = false
 			ball.CanCollide = true
+			if ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true then
+				ball:SetNetworkOwner(nil)
+			end
 			ball.CustomPhysicalProperties =
 				PhysicalProperties.new(settings.Density, settings.Friction, settings.Elasticity, 1, 1)
 		end
@@ -82,6 +99,11 @@ local function initGroup(assembly: Model)
 end
 
 function BeachBalls.tickWorld(context: MapFeatureKit.Context)
+	for assembly in initializedAssemblies do
+		if not assembly:IsDescendantOf(Workspace) then
+			initializedAssemblies[assembly] = nil
+		end
+	end
 	for _, group in context.instances do
 		local assembly = group:FindFirstChild("Assembly")
 		if assembly and assembly:IsA("Model") and not initializedAssemblies[assembly] then
@@ -101,6 +123,9 @@ function BeachBalls.tickWorld(context: MapFeatureKit.Context)
 	local settings = MapFeatures.BeachBall
 	for ball, info in balls do
 		if ball.Parent == nil or info.assembly.Parent == nil then
+			if ball.Parent and info.assembly.Parent == nil then
+				ball:Destroy()
+			end
 			balls[ball] = nil
 			initializedAssemblies[info.assembly] = nil
 			continue
@@ -122,16 +147,30 @@ function BeachBalls.forget(player: Player?)
 		return
 	end
 	for ball, info in balls do
-		if ball.Parent then
-			ball.Anchored = true
+		if ball.Parent and info.assembly.Parent then
+			ball.Anchored = if ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true then info.anchored else true
 			ball.CFrame = info.assembly:GetPivot() * info.homeRelative
-			ball.Parent = info.assembly
-			ball.CustomPhysicalProperties = nil
+			ball.Parent = info.parent
+			ball.CustomPhysicalProperties = info.properties
+			if ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true then
+				ball.CanCollide = info.collide
+			end
 		end
 	end
 	table.clear(balls)
 	table.clear(initializedAssemblies)
 	nextCheckAt = 0
+end
+
+-- Only live course balls opt into directional fan forcing. Arena physics stay unchanged.
+function BeachBalls.active(): { BasePart }
+	local result = {}
+	for ball, info in balls do
+		if ball.Parent and info.assembly.Parent and ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true then
+			table.insert(result, ball)
+		end
+	end
+	return result
 end
 
 return BeachBalls

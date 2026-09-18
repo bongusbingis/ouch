@@ -4,14 +4,14 @@
 -- MarketplaceService product information; catalog status controls merchandising.
 
 export type CatalogStatus = "Preview" | "Active" | "Hidden"
-export type ProductType = "Crate" | "Bonks" | "SeasonPass" | "Bundle" | "Cosmetic"
+export type ProductType = "Crate" | "Bonks" | "SeasonPass" | "Bundle" | "Cosmetic" | "OfferUnlock"
 
 local StoreCatalog = require(script.Parent.Parent.Parent.Shared.Game.Economy.StoreCatalog)
+local Cosmetics = require(script.Parent.Parent.Cosmetics.Cosmetics)
 
--- Cosmetic products are how a rotating-shop offer is priced in Robux. One
--- product per cosmetic rather than shared price tiers: a receipt then names
--- exactly what was bought with no second lookup to get wrong, which matters
--- because a receipt is the only record that survives a failed grant.
+-- OfferUnlock products price the rotating Robux slots by rarity. Per-item
+-- Cosmetic products remain valid for future curated offers, but the daily
+-- rotation resolves its exact durable grant from the player's persisted slot.
 export type ProductDef = {
 	Id: number?,
 	Icon: string?,
@@ -25,6 +25,7 @@ export type ProductDef = {
 	SeasonId: string?,
 	BundleId: string?,
 	ItemId: string?,
+	Rarity: string?,
 }
 
 local Catalog: { [string]: ProductDef } = {
@@ -122,8 +123,39 @@ local Catalog: { [string]: ProductDef } = {
 		Type = "SeasonPass",
 		SeasonId = "S1",
 	},
+	OfferUnlockCommon = {
+		Id = 3713076299,
+		Icon = "",
+		CatalogStatus = "Active",
+		DisplayName = "Common Unlock",
+		Description = "Unlock today's Common offer instantly.",
+		DisplayOrder = 600,
+		Type = "OfferUnlock",
+		Rarity = "Common",
+	},
+	OfferUnlockRare = {
+		Id = 3713076349,
+		Icon = "",
+		CatalogStatus = "Active",
+		DisplayName = "Rare Unlock",
+		Description = "Unlock today's Rare offer instantly.",
+		DisplayOrder = 610,
+		Type = "OfferUnlock",
+		Rarity = "Rare",
+	},
+	OfferUnlockLegendary = {
+		Id = 3713076414,
+		Icon = "",
+		CatalogStatus = "Active",
+		DisplayName = "Legendary Unlock",
+		Description = "Unlock today's Legendary offer instantly.",
+		DisplayOrder = 620,
+		Type = "OfferUnlock",
+		Rarity = "Legendary",
+	},
 }
 
+local offerRarities: { [string]: string } = {}
 for key, definition in Catalog do
 	assert(definition.DisplayOrder % 1 == 0, `developer product "{key}" must define an integer DisplayOrder`)
 	local icon = definition.Icon
@@ -158,6 +190,13 @@ for key, definition in Catalog do
 				`cosmetic product "{key}" must define ItemId`
 			)
 		end
+	end
+	if definition.Type == "OfferUnlock" then
+		local rarityId = definition.Rarity
+		local rarity = if type(rarityId) == "string" then Cosmetics.Rarities[rarityId] else nil
+		assert(rarity ~= nil and rarity.DirectBonks > 0, `offer unlock product "{key}" must define a priced rarity`)
+		assert(offerRarities[rarityId] == nil, `offer unlock rarity "{rarityId}" is shared by two products`)
+		offerRarities[rarityId] = key
 	end
 end
 

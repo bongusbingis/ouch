@@ -1,0 +1,127 @@
+{
+  "purpose": "Real Studio raycast measurements of the route-floor and ramp source assets Ball Barrage uses, per HANDOFF.md section 5.1 steps 3-4. Hazard-mechanism pieces (BigBall, sweeper, piston, hammers, bumpers, fan, pad) are not raycast-scanned here because they are not walkable surfaces; their Support/axle points come from the already-measured PivotOffset/size data in docs/splashdown/evidence/inventory.json, cited per-piece below.",
+  "methodology": "For each source MeshPart in workspace.battle_stadium: clone it (source gallery left untouched), anchor the clone, translate it (no rotation change) to an isolated point far above the arena, then cast a grid of downward Raycasts (Enum.RaycastFilterType.Include, filtered to the clone only) from above its bounding box down through it. Each hit position is converted to the clone's own object space via CFrame:PointToObjectSpace, so recorded coordinates are root-local and independent of where the source sits in the gallery. Grid spacing and hit/miss counts are recorded per asset. Clones and scratch folders were destroyed immediately after each measurement; workspace.battle_stadium was never modified.",
+  "studioSessionId": "f2e79758-7afe-47ea-8efc-85035edf8307",
+  "placeId": 121997450145716,
+  "measuredAt": "2026-09-15",
+  "assets": {
+    "platform_001": {
+      "role": "Straight lane floor slab (also representative of platform_002/003, identical mesh/size, trim-color variants only)",
+      "size": [70.06987762451172, 28.54939079284668, 89.851806640625],
+      "rayStep": 1.0,
+      "hits": 6052,
+      "misses": 338,
+      "note": "Misses are edge/bevel rays (~5.3%), consistent with a rounded-edge slab, not holes.",
+      "topLocalY": 14.275,
+      "footprintX": [-34.035, 34.965],
+      "footprintZ": [-43.926, 44.074],
+      "sockets": {
+        "forwardAxis": "Z",
+        "Entry": { "local": [0, 14.275, -43.926] },
+        "Exit": { "local": [0, 14.275, 44.074] },
+        "Support": { "local": [0, -14.3, 0], "note": "underside center, matches inventory PΔ 0,-14.3,0" }
+      }
+    },
+    "obstacle_9_001": {
+      "role": "Conveyor belt (beat 01, x2 instances at different ConveyorSpeed)",
+      "size": [27.95486068725586, 1.7447575330734253, 55.90972137451172],
+      "rayStep": 0.5,
+      "hits": 6182,
+      "misses": 90,
+      "topLocalYRange": [0.345, 0.872],
+      "topLocalYUsed": 0.87,
+      "footprintXHalf": 13.98,
+      "footprintZHalf": 27.95,
+      "sockets": {
+        "forwardAxis": "Z",
+        "Entry": { "local": [0, 0.87, -27.95] },
+        "Exit": { "local": [0, 0.87, 27.95] },
+        "Support": { "local": [0, -0.87, 0] }
+      },
+      "note": "Chevron ridges cause the 0.35-0.87 Y range; ConveyorAxis default Z matches the kit contract default."
+    },
+    "box_011": {
+      "role": "Elevation-change ramp (zigzag/slope block), monotonic descent with flat plateaus at both ends. box_013 is the mirrored twin (PΔ x sign flipped, -2.2 vs 2.2); not independently measured, used wherever the opposite-hand ramp is needed.",
+      "size": [153.06268310546875, 53.853248596191406, 60.27421188354492],
+      "rayStep": 0.5,
+      "hits": 32287,
+      "misses": 4860,
+      "profileLongAxisX_bins20": [
+        { "range": [-76.5, -68.9], "hitFrac": 0.42, "y": [26.138, 26.927] },
+        { "range": [-68.9, -61.2], "hitFrac": 0.92, "y": [26.090, 26.925] },
+        { "range": [-61.2, -53.6], "hitFrac": 0.92, "y": [26.114, 26.892] },
+        { "range": [-53.6, -45.9], "hitFrac": 0.92, "y": [25.986, 26.855] },
+        { "range": [-45.9, -38.3], "hitFrac": 0.92, "y": [25.883, 26.812] },
+        { "range": [-38.3, -30.6], "hitFrac": 0.92, "y": [25.762, 26.777] },
+        { "range": [-30.6, -23.0], "hitFrac": 0.92, "y": [25.428, 26.737] },
+        { "range": [-23.0, -15.3], "hitFrac": 0.91, "y": [21.469, 26.693] },
+        { "range": [-15.3, -7.7],  "hitFrac": 0.92, "y": [17.352, 23.152] },
+        { "range": [-7.7, 0.0],    "hitFrac": 0.92, "y": [12.958, 18.492] },
+        { "range": [0.0, 7.7],     "hitFrac": 0.92, "y": [8.709, 13.538] },
+        { "range": [7.7, 15.3],    "hitFrac": 0.92, "y": [3.991, 9.082] },
+        { "range": [15.3, 23.0],   "hitFrac": 0.92, "y": [1.002, 4.906] },
+        { "range": [23.0, 30.6],   "hitFrac": 0.92, "y": [-2.212, 1.940] },
+        { "range": [30.6, 38.3],   "hitFrac": 0.92, "y": [-2.350, 0.007] },
+        { "range": [38.3, 45.9],   "hitFrac": 0.92, "y": [-3.949, -1.698] },
+        { "range": [45.9, 53.6],   "hitFrac": 0.92, "y": [-3.958, -1.654] },
+        { "range": [53.6, 61.2],   "hitFrac": 0.92, "y": [-4.595, -1.613] },
+        { "range": [61.2, 68.9],   "hitFrac": 0.92, "y": [-2.259, -1.574] },
+        { "range": [68.9, 76.5],   "hitFrac": 0.46, "y": [-4.001, -1.573] }
+      ],
+      "sockets": {
+        "forwardAxis": "X",
+        "topPlateau": { "localXRange": [-76.5, -61.2], "localY": 26.9 },
+        "bottomPlateau": { "localXRange": [61.2, 76.5], "localY": -1.6 },
+        "Entry": { "local": [-69, 26.9, 0], "note": "top plateau, high-X end" },
+        "Exit": { "local": [69, -1.6, 0], "note": "bottom plateau, low-X end" },
+        "netRise": 28.5,
+        "slopedRunStuds": 75,
+        "Support": { "local": [0, -26.9, 0] }
+      },
+      "usage": "Uniformly scaled per-beat to hit the exact required elevation change: scale = requiredRise / 28.5. Flat plateaus at both ends give flush sockets against adjacent platform_00x slabs (no floating slab)."
+    },
+    "slide_001": {
+      "role": "Finish slide (beat 06): built-in stair-up + curved slide-down shape, real inflatable-slide geometry.",
+      "size": [33.97971725463867, 56.8065185546875, 89.7237319946289],
+      "rayStep": 0.5,
+      "hits": 12166,
+      "misses": 74,
+      "note": "Y swings widely within each Z bin because the cross-section is a curved chute, not a flat plane; both Z ends are low (~-23.5) and the middle peaks (~28.3), i.e. stairs-up-one-side / slide-down-the-other shape.",
+      "sockets": {
+        "forwardAxis": "Z",
+        "peakPlatform": { "localZRange": [6.4, 19.2], "localY": 28.3 },
+        "descentExit": { "localZRange": [32.0, 44.9], "localY": -23.5 },
+        "Entry": { "local": [0, 28.3, 13], "note": "platform top; beat 05 arrives here at matching height, stair side of the mesh is left off-route" },
+        "Exit": { "local": [0, -23.5, 38], "note": "bottom of the slide chute, over race liquid / finish" },
+        "netDrop": 51.8,
+        "Support": { "local": [0, -28.4, 0] }
+      },
+      "usage": "Beat 06 target is -12 studs. Uniform scale = 12 / 51.8 ≈ 0.232 applied to the whole piece; only the slide-down (peak-to-exit) half of the mesh is used as the trafficked route, the stair-up half is oriented away from the lane."
+    },
+    "arc_004": {
+      "role": "Evaluated as a Serpentine turn candidate (HANDOFF 5.2: 'quarter-arc assets for the turns where the measured socket fits') and NOT selected.",
+      "size": [278.1845397949219, 10.17761516571045, 101.15618896484375],
+      "rayStep": 1.0,
+      "hits": 20617,
+      "misses": 7841,
+      "shapeSummary": "Flat-top annular sector (constant local Y ~5 across the filled area, i.e. no slope), banana-shaped footprint: full-width in the middle Z rows, tapering to a rounded cap at high Z and to a genuine inner-radius hole at low Z. A 10-stud-cell hit/height map is recorded below.",
+      "cellMapNote": "Rows are Z cells (high Z first) top-to-bottom, columns are X cells (low X first) left-to-right, 10 studs per cell, value = max local Y in that cell or '.' for no hits.",
+      "cellMap": [
+        "  .   .   .   .   .   .   .   .   .   .   .   2   4   4   4   4   2   .   .   .   .   .   .   .   .   .   .   .",
+        "  .   .   .   .   .   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   .   .   .   .   .",
+        "  .   3   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   3   .",
+        "  5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5",
+        "  5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5",
+        "  5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5",
+        "  2   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   .",
+        "  .   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   .",
+        "  .   4   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   5   4   .",
+        "  .   .   5   5   5   5   5   5   5   5   4   3   .   .   .   .   3   4   5   5   5   5   5   5   5   5   .   .",
+        "  .   .   5   5   5   5   2   .   .   .   .   .   .   .   .   .   .   .   .   .   .   3   5   5   5   5   .   ."
+      ],
+      "reasonNotSelected": "arc_004's natural radius is far larger than Ball Barrage's 112-134 stud turn envelope (LanePitch 112). At the scale-down needed to fit, the band becomes a thin sliver and deriving reliable Entry/Exit chord sockets would need dedicated radius/angle-fitting measurement beyond this pilot's budget. Ball Barrage's two turns are instead built from two measured platform_001 slabs abutted at a right angle (each slab's own Entry/Exit sockets are known exactly from the measurement above), which is a measured-socket construction, not an unmeasured bounding-box rotation.",
+      "followUp": "If a curved turn is wanted for a later course, re-measure arc_001-004 with a center/radius fit (sample the inner-hole boundary and outer cap boundary at fine resolution along several radii) before relying on it."
+    }
+  },
+  "hazardPieceSupportSource": "obstacle_23_001/002 (BigBall), obstacle_2_001/002 (sweeper), obstacle_22_001/002/003 (piston), obstacle_3_001/002 and obstacle_4_001/002 (hammers), obstacle_18_001/obstacle_19_001 (bumpers), propeller_trampoline_1_001/2_001 (fan), trampoline_1_001/trampoline_1_002 (pad, renamed Outer/Inner per the trampoline_3 precedent) are mounted objects, not walkable surfaces; their base/Support contact and existing mechanical pivots are taken directly from the per-child size+pivotOffset rows already recorded in docs/splashdown/evidence/inventory.json (see AssetManifest.luau source comments for the exact cited lines), not re-raycast here."
+}

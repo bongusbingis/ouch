@@ -170,6 +170,10 @@ function PartyClient:kick(targetUserId: number)
 	return self:request(Protocol.Actions.KickMember, { targetUserId = targetUserId })
 end
 
+function PartyClient:leave()
+	return self:request(Protocol.Actions.LeaveParty, nil)
+end
+
 function PartyClient:setQueue(queueId: string)
 	return self:request(Protocol.Actions.SetQueue, { queueId = queueId })
 end

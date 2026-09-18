@@ -94,7 +94,7 @@ local function base(overrides: { [string]: any }?): any
 			placement = index,
 			score = ({ 11, 8, 6 })[index],
 		}
-		if result.modeId == "FFA" and score then
+		if result.placement ~= nil and score then
 			entry.playerId = score.id
 			entry.userId = tonumber(score.id) or index
 			entry.displayName = score.label
@@ -200,6 +200,33 @@ function DebugPostMatchData.scenarios(): { Scenario }
 			{ id = "Red", label = "RED", score = 20 },
 		},
 	})
+	local race = base({
+		resultId = "splashdown-second",
+		modeId = "Splashdown",
+		modeName = "Splashdown",
+		scoreLabel = "POINTS",
+		outcome = "Defeat",
+		winnerId = "2",
+		placement = 2,
+		presentation = {
+			eyebrow = "MATCH COMPLETE",
+			title = "2ND PLACE",
+			detail = "ALEX TAKES THE WIN",
+			accent = "Cyan",
+		},
+		scores = {
+			{ id = "2", label = "ALEX", score = 78, placement = 1 },
+			{ id = "1", label = "YOU", score = 66, placement = 2 },
+			{ id = "3", label = "SAM", score = 41, placement = 3 },
+			{ id = "4", label = "MILO", score = 24, placement = 4 },
+		},
+		personalStats = {
+			{ id = "BestFinish", label = "BEST FINISH", value = 1 },
+			{ id = "TotalTime", label = "TOTAL TIME", value = 214.6 },
+			{ id = "Splashdowns", label = "SPLASHDOWNS", value = 3 },
+			{ id = "Placement", label = "PLACEMENT", value = 2 },
+		},
+	})
 	local noParty = base({ resultId = "no-party", party = CLEAR })
 	local longParty = base({
 		resultId = "long-party",
@@ -258,6 +285,7 @@ function DebugPostMatchData.scenarios(): { Scenario }
 		{ name = "REWARDS PENDING", result = rewardsPending },
 		{ name = "BOOSTS / TIER UP", result = boostedRewards },
 		{ name = "TIED ROUND", result = tie },
+		{ name = "SPLASHDOWN 2ND", result = race },
 		{ name = "NO PARTY PROJECTION", result = noParty },
 		{ name = "LONG PARTY NAMES", result = longParty },
 		{

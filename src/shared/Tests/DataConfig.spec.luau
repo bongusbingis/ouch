@@ -26,6 +26,8 @@ T.describe("Data config", function()
 		local template = DataConfig.Template
 		T.expect(type(template.Shop.Offers)):toEqual("table")
 		T.expect(#template.Shop.Offers):toEqual(0)
+		T.expect(template.Shop.Version):toEqual(1)
+		T.expect(type(template.Shop.Purchased)):toEqual("table")
 		T.expect(template.Shop.Bucket < 0):toBeTruthy()
 	end)
 

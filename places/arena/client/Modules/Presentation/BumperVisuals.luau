@@ -1,4 +1,4 @@
--- Description: Renders the ring and course bumpers, tracking their authored parts under every tagged Scriptables root, pulsing them to the live music beat, and playing a stronger squash and impact sound when the server broadcasts a bumper hit.
+-- Description: Renders the ring and course bumpers, tracking their authored parts under every tagged Scriptables root, squashing them on a metronome locked to the playing track's tempo, and playing a stronger squash and impact sound when the server broadcasts a bumper hit.
 
 --!strict
 
@@ -11,6 +11,7 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ScriptableRoots = require(Game:WaitForChild("MapFeatures"):WaitForChild("ScriptableRoots"))
 local Spring = require(Game:WaitForChild("Util"):WaitForChild("Spring"))
+local BeatClock = require(Game:WaitForChild("Util"):WaitForChild("BeatClock"))
 local GameAudio = require(script.Parent.GameAudio)
 local MatchAudio = require(script.Parent.MatchAudio)
 
@@ -26,12 +27,31 @@ local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
 local started = false
 local beatSound: Sound? = nil
-local beatEnvelope = 0
-local previousLoudness = 0
-local lastBeatAt = -math.huge
+local beatClock: BeatClock.Clock? = nil
 
 local function config()
 	return MapFeatures.Bumper
+end
+
+-- The clock only needs the tempo half of the bumper settings, named without the
+-- Beat prefix the config uses to keep them apart from the squash values.
+local function beatSettings(): BeatClock.Settings
+	local settings = config()
+	return {
+		DefaultPeriodSeconds = settings.BeatDefaultPeriodSeconds,
+		MinPeriodSeconds = settings.BeatMinPeriodSeconds,
+		MaxPeriodSeconds = settings.BeatMaxPeriodSeconds,
+		EnvelopeResponseHz = settings.BeatEnvelopeResponseHz,
+		LoudnessFloor = settings.BeatLoudnessFloor,
+		Sensitivity = settings.BeatSensitivity,
+		OnsetGapSeconds = settings.BeatOnsetGapSeconds,
+		TempoSamples = settings.BeatTempoSamples,
+		TempoAdaptRate = settings.BeatTempoAdaptRate,
+		PhaseCorrection = settings.BeatPhaseCorrection,
+		PhaseWindow = settings.BeatPhaseWindow,
+		LockedScale = settings.BeatLockedScale,
+		BeatsPerPulse = settings.BeatsPerPulse,
+	}
 end
 
 local function isBumper(part: BasePart): boolean
@@ -127,11 +147,16 @@ local function hitImpulse(part: BasePart)
 	GameAudio.play("JumpPadBounce", part)
 end
 
-local function resetBeatDetector(sound: Sound?)
+local function resetBeatClock(sound: Sound?)
 	beatSound = sound
-	beatEnvelope = if sound then sound.PlaybackLoudness else 0
-	previousLoudness = beatEnvelope
-	lastBeatAt = -math.huge
+	if sound == nil then
+		beatClock = nil
+		return
+	end
+	local settings = beatSettings()
+	local clock = BeatClock.new(settings)
+	BeatClock.reset(clock, settings, sound.TimePosition, sound.PlaybackLoudness)
+	beatClock = clock
 end
 
 local function pulseBeat()
@@ -143,31 +168,19 @@ end
 local function updateBeat(deltaTime: number)
 	local sound = MatchAudio.getCurrentMusic()
 	if sound ~= beatSound then
-		resetBeatDetector(sound)
+		resetBeatClock(sound)
 		return
 	end
-	if sound == nil or not sound.IsPlaying then
+	local clock = beatClock
+	if sound == nil or clock == nil or not sound.IsPlaying then
 		return
 	end
-
-	local settings = config()
-	local loudness = sound.PlaybackLoudness
-	local alpha = 1 - math.exp(-settings.BeatEnvelopeResponseHz * math.max(deltaTime, 0))
-	beatEnvelope += (loudness - beatEnvelope) * alpha
-	local threshold = math.max(settings.BeatLoudnessFloor, beatEnvelope * settings.BeatSensitivity)
-	local trackTime = sound.TimePosition
-	if trackTime < lastBeatAt then
-		lastBeatAt = -math.huge
-	end
-	if
-		loudness > previousLoudness
-		and loudness >= threshold
-		and trackTime - lastBeatAt >= settings.BeatCooldownSeconds
-	then
-		lastBeatAt = trackTime
+	local pulses = BeatClock.advance(clock, beatSettings(), sound.TimePosition, sound.PlaybackLoudness, deltaTime)
+	-- Several beats can only land in one frame after a hitch, and the bumpers
+	-- should read as one squash rather than a stack of them.
+	if pulses > 0 then
 		pulseBeat()
 	end
-	previousLoudness = loudness
 end
 
 local function step(deltaTime: number)
@@ -214,7 +227,7 @@ function BumperVisuals.stop()
 	for root in rootConnections do
 		removeRoot(root)
 	end
-	resetBeatDetector(nil)
+	resetBeatClock(nil)
 	started = false
 end
 

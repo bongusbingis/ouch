@@ -321,6 +321,27 @@ T.describe("ShopLayout", function()
 		end
 	end)
 
+	T.it("keeps later importance bands below the dynamic catalog", function()
+		local passes = block("passes", 12, 100)
+		passes.priority = 1
+		local crates = block("crates", 4, 260)
+		crates.priority = 2
+		local forYou = block("forYou", 4, 420)
+		forYou.priority = 2
+		local bonks = block("bonks", 8, 190)
+		bonks.priority = 2
+		local misc = block("misc", 4, 80)
+		misc.priority = 3
+
+		local placements = ShopLayout.compact({ passes, crates, forYou, bonks, misc }, TRACKS, GAP)
+		local at = placedBy(placements)
+		T.expect(at.crates.y):toEqual(at.passes.y + passes.height + GAP)
+		T.expect(at.forYou.y):toEqual(at.crates.y)
+		T.expect(at.bonks.y >= at.crates.y):toBeTruthy()
+		T.expect(at.misc.y > at.bonks.y):toBeTruthy()
+		T.expect(overlaps(placements, GAP)):toEqual(false)
+	end)
+
 	T.it("never overlaps blocks whatever order and spans it is handed", function()
 		local spans = { 12, 4, 8, 4, 4, 8, 4, 12, 4 }
 		local blocks = {}

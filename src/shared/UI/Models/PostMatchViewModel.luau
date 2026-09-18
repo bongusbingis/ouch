@@ -1,16 +1,23 @@
--- Description: Pure post-match presentation rules for party roles, action copy, request state, countdowns, and bounded responsive canvas sizing.
+-- Description: Pure post-match presentation rules: party roles and the final action copy, footer status lines, the countdown caption, the stage heading, per-stat value formatting, the season bar reveal, and countdown rounding.
 
 --!strict
+
+local SplashdownHUDModel = require(script.Parent.SplashdownHUDModel)
+local formatNumber = require(script.Parent.NumberText)
 
 local PostMatchViewModel = {}
 
 export type Action = "PlayAgain" | "CancelPlayAgain" | "ReturnToLobby" | "LeaveParty" | "FindMatch"
 
+export type PrimaryStyle = "Primary" | "Done" | "Waiting"
+
 export type ActionModel = {
 	isLeader: boolean,
 	partySize: number,
 	partyNames: { string },
+	leaderName: string,
 	primaryText: string,
+	primaryStyle: PrimaryStyle,
 	returnText: string,
 	returnAction: "ReturnToLobby" | "LeaveParty",
 	statusText: string,
@@ -18,6 +25,10 @@ export type ActionModel = {
 	busy: boolean,
 	primaryEnabled: boolean,
 }
+
+export type Countdown = { caption: string, value: string }
+
+export type SeasonReveal = { startFraction: number, endFraction: number, tierUp: boolean }
 
 local function partyInfo(localUserId: number, party: any?): (number, number, { string }, string)
 	if party == nil then
@@ -40,7 +51,8 @@ function PostMatchViewModel.actions(
 	party: any?,
 	status: any?,
 	requesting: boolean,
-	pendingAction: Action?
+	pendingAction: Action?,
+	departing: boolean?
 ): ActionModel
 	local partyLeaderId, partySize, partyNames, leaderName = partyInfo(localUserId, party)
 	local leaderUserId = if status and status.leaderUserId then status.leaderUserId else partyLeaderId
@@ -48,37 +60,46 @@ function PostMatchViewModel.actions(
 	local replaySelected = status ~= nil and status.state == "PlayAgain"
 	local selfReturning = status ~= nil and status.selfReturning == true
 	local groupReturning = status ~= nil and status.state == "Returning"
-	local busy = requesting or selfReturning or groupReturning
+	local busy = requesting or selfReturning or groupReturning or departing == true
 	local canReplay = status == nil or status.canReplay ~= false
-	local primaryText = if not isLeader
-		then "WAITING FOR LEADER"
-		else if not canReplay
-			then "FIND PLAYERS"
-			else if replaySelected
-				then "NEXT ROUND ✓"
-				else if partySize > 1 then "PLAY AGAIN WITH PARTY" else "PLAY AGAIN"
-	local returnText = if isLeader
-		then if partySize > 1 then "RETURN PARTY TO LOBBY" else "RETURN TO LOBBY"
-		else "LEAVE PARTY & RETURN"
+
+	local primaryText, primaryStyle: PrimaryStyle
+	if busy then
+		primaryText, primaryStyle = "PLEASE WAIT…", "Waiting"
+	elseif not isLeader then
+		primaryText, primaryStyle = "LEADER DECIDES", "Waiting"
+	elseif not canReplay then
+		primaryText, primaryStyle = "FIND PLAYERS", "Primary"
+	elseif replaySelected then
+		primaryText, primaryStyle = "NEXT ROUND ✓", "Done"
+	else
+		primaryText, primaryStyle = "PLAY AGAIN", "Primary"
+	end
+	local returnText = if isLeader then "LOBBY" else "LEAVE PARTY"
+
 	local statusText
-	if selfReturning or (requesting and pendingAction == "LeaveParty") then
-		statusText = "LEAVING PARTY - RETURNING ONLY YOU"
+	if departing then
+		statusText = if selfReturning
+			then "LEAVING YOUR PARTY · HEADING TO THE LOBBY"
+			else if partySize > 1 then "YOUR PARTY IS HEADING TO THE LOBBY" else "HEADING TO THE LOBBY"
+	elseif selfReturning or (requesting and pendingAction == "LeaveParty") then
+		statusText = "LEAVING YOUR PARTY · HEADING TO THE LOBBY"
 	elseif (status and status.findingPlayers) or (requesting and pendingAction == "FindMatch") then
 		statusText = "HEADING TO THE LOBBY TO FIND PLAYERS"
 	elseif groupReturning or (requesting and pendingAction == "ReturnToLobby") then
-		statusText = if partySize > 1 then "RETURNING YOUR PARTY TO LOBBY" else "RETURNING TO LOBBY"
+		statusText = if partySize > 1 then "YOUR PARTY IS HEADING TO THE LOBBY" else "HEADING TO THE LOBBY"
 	elseif requesting then
-		statusText = "SAVING YOUR PARTY'S CHOICE"
+		statusText = "SAVING YOUR CHOICE…"
 	elseif not canReplay then
-		statusText = if isLeader then "LET'S FIND MORE PLAYERS" else leaderName .. " CAN FIND YOUR NEXT MATCH"
+		statusText = if isLeader
+			then "NOT ENOUGH PLAYERS · FIND SOME IN THE LOBBY"
+			else leaderName .. " CAN FIND YOUR NEXT MATCH"
 	elseif replaySelected then
 		statusText = if isLeader
-			then if partySize > 1
-				then "YOUR PARTY IS STAYING FOR THE NEXT ROUND"
-				else "YOU'RE STAYING FOR THE NEXT ROUND"
-			else "YOUR PARTY IS STAYING — YOUR LEADER CAN RETURN TO LOBBY"
+			then if partySize > 1 then "YOUR PARTY STAYS FOR THE NEXT ROUND" else "YOU'RE IN FOR THE NEXT ROUND"
+			else "YOUR PARTY STAYS · LEAVE PARTY TO GO ALONE"
 	elseif not isLeader then
-		statusText = "WAITING FOR " .. leaderName .. " - YOU CAN LEAVE WITHOUT MOVING THE PARTY"
+		statusText = "WAITING FOR " .. leaderName .. " · LEAVE PARTY TO GO ALONE"
 	else
 		statusText = "READY FOR ANOTHER ROUND?"
 	end
@@ -87,7 +108,9 @@ function PostMatchViewModel.actions(
 		isLeader = isLeader,
 		partySize = partySize,
 		partyNames = partyNames,
+		leaderName = leaderName,
 		primaryText = primaryText,
+		primaryStyle = primaryStyle,
 		returnText = returnText,
 		returnAction = if isLeader then "ReturnToLobby" else "LeaveParty",
 		statusText = statusText,
@@ -97,31 +120,70 @@ function PostMatchViewModel.actions(
 	}
 end
 
-function PostMatchViewModel.destination(status: any?, partySize: number): string?
+function PostMatchViewModel.countdown(
+	status: any?,
+	partySize: number,
+	remaining: number,
+	departing: boolean?
+): Countdown
+	if departing then
+		return { caption = "HEADING TO", value = "LOBBY" }
+	end
+	local value = `{remaining}s`
 	if status == nil then
-		return nil
+		return { caption = "RESULTS END IN", value = value }
 	end
 	if status.nextDestination == "Lobby" then
-		return if status.selfReturning or partySize <= 1
-			then "RETURNING TO LOBBY WHEN THE TIMER ENDS"
-			else "YOUR PARTY RETURNS TO LOBBY WHEN THE TIMER ENDS"
+		return {
+			caption = if status.selfReturning or partySize <= 1 then "LOBBY IN" else "PARTY LEAVES IN",
+			value = value,
+		}
 	elseif status.nextDestination == "Arena" then
-		return "NEXT ROUND WHEN THE TIMER ENDS"
+		return { caption = "NEXT ROUND IN", value = value }
 	end
-	return nil
+	return { caption = "RESULTS END IN", value = value }
+end
+
+function PostMatchViewModel.kicker(modeName: string, eyebrow: string): string
+	return string.upper(modeName) .. " · " .. eyebrow
+end
+
+function PostMatchViewModel.stageHeading(
+	teamMode: boolean,
+	podiumCount: number,
+	tied: boolean,
+	standings: boolean
+): string
+	if standings then
+		return "FINAL STANDINGS"
+	end
+	if podiumCount == 0 then
+		return if tied then "DEAD HEAT" else "READY FOR THE NEXT ONE"
+	end
+	return if teamMode then "WINNING TEAM STANDOUTS" else "TOP FINISHERS"
+end
+
+function PostMatchViewModel.statText(stat: { id: string, value: number }): string
+	if stat.id == "TotalTime" then
+		return SplashdownHUDModel.formatTime(stat.value)
+	end
+	if stat.id == "BestFinish" or stat.id == "Placement" then
+		return if stat.value >= 1 then SplashdownHUDModel.ordinal(stat.value) else "—"
+	end
+	return formatNumber(stat.value)
+end
+
+function PostMatchViewModel.seasonReveal(season: any): SeasonReveal
+	local span = math.max(season.xpForNextTier, 1)
+	local endFraction = math.clamp(season.xpIntoTier / span, 0, 1)
+	local tierUp = season.afterTier > season.beforeTier
+	local gained = math.max(season.afterXp - season.beforeXp, 0)
+	local startFraction = if tierUp then 0 else math.clamp((season.xpIntoTier - gained) / span, 0, endFraction)
+	return { startFraction = startFraction, endFraction = endFraction, tierUp = tierUp }
 end
 
 function PostMatchViewModel.remainingSeconds(endsAt: number, now: number): number
 	return math.max(math.ceil(endsAt - now), 0)
-end
-
-function PostMatchViewModel.canvasSize(width: number, height: number): (number, number, boolean)
-	local canvasWidth = math.min(math.max(width, 0), 1920)
-	local canvasHeight = math.min(math.max(height, 0), 1080)
-	if height > width then
-		canvasHeight = math.min(canvasHeight, canvasWidth * 0.75)
-	end
-	return canvasWidth, canvasHeight, canvasWidth < 1000 or canvasHeight < 620
 end
 
 return table.freeze(PostMatchViewModel)

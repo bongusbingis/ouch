@@ -16,6 +16,7 @@ local MapFeatureKit = require(script.Parent.MapFeatureKit)
 
 local Bumpers = {}
 local ShoveTuning = require(ReplicatedStorage.Shared.Game.MapFeatures.ShoveTuning)
+local Parts = require(script.Parent.FeatureParts)
 Bumpers.folderName = "Rotating"
 Bumpers.instanceClass = "Folder"
 
@@ -99,7 +100,10 @@ function Bumpers.tickWorld(context: MapFeatureKit.Context)
 			-- Root-only contact excludes cosmetic/limb grazing. A small padded
 			-- oriented box makes near-edge contacts register more reliably.
 			local padding = Vector3.one * MapFeatures.Bumper.ContactPadding * 2
-			for _, root in Workspace:GetPartBoundsInBox(bumper.CFrame, bumper.Size + padding, overlap) do
+			local touching = if bumper:GetAttribute(MapFeatures.Attributes.ShoveContact) == "mesh"
+				then Workspace:GetPartsInPart(bumper, overlap)
+				else Workspace:GetPartBoundsInBox(bumper.CFrame, bumper.Size + padding, overlap)
+			for _, root in touching do
 				contacts[root] = contacts[root] or bumper
 			end
 		end
@@ -148,7 +152,14 @@ local function bump(
 		attachment = attachment,
 		expiresAt = context.now + settings.ShoveSeconds,
 	}
-	MovementGuard.allow(root, "Bumper", settings.GuardSeconds, settings.KnockbackSpeed * 1.3, target.Y * 1.3, bumper)
+	MovementGuard.allow(
+		root,
+		"Bumper",
+		math.max(settings.GuardSeconds, Parts.number(bumper, "GuardSeconds", settings.GuardSeconds, 0.3, 10)),
+		settings.KnockbackSpeed * 1.3,
+		target.Y * 1.3,
+		bumper
+	)
 	Network.fire("BumperHit", nil, bumper)
 end
 
@@ -189,7 +200,8 @@ function Bumpers.tickPlayer(context: MapFeatureKit.Context, player: Player, root
 	end
 	if not visit.bumped and shoves[player] == nil and context.now >= (cooldowns[player] or 0) then
 		visit.bumped = true
-		cooldowns[player] = context.now + MapFeatures.Bumper.RetriggerCooldown
+		cooldowns[player] = context.now
+			+ Parts.number(bumper, "RetriggerCooldown", MapFeatures.Bumper.RetriggerCooldown, 0.1, 10)
 		bump(context, player, bumper, root, humanoid)
 	end
 end

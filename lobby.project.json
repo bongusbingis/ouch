@@ -6,7 +6,6 @@
   "blockedPlaceIds": [121997450145716],
   "globIgnorePaths": [
     "src/shared/Tests/**",
-    "src/shared/UI/Stories/**",
     "places/lobby/client/UI/Stories/**",
     "**/_Index/**/*.server.lua",
     "**/_Index/**/*.server.luau",
@@ -91,6 +90,7 @@
           "TrainingHazards": {
             "$className": "Folder",
             "MapFeatureKit": { "$path": "places/arena/server/Modules/MapFeatures/MapFeatureKit.luau" },
+            "FeatureParts": { "$path": "places/arena/server/Modules/MapFeatures/FeatureParts.luau" },
             "Bumpers": { "$path": "places/arena/server/Modules/MapFeatures/Bumpers.luau" },
             "RotorBump": { "$path": "places/arena/server/Modules/MapFeatures/RotorBump.luau" }
           },

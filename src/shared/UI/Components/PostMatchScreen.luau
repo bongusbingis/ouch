@@ -5,60 +5,239 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
+local T = require(script.Parent.Parent.Tokens)
+local Motion = require(script.Parent.Parent.Motion)
 local Model = require(script.Parent.Parent.Models.PostMatchViewModel)
+local Layout = require(script.Parent.Parent.Models.PostMatchLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
+local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
+local useReveal = require(script.Parent.Parent.Hooks.useReveal)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local Selection = require(script.Parent.Parent.Services.Selection)
-local Label = require(script.Parent.Arena.Label)
-local Surface = require(script.Parent.Arena.Surface)
-local ActionButton = require(script.Parent.Arena.ActionButton)
+local CandyPanel = require(script.Parent.CandyPanel)
+local CandySurface = require(script.Parent.CandySurface)
+local CandyTitle = require(script.Parent.CandyTitle)
+local PuffyButton = require(script.Parent.PuffyButton)
 local Podium = require(script.Parent.Arena.ResultsPodium)
-local Progress = require(script.Parent.Arena.ResultProgress)
-local formatNumber = require(script.Parent.Parent.Models.NumberText)
-local c = React.createElement
-local colors = Config.Colors
+local Rewards = require(script.Parent.Arena.ResultProgress)
+local c, C, R = React.createElement, T.Colors, T.Results
+
+local PILL_PAD = 14
 
 local function errorText(code)
 	if code == nil then
 		return nil
 	end
 	if code == "not_party_leader" then
-		return "Your party leader chooses the next round."
+		return "YOUR PARTY LEADER CHOOSES THE NEXT ROUND"
 	end
 	if code == "results_expired" then
-		return "The next round is starting."
+		return "THE NEXT ROUND IS STARTING"
 	end
 	if code == "return_in_progress" then
-		return "Your return is already in progress."
+		return "YOUR RETURN IS ALREADY IN PROGRESS"
 	end
 	if code == "rewards_pending" then
-		return "Finishing your rewards. Try again in a moment."
+		return "FINISHING YOUR REWARDS · TRY AGAIN IN A MOMENT"
 	end
 	if code == "not_enough_players" then
-		return "We need more players. Find your next match below."
+		return "NOT ENOUGH PLAYERS · FIND SOME IN THE LOBBY"
 	end
 	if code == "reveal_in_progress" then
-		return "Your results are still arriving."
+		return "YOUR RESULTS ARE STILL ARRIVING"
 	end
 	if code == "request_timed_out" then
-		return "No response yet. You can try again."
+		return "NO RESPONSE YET · YOU CAN TRY AGAIN"
 	end
-	return "That didn’t work. Please try again."
+	return "THAT DIDN'T WORK · PLEASE TRY AGAIN"
 end
 
 local function selectable(button)
 	return Selection.isSelectable(button)
 end
 
+-- One staged block: hidden until its turn, then popped in with the shared candy motion.
+local function Reveal(props)
+	local reduced = useReducedMotion()
+	local ref = React.useRef(nil)
+	React.useEffect(function()
+		if props.Shown and ref.current and not reduced then
+			return Motion.popIn(ref.current)
+		end
+		return nil
+	end, { props.Shown, props.Key })
+	local native = table.clone(props.Native)
+	native.ref = ref
+	native.BackgroundTransparency = 1
+	native.Visible = props.Shown
+	return c("Frame", native, props.children)
+end
+
+local function pill(props)
+	local z = props.ZIndex or 12
+	local native = table.clone(props.Native)
+	native.BackgroundTransparency = 1
+	native.ZIndex = z
+	return c("Frame", native, {
+		Surface = c(CandySurface, { Color = props.Color, LipColor = props.LipColor, Shadow = false, ZIndex = z }),
+		Text = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = props.Font,
+			Text = props.Text,
+			TextColor3 = props.TextColor or C.Ink,
+			TextSize = props.TextSize,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(PILL_PAD, 0),
+			Size = UDim2.new(1, -PILL_PAD * 2, 1, -T.Shape.LipHeight),
+			ZIndex = z + 6,
+		}),
+	})
+end
+
+local function pillWidth(text: string, size: number, font: Enum.Font, maximum: number): number
+	local wanted = TextService:GetTextSize(text, size, font, Vector2.new(100000, 1000)).X + PILL_PAD * 2 + 4
+	return math.floor(math.max(math.min(wanted, maximum), 0))
+end
+
+local function standingsRows(result, rowHeight: number)
+	local appearance = result.personalAppearance
+	local localId = if appearance then appearance.playerId else nil
+	local localTeam = if appearance then appearance.teamId else nil
+	local teamMode = result.placement == nil
+	local rows = {
+		Layout = c("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+	}
+	local circle = rowHeight - 12
+	local textSize = if rowHeight < 40 then 15 else 18
+	local nameLeft = if teamMode then 14 else circle + 16
+	for index, score in result.scores do
+		local isLocal = if teamMode then score.id == localTeam else score.id == localId
+		local rank = score.placement or index
+		rows[score.id] = c("Frame", {
+			BackgroundColor3 = if isLocal then C.Pink else C.SurfaceWarm,
+			BorderSizePixel = 0,
+			LayoutOrder = index,
+			Size = UDim2.new(1, 0, 0, rowHeight),
+			ZIndex = 17,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+			Outline = c("UIStroke", { Color = if isLocal then C.PinkLip else C.WellLine, Thickness = 2 }),
+			Rank = if not teamMode
+				then c("Frame", {
+					BackgroundColor3 = R.PlacementColors[rank] or C.Well,
+					BorderSizePixel = 0,
+					Position = UDim2.fromOffset(6, 6),
+					Size = UDim2.fromOffset(circle, circle),
+					ZIndex = 18,
+				}, {
+					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+					Outline = c("UIStroke", { Color = C.Ink, Thickness = 2 }),
+					Text = c("TextLabel", {
+						BackgroundTransparency = 1,
+						Font = T.Type.Display,
+						Text = tostring(rank),
+						TextColor3 = C.Ink,
+						TextSize = textSize,
+						Size = UDim2.fromScale(1, 1),
+						ZIndex = 19,
+					}),
+				})
+				else nil,
+			Name = c("TextLabel", {
+				BackgroundTransparency = 1,
+				Font = T.Type.Label,
+				Text = score.label .. (if isLocal and not teamMode then " (YOU)" else ""),
+				TextColor3 = C.Ink,
+				TextSize = textSize,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Position = UDim2.fromOffset(nameLeft, 0),
+				Size = UDim2.new(1, -nameLeft - 130, 1, 0),
+				ZIndex = 18,
+			}),
+			Score = c("TextLabel", {
+				AnchorPoint = Vector2.new(1, 0),
+				BackgroundTransparency = 1,
+				Font = T.Type.Display,
+				Text = `{score.score} {result.scoreLabel}`,
+				TextColor3 = C.Ink,
+				TextSize = textSize,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				Position = UDim2.new(1, -12, 0, 0),
+				Size = UDim2.fromOffset(120, rowHeight),
+				ZIndex = 18,
+			}),
+		})
+	end
+	return rows
+end
+
+local function countdownChip(countdown, drain: number, rectPosition: Vector2, rectSize: Vector2)
+	return c("Frame", {
+		BackgroundColor3 = C.Well,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(rectPosition.X, rectPosition.Y),
+		Size = UDim2.fromOffset(rectSize.X, rectSize.Y),
+		ZIndex = 15,
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, 16) }),
+		Outline = c("UIStroke", { Color = C.WellLine, Thickness = T.Shape.StrokeInner }),
+		Caption = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = T.Type.CompactLabel,
+			Text = countdown.caption,
+			TextColor3 = C.InkSoft,
+			TextSize = 13,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(6, 5),
+			Size = UDim2.new(1, -12, 0, 14),
+			ZIndex = 16,
+		}),
+		Value = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = T.Type.Display,
+			Text = countdown.value,
+			TextColor3 = C.Ink,
+			TextSize = 24,
+			Position = UDim2.fromOffset(0, 17),
+			Size = UDim2.new(1, 0, 0, 24),
+			ZIndex = 16,
+		}),
+		Track = c("Frame", {
+			BackgroundColor3 = C.WellLine,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 10, 1, -R.CountdownBarHeight - 5),
+			Size = UDim2.new(1, -20, 0, R.CountdownBarHeight),
+			ZIndex = 16,
+		}, {
+			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			Fill = c("Frame", {
+				BackgroundColor3 = C.Pink,
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(math.clamp(drain, 0, 1), 1),
+				Visible = drain > 0,
+				ZIndex = 17,
+			}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+		}),
+	})
+end
+
+local function place(rect)
+	return UDim2.fromOffset(rect.position.X, rect.position.Y), UDim2.fromOffset(rect.size.X, rect.size.Y)
+end
+
 return function(props)
 	local result = props.Result
 	local visible = props.Visible and result ~= nil
+	local departing = props.Departing == true
 	local safe = useSafeArea(Enum.ScreenInsets.None, Enum.ScreenInsets.CoreUISafeInsets)
+	local reduced = useReducedMotion()
 	local rootRef, primaryRef, returnRef = React.useRef(nil), React.useRef(nil), React.useRef(nil)
 	local scoresRef = React.useRef(nil)
 	local clearedOutsideSelection = React.useRef(false)
@@ -66,7 +245,11 @@ return function(props)
 	local now, setNow = React.useState(Workspace:GetServerTimeNow())
 	local standings, setStandings = React.useState(false)
 	local gamepad, setGamepad = React.useState(string.find(UserInputService:GetLastInputType().Name, "Gamepad") ~= nil)
-	local interactive = visible and now >= result.interactiveAt
+	local key = if result then result.resultId else ""
+	local interactive = visible and not departing and now >= result.interactiveAt
+	local personalShown = useReveal(key, R.PersonalDelay, reduced or not visible)
+	local footerShown = useReveal(key, R.FooterDelay, reduced or not visible)
+	local headingShown = useReveal(key, R.RevealDelay, reduced or not visible)
 	React.useEffect(function()
 		local connection = UserInputService.LastInputTypeChanged:Connect(function(input)
 			setGamepad(string.find(input.Name, "Gamepad") ~= nil)
@@ -109,7 +292,7 @@ return function(props)
 					else nil
 			end
 		end
-	end, { visible, if result then result.resultId else "" })
+	end, { visible, key })
 	React.useEffect(function()
 		if not visible or props.FocusEnabled == false then
 			return
@@ -158,77 +341,61 @@ return function(props)
 				connection:Disconnect()
 			end
 		end
-	end, { visible, interactive, gamepad, props.Requesting, props.Status, props.FocusEnabled })
+	end, { visible, interactive, gamepad, props.Requesting, props.Status, props.FocusEnabled, footerShown })
 	if not visible then
 		return nil
 	end
 
+	local layout = Layout.resolve(safe.size, props.OnOpenShop ~= nil)
 	local party = if props.Status and props.Status.party then props.Status.party else result.party
-	local actions =
-		Model.actions(Players.LocalPlayer.UserId, party, props.Status, props.Requesting == true, props.PendingAction)
-	local short = safe.size.Y < Config.Results.ShortHeightPx
-	local width = math.min(safe.size.X - Config.Results.EdgePx * 2, Config.Results.MaxWidthPx)
-	local height = math.max(safe.size.Y - Config.Results.EdgePx * 2, 180)
-	if safe.size.Y > safe.size.X then
-		height = math.min(height, width * 0.75)
-	end
-	local headerHeight = if short then Config.Results.ShortHeaderPx else Config.Results.HeaderPx
-	local footerHeight = if short then 78 else 104
-	local bodyTop = headerHeight + (if short then 8 else 12)
-	local bodyHeight = math.max(height - bodyTop - footerHeight - 8, 80)
-	local detailWidth = if width < 850 then 0.32 else 0.28
-	local stageWidth = 1 - detailWidth
-	local accent = colors[result.presentation.accent] or colors.Cyan
+	local actions = Model.actions(
+		Players.LocalPlayer.UserId,
+		party,
+		props.Status,
+		props.Requesting == true,
+		props.PendingAction,
+		departing
+	)
 	local remaining = Model.remainingSeconds(result.endsAt, now)
-	local message = errorText(props.Error) or actions.statusText
-	local destination = Model.destination(props.Status, actions.partySize)
-	local primaryText = if actions.busy
-		then "PLEASE WAIT…"
-		else if not actions.isLeader
-			then "LEADER CHOOSES"
-			else if actions.replaySelected or (props.Status and props.Status.canReplay == false)
-				then actions.primaryText
-				else "PLAY AGAIN"
-	local returnText = if actions.returnAction == "LeaveParty" then "LEAVE PARTY" else "LOBBY"
+	local countdown = Model.countdown(props.Status, actions.partySize, remaining, departing)
+	local span = math.max(result.endsAt - result.interactiveAt, 1)
+	local drain = if departing then 1 else math.clamp((result.endsAt - now) / span, 0, 1)
+	local message = if departing then actions.statusText else errorText(props.Error) or actions.statusText
+	local accent = R.Accents[result.presentation.accent] or C.Cyan
+	local teamMode = result.placement == nil
+	local tied = #result.scores >= 2 and result.scores[1].score == result.scores[2].score
+	local podium = result.podium or {}
+	local heading = Model.stageHeading(teamMode, #podium, tied, standings)
+	local kicker = Model.kicker(result.modeName, result.presentation.eyebrow)
+	local kickerWidth = pillWidth(kicker, T.Type.Minimum, T.Type.CompactLabel, layout.kicker.size.X)
+	local detail = result.presentation.detail
+	local detailWidth = if detail then pillWidth(detail, layout.detailSize, T.Type.Label, layout.detail.size.X) else 0
+	local headingWidth = pillWidth(heading, T.Type.Minimum, T.Type.CompactLabel, layout.stage.size.X - 16)
+	local stageTop = R.StageHeadingHeight + 8
+	local done = actions.primaryStyle == "Done"
+	local primaryEnabled = interactive and actions.primaryEnabled
+	local secondaryEnabled = interactive and not actions.busy
 	local returnCallback = if actions.returnAction == "LeaveParty" then props.OnLeaveParty else props.OnReturnToLobby
-	-- The storefront shortcut rides the header beside the scores toggle, and only
-	-- where there is room for a second control without crowding the mode name. On a
-	-- narrow screen it is dropped rather than squeezed: the menu toggle reaches the
-	-- same page, so nothing becomes unreachable. Labelled from what this match
-	-- actually paid, so it reads as a consequence of the round and not an advert.
-	local earnedBonks = if result.rewards then result.rewards.bonks else nil
-	local shopText = if typeof(earnedBonks) == "number" and earnedBonks > 0
-		then `SPEND {formatNumber(earnedBonks)}`
-		else "SHOP"
-	local showShop = props.OnOpenShop ~= nil and width >= 760 and not short
-	local rows = { Layout = c("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }) }
-	for index, score in result.scores do
-		rows[score.id] = c(
-			Surface,
-			{ Shadow = false, Color = colors.Cyan, Native = { Size = UDim2.new(1, -8, 0, 44), LayoutOrder = index } },
-			{
-				Rank = c(Label, {
-					Text = if score.placement then tostring(score.placement) else "",
-					Title = true,
-					Size = 25,
-					Native = { Size = UDim2.fromScale(0.14, 1) },
-				}),
-				Name = c(Label, {
-					Text = score.label,
-					Size = 22,
-					Align = Enum.TextXAlignment.Left,
-					Native = { Position = UDim2.fromScale(0.16, 0), Size = UDim2.fromScale(0.6, 1) },
-				}),
-				Score = c(Label, {
-					Text = tostring(score.score),
-					Title = true,
-					Size = 28,
-					Color = colors.Yellow,
-					Native = { Position = UDim2.fromScale(0.78, 0), Size = UDim2.fromScale(0.2, 1) },
-				}),
-			}
+	local canvasPosition, canvasSize = place(layout.canvas)
+	local kickerPosition = place(layout.kicker)
+	local titlePosition, titleSize = place(layout.title)
+	local detailPosition = place(layout.detail)
+	local scoresPosition, scoresSize = place(layout.scores)
+	local stagePosition, stageSize = place(layout.stage)
+	local personalPosition, personalSize = place(layout.personal)
+	local footerPosition, footerSize = place(layout.footer)
+	local statusPosition, statusSize = place(layout.status)
+	local secondaryPosition, secondarySize = place(layout.secondary)
+	local primaryPosition, primarySize = place(layout.primary)
+	if departing then
+		statusSize = UDim2.fromOffset(
+			layout.footer.size.X
+				- layout.status.position.X
+				- (if layout.compact then R.CompactFooterInset else R.FooterInset),
+			layout.status.size.Y
 		)
 	end
+
 	return c("Frame", {
 		ref = rootRef,
 		BackgroundTransparency = 1,
@@ -239,9 +406,11 @@ return function(props)
 	}, {
 		Canvas = c("Frame", {
 			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(safe.position.X + safe.size.X / 2, safe.position.Y + safe.size.Y / 2),
-			Size = UDim2.fromOffset(width, height),
+			Position = UDim2.fromOffset(
+				safe.position.X + layout.canvas.position.X,
+				safe.position.Y + layout.canvas.position.Y
+			),
+			Size = canvasSize,
 			ZIndex = 11,
 			SelectionGroup = true,
 			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
@@ -249,175 +418,211 @@ return function(props)
 			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 		}, {
-			HeaderSurface = c(Surface, {
-				Color = accent,
-				Shadow = false,
-				Native = {
-					Position = UDim2.fromOffset(-4, -4),
-					Size = UDim2.new(1, -140, 0, headerHeight + 8),
-					ZIndex = 1,
-				},
-			}),
-			Title = c(Label, {
-				Text = result.presentation.title,
-				Title = true,
-				Size = if short then 34 else 52,
-				Color = colors.White,
-				Align = Enum.TextXAlignment.Left,
-				Native = {
-					Position = UDim2.fromOffset(10, 0),
-					Size = UDim2.new(1, if showShop then -310 else -168, 0, headerHeight * 0.64),
-					ZIndex = 3,
-				},
-			}),
-			Subtitle = c(Label, {
-				Text = result.modeName
-					.. (if result.presentation.detail then "  •  " .. result.presentation.detail else ""),
-				Size = if short then 15 else 21,
-				Align = Enum.TextXAlignment.Left,
-				Color = colors.White,
-				Native = {
-					Position = UDim2.fromOffset(10, headerHeight * 0.68),
-					ZIndex = 3,
-					Size = UDim2.new(1, if showShop then -290 else -148, 0, headerHeight * 0.3),
-				},
-			}),
-			ShopButton = if showShop
-				then c(ActionButton, {
-					Text = shopText,
-					TextSize = 20,
-					Color = colors.Yellow,
-					Enabled = interactive,
-					Native = { Position = UDim2.new(1, -270, 0, 0), Size = UDim2.fromOffset(130, 44) },
-					OnActivated = props.OnOpenShop,
-				})
-				else nil,
-			StandingsButton = c(ActionButton, {
-				Text = if standings then "PODIUM" else "SCORES",
-				ButtonRef = scoresRef,
-				TextSize = 22,
-				Color = colors.Cyan,
-				Native = { Position = UDim2.new(1, -134, 0, 0), Size = UDim2.fromOffset(128, 44) },
-				OnActivated = function()
-					setStandings(not standings)
-				end,
-			}),
-			Stage = c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(0, bodyTop),
-				Size = UDim2.new(stageWidth, -18, 0, bodyHeight),
-				ZIndex = 12,
+			Header = c(Reveal, {
+				Shown = true,
+				Key = key,
+				Native = { Size = UDim2.new(1, 0, 0, layout.headerHeight), ZIndex = 12 },
 			}, {
-				Heading = c(Label, {
-					Text = if standings
-						then "FINAL STANDINGS"
-						else if not result.podium or #result.podium == 0
-							then "READY FOR THE NEXT ONE"
-							else if result.modeId == "TDM" then "WINNING TEAM STANDOUTS" else "TOP FINISHERS",
-					Title = true,
-					Color = colors.White,
-					Size = if short then 15 else 20,
-					Native = { Size = UDim2.new(1, 0, 0, 24), Visible = not short },
-				}),
-				Podium = c("Frame", {
-					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(0, if short then 0 else 24),
-					Size = UDim2.new(1, 0, 1, if short then 0 else -24),
-				}, {
-					Content = c(Podium, {
-						Entries = result.podium,
-						ResultId = result.resultId,
-						Compact = short,
-						ShowLabels = not standings,
-						ScoreLabel = result.scoreLabel,
-					}),
-				}),
-				Standings = if standings
-					then c("ScrollingFrame", {
-						BackgroundTransparency = 1,
-						BorderSizePixel = 0,
-						Position = UDim2.fromOffset(4, 32),
-						Size = UDim2.new(1, -8, 1, -36),
-						AutomaticCanvasSize = Enum.AutomaticSize.Y,
-						CanvasSize = UDim2.new(),
-						ScrollBarThickness = 4,
-						ScrollBarImageColor3 = colors.Cyan,
-					}, rows)
-					else nil,
-			}),
-			Personal = c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.new(stageWidth, 0, 0, bodyTop),
-				Size = UDim2.new(detailWidth, -6, 0, bodyHeight),
-				ZIndex = 12,
-			}, { Content = c(Progress, { Result = result, Compact = short, Height = bodyHeight }) }),
-			Footer = c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.new(0, 0, 1, -footerHeight),
-				Size = UDim2.new(1, 0, 0, footerHeight),
-				ZIndex = 15,
-			}, {
-				Backdrop = c(Surface, {
-					Color = colors.Cyan,
-					Shadow = false,
-					Native = { Position = UDim2.fromOffset(-6, -3), Size = UDim2.new(1, 12, 1, 6), ZIndex = 1 },
-				}),
-				Status = c(Label, {
-					Text = if props.Error or actions.busy or not destination then message else destination,
-					Size = if short then 15 else 19,
-					Color = if props.Error then colors.Yellow else colors.White,
-					Align = Enum.TextXAlignment.Left,
-					Native = { Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -80, 0, 26), ZIndex = 3 },
-				}),
-				Countdown = c(Label, {
-					Text = `{remaining}s`,
-					Title = true,
-					Size = 23,
-					Color = colors.Yellow,
-					Align = Enum.TextXAlignment.Right,
-					Native = { Position = UDim2.new(1, -64, 0, 0), Size = UDim2.fromOffset(58, 26), ZIndex = 3 },
-				}),
-				PlayAgain = c(ActionButton, {
-					ButtonRef = primaryRef,
-					Text = primaryText,
-					Primary = true,
-					Completed = actions.replaySelected,
-					TextSize = if short then 22 else 29,
-					Enabled = interactive and actions.primaryEnabled,
+				Kicker = pill({
+					Text = kicker,
+					Color = C.Yellow,
+					LipColor = C.YellowLip,
+					Font = T.Type.CompactLabel,
+					TextSize = T.Type.Minimum,
 					Native = {
-						Position = UDim2.fromOffset(0, 30),
-						Size = UDim2.new(0.65, -10, 0, if short then 44 else 58),
+						Position = kickerPosition,
+						Size = UDim2.fromOffset(kickerWidth, layout.kicker.size.Y),
 					},
-					OnActivated = props.OnPlayAgain,
 				}),
-				Lobby = c(ActionButton, {
-					ButtonRef = returnRef,
-					Text = returnText,
-					TextSize = if short then 22 else 29,
-					Color = colors.Cyan,
-					Enabled = interactive and not actions.busy,
-					Native = {
-						Position = UDim2.new(0.65, 4, 0, 30),
-						Size = UDim2.new(0.35, -10, 0, if short then 44 else 58),
-					},
-					OnActivated = returnCallback,
+				Title = c(CandyTitle, {
+					Text = result.presentation.title,
+					Color = accent,
+					TextSize = layout.titleSize,
+					Native = { Position = titlePosition, Size = titleSize, ZIndex = 14 },
 				}),
-				Destination = if not short
-					then c(Label, {
-						Text = if props.Status and props.Status.canReplay == false
-							then "Find players keeps your party together"
-							else if actions.replaySelected
-								then if actions.partySize > 1
-									then "Your party is staying together"
-									else "You're staying for the next round"
-								else if actions.partySize > 1
-									then "Your party leader picks the next stop"
-									else "Stay for another round or change your look in the lobby",
-						Size = 13,
-						Color = colors.White,
-						Native = { Position = UDim2.fromOffset(0, 91), Size = UDim2.new(1, -6, 0, 13), ZIndex = 3 },
+				Detail = if detail
+					then pill({
+						Text = detail,
+						Color = C.SurfaceWarm,
+						LipColor = C.WellLine,
+						Font = T.Type.Label,
+						TextSize = layout.detailSize,
+						ZIndex = 15,
+						Native = {
+							Position = detailPosition,
+							Size = UDim2.fromOffset(detailWidth, layout.detail.size.Y),
+						},
 					})
 					else nil,
+				Scores = if layout.showStage
+					then c(PuffyButton, {
+						ButtonRef = scoresRef,
+						Text = if standings then "PODIUM" else "SCORES",
+						TextSize = 20,
+						TextColor = C.Ink,
+						Color = C.SurfaceWarm,
+						LipColor = C.WellLine,
+						Shadow = false,
+						Native = { Position = scoresPosition, Size = scoresSize, ZIndex = 14 },
+						OnActivated = function()
+							setStandings(not standings)
+						end,
+					})
+					else nil,
+				Shop = if layout.shop and props.OnOpenShop
+					then c(PuffyButton, {
+						Text = "SHOP",
+						TextSize = 20,
+						TextColor = C.Ink,
+						Color = C.Yellow,
+						LipColor = C.YellowLip,
+						Shadow = false,
+						Enabled = interactive,
+						Native = {
+							Position = UDim2.fromOffset(layout.shop.position.X, layout.shop.position.Y),
+							Size = UDim2.fromOffset(layout.shop.size.X, layout.shop.size.Y),
+							ZIndex = 14,
+						},
+						OnActivated = props.OnOpenShop,
+					})
+					else nil,
+			}),
+			Stage = if layout.showStage
+				then c("Frame", {
+					BackgroundTransparency = 1,
+					Position = stagePosition,
+					Size = stageSize,
+					ZIndex = 12,
+				}, {
+					Heading = c(Reveal, {
+						Shown = headingShown,
+						Key = key,
+						Native = {
+							Size = UDim2.fromOffset(headingWidth, R.StageHeadingHeight),
+							ZIndex = 13,
+						},
+					}, {
+						Pill = pill({
+							Text = heading,
+							Color = C.SurfaceWarm,
+							LipColor = C.WellLine,
+							Font = T.Type.CompactLabel,
+							TextSize = T.Type.Minimum,
+							Native = { Size = UDim2.fromScale(1, 1) },
+						}),
+					}),
+					Podium = c(Podium, {
+						Entries = podium,
+						ResultId = key,
+						ShowLabels = not standings,
+						ScoreLabel = result.scoreLabel,
+						PlateWidth = layout.nameplateWidth,
+						PlateHeight = layout.nameplateHeight,
+						BadgeSize = layout.nameplateBadge,
+						TopInset = stageTop,
+					}),
+					Standings = if standings
+						then c("Frame", {
+							BackgroundColor3 = C.Well,
+							BorderSizePixel = 0,
+							Position = UDim2.fromOffset(0, stageTop),
+							Size = UDim2.new(1, 0, 1, -stageTop),
+							ZIndex = 16,
+						}, {
+							Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
+							Outline = c("UIStroke", { Color = C.WellLine, Thickness = T.Shape.StrokeInner }),
+							Scroll = c("ScrollingFrame", {
+								AutomaticCanvasSize = Enum.AutomaticSize.Y,
+								BackgroundTransparency = 1,
+								BorderSizePixel = 0,
+								CanvasSize = UDim2.new(),
+								Position = UDim2.fromOffset(8, 8),
+								ScrollBarImageColor3 = C.Pink,
+								ScrollBarThickness = 4,
+								ScrollingDirection = Enum.ScrollingDirection.Y,
+								Selectable = false,
+								Size = UDim2.new(1, -16, 1, -16),
+								ZIndex = 17,
+							}, standingsRows(result, layout.standingsRowHeight)),
+						})
+						else nil,
+				})
+				else nil,
+			Personal = c(Reveal, {
+				Shown = personalShown,
+				Key = key,
+				Native = { Position = personalPosition, Size = personalSize, ZIndex = 12 },
+			}, {
+				Panel = c(Rewards, {
+					Result = result,
+					Inset = layout.inset,
+					ChipHeight = layout.rewardChipHeight,
+					RowHeight = layout.statRowHeight,
+					Shown = personalShown,
+				}),
+			}),
+			Footer = c(Reveal, {
+				Shown = footerShown,
+				Key = key,
+				Native = { Position = footerPosition, Size = footerSize, ZIndex = 13 },
+			}, {
+				Panel = c(CandyPanel, {
+					Tilt = R.FooterTilt,
+					Native = { Size = UDim2.fromScale(1, 1), ZIndex = 13 },
+				}, {
+					Countdown = countdownChip(countdown, drain, layout.countdown.position, layout.countdown.size),
+					Status = if layout.showStatus or departing
+						then c("TextLabel", {
+							BackgroundTransparency = 1,
+							Font = T.Type.Label,
+							Text = message,
+							TextColor3 = if props.Error and not departing then C.PinkLip else C.InkSoft,
+							TextSize = if layout.compact then 15 else 18,
+							TextWrapped = true,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextYAlignment = Enum.TextYAlignment.Center,
+							Position = statusPosition,
+							Size = statusSize,
+							ZIndex = 15,
+						})
+						else nil,
+					Secondary = if not departing
+						then c(PuffyButton, {
+							ButtonRef = returnRef,
+							Text = actions.returnText,
+							TextSize = if layout.compact then 20 else T.Type.Tab,
+							TextColor = C.Ink,
+							Color = C.Well,
+							LipColor = if secondaryEnabled then C.WellLine else nil,
+							Enabled = secondaryEnabled,
+							Native = { Position = secondaryPosition, Size = secondarySize, ZIndex = 15 },
+							OnActivated = returnCallback,
+						})
+						else nil,
+					Primary = if departing
+						then nil
+						elseif done then pill({
+							Text = actions.primaryText,
+							Color = C.Lime,
+							LipColor = C.LimeLip,
+							Font = T.Type.Display,
+							TextSize = if layout.compact then 20 else T.Type.Tab,
+							ZIndex = 15,
+							Native = { Position = primaryPosition, Size = primarySize },
+						})
+						else c(PuffyButton, {
+							ButtonRef = primaryRef,
+							Text = actions.primaryText,
+							TextSize = if layout.compact then 20 else T.Type.Tab,
+							TextColor = C.Surface,
+							Color = C.Pink,
+							LipColor = if primaryEnabled then C.PinkLip else nil,
+							Style = "Primary",
+							Enabled = primaryEnabled,
+							Native = { Position = primaryPosition, Size = primarySize, ZIndex = 15 },
+							OnActivated = props.OnPlayAgain,
+						}),
+				}),
 			}),
 		}),
 	})

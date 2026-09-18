@@ -8,6 +8,7 @@ local arenaOrigin = require(script.Parent.ArenaOrigin)
 
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ModeVoteClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("ModeVoteClient"))
+local PostMatchClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PostMatchClient"))
 
 local PresentationCamera = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -28,6 +29,7 @@ local origin: Vector3? = nil
 local blur: BlurEffect? = nil
 local cameraLease: PresentationCamera.Token? = nil
 local voteDisconnect: (() -> ())? = nil
+local postMatchDisconnect: (() -> ())? = nil
 
 local function frame(camera: Camera, deltaTime: number)
 	local part = origin
@@ -88,18 +90,18 @@ function VoteCamera.start()
 		end
 		origin = position
 
-		voteDisconnect = ModeVoteClient.subscribe(function(snapshot)
-			if snapshot.admitted and snapshot.open then
+		-- A player leaving for the lobby keeps the results stage; the ballot never takes their camera.
+		local function evaluate()
+			local snapshot = ModeVoteClient.getSnapshot()
+			if snapshot.admitted and snapshot.open and not PostMatchClient.getSnapshot().departing then
 				activate()
 			else
 				deactivate()
 			end
-		end)
-
-		local snapshot = ModeVoteClient.getSnapshot()
-		if snapshot.admitted and snapshot.open then
-			activate()
 		end
+		voteDisconnect = ModeVoteClient.subscribe(evaluate)
+		postMatchDisconnect = PostMatchClient.subscribe(evaluate)
+		evaluate()
 	end)
 end
 
@@ -109,6 +111,10 @@ function VoteCamera.destroy()
 	if voteDisconnect then
 		voteDisconnect()
 		voteDisconnect = nil
+	end
+	if postMatchDisconnect then
+		postMatchDisconnect()
+		postMatchDisconnect = nil
 	end
 	origin = nil
 	started = false

@@ -1,0 +1,52 @@
+{
+  "purpose": "Ground-truth geometry for Ball Barrage's mounted hazard pieces (not walkable surfaces, so not raycast-scanned; see course-sockets-ballbarrage.json for that methodology). For any single BasePart, Size defines a box always centered exactly on CFrame (Roblox engine guarantee), so Support (base contact, local space) = (0, -Size.Y/2, 0) with no measurement needed. What is NOT derivable from Size/CFrame alone is the parent-to-child relative transform for two-mesh assemblies, so that was read directly via parent.CFrame:ToObjectSpace(child.CFrame) in Studio Edit mode against the untouched workspace.battle_stadium.",
+  "studioSessionId": "f2e79758-7afe-47ea-8efc-85035edf8307",
+  "measuredAt": "2026-09-15",
+  "note": "PivotOffset (the 'PΔ' column in 01-asset-inventory.md) is a separate, artist-authored property independent of Size/CFrame; it becomes irrelevant once CourseBuilder clears it per HANDOFF 5.1 step 2, so it is not used in any socket below.",
+  "pieces": {
+    "BigBall_obstacle_23_001": {
+      "pole": { "size": [5.494877338409424, 34.845821380615234, 5.494786262512207] },
+      "sphere_obstacle_23_002": { "size": [13.71717357635498, 12.981073379516602, 13.717082977294922], "relPosToPole": [0.000, 21.784, -0.000] },
+      "Support": { "local": [0, -17.42, 0], "note": "pole bottom face, relative to pole's own CFrame" },
+      "sphereLocalYRange": [15.29, 28.27],
+      "poleTopLocalY": 17.42,
+      "note": "Sphere embeds ~2.1 studs into pole top; BigBall=true goes on the sphere only, pole is support geometry per HANDOFF 6."
+    },
+    "Sweeper_obstacle_2_001": {
+      "frame": { "size": [49.456443786621094, 32.287994384765625, 7.025842666625977] },
+      "drum_obstacle_2_002": { "size": [40.8177375793457, 12.25576400756836, 12.255731582641602], "relPosToFrame": [-0.001, -14.090, 0.000] },
+      "Support": { "local": [0, -16.14, 0] }
+    },
+    "Piston_obstacle_22_001": {
+      "base": { "size": [16.51, 16.51, 20.32] },
+      "spring_obstacle_22_002": { "relPosToBase": "not independently read (spring is a slide child, not a rock/rotate child); use inventory.json size 5.95x5.66x21.90" },
+      "head_obstacle_22_003": { "size": [10.890019416809082, 9.318285942077637, 15.42877197265625], "relPosToSpring": [0.195, -0.769, -17.258] },
+      "Support": { "local": [0, -10.16, 0], "note": "base bottom face" }
+    },
+    "LargeHammer_obstacle_3_001": {
+      "pillar": { "size": [4.6067280769348145, 3.933828353881836, 4.355025291442871] },
+      "head_obstacle_3_002": { "size": [18.525554656982422, 31.26760482788086, 3.193833827972412], "relPosToPillar": [0.000, -16.846, 0.000] },
+      "axle": { "local": [0, 0, 0], "note": "pillar's own CFrame origin is the mechanical axle; head hangs 16.85 studs below it and rocks about this point per HANDOFF 6 'head 002 pivot at pillar axle'" },
+      "Support": { "local": [0, -1.97, 0], "note": "pillar bottom; pillar itself is the fixed mount, not the moving part" }
+    },
+    "SmallHammer_obstacle_4_001": {
+      "pillar": { "size": [4.648951530456543, 4.649102210998535, 5.4834113121032715] },
+      "head_obstacle_4_002": { "size": [13.721905708312988, 32.58733367919922, 9.827880859375], "relPosToPillar": [0.000, -16.353, 0.000] },
+      "axle": { "local": [0, 0, 0] },
+      "Support": { "local": [0, -2.32, 0] }
+    },
+    "Bumper_obstacle_18_001": { "size": [14.347249984741211, 13.403928756713867, 14.347522735595703], "Support": { "local": [0, -6.70, 0] } },
+    "Bumper_obstacle_19_001": { "size": [19.872339248657227, 12.832365036010742, 21.228904724121094], "Support": { "local": [0, -6.42, 0] } },
+    "Fan_propeller_trampoline_1_001": {
+      "cage": { "size": [35.38692092895508, 22.642114639282227, 35.38701248168945] },
+      "blade_propeller_trampoline_2_001": { "size": [29.059223175048828, 1.9473934173583984, 29.05949592590332], "relPosToCage": [0.000, 7.602, 0.000] },
+      "Support": { "local": [0, -11.32, 0] }
+    },
+    "JumpPad_trampoline_1_001": {
+      "outer": { "size": [11.609274864196777, 3.1249582767486572, 11.609457015991211] },
+      "inner_trampoline_1_002": { "size": [7.510320663452148, 1.0670387744903564, 7.510275363922125], "relPosToOuter": [0.000, 1.825, 0.000] },
+      "Support": { "local": [0, -1.56, 0] },
+      "note": "trampoline_1_002 renamed to the Inner role, trampoline_1_001 to Outer, matching the trampoline_3 JumpPad precedent (01-asset-inventory.md line 214). trampoline_1 has no existing course usage, so this is the first renaming for it."
+    }
+  }
+}

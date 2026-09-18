@@ -1,0 +1,20 @@
+[
+  {
+    "cleaned": true,
+    "ghostPresent": true,
+    "ghostNonColliding": true,
+    "ghostMoved": true,
+    "kind": "shake",
+    "sourceHidden": true,
+    "sourceUnchanged": true
+  },
+  {
+    "cleaned": true,
+    "ghostPresent": true,
+    "ghostNonColliding": true,
+    "ghostMoved": true,
+    "kind": "impact",
+    "sourceHidden": true,
+    "sourceUnchanged": true
+  }
+]

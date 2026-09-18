@@ -83,7 +83,11 @@ local Analytics = {
 	FieldSchemas = {
 		Default = { { "deviceClass" }, { "assistBucket" }, { "modeId", "reason", "source", "track", "queueId" } },
 		Shop = { { "deviceClass" }, { "variantId" }, { "offerKind", "section", "productType", "source" } },
-		Economy = { { "deviceClass" }, { "variantId" }, { "source", "productType", "modeId" } },
+		Economy = {
+			{ "deviceClass" },
+			{ "variantId" },
+			{ "offerResolution", "source", "productType", "modeId" },
+		},
 	},
 
 	-- Match Enum.AnalyticsEconomyTransactionType names exactly.

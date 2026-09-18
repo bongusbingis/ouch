@@ -38,8 +38,13 @@ local function update(state, dt: number)
 	setPivot(state.object, CFrame.Angles(0, state.baseRotation + spin, 0) * state.basePivot)
 end
 
+-- A preview that holds one pose needs no place in the update loop at all: it is
+-- posed once here and never costs another frame.
 local function register(state)
 	update(state, 0)
+	if state.config.SpinDegreesPerSecond == 0 then
+		return nil
+	end
 	return PreviewScheduler.register(state.viewport, function(dt)
 		update(state, dt)
 	end, state.config.UpdateHz)
@@ -52,16 +57,38 @@ local function preparePart(part: BasePart)
 	part.CanTouch = false
 end
 
+-- A still preview rig is never animated, heard or simulated, so the authored
+-- character's sounds, animator and joint constraints are cut once into a shared
+-- template. Every tile then clones that lighter rig instead of repeating the
+-- strip, which is what makes a page full of previews affordable.
+local UNUSED_IN_PREVIEW: { [string]: boolean } = {
+	AnimationConstraint = true,
+	Animator = true,
+	BallSocketConstraint = true,
+	NoCollisionConstraint = true,
+	Sound = true,
+}
+local previewTemplate: Model? = nil
+
 local function characterPreview(): Model
-	local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Rigs"):WaitForChild("CharacterRig")
-	assert(template:IsA("Model"), "[InventoryPreview] Assets.Rigs.CharacterRig must be a Model")
-	local rig = template:Clone()
-	for _, descendant in rig:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			preparePart(descendant)
+	local cached = previewTemplate
+	if cached == nil then
+		local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Rigs"):WaitForChild("CharacterRig")
+		assert(template:IsA("Model"), "[InventoryPreview] Assets.Rigs.CharacterRig must be a Model")
+		cached = template:Clone()
+		for _, descendant in cached:GetDescendants() do
+			if UNUSED_IN_PREVIEW[descendant.ClassName] then
+				descendant:Destroy()
+			end
 		end
+		for _, descendant in cached:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				preparePart(descendant)
+			end
+		end
+		previewTemplate = cached
 	end
-	return rig
+	return cached:Clone()
 end
 
 local function setScale(object: Model | BasePart, scale: number)
@@ -154,7 +181,7 @@ local ViewportPreview = React.memo(function(props: Props)
 		local unregister: (() -> ())? = nil
 		local appearance = nil
 		local resize = nil
-		local preparation = task.defer(function()
+		local cancelBuild = PreviewScheduler.build(viewport, function()
 			local prepared: Model | BasePart
 			if props.Category == "CharacterColor" or props.Category == "CostumeAssets" then
 				local look = {
@@ -201,9 +228,7 @@ local ViewportPreview = React.memo(function(props: Props)
 			})
 		end)
 		return function()
-			if coroutine.status(preparation) ~= "dead" then
-				task.cancel(preparation)
-			end
+			cancelBuild()
 			if resize then
 				resize:Disconnect()
 			end

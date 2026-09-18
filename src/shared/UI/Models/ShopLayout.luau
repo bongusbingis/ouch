@@ -175,13 +175,10 @@ function ShopLayout.place(blocks: { Block }, tracks: number, gap: number): ({ Pl
 	return placements, bottom
 end
 
--- Establish the configured composition first, including the smaller section
--- that follows a wide one in the data but sits beside it visually. Then allow
--- content-sized alternatives to fill the shorter columns. A narrower block is
--- used when it finishes earlier, or removes unused card columns at the same
--- height. An offer cannot steal its neighbour's top-row position or turn a
--- compact currency row into a much longer column.
-function ShopLayout.compact(blocks: { Block }, tracks: number, gap: number): ({ Placement }, number)
+-- Compact one importance band without allowing another band to fill its open
+-- columns. Within a band, sections still use the masonry packer and may trade
+-- width for a shorter overall composition.
+local function compactBand(blocks: { Block }, tracks: number, gap: number): ({ Placement }, number)
 	local baseline = ShopLayout.place(blocks, tracks, gap)
 	table.sort(baseline, function(a, b)
 		return if a.y == b.y then a.index < b.index else a.y < b.y
@@ -207,6 +204,38 @@ function ShopLayout.compact(blocks: { Block }, tracks: number, gap: number): ({ 
 		bottom = math.max(bottom, selected.y + selected.block.height)
 	end
 	return placements, bottom
+end
+
+-- Priority creates broad reading bands while the cards inside each band keep
+-- the responsive masonry behaviour. Unranked blocks share the first band so
+-- existing callers retain the original packing rules.
+function ShopLayout.compact(blocks: { Block }, tracks: number, gap: number): ({ Placement }, number)
+	local bands: { [number]: { Block } } = {}
+	local priorities = {}
+	for _, block in blocks do
+		local priority = block.priority or 1
+		if not bands[priority] then
+			bands[priority] = {}
+			table.insert(priorities, priority)
+		end
+		table.insert(bands[priority], block)
+	end
+	table.sort(priorities)
+
+	local placements = {}
+	local offset = 0
+	for bandIndex, priority in priorities do
+		local bandPlacements, bandBottom = compactBand(bands[priority], tracks, gap)
+		for _, placement in bandPlacements do
+			placement.y += offset
+			table.insert(placements, placement)
+		end
+		offset += bandBottom
+		if bandIndex < #priorities then
+			offset += gap
+		end
+	end
+	return placements, offset
 end
 
 return ShopLayout

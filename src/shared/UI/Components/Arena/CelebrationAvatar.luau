@@ -34,7 +34,7 @@ return React.memo(function(props)
 		frameCamera()
 		local resize = viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(frameCamera)
 		local display, unregister = nil, nil
-		local preparation = task.defer(function()
+		local cancelBuild = PreviewScheduler.build(viewport, function()
 			display = EmoteRig.create(world, props.ColorId, props.CostumeId)
 			if props.Playing ~= nil then
 				display.setOrigin(CFrame.identity)
@@ -57,9 +57,7 @@ return React.memo(function(props)
 		end)
 		return function()
 			resize:Disconnect()
-			if coroutine.status(preparation) ~= "dead" then
-				task.cancel(preparation)
-			end
+			cancelBuild()
 			if unregister then
 				unregister()
 			end

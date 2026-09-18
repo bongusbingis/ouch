@@ -168,6 +168,37 @@ T.describe("ShopViewModel", function()
 		T.expect(card.status):toEqual("Owned")
 	end)
 
+	T.it("maps each For You role to exactly one currency and preserves purchased slots", function()
+		local common = Products.Catalog.OfferUnlockCommon
+		local rare = Products.Catalog.OfferUnlockRare
+		local model = build({
+			shopState = {
+				offers = {
+					{ itemId = "DodgeBall1", role = "RobuxCommon", rarity = "Common" },
+					{ itemId = "DodgeBall10", role = "RobuxPremium", rarity = "Rare", purchased = true },
+					{ itemId = "DodgeBall19", role = "Bonks", rarity = "Legendary", bonksPrice = 10000 },
+				},
+			},
+			metadata = {
+				[`Product:{common.Id}`] = { priceInRobux = 99, isForSale = true },
+				[`Product:{rare.Id}`] = { priceInRobux = 199, isForSale = true },
+			},
+		})
+		local commonCard = model.byId["Cosmetic:DodgeBall1"]
+		T.expect(commonCard.productId):toEqual(common.Id)
+		T.expect(commonCard.robuxPrice):toEqual(99)
+		T.expect(commonCard.bonksPrice):toBeNil()
+		local purchased = model.byId["Cosmetic:DodgeBall10"]
+		T.expect(purchased.status):toEqual("Purchased")
+		T.expect(purchased.purchased):toEqual(true)
+		T.expect(purchased.productId):toBeNil()
+		T.expect(purchased.robuxPrice):toBeNil()
+		local bonks = model.byId["Cosmetic:DodgeBall19"]
+		T.expect(bonks.bonksPrice):toEqual(10000)
+		T.expect(bonks.productId):toBeNil()
+		T.expect(bonks.robuxPrice):toBeNil()
+	end)
+
 	T.it("omits redundant card hints while retaining useful crate pricing", function()
 		local model = build(nil)
 		T.expect(model.byId["Cosmetic:DodgeBall1"].hintText):toBeNil()

@@ -434,6 +434,34 @@ local function randomPurchaseAllowed(): (boolean, string?)
 	return true, nil
 end
 
+local function hasResolvableOffer(rarity: string): boolean
+	local snapshot = state.shopState
+	if snapshot == nil then
+		return false
+	end
+	local expectedRole = nil
+	for _, role in ShopConfig.Rotation.Roles do
+		if role.Id ~= "Bonks" and role.Rarities and table.find(role.Rarities, rarity) then
+			expectedRole = role.Id
+			break
+		end
+	end
+	if expectedRole == nil then
+		return false
+	end
+	for _, offer in snapshot.offers or {} do
+		if
+			offer.role == expectedRole
+			and offer.rarity == rarity
+			and offer.purchased ~= true
+			and offer.owned ~= true
+		then
+			return true
+		end
+	end
+	return false
+end
+
 local function recoverySupported(): boolean
 	local recovery = state.shopState and state.shopState.bonksOpen
 	return recovery ~= nil and recovery.version == 1 and nextBonksSequence ~= nil
@@ -550,6 +578,9 @@ function ShopClient.promptProduct(_cardId: string, productId: number): (boolean,
 		if not allowed then
 			return false, policyReason
 		end
+	end
+	if definition.Type == "OfferUnlock" and not hasResolvableOffer(definition.Rarity) then
+		return false, "offer_unavailable"
 	end
 	if definition.Type == "SeasonPass" then
 		local season = BattlePassLogic.activeSeason(Seasons.Definitions, os.time())

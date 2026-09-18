@@ -111,6 +111,14 @@ T.describe("Candy shop composition", function()
 			T.expect(grid.cardHeight):toEqual(original.MinHeightPx)
 		end
 	end)
+	T.it("uses a shorter split hero for season and featured offers", function()
+		for _, className in { "Season", "Promo" } do
+			local class = CandyConfig.CardClasses[className]
+			T.expect(class.Layout):toEqual("Split")
+			T.expect(class.MinHeightPx):toEqual(220)
+			T.expect(class.MaxHeightPx):toEqual(220)
+		end
+	end)
 	T.it("restores stacked height when a short window cannot fit split artwork and copy", function()
 		local narrow, narrowClass = catalogGrid(279, 3, "Pass", 4, true)
 		T.expect(narrow.cardWidth):toEqual(279)
@@ -171,6 +179,25 @@ T.describe("Candy shop composition", function()
 		T.expect(featured[1].style.Span):toEqual(12)
 		T.expect(catalog[1].id):toEqual("Future")
 	end)
+	T.it("orders catalog groups by storefront importance", function()
+		local _, catalog = Composition.groups({
+			sections = {
+				{ id = "Bonks", cards = { { id = "b" } } },
+				{ id = "Future", cards = { { id = "m" } } },
+				{ id = "ForYou", cards = { { id = "f" } } },
+				{ id = "More", cards = { { id = "p" } } },
+				{ id = "Crates", cards = { { id = "c" } } },
+			},
+			hero = {},
+		}, CandyConfig)
+		T.expect(catalog[1].id):toEqual("More")
+		T.expect(catalog[1].style.Span):toEqual(12)
+		T.expect(catalog[2].id):toEqual("Crates")
+		T.expect(catalog[3].id):toEqual("ForYou")
+		T.expect(catalog[4].id):toEqual("Bonks")
+		T.expect(catalog[5].id):toEqual("Future")
+		T.expect(catalog[5].style.Priority > catalog[4].style.Priority):toBeTruthy()
+	end)
 	T.it("removes empty sections without losing any real cards", function()
 		local featured, catalog = Composition.groups({
 			sections = {
@@ -183,9 +210,24 @@ T.describe("Candy shop composition", function()
 		T.expect(#catalog):toEqual(1)
 		T.expect(#catalog[1].cards):toEqual(3)
 	end)
+	T.it("keeps a two-card For You block in its dynamic desktop lane", function()
+		local _, catalog = Composition.groups({
+			sections = {
+				{ id = "ForYou", cards = { { id = "common" }, { id = "premium" } } },
+				{ id = "Bonks", cards = { { id = "bonks" } } },
+			},
+			hero = {},
+		}, CandyConfig)
+		T.expect(catalog[1].id):toEqual("ForYou")
+		T.expect(#catalog[1].cards):toEqual(2)
+		T.expect(catalog[1].style.Span):toEqual(4)
+		T.expect(catalog[2].style.Span < 12):toBeTruthy()
+	end)
 	T.it("uses two lanes at medium width and lets only a demanding block span both", function()
 		T.expect(Composition.span(700, 4, 184, 22, 920, 560)):toEqual(6)
+		T.expect(Composition.span(700, 8, 280, 22, 920, 560)):toEqual(6)
 		T.expect(Composition.span(700, 8, 360, 22, 920, 560)):toEqual(12)
+		T.expect(Composition.span(700, 12, 184, 22, 920, 560)):toEqual(12)
 		T.expect(Composition.span(350, 4, 184, 22, 920, 560)):toEqual(12)
 		T.expect(Composition.span(1200, 4, 184, 22, 920, 560)):toEqual(4)
 	end)

@@ -1,0 +1,1952 @@
+-- Name: CourseForge.server.luau
+-- Author: Jack C.
+-- Description: Standalone Studio plugin that assembles Splashdown courses from the battle_stadium source pack by snapping each piece's measured Entry socket onto a free Exit socket on the run, with live previews, friendly names and per-join offset nudging; self-contained so it runs in a bare baseplate that holds only the source pack.
+-- Created: 2026-09-17
+
+--!nonstrict
+
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
+local CoreGui = game:GetService("CoreGui")
+local Selection = game:GetService("Selection")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local PLUGIN_NAME = "CourseForge"
+local BUILD_MODEL_NAME = "CourseForgeBuild"
+
+local CONTAINER_NAMES = {
+	"battle_stadium",
+	"Battle_Arena",
+	"battle_arena",
+	"BattleArena",
+	"BattleStadium",
+	"AssetPack",
+}
+
+local function v(x: number, y: number, z: number): Vector3
+	return Vector3.new(x, y, z)
+end
+
+-- Baked from AssetManifest.luau Version 7, SourceHash e9e69d1defddda53ba439cf78660d1b668c489913c309b771cda7fcb7d9f7eec
+-- 58 entries. Socket positions are in the ROOT PART's own local CFrame space, at scale 1.
+local SOCKETS = {}
+
+SOCKETS.arch_003 = {
+	Role = "ArchFrame",
+	Kind = "Mount",
+	Size = v(29.5106, 12.8461, 7.7904),
+	Sockets = { Support = { p = v(0, -6.423, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.arch_004 = {
+	Role = "TunnelArch",
+	Kind = "Mount",
+	Size = v(57.0665, 40.7778, 89.8614),
+	Sockets = { Support = { p = v(0, -20.3889, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.arch_005 = {
+	Role = "TunnelArch",
+	Kind = "Mount",
+	Size = v(57.0665, 40.7778, 89.8614),
+	Sockets = { Support = { p = v(0, -20.3889, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.arch_006 = {
+	Role = "TunnelArch",
+	Kind = "Mount",
+	Size = v(57.0665, 40.7778, 89.8614),
+	Sockets = { Support = { p = v(0, -20.3889, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.ball_001 = {
+	Role = "BeachBall",
+	Kind = "Mount",
+	Size = v(9.1778, 9.3183, 9.3183),
+	Sockets = { Support = { p = v(0, -4.6591, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.box_011 = {
+	Role = "RampDescendingPositiveX",
+	Kind = "Surface",
+	Size = v(153.0627, 53.8532, 60.2742),
+	ForwardAxis = "X",
+	Heading = -90,
+	Sockets = {
+		Entry = { p = v(-72.79, 26.915, 0), a = v(-1, 0, 0) },
+		Exit = { p = v(72.96, -1.625, 0), a = v(1, 0, 0) },
+		Support = { p = v(0, -26.9265, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.box_013 = {
+	Role = "RampDescendingNegativeX",
+	Kind = "Surface",
+	Size = v(153.0627, 53.8532, 60.2742),
+	ForwardAxis = "X",
+	Heading = 90,
+	Sockets = {
+		Entry = { p = v(72.79, 26.915, 0), a = v(1, 0, 0) },
+		Exit = { p = v(-72.96, -1.625, 0), a = v(-1, 0, 0) },
+		Support = { p = v(0, -26.9265, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_001 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_002 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_003 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_004 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_005 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_006 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_007 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.color_box_008 = {
+	Role = "FallingTile",
+	Kind = "Surface",
+	Size = v(18.6366, 9.3183, 27.9549),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.6592, -13.75), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.6592, 13.75), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.6592, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.door_002 = {
+	Role = "DoorSlab",
+	Kind = "Mount",
+	Size = v(75.152, 45.7895, 6.2765),
+	Sockets = { Support = { p = v(0, -22.8948, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.door_003 = {
+	Role = "DoorSlab",
+	Kind = "Mount",
+	Size = v(75.152, 45.7895, 6.2765),
+	Sockets = { Support = { p = v(0, -22.8948, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.door_004 = {
+	Role = "DoorSlab",
+	Kind = "Mount",
+	Size = v(75.152, 45.7895, 6.2765),
+	Sockets = { Support = { p = v(0, -22.8948, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.door_005 = {
+	Role = "DoorSlab",
+	Kind = "Mount",
+	Size = v(75.152, 45.7895, 6.2765),
+	Sockets = { Support = { p = v(0, -22.8948, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.door_006 = {
+	Role = "DoorSlab",
+	Kind = "Mount",
+	Size = v(75.152, 45.7895, 6.2765),
+	Sockets = { Support = { p = v(0, -22.8948, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.door_007 = {
+	Role = "DoorSlab",
+	Kind = "Mount",
+	Size = v(75.152, 45.7895, 6.2765),
+	Sockets = { Support = { p = v(0, -22.8948, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_10_001 = {
+	Role = "LogRollBarrel",
+	Kind = "Mount",
+	Size = v(6.1188, 13.9774, 6.1188),
+	ContactRadius = 3.0594,
+	Sockets = { Support = { p = v(0, 0, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_11_001 = {
+	Role = "SeesawPlank",
+	Kind = "Surface",
+	Size = v(38.7328, 4.7789, 4.7789),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 0.9482, -37.5), a = v(0, 0, -1) },
+		Exit = { p = v(0, 0.9482, 37.5), a = v(0, 0, 1) },
+		Support = { p = v(0, -2.3896, 0), a = v(0, -1, 0) },
+		Axle = { p = v(0, 0, 0), a = v(1, 0, 0) },
+	},
+}
+SOCKETS.obstacle_12_001 = {
+	Role = "CrossSpinner",
+	Kind = "Mount",
+	Size = v(58.0759, 12.3498, 58.076),
+	ContactRadius = 29.038,
+	Sockets = { Support = { p = v(0, -6.1749, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_13_001 = {
+	Role = "CarouselDeck",
+	Kind = "Mount",
+	Size = v(52.5515, 11.2503, 52.5512),
+	Sockets = { Support = { p = v(0, -5.6252, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_14_001 = {
+	Role = "DiscHubSmall",
+	Kind = "Mount",
+	Size = v(9.8577, 5.1094, 9.8575),
+	Sockets = { Support = { p = v(0, -2.5547, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_15_001 = {
+	Role = "DiscHubLarge",
+	Kind = "Mount",
+	Size = v(14.4412, 14.4409, 14.441),
+	Sockets = { Support = { p = v(0, -7.2205, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_16_001 = {
+	Role = "PizzaHub",
+	Kind = "Mount",
+	Size = v(28.0051, 6.2875, 28.0047),
+	Sockets = { Support = { p = v(0, -3.1437, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_18_001 = {
+	Role = "BumperCube",
+	Kind = "Mount",
+	Size = v(14.3472, 13.4039, 14.3475),
+	Sockets = { Support = { p = v(0, -6.7, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_19_001 = {
+	Role = "BumperTriangle",
+	Kind = "Mount",
+	Size = v(19.8723, 12.8324, 21.2289),
+	Sockets = { Support = { p = v(0, -6.42, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_1_001 = {
+	Role = "Mallet",
+	Kind = "Mount",
+	Size = v(19.1815, 11.8974, 13.1538),
+	ContactRadius = 12.6,
+	Sockets = {
+		Support = { p = v(7.1026, -5.9487, -0.281), a = v(0, -1, 0) },
+		Axle = { p = v(7.1026, -5.9487, -0.281), a = v(0, 0, 1) },
+	},
+}
+SOCKETS.obstacle_22_001 = {
+	Role = "PistonBase",
+	Kind = "Mount",
+	Size = v(16.51, 16.51, 20.32),
+	Sockets = { Support = { p = v(0, -10.16, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_23_001 = {
+	Role = "BigBallPole",
+	Kind = "Mount",
+	Size = v(5.4949, 34.8458, 5.4948),
+	Sockets = { Support = { p = v(0, -17.42, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_24_001 = {
+	Role = "PaddleWheel",
+	Kind = "Mount",
+	Size = v(59.8161, 43.871, 43.871),
+	ContactRadius = 15.4862,
+	Sockets = {
+		Support = { p = v(0, -26.1015, 0.0665), a = v(0, -1, 0) },
+		Axle = { p = v(0, -4.2481, 0.0665), a = v(1, 0, 0) },
+	},
+}
+SOCKETS.obstacle_25_001 = {
+	Role = "SeesawPedestal",
+	Kind = "Surface",
+	Size = v(9.3183, 18.6366, 9.3183),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 17.7227, -23), a = v(0, 0, -1) },
+		Exit = { p = v(0, 17.7227, 23), a = v(0, 0, 1) },
+		Support = { p = v(0, -9.3184, 0), a = v(0, -1, 0) },
+		Axle = { p = v(0, 12.7051, 0), a = v(1, 0, 0) },
+	},
+}
+SOCKETS.obstacle_26_001 = {
+	Role = "DiscHubLargeVariant",
+	Kind = "Mount",
+	Size = v(14.4412, 14.4409, 14.441),
+	Sockets = { Support = { p = v(0, -7.2205, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_27_001 = {
+	Role = "TwoArmCross",
+	Kind = "Mount",
+	Size = v(6.2458, 12.3498, 58.076),
+	ContactRadius = 29.038,
+	Sockets = { Support = { p = v(0, -6.1749, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_2_001 = {
+	Role = "SweeperFrame",
+	Kind = "Mount",
+	Size = v(49.4564, 32.288, 7.0258),
+	ContactRadius = 6.1279,
+	Sockets = { Support = { p = v(0, -16.14, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.obstacle_3_001 = {
+	Role = "LargeHammerPillar",
+	Kind = "Mount",
+	Size = v(4.6067, 3.9338, 4.355),
+	Sockets = { Support = { p = v(0, -1.97, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_4_001 = {
+	Role = "SmallHammerPillar",
+	Kind = "Mount",
+	Size = v(4.649, 4.6491, 5.4834),
+	Sockets = { Support = { p = v(0, -2.32, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_5_001 = {
+	Role = "MaceTopLink",
+	Kind = "Mount",
+	Size = v(1.701, 3.8185, 2.4847),
+	ContactRadius = 20.7559,
+	Sockets = { Support = { p = v(0, 0, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 0, 1) } },
+}
+SOCKETS.obstacle_6_001 = {
+	Role = "Dumbbell",
+	Kind = "Mount",
+	Size = v(38.3539, 11.0984, 4.9764),
+	ContactRadius = 19.177,
+	Sockets = { Support = { p = v(0, -5.5492, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(0, 1, 0) } },
+}
+SOCKETS.obstacle_8_001 = {
+	Role = "SwingPanelAxle",
+	Kind = "Mount",
+	Size = v(41.125, 5.5235, 5.5235),
+	Sockets = { Support = { p = v(0, -2.7617, 0), a = v(0, -1, 0) }, Axle = { p = v(0, 0, 0), a = v(1, 0, 0) } },
+}
+SOCKETS.obstacle_9_001 = {
+	Role = "Conveyor",
+	Kind = "Surface",
+	Size = v(27.9549, 1.7448, 55.9097),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 0.87, -27.95), a = v(0, 0, -1) },
+		Exit = { p = v(0, 0.87, 27.95), a = v(0, 0, 1) },
+		Support = { p = v(0, -0.87, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.platform_001 = {
+	Role = "StraightLaneFloor",
+	Kind = "Surface",
+	Size = v(70.0699, 28.5494, 89.8518),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 14.275, -43.926), a = v(0, 0, -1) },
+		Exit = { p = v(0, 14.275, 44.074), a = v(0, 0, 1) },
+		Support = { p = v(0, -14.3, 0), a = v(0, -1, 0) },
+		SidePositiveX = { p = v(34.965, 14.275, 0), a = v(1, 0, 0) },
+		SideNegativeX = { p = v(-34.035, 14.275, 0), a = v(-1, 0, 0) },
+	},
+}
+SOCKETS.platform_002 = {
+	Role = "StraightLaneFloor",
+	Kind = "Surface",
+	Size = v(70.0699, 28.5494, 89.8518),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 14.275, -43.926), a = v(0, 0, -1) },
+		Exit = { p = v(0, 14.275, 44.074), a = v(0, 0, 1) },
+		Support = { p = v(0, -14.3, 0), a = v(0, -1, 0) },
+		SidePositiveX = { p = v(34.965, 14.275, 0), a = v(1, 0, 0) },
+		SideNegativeX = { p = v(-34.035, 14.275, 0), a = v(-1, 0, 0) },
+	},
+}
+SOCKETS.platform_003 = {
+	Role = "StraightLaneFloor",
+	Kind = "Surface",
+	Size = v(70.0699, 28.5494, 89.8518),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 14.275, -43.926), a = v(0, 0, -1) },
+		Exit = { p = v(0, 14.275, 44.074), a = v(0, 0, 1) },
+		Support = { p = v(0, -14.3, 0), a = v(0, -1, 0) },
+		SidePositiveX = { p = v(34.965, 14.275, 0), a = v(1, 0, 0) },
+		SideNegativeX = { p = v(-34.035, 14.275, 0), a = v(-1, 0, 0) },
+	},
+}
+SOCKETS.propeller_trampoline_1_001 = {
+	Role = "FanCage",
+	Kind = "Mount",
+	Size = v(35.3869, 22.6421, 35.387),
+	Sockets = { Support = { p = v(0, -11.32, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.slide_001 = {
+	Role = "FinishSlide",
+	Kind = "Surface",
+	Size = v(33.9797, 56.8065, 89.7237),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 28.3, 13), a = v(0, 0, 1) },
+		Exit = { p = v(0, -23.5, 38), a = v(0, 0, 1) },
+		Support = { p = v(0, -28.4, 0), a = v(0, -1, 0) },
+	},
+}
+SOCKETS.trampoline_1_001 = {
+	Role = "JumpPadOuter",
+	Kind = "Mount",
+	Size = v(11.6093, 3.125, 11.6095),
+	Sockets = { Support = { p = v(0, -1.56, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.trampoline_2_001 = {
+	Role = "JumpPadOuterRinged",
+	Kind = "Mount",
+	Size = v(12.3831, 11.1847, 12.383),
+	Sockets = { Support = { p = v(0, -5.5923, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.trampoline_3_001 = {
+	Role = "JumpPadOuterStriped",
+	Kind = "Mount",
+	Size = v(27.0026, 4.7706, 27.0023),
+	Sockets = { Support = { p = v(0, -2.3853, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.trampoline_4_001 = {
+	Role = "JumpPadOuterRibbed",
+	Kind = "Mount",
+	Size = v(14.8598, 12.7562, 14.8595),
+	Sockets = { Support = { p = v(0, -6.3781, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.trampoline_5_001 = {
+	Role = "JumpPadOuterDomed",
+	Kind = "Mount",
+	Size = v(14.2431, 2.9962, 14.243),
+	Sockets = { Support = { p = v(0, -1.498, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.wall_001 = {
+	Role = "GuardWall",
+	Kind = "Mount",
+	Size = v(18.8965, 22.9403, 7.7135),
+	Sockets = { Support = { p = v(0, -11.4702, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.wall_002 = {
+	Role = "GuardWall",
+	Kind = "Mount",
+	Size = v(18.8965, 22.9403, 7.7135),
+	Sockets = { Support = { p = v(0, -11.4702, 0), a = v(0, -1, 0) } },
+}
+SOCKETS.water_platform_001 = {
+	Role = "RoundLanding",
+	Kind = "Surface",
+	Size = v(37.2731, 9.4066, 37.2731),
+	ForwardAxis = "Z",
+	Heading = 180,
+	Sockets = {
+		Entry = { p = v(0, 4.7031, -18.6366), a = v(0, 0, -1) },
+		Exit = { p = v(0, 4.7031, 18.3634), a = v(0, 0, 1) },
+		Support = { p = v(0, -4.7033, 0), a = v(0, -1, 0) },
+		SidePositiveX = { p = v(18.3634, 4.7031, 0), a = v(1, 0, 0) },
+		SideNegativeX = { p = v(-18.6361, 4.7031, 0), a = v(-1, 0, 0) },
+	},
+}
+SOCKETS.box_012 = {
+	Role = "RampConnector",
+	Kind = "Surface",
+	Size = v(51.172, 53.8566, 55.442),
+	ForwardAxis = "X",
+	Heading = -90,
+	Sockets = {
+		Entry = { p = v(-24.1787, 26.927, 0), a = v(-1, 0, 0) },
+		Exit = { p = v(24.3067, 26.927, 0), a = v(1, 0, 0) },
+		Support = { p = v(0, -26.9283, 0), a = v(0, -1, 0) },
+	},
+}
+
+-- The map-building subset of the source pack: 118 of the 176 roots. Balloons,
+-- drones, collectibles, banners, speakers and the column/cap dressing are left
+-- out on purpose -- they are scenery, not pieces a course is assembled from.
+-- Name and category come from docs/splashdown/01-asset-inventory.md.
+local CATEGORY_ORDER = {
+	"Floors",
+	"Ramps",
+	"Tracks",
+	"Belts & tiles",
+	"Rung bridges",
+	"Arches & gates",
+	"Barriers",
+	"Pads & fans",
+	"Markers",
+	"Blocks",
+	"Hazards",
+}
+
+local CATALOG = {}
+
+CATALOG.bridge_003 = { Name = "Checker bridge deck", Category = "Floors" }
+CATALOG.water_platform_001 = { Name = "Foam landing pad A", Category = "Floors" }
+CATALOG.water_platform_002 = { Name = "Foam landing pad B", Category = "Floors" }
+CATALOG.water_platform_003 = { Name = "Foam landing pad C", Category = "Floors" }
+CATALOG.water_platform_partition_001 = { Name = "Foam pad (mid) A", Category = "Floors" }
+CATALOG.water_platform_partition_002 = { Name = "Foam pad (mid) B", Category = "Floors" }
+CATALOG.water_platform_partition_003 = { Name = "Foam pad (mid) C", Category = "Floors" }
+CATALOG.water_platform_tube_001 = { Name = "Foam pad + tube A", Category = "Floors" }
+CATALOG.water_platform_tube_002 = { Name = "Foam pad + tube B", Category = "Floors" }
+CATALOG.water_platform_tube_003 = { Name = "Foam pad + tube C", Category = "Floors" }
+CATALOG.platform_001 = { Name = "Lane slab (green trim)", Category = "Floors" }
+CATALOG.platform_003 = { Name = "Lane slab (orange trim)", Category = "Floors" }
+CATALOG.platform_002 = { Name = "Lane slab (pink trim)", Category = "Floors" }
+CATALOG.octagon_002 = { Name = "Octagon platform (flat)", Category = "Floors" }
+CATALOG.octagon_001 = { Name = "Octagon plaza (raised)", Category = "Floors" }
+CATALOG.bridge_001 = { Name = "Arched ramp (green)", Category = "Ramps" }
+CATALOG.bridge_002 = { Name = "Arched ramp (orange)", Category = "Ramps" }
+CATALOG.slide_001 = { Name = "Inflatable slide", Category = "Ramps" }
+CATALOG.box_012 = { Name = "Ramp landing (tall)", Category = "Ramps" }
+CATALOG.box_011 = { Name = "Zigzag ramp (down +X)", Category = "Ramps" }
+CATALOG.box_013 = { Name = "Zigzag ramp (down -X)", Category = "Ramps" }
+CATALOG.arc_001 = { Name = "Curved track A", Category = "Tracks" }
+CATALOG.arc_002 = { Name = "Curved track B", Category = "Tracks" }
+CATALOG.arc_003 = { Name = "Curved track C", Category = "Tracks" }
+CATALOG.arc_004 = { Name = "Curved track D", Category = "Tracks" }
+CATALOG.obstacle_9_001 = { Name = "Chevron belt", Category = "Belts & tiles" }
+CATALOG.color_box_001 = { Name = "Rainbow tile A", Category = "Belts & tiles" }
+CATALOG.color_box_002 = { Name = "Rainbow tile B", Category = "Belts & tiles" }
+CATALOG.color_box_003 = { Name = "Rainbow tile C", Category = "Belts & tiles" }
+CATALOG.color_box_004 = { Name = "Rainbow tile D", Category = "Belts & tiles" }
+CATALOG.color_box_005 = { Name = "Rainbow tile E", Category = "Belts & tiles" }
+CATALOG.color_box_006 = { Name = "Rainbow tile F", Category = "Belts & tiles" }
+CATALOG.color_box_007 = { Name = "Rainbow tile G", Category = "Belts & tiles" }
+CATALOG.color_box_008 = { Name = "Rainbow tile H", Category = "Belts & tiles" }
+CATALOG.road_001 = { Name = "Rung bridge (green)", Category = "Rung bridges" }
+CATALOG.road_002 = { Name = "Rung bridge (pink)", Category = "Rung bridges" }
+CATALOG.checkpoint_001 = { Name = "Checkpoint arch A", Category = "Arches & gates" }
+CATALOG.checkpoint_002 = { Name = "Checkpoint arch B", Category = "Arches & gates" }
+CATALOG.checkpoint_003 = { Name = "Checkpoint arch C", Category = "Arches & gates" }
+CATALOG.ring_002 = { Name = "Large hoop", Category = "Arches & gates" }
+CATALOG.arch_001 = { Name = "Small arch A", Category = "Arches & gates" }
+CATALOG.arch_002 = { Name = "Small arch B", Category = "Arches & gates" }
+CATALOG.arch_003 = { Name = "Small arch C", Category = "Arches & gates" }
+CATALOG.arch_004 = { Name = "Tunnel arch A", Category = "Arches & gates" }
+CATALOG.arch_005 = { Name = "Tunnel arch B", Category = "Arches & gates" }
+CATALOG.arch_006 = { Name = "Tunnel arch C", Category = "Arches & gates" }
+CATALOG.fence_001 = { Name = "Curved guard rail", Category = "Barriers" }
+CATALOG.door_002 = { Name = "Door slab A", Category = "Barriers" }
+CATALOG.door_003 = { Name = "Door slab B", Category = "Barriers" }
+CATALOG.door_004 = { Name = "Door slab C", Category = "Barriers" }
+CATALOG.door_005 = { Name = "Door slab D", Category = "Barriers" }
+CATALOG.door_006 = { Name = "Door slab E", Category = "Barriers" }
+CATALOG.door_007 = { Name = "Door slab F", Category = "Barriers" }
+CATALOG.wall_003 = { Name = "Long rail A", Category = "Barriers" }
+CATALOG.wall_009 = { Name = "Long rail B", Category = "Barriers" }
+CATALOG.wall_010 = { Name = "Long rail C", Category = "Barriers" }
+CATALOG.wall_011 = { Name = "Long rail D", Category = "Barriers" }
+CATALOG.wall_012 = { Name = "Long rail E", Category = "Barriers" }
+CATALOG.wall_013 = { Name = "Long rail F", Category = "Barriers" }
+CATALOG.wall_014 = { Name = "Long rail G", Category = "Barriers" }
+CATALOG.wall_015 = { Name = "Long rail H", Category = "Barriers" }
+CATALOG.wall_004 = { Name = "Low hurdle A", Category = "Barriers" }
+CATALOG.wall_006 = { Name = "Low hurdle B", Category = "Barriers" }
+CATALOG.wall_007 = { Name = "Low hurdle C", Category = "Barriers" }
+CATALOG.wall_008 = { Name = "Low hurdle D", Category = "Barriers" }
+CATALOG.wall_001 = { Name = "Tall wall endcap A", Category = "Barriers" }
+CATALOG.wall_002 = { Name = "Tall wall endcap B", Category = "Barriers" }
+CATALOG.propeller_trampoline_1_001 = { Name = "Caged fan", Category = "Pads & fans" }
+CATALOG.trampoline_1_001 = { Name = "Jump pad (low)", Category = "Pads & fans" }
+CATALOG.trampoline_2_001 = { Name = "Jump pad (tall)", Category = "Pads & fans" }
+CATALOG.trampoline_5_001 = { Name = "Jump pad (wide low)", Category = "Pads & fans" }
+CATALOG.trampoline_4_001 = { Name = "Jump pad (wide tall)", Category = "Pads & fans" }
+CATALOG.trampoline_3_001 = { Name = "Trampoline", Category = "Pads & fans" }
+CATALOG.finish_002 = { Name = "Finish arch", Category = "Markers" }
+CATALOG.finish_001 = { Name = "Finish strip", Category = "Markers" }
+CATALOG.podium_001 = { Name = "Drum platform A", Category = "Blocks" }
+CATALOG.podium_002 = { Name = "Drum platform B", Category = "Blocks" }
+CATALOG.podium_003 = { Name = "Drum platform C", Category = "Blocks" }
+CATALOG.podium_004 = { Name = "Drum platform D", Category = "Blocks" }
+CATALOG.podium_005 = { Name = "Drum platform E", Category = "Blocks" }
+CATALOG.podium_006 = { Name = "Drum platform F", Category = "Blocks" }
+CATALOG.podium_007 = { Name = "Drum platform G", Category = "Blocks" }
+CATALOG.box_004 = { Name = "Foam bar A", Category = "Blocks" }
+CATALOG.box_005 = { Name = "Foam bar B", Category = "Blocks" }
+CATALOG.box_006 = { Name = "Foam bar C", Category = "Blocks" }
+CATALOG.box_007 = { Name = "Foam bar D", Category = "Blocks" }
+CATALOG.box_008 = { Name = "Foam bar E", Category = "Blocks" }
+CATALOG.box_009 = { Name = "Foam bar F", Category = "Blocks" }
+CATALOG.box_010 = { Name = "Foam bar G", Category = "Blocks" }
+CATALOG.box_003 = { Name = "Ramp landing (short)", Category = "Blocks" }
+CATALOG.box_001 = { Name = "Small cube A", Category = "Blocks" }
+CATALOG.box_002 = { Name = "Small cube B", Category = "Blocks" }
+CATALOG.ball_001 = { Name = "Beach ball", Category = "Hazards" }
+CATALOG.obstacle_23_001 = { Name = "Big ball on pole", Category = "Hazards" }
+CATALOG.obstacle_21_001 = { Name = "Blue hump", Category = "Hazards" }
+CATALOG.obstacle_20_001 = { Name = "Blue hump (strapped)", Category = "Hazards" }
+CATALOG.obstacle_18_001 = { Name = "Bumper cube", Category = "Hazards" }
+CATALOG.obstacle_19_001 = { Name = "Bumper wedge", Category = "Hazards" }
+CATALOG.obstacle_13_001 = { Name = "Carousel", Category = "Hazards" }
+CATALOG.obstacle_12_001 = { Name = "Cross spinner", Category = "Hazards" }
+CATALOG.obstacle_6_001 = { Name = "Dumbbell spinner", Category = "Hazards" }
+CATALOG.obstacle_3_001 = { Name = "Hammer (large)", Category = "Hazards" }
+CATALOG.obstacle_4_001 = { Name = "Hammer (small)", Category = "Hazards" }
+CATALOG.obstacle_10_001 = { Name = "Log roller", Category = "Hazards" }
+CATALOG.obstacle_5_001 = { Name = "Mace and chain", Category = "Hazards" }
+CATALOG.obstacle_1_001 = { Name = "Mallet (small)", Category = "Hazards" }
+CATALOG.obstacle_24_001 = { Name = "Paddle wheel", Category = "Hazards" }
+CATALOG.obstacle_16_001 = { Name = "Pizza platform", Category = "Hazards" }
+CATALOG.obstacle_25_001 = { Name = "Seesaw beam (short)", Category = "Hazards" }
+CATALOG.obstacle_11_001 = { Name = "Seesaw plank (long)", Category = "Hazards" }
+CATALOG.obstacle_7_001 = { Name = "Sliding panel", Category = "Hazards" }
+CATALOG.obstacle_2_001 = { Name = "Spiked roller", Category = "Hazards" }
+CATALOG.obstacle_26_001 = { Name = "Spin disc (large, purple)", Category = "Hazards" }
+CATALOG.obstacle_15_001 = { Name = "Spin disc (large, red)", Category = "Hazards" }
+CATALOG.obstacle_14_001 = { Name = "Spin disc (small)", Category = "Hazards" }
+CATALOG.obstacle_22_001 = { Name = "Spring piston", Category = "Hazards" }
+CATALOG.obstacle_27_001 = { Name = "Sweep bar", Category = "Hazards" }
+CATALOG.obstacle_8_001 = { Name = "Swing panel", Category = "Hazards" }
+
+-- ---------------------------------------------------------------------------
+-- Catalog
+-- ---------------------------------------------------------------------------
+
+-- Which BasePart carries a source's local frame. Every socket is expressed
+-- relative to this part, so the catalog, the ghost and the committed piece have
+-- to agree on it; picking a different part for a two-part Model source would
+-- silently place that piece against the wrong frame.
+local function resolveRoot(instance: Instance): BasePart?
+	if instance:IsA("BasePart") then
+		return instance :: BasePart
+	end
+	if instance:IsA("Model") then
+		return instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return instance:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local Catalog = {}
+Catalog.container = nil :: Instance?
+Catalog.entries = {} :: { any }
+Catalog.byId = {} :: { [string]: any }
+
+-- Axis-aligned bounds of a root's whole subtree expressed in the ROOT PART's own
+-- local frame, which is the frame the baked sockets use.
+local function localBounds(root: BasePart): (Vector3, Vector3)
+	local inverse = root.CFrame:Inverse()
+	local minX, minY, minZ = math.huge, math.huge, math.huge
+	local maxX, maxY, maxZ = -math.huge, -math.huge, -math.huge
+
+	local function accumulate(part: BasePart)
+		local relative = inverse * part.CFrame
+		local half = part.Size * 0.5
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local corner = relative * Vector3.new(half.X * sx, half.Y * sy, half.Z * sz)
+					minX, maxX = math.min(minX, corner.X), math.max(maxX, corner.X)
+					minY, maxY = math.min(minY, corner.Y), math.max(maxY, corner.Y)
+					minZ, maxZ = math.min(minZ, corner.Z), math.max(maxZ, corner.Z)
+				end
+			end
+		end
+	end
+
+	accumulate(root)
+	for _, descendant in root:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			accumulate(descendant)
+		end
+	end
+
+	return Vector3.new(minX, minY, minZ), Vector3.new(maxX, maxY, maxZ)
+end
+
+-- Sockets for a source the measured manifest does not cover. Entry/Exit sit at
+-- the centre of the two end faces on the longer horizontal axis, level with the
+-- top surface, and Support at bottom centre. Heading follows the manifest's
+-- convention: yaw 0 faces world -Z, so local +Z travel is heading 180 and local
+-- +X travel is heading -90.
+local function deriveSockets(root: BasePart)
+	local min, max = localBounds(root)
+	local centre = (min + max) * 0.5
+	local spanX, spanZ = max.X - min.X, max.Z - min.Z
+	local sockets = {
+		Support = { p = Vector3.new(centre.X, min.Y, centre.Z), a = Vector3.new(0, -1, 0) },
+	}
+
+	local heading, forwardAxis
+	if spanZ >= spanX then
+		forwardAxis, heading = "Z", 180
+		sockets.Entry = { p = Vector3.new(centre.X, max.Y, min.Z), a = Vector3.new(0, 0, -1) }
+		sockets.Exit = { p = Vector3.new(centre.X, max.Y, max.Z), a = Vector3.new(0, 0, 1) }
+	else
+		forwardAxis, heading = "X", -90
+		sockets.Entry = { p = Vector3.new(min.X, max.Y, centre.Z), a = Vector3.new(-1, 0, 0) }
+		sockets.Exit = { p = Vector3.new(max.X, max.Y, centre.Z), a = Vector3.new(1, 0, 0) }
+	end
+
+	return sockets, heading, forwardAxis, max - min
+end
+
+local function findContainer(): Instance?
+	for _, name in CONTAINER_NAMES do
+		local found = Workspace:FindFirstChild(name)
+		if found and #found:GetChildren() > 20 then
+			return found
+		end
+	end
+
+	local best, bestScore = nil, 0
+	for _, child in Workspace:GetChildren() do
+		if (child:IsA("Model") or child:IsA("Folder")) and child.Name ~= BUILD_MODEL_NAME then
+			local score = 0
+			for _, grandchild in child:GetChildren() do
+				if CATALOG[grandchild.Name] then
+					score += 1
+				end
+			end
+			if score > bestScore then
+				best, bestScore = child, score
+			end
+		end
+	end
+	return if bestScore >= 20 then best else nil
+end
+
+function Catalog.rescan(): (boolean, string)
+	Catalog.container = findContainer()
+	Catalog.entries = {}
+	Catalog.byId = {}
+
+	local container = Catalog.container
+	if not container then
+		return false, "No source pack found in Workspace"
+	end
+
+	for _, child in container:GetChildren() do
+		-- CATALOG is the whitelist as well as the naming table: anything not in it
+		-- is scenery (balloons, drones, collectibles, banners) rather than a piece
+		-- a course is built from, and never appears in the list.
+		local listing = CATALOG[child.Name]
+		local root = listing and resolveRoot(child)
+		if root then
+			local baked = SOCKETS[child.Name]
+			local sockets, heading, forwardAxis, size, measured
+
+			if baked then
+				sockets, heading, forwardAxis, size, measured =
+					baked.Sockets, baked.Heading, baked.ForwardAxis, baked.Size, true
+				if not (sockets.Entry and sockets.Exit) then
+					local derived, derivedHeading, derivedAxis = deriveSockets(root)
+					local merged = table.clone(sockets)
+					merged.Entry = merged.Entry or derived.Entry
+					merged.Exit = merged.Exit or derived.Exit
+					sockets = merged
+					heading = heading or derivedHeading
+					forwardAxis = forwardAxis or derivedAxis
+					measured = "partial"
+				end
+			else
+				sockets, heading, forwardAxis, size = deriveSockets(root)
+				measured = false
+			end
+
+			local entry = {
+				id = child.Name,
+				name = listing.Name,
+				category = listing.Category,
+				source = child,
+				root = root,
+				sockets = sockets,
+				heading = heading,
+				forwardAxis = forwardAxis,
+				size = size,
+				measured = measured,
+				kind = if baked then baked.Kind else "Surface",
+			}
+			table.insert(Catalog.entries, entry)
+			Catalog.byId[entry.id] = entry
+		end
+	end
+
+	local rank: { [string]: number } = {}
+	for index, name in CATEGORY_ORDER do
+		rank[name] = index
+	end
+	table.sort(Catalog.entries, function(a, b)
+		local ra, rb = rank[a.category] or 99, rank[b.category] or 99
+		if ra ~= rb then
+			return ra < rb
+		end
+		if a.name ~= b.name then
+			return a.name < b.name
+		end
+		return a.id < b.id
+	end)
+
+	return true, string.format("%s - %d pieces", container.Name, #Catalog.entries)
+end
+
+-- ---------------------------------------------------------------------------
+-- Placement maths
+-- ---------------------------------------------------------------------------
+
+-- Lifted from CoursePresets.placeTravelPiece so the plugin and the declarative
+-- pipeline put a piece in exactly the same place. Solves the standard "put local
+-- point X at world point P with rotation R" identity, with R built from a single
+-- scalar yaw rather than a socket axis, which sidesteps Roblox's "-Z is forward"
+-- convention entirely.
+local function solveRootCFrame(socketLocal: Vector3, targetPosition: Vector3, yaw: number, heading: number): CFrame
+	return CFrame.new(targetPosition) * CFrame.Angles(0, math.rad(yaw - heading), 0) * CFrame.new(-socketLocal)
+end
+
+local function scaled(socket, scale: number): Vector3
+	return socket.p * scale
+end
+
+local function placeByRoot(holder: Model, root: BasePart, targetCFrame: CFrame)
+	holder.WorldPivot = root.CFrame
+	holder:PivotTo(targetCFrame)
+end
+
+-- ---------------------------------------------------------------------------
+-- Build model and placed-piece bookkeeping
+-- ---------------------------------------------------------------------------
+
+local function buildModel(create: boolean): Model?
+	local existing = Workspace:FindFirstChild(BUILD_MODEL_NAME)
+	if existing and existing:IsA("Model") then
+		return existing
+	end
+	if not create then
+		return nil
+	end
+	local model = Instance.new("Model")
+	model.Name = BUILD_MODEL_NAME
+	model.Parent = Workspace
+	return model
+end
+
+local function placedPieces(): { Model }
+	local model = buildModel(false)
+	if not model then
+		return {}
+	end
+	local pieces = {}
+	for _, child in model:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("CF_Asset") then
+			table.insert(pieces, child)
+		end
+	end
+	return pieces
+end
+
+local function pieceSocket(piece: Model, key: string): (Vector3?, number?)
+	local id = piece:GetAttribute("CF_Asset")
+	local entry = id and Catalog.byId[id]
+	local root = piece.PrimaryPart
+	if not (entry and root) then
+		return nil, nil
+	end
+	local socket = entry.sockets[key]
+	if not socket then
+		return nil, nil
+	end
+	local scale = piece:GetAttribute("CF_Scale") or 1
+	return root.CFrame:PointToWorldSpace(scaled(socket, scale)), piece:GetAttribute("CF_Yaw") or 0
+end
+
+-- ---------------------------------------------------------------------------
+-- Session state
+-- ---------------------------------------------------------------------------
+
+local State = {
+	activeId = nil :: string?,
+	scale = 0.55,
+	rotationStep = 45,
+	gridSize = 4,
+	yawOffset = 0,
+	-- Persistent nudge applied in the joint's own frame, so a run can be laid
+	-- with a deliberate gap or a small lift without hand-editing every piece.
+	offsetForward = 0,
+	offsetLateral = 0,
+	offsetVertical = 0,
+	snapSockets = true,
+	snapGrid = false,
+	snapRadius = 45,
+	socketKey = "Exit",
+	lastPlaced = nil :: Model?,
+	currentSnap = nil,
+	placing = false,
+}
+
+-- ---------------------------------------------------------------------------
+-- Socket occupancy
+-- ---------------------------------------------------------------------------
+
+local function collectSockets()
+	local list = {}
+	for _, piece in placedPieces() do
+		for _, key in { "Entry", "Exit" } do
+			local position, yaw = pieceSocket(piece, key)
+			if position then
+				table.insert(list, { piece = piece, key = key, position = position, yaw = yaw })
+			end
+		end
+	end
+	return list
+end
+
+-- A socket with another piece's socket already sitting on it is taken. Without
+-- this check the nearest-Exit search happily offers a joint in the middle of a
+-- finished run, and the new piece lands inside the piece already attached there
+-- -- which is exactly the "socket appears inside the previous item" failure.
+local function freeSockets(key: string)
+	local all = collectSockets()
+	local tolerance = math.max(1.5, 4 * State.scale)
+	local open = {}
+	for _, socket in all do
+		if socket.key == key then
+			local taken = false
+			for _, other in all do
+				if other.piece ~= socket.piece and (other.position - socket.position).Magnitude <= tolerance then
+					taken = true
+					break
+				end
+			end
+			if not taken then
+				table.insert(open, socket)
+			end
+		end
+	end
+	return open
+end
+
+-- ---------------------------------------------------------------------------
+-- Ghost preview and 3D socket markers
+-- ---------------------------------------------------------------------------
+
+local Ghost = {}
+Ghost.model = nil :: Model?
+Ghost.root = nil :: BasePart?
+
+function Ghost.clear()
+	if Ghost.model then
+		Ghost.model:Destroy()
+	end
+	Ghost.model = nil
+	Ghost.root = nil
+end
+
+function Ghost.build(entry, scale: number)
+	Ghost.clear()
+	local holder = Instance.new("Model")
+	holder.Name = PLUGIN_NAME .. "Ghost"
+	local clone = entry.source:Clone()
+	clone.Parent = holder
+	-- Parenting to the camera keeps the preview out of the saved place and out of
+	-- Explorer, which is what makes it safe to leave one on screen mid-placement.
+	holder.Parent = Workspace.CurrentCamera
+
+	local root = resolveRoot(clone)
+	for _, descendant in holder:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			descendant.Transparency = math.max(descendant.Transparency, 0.45)
+			descendant.PivotOffset = CFrame.identity
+			descendant.Locked = true
+		end
+	end
+	holder:ScaleTo(scale)
+
+	Ghost.model, Ghost.root = holder, root
+	return holder, root
+end
+
+local markerFolder: Folder? = nil
+
+local function clearMarkers()
+	if markerFolder then
+		markerFolder:Destroy()
+		markerFolder = nil
+	end
+end
+
+local function markerRoot(): Folder
+	if markerFolder and markerFolder.Parent then
+		return markerFolder
+	end
+	local made = Instance.new("Folder")
+	made.Name = PLUGIN_NAME .. "Markers"
+	made.Parent = CoreGui
+	markerFolder = made
+	return made
+end
+
+-- Draws every free joint so it is obvious where a piece can attach, and which
+-- one is currently selected. Adornments are used rather than Parts so nothing
+-- lands in Workspace and nothing can be selected or saved by accident.
+local function drawMarkers(open, active)
+	clearMarkers()
+	if not State.placing then
+		return
+	end
+	local parent = markerRoot()
+	for _, socket in open do
+		local isActive = active ~= nil and active.piece == socket.piece and active.key == socket.key
+		local sphere = Instance.new("SphereHandleAdornment")
+		sphere.Adornee = Workspace.Terrain
+		sphere.CFrame = CFrame.new(socket.position)
+		sphere.Radius = if isActive then 2.4 else 1.2
+		sphere.Color3 = if isActive then Color3.fromRGB(255, 214, 80) else Color3.fromRGB(90, 220, 140)
+		sphere.Transparency = if isActive then 0.05 else 0.45
+		sphere.ZIndex = 5
+		sphere.AlwaysOnTop = true
+		sphere.Parent = parent
+	end
+end
+
+local highlight: Highlight? = nil
+
+local function clearHighlight()
+	if highlight then
+		highlight:Destroy()
+		highlight = nil
+	end
+end
+
+local function showHighlight(piece: Model)
+	clearHighlight()
+	local made = Instance.new("Highlight")
+	made.Adornee = piece
+	made.FillTransparency = 0.75
+	made.OutlineColor = Color3.fromRGB(255, 214, 80)
+	made.FillColor = Color3.fromRGB(255, 214, 80)
+	made.Parent = CoreGui
+	highlight = made
+end
+
+-- ---------------------------------------------------------------------------
+-- Snapping
+-- ---------------------------------------------------------------------------
+
+local function findSnap(worldPoint: Vector3)
+	if not State.snapSockets then
+		return nil, {}
+	end
+	local open = freeSockets(State.socketKey)
+	local best, bestDistance = nil, State.snapRadius
+	for _, socket in open do
+		local distance = (socket.position - worldPoint).Magnitude
+		if distance < bestDistance then
+			best, bestDistance = socket, distance
+		end
+	end
+	return best, open
+end
+
+local function snapToGrid(position: Vector3): Vector3
+	local step = State.gridSize
+	if not State.snapGrid or step <= 0 then
+		return position
+	end
+	return Vector3.new(
+		math.round(position.X / step) * step,
+		math.round(position.Y / step) * step,
+		math.round(position.Z / step) * step
+	)
+end
+
+-- The nudge is applied in the joint's own frame, so "forward" means along the
+-- route rather than along a world axis, and a gap stays a gap after the run turns.
+local function applyOffset(position: Vector3, yaw: number): Vector3
+	local frame = CFrame.Angles(0, math.rad(yaw), 0)
+	local forward = frame * Vector3.new(0, 0, -1)
+	local right = frame * Vector3.new(1, 0, 0)
+	return position
+		+ forward * State.offsetForward
+		+ right * State.offsetLateral
+		+ Vector3.new(0, State.offsetVertical, 0)
+end
+
+-- Where the ghost should sit for the current mouse ray. Returns the root CFrame
+-- plus the yaw a placement from here would record.
+local function solveGhostPose(entry, hitPosition: Vector3?)
+	local scale = State.scale
+	local snap, open = nil, {}
+	-- A Mount is a hazard or prop that stands ON a deck; it has no meaningful
+	-- route through it, so chaining one into the run is never what was wanted.
+	-- Those drop onto the surface under the cursor instead.
+	if hitPosition and entry.kind ~= "Mount" then
+		snap, open = findSnap(hitPosition)
+	end
+	State.currentSnap = snap
+	drawMarkers(open, snap)
+
+	if snap then
+		local yaw = (snap.yaw or 0) + State.yawOffset
+		-- Chaining forward mates the new piece's Entry to a free Exit; prepending
+		-- is the mirror of that, Exit onto Entry. Mating Entry to Entry would face
+		-- the new piece backwards into the run.
+		local ghostKey = if State.socketKey == "Exit" then "Entry" else "Exit"
+		local ghostSocket = entry.sockets[ghostKey]
+		if ghostSocket then
+			local target = applyOffset(snap.position, yaw)
+			return solveRootCFrame(scaled(ghostSocket, scale), target, yaw, entry.heading or 180), yaw
+		end
+	end
+
+	if not hitPosition then
+		return nil
+	end
+
+	local position = snapToGrid(hitPosition)
+	local yaw = State.yawOffset
+	local support = entry.sockets.Support
+	if support then
+		-- Drop onto the surface by the Support socket, which is the bottom-centre
+		-- contact point rather than the bounding-box centre.
+		return solveRootCFrame(scaled(support, scale), position, yaw, 0), yaw
+	end
+	return solveRootCFrame(Vector3.zero, position, yaw, 0), yaw
+end
+
+-- ---------------------------------------------------------------------------
+-- Commit
+-- ---------------------------------------------------------------------------
+
+local function commitPlacement(entry, rootCFrame: CFrame, yaw: number)
+	local recording = ChangeHistoryService:TryBeginRecording(PLUGIN_NAME .. "Place", "Place " .. entry.name)
+
+	local parent = buildModel(true)
+	local holder = Instance.new("Model")
+	holder.Name = entry.id
+
+	local clone = entry.source:Clone()
+	clone.Parent = holder
+	local root = resolveRoot(clone)
+	for _, descendant in holder:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = true
+			descendant.CanQuery = true
+			descendant.CanTouch = false
+			descendant.PivotOffset = CFrame.identity
+			descendant:SetAttribute("SourceAsset", entry.id)
+		end
+	end
+
+	holder:ScaleTo(State.scale)
+	holder.PrimaryPart = root
+	holder.Parent = parent
+	if root then
+		placeByRoot(holder, root, rootCFrame)
+	end
+
+	holder:SetAttribute("CF_Asset", entry.id)
+	holder:SetAttribute("CF_Scale", State.scale)
+	holder:SetAttribute("CF_Yaw", yaw)
+
+	State.lastPlaced = holder
+	if recording then
+		ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
+	end
+	return holder
+end
+
+-- ---------------------------------------------------------------------------
+-- Widget
+-- ---------------------------------------------------------------------------
+
+local toolbar = plugin:CreateToolbar("Course Forge")
+local toggleButton = toolbar:CreateButton(
+	"Course Forge",
+	"Assemble a course from the source pack",
+	"rbxasset://textures/ui/GuiImagePlaceholder.png"
+)
+toggleButton.ClickableWhenViewportHidden = true
+
+local widget = plugin:CreateDockWidgetPluginGui(
+	PLUGIN_NAME,
+	DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, false, false, 320, 640, 280, 420)
+)
+widget.Title = "Course Forge"
+widget.Name = PLUGIN_NAME
+
+local BACKGROUND = Color3.fromRGB(34, 36, 40)
+local PANEL = Color3.fromRGB(46, 49, 54)
+local FIELD = Color3.fromRGB(28, 30, 33)
+local ACCENT = Color3.fromRGB(90, 220, 140)
+local TEXT = Color3.fromRGB(226, 229, 233)
+local MUTED = Color3.fromRGB(150, 156, 164)
+
+local function corner(instance: Instance, radius: number)
+	local made = Instance.new("UICorner")
+	made.CornerRadius = UDim.new(0, radius)
+	made.Parent = instance
+end
+
+local root = Instance.new("Frame")
+root.Size = UDim2.fromScale(1, 1)
+root.BackgroundColor3 = BACKGROUND
+root.BorderSizePixel = 0
+root.Parent = widget
+
+local padding = Instance.new("UIPadding")
+for _, side in { "PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight" } do
+	padding[side] = UDim.new(0, 6)
+end
+padding.Parent = root
+
+-- The controls sit in a fixed-height header and the list fills whatever is left,
+-- so the list cannot be pushed off the bottom of a short dock.
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 178)
+header.BackgroundTransparency = 1
+header.Parent = root
+
+local headerLayout = Instance.new("UIListLayout")
+headerLayout.Padding = UDim.new(0, 4)
+headerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+headerLayout.Parent = header
+
+local order = 0
+local function nextOrder(): number
+	order += 1
+	return order
+end
+
+local function label(parent: Instance, text: string, height: number, colour: Color3?): TextLabel
+	local made = Instance.new("TextLabel")
+	made.Size = UDim2.new(1, 0, 0, height)
+	made.BackgroundTransparency = 1
+	made.Font = Enum.Font.SourceSans
+	made.TextSize = 13
+	made.TextColor3 = colour or TEXT
+	made.TextXAlignment = Enum.TextXAlignment.Left
+	made.Text = text
+	made.LayoutOrder = nextOrder()
+	made.Parent = parent
+	return made
+end
+
+local function button(text: string, parent: Instance, size: UDim2): TextButton
+	local made = Instance.new("TextButton")
+	made.Size = size
+	made.BackgroundColor3 = PANEL
+	made.BorderSizePixel = 0
+	made.Font = Enum.Font.SourceSansSemibold
+	made.TextSize = 12
+	made.TextColor3 = TEXT
+	made.Text = text
+	made.AutoButtonColor = true
+	made.Parent = parent
+	corner(made, 4)
+	return made
+end
+
+local function row(parent: Instance, height: number): Frame
+	local made = Instance.new("Frame")
+	made.Size = UDim2.new(1, 0, 0, height)
+	made.BackgroundTransparency = 1
+	made.LayoutOrder = nextOrder()
+	made.Parent = parent
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Padding = UDim.new(0, 4)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = made
+	return made
+end
+
+local function textBox(parent: Instance, text: string, size: UDim2): TextBox
+	local made = Instance.new("TextBox")
+	made.Size = size
+	made.BackgroundColor3 = FIELD
+	made.BorderSizePixel = 0
+	made.Font = Enum.Font.SourceSans
+	made.TextSize = 12
+	made.TextColor3 = TEXT
+	made.Text = text
+	made.ClearTextOnFocus = false
+	made.Parent = parent
+	corner(made, 4)
+	return made
+end
+
+local sourceLabel = label(header, "Source: scanning...", 16, MUTED)
+
+local topRow = row(header, 22)
+local rescanButton = button("Rescan", topRow, UDim2.new(0.5, -2, 1, 0))
+local clearButton = button("Clear build", topRow, UDim2.new(0.5, -2, 1, 0))
+
+label(header, "scale   rotation step   grid", 14, MUTED)
+local settingsRow = row(header, 22)
+local scaleBox = textBox(settingsRow, "0.55", UDim2.new(0.333, -3, 1, 0))
+local rotationBox = textBox(settingsRow, "45", UDim2.new(0.333, -3, 1, 0))
+local gridBox = textBox(settingsRow, "4", UDim2.new(0.333, -3, 1, 0))
+
+label(header, "joint nudge:  forward   sideways   up", 14, MUTED)
+local offsetRow = row(header, 22)
+local forwardBox = textBox(offsetRow, "0", UDim2.new(0.333, -3, 1, 0))
+local lateralBox = textBox(offsetRow, "0", UDim2.new(0.333, -3, 1, 0))
+local verticalBox = textBox(offsetRow, "0", UDim2.new(0.333, -3, 1, 0))
+
+local nudgeRow = row(header, 22)
+local nudgeBackButton = button("- fwd", nudgeRow, UDim2.new(0.25, -3, 1, 0))
+local nudgeForwardButton = button("+ fwd", nudgeRow, UDim2.new(0.25, -3, 1, 0))
+local resetOffsetButton = button("Reset nudge", nudgeRow, UDim2.new(0.5, -3, 1, 0))
+
+local actionRow = row(header, 22)
+local rotateLeftButton = button("Rot -", actionRow, UDim2.new(0.25, -3, 1, 0))
+local rotateRightButton = button("Rot +", actionRow, UDim2.new(0.25, -3, 1, 0))
+local endSwapButton = button("End: Exit", actionRow, UDim2.new(0.25, -3, 1, 0))
+local repeatButton = button("Repeat", actionRow, UDim2.new(0.25, -3, 1, 0))
+
+local toggleRow = row(header, 22)
+local socketToggle = button("Socket snap: ON", toggleRow, UDim2.new(0.5, -2, 1, 0))
+local gridToggle = button("Grid snap: OFF", toggleRow, UDim2.new(0.5, -2, 1, 0))
+
+local searchBox = textBox(header, "", UDim2.new(1, 0, 0, 22))
+searchBox.PlaceholderText = "Search pieces..."
+searchBox.Text = ""
+searchBox.LayoutOrder = nextOrder()
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 30)
+statusLabel.Position = UDim2.new(0, 0, 1, -30)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 12
+statusLabel.TextColor3 = MUTED
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.TextYAlignment = Enum.TextYAlignment.Top
+statusLabel.TextWrapped = true
+statusLabel.Text = "Idle"
+statusLabel.Parent = root
+
+local list = Instance.new("ScrollingFrame")
+list.Position = UDim2.fromOffset(0, 182)
+list.Size = UDim2.new(1, 0, 1, -216)
+list.BackgroundColor3 = FIELD
+list.BorderSizePixel = 0
+list.ScrollBarThickness = 6
+list.CanvasSize = UDim2.new()
+list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+list.Parent = root
+corner(list, 4)
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 2)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = list
+
+local listPadding = Instance.new("UIPadding")
+listPadding.PaddingTop = UDim.new(0, 4)
+listPadding.PaddingBottom = UDim.new(0, 4)
+listPadding.PaddingLeft = UDim.new(0, 4)
+listPadding.PaddingRight = UDim.new(0, 4)
+listPadding.Parent = list
+
+local function setStatus(text: string)
+	statusLabel.Text = text
+end
+
+-- ---------------------------------------------------------------------------
+-- Catalog rows, with a live 3D preview of each piece
+-- ---------------------------------------------------------------------------
+
+local ROW_HEIGHT = 46
+local rowButtons: { [string]: TextButton } = {}
+local rowFrames: { any } = {}
+
+local function refreshSelection()
+	for id, made in rowButtons do
+		local selected = id == State.activeId
+		made.BackgroundColor3 = if selected then ACCENT else PANEL
+		local title = made:FindFirstChild("Title") :: TextLabel?
+		local subtitle = made:FindFirstChild("Subtitle") :: TextLabel?
+		if title then
+			title.TextColor3 = if selected then Color3.fromRGB(18, 24, 20) else TEXT
+		end
+		if subtitle then
+			subtitle.TextColor3 = if selected then Color3.fromRGB(40, 70, 52) else MUTED
+		end
+	end
+end
+
+-- Builds the ViewportFrame contents for one row. Deferred until the row is
+-- actually on screen: 118 live viewports built up front makes opening the widget
+-- crawl, and most are never looked at.
+local function populatePreview(record)
+	if record.built or not record.entry then
+		return
+	end
+	record.built = true
+
+	local viewport = record.viewport
+	local world = Instance.new("WorldModel")
+	world.Parent = viewport
+
+	local clone = record.entry.source:Clone()
+	for _, descendant in clone:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+		end
+	end
+	if clone:IsA("BasePart") then
+		clone.Anchored = true
+		clone.CanCollide = false
+	end
+	clone.Parent = world
+
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 40
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+
+	local centre, size
+	if clone:IsA("Model") then
+		local cf, bounds = clone:GetBoundingBox()
+		centre, size = cf.Position, bounds
+	else
+		centre, size = clone.Position, clone.Size
+	end
+	local radius = math.max(size.Magnitude * 0.5, 0.1)
+	local distance = radius / math.tan(math.rad(camera.FieldOfView * 0.5)) * 1.25
+	camera.CFrame = CFrame.lookAt(centre + Vector3.new(0.85, 0.6, 1).Unit * distance, centre)
+end
+
+-- Walks the rows currently inside the scroll window and builds those previews.
+local function refreshVisiblePreviews()
+	local top = list.CanvasPosition.Y - ROW_HEIGHT
+	local bottom = top + list.AbsoluteWindowSize.Y + ROW_HEIGHT * 3
+	for _, record in rowFrames do
+		if record.frame.Visible then
+			local y = record.frame.AbsolutePosition.Y - list.AbsolutePosition.Y + list.CanvasPosition.Y
+			if y >= top and y <= bottom then
+				populatePreview(record)
+			end
+		end
+	end
+end
+
+local startPlacing
+
+local function rebuildList()
+	for _, record in rowFrames do
+		record.frame:Destroy()
+	end
+	table.clear(rowFrames)
+	table.clear(rowButtons)
+
+	local index = 0
+	local lastCategory = nil
+	for _, entry in Catalog.entries do
+		index += 1
+		if entry.category ~= lastCategory then
+			lastCategory = entry.category
+			local heading = Instance.new("TextLabel")
+			heading.Size = UDim2.new(1, -8, 0, 18)
+			heading.BackgroundTransparency = 1
+			heading.Font = Enum.Font.SourceSansBold
+			heading.TextSize = 11
+			heading.TextColor3 = MUTED
+			heading.TextXAlignment = Enum.TextXAlignment.Left
+			heading.Text = string.upper(entry.category)
+			heading.LayoutOrder = index
+			heading.Parent = list
+			table.insert(rowFrames, { frame = heading, category = entry.category, isHeading = true })
+			index += 1
+		end
+
+		local made = Instance.new("TextButton")
+		made.Size = UDim2.new(1, -8, 0, ROW_HEIGHT)
+		made.BackgroundColor3 = PANEL
+		made.BorderSizePixel = 0
+		made.Text = ""
+		made.AutoButtonColor = true
+		made.LayoutOrder = index
+		made.Parent = list
+		corner(made, 4)
+
+		local viewport = Instance.new("ViewportFrame")
+		viewport.Size = UDim2.fromOffset(40, 40)
+		viewport.Position = UDim2.fromOffset(3, 3)
+		viewport.BackgroundColor3 = Color3.fromRGB(22, 24, 27)
+		viewport.BorderSizePixel = 0
+		viewport.Ambient = Color3.fromRGB(190, 190, 200)
+		viewport.LightColor = Color3.fromRGB(255, 255, 255)
+		viewport.LightDirection = Vector3.new(-0.6, -1, -0.4)
+		viewport.Parent = made
+		corner(viewport, 3)
+
+		local title = Instance.new("TextLabel")
+		title.Name = "Title"
+		title.Size = UDim2.new(1, -96, 0, 18)
+		title.Position = UDim2.fromOffset(48, 5)
+		title.BackgroundTransparency = 1
+		title.Font = Enum.Font.SourceSansSemibold
+		title.TextSize = 13
+		title.TextColor3 = TEXT
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextTruncate = Enum.TextTruncate.AtEnd
+		title.Text = entry.name
+		title.Parent = made
+
+		local subtitle = Instance.new("TextLabel")
+		subtitle.Name = "Subtitle"
+		subtitle.Size = UDim2.new(1, -96, 0, 14)
+		subtitle.Position = UDim2.fromOffset(48, 24)
+		subtitle.BackgroundTransparency = 1
+		subtitle.Font = Enum.Font.SourceSans
+		subtitle.TextSize = 11
+		subtitle.TextColor3 = MUTED
+		subtitle.TextXAlignment = Enum.TextXAlignment.Left
+		subtitle.TextTruncate = Enum.TextTruncate.AtEnd
+		subtitle.Text = entry.id
+		subtitle.Parent = made
+
+		-- A measured piece chains on real swept sockets; a derived one chains on
+		-- its bounding box, and a mount does not chain at all. Say which, because
+		-- it predicts how well the piece will line up.
+		local badge = Instance.new("TextLabel")
+		badge.Size = UDim2.fromOffset(44, 14)
+		badge.Position = UDim2.new(1, -46, 0, 24)
+		badge.BackgroundTransparency = 1
+		badge.Font = Enum.Font.SourceSans
+		badge.TextSize = 10
+		badge.TextXAlignment = Enum.TextXAlignment.Right
+		if entry.kind == "Mount" then
+			badge.Text = "mount"
+			badge.TextColor3 = Color3.fromRGB(150, 180, 230)
+		elseif entry.measured == true then
+			badge.Text = "measured"
+			badge.TextColor3 = ACCENT
+		else
+			badge.Text = "approx"
+			badge.TextColor3 = MUTED
+		end
+		badge.Parent = made
+
+		made.Activated:Connect(function()
+			startPlacing(entry.id)
+		end)
+
+		rowButtons[entry.id] = made
+		table.insert(rowFrames, { frame = made, viewport = viewport, entry = entry, built = false })
+	end
+
+	refreshSelection()
+	task.defer(refreshVisiblePreviews)
+end
+
+local function applyFilter()
+	local query = searchBox.Text:lower()
+	local shownInCategory: { [string]: number } = {}
+	for _, record in rowFrames do
+		if not record.isHeading then
+			local entry = record.entry
+			local haystack = (entry.name .. " " .. entry.id .. " " .. entry.category):lower()
+			local visible = query == "" or haystack:find(query, 1, true) ~= nil
+			record.frame.Visible = visible
+			if visible then
+				shownInCategory[entry.category] = (shownInCategory[entry.category] or 0) + 1
+			end
+		end
+	end
+	-- A heading with nothing under it is noise once a search has filtered its
+	-- whole category away.
+	for _, record in rowFrames do
+		if record.isHeading then
+			record.frame.Visible = (shownInCategory[record.category] or 0) > 0
+		end
+	end
+	task.defer(refreshVisiblePreviews)
+end
+
+list:GetPropertyChangedSignal("CanvasPosition"):Connect(refreshVisiblePreviews)
+searchBox:GetPropertyChangedSignal("Text"):Connect(applyFilter)
+
+-- ---------------------------------------------------------------------------
+-- Placement session
+-- ---------------------------------------------------------------------------
+
+local mouse = plugin:GetMouse()
+local connections: { RBXScriptConnection } = {}
+
+local function disconnectAll()
+	for _, connection in connections do
+		connection:Disconnect()
+	end
+	table.clear(connections)
+end
+
+local function raycastFromMouse(): Vector3?
+	local ray = mouse.UnitRay
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local filter: { Instance } = { Workspace.CurrentCamera }
+	if Catalog.container then
+		-- The source pack is a parked display, never a placement surface; letting
+		-- the cursor land on it would build the course inside the showcase.
+		table.insert(filter, Catalog.container)
+	end
+	params.FilterDescendantsInstances = filter
+
+	local result = Workspace:Raycast(ray.Origin, ray.Direction * 20000, params)
+	if result then
+		return result.Position
+	end
+
+	-- No geometry under the cursor: fall back to the horizontal plane through
+	-- y = 0 so a course can be started on an empty baseplate.
+	if math.abs(ray.Direction.Y) > 1e-4 then
+		local distance = -ray.Origin.Y / ray.Direction.Y
+		if distance > 0 then
+			return ray.Origin + ray.Direction * distance
+		end
+	end
+	return nil
+end
+
+local updateGhost
+
+local function stopPlacing()
+	State.placing = false
+	State.activeId = nil
+	State.currentSnap = nil
+	Ghost.clear()
+	clearHighlight()
+	clearMarkers()
+	disconnectAll()
+	plugin:Deactivate()
+	refreshSelection()
+	setStatus("Idle")
+end
+
+function updateGhost()
+	local entry = State.activeId and Catalog.byId[State.activeId]
+	if not (entry and Ghost.model and Ghost.root) then
+		return
+	end
+
+	local hit = raycastFromMouse()
+	local rootCFrame = solveGhostPose(entry, hit)
+	if not rootCFrame then
+		return
+	end
+	placeByRoot(Ghost.model, Ghost.root, rootCFrame)
+
+	local snap = State.currentSnap
+	local nudge = ""
+	if State.offsetForward ~= 0 or State.offsetLateral ~= 0 or State.offsetVertical ~= 0 then
+		nudge = string.format("  nudge %+g/%+g/%+g", State.offsetForward, State.offsetLateral, State.offsetVertical)
+	end
+
+	if snap then
+		showHighlight(snap.piece)
+		local placedName = Catalog.byId[snap.piece:GetAttribute("CF_Asset")]
+		setStatus(
+			string.format(
+				"%s -> %s %s%s",
+				entry.name,
+				placedName and placedName.name or snap.piece.Name,
+				State.socketKey,
+				nudge
+			)
+		)
+	else
+		clearHighlight()
+		if entry.kind == "Mount" then
+			setStatus(string.format("%s  drops on the surface  yaw %d", entry.name, math.round(State.yawOffset)))
+		else
+			setStatus(string.format("%s  no free joint in range  yaw %d", entry.name, math.round(State.yawOffset)))
+		end
+	end
+end
+
+local function placeNow()
+	local entry = State.activeId and Catalog.byId[State.activeId]
+	if not entry then
+		return
+	end
+	local rootCFrame, yaw = solveGhostPose(entry, raycastFromMouse())
+	if not rootCFrame then
+		return
+	end
+	local holder = commitPlacement(entry, rootCFrame, yaw or 0)
+	Selection:Set({ holder })
+	-- The yaw offset is a per-placement nudge, not a mode: keeping it would make
+	-- every following piece in the chain inherit a turn meant for one. The joint
+	-- offset is deliberately NOT reset -- that one is a setting.
+	State.yawOffset = 0
+	updateGhost()
+end
+
+-- Places another copy on the last piece's Exit with no mouse involved. This is
+-- the straight-run fast path: pick a piece once, then press Enter to lay a run.
+local function repeatAtChainEnd()
+	local entry = State.activeId and Catalog.byId[State.activeId]
+	local last = State.lastPlaced
+	if not (entry and last and last.Parent) then
+		setStatus("Nothing placed yet to chain from")
+		return
+	end
+	local position, yaw = pieceSocket(last, "Exit")
+	local ghostSocket = entry.sockets.Entry
+	if not (position and ghostSocket) then
+		setStatus("That piece has no Exit to chain from")
+		return
+	end
+	local finalYaw = (yaw or 0) + State.yawOffset
+	local target = applyOffset(position, finalYaw)
+	local rootCFrame = solveRootCFrame(scaled(ghostSocket, State.scale), target, finalYaw, entry.heading or 180)
+	Selection:Set({ commitPlacement(entry, rootCFrame, finalYaw) })
+	State.yawOffset = 0
+	updateGhost()
+end
+
+function startPlacing(id: string)
+	local entry = Catalog.byId[id]
+	if not entry then
+		return
+	end
+	disconnectAll()
+	State.activeId = id
+	State.placing = true
+	State.yawOffset = 0
+	Ghost.build(entry, State.scale)
+	plugin:Activate(true)
+	refreshSelection()
+
+	table.insert(connections, mouse.Move:Connect(updateGhost))
+	table.insert(connections, mouse.Button1Down:Connect(placeNow))
+	updateGhost()
+end
+
+-- ---------------------------------------------------------------------------
+-- Controls
+-- ---------------------------------------------------------------------------
+
+local function rotate(direction: number)
+	State.yawOffset = (State.yawOffset + direction * State.rotationStep) % 360
+	updateGhost()
+end
+
+local function swapEnd()
+	State.socketKey = if State.socketKey == "Exit" then "Entry" else "Exit"
+	endSwapButton.Text = "End: " .. State.socketKey
+	updateGhost()
+end
+
+local function setForwardOffset(value: number)
+	State.offsetForward = value
+	forwardBox.Text = tostring(value)
+	updateGhost()
+end
+
+rotateLeftButton.Activated:Connect(function()
+	rotate(-1)
+end)
+rotateRightButton.Activated:Connect(function()
+	rotate(1)
+end)
+endSwapButton.Activated:Connect(swapEnd)
+repeatButton.Activated:Connect(repeatAtChainEnd)
+
+nudgeForwardButton.Activated:Connect(function()
+	setForwardOffset(State.offsetForward + 1)
+end)
+nudgeBackButton.Activated:Connect(function()
+	setForwardOffset(State.offsetForward - 1)
+end)
+resetOffsetButton.Activated:Connect(function()
+	State.offsetForward, State.offsetLateral, State.offsetVertical = 0, 0, 0
+	forwardBox.Text, lateralBox.Text, verticalBox.Text = "0", "0", "0"
+	updateGhost()
+end)
+
+socketToggle.Activated:Connect(function()
+	State.snapSockets = not State.snapSockets
+	socketToggle.Text = "Socket snap: " .. (if State.snapSockets then "ON" else "OFF")
+	updateGhost()
+end)
+
+gridToggle.Activated:Connect(function()
+	State.snapGrid = not State.snapGrid
+	gridToggle.Text = "Grid snap: " .. (if State.snapGrid then "ON" else "OFF")
+	updateGhost()
+end)
+
+local function bindNumber(box: TextBox, apply: (number) -> (), minimum: number?)
+	box.FocusLost:Connect(function()
+		local value = tonumber(box.Text)
+		if value and (minimum == nil or value >= minimum) then
+			apply(value)
+		else
+			box.Text = "0"
+		end
+		updateGhost()
+	end)
+end
+
+bindNumber(scaleBox, function(value)
+	State.scale = value
+	if State.activeId then
+		startPlacing(State.activeId)
+	end
+end, 0.01)
+bindNumber(rotationBox, function(value)
+	State.rotationStep = value
+end, 1)
+bindNumber(gridBox, function(value)
+	State.gridSize = value
+end, 0)
+bindNumber(forwardBox, function(value)
+	State.offsetForward = value
+end)
+bindNumber(lateralBox, function(value)
+	State.offsetLateral = value
+end)
+bindNumber(verticalBox, function(value)
+	State.offsetVertical = value
+end)
+
+clearButton.Activated:Connect(function()
+	local model = buildModel(false)
+	if not model then
+		setStatus("No build model to clear")
+		return
+	end
+	local recording = ChangeHistoryService:TryBeginRecording(PLUGIN_NAME .. "Clear", "Clear course build")
+	model:Destroy()
+	State.lastPlaced = nil
+	if recording then
+		ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
+	end
+	setStatus("Cleared " .. BUILD_MODEL_NAME)
+end)
+
+local function rescan()
+	local ok, message = Catalog.rescan()
+	sourceLabel.Text = "Source: " .. message
+	sourceLabel.TextColor3 = if ok then MUTED else Color3.fromRGB(235, 120, 120)
+	rebuildList()
+	applyFilter()
+end
+
+rescanButton.Activated:Connect(rescan)
+
+-- ---------------------------------------------------------------------------
+-- Keyboard
+-- ---------------------------------------------------------------------------
+
+local keyboardConnection = UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+	if processed or not State.placing then
+		return
+	end
+	local key = input.KeyCode
+	if key == Enum.KeyCode.R then
+		rotate(if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then -1 else 1)
+	elseif key == Enum.KeyCode.Escape then
+		stopPlacing()
+	elseif key == Enum.KeyCode.Tab then
+		swapEnd()
+	elseif key == Enum.KeyCode.Return then
+		repeatAtChainEnd()
+	elseif key == Enum.KeyCode.Equals or key == Enum.KeyCode.KeypadPlus then
+		setForwardOffset(State.offsetForward + 1)
+	elseif key == Enum.KeyCode.Minus or key == Enum.KeyCode.KeypadMinus then
+		setForwardOffset(State.offsetForward - 1)
+	end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Bootstrap
+-- ---------------------------------------------------------------------------
+
+toggleButton.Click:Connect(function()
+	widget.Enabled = not widget.Enabled
+end)
+
+widget:GetPropertyChangedSignal("Enabled"):Connect(function()
+	toggleButton:SetActive(widget.Enabled)
+	if widget.Enabled then
+		task.defer(refreshVisiblePreviews)
+	elseif State.placing then
+		stopPlacing()
+	end
+end)
+
+plugin.Deactivation:Connect(function()
+	if State.placing then
+		stopPlacing()
+	end
+end)
+
+plugin.Unloading:Connect(function()
+	keyboardConnection:Disconnect()
+	disconnectAll()
+	Ghost.clear()
+	clearHighlight()
+	clearMarkers()
+end)
+
+rescan()
+setStatus("Pick a piece to start placing")

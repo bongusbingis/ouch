@@ -16,6 +16,8 @@ local ScriptableRoots = require(
 )
 
 local SplashdownCourses = {}
+local RisingLiquid = require(ReplicatedStorage.Shared.Game.MapFeatures.RisingLiquid)
+local DoorRows = require(script.Parent.DoorRows)
 
 export type Checkpoint = {
 	index: number,
@@ -27,6 +29,7 @@ export type LavaRise = {
 	studs: number,
 	delaySeconds: number,
 	seconds: number,
+	pauses: { RisingLiquid.Pause }?,
 }
 
 export type LiveCourse = {
@@ -92,38 +95,14 @@ local function sortedCheckpoints(folder: Instance, path: string): { Checkpoint }
 end
 
 local function doorRows(folder: Instance?): { { BasePart } }
-	local rows: { { BasePart } } = {}
-	if folder == nil then
-		return rows
-	end
-	local attributes = MapFeatures.Attributes
-	for _, child in folder:GetChildren() do
-		if not child:IsA("BasePart") then
-			continue
-		end
-		local row = tonumber(child:GetAttribute(attributes.DoorRow))
-		if row == nil then
-			continue
-		end
-		rows[row] = rows[row] or {}
-		table.insert(rows[row], child)
-	end
-	local ordered = {}
-	for row = 1, #rows do
-		local doors = rows[row] or {}
-		table.sort(doors, function(a, b)
-			return (tonumber(a:GetAttribute(attributes.DoorIndex)) or 0)
-				< (tonumber(b:GetAttribute(attributes.DoorIndex)) or 0)
-		end)
-		table.insert(ordered, doors)
-	end
-	return ordered
+	return DoorRows.resolve(folder)
 end
 
 -- Resolves a course model's markers; the same walk validates a template at
 -- boot and binds the live clone, so nothing the race depends on can differ.
 local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local definition = Splashdown.Courses[courseId]
+	print(Splashdown.Courses, courseId, definition)
 	assert(definition, `[SplashdownCourses] no course config for {courseId}`)
 	local origin = requireChild(model, "Origin", `{path}.Origin`, "BasePart") :: BasePart
 	local scriptables = requireChild(model, "Scriptables", `{path}.Scriptables`, "Folder") :: Folder
@@ -153,14 +132,10 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local lava: BasePart? = nil
 	local lavaRise: LavaRise? = nil
 	for _, hazard in hazards do
-		local studs = tonumber(hazard:GetAttribute("RiseStuds"))
-		if studs and studs > 0 then
+		local rise = RisingLiquid.resolve(hazard:GetAttributes())
+		if rise then
 			lava = hazard
-			lavaRise = {
-				studs = studs,
-				delaySeconds = tonumber(hazard:GetAttribute("RiseDelaySeconds")) or 0,
-				seconds = math.max(tonumber(hazard:GetAttribute("RiseSeconds")) or 1, 1),
-			}
+			lavaRise = rise
 			break
 		end
 	end
@@ -172,10 +147,20 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local rows = doorRows(doorsFolder)
 	local doorConfig = definition.Doors
 	if doorConfig then
+		assert(
+			doorConfig.PerRow >= 3 and doorConfig.PerRow <= 5 and doorConfig.PerRow % 1 == 0,
+			"[SplashdownCourses] Door rows need 3–5 doors"
+		)
+		assert(
+			doorConfig.BreakablePerRow >= 1
+				and doorConfig.BreakablePerRow <= doorConfig.PerRow
+				and doorConfig.BreakablePerRow % 1 == 0,
+			"[SplashdownCourses] invalid breakable door count"
+		)
 		assert(#rows > 0, `[SplashdownCourses] {path}.Scriptables.Doors must hold door rows`)
 		for row, doors in rows do
 			assert(
-				#doors >= doorConfig.PerRow,
+				#doors == doorConfig.PerRow,
 				`[SplashdownCourses] {path} door row {row} needs {doorConfig.PerRow} doors`
 			)
 		end

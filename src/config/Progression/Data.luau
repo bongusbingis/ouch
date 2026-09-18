@@ -52,7 +52,9 @@ return {
 			-- excludes owned items: buying one offer would otherwise reshuffle
 			-- the others on the next recompute.
 			Bucket = -1, -- period index; -1 = never drawn
-			Offers = {}, -- { itemId }
+			Version = 1,
+			Offers = {}, -- { { ItemId, Role, Rarity } }
+			Purchased = {}, -- { [role]: true }, reset at rotation
 		},
 		Tutorial = {
 			Version = 0,

@@ -1,0 +1,2436 @@
+{
+  "contactedPieces": [
+    "01_Countercurrent/Belt01",
+    "01_Countercurrent/Belt02",
+    "01_Countercurrent/Bumper02",
+    "01_Countercurrent/Sweeper01",
+    "02_RedRebound/Ball01",
+    "02_RedRebound/Ball02",
+    "02_RedRebound/Ball03",
+    "03_PunchPass/Piston01",
+    "03_PunchPass/Piston02",
+    "04_SkyThread/Bumper03",
+    "04_SkyThread/Fan01",
+    "04_SkyThread/Pad01",
+    "04_SkyThread/Pad02",
+    "05_HammerHour/HammerLarge",
+    "05_HammerHour/HammerSmall",
+    "06_SplashSprint/Bumper04"
+  ],
+  "courseId": "BallBarrage",
+  "expertCleanSeconds": 38.35303610000119,
+  "expertCompletionRate": 1,
+  "midCompletionRate": 1,
+  "midMedianSeconds": 63.66275459999815,
+  "pacePass": false,
+  "placeId": 121997450145716,
+  "routeLength": 881.0531158447266,
+  "runs": [
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 5.272260499998083
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 14.177394299997104
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 20.614410599999246
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 27.65825009999753
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 32.28666109999904
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 39.29149099999813
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 42.55570959999568
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 28,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.62
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 4.43
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 5.23
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.65
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 6.03
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 6.82
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 7.62
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 7.69
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 8.49
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 12.6
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 15.18
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 16.53
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 18.29
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 19.11
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 20.15
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 21.56
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 22.36
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 22.68
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 27.48
+        },
+        {
+          "pieceId": "04_SkyThread/Fan01",
+          "t": 28.02
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 29.06
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 30.26
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 36.42
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 37.22
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 38.02
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 41.47
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 42.27
+        }
+      ],
+      "distinctContacts": 16,
+      "doorEvents": [],
+      "elapsedSeconds": 42.55574009999509,
+      "fallCount": 1,
+      "falls": [
+        {
+          "t": 19.34342139999717,
+          "wp": "CornerB",
+          "x": 57.807125091552734,
+          "y": 19980.974609375,
+          "z": 69.26290130615234
+        }
+      ],
+      "policy": "expert",
+      "relocations": [
+        {
+          "at": 0.0048349999997299165,
+          "reason": "initial seating"
+        },
+        {
+          "at": 20.147130899997137,
+          "reason": "checkpoint respawn after fall at CornerB"
+        }
+      ],
+      "seed": 901,
+      "trajectorySamples": 80
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.068360000001121
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 11.62976990000243
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 16.688818600003287
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 23.368078999999852
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 28.049499900000228
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 35.06751720000102
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 38.3529918000022
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 24,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.42
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.22
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.02
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.45
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.82
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.25
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.64
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.51
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.32
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.05
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 12.63
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 13.99
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 15.73
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 17.65
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 18.4
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 23.19
+        },
+        {
+          "pieceId": "04_SkyThread/Fan01",
+          "t": 23.73
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 24.76
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 25.96
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 32.19
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 32.99
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 33.8
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 37.26
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 38.06
+        }
+      ],
+      "distinctContacts": 16,
+      "doorEvents": [],
+      "elapsedSeconds": 38.35303610000119,
+      "fallCount": 0,
+      "falls": [],
+      "policy": "expert",
+      "relocations": [
+        {
+          "at": 0.0026239999970130157,
+          "reason": "initial seating"
+        }
+      ],
+      "seed": 902,
+      "trajectorySamples": 77
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.0741264000025694
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 12.042772700002388
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 14.556326699999772
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 15.634986200002459
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 18.497208800003136
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 19.578732200003287
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 25.274393200001214
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 32.55121800000052
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 37.23733060000086
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 44.25042780000149
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 47.56169500000033
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 31,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.43
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.23
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.04
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.84
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.26
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.61
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 5.41
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.64
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.44
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.47
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.05
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 14.56
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 16.64
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.44
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 18.5
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 20.59
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 21.95
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 23.7
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 24.5
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 26.22
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 27.02
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 27.48
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 32.37
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 33.59
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 35.15
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 41.38
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 42.18
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 42.99
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 46.45
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 47.25
+        }
+      ],
+      "distinctContacts": 15,
+      "doorEvents": [],
+      "elapsedSeconds": 47.561752000001434,
+      "fallCount": 2,
+      "falls": [
+        {
+          "t": 13.745901100002811,
+          "wp": "Gap01",
+          "x": 56.14685821533203,
+          "y": 19980.833984375,
+          "z": 148.76866149902344
+        },
+        {
+          "t": 17.695310300001438,
+          "wp": "Step01",
+          "x": 57.61661148071289,
+          "y": 19980.9765625,
+          "z": 142.51719665527344
+        }
+      ],
+      "policy": "expert",
+      "relocations": [
+        {
+          "at": 0.0028965999990759883,
+          "reason": "initial seating"
+        },
+        {
+          "at": 14.55005119999987,
+          "reason": "checkpoint respawn after fall at Gap01"
+        },
+        {
+          "at": 18.49589140000171,
+          "reason": "checkpoint respawn after fall at Step01"
+        }
+      ],
+      "seed": 903,
+      "trajectorySamples": 93
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.077007700001559
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 12.145908400001645
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 14.65594019999844
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 15.734270000000834
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 18.594767499998852
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 19.67573260000063
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 25.191911800000526
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 32.72062050000022
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 37.4012049999983
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 44.396368199999415
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 47.819844500001636
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 31,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.42
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.22
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.02
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.83
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.26
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.66
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 5.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.52
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.32
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.57
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.15
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 14.66
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 16.74
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.54
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 18.59
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 20.68
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 22.06
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 23.81
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 24.69
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 26.16
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 26.97
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 27.66
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 32.54
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 33.77
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 35.31
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 41.54
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 42.34
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 43.13
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 46.59
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 47.4
+        }
+      ],
+      "distinctContacts": 15,
+      "doorEvents": [],
+      "elapsedSeconds": 47.81987980000122,
+      "fallCount": 2,
+      "falls": [
+        {
+          "t": 13.846512399999483,
+          "wp": "Gap01",
+          "x": 56.13401794433594,
+          "y": 19980.728515625,
+          "z": 148.71669006347656
+        },
+        {
+          "t": 17.787927400000626,
+          "wp": "Step01",
+          "x": 57.747779846191406,
+          "y": 19980.78125,
+          "z": 142.6591033935547
+        }
+      ],
+      "policy": "mid",
+      "relocations": [
+        {
+          "at": 0.0026994999971066136,
+          "reason": "initial seating"
+        },
+        {
+          "at": 14.650899000000209,
+          "reason": "checkpoint respawn after fall at Gap01"
+        },
+        {
+          "at": 18.592601100001048,
+          "reason": "checkpoint respawn after fall at Step01"
+        }
+      ],
+      "seed": 101,
+      "trajectorySamples": 94
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.0754328000002715
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 12.198853800000506
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 15.056853999998566
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 16.135978700000123
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 19.00146549999772
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 20.082360599997628
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 22.938940600000933
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 24.017865099998744
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 26.87891319999835
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 27.959496299998136
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 30.454175899998518
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 31.530657899998914
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 34.41148880000037
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 35.49591359999977
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 41.26941149999766
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 48.67217519999758
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 53.347731300000305
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 60.36765999999989
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 63.662487300000066
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 45,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.42
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.23
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.03
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.83
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.27
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.64
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 5.44
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.59
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.4
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.62
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.2
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 14
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 15.06
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.14
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.94
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 19
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 21.09
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 21.89
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 22.94
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 25.02
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 25.83
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 26.88
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 28.96
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 30.45
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 32.54
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 33.35
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 34.41
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 36.5
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 37.3
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 38.14
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 39.72
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 40.52
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 42.25
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 43.05
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 43.82
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 48.49
+        },
+        {
+          "pieceId": "04_SkyThread/Fan01",
+          "t": 49.03
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 50.09
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 51.26
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 57.49
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 58.29
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 59.1
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 62.57
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 63.37
+        }
+      ],
+      "distinctContacts": 16,
+      "doorEvents": [],
+      "elapsedSeconds": 63.66275459999815,
+      "fallCount": 6,
+      "falls": [
+        {
+          "t": 14.249623899999278,
+          "wp": "Step01",
+          "x": 57.679378509521484,
+          "y": 19980.69921875,
+          "z": 142.353515625
+        },
+        {
+          "t": 18.197941999998875,
+          "wp": "Step01",
+          "x": 57.66974639892578,
+          "y": 19980.87109375,
+          "z": 142.61585998535156
+        },
+        {
+          "t": 22.13436609999917,
+          "wp": "Step01",
+          "x": 57.708702087402344,
+          "y": 19980.734375,
+          "z": 142.57029724121094
+        },
+        {
+          "t": 26.072940999998536,
+          "wp": "Step01",
+          "x": 57.76088333129883,
+          "y": 19980.822265625,
+          "z": 142.5541229248047
+        },
+        {
+          "t": 29.64747979999811,
+          "wp": "Gap01",
+          "x": 56.194175720214844,
+          "y": 19980.857421875,
+          "z": 148.31309509277344
+        },
+        {
+          "t": 33.609529099998326,
+          "wp": "Step01",
+          "x": 57.65278244018555,
+          "y": 19980.90625,
+          "z": 142.2411651611328
+        }
+      ],
+      "policy": "mid",
+      "relocations": [
+        {
+          "at": 0.0029161999991629273,
+          "reason": "initial seating"
+        },
+        {
+          "at": 15.052708399998664,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 18.99930409999797,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 22.936355199999525,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 26.876196699999127,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 30.449151199998596,
+          "reason": "checkpoint respawn after fall at Gap01"
+        },
+        {
+          "at": 34.4105215999989,
+          "reason": "checkpoint respawn after fall at Step01"
+        }
+      ],
+      "seed": 102,
+      "trajectorySamples": 122
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.07375139999931
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 12.139470199999778
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 14.999918500001513
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 16.083493099999032
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 18.949670300000435
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 20.03440600000249
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 22.887187799999083
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 23.96286560000226
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 26.827439700002287
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 27.907694500001526
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 30.777379400002246
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 31.856720300002053
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 34.71822500000053
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 35.796997600002214
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 38.659555099999125
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 39.739813800002594
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 42.60160750000068
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 43.67672930000117
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 49.19167940000261
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 55.87738010000248
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 60.56514679999964
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 67.58362190000116
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 70.87555079999947
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 51,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.42
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.23
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.03
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.83
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.26
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.64
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 5.44
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.52
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.32
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.56
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.14
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.94
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 15
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.09
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.89
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 18.95
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 21.04
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 21.84
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 22.89
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 24.97
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 25.77
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 26.83
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 28.91
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 29.71
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 30.78
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 32.86
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 33.66
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 34.72
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 36.8
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 37.61
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 38.66
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 40.74
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 41.55
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 42.6
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 44.68
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 45.49
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 46.32
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 47.9
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 48.98
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 50.15
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 50.91
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 55.69
+        },
+        {
+          "pieceId": "04_SkyThread/Fan01",
+          "t": 56.24
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 57.28
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 58.48
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 64.7
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 65.5
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 66.31
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 69.78
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 70.58
+        }
+      ],
+      "distinctContacts": 16,
+      "doorEvents": [],
+      "elapsedSeconds": 70.87558100000024,
+      "fallCount": 8,
+      "falls": [
+        {
+          "t": 14.197045799999614,
+          "wp": "Step01",
+          "x": 57.778228759765625,
+          "y": 19980.876953125,
+          "z": 142.6772003173828
+        },
+        {
+          "t": 18.14588790000198,
+          "wp": "Step01",
+          "x": 57.58818054199219,
+          "y": 19980.8515625,
+          "z": 142.30247497558594
+        },
+        {
+          "t": 22.079532600000675,
+          "wp": "Step01",
+          "x": 57.608638763427734,
+          "y": 19980.875,
+          "z": 142.26348876953125
+        },
+        {
+          "t": 26.024474400001054,
+          "wp": "Step01",
+          "x": 57.63105773925781,
+          "y": 19980.916015625,
+          "z": 142.64480590820312
+        },
+        {
+          "t": 29.974358600000414,
+          "wp": "Step01",
+          "x": 57.62663269042969,
+          "y": 19980.8515625,
+          "z": 142.6144561767578
+        },
+        {
+          "t": 33.910294299999805,
+          "wp": "Step01",
+          "x": 57.61304473876953,
+          "y": 19980.84765625,
+          "z": 142.54837036132812
+        },
+        {
+          "t": 37.85292490000211,
+          "wp": "Step01",
+          "x": 57.75402069091797,
+          "y": 19980.7421875,
+          "z": 142.58770751953125
+        },
+        {
+          "t": 41.79651139999987,
+          "wp": "Step01",
+          "x": 57.789798736572266,
+          "y": 19980.669921875,
+          "z": 142.43807983398438
+        }
+      ],
+      "policy": "mid",
+      "relocations": [
+        {
+          "at": 0.003502499999740394,
+          "reason": "initial seating"
+        },
+        {
+          "at": 14.998232800000551,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 18.947201099999802,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 22.88299100000222,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 26.82569700000022,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 30.77514650000012,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 34.71485780000148,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 38.65506599999935,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 42.59740520000196,
+          "reason": "checkpoint respawn after fall at Step01"
+        }
+      ],
+      "seed": 103,
+      "trajectorySamples": 135
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.0697820000023057
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 12.022040200001356
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 14.883869900000718
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 15.96227220000219
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 18.829113899999356
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 19.907168699999602
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 22.777216000002227
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 23.858006900001783
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 26.35996399999931
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 27.43229710000014
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 30.317867900001147
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 31.398161799999798
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 34.26353670000026
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 35.34367639999982
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 38.21240899999975
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 39.29207210000095
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 42.15329439999914
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 43.23258540000097
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 46.0953866000018
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 47.17330570000195
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 50.035758400001214
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 51.12031919999936
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 53.61431850000008
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 54.69469840000238
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Floor03",
+          "t": 57.56881120000253
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 58.647825800002465
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 63.87907450000057
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 70.5573086000004
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 75.24029639999935
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 82.25301240000044
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 85.62145450000025
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 60,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.42
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.23
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.03
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.45
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.83
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.26
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.64
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 5.44
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.45
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.26
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.45
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.03
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.83
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 14.88
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 16.97
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 17.77
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 18.83
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 20.91
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 21.71
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 22.78
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 24.86
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 26.36
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 28.44
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 29.25
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 30.32
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 32.41
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 33.21
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 34.26
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 36.35
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 37.15
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 38.21
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 40.3
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 41.1
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 42.15
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 44.24
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 45.04
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 46.1
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 48.18
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 48.98
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 50.04
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 52.12
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 53.61
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 55.7
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 56.5
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 57.57
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 59.65
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 60.45
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 61.29
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 62.85
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 64.85
+        },
+        {
+          "pieceId": "03_PunchPass/Piston02",
+          "t": 65.59
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 70.38
+        },
+        {
+          "pieceId": "04_SkyThread/Fan01",
+          "t": 70.92
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 71.96
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 73.15
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 79.39
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 80.19
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 80.98
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 84.45
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 85.26
+        }
+      ],
+      "distinctContacts": 16,
+      "doorEvents": [],
+      "elapsedSeconds": 85.62148639999941,
+      "fallCount": 12,
+      "falls": [
+        {
+          "t": 14.07565710000199,
+          "wp": "Step01",
+          "x": 57.78162384033203,
+          "y": 19980.94921875,
+          "z": 142.65431213378906
+        },
+        {
+          "t": 18.020204000000376,
+          "wp": "Step01",
+          "x": 57.77080154418945,
+          "y": 19980.408203125,
+          "z": 142.48095703125
+        },
+        {
+          "t": 21.96943630000169,
+          "wp": "Step01",
+          "x": 57.672122955322266,
+          "y": 19980.94140625,
+          "z": 142.6457061767578
+        },
+        {
+          "t": 25.552488900000753,
+          "wp": "Gap01",
+          "x": 56.071571350097656,
+          "y": 19980.87109375,
+          "z": 148.69361877441406
+        },
+        {
+          "t": 29.514408099999855,
+          "wp": "Step01",
+          "x": 57.65584182739258,
+          "y": 19980.953125,
+          "z": 142.43528747558594
+        },
+        {
+          "t": 33.45534650000263,
+          "wp": "Step01",
+          "x": 57.77690887451172,
+          "y": 19980.998046875,
+          "z": 142.6774444580078
+        },
+        {
+          "t": 37.40405699999974,
+          "wp": "Step01",
+          "x": 57.721153259277344,
+          "y": 19980.77734375,
+          "z": 142.45437622070312
+        },
+        {
+          "t": 41.3462208000019,
+          "wp": "Step01",
+          "x": 57.745361328125,
+          "y": 19980.7890625,
+          "z": 142.65850830078125
+        },
+        {
+          "t": 45.291057800001,
+          "wp": "Step01",
+          "x": 57.79869842529297,
+          "y": 19980.8203125,
+          "z": 142.54962158203125
+        },
+        {
+          "t": 49.23213140000007,
+          "wp": "Step01",
+          "x": 57.70269775390625,
+          "y": 19980.669921875,
+          "z": 142.56700134277344
+        },
+        {
+          "t": 52.81204799999978,
+          "wp": "Gap01",
+          "x": 56.075504302978516,
+          "y": 19980.873046875,
+          "z": 148.80758666992188
+        },
+        {
+          "t": 56.76054650000151,
+          "wp": "Step01",
+          "x": 57.62683868408203,
+          "y": 19980.943359375,
+          "z": 142.62509155273438
+        }
+      ],
+      "policy": "mid",
+      "relocations": [
+        {
+          "at": 0.0037186000008659903,
+          "reason": "initial seating"
+        },
+        {
+          "at": 14.879212600000756,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 18.823766100002103,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 22.774280000001454,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 26.35568720000083,
+          "reason": "checkpoint respawn after fall at Gap01"
+        },
+        {
+          "at": 30.31547050000154,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 34.259677300000476,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 38.20811239999966,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 42.1498399000011,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 46.09192249999978,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 50.03256540000075,
+          "reason": "checkpoint respawn after fall at Step01"
+        },
+        {
+          "at": 53.61250429999927,
+          "reason": "checkpoint respawn after fall at Gap01"
+        },
+        {
+          "at": 57.56359430000157,
+          "reason": "checkpoint respawn after fall at Step01"
+        }
+      ],
+      "seed": 104,
+      "trajectorySamples": 160
+    },
+    {
+      "beatSplits": [
+        {
+          "arc": 27.95001220703125,
+          "beat": "01_Countercurrent",
+          "firstPiece": "Belt01",
+          "t": 3.078163100002712
+        },
+        {
+          "arc": 29.048999786376953,
+          "beat": "02_RedRebound",
+          "firstPiece": "Ramp02",
+          "t": 12.162930000002234
+        },
+        {
+          "arc": 23.667299652099608,
+          "beat": "03_PunchPass",
+          "firstPiece": "CornerB",
+          "t": 17.525157700001728
+        },
+        {
+          "arc": 58.11179733276367,
+          "beat": "04_SkyThread",
+          "firstPiece": "Ramp05",
+          "t": 24.202891500000987
+        },
+        {
+          "arc": 26.400001525878906,
+          "beat": "05_HammerHour",
+          "firstPiece": "Floor07",
+          "t": 28.890789900000527
+        },
+        {
+          "arc": 26.400005340576172,
+          "beat": "06_SplashSprint",
+          "firstPiece": "Floor10",
+          "t": 35.89730590000181
+        },
+        {
+          "arc": 881.0531158447266,
+          "beat": "Finish",
+          "firstPiece": "Finish",
+          "t": 39.184340800002246
+        }
+      ],
+      "checkpointsEarned": 5,
+      "cleared": true,
+      "contactCount": 24,
+      "contacts": [
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 1.43
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 2.23
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.03
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 3.46
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt01",
+          "t": 3.84
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 4.26
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 4.65
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.06
+        },
+        {
+          "pieceId": "01_Countercurrent/Sweeper01",
+          "t": 5.45
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 5.87
+        },
+        {
+          "pieceId": "01_Countercurrent/Belt02",
+          "t": 6.67
+        },
+        {
+          "pieceId": "01_Countercurrent/Bumper02",
+          "t": 10.58
+        },
+        {
+          "pieceId": "02_RedRebound/Ball01",
+          "t": 13.17
+        },
+        {
+          "pieceId": "02_RedRebound/Ball02",
+          "t": 14.57
+        },
+        {
+          "pieceId": "02_RedRebound/Ball03",
+          "t": 16.32
+        },
+        {
+          "pieceId": "03_PunchPass/Piston01",
+          "t": 18.49
+        },
+        {
+          "pieceId": "04_SkyThread/Pad01",
+          "t": 24.02
+        },
+        {
+          "pieceId": "04_SkyThread/Pad02",
+          "t": 25.25
+        },
+        {
+          "pieceId": "04_SkyThread/Bumper03",
+          "t": 26.8
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 33.03
+        },
+        {
+          "pieceId": "05_HammerHour/HammerLarge",
+          "t": 33.83
+        },
+        {
+          "pieceId": "05_HammerHour/HammerSmall",
+          "t": 34.63
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 38.1
+        },
+        {
+          "pieceId": "06_SplashSprint/Bumper04",
+          "t": 38.9
+        }
+      ],
+      "distinctContacts": 14,
+      "doorEvents": [],
+      "elapsedSeconds": 39.184384500000306,
+      "fallCount": 0,
+      "falls": [],
+      "policy": "mid",
+      "relocations": [
+        {
+          "at": 0.0024358999980904628,
+          "reason": "initial seating"
+        }
+      ],
+      "seed": 105,
+      "trajectorySamples": 79
+    }
+  ],
+  "scopeNote": "scripted proxy only; not a human skill classification and not the required interactive keyboard run",
+  "specHash": "943e493c",
+  "studsPerSecondMid": 13.839380990981375
+}

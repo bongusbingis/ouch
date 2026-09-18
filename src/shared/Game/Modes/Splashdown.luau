@@ -34,7 +34,7 @@ Splashdown.rules = Splashdown.resolveRules()
 
 Splashdown.statLabels = {
 	{ id = "BestFinish", label = "BEST FINISH" },
-	{ id = "TotalTime", label = "TOTAL TIME (SEC)" },
+	{ id = "TotalTime", label = "TOTAL TIME" },
 	{ id = "Splashdowns", label = "SPLASHDOWNS" },
 }
 

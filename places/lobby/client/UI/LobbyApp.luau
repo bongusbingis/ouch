@@ -700,6 +700,29 @@ local function LobbyContent(props)
 		end)
 	end, { partyClient, notifications.confirm })
 
+	local leaveParty = React.useCallback(function()
+		local current = partyClient:getSnapshot()
+		if
+			current == nil
+			or #current.members <= 1
+			or partyClient:isBusy()
+			or (current.phase ~= "Lobby" and current.phase ~= "Queued")
+		then
+			return
+		end
+		setPartyMembersOpen(false)
+		notifications.confirm({
+			title = "LEAVE PARTY?",
+			description = "Leave this party and play on your own?",
+			confirmText = "LEAVE",
+			cancelText = "CANCEL",
+		}, function(confirmed)
+			if confirmed then
+				task.spawn(partyClient.leave, partyClient)
+			end
+		end)
+	end, { partyClient, notifications.confirm })
+
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false or onboardingActive then
 			return
@@ -1126,12 +1149,17 @@ local function LobbyContent(props)
 						and snapshot.leaderUserId == Players.LocalPlayer.UserId
 						and not requestBusy
 						and (snapshot.phase == "Lobby" or snapshot.phase == "Queued"),
+					CanLeave = snapshot ~= nil
+						and #snapshot.members > 1
+						and not requestBusy
+						and (snapshot.phase == "Lobby" or snapshot.phase == "Queued"),
 					OnToggleCode = function()
 						setCodeVisible(function(value)
 							return not value
 						end)
 					end,
 					OnRemove = removePartyMember,
+					OnLeave = leaveParty,
 					OnClose = function()
 						setPartyMembersOpen(false)
 					end,

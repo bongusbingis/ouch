@@ -16,12 +16,15 @@ local Title = require(script.Parent.CandyTitle)
 local Well = require(script.Parent.Well)
 local Button = require(script.Parent.PuffyButton)
 local BonksChip = require(script.Parent.BonksChip)
+local Icon = require(script.Parent.Icon)
+local TextService = game:GetService("TextService")
 local Section = require(script.Parent.Shop.ShopSection)
 local c, C, L = React.createElement, T.Colors, T.Shop
 local function blocks(entries, width, offset, props)
 	local unit = Layout.trackUnit(width, Config.Tracks, Config.GapPx)
 	for _, entry in entries do
 		entry.class = Config.CardClasses[entry.style.Class]
+		entry.priority = entry.style.Priority
 		if props.Short then
 			entry.class = Composition.shortClass(entry.class, L.PromoMin, T.LobbyLandscape.CardHeight)
 		end
@@ -61,6 +64,8 @@ local function blocks(entries, width, offset, props)
 			Height = e.height,
 			HeaderHeight = e.headerHeight,
 			LayoutOrder = index,
+			VisibleTop = props.VisibleTop,
+			VisibleBottom = props.VisibleBottom,
 			OnCardActivated = props.OnCardActivated,
 			OnExpired = props.OnRefresh,
 			SeasonState = props.SeasonState,
@@ -90,8 +95,15 @@ return function(props)
 	local scroller = React.useRef(nil)
 	local width, setWidth =
 		React.useState(math.max(1, size.X - inset * 2 - scrollInset * 2 - scrollPadding * 2 - Config.ScrollBarPx))
+	local band, setBand = React.useState(0)
 	local renderProps = table.clone(props)
 	renderProps.Short = short
+	-- Which slice of the canvas the sections should actually build. The band is
+	-- quantised so an ordinary scroll re-renders a few times rather than every
+	-- frame, and the margin builds the next cards before they are reached.
+	local viewHeight = math.max(size.Y - header - inset - scrollInset * 2, 1)
+	renderProps.VisibleTop = band * L.CullBand - L.CullMargin
+	renderProps.VisibleBottom = band * L.CullBand + viewHeight + L.CullBand + L.CullMargin
 	local featured, catalog = Composition.groups(props.Model, Config)
 	local content, featureBottom = blocks(featured, width, 0, renderProps)
 	local rest, bottom, anchors =
@@ -127,6 +139,12 @@ return function(props)
 	end
 	local walletY = if portrait then 91 else header / 2
 	local getWidth = if short then T.Layout.MinTarget else 156
+	local titleSize = if portrait then 38 elseif short then T.Type.Section else T.Type.Title
+	local titleHeight = if portrait then 60 elseif short then 48 else 76
+	local titleTop = if portrait then 0 elseif short then 2 else -18
+	local stickerWidth = math.ceil(TextService:GetTextSize("SHOP", titleSize, T.Type.Display, Vector2.new(4096, 200)).X)
+		+ 36
+	local decorated = not short and not portrait
 	return c(Panel, {
 		Tilt = if short then 0 else nil,
 		Native = {
@@ -140,13 +158,35 @@ return function(props)
 		Title = c(Title, {
 			Tilt = if short then 0 else nil,
 			Text = "SHOP",
-			TextSize = if portrait then 38 elseif short then T.Type.Section else T.Type.Title,
+			TextSize = titleSize,
 			Native = {
-				Position = UDim2.fromOffset(inset, if portrait then 0 elseif short then 2 else -18),
-				Size = UDim2.fromOffset(if short then 150 else 226, if portrait then 60 elseif short then 48 else 76),
+				Position = UDim2.fromOffset(inset, titleTop),
+				Size = UDim2.fromOffset(if short then 150 else 226, titleHeight),
 				ZIndex = 8,
 			},
 		}),
+		TitleStar = if decorated
+			then c(Icon, {
+				Name = "Star",
+				Color = C.Yellow,
+				Native = {
+					Position = UDim2.fromOffset(inset + stickerWidth - 10, titleTop - T.Layout.CompactGap),
+					Size = UDim2.fromOffset(titleHeight * 0.7, titleHeight * 0.7),
+					ZIndex = 10,
+				},
+			})
+			else nil,
+		TitleSparkle = if decorated
+			then c(Icon, {
+				Name = "Sparkle",
+				Color = C.Cyan,
+				Native = {
+					Position = UDim2.fromOffset(inset - titleHeight * 0.55, titleTop + titleHeight * 0.3),
+					Size = UDim2.fromOffset(titleHeight * 0.45, titleHeight * 0.45),
+					ZIndex = 10,
+				},
+			})
+			else nil,
 		Bonks = c(BonksChip, {
 			Candy = true,
 			Amount = props.Model.bonks,
@@ -207,6 +247,12 @@ return function(props)
 				ZIndex = 4,
 				[React.Change.AbsoluteSize] = function(instance)
 					setWidth(math.max(1, instance.AbsoluteSize.X - Config.ScrollBarPx - scrollPadding * 2))
+				end,
+				[React.Change.CanvasPosition] = function(instance)
+					local reached = math.max(math.floor(instance.CanvasPosition.Y / L.CullBand), 0)
+					setBand(function(current)
+						return if current == reached then current else reached
+					end)
 				end,
 			}, content),
 		}),

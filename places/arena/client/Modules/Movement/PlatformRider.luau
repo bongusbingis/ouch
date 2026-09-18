@@ -38,6 +38,8 @@ local function platformFor(hit: RaycastResult?): (RotatingPlatforms.Platform?, R
 	end
 	for _, platform in RotatingPlatforms.all() do
 		if hit.Instance:IsDescendantOf(platform.assembly) then
+			-- A ServerCarries group is still ours to carry: the server applies its
+			-- delta only to characters it simulates, and never to this one.
 			local _, rotor = RotatingPlatforms.rotorFor(hit.Instance)
 			return platform, rotor
 		end

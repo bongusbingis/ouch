@@ -13,6 +13,8 @@ local MovementGuard = require(Game:WaitForChild("Adapters"):WaitForChild("Moveme
 local RotatingPlatforms = require(Game:WaitForChild("MapFeatures"):WaitForChild("RotatingPlatforms"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local ShoveTuning = require(Game.MapFeatures.ShoveTuning)
+local Parts = require(script.Parent.FeatureParts)
+local Network = require(ReplicatedStorage.Shared.Network)
 
 local RotorBump = {}
 RotorBump.folderName = "Rotating"
@@ -51,7 +53,10 @@ local function testPart(platform: RotatingPlatforms.Platform, rotor: RotatingPla
 	-- Root-only contact excludes cosmetic/limb grazing. A small padded
 	-- oriented box makes near-edge contacts register more reliably.
 	local padding = Vector3.one * MapFeatures.RotorBump.ContactPadding * 2
-	for _, root in Workspace:GetPartBoundsInBox(part.CFrame, part.Size + padding, overlap) do
+	local touching = if rotor.part:GetAttribute(MapFeatures.Attributes.ShoveContact) == "mesh"
+		then Workspace:GetPartsInPart(part, overlap)
+		else Workspace:GetPartBoundsInBox(part.CFrame, part.Size + padding, overlap)
+	for _, root in touching do
 		if contacts[root] == nil then
 			contacts[root] = { platform = platform, rotor = rotor, part = part }
 		end
@@ -145,7 +150,20 @@ local function bump(
 		attachment = attachment,
 		expiresAt = context.now + response.ShoveSeconds,
 	}
-	MovementGuard.allow(root, "RotorBump", response.GuardSeconds, speed * 1.3, target.Y * 1.3, contact.part)
+	MovementGuard.allow(
+		root,
+		"RotorBump",
+		math.max(
+			response.GuardSeconds,
+			Parts.number(contact.rotor.part, "GuardSeconds", response.GuardSeconds, 0.3, 10)
+		),
+		speed * 1.3,
+		target.Y * 1.3,
+		contact.part
+	)
+	if contact.rotor.part:GetAttribute(MapFeatures.Attributes.ImpactVisual) == true then
+		Network.fire("HazardVisual", nil, contact.part, "impact", 0.25)
+	end
 end
 
 function RotorBump.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)
@@ -186,7 +204,8 @@ function RotorBump.tickPlayer(context: MapFeatureKit.Context, player: Player, ro
 	end
 	if not visit.bumped and shoves[player] == nil and context.now >= (cooldowns[player] or 0) then
 		visit.bumped = true
-		cooldowns[player] = context.now + MapFeatures.RotorBump.RetriggerCooldown
+		cooldowns[player] = context.now
+			+ Parts.number(rotor.part, "RetriggerCooldown", MapFeatures.RotorBump.RetriggerCooldown, 0.1, 10)
 		bump(context, player, contact, root, humanoid)
 	end
 end

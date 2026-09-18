@@ -69,6 +69,7 @@ local definitions = {
 	CombatSimEvent = "unreliable",
 	JumpPadImpulse = "unreliable",
 	BumperHit = "unreliable",
+	HazardVisual = "event", -- server-authored contact/countdown, client-only ghost deformation
 	DoorBroken = "unreliable",
 	SplashdownEvent = "unreliable",
 	ReportAnalyticsEvent = "event",

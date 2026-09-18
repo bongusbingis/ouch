@@ -1,4 +1,5 @@
--- Read-only story data from the shipped catalog. No Robux prices or purchase calls are simulated here.
+-- Read-only story data from the shipped catalog. Regional prices are simulated;
+-- purchase calls remain disabled.
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,14 +18,22 @@ local Fixtures = {}
 function Fixtures.build(state: string?)
 	local now = os.time()
 	local offers = {}
-	for _, crateId in { "DodgeballCrate", "HammerCrate", "EffectsCrate" } do
-		local itemId = Crates[crateId].ItemPool[1]
+	for _, entry in {
+		{ itemId = "DodgeBall1", role = "RobuxCommon" },
+		{ itemId = "DodgeBall10", role = "RobuxPremium" },
+		{ itemId = "DodgeBall19", role = "Bonks" },
+	} do
+		local itemId = entry.itemId
 		local item = Cosmetics.Items[itemId]
 		table.insert(offers, {
 			itemId = itemId,
+			role = entry.role,
 			rarity = item.Rarity,
 			displayName = item.DisplayName,
-			bonksPrice = DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities),
+			bonksPrice = if entry.role == "Bonks"
+				then DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities)
+				else nil,
+			purchased = state == "Purchased" and entry.role == "RobuxCommon",
 		})
 	end
 	local data = {
@@ -48,6 +57,13 @@ function Fixtures.build(state: string?)
 		ownedPasses = {},
 		pending = if state == "Pending" then { ["Crate:EffectsCrate"] = true } else {},
 	}
+	for _, entry in {
+		{ definition = Products.Catalog.OfferUnlockCommon, price = 99 },
+		{ definition = Products.Catalog.OfferUnlockRare, price = 199 },
+		{ definition = Products.Catalog.OfferUnlockLegendary, price = 599 },
+	} do
+		snapshot.metadata[`Product:{entry.definition.Id}`] = { priceInRobux = entry.price, isForSale = true }
+	end
 	if state == "Unavailable" then
 		for _, catalog in { Products.Catalog, GamePasses.Catalog } do
 			for _, definition in catalog do

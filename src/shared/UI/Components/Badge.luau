@@ -17,7 +17,7 @@ return function(props)
 	native.BackgroundColor3 = props.Color or T.Colors.Yellow
 	native.BorderSizePixel = 0
 	native.Size = native.Size or UDim2.fromOffset(T.Layout.BadgeSize, T.Layout.BadgeSize)
-	native.Rotation = T.Shape.TiltBadge
+	native.Rotation = if props.Tilt ~= nil then props.Tilt else T.Shape.TiltBadge
 	native.Visible = props.Visible ~= false
 	native.ZIndex = native.ZIndex or 12
 	return c("Frame", native, {
@@ -30,8 +30,12 @@ return function(props)
 				Text = props.Text or "✓",
 				TextSize = props.TextSize or T.Type.Section,
 				Font = T.Type.Label,
-				TextColor3 = T.Colors.Ink,
+				TextColor3 = props.TextColor or T.Colors.Ink,
 				ZIndex = native.ZIndex + 1,
+			}, {
+				Outline = if props.TextColor == T.Colors.Surface
+					then c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Type.Outline })
+					else nil,
 			})
 			else nil,
 		Shackle = if props.Lock

@@ -45,8 +45,10 @@ export type Props = {
 	CodeVisible: boolean,
 	CodeAvailable: boolean,
 	CanRemove: boolean,
+	CanLeave: boolean,
 	OnToggleCode: () -> (),
 	OnRemove: (number, string) -> (),
+	OnLeave: () -> (),
 	OnClose: () -> (),
 }
 
@@ -172,9 +174,11 @@ return function(props: Props)
 		local leader = member.userId == props.LeaderUserId
 		local removable = props.LocalUserId == props.LeaderUserId and not localMember
 		local removeEnabled = props.CanRemove and member.username ~= nil
+		local leaveEnabled = localMember and props.CanLeave
+		local hasAction = removable or leaveEnabled
 		local accentColor = if localMember then C.Pink elseif leader then C.Yellow else nil
 		local textLeft = cardInset + (if accentColor then 10 else 0)
-		local textRight = if removable then actionWidth + gap + cardInset else cardInset
+		local textRight = if hasAction then actionWidth + gap + cardInset else cardInset
 		local faceHeight = rowHeight - T.Shape.LipHeight
 		local status = if localMember and leader
 			then "YOU / PARTY LEADER"
@@ -223,7 +227,7 @@ return function(props: Props)
 					10
 				)
 				else nil,
-			Remove = if removable
+			Action = if removable
 				then c(PuffyButton, {
 					Text = "REMOVE",
 					TextSize = if short then 16 else 18,
@@ -243,6 +247,21 @@ return function(props: Props)
 							props.OnRemove(member.userId, member.username)
 						end
 					end,
+				})
+				elseif leaveEnabled then c(PuffyButton, {
+					Text = "LEAVE",
+					TextSize = if short then 16 else 18,
+					TextColor = C.Surface,
+					Color = C.Orange,
+					LipColor = C.OrangeLip,
+					Shadow = false,
+					Native = {
+						AnchorPoint = Vector2.new(1, 0.5),
+						Position = UDim2.new(1, -cardInset, 0, faceHeight / 2),
+						Size = UDim2.fromOffset(actionWidth, T.Layout.MinTarget),
+						ZIndex = 10,
+					},
+					OnActivated = props.OnLeave,
 				})
 				else nil,
 		})

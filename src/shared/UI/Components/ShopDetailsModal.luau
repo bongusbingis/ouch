@@ -235,6 +235,8 @@ end
 local function statusFor(card, isCrate, shortfall)
 	return if card.pending
 		then (if isCrate then "OPENING…" else "PROCESSING…")
+		else if card.purchased
+			then "PURCHASED"
 		else if card.owned
 			then (if isCrate then "OWNED" else "")
 			else if card.status == "Loading"
@@ -296,8 +298,11 @@ local function ItemDetails(props)
 	local equipped = preview ~= nil and ((props.Equipped or {})[preview.category] or "") == (preview.itemId or "")
 	local hasEquip = previewOwned and props.OnEquipItem ~= nil
 	local hasInventory = previewOwned and props.OnViewInventory ~= nil
-	local hasBonks = card.bonksPrice ~= nil and not card.owned
-	local hasRobux = not card.owned and (card.productId ~= nil or card.passId ~= nil) and card.robuxPrice ~= nil
+	local hasBonks = card.bonksPrice ~= nil and not card.owned and not card.purchased
+	local hasRobux = not card.owned
+		and not card.purchased
+		and (card.productId ~= nil or card.passId ~= nil)
+		and card.robuxPrice ~= nil
 	local hasAudition = isEffect and props.OnPreviewEffect ~= nil
 	local balance = card.bonksAvailable or 0
 	local shortfall = if hasBonks then math.max(0, card.bonksPrice - balance) else 0
@@ -353,10 +358,11 @@ local function ItemDetails(props)
 		})
 		badgeX += width + I.BadgeGap
 	end
-	if card.owned then
-		local width = ribbonWidth("OWNED")
+	if card.owned or card.purchased then
+		local stamp = if card.purchased then "PURCHASED" else "OWNED"
+		local width = ribbonWidth(stamp)
 		details.Owned = c(Ribbon, {
-			Text = "OWNED",
+			Text = stamp,
 			Color = C.Yellow,
 			Native = {
 				Position = UDim2.fromOffset(badgeX, 0),
@@ -718,8 +724,11 @@ local function CrateDetails(props)
 	end
 
 	local short = not portrait and size.Y < 420
-	local hasBonks = card.bonksPrice ~= nil and not card.owned
-	local hasRobux = not card.owned and (card.productId ~= nil or card.passId ~= nil) and card.robuxPrice ~= nil
+	local hasBonks = card.bonksPrice ~= nil and not card.owned and not card.purchased
+	local hasRobux = not card.owned
+		and not card.purchased
+		and (card.productId ~= nil or card.passId ~= nil)
+		and card.robuxPrice ~= nil
 	local quantities = if hasBonks then card.openQuantities or { 1 } else {}
 	local balance = card.bonksAvailable or 0
 	local minimumPrice = math.huge

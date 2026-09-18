@@ -13,6 +13,7 @@ local WriteThroughProxy = require(
 local Products = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Products"))
 local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates"))
 local Bundles = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Bundles"))
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local AnalyticsConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Analytics"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
@@ -20,6 +21,7 @@ local CrateService = require(script.Parent.CrateService)
 local PlayerData = require(script.Parent.PlayerData)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local RewardService = require(script.Parent.RewardService)
+local ShopService = require(script.Parent.ShopService)
 local ReceiptHistory = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("ReceiptHistory")
 )
@@ -32,6 +34,7 @@ type StartOptions = {
 	bundles: any?,
 	crateService: any?,
 	rewardService: any?,
+	shopService: any?,
 	playerData: any?,
 	analyticsService: any?,
 	network: any?,
@@ -51,6 +54,7 @@ local activeCrates: any = Crates
 local activeBundles: any = Bundles
 local activeCrateService: any = CrateService
 local activeRewardService: any = RewardService
+local activeShopService: any = ShopService
 local activePlayerData: any = PlayerData
 local activeAnalyticsService: any = AnalyticsService
 local activeNetwork: any = Network
@@ -87,6 +91,38 @@ local handlers: { [string]: Handler } = {
 				kind = "Cosmetic",
 				productId = receiptInfo.ProductId,
 				itemId = def.ItemId,
+			}
+	end,
+	OfferUnlock = function(player, def, receiptInfo)
+		local rarity = Cosmetics.Rarities[def.Rarity]
+		if rarity == nil or rarity.DirectBonks <= 0 then
+			return false, nil
+		end
+		local itemId, role, reason = activeShopService.resolveOfferForTier(player, def.Rarity)
+		if itemId == nil then
+			activePlayerData.addBonks(player, rarity.DirectBonks)
+			return true,
+				{
+					grantId = tostring(receiptInfo.PurchaseId),
+					kind = "Bonks",
+					productId = receiptInfo.ProductId,
+					amount = rarity.DirectBonks,
+					offerItemId = activeShopService.itemForRole(player, role),
+					substitutedFor = def.Rarity,
+					substitutionReason = reason,
+				}
+		end
+		if not activeRewardService.grant(player, { kind = "Cosmetic", itemId = itemId, duplicateRefund = false }) then
+			return false, nil
+		end
+		activeShopService.markPurchased(player, role)
+		return true,
+			{
+				grantId = tostring(receiptInfo.PurchaseId),
+				kind = "Cosmetic",
+				productId = receiptInfo.ProductId,
+				itemId = itemId,
+				role = role,
 			}
 	end,
 	Bundle = function(player, def, receiptInfo)
@@ -180,6 +216,25 @@ local function grantReceipt(receiptInfo: { [string]: any }, player: Player): Enu
 				tostring(receiptInfo.ProductId),
 				{ productType = def.Type }
 			)
+		elseif def.Type == "OfferUnlock" and work.Payload then
+			local payload = work.Payload
+			local substituted = payload.substitutedFor ~= nil
+			local resolvedItemId = payload.itemId or payload.offerItemId or "none"
+			local resolution = `{def.Rarity}:{resolvedItemId}:{if substituted then "Substitute" else "Granted"}`
+			pcall(
+				activeAnalyticsService.logEconomyEvent,
+				player,
+				"Source",
+				if substituted then "Bonks" else "Cosmetic",
+				if substituted then payload.amount else 1,
+				if substituted then data.Bonks else 1,
+				AnalyticsConfig.EconomyTransactionTypes.IAP,
+				tostring(receiptInfo.ProductId),
+				{ productType = def.Type, offerResolution = resolution }
+			)
+			if activeShopService.fireState then
+				pcall(activeShopService.fireState, player)
+			end
 		end
 		local payload = if work.Payload then WriteThroughProxy.snapshot(work.Payload) else nil
 		if payload then
@@ -236,6 +291,7 @@ function MonetizationService.start(options: StartOptions?)
 	activeBundles = if options and options.bundles then options.bundles else Bundles
 	activeCrateService = if options and options.crateService then options.crateService else CrateService
 	activeRewardService = if options and options.rewardService then options.rewardService else RewardService
+	activeShopService = if options and options.shopService then options.shopService else ShopService
 	activePlayerData = if options and options.playerData then options.playerData else PlayerData
 	activeAnalyticsService = if options and options.analyticsService then options.analyticsService else AnalyticsService
 	activeNetwork = if options and options.network then options.network else Network
@@ -277,6 +333,7 @@ function MonetizationService._resetForTest()
 	activeBundles = Bundles
 	activeCrateService = CrateService
 	activeRewardService = RewardService
+	activeShopService = ShopService
 	activePlayerData = PlayerData
 	activeAnalyticsService = AnalyticsService
 	activeNetwork = Network

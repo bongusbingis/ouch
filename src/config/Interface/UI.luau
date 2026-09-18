@@ -8,7 +8,7 @@ local characterBody = {
 }
 
 return {
-	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1 },
+	Preview = { MaxHz = 30, MaxDeltaSeconds = 0.1, BuildsPerFrame = 1 },
 	LobbyArtwork = {
 		Logo = {
 			Image = "rbxassetid://78333957912633",

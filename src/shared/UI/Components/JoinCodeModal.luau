@@ -10,7 +10,10 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local PriceButton = require(script.Parent.Shop.ShopPriceButton)
+local CandyPanel = require(script.Parent.CandyPanel)
+local CandyTitle = require(script.Parent.CandyTitle)
+local CandySurface = require(script.Parent.CandySurface)
+local PuffyButton = require(script.Parent.PuffyButton)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local Motion = require(script.Parent.Parent.Motion)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
@@ -19,11 +22,12 @@ local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local JoinCodeLayout = require(script.Parent.Parent.Models.JoinCodeLayout)
 local ScrollFrame = require(script.Parent.ScrollFrame)
 local Well = require(script.Parent.Well)
+local T = require(script.Parent.Parent.Tokens)
 
 local modalSurface = require(script.Parent.ModalSurface)
 
 local c = React.createElement
-local Palette = UIConfig.ProgressionStyle
+local C, J = T.Colors, T.JoinCode
 local CODE_LENGTH = 6
 local HELP_TEXT = ""
 
@@ -61,41 +65,35 @@ local function DigitBox(props)
 		end
 	end, { props.Delay })
 	return c("Frame", {
-		BackgroundColor3 = Palette.PanelRaised,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		LayoutOrder = props.LayoutOrder,
-		Position = UDim2.fromScale(0.409565, 0.0598802),
-		Size = UDim2.new(0.95 / 6, -8, 1, 0),
+		Size = UDim2.new(0.95 / CODE_LENGTH, -J.DigitGap, 1, 0),
+		ZIndex = 106,
 	}, {
 		EntranceScale = c("UIScale", { Scale = styles.Scale }),
-		UIAspectRatioConstraint = c("UIAspectRatioConstraint"),
-		UICorner = c("UICorner", {
-			CornerRadius = UDim.new(0, UIConfig.Radius.Tile),
-		}),
-		UIStroke = c("UIStroke", {
-			Color = Palette.White,
-			Thickness = 2,
+		Maximum = c("UISizeConstraint", { MaxSize = Vector2.new(math.huge, J.DigitHeight) }),
+		Surface = c(CandySurface, {
+			Color = if props.Active then C.Yellow else C.SurfaceWarm,
+			LipColor = if props.Active then C.Yellow:Lerp(C.Ink, 0.22) else C.WellLine,
+			Radius = J.DigitRadius,
+			Shadow = false,
+			ZIndex = 106,
 		}),
 		Char = c(ResponsiveText, {
 			HostName = "Char",
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 50,
+			MeasurementFont = T.Type.Display,
+			MaxTextSize = J.DigitTextSize,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-				LayoutOrder = 3,
-				Position = UDim2.fromScale(0.5, 0.5),
+				Font = T.Type.Display,
+				Position = UDim2.new(0.5, 0, 0.5, -T.Shape.LipHeight / 2),
 				Size = UDim2.fromScale(0.8, 0.8),
 				Text = props.Character,
-				TextColor3 = Palette.White,
+				TextColor3 = C.Ink,
+				ZIndex = 111,
 			},
-		}, {
-			Outline = c("UIStroke", {
-				Color = Palette.Ink,
-				Thickness = 0.045,
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			}),
 		}),
 	})
 end
@@ -137,13 +135,13 @@ return function(props: Props)
 	openRef.current = props.Open
 	focusAllowedRef.current = props.Open and props.FocusEnabled ~= false
 	local code, setCode = React.useState("")
+	local inputFocused, setInputFocused = React.useState(false)
 	local errorText, setErrorText = React.useState(HELP_TEXT)
-	local errorColor, setErrorColor = React.useState(Color3.new(1, 1, 1))
+	local errorColor, setErrorColor = React.useState(C.InkSoft)
 	local submitting, setSubmitting = React.useState(false)
 	local reducedMotion = useReducedMotion()
 	local modalStyles = ReactSpring.useSpring({
 		Scale = if props.Open then 1 else 0.82,
-		Rotation = if props.Open then 0 else -2,
 		config = Motion.Modal,
 		immediate = reducedMotion,
 	})
@@ -180,11 +178,11 @@ return function(props: Props)
 		errorRevision.current += 1
 		local revision = errorRevision.current
 		setErrorText(message)
-		setErrorColor(Palette.Yellow)
+		setErrorColor(C.PinkLip)
 		task.delay(3, function()
 			if revision == errorRevision.current then
 				setErrorText(HELP_TEXT)
-				setErrorColor(Color3.new(1, 1, 1))
+				setErrorColor(C.InkSoft)
 			end
 		end)
 	end
@@ -202,7 +200,7 @@ return function(props: Props)
 		end
 		setCode("")
 		setErrorText(HELP_TEXT)
-		setErrorColor(Color3.new(1, 1, 1))
+		setErrorColor(C.InkSoft)
 		setSubmitting(false)
 		props.OnClose()
 		local selection = previousSelection.current
@@ -256,7 +254,7 @@ return function(props: Props)
 		previousSelection.current = GuiService.SelectedObject
 		setCode("")
 		setErrorText(HELP_TEXT)
-		setErrorColor(Color3.new(1, 1, 1))
+		setErrorColor(C.InkSoft)
 		scheduleFocus(0)
 		return function()
 			focusRevision.current += 1
@@ -359,28 +357,22 @@ return function(props: Props)
 	local digits = {
 		Dash = c(ResponsiveText, {
 			HostName = "Dash",
-			MeasurementFont = Enum.Font.LuckiestGuy,
-			MaxTextSize = 42,
+			MeasurementFont = T.Type.Display,
+			MaxTextSize = J.DigitTextSize,
 			Native = {
 				BackgroundTransparency = 1,
 				LayoutOrder = 4,
-				Position = UDim2.fromScale(0.500703, 0.109386),
 				Size = UDim2.fromScale(0.05, 1),
 				Text = "-",
-				Font = Enum.Font.LuckiestGuy,
-				TextColor3 = Palette.White,
+				Font = T.Type.Display,
+				TextColor3 = C.InkSoft,
+				ZIndex = 106,
 			},
-		}, {
-			Outline = c("UIStroke", {
-				Color = Palette.Ink,
-				Thickness = 0.045,
-				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			}),
 		}),
 		UIListLayout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 8),
+			Padding = UDim.new(0, J.DigitGap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 		}),
@@ -390,14 +382,16 @@ return function(props: Props)
 			LayoutOrder = if index <= 3 then index else index + 1,
 			Delay = (index - 1) * 0.025,
 			Character = string.sub(code, index, index),
+			Active = inputFocused and not submitting and props.FocusEnabled ~= false and index == #code + 1,
 		})
 	end
 
 	local canSubmit = #code == CODE_LENGTH and not submitting and props.FocusEnabled ~= false
+	local compact = panelSize.X < J.CompactWidth
 	return modalSurface({
 		Active = true,
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.new(),
+		BackgroundColor3 = C.Ink,
 		BackgroundTransparency = 0.35,
 		Selectable = false,
 		Text = "",
@@ -407,25 +401,20 @@ return function(props: Props)
 			setRootPosition(root.AbsolutePosition)
 		end,
 	}, {
-		Panel = c("ImageLabel", {
+		Panel = c(CandyPanel, {
 			Active = true,
 			ZIndex = 101,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = UIConfig.Layout.PageSurface.Image,
 			Position = if layout.position
 				then UDim2.fromOffset(layout.position.X, layout.position.Y)
 				else UDim2.fromScale(0.5, 0.534555),
-			Rotation = if layout.position then 0 else modalStyles.Rotation,
-			ScaleType = Enum.ScaleType.Slice,
 			SelectionGroup = true,
 			SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorRight = Enum.SelectionBehavior.Stop,
 			SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 			Size = UDim2.fromOffset(panelSize.X, panelSize.Y),
-			SliceCenter = UIConfig.Layout.PageSurface.SliceCenter,
-			SliceScale = UIConfig.Layout.PageSurface.SliceScale,
 			Visible = true,
 		}, {
 			ModalScale = c("UIScale", { Scale = modalStyles.Scale }),
@@ -440,60 +429,61 @@ return function(props: Props)
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				ScrollingEnabled = layout.scrolling,
 				Selectable = layout.scrolling,
-				ScrollBarThickness = if layout.scrolling then 6 else 0,
-				ScrollBarImageColor3 = Palette.White,
+				ScrollBarThickness = if layout.scrolling then J.ScrollBar else 0,
+				ScrollBarImageColor3 = C.Pink,
+				ZIndex = 104,
 			}, {
 				Content = c("Frame", {
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 0, layout.contentHeight),
+					ZIndex = 104,
 				}, {
-					Title = c(ResponsiveText, {
-						HostName = "Title",
-						MeasurementFont = Enum.Font.LuckiestGuy,
-						MaxTextSize = 46,
+					-- The title scrolls with the form so it never covers the entry
+					-- or actions when the native keyboard leaves only a short viewport.
+					Title = c(CandyTitle, {
+						Text = "JOIN PARTY",
+						TextSize = if compact then J.CompactTitleSize else J.TitleSize,
 						Native = {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundTransparency = 1,
-							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-							Position = UDim2.fromScale(0.5, 0.147601),
-							Size = UDim2.fromScale(0.9, 0.144798),
-							Text = "ENTER PARTY CODE",
-							TextColor3 = Color3.new(1, 1, 1),
-							ZIndex = 2,
+							AnchorPoint = Vector2.new(0, 0.5),
+							Position = UDim2.fromScale(0.05, J.TitleCenter),
+							Size = UDim2.new(
+								0.9,
+								0,
+								0,
+								math.min(J.TitleHeight, layout.contentHeight * J.TitleHeightScale)
+							),
+							ZIndex = 106,
 						},
-					}, {
-						Outline = c("UIStroke", {
-							Color = Palette.Ink,
-							Thickness = 0.045,
-							StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-						}),
 					}),
-					Frame = c("Frame", {
-						AnchorPoint = Vector2.new(0.5, 0),
-						BackgroundColor3 = Color3.new(1, 1, 1),
-						BorderColor3 = Color3.new(),
-						BorderSizePixel = 0,
-						Position = UDim2.fromScale(0.5, 0.202036),
-						Size = UDim2.new(0.8, 0, 0, 2),
+					Instruction = c(ResponsiveText, {
+						MeasurementFont = T.Type.Label,
+						MaxTextSize = T.Type.Minimum,
+						MinTextSize = 14,
+						Native = {
+							AnchorPoint = Vector2.new(0, 0.5),
+							BackgroundTransparency = 1,
+							Font = T.Type.Label,
+							Position = UDim2.fromScale(0.05, J.InstructionCenter),
+							Size = UDim2.fromScale(0.9, 0.08),
+							Text = "Enter your friend's 6-digit party code.",
+							TextColor3 = C.InkSoft,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							ZIndex = 105,
+						},
 					}),
 					EntryBox = c(Well, {
+						Candy = true,
 						Native = {
 							Position = UDim2.fromScale(0.05, JoinCodeLayout.EntryTop),
-							Size = UDim2.fromScale(0.9, 0.34441),
+							Size = UDim2.fromScale(0.9, J.EntryHeightScale),
+							ZIndex = 105,
 						},
 					}, {
 						Holder = c("Frame", {
 							BackgroundTransparency = 1,
-							Position = UDim2.fromOffset(
-								UIConfig.Spacing.CompactInsetPx,
-								UIConfig.Spacing.CompactInsetPx
-							),
-							Size = UDim2.new(
-								1,
-								-UIConfig.Spacing.CompactInsetPx * 2,
-								1,
-								-UIConfig.Spacing.CompactInsetPx * 2
-							),
+							Position = UDim2.fromOffset(J.EntryInset, J.EntryInset),
+							Size = UDim2.new(1, -J.EntryInset * 2, 1, -J.EntryInset * 2),
+							ZIndex = 106,
 						}, digits),
 						InputCapture = c("TextBox", {
 							ref = inputRef,
@@ -508,6 +498,7 @@ return function(props: Props)
 							TextEditable = not submitting and props.FocusEnabled ~= false,
 							TextSize = 14,
 							TextTransparency = 1,
+							ZIndex = 112,
 							[React.Change.Text] = function(input: TextBox)
 								local nextCode = sanitize(input.Text)
 								setCode(nextCode)
@@ -521,6 +512,7 @@ return function(props: Props)
 								enterPressed: boolean,
 								input: InputObject?
 							)
+								setInputFocused(false)
 								if
 									input
 									and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1)
@@ -538,6 +530,7 @@ return function(props: Props)
 								end
 							end,
 							[React.Event.Focused] = function()
+								setInputFocused(true)
 								resumeFocusRef.current = true
 							end,
 							[React.Event.ReturnPressedFromOnScreenKeyboard] = submit,
@@ -547,51 +540,68 @@ return function(props: Props)
 						AnchorPoint = Vector2.new(0.5, 1),
 						BackgroundTransparency = 1,
 						Position = UDim2.fromScale(0.5, JoinCodeLayout.ActionBottom),
-						Size = UDim2.fromScale(0.8, 0.158129),
+						Size = UDim2.new(
+							0.9,
+							0,
+							0,
+							math.max(T.Layout.MinTarget, layout.contentHeight * J.ActionHeightScale)
+						),
+						ZIndex = 105,
 					}, {
 						UIListLayout = c("UIListLayout", {
 							FillDirection = Enum.FillDirection.Horizontal,
 							HorizontalAlignment = Enum.HorizontalAlignment.Center,
-							Padding = UDim.new(0.03, 0),
+							Padding = UDim.new(0, J.ActionGap),
 							SortOrder = Enum.SortOrder.LayoutOrder,
 							VerticalAlignment = Enum.VerticalAlignment.Center,
 						}),
-						Confirm = c(PriceButton, {
-							Color = Palette.Pink,
+						Confirm = c(PuffyButton, {
+							Color = C.Pink,
+							Shadow = false,
 							Enabled = canSubmit,
 							Text = if submitting then "JOINING…" else "JOIN PARTY",
-							TextSize = 24,
+							TextColor = if canSubmit then C.Surface else C.Ink,
+							TextSize = if compact then T.Type.Minimum else T.Type.TileLabel,
 							EntranceDelay = 0.025,
-							LayoutOrder = 3,
-							AnchorPoint = Vector2.zero,
-							Size = UDim2.fromScale(0.4, 1),
+							Native = {
+								LayoutOrder = 2,
+								Size = UDim2.new(0.5, -J.ActionGap / 2, 1, 0),
+								ZIndex = 106,
+							},
 							OnActivated = submit,
 						}),
-						Cancel = c(PriceButton, {
+						Cancel = c(PuffyButton, {
 							Enabled = props.FocusEnabled ~= false,
 							Text = if submitting then "CLOSE" else "CANCEL",
-							TextSize = 24,
-							Color = Palette.Cyan,
-							LayoutOrder = 2,
-							AnchorPoint = Vector2.zero,
-							Size = UDim2.fromScale(0.4, 1),
+							TextSize = if compact then T.Type.Minimum else T.Type.TileLabel,
+							TextColor = C.Ink,
+							Color = C.SurfaceWarm,
+							LipColor = C.WellLine,
+							Shadow = false,
+							Native = {
+								LayoutOrder = 1,
+								Size = UDim2.new(0.5, -J.ActionGap / 2, 1, 0),
+								ZIndex = 106,
+							},
 							OnActivated = close,
 						}),
 					}),
 					ErrorText = c(ResponsiveText, {
 						HostName = "ErrorText",
-						MeasurementFont = UIConfig.Text.BodyFont,
+						MeasurementFont = T.Type.Label,
+						MaxTextSize = T.Type.Minimum,
+						MinTextSize = 14,
+						Wrapped = true,
 						Native = {
 							AnchorPoint = Vector2.new(0.5, 0.5),
 							BackgroundTransparency = 1,
-							Font = UIConfig.Text.BodyFont,
-							Position = UDim2.fromScale(0.495, 0.73),
-							Size = UDim2.fromScale(0.9, 0.0741377),
+							Font = T.Type.Label,
+							Position = UDim2.fromScale(0.5, J.ErrorCenter),
+							Size = UDim2.new(0.9, 0, 0, math.max(28, layout.contentHeight * 0.0741377)),
 							Text = errorText,
 							TextColor3 = errorColor,
-							TextStrokeColor3 = Palette.Ink,
-							TextStrokeTransparency = 0.35,
-							ZIndex = 2,
+							TextWrapped = true,
+							ZIndex = 105,
 						},
 					}),
 				}),

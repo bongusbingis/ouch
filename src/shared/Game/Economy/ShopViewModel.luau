@@ -44,6 +44,8 @@ export type Card = {
 	bundleId: string?,
 	affordable: boolean,
 	owned: boolean,
+	purchased: boolean?,
+	role: string?,
 	pending: boolean,
 	previewItems: { PreviewItem },
 	odds: { OddsEntry }?,
@@ -103,6 +105,16 @@ local function productFor(products: { [string]: any }, field: string, value: str
 		end
 	end
 	return nil, nil
+end
+
+local function offerProductFor(products: { [string]: any }, rarity: string): any?
+	for _, key in orderedCatalogKeys(products) do
+		local definition = products[key]
+		if definition.Type == "OfferUnlock" and definition.Rarity == rarity then
+			return definition
+		end
+	end
+	return nil
 end
 
 local function metadataFor(metadata: { [string]: any }, kind: string, id: number?): any?
@@ -313,11 +325,15 @@ local function cosmeticCard(args: any, offer: any): Card?
 	if definition == nil then
 		return nil
 	end
-	local _, product = productFor(args.products, "ItemId", offer.itemId)
+	local role = offer.role or "Bonks"
+	local product = if role ~= "Bonks" then offerProductFor(args.products, offer.rarity) else nil
 	local productStatus, robuxPrice = productPresentation(product, args.metadata)
 	local owned = CosmeticsLogic.isOwned(args.cosmetics.Items, args.owned, offer.itemId)
+	local purchased = offer.purchased == true
 	local preview = previewItem(offer.itemId, args.cosmetics)
-	local status = if owned
+	local status = if purchased
+		then "Purchased"
+		else if owned
 		then "Owned"
 		else if offer.bonksPrice ~= nil or productStatus == "Active"
 			then "Active"
@@ -331,17 +347,19 @@ local function cosmeticCard(args: any, offer: any): Card?
 		status = status,
 		badge = definition.Rarity,
 		thumbnail = if definition.Thumbnail ~= "" then definition.Thumbnail else nil,
-		bonksPrice = offer.bonksPrice,
+		bonksPrice = if purchased or role ~= "Bonks" then nil else offer.bonksPrice,
 		bonksAvailable = args.bonks,
 		originalBonksPrice = nil,
-		robuxPrice = if productStatus == "Active" then robuxPrice else nil,
-		productId = if productStatus == "Active" then product.Id else nil,
+		robuxPrice = if not purchased and role ~= "Bonks" and productStatus == "Active" then robuxPrice else nil,
+		productId = if not purchased and role ~= "Bonks" and productStatus == "Active" then product.Id else nil,
 		passId = nil,
 		itemId = offer.itemId,
 		crateId = nil,
 		bundleId = nil,
-		affordable = offer.bonksPrice ~= nil and args.bonks >= offer.bonksPrice,
+		affordable = role == "Bonks" and offer.bonksPrice ~= nil and args.bonks >= offer.bonksPrice,
 		owned = owned,
+		purchased = purchased,
+		role = role,
 		pending = args.pending[`Cosmetic:{offer.itemId}`] == true
 			or (product ~= nil and product.Id ~= nil and args.pending[`ProductId:{product.Id}`] == true),
 		previewItems = if preview then { preview } else {},

@@ -40,6 +40,22 @@ T.describe("MonetizationConfig", function()
 		end
 	end)
 
+	T.it("ships exactly one tier unlock product for every directly priced rarity", function()
+		local seen = {}
+		for key, definition in Products.Catalog do
+			if definition.Type == "OfferUnlock" then
+				T.expect(definition.CatalogStatus):toEqual("Active")
+				T.expect(definition.Id ~= nil):toBeTruthy()
+				T.expect(seen[definition.Rarity]):toBeNil()
+				T.expect(Cosmetics.Rarities[definition.Rarity].DirectBonks > 0):toBeTruthy()
+				seen[definition.Rarity] = key
+			end
+		end
+		T.expect(seen.Common):toEqual("OfferUnlockCommon")
+		T.expect(seen.Rare):toEqual("OfferUnlockRare")
+		T.expect(seen.Legendary):toEqual("OfferUnlockLegendary")
+	end)
+
 	T.it("maps active passes and validates their grants", function()
 		T.expect(GamePasses.ById[GamePasses.Catalog.DoubleXP.Id]):toEqual(GamePasses.Catalog.DoubleXP)
 		T.expect(GamePasses.Catalog.SplatStarter.Id):toEqual(1968922292)

@@ -34,12 +34,8 @@ return function(props: Props)
 	if props.DeviceClass ~= "Touch" or viewport.X <= 0 or viewport.Y <= 0 then
 		return nil
 	end
-	-- Read fresh each render rather than memoising: the control rects a prompt
-	-- anchors to (the swipe band's free column, the action button) are published
-	-- as their UI lays out, and a stale snapshot would strand a prompt at the
-	-- fallback position once a control finally registers.
-	local geometry = Combat.inputGeometry()
 
+	local geometry = Combat.inputGeometry()
 	local sizing = OnboardingConfig.Gesture
 	local size = math.clamp(math.min(viewport.X, viewport.Y) * sizing.SizeScale, sizing.MinPixels, sizing.MaxPixels)
 	local labelHeight = size * sizing.LabelScale
@@ -47,15 +43,10 @@ return function(props: Props)
 	local position: Vector2
 
 	if props.Kind == "Swipe" then
-		-- The flick starts in the free right-hand column of the swipe band, where
-		-- the aiming thumb rests -- not the screen centre, which sits over the
-		-- joystick and hotbar.
 		anchor = Vector2.new(0.5, 1)
 		position =
 			Vector2.new(geometry.swipeAnchor.X, geometry.swipeRect.maxY - size - geometry.swipeDistancePixels * 0.35)
 	elseif props.Kind == "Tap" and geometry.actionButtonRect ~= nil then
-		-- The tap action is the on-screen BONK button; crown the real control
-		-- instead of floating a ring over the reticle, and stay above the thumb.
 		local rect = geometry.actionButtonRect
 		anchor = Vector2.new(0.5, 1)
 		position = Vector2.new((rect.minX + rect.maxX) / 2, rect.minY - sizing.ClearancePixels)

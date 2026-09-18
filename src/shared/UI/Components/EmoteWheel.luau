@@ -294,12 +294,14 @@ export type Props = {
 	-- utility row at the bottom centre where neither thumb is steering or aiming.
 	TouchButtonPlacement: ("Default" | "BesideToolbar")?,
 	EmptySlotsAssignable: boolean?,
+	Snapshot: any?,
 	ZIndex: number?,
 }
 
 return function(props: Props)
 	local hudLayout, rootOrigin = useArenaHUDLayout(Enum.ScreenInsets.CoreUISafeInsets)
-	local snapshot = EmoteWheelController.useSnapshot()
+	local controllerSnapshot = EmoteWheelController.useSnapshot()
+	local snapshot = props.Snapshot or controllerSnapshot
 	local viewport = useViewportSize()
 	local reducedMotion = useReducedMotion()
 	local preferred = usePreferredTextSize()

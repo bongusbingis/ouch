@@ -9,6 +9,7 @@ local Workspace = game:GetService("Workspace")
 local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Rotation = require(script.Parent.Rotation)
+local MotionProfile = require(script.Parent.MotionProfile)
 local ScriptableRoots = require(script.Parent.ScriptableRoots)
 
 local RotatingPlatforms = {}
@@ -38,6 +39,14 @@ export type LocalRotor = {
 	carriesRiders: boolean,
 	shove: boolean,
 	shoveSpeed: number?,
+	parentRotor: LocalRotor?,
+	parentToCenter: CFrame?,
+	profile: string?,
+	windup: number?,
+	strike: number?,
+	hold: number?,
+	acceleration: number?,
+	phaseDegrees: number?,
 }
 
 type RotorOptions = {
@@ -51,6 +60,12 @@ type RotorOptions = {
 	shove: boolean?,
 	shoveSpeed: number?,
 	followers: { Follower }?,
+	profile: string?,
+	windup: number?,
+	strike: number?,
+	hold: number?,
+	acceleration: number?,
+	phaseDegrees: number?,
 }
 
 export type Platform = {
@@ -115,8 +130,14 @@ end
 function RotatingPlatforms.rotorFor(part: BasePart): (Platform?, LocalRotor?)
 	for _, platform in platforms do
 		for _, rotor in platform.localRotors do
-			if rotor.carriesRiders and rotorOwns(rotor, part) then
-				return platform, rotor
+			if rotorOwns(rotor, part) then
+				local ancestor: LocalRotor? = rotor
+				while ancestor do
+					if ancestor.carriesRiders then
+						return platform, rotor
+					end
+					ancestor = ancestor.parentRotor
+				end
 			end
 		end
 	end
@@ -137,13 +158,31 @@ end
 
 local MINIMUM_TURN_RADIANS = 1e-5
 
-local function rotorSpin(rotor: LocalRotor, now: number): CFrame
-	if rotor.mode == "slide" then
-		return CFrame.new(axisVector(rotor.axis) * Rotation.slideAt(now, rotor.amplitude, rotor.period, rotor.phase))
+local function motionAt(platform: Platform, rotor: LocalRotor, now: number): (number, number)
+	if rotor.profile == "hammer" then
+		return MotionProfile.hammer(now, rotor.amplitude, rotor.windup :: number, rotor.strike :: number, rotor.phase)
+	elseif rotor.profile == "piston" then
+		return MotionProfile.piston(now, rotor.amplitude, rotor.period, rotor.hold :: number, rotor.phase)
+	elseif rotor.mode == "spin" then
+		local epoch = tonumber(platform.origin:GetAttribute(Attributes.MotionEpoch))
+		-- Never accelerate against the absolute Unix clock when a builder forgets its epoch.
+		return MotionProfile.spin(
+			now,
+			rotor.degreesPerSecond,
+			if epoch then rotor.acceleration or 0 else 0,
+			epoch or 0,
+			rotor.phaseDegrees or 0
+		)
 	end
-	local a = if rotor.mode == "rock"
-		then Rotation.rockAt(now, rotor.amplitude, rotor.period, rotor.phase)
-		else Rotation.angleAt(now, rotor.degreesPerSecond)
+	return Rotation.rockAt(now, rotor.amplitude, rotor.period, rotor.phase),
+		Rotation.rockRateAt(now, rotor.amplitude, rotor.period, rotor.phase)
+end
+
+local function rotorSpin(platform: Platform, rotor: LocalRotor, now: number): CFrame
+	local a = motionAt(platform, rotor, now)
+	if rotor.mode == "slide" then
+		return CFrame.new(axisVector(rotor.axis) * a)
+	end
 	if rotor.axis == "X" then
 		return CFrame.Angles(a, 0, 0)
 	elseif rotor.axis == "Z" then
@@ -152,8 +191,15 @@ local function rotorSpin(rotor: LocalRotor, now: number): CFrame
 	return CFrame.Angles(0, a, 0)
 end
 
+local function rotorBasePoseAt(platform: Platform, rotor: LocalRotor, now: number): CFrame
+	if rotor.parentRotor then
+		return RotatingPlatforms.rotorPoseAt(platform, rotor.parentRotor, now) * (rotor.parentToCenter :: CFrame)
+	end
+	return RotatingPlatforms.poseAt(platform, now) * rotor.relativeCenter
+end
+
 function RotatingPlatforms.rotorPoseAt(platform: Platform, rotor: LocalRotor, now: number): CFrame
-	return RotatingPlatforms.poseAt(platform, now) * rotor.relativeCenter * rotorSpin(rotor, now)
+	return rotorBasePoseAt(platform, rotor, now) * rotorSpin(platform, rotor, now)
 end
 
 -- Velocity of the rotor's surface at a world position: the ring's own turn plus
@@ -164,43 +210,50 @@ function RotatingPlatforms.surfaceVelocityAt(
 	position: Vector3,
 	now: number
 ): Vector3
-	local centerFrame = RotatingPlatforms.poseAt(platform, now) * rotor.relativeCenter
-	local axisWorld = centerFrame:VectorToWorldSpace(axisVector(rotor.axis))
 	local ringAxis = platform.origin.CFrame.UpVector * math.rad(platform.degreesPerSecond)
 	local velocity = ringAxis:Cross(position - platform.origin.Position)
-	local r = position - centerFrame.Position
-	if rotor.mode == "spin" then
-		velocity += (axisWorld * math.rad(rotor.degreesPerSecond)):Cross(r)
-	elseif rotor.mode == "rock" then
-		velocity += (axisWorld * Rotation.rockRateAt(now, rotor.amplitude, rotor.period, rotor.phase)):Cross(r)
-	else
-		velocity += axisWorld * Rotation.rockRateAt(now, rotor.amplitude, rotor.period, rotor.phase)
+	local current: LocalRotor? = rotor
+	while current do
+		local centerFrame = rotorBasePoseAt(platform, current, now)
+		local axisWorld = centerFrame:VectorToWorldSpace(axisVector(current.axis))
+		local r = position - centerFrame.Position
+		local _, rate = motionAt(platform, current, now)
+		velocity += if current.mode == "slide" then axisWorld * rate else (axisWorld * rate):Cross(r)
+		current = current.parentRotor
 	end
 	return velocity
 end
 
-local function step()
-	local now = Workspace:GetServerTimeNow()
-	for _, platform in platforms do
-		local angle = Rotation.angleAt(now, platform.degreesPerSecond)
-		local pose = platform.origin.CFrame * CFrame.Angles(0, angle, 0) * platform.relativePivot
-		if platform.appliedAngle == nil or math.abs(angle - platform.appliedAngle) >= MINIMUM_TURN_RADIANS then
-			platform.appliedAngle = angle
-			platform.assembly:PivotTo(pose)
-		end
-		-- One server mover composes the ring with its fan blades, paddles, discs, and swing panels.
-		for _, rotor in platform.localRotors do
-			if rotor.part:IsDescendantOf(platform.assembly) then
-				local center = pose * rotor.relativeCenter * rotorSpin(rotor, now)
-				rotor.part.CFrame = center * rotor.centerToPart
-				for _, follower in rotor.followers do
-					if follower.part.Parent ~= nil then
-						follower.part.CFrame = center * follower.centerToPart
-					end
+-- Applies a compiled assembly without depending on a running heartbeat.
+function RotatingPlatforms.applyAt(platform: Platform, now: number)
+	local angle = Rotation.angleAt(now, platform.degreesPerSecond)
+	local pose = platform.origin.CFrame * CFrame.Angles(0, angle, 0) * platform.relativePivot
+	if platform.appliedAngle == nil or math.abs(angle - platform.appliedAngle) >= MINIMUM_TURN_RADIANS then
+		platform.appliedAngle = angle
+		platform.assembly:PivotTo(pose)
+	end
+	-- One server mover composes the ring with its fan blades, paddles, discs, and swing panels.
+	for _, rotor in platform.localRotors do
+		if rotor.part:IsDescendantOf(platform.assembly) then
+			local center = RotatingPlatforms.rotorPoseAt(platform, rotor, now)
+			rotor.part.CFrame = center * rotor.centerToPart
+			for _, follower in rotor.followers do
+				if follower.part:IsDescendantOf(platform.assembly) then
+					follower.part.CFrame = center * follower.centerToPart
 				end
 			end
 		end
 	end
+end
+
+function RotatingPlatforms.stepAt(now: number)
+	for _, platform in platforms do
+		RotatingPlatforms.applyAt(platform, now)
+	end
+end
+
+local function step()
+	RotatingPlatforms.stepAt(Workspace:GetServerTimeNow())
 end
 
 local function attributeRotor(part: BasePart): RotorOptions?
@@ -210,13 +263,39 @@ local function attributeRotor(part: BasePart): RotorOptions?
 	end
 	local axis = part:GetAttribute(Attributes.RotorAxis)
 	local amplitude = tonumber(part:GetAttribute(Attributes.RotorAmplitude)) or 0
+	local profile = part:GetAttribute(Attributes.RotorProfile)
+	local period = math.max(tonumber(part:GetAttribute(Attributes.RotorPeriod)) or 1, 0.05)
+	local phase = tonumber(part:GetAttribute(Attributes.RotorPhase)) or 0
+	if profile == "piston" and mode == "slide" then
+		period = math.max(tonumber(part:GetAttribute(Attributes.PistonPeriod)) or MapFeatures.Piston.PeriodSeconds, 0.1)
+		amplitude = tonumber(part:GetAttribute(Attributes.PistonExtendStuds)) or MapFeatures.Piston.ExtendStuds
+		phase = tonumber(part:GetAttribute(Attributes.PistonPhase)) or 0
+	elseif profile ~= "hammer" or mode ~= "rock" then
+		profile = nil
+	end
 	return {
 		axis = if axis == "X" or axis == "Z" then axis else "Y",
 		mode = mode,
 		degreesPerSecond = tonumber(part:GetAttribute(Attributes.RotorSpeed)) or 0,
 		amplitude = if mode == "slide" then amplitude else math.rad(amplitude),
-		period = math.max(tonumber(part:GetAttribute(Attributes.RotorPeriod)) or 1, 0.05),
-		phase = tonumber(part:GetAttribute(Attributes.RotorPhase)) or 0,
+		period = period,
+		phase = phase,
+		profile = profile :: string?,
+		windup = math.max(
+			tonumber(part:GetAttribute(Attributes.WindupSeconds)) or MapFeatures.Hammer.WindupSeconds,
+			0.05
+		),
+		strike = math.max(
+			tonumber(part:GetAttribute(Attributes.StrikeSeconds)) or MapFeatures.Hammer.StrikeSeconds,
+			0.05
+		),
+		hold = math.clamp(
+			tonumber(part:GetAttribute(Attributes.HoldSeconds)) or MapFeatures.Piston.HoldSeconds,
+			0,
+			period - 0.05
+		),
+		acceleration = tonumber(part:GetAttribute(Attributes.RotorAccel)) or 0,
+		phaseDegrees = tonumber(part:GetAttribute(Attributes.RotorPhaseDegrees)) or 0,
 		carriesRiders = part:GetAttribute(Attributes.RotorCarries) == true,
 		shove = part:GetAttribute(Attributes.Shove) == true,
 		shoveSpeed = tonumber(part:GetAttribute(Attributes.ShoveSpeed)),
@@ -249,6 +328,12 @@ local function build(origin: BasePart, assembly: Model): Platform
 			amplitude = options.amplitude or 0,
 			period = options.period or 1,
 			phase = options.phase or 0,
+			profile = options.profile,
+			windup = options.windup,
+			strike = options.strike,
+			hold = options.hold,
+			acceleration = options.acceleration,
+			phaseDegrees = options.phaseDegrees,
 			carriesRiders = options.carriesRiders,
 			shove = options.shove == true,
 			shoveSpeed = options.shoveSpeed,
@@ -268,11 +353,16 @@ local function build(origin: BasePart, assembly: Model): Platform
 			})
 		end
 		if isFan(base) then
+			local fanAxis = base:GetAttribute(Attributes.FanAxis)
+			local axis: Axis = if fanAxis == "X" or fanAxis == "Z" then fanAxis else "Y"
 			for _, blade in base:GetChildren() do
 				if blade:IsA("BasePart") and isFanBlade(blade) then
-					local center = CFrame.new(blade.CFrame:PointToWorldSpace(blade.PivotOffset.Position))
+					-- Carry the fan's own rotation into the centre so the blade spins about
+					-- the fan's local axis, matching FanUpdraft's local-axis airflow, instead
+					-- of always turning about world Y regardless of how the fan is pitched.
+					local center = base.CFrame.Rotation + blade.CFrame:PointToWorldSpace(blade.PivotOffset.Position)
 					addRotor(blade, center, {
-						axis = "Y",
+						axis = axis,
 						mode = "spin",
 						degreesPerSecond = MapFeatures.Fan.BladeDegreesPerSecond,
 						carriesRiders = false,
@@ -327,6 +417,43 @@ local function build(origin: BasePart, assembly: Model): Platform
 		end
 	end
 
+	-- Each part has exactly one motion owner. An explicit attribute replaces a
+	-- legacy name match on that same part; unrelated arena paths stay unchanged.
+	local byPart: { [BasePart]: LocalRotor } = {}
+	for _, rotor in localRotors do
+		byPart[rotor.part] = rotor
+	end
+	local unique: { LocalRotor } = {}
+	for _, rotor in localRotors do
+		if byPart[rotor.part] == rotor then
+			table.insert(unique, rotor)
+		end
+	end
+	localRotors = unique
+	local function owner(part: Instance): LocalRotor?
+		local ancestor: Instance? = part
+		while ancestor and ancestor ~= assembly do
+			if ancestor:IsA("BasePart") and byPart[ancestor] then
+				return byPart[ancestor]
+			end
+			ancestor = ancestor.Parent
+		end
+		return nil
+	end
+	for _, rotor in localRotors do
+		rotor.parentRotor = if rotor.part.Parent then owner(rotor.part.Parent) else nil
+		if rotor.parentRotor then
+			rotor.parentToCenter = rotor.parentRotor.relativeCenter:ToObjectSpace(rotor.relativeCenter)
+		end
+		local followers: { Follower } = {}
+		for _, follower in rotor.followers do
+			if owner(follower.part) == rotor then
+				table.insert(followers, follower)
+			end
+		end
+		rotor.followers = followers
+	end
+
 	return {
 		origin = origin,
 		assembly = assembly,
@@ -338,6 +465,10 @@ local function build(origin: BasePart, assembly: Model): Platform
 		localRotors = localRotors,
 	}
 end
+
+-- Builds a snapshot without registering a heartbeat or modifying geometry.
+-- Useful to builders/validators and deterministic engine tests.
+RotatingPlatforms.build = build
 
 local function forgetGroup(state: RootState, child: Instance)
 	if not child:IsA("Folder") then

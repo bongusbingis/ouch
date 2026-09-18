@@ -26,6 +26,7 @@ local EntitlementService = require(script.Parent.EntitlementService)
 local ShopService = {}
 
 local SWEEP_SECONDS = 60
+local SHOP_VERSION = 1
 
 local started = false
 local sweeping = false
@@ -37,8 +38,8 @@ local activeTime: () -> number = os.time
 local activePaidRandomPolicy: any = PaidRandomPolicyService
 local activeEntitlements: any = EntitlementService
 
-local function rotationPool(): { string }
-	return ShopRotation.pool(Cosmetics.Items, Shop.Rotation.Categories)
+local function rotationPools(): { [string]: { string } }
+	return ShopRotation.poolByRarity(Cosmetics.Items, Shop.Rotation.Categories)
 end
 
 -- Gathers the inputs the pure resolver needs; the eligibility rules themselves
@@ -64,39 +65,65 @@ function ShopService.ensure(player: Player): any?
 		return nil
 	end
 	local bucket = FeaturedRotation.periodIndex(Shop.Rotation.RotationSeconds, activeTime())
-	if data.Shop ~= nil and data.Shop.Bucket == bucket and #data.Shop.Offers > 0 then
+	if
+		data.Shop ~= nil
+		and data.Shop.Version == SHOP_VERSION
+		and data.Shop.Bucket == bucket
+		and type(data.Shop.Offers) == "table"
+		and type(data.Shop.Purchased) == "table"
+	then
 		return data
 	end
 	data.Shop = {
+		Version = SHOP_VERSION,
 		Bucket = bucket,
-		Offers = ShopRotation.draw(
+		Offers = ShopRotation.drawRoles(
 			player.UserId,
 			bucket,
-			rotationPool(),
+			rotationPools(),
 			data.Cosmetics.Owned,
-			Shop.Rotation.OfferCount,
+			Shop.Rotation.Roles,
 			Cosmetics.Items
 		),
+		Purchased = {},
 	}
 	return data
 end
 
-local function offersFrom(data: any?): { string }
+local function offerRecordsFrom(data: any?): { any }
 	if data == nil or data.Shop == nil then
 		return {}
 	end
 	local offers = {}
-	for _, itemId in data.Shop.Offers do
-		local item = Cosmetics.Items[itemId]
-		if item and ShopRotation.isEligible(item, Shop.Rotation.Categories) then
-			table.insert(offers, itemId)
+	for _, record in data.Shop.Offers do
+		if type(record) ~= "table" then
+			continue
+		end
+		local itemId = record.ItemId
+		local item = if type(itemId) == "string" then Cosmetics.Items[itemId] else nil
+		if
+			type(itemId) == "string"
+			and type(record.Role) == "string"
+			and item
+			and record.Rarity == item.Rarity
+			and ShopRotation.isEligible(item, Shop.Rotation.Categories)
+		then
+			table.insert(offers, record)
 		end
 	end
 	return offers
 end
 
+function ShopService.offerRecords(player: Player): { any }
+	return offerRecordsFrom(ShopService.ensure(player))
+end
+
 function ShopService.offersFor(player: Player): { string }
-	return offersFrom(ShopService.ensure(player))
+	local itemIds = {}
+	for _, record in ShopService.offerRecords(player) do
+		table.insert(itemIds, record.ItemId)
+	end
+	return itemIds
 end
 
 function ShopService.isPurchasable(player: Player, itemId: string): boolean
@@ -104,11 +131,87 @@ function ShopService.isPurchasable(player: Player, itemId: string): boolean
 	if item == nil then
 		return false
 	end
+	if item.ShopEligible == false then
+		return false
+	end
 	if not ShopRotation.includes(item, Shop.Rotation.Categories) then
 		return DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities) ~= nil
 	end
-	return ShopRotation.isEligible(item, Shop.Rotation.Categories)
-		and table.find(ShopService.offersFor(player), itemId) ~= nil
+	if not ShopRotation.isEligible(item, Shop.Rotation.Categories) then
+		return false
+	end
+	for _, record in ShopService.offerRecords(player) do
+		if record.ItemId == itemId then
+			return record.Role == "Bonks"
+		end
+	end
+	return false
+end
+
+local function roleForRarity(rarity: string): string?
+	for _, role in Shop.Rotation.Roles do
+		if role.Id ~= "Bonks" and role.Rarities and table.find(role.Rarities, rarity) then
+			return role.Id
+		end
+	end
+	return nil
+end
+
+function ShopService.itemForRole(player: Player, roleId: string?): string?
+	if roleId == nil then
+		return nil
+	end
+	for _, record in ShopService.offerRecords(player) do
+		if record.Role == roleId then
+			return record.ItemId
+		end
+	end
+	return nil
+end
+
+function ShopService.resolveOfferForTier(player: Player, rarity: string): (string?, string?, string?)
+	local data = ShopService.ensure(player)
+	if data == nil then
+		return nil, nil, "no_profile"
+	end
+	local roleId = roleForRarity(rarity)
+	if roleId == nil then
+		return nil, nil, "unknown_tier"
+	end
+	local record = nil
+	for _, candidate in offerRecordsFrom(data) do
+		if candidate.Role == roleId then
+			record = candidate
+			break
+		end
+	end
+	if record == nil then
+		return nil, roleId, "slot_missing"
+	end
+	if record.Rarity ~= rarity then
+		return nil, roleId, "rarity_mismatch"
+	end
+	if data.Shop.Purchased[roleId] == true then
+		return nil, roleId, "already_purchased"
+	end
+	if CosmeticsLogic.isOwned(Cosmetics.Items, data.Cosmetics.Owned, record.ItemId) then
+		return nil, roleId, "already_owned"
+	end
+	return record.ItemId, roleId, nil
+end
+
+function ShopService.markPurchased(player: Player, roleId: string): boolean
+	local data = ShopService.ensure(player)
+	if data == nil or roleId == "Bonks" then
+		return false
+	end
+	for _, record in offerRecordsFrom(data) do
+		if record.Role == roleId then
+			data.Shop.Purchased[roleId] = true
+			return true
+		end
+	end
+	return false
 end
 
 function ShopService.stateFor(player: Player): any
@@ -116,18 +219,23 @@ function ShopService.stateFor(player: Player): any
 	local now = activeTime()
 	local data = ShopService.ensure(player)
 	local owned = if data then data.Cosmetics.Owned else {}
-	local storedOffers = offersFrom(data)
+	local storedOffers = offerRecordsFrom(data)
 
 	local offers = {}
-	for _, itemId in storedOffers do
+	for _, record in storedOffers do
+		local itemId = record.ItemId
 		local item = Cosmetics.Items[itemId]
 		if item ~= nil then
 			table.insert(offers, {
 				itemId = itemId,
+				role = record.Role,
 				rarity = item.Rarity,
 				displayName = item.DisplayName,
-				bonksPrice = DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities),
+				bonksPrice = if record.Role == "Bonks"
+					then DirectPurchase.priceFor(itemId, Cosmetics.Items, Cosmetics.Rarities)
+					else nil,
 				owned = CosmeticsLogic.isOwned(Cosmetics.Items, owned, itemId),
+				purchased = data.Shop.Purchased[record.Role] == true,
 			})
 		end
 	end
@@ -182,8 +290,13 @@ local function sweep()
 	for _, player in activePlayers:GetPlayers() do
 		local before = activePlayerData.get(player)
 		local storedBucket = if before and before.Shop then before.Shop.Bucket else nil
+		local storedVersion = if before and before.Shop then before.Shop.Version else nil
 		local data = ShopService.ensure(player)
-		if data ~= nil and storedBucket ~= nil and data.Shop.Bucket ~= storedBucket then
+		if
+			data ~= nil
+			and storedBucket ~= nil
+			and (data.Shop.Bucket ~= storedBucket or data.Shop.Version ~= storedVersion)
+		then
 			ShopService.fireState(player)
 		end
 	end
