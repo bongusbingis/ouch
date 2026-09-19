@@ -23,7 +23,6 @@
     },
 
     "ReplicatedStorage": {
-      "SplashdownTraining": { "$path": "assets/SplashdownTraining.rbxm" },
       "ThirdPartyCredits": {
         "$path": "generated/ThirdPartyCredits.luau"
       },

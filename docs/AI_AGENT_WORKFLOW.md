@@ -4,7 +4,7 @@
 
 This document defines a provider-neutral workflow for coding assistants that can delegate work to subagents. It is designed for Roblox production, but the scheduling, ownership, and verification rules apply to any software project.
 
-The system has one coordinating agent, **Prime**, and a pool of bounded specialists. The pool provides at least eight distinct capabilities, but Prime activates only the lanes that a task needs. Agent count is available capacity, not a requirement to fan every request out to every specialist.
+The system has one coordinating agent, **Prime**, and a pool of bounded specialists. The pool provides ten distinct capabilities, but Prime activates only the lanes that a task needs. Agent count is available capacity, not a requirement to fan every request out to every specialist.
 
 The workflow has four goals:
 
@@ -15,7 +15,8 @@ The workflow has four goals:
 
 ## Core operating principles
 
-- Prime owns the overall goal, task graph, priorities, integration decisions, and final answer.
+- **Jack is the final authority.** Every agent, including Prime, operates under Jack's direction. Decisions that cannot be made in good faith — ambiguous product intent, unresolvable tradeoffs, scope questions, or anything that risks an incorrect irreversible action — must be escalated to Jack rather than guessed at.
+- Prime owns the overall goal, task graph, priorities, integration decisions, and final answer, subject to Jack's authority.
 - Specialists receive bounded assignments rather than the entire conversation or repository history.
 - Every assignment has an explicit read scope, write scope, acceptance criteria, and return format.
 - Only independent work runs concurrently.
@@ -23,11 +24,13 @@ The workflow has four goals:
 - Research, design, implementation, review, and release approval remain distinguishable activities.
 - Evidence lives in files; agent messages contain short summaries and paths.
 - Claims are never upgraded from planned to verified without recorded evidence.
-- Existing project instructions and newer user direction override this general workflow.
+- Explicit instructions from Jack take precedence over this workflow's defaults. Existing project instructions override general workflow conventions.
 
 ## Agent roster
 
 These are roles, not requirements for a particular vendor, model, tool, or agent configuration format. One underlying agent may fill different roles at different times, but it must follow the contract of its current role.
+
+For small, low-risk changes, Prime may combine roles into a single assignment — for example, Scout + Mason for a trivial bug, or Gauge + Sentry for a narrowly scoped review. The role contracts still apply; consolidation is about dispatch efficiency, not about relaxing verification standards.
 
 ### 1. Prime — orchestrator and integrator
 
@@ -35,14 +38,15 @@ Prime is the only agent responsible for the complete outcome.
 
 Responsibilities:
 
-- Translate the user's goal into deliverables, invariants, acceptance criteria, and a dependency graph.
+- Translate Jack's goal into deliverables, invariants, acceptance criteria, and a dependency graph.
 - Maintain the live task board and assign specialist lanes.
 - Decide which work benefits from parallelism and which work must remain sequential.
 - Grant file and resource leases before allowing mutations.
 - Reconcile conflicting recommendations.
 - Inspect returned evidence, diffs, and test results.
 - Create follow-up work when verification reveals a real gap.
-- Communicate decisions, blockers, risks, and the final result to the user.
+- Communicate decisions, blockers, risks, and the final result to Jack.
+- Escalate to Jack when a decision genuinely cannot be made in good faith — ambiguous intent, unresolvable tradeoffs between specialist recommendations, scope questions, or any action that risks an irreversible mistake.
 
 Prime should avoid doing broad implementation while specialists are active. It may handle small integration edits, resolve conflicts, or perform an urgent unblocker when that is cheaper than opening another lane.
 
@@ -172,7 +176,7 @@ Responsibilities:
 - Audit saved-data schemas, migrations, receipts, ownership, catalog IDs, probabilities, prices, rewards, and feature flags.
 - Compare before-and-after configuration and public protocol behavior.
 - Verify backward compatibility and rollback requirements.
-- Flag changes that require human product approval or staged rollout.
+- Flag changes that require approval from Jack or staged rollout.
 - Produce invariant reports for monetization and progression work.
 
 Default mode: read-only. Keeper may propose migrations or guards but should not execute irreversible operations.
@@ -207,7 +211,7 @@ The task is waiting on an event that can resolve without a new product decision,
 - a background build or test;
 - a review response;
 - an asset-processing operation;
-- an already-requested user action;
+- an already-requested action from Jack;
 - a scheduled retry after a transient failure.
 
 Every waiting task must record:
@@ -251,7 +255,7 @@ Prime repeats this loop until the goal is achieved or all remaining work is genu
    - critical-path impact;
    - number of downstream tasks unblocked;
    - risk reduction;
-   - user-visible value;
+   - player-visible value;
    - age;
    - estimated cost.
 7. Match the highest-value task to the cheapest capable specialist lane.
@@ -259,18 +263,20 @@ Prime repeats this loop until the goal is achieved or all remaining work is genu
 9. Dispatch independent work up to the configured concurrency limit.
 10. Continue planning, integration, or another READY task instead of synchronously waiting on one lane.
 11. When no READY work remains, recheck due waiting conditions.
-12. If only blocked work remains, ask the user for the smallest specific decision required.
+12. If only blocked work remains, ask Jack for the smallest specific decision required.
 
 Prime should keep enough capacity for integration and unexpected high-priority findings. Maximum concurrency is a ceiling, not a target.
 
 ## Task contract
 
-Every delegated task should contain the following fields:
+Every delegated task should contain the following fields. A work packet must be understandable without the full parent conversation and small enough that the specialist does not need to rediscover the whole project.
 
 ```yaml
 id: FEAT-001
 title: Short, outcome-focused title
 status: ready
+priority: P1          # P0=blocker, P1=critical-path, P2=important, P3=nice-to-have
+estimated_tokens: small  # small / medium / large — informs capability routing
 role: mason
 objective: One concrete outcome
 reason: Why this work exists
@@ -293,14 +299,12 @@ forbidden:
 return_format: standard-result-v1
 ```
 
-A work packet should be understandable without the full parent conversation. It should also be small enough that the specialist does not need to rediscover the whole project.
-
 ## Standard specialist return
 
 Every specialist returns a concise summary in this form:
 
 ```text
-RESULT: PASS | WAITING | BLOCKED
+RESULT: PASS | FAIL | WAITING | BLOCKED
 SUMMARY: What was established or changed
 CHANGED: Exact files or "none"
 CHECKS: Commands/scenarios and outcomes
@@ -312,6 +316,8 @@ NEXT: Suggested follow-up tasks
 
 Raw logs, large diffs, screenshots, and generated reports belong in the evidence directory, not in the message to Prime.
 
+Each evidence artifact must record the task ID, the source state it was reviewed against (commit or file hashes when relevant dirty or untracked files exist), and the environment or scenario used. Prime compares evidence against the candidate integration state and invalidates affected results after material changes. For Roblox-specific evidence, include place identity, Studio state, and capture identifiers when those facts affect the result.
+
 ## Ownership and concurrency rules
 
 ### File leases
@@ -322,6 +328,14 @@ Raw logs, large diffs, screenshots, and generated reports belong in the evidence
 - Read-only work may run alongside a writer unless it depends on a stable snapshot of files being changed.
 - Before integration, Prime inspects the current diff rather than relying on an earlier snapshot.
 - Specialists do not stage, commit, rebase, reset, or discard work unless the task explicitly grants that authority.
+
+### Lease lifecycle
+
+- A lease begins when Prime dispatches a task and ends when the specialist returns its result.
+- A lease is abandoned if the specialist errors out or produces no output or progress signal. Prime reclaims the write scope and preserves partial work in the evidence directory without integrating it.
+- A specialist may request a lease extension with justification. Prime grants it or splits the remaining work into a new task.
+- When a lease expires or is reclaimed, no other agent may integrate the partial work without Prime's review.
+- Lease expiry removes authorization but does not prove the old worker has stopped. Before reassigning writable resources, Prime must stop the old worker or confirm its output is isolated. Do not reclaim a resource solely because a timer elapsed if the worker may still be writing.
 
 ### Exclusive resources
 
@@ -337,9 +351,9 @@ Examples of exclusive resources include:
 
 Prime grants and releases these resources explicitly. A waiting task should release a resource unless retaining it is essential and recorded.
 
-### Human gates
+### Gates requiring Jack's authorization
 
-Require explicit human authorization for material external or irreversible actions, including:
+Require explicit authorization from Jack for material external or irreversible actions, including:
 
 - publishing a live place or release;
 - changing monetization, prices, probabilities, or rewards;
@@ -347,7 +361,34 @@ Require explicit human authorization for material external or irreversible actio
 - uploading or deleting production assets;
 - sending external communications;
 - changing secrets, credentials, or access controls;
-- widening scope beyond the stated user goal.
+- widening scope beyond Jack's stated goal.
+
+### Task handoffs
+
+When work transfers between agents, the handoff must contain the task contract, relevant source files or snapshot, accepted decisions, current diff, evidence paths, and unresolved questions. Do not depend on shared chat history or provider-specific conversation state being portable. The receiving worker verifies that its tools and source state match the assignment before claiming results.
+
+A Prime transfer requires a checkpoint of the board, all decisions, partial work, and active leases, plus cessation of the outgoing Prime's authority. There must never be two coordinators writing the same board.
+
+## Failure escalation
+
+When a specialist returns FAIL or a downstream gate reveals a defect, Prime classifies the failure and responds accordingly:
+
+- **Rework within scope.** The failure is local to the specialist's assignment. Prime creates a focused repair task for the same or an equivalent specialist, citing the specific evidence.
+- **Rework across roles.** The failure implicates an upstream decision — for example, a Sentry finding that requires an Architect redesign. Prime reopens the upstream task, invalidates downstream evidence that depended on the original decision, and re-dispatches affected work.
+- **Scope violation.** A specialist modified files or resources outside its lease. Prime stops the offending worker and preserves its diff and evidence. Prime identifies changes attributable to that worker and removes only those, taking care not to discard concurrent work from other specialists. If attribution is ambiguous, Prime quarantines the affected files, pauses that scope, and asks Jack for the specific recovery decision.
+- **Cascading failure.** Multiple tasks are affected, the root cause is unclear, or the repair path is ambiguous. Prime halts the affected subtree of tasks, summarizes the situation with evidence, and escalates to Jack for a decision.
+
+A failed test with a known, bounded repair is READY work, not a blocker. Repeated failure on the same task without a changed condition is a blocker and must be escalated.
+
+## Conflict resolution
+
+When specialists return contradictory recommendations, Prime:
+
+1. Identifies whether the disagreement is factual (different assumptions) or evaluative (different values or priorities).
+2. Requests targeted clarification from the dissenting specialists, scoped to the specific disagreement.
+3. Decides based on Jack's stated intent, acceptance criteria, and evidence weight.
+4. Records the decision and rationale in `decisions.md`.
+5. Escalates to Jack when the conflict involves a product-level tradeoff that acceptance criteria do not resolve.
 
 ## Quality gates
 
@@ -388,7 +429,7 @@ Prime selects gates according to risk. Not every task requires every gate.
 
 - Keeper confirmed protected IDs, values, schemas, receipts, and ownership behavior.
 - Migration and rollback behavior are defined when durable data changes.
-- Product-sensitive changes have human approval.
+- Product-sensitive changes have Jack's approval.
 
 ### Documentation gate
 
@@ -425,7 +466,7 @@ Prime selects gates according to risk. Not every task requires every gate.
 3. Mason implements with shared tokens and components.
 4. Lens captures and reviews required states and devices.
 5. Gauge checks functional behavior; Sentry checks state and network boundaries.
-6. Quill updates user-facing strings or guidance.
+6. Quill updates player-facing strings or guidance.
 
 ### World, course, animation, or asset work
 
@@ -446,7 +487,7 @@ Prime selects gates according to risk. Not every task requires every gate.
 4. Lens and Rigger verify player-facing and Studio-dependent surfaces.
 5. Keeper checks configuration, economy, and compatibility.
 6. Quill prepares patch notes, handoff, and rollback instructions.
-7. Prime presents the evidence and requests any required human release approval.
+7. Prime presents the evidence and requests release approval from Jack.
 
 ## Token-efficiency policy
 
@@ -506,7 +547,9 @@ The orchestration mechanism may use any storage format. A practical repository-l
       screenshots/
 ```
 
-The live board is operational state and may remain untracked. Stable decisions, specifications, and user-approved behavior should be moved into the repository's durable documentation.
+The live board is operational state and may remain untracked. Stable decisions, specifications, and approved behavior should be moved into the repository's durable documentation.
+
+`board.json` and `completed.ndjson` are operational state and should be `.gitignore`d. Evidence files — memos, test output, screenshots, and reviews — should be committed alongside the code they document.
 
 ## Success metrics
 
@@ -521,7 +564,7 @@ Track workflow quality over time rather than optimizing for the number of active
 - Number of conflicting concurrent edits
 - Percentage of claims backed by saved evidence
 - Number of escaped regressions
-- Human decisions requested with sufficient context on the first attempt
+- Decisions escalated to Jack with sufficient context on the first attempt
 
 If token use rises without corresponding reductions in lead time or defects, reduce fan-out, tighten task packets, or consolidate overlapping roles.
 
@@ -550,7 +593,7 @@ If token use rises without corresponding reductions in lead time or defects, red
 
 ## Definition of done
 
-Prime may declare the user's goal complete only when:
+Prime may declare Jack's goal complete only when:
 
 - every required deliverable exists;
 - acceptance criteria are satisfied;
