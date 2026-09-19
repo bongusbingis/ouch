@@ -14,7 +14,7 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local SharedGame = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local OnboardingHit = require(SharedGame:WaitForChild("Onboarding"):WaitForChild("OnboardingHit"))
 local PlayerIds = require(SharedGame:WaitForChild("Adapters"):WaitForChild("PlayerIds"))
-local ServerAuthAdapter = require(SharedGame:WaitForChild("Adapters"):WaitForChild("ServerAuthAdapter"))
+local CombatSimServer = require(SharedGame:WaitForChild("Adapters"):WaitForChild("CombatSimServer"))
 
 local Onboarding = script.Parent.Parent:WaitForChild("Onboarding")
 local OnboardingCombat = require(Onboarding:WaitForChild("OnboardingCombat"))
@@ -345,7 +345,7 @@ function LobbyCombatTest.start()
 		folder:Destroy()
 	end
 
-	ServerAuthAdapter.onEvent(onSimEvent)
+	CombatSimServer.onEvent(onSimEvent)
 
 	RunService.Heartbeat:Connect(function()
 		if next(sessions) == nil then

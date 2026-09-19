@@ -5,11 +5,11 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ServerAuthAdapter = require(
+local CombatSimServer = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
 		:WaitForChild("Adapters")
-		:WaitForChild("ServerAuthAdapter")
+		:WaitForChild("CombatSimServer")
 )
 local ModeRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
@@ -106,7 +106,7 @@ function OnboardingCombat.start()
 	InputSetup.start()
 	PlayerConfigService.start({ schemas = { PlayerAssist } })
 	BallService.start()
-	ServerAuthAdapter.start()
+	CombatSimServer.start()
 end
 
 return OnboardingCombat

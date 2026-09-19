@@ -190,6 +190,45 @@ T.describe("SimStateCodec", function()
 		T.expect(hammer.direction):toEqual(vector.create(1, 0, 0))
 		T.expect(hammer.hitTargetId):toEqual("p2")
 	end)
+
+	T.it("maps phases to numbers bidirectionally", function()
+		T.expect(SimStateCodec.phaseToNumber("Held")):toEqual(0)
+		T.expect(SimStateCodec.phaseToNumber("Windup")):toEqual(1)
+		T.expect(SimStateCodec.phaseToNumber("InFlight")):toEqual(2)
+		T.expect(SimStateCodec.phaseToNumber("Bouncing")):toEqual(3)
+		T.expect(SimStateCodec.phaseToNumber("Rolling")):toEqual(4)
+		T.expect(SimStateCodec.phaseToNumber("Free")):toEqual(5)
+
+		T.expect(SimStateCodec.numberToPhase(0)):toEqual("Held")
+		T.expect(SimStateCodec.numberToPhase(1)):toEqual("Windup")
+		T.expect(SimStateCodec.numberToPhase(2)):toEqual("InFlight")
+		T.expect(SimStateCodec.numberToPhase(3)):toEqual("Bouncing")
+		T.expect(SimStateCodec.numberToPhase(4)):toEqual("Rolling")
+		T.expect(SimStateCodec.numberToPhase(5)):toEqual("Free")
+		T.expect(SimStateCodec.numberToPhase(999)):toEqual("Free")
+	end)
+
+	T.it("decodes individual projectiles via decodeProjectile", function()
+		local ball = fakeInstance("ball_0042", "BasePart")
+		ball._attributes.ph = 2
+		ball._attributes.ow = "player_1"
+		ball._attributes.hb = nil
+		ball._attributes.tg = "player_2"
+		ball._attributes.vel = vector.create(10, 20, 30)
+
+		local decoded = SimStateCodec.decodeProjectile(ball :: any)
+		T.expect(decoded).toBeTruthy()
+		if decoded then
+			T.expect(decoded.id):toEqual("ball_0042")
+			T.expect(decoded.phase):toEqual("InFlight")
+			T.expect(decoded.ownerId):toEqual("player_1")
+			T.expect(decoded.targetId):toEqual("player_2")
+			T.expect(decoded.velocity):toEqual(vector.create(10, 20, 30))
+		end
+
+		local nonPart = fakeInstance("Folder", "Folder")
+		T.expect(SimStateCodec.decodeProjectile(nonPart :: any)):toBeNil()
+	end)
 end)
 
 return true

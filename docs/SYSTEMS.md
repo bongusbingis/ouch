@@ -6,26 +6,30 @@ Each system's responsibility, owner modules, key invariants, and protected contr
 **Purpose:** Runs a pure, fixed-tick physics and combat simulation that is fully server-authoritative.
 **Owner modules:** 
 - `src/shared/Game/Sim/SimCore.luau`
-- `src/shared/Game/Sim/MatchSim.luau`
+- `src/shared/Game/Sim/Projectiles.luau`
 - `src/shared/Game/Sim/WeaponRegistry.luau`
+- `src/shared/Game/Adapters/CombatSimServer.luau`
 **Key invariants:** 
 - `SimCore` must remain perfectly deterministic and free of side-effects; it solely maps `SimState` + `InputCommand` -> `SimState` + `SimEvent`.
-- Players are synchronized strictly by their presence in the `WorldSnapshot`.
+- The server maintains persistent `SimState` in memory across fixed ticks, encoding state back to instances for client replication.
+- Replicated client character positions are sampled into `WorldSnapshot`, with `MovementGuard` bounding physical anomalies, while projectile trajectories and combat hit detection remain 100% server-authoritative.
 - Weapons must be routed and executed in canonical order, maintaining fairness regardless of network latency.
 **Depends on:** Command inputs, pure weapon definitions, network synchronization layer.
-**Consumers:** The client renderer (to visually predict combat), server replication layer.
+**Consumers:** Server orchestration (`MatchService`, `QuestService`, `AnalyticsService`, `OnboardingCombat`), client presentation (aim trajectory preview via `ProjectileTrajectory`, weapon presentation, and event feedback via `CombatSimEvent`). Combat simulation itself runs exclusively on the server.
 
 ### Game Modes
 **Purpose:** Defines the rules and lifecycles for different arena gametypes like FFA, TDM, and Infection.
 **Owner modules:** 
 - `src/shared/Game/Modes/GameMode.luau`
+- `src/shared/Game/Modes/MatchSim.luau`
 - `src/shared/Game/Modes/ModeRegistry.luau`
 - `src/shared/Game/Modes/ModeVote.luau`
 **Key invariants:** 
 - GameMode modules must expose pure `MatchRules` completely separate from server lifecycle logic.
+- `MatchSim` drives match phase transitions, timers, and scoring as a pure finite state machine parameterized by `MatchRules`.
 - Modes must define a deterministic way to evaluate a winner and score targets (either globally or scoped per team).
 **Depends on:** Configuration values for constraints, Combat & Simulation to track eliminations.
-**Consumers:** MatchmakerService (for queues), UI layer (for scoring and match flow).
+**Consumers:** MatchService (for match lifecycle and scoring), MatchmakerService (for queues), UI layer (for scoring and match flow).
 
 ### Splashdown
 **Purpose:** Manages the racing-based obstacle course mode, handling checkpoints, course sequencing, and placements.

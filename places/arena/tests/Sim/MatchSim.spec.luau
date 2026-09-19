@@ -7,7 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = Shared:WaitForChild("Game")
 
-local MatchSim = require(Game:WaitForChild("Sim"):WaitForChild("MatchSim"))
+local MatchSim = require(Game:WaitForChild("Modes"):WaitForChild("MatchSim"))
 local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegistry"))
 
 local RULES = ModeRegistry.default().rules

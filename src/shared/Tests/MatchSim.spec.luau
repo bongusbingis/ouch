@@ -3,7 +3,7 @@
 --!strict
 
 local T = require(script.Parent.TestKit)
-local MatchSim = require(script.Parent.Parent.Game.Sim.MatchSim)
+local MatchSim = require(script.Parent.Parent.Game.Modes.MatchSim)
 local ModeRegistry = require(script.Parent.Parent.Game.Modes.ModeRegistry)
 
 type MatchEvent = MatchSim.MatchEvent

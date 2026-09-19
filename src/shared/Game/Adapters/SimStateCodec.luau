@@ -38,35 +38,50 @@ local function setAttributeIfChanged(instance: Instance, name: string, value: an
 	end
 end
 
+function SimStateCodec.numberToPhase(number: number): SimTypes.ProjectilePhase
+	return NUMBER_TO_PHASE[number] or "Free"
+end
+
+function SimStateCodec.phaseToNumber(phase: SimTypes.ProjectilePhase): number
+	return PHASE_TO_NUMBER[phase] or 5
+end
+
+function SimStateCodec.decodeProjectile(ball: Instance): ProjectileState?
+	if not ball:IsA("BasePart") then
+		return nil
+	end
+	local velocity = ball:GetAttribute("vel")
+	local hasVelocity = typeof(velocity) == "Vector3" or typeof(velocity) == "vector"
+	return {
+		id = ball.Name,
+		archetype = "Dodgeball",
+		ownerId = ball:GetAttribute("ow") :: string?,
+		heldBy = ball:GetAttribute("hb") :: string?,
+		phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 5] or "Free",
+		position = ball.CFrame.Position,
+		velocity = if hasVelocity then velocity else vector.zero,
+		targetId = ball:GetAttribute("tg") :: string?,
+		effectiveRadius = (ball:GetAttribute("er") :: number?) or DEFAULT_EFFECTIVE_RADIUS,
+		flightTime = (ball:GetAttribute("ft") :: number?) or 0,
+		windupRemaining = (ball:GetAttribute("wu") :: number?) or 0,
+		bounceCount = (ball:GetAttribute("bc") :: number?) or 0,
+		releaseAim = ball:GetAttribute("ra") :: Vector3?,
+		releaseTargetId = ball:GetAttribute("rt") :: string?,
+		releaseDeviceClass = ball:GetAttribute("rd") :: string?,
+		releaseCharge = ball:GetAttribute("rc") :: number?,
+	}
+end
+
 function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]: Model }): SimState
 	local state = SimTypes.newState()
 	state.tick = (ballsFolder:GetAttribute("tk") :: number?) or 0
 	state.nextProjectileSeq = (ballsFolder:GetAttribute("sq") :: number?) or 1
 
 	for _, ball in ballsFolder:GetChildren() do
-		if not ball:IsA("BasePart") then
-			continue
+		local decoded = SimStateCodec.decodeProjectile(ball)
+		if decoded then
+			state.projectiles[ball.Name] = decoded
 		end
-		local velocity = ball:GetAttribute("vel")
-		local hasVelocity = typeof(velocity) == "Vector3" or typeof(velocity) == "vector"
-		state.projectiles[ball.Name] = {
-			id = ball.Name,
-			archetype = "Dodgeball",
-			ownerId = ball:GetAttribute("ow") :: string?,
-			heldBy = ball:GetAttribute("hb") :: string?,
-			phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 5] or "Free",
-			position = ball.CFrame.Position,
-			velocity = if hasVelocity then velocity else vector.zero,
-			targetId = ball:GetAttribute("tg") :: string?,
-			effectiveRadius = (ball:GetAttribute("er") :: number?) or DEFAULT_EFFECTIVE_RADIUS,
-			flightTime = (ball:GetAttribute("ft") :: number?) or 0,
-			windupRemaining = (ball:GetAttribute("wu") :: number?) or 0,
-			bounceCount = (ball:GetAttribute("bc") :: number?) or 0,
-			releaseAim = ball:GetAttribute("ra") :: Vector3?,
-			releaseTargetId = ball:GetAttribute("rt") :: string?,
-			releaseDeviceClass = ball:GetAttribute("rd") :: string?,
-			releaseCharge = ball:GetAttribute("rc") :: number?,
-		}
 	end
 
 	for playerId, model in characterModels do
