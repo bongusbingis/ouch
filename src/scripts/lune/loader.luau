@@ -146,7 +146,7 @@ function Loader.build(sourcemapPath: string): (Node, (node: Node) -> any)
 		if child then
 			return child
 		end
-		if key == "FindFirstChild" or key == "WaitForChild" then
+		if key == "FindFirstChild" or key == "WaitForChild" or key == "GetService" then
 			return function(node: Node, name: string)
 				local found = rawget(node, "_children")[name]
 				if key == "WaitForChild" and found == nil then

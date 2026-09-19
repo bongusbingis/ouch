@@ -36,6 +36,7 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local ArenaLoadingClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
 
 local connections = {}
+local loadedModules = {}
 local combatPresenters = {}
 local damagePresenters = {}
 local DeathEffects
@@ -113,6 +114,7 @@ local systems = {
 for _, system in systems do
 	local ok, err = pcall(function()
 		local module = if system.load then system.load() else require(system.parent:WaitForChild(system.name))
+		table.insert(loadedModules, module)
 		if system.onLoaded then
 			system.onLoaded(module)
 		end
@@ -211,14 +213,24 @@ table.insert(
 
 script.Destroying:Connect(function()
 	Combat.setInputEnabled(false)
-	if FanAirflow then
-		FanAirflow.stop()
+	CameraAssist.stop()
+	for i = #loadedModules, 1, -1 do
+		local module = loadedModules[i]
+		if typeof(module) == "table" then
+			if typeof(module.destroy) == "function" then
+				pcall(module.destroy)
+			elseif typeof(module.stop) == "function" then
+				pcall(module.stop)
+			end
+		end
 	end
 	if matchStateConnection then
 		matchStateConnection:Disconnect()
+		matchStateConnection = nil
 	end
 	if matchStateModeConnection then
 		matchStateModeConnection:Disconnect()
+		matchStateModeConnection = nil
 	end
 	for _, connection in connections do
 		if typeof(connection) == "RBXScriptConnection" then
@@ -227,11 +239,9 @@ script.Destroying:Connect(function()
 			connection()
 		end
 	end
+	table.clear(connections)
 	InputRouter.destroy()
 	CombatInputSender.destroy()
 	CombatState.destroy()
 	VoteCamera.destroy()
-	if DeathEffects then
-		DeathEffects.destroy()
-	end
 end)

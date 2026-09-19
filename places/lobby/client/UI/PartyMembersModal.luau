@@ -395,10 +395,9 @@ return function(props: Props)
 				Members = c(ScrollFrame, {
 					Active = true,
 					Selectable = not props.CanRemove,
-					AutomaticCanvasSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
-					CanvasSize = UDim2.new(),
+					CanvasSize = UDim2.new(1, 0, 0, listContentHeight),
 					ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
 					Position = UDim2.fromOffset(contentInset, listTop),
 					ScrollingDirection = Enum.ScrollingDirection.Y,

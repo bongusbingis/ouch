@@ -17,6 +17,8 @@ local tracks: { [string]: AnimationTrack } = {}
 local missing: { [string]: boolean } = {}
 local lastPlayedAt: { [string]: number } = {}
 local currentLoop: AnimationTrack? = nil
+local characterAddedConnection: RBXScriptConnection? = nil
+local combatStateUnsubscribe: (() -> ())? = nil
 
 local function clipKey(weapon: string, name: string): string
 	return weapon .. "." .. name
@@ -110,6 +112,12 @@ local function playOnce(weapon: string, name: string, fadeTime: number, cooldown
 end
 
 local function onCharacter(character: Model)
+	for _, track in tracks do
+		pcall(function()
+			track:Stop(0)
+			track:Destroy()
+		end)
+	end
 	table.clear(tracks)
 	table.clear(missing)
 	table.clear(lastPlayedAt)
@@ -154,13 +162,37 @@ function WeaponAnimations.start()
 	started = true
 
 	local player = Players.LocalPlayer
-	player.CharacterAdded:Connect(onCharacter)
+	characterAddedConnection = player.CharacterAdded:Connect(onCharacter)
 	local character = player.Character
 	if character then
 		onCharacter(character)
 	end
 
-	CombatState.subscribe(onState)
+	combatStateUnsubscribe = CombatState.subscribe(onState)
+end
+
+function WeaponAnimations.stop()
+	if characterAddedConnection then
+		characterAddedConnection:Disconnect()
+		characterAddedConnection = nil
+	end
+	if combatStateUnsubscribe then
+		combatStateUnsubscribe()
+		combatStateUnsubscribe = nil
+	end
+	stopLoop()
+	for _, track in tracks do
+		pcall(function()
+			track:Stop(0)
+			track:Destroy()
+		end)
+	end
+	table.clear(tracks)
+	table.clear(missing)
+	table.clear(lastPlayedAt)
+	currentLoop = nil
+	animator = nil
+	started = false
 end
 
 return WeaponAnimations

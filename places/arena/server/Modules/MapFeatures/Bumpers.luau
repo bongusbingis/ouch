@@ -97,6 +97,21 @@ function Bumpers.tickWorld(context: MapFeatureKit.Context)
 		end
 		for _, bumper in bumpersFor(assembly) do
 			activeBumpers[bumper] = true
+			local bumperPos = bumper.Position
+			local reach = bumper.Size.Magnitude * 0.5 + MapFeatures.Bumper.ContactPadding * 2 + 3
+			local reachSq = reach * reach
+			local nearAnyRoot = false
+			for _, root in roots do
+				local diff = root.Position - bumperPos
+				if diff.X * diff.X + diff.Y * diff.Y + diff.Z * diff.Z <= reachSq then
+					nearAnyRoot = true
+					break
+				end
+			end
+			if not nearAnyRoot then
+				continue
+			end
+
 			-- Root-only contact excludes cosmetic/limb grazing. A small padded
 			-- oriented box makes near-edge contacts register more reliably.
 			local padding = Vector3.one * MapFeatures.Bumper.ContactPadding * 2

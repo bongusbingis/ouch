@@ -23,7 +23,7 @@ local function fixture(returnQueueId)
 	end
 	local record = {
 		partyId = "party",
-		schemaVersion = 2,
+		schemaVersion = 3,
 		revision = 1,
 		leaderUserId = 10,
 		phase = "Teleporting",

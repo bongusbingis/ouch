@@ -34,6 +34,8 @@ type PadState = {
 local pads: { [Model]: PadState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
+local renderConnection: RBXScriptConnection? = nil
+local remoteConnection: RBXScriptConnection? = nil
 local started = false
 
 local function config()
@@ -175,7 +177,11 @@ local function step(deltaTime: number)
 				continue
 			end
 			local baseSize = partState.baseSize
-			local height = math.max(baseSize.Y + partState.spring.position, baseSize.Y * settings.MinimumSquash)
+			local s = partState.spring.position
+			if math.abs(s) < 1e-3 and part.Size == baseSize then
+				continue
+			end
+			local height = math.max(baseSize.Y + s, baseSize.Y * settings.MinimumSquash)
 			local spread = 1 / math.sqrt(height / baseSize.Y)
 			part.Size = Vector3.new(baseSize.X * spread, height, baseSize.Z * spread)
 			part.CFrame = partState.baseCFrame + Vector3.new(0, (height - baseSize.Y) / 2, 0)
@@ -191,16 +197,24 @@ function JumpPadVisuals.start()
 
 	unwatch = ScriptableRoots.watch(addRoot, removeRoot)
 
-	Network.on("JumpPadImpulse", function(pad)
+	remoteConnection = Network.on("JumpPadImpulse", function(pad)
 		if typeof(pad) == "Instance" and pad:IsA("Model") then
 			impulse(pad)
 		end
 	end)
 
-	RunService.RenderStepped:Connect(step)
+	renderConnection = RunService.RenderStepped:Connect(step)
 end
 
 function JumpPadVisuals.stop()
+	if renderConnection then
+		renderConnection:Disconnect()
+		renderConnection = nil
+	end
+	if remoteConnection then
+		remoteConnection:Disconnect()
+		remoteConnection = nil
+	end
 	if unwatch then
 		unwatch()
 		unwatch = nil

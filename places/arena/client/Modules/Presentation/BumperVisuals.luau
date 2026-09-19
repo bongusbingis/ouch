@@ -25,6 +25,8 @@ type BumperState = {
 local bumpers: { [BasePart]: BumperState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
+local renderConnection: RBXScriptConnection? = nil
+local remoteConnection: RBXScriptConnection? = nil
 local started = false
 local beatSound: Sound? = nil
 local beatClock: BeatClock.Clock? = nil
@@ -210,16 +212,24 @@ function BumperVisuals.start()
 
 	unwatch = ScriptableRoots.watch(addRoot, removeRoot)
 
-	Network.on("BumperHit", function(part)
+	remoteConnection = Network.on("BumperHit", function(part)
 		if typeof(part) == "Instance" and part:IsA("BasePart") then
 			hitImpulse(part)
 		end
 	end)
 
-	RunService.RenderStepped:Connect(step)
+	renderConnection = RunService.RenderStepped:Connect(step)
 end
 
 function BumperVisuals.stop()
+	if renderConnection then
+		renderConnection:Disconnect()
+		renderConnection = nil
+	end
+	if remoteConnection then
+		remoteConnection:Disconnect()
+		remoteConnection = nil
+	end
 	if unwatch then
 		unwatch()
 		unwatch = nil

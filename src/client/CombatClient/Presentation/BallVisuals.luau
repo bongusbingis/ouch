@@ -71,6 +71,8 @@ local trailEnabled: { [BasePart]: boolean } = {}
 local seen = EventDedup.new(4096)
 local predicted: PredictedThrow? = nil
 local lastReleaseRevision = 0
+local started = false
+local folderConnections: { RBXScriptConnection } = {}
 
 local function cframeOffset(offset: Vector3): CFrame
 	return CFrame.new(offset.x, offset.y, offset.z)
@@ -140,6 +142,14 @@ end
 
 local function updateRestPulse(ball: BasePart, visual: BasePart, active: boolean, dt: number)
 	if not active then
+		destroyRestPulse(ball)
+		return
+	end
+
+	local localPlayer = Players.LocalPlayer
+	local localChar = localPlayer and localPlayer.Character
+	local localRoot = if localChar then localChar:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if localRoot and (visual.Position - localRoot.Position).Magnitude > 60 then
 		destroyRestPulse(ball)
 		return
 	end
@@ -360,22 +370,33 @@ local function stepPrediction(dt: number)
 end
 
 function BallVisuals.start()
+	if started then
+		return
+	end
+	started = true
+
 	local folder = Workspace:WaitForChild("Balls")
 	for _, child in folder:GetChildren() do
 		if child:IsA("BasePart") then
 			addBall(child)
 		end
 	end
-	folder.ChildAdded:Connect(function(child)
-		if child:IsA("BasePart") then
-			addBall(child)
-		end
-	end)
-	folder.ChildRemoved:Connect(function(child)
-		if child:IsA("BasePart") then
-			removeBall(child)
-		end
-	end)
+	table.insert(
+		folderConnections,
+		folder.ChildAdded:Connect(function(child)
+			if child:IsA("BasePart") then
+				addBall(child)
+			end
+		end)
+	)
+	table.insert(
+		folderConnections,
+		folder.ChildRemoved:Connect(function(child)
+			if child:IsA("BasePart") then
+				removeBall(child)
+			end
+		end)
+	)
 
 	RunService:BindToRenderStep("BallVisuals", Enum.RenderPriority.Character.Value + 2, function(dt)
 		local alpha = 1 - math.exp(-Combat.Dodgeball.RemoteSmoothing * dt)
@@ -477,6 +498,29 @@ function BallVisuals.start()
 			end
 		end
 	end)
+end
+
+function BallVisuals.stop()
+	if not started then
+		return
+	end
+	started = false
+	pcall(function()
+		RunService:UnbindFromRenderStep("BallVisuals")
+	end)
+	for _, conn in folderConnections do
+		conn:Disconnect()
+	end
+	table.clear(folderConnections)
+	for ball in visuals do
+		removeBall(ball)
+	end
+	table.clear(visuals)
+	table.clear(appliedAssets)
+	table.clear(restPulses)
+	table.clear(feelStates)
+	table.clear(trailEnabled)
+	predicted = nil
 end
 
 return BallVisuals

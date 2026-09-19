@@ -507,6 +507,17 @@ Using more agents saves time and tokens only when assignments are bounded. Uncon
 - Reserve the strongest reasoning for Prime, difficult architecture, ambiguous design, and high-risk adjudication.
 - Use fast workers for targeted searches, mechanical edits, test execution, and documentation formatting.
 - Escalate a task only after the cheaper lane identifies a concrete reason.
+- A stronger model does not fix missing tools, missing authorization, or an unavailable test environment. Escalate reasoning only when the task itself is genuinely harder.
+
+### Capacity management
+
+Jack's subscriptions have daily and monthly usage limits that agents cannot directly query. Prime must manage capacity through behavioral rules:
+
+- **Session budgeting.** At the start of a work session, assess the scope of remaining work and allocate capacity accordingly. Do not burn the full daily allowance on the first task if multiple tasks are queued.
+- **Progressive consolidation.** When capacity is limited or the session is long, consolidate roles more aggressively — combine Scout + Mason, Gauge + Sentry, or have Prime handle small tasks directly. The role contracts still apply; only the dispatch changes.
+- **Conserve on success, spend on failure.** Work that is passing gates smoothly should use cheaper tiers. Reserve expensive reasoning for tasks that have already failed at a cheaper tier, ambiguous requirements, or safety-critical review (economy, data, monetization).
+- **Observable signals to conserve:** rate-limit warnings from the provider, slow response times, repeated context-window truncation, or Jack saying capacity is low. When any of these appear, reduce active lanes and consolidate remaining work.
+- **Never waste capacity re-reading the whole repo.** Reuse Scout memos and prior evidence. The most expensive operation is making every new specialist rediscover the project from scratch.
 
 ### Controlled fan-out
 

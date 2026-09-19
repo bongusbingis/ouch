@@ -34,6 +34,9 @@ local visualGripCFrames: { [Player]: CFrame } = {}
 local visualLongAxes: { [Player]: HammerGrip.Axis } = {}
 local springs: { [Player]: Spring.Spring } = {}
 local seenEvents = EventDedup.new(4096)
+local started = false
+local renderConnection: RBXScriptConnection? = nil
+local playerRemovingConnection: RBXScriptConnection? = nil
 
 local function gripFor(visual: BasePart, baseSize: Vector3): (CFrame, HammerGrip.Axis)
 	local axis = HammerGrip.longestAxis(baseSize.X, baseSize.Y, baseSize.Z)
@@ -150,12 +153,17 @@ local function audioParentFor(playerId: string): Instance?
 end
 
 function HammerVisuals.start()
-	Players.PlayerRemoving:Connect(function(player)
+	if started then
+		return
+	end
+	started = true
+
+	playerRemovingConnection = Players.PlayerRemoving:Connect(function(player)
 		remove(player)
 		springs[player] = nil
 	end)
 
-	RunService.RenderStepped:Connect(function(dt)
+	renderConnection = RunService.RenderStepped:Connect(function(dt)
 		local feel = Combat.HammerFeel
 		local now = os.clock()
 		for _, player in Players:GetPlayers() do
@@ -227,6 +235,25 @@ function HammerVisuals.onEvent(event: any)
 	local parent = audioParentFor(playerId)
 	if parent and soundName then
 		WorldAudio.play("Hammer", soundName, parent)
+	end
+end
+
+function HammerVisuals.stop()
+	if not started then
+		return
+	end
+	started = false
+	if renderConnection then
+		renderConnection:Disconnect()
+		renderConnection = nil
+	end
+	if playerRemovingConnection then
+		playerRemovingConnection:Disconnect()
+		playerRemovingConnection = nil
+	end
+	for player in visuals do
+		remove(player)
+		springs[player] = nil
 	end
 end
 

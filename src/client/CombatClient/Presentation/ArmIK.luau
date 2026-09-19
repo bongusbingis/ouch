@@ -39,6 +39,7 @@ end
 local started = false
 local replicate = true
 local chains: { [Player]: Chain } = {}
+local connections: { RBXScriptConnection } = {}
 local lastReportAt = 0
 local lastReportedCharge = -1
 
@@ -260,24 +261,48 @@ function ArmIK.start(options: { replicate: boolean? }?)
 	replicate = options == nil or options.replicate ~= false
 
 	local function observe(player: Player)
-		player.CharacterAdded:Connect(function(character)
-			buildChain(player, character)
-		end)
-		player.CharacterRemoving:Connect(function()
-			destroyChain(player)
-		end)
+		table.insert(
+			connections,
+			player.CharacterAdded:Connect(function(character)
+				buildChain(player, character)
+			end)
+		)
+		table.insert(
+			connections,
+			player.CharacterRemoving:Connect(function()
+				destroyChain(player)
+			end)
+		)
 		if player.Character then
 			buildChain(player, player.Character)
 		end
 	end
 
-	Players.PlayerAdded:Connect(observe)
-	Players.PlayerRemoving:Connect(destroyChain)
+	table.insert(connections, Players.PlayerAdded:Connect(observe))
+	table.insert(connections, Players.PlayerRemoving:Connect(destroyChain))
 	for _, player in Players:GetPlayers() do
 		observe(player)
 	end
 
 	RunService:BindToRenderStep("ThrowArmIK", Enum.RenderPriority.Character.Value + 1, update)
+end
+
+function ArmIK.stop()
+	if not started then
+		return
+	end
+	started = false
+	pcall(function()
+		RunService:UnbindFromRenderStep("ThrowArmIK")
+	end)
+	for _, conn in connections do
+		conn:Disconnect()
+	end
+	table.clear(connections)
+	for player in chains do
+		destroyChain(player)
+	end
+	table.clear(chains)
 end
 
 return ArmIK

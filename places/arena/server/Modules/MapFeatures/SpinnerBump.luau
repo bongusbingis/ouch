@@ -63,6 +63,22 @@ function SpinnerBump.tickWorld(context: MapFeatureKit.Context)
 			local spinner = if enabled then assembly:FindFirstChild(name) else nil
 			if spinner and spinner:IsA("BasePart") then
 				activeSpinners[spinner] = true
+				local spinnerPos = spinner.Position
+				local reach = spinner.Size.Magnitude * 0.5 + MapFeatures.Spinner.ContactPadding * 2 + 3
+				local reachSq = reach * reach
+				local nearAnyRoot = false
+				for _, rootInst in roots do
+					local root = rootInst :: BasePart
+					local diff = root.Position - spinnerPos
+					if diff.X * diff.X + diff.Y * diff.Y + diff.Z * diff.Z <= reachSq then
+						nearAnyRoot = true
+						break
+					end
+				end
+				if not nearAnyRoot then
+					continue
+				end
+
 				-- Root-only contact excludes cosmetic/limb grazing. A small padded
 				-- oriented box makes near-edge contacts register more reliably.
 				local padding = Vector3.one * MapFeatures.Spinner.ContactPadding * 2

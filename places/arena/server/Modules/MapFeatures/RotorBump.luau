@@ -50,6 +50,22 @@ local function testPart(platform: RotatingPlatforms.Platform, rotor: RotatingPla
 	if part.Parent == nil then
 		return
 	end
+	local partPos = part.Position
+	local reach = part.Size.Magnitude * 0.5 + MapFeatures.RotorBump.ContactPadding * 2 + 3
+	local reachSq = reach * reach
+	local nearAnyRoot = false
+	for _, rootInst in roots do
+		local root = rootInst :: BasePart
+		local diff = root.Position - partPos
+		if diff.X * diff.X + diff.Y * diff.Y + diff.Z * diff.Z <= reachSq then
+			nearAnyRoot = true
+			break
+		end
+	end
+	if not nearAnyRoot then
+		return
+	end
+
 	-- Root-only contact excludes cosmetic/limb grazing. A small padded
 	-- oriented box makes near-edge contacts register more reliably.
 	local padding = Vector3.one * MapFeatures.RotorBump.ContactPadding * 2

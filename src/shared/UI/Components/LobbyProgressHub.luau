@@ -305,7 +305,8 @@ return function(props)
 		Padding = c("UIPadding", {
 			PaddingTop = UDim.new(0, if props.Compact then 0 else 2),
 			PaddingBottom = UDim.new(0, 6),
-			PaddingLeft = UDim.new(0, 3),
+			PaddingLeft = UDim.new(0, 15),
+			PaddingRight = UDim.new(0, 12),
 		}),
 	}
 	if active == "DAILY" then
@@ -351,8 +352,8 @@ return function(props)
 		Content = c(Scroll, {
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(16, contentTop),
-			Size = UDim2.new(1, -32, 1, -contentTop - 4),
+			Position = UDim2.fromOffset(4, contentTop),
+			Size = UDim2.new(1, -8, 1, -contentTop - 4),
 			CanvasSize = UDim2.new(),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollingDirection = Enum.ScrollingDirection.Y,

@@ -3,6 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local EXPECTED_REMOTES = {
 	PartyRequest = "RemoteFunction",
@@ -14,12 +15,13 @@ local EXPECTED_REMOTES = {
 return function()
 	describe("Lobby remotes", function()
 		it("materializes the party remotes with their declared classes", function()
+			if not RunService:IsServer() then
+				return
+			end
 			local folder = ReplicatedStorage:FindFirstChild("Remotes")
 			if not folder then
-				pcall(function()
-					require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-				end)
-				folder = ReplicatedStorage:WaitForChild("Remotes", 3)
+				require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+				folder = ReplicatedStorage:WaitForChild("Remotes", 5)
 			end
 			expect(folder).to.be.ok()
 

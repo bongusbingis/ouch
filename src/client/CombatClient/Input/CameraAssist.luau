@@ -130,4 +130,16 @@ function CameraAssist.start()
 	RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value + 1, update)
 end
 
+function CameraAssist.stop()
+	if not started then
+		return
+	end
+	started = false
+	pcall(function()
+		RunService:UnbindFromRenderStep(RENDER_NAME)
+	end)
+	lastRotation = nil
+	lastTargetDirection = nil
+end
+
 return CameraAssist

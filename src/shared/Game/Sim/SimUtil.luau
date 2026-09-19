@@ -26,8 +26,7 @@ function SimUtil.pushEvent(events: { SimEvent }, state: SimState, event: SimEven
 end
 
 function SimUtil.hasHandBall(state: SimState, playerId: string): boolean
-	for _, id in SimUtil.sortedKeys(state.projectiles) do
-		local projectile = state.projectiles[id]
+	for _, projectile in state.projectiles do
 		if
 			(projectile.phase == "Held" or projectile.phase == "Windup")
 			and (projectile.heldBy == playerId or projectile.ownerId == playerId)

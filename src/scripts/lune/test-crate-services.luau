@@ -51,6 +51,10 @@ local deps = {
 	BattlePassLogic = pure(root.ReplicatedStorage.Shared.Game.Progression.BattlePassLogic),
 	Listeners = pure(root.ReplicatedStorage.Shared.Game.Util.Listeners),
 	ClientRequests = { TimeoutSeconds = 0.03 },
+	Emotes = pure(config.Cosmetics.Emotes),
+	FeaturedRotation = pure(root.ReplicatedStorage.Shared.Game.Economy.FeaturedRotation),
+	StarterOffer = pure(root.ReplicatedStorage.Shared.Game.Economy.StarterOffer),
+	Boosts = pure(root.ReplicatedStorage.Shared.Game.Economy.Boosts),
 }
 local nodes = {}
 local function node(name)
@@ -134,6 +138,12 @@ node("Players").PlayerRemoving = removing
 node("Players").GetPlayerByUserId = function()
 	return player
 end
+node("RunService").IsStudio = function()
+	return false
+end
+node("RunService").IsServer = function()
+	return true
+end
 deps.AnalyticsService = setmetatable({}, {
 	__index = function()
 		return function() end
@@ -146,11 +156,12 @@ deps.CrateRolls = {
 	end,
 }
 deps.PaidRandomPolicyService = loadService("PaidRandomPolicyService")
+deps.EntitlementService = loadService("EntitlementService")
 deps.PlayerData = loadService("PlayerData")
 deps.CosmeticsService = loadService("CosmeticsService")
 deps.CrateService = loadService("CrateService")
-deps.MonetizationService = loadService("MonetizationService")
 deps.ShopService = loadService("ShopService")
+deps.MonetizationService = loadService("MonetizationService")
 deps.ClientRequest = loadService("ClientRequest", "src/shared/Game/Data/ClientRequest.luau")
 local client = loadService("ShopClient", "src/shared/Game/Economy/ShopClient.luau")
 

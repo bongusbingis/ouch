@@ -1,4 +1,4 @@
--- Description: In-place spec asserting the five authored Splashdown course templates meet the course contract: an origin, start pads for a full queue, ordered checkpoints with a trigger and pad each, a finish trigger and deck, at least one hazard, door rows where the course needs them, and every piece inside the stadium bowl.
+-- Description: In-place spec asserting the authored Splashdown course templates in CourseOrder meet the course contract: an origin, start pads for a full queue, ordered checkpoints with a trigger and pad each, a finish trigger and deck, at least one hazard, door rows where the course needs them, and every piece inside the stadium bowl.
 
 --!nonstrict
 
