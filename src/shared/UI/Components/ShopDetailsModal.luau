@@ -237,15 +237,15 @@ local function statusFor(card, isCrate, shortfall)
 		then (if isCrate then "OPENING…" else "PROCESSING…")
 		else if card.purchased
 			then "PURCHASED"
-		else if card.owned
-			then (if isCrate then "OWNED" else "")
-			else if card.status == "Loading"
-				then "LOADING PRICE…"
-				else if card.status == "Preview"
-					then "COMING SOON"
-					else if card.status == "Unavailable"
-						then "UNAVAILABLE"
-						else if shortfall > 0 then `NEED {formatNumber(shortfall)} MORE BONKS` else ""
+			else if card.owned
+				then (if isCrate then "OWNED" else "")
+				else if card.status == "Loading"
+					then "LOADING PRICE…"
+					else if card.status == "Preview"
+						then "COMING SOON"
+						else if card.status == "Unavailable"
+							then "UNAVAILABLE"
+							else if shortfall > 0 then `NEED {formatNumber(shortfall)} MORE BONKS` else ""
 end
 
 local function ItemDetails(props)

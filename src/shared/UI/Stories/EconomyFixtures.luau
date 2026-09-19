@@ -18,11 +18,13 @@ local Fixtures = {}
 function Fixtures.build(state: string?)
 	local now = os.time()
 	local offers = {}
-	for _, entry in {
-		{ itemId = "DodgeBall1", role = "RobuxCommon" },
-		{ itemId = "DodgeBall10", role = "RobuxPremium" },
-		{ itemId = "DodgeBall19", role = "Bonks" },
-	} do
+	for _, entry in
+		{
+			{ itemId = "DodgeBall1", role = "RobuxCommon" },
+			{ itemId = "DodgeBall10", role = "RobuxPremium" },
+			{ itemId = "DodgeBall19", role = "Bonks" },
+		}
+	do
 		local itemId = entry.itemId
 		local item = Cosmetics.Items[itemId]
 		table.insert(offers, {
@@ -57,11 +59,13 @@ function Fixtures.build(state: string?)
 		ownedPasses = {},
 		pending = if state == "Pending" then { ["Crate:EffectsCrate"] = true } else {},
 	}
-	for _, entry in {
-		{ definition = Products.Catalog.OfferUnlockCommon, price = 99 },
-		{ definition = Products.Catalog.OfferUnlockRare, price = 199 },
-		{ definition = Products.Catalog.OfferUnlockLegendary, price = 599 },
-	} do
+	for _, entry in
+		{
+			{ definition = Products.Catalog.OfferUnlockCommon, price = 99 },
+			{ definition = Products.Catalog.OfferUnlockRare, price = 199 },
+			{ definition = Products.Catalog.OfferUnlockLegendary, price = 599 },
+		}
+	do
 		snapshot.metadata[`Product:{entry.definition.Id}`] = { priceInRobux = entry.price, isForSale = true }
 	end
 	if state == "Unavailable" then

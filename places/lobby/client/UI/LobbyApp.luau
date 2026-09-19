@@ -990,15 +990,12 @@ local function LobbyContent(props)
 						OnInspect = economyMenu.inspectInventory,
 					})
 				elseif pageName == "Settings" then
-					return c(
-						SettingsPage,
-						{
-							Position = position,
-							Size = if settingsComposition then settingsComposition.panel.size else nil,
-							TransitionScale = scale,
-							Place = "Lobby",
-						}
-					)
+					return c(SettingsPage, {
+						Position = position,
+						Size = if settingsComposition then settingsComposition.panel.size else nil,
+						TransitionScale = scale,
+						Place = "Lobby",
+					})
 				elseif pageName == "Shop" then
 					return c(ShopPage, {
 						SeasonState = seasonState,

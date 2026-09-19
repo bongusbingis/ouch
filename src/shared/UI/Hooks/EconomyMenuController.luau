@@ -262,9 +262,9 @@ function EconomyMenuController.use(options: Options): Controller
 			then pass.PurchaseMessage
 			else if grant.kind == "Bonks" and grant.substitutedFor
 				then `TODAY'S {string.upper(grant.substitutedFor)} OFFER WAS UNAVAILABLE, SO YOU RECEIVED {grant.amount} BONKS INSTEAD.`
-			else if grant.kind == "Bonks"
-				then `YOU RECEIVED {grant.amount} BONKS.`
-				else "NEW GEAR! CHECK YOUR BACKPACK."
+				else if grant.kind == "Bonks"
+					then `YOU RECEIVED {grant.amount} BONKS.`
+					else "NEW GEAR! CHECK YOUR BACKPACK."
 		notifications.notify({
 			title = "PURCHASE COMPLETE",
 			description = description,

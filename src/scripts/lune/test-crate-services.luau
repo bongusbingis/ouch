@@ -52,7 +52,6 @@ local deps = {
 	Listeners = pure(root.ReplicatedStorage.Shared.Game.Util.Listeners),
 	ClientRequests = { TimeoutSeconds = 0.03 },
 	Emotes = pure(config.Cosmetics.Emotes),
-	FeaturedRotation = pure(root.ReplicatedStorage.Shared.Game.Economy.FeaturedRotation),
 	StarterOffer = pure(root.ReplicatedStorage.Shared.Game.Economy.StarterOffer),
 	Boosts = pure(root.ReplicatedStorage.Shared.Game.Economy.Boosts),
 }
@@ -80,8 +79,8 @@ local function loadService(name, path)
 		injectGlobals = true,
 		environment = {
 			game = {
-				GetService = function(_, name)
-					return node(name)
+				GetService = function(_, serviceName)
+					return node(serviceName)
 				end,
 			},
 			script = node(name),
@@ -282,9 +281,9 @@ local function startClient(options)
 		fire = function()
 			error("Network.fire is server-only; clients must use fireServer")
 		end,
-		fireServer = function(name, sequence)
-			eq(name, "AcknowledgeBonksCrate")
-			deps.CrateService.acknowledgeBonksOpen(player, sequence)
+		fireServer = function(remoteName, ackSequence)
+			eq(remoteName, "AcknowledgeBonksCrate")
+			deps.CrateService.acknowledgeBonksOpen(player, ackSequence)
 		end,
 	}
 	client.start({ DeferMarketplaceData = true, Network = clientNetwork, Marketplace = market, Player = player })

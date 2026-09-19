@@ -205,15 +205,11 @@ return function(props: Props)
 				Size = UDim2.new(0.5, -16, 0, blockHeight),
 			}, {
 				Header = content[headerKey],
-				Rows = c(
-					"Frame",
-					{
-						BackgroundTransparency = 1,
-						Position = UDim2.fromOffset(0, 38),
-						Size = UDim2.new(1, 0, 0, categoryHeight),
-					},
-					categoryRows
-				),
+				Rows = c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(0, 38),
+					Size = UDim2.new(1, 0, 0, categoryHeight),
+				}, categoryRows),
 			})
 			content[headerKey], content[rowsKey] = nil, nil
 			columnHeights[column] += blockHeight + SETTINGS.RowGap

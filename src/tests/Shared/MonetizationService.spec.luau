@@ -149,13 +149,25 @@ return function()
 			ShopService.start({
 				playerData = playerData,
 				network = network,
-				paidRandomPolicy = { canReceivePaidRandom = function() return false, "paid_random_restricted" end },
-				entitlements = {
-					isReady = function() return true end,
-					has = function() return false end,
-					ownsAny = function() return false end,
+				paidRandomPolicy = {
+					canReceivePaidRandom = function()
+						return false, "paid_random_restricted"
+					end,
 				},
-				time = function() return NOW end,
+				entitlements = {
+					isReady = function()
+						return true
+					end,
+					has = function()
+						return false
+					end,
+					ownsAny = function()
+						return false
+					end,
+				},
+				time = function()
+					return NOW
+				end,
 				sweepSeconds = 0,
 			})
 			local products = {
@@ -167,7 +179,11 @@ return function()
 			}
 			MonetizationService.start({
 				marketplace = marketplace,
-				players = { GetPlayerByUserId = function() return player end },
+				players = {
+					GetPlayerByUserId = function()
+						return player
+					end,
+				},
 				products = products,
 				playerData = playerData,
 				shopService = ShopService,
@@ -184,7 +200,9 @@ return function()
 					end,
 				},
 				network = network,
-				time = function() return NOW end,
+				time = function()
+					return NOW
+				end,
 			})
 
 			local function receipt(productId, purchaseId)

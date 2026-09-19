@@ -162,8 +162,7 @@ T.describe("ShopRotation", function()
 					byRole[offer.Role] = offer
 				end
 				T.expect(byRole.RobuxCommon.Rarity):toEqual("Common")
-				T.expect(byRole.RobuxPremium.Rarity == "Rare" or byRole.RobuxPremium.Rarity == "Legendary")
-					:toBeTruthy()
+				T.expect(byRole.RobuxPremium.Rarity == "Rare" or byRole.RobuxPremium.Rarity == "Legendary"):toBeTruthy()
 				T.expect(byRole.Bonks ~= nil):toBeTruthy()
 			end
 		end

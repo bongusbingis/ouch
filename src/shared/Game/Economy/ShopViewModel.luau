@@ -334,10 +334,10 @@ local function cosmeticCard(args: any, offer: any): Card?
 	local status = if purchased
 		then "Purchased"
 		else if owned
-		then "Owned"
-		else if offer.bonksPrice ~= nil or productStatus == "Active"
-			then "Active"
-			else if productStatus == "Preview" then "Preview" else "Unavailable"
+			then "Owned"
+			else if offer.bonksPrice ~= nil or productStatus == "Active"
+				then "Active"
+				else if productStatus == "Preview" then "Preview" else "Unavailable"
 	return {
 		id = `Cosmetic:{offer.itemId}`,
 		kind = "Cosmetic",
