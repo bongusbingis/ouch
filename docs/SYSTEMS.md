@@ -2,6 +2,8 @@
 
 Each system's responsibility, owner modules, key invariants, and protected contracts.
 
+All systems serve the four highest product priorities: **monetization, engagement, retention, and CCU**. Default to continued play even when presentation or gameplay is degraded or broken. Showing a failure screen or deliberately blocking match entry requires Jack's explicit approval, including for gameplay-critical errors. Preserve purchase, ownership, server-authority, and saved-data correctness while isolating failures. See `CONVENTIONS.md` and `AI_AGENT_WORKFLOW.md` for design and review requirements.
+
 ### Combat & Simulation
 **Purpose:** Runs a pure, fixed-tick physics and combat simulation that is fully server-authoritative.
 **Owner modules:** 
@@ -30,6 +32,19 @@ Each system's responsibility, owner modules, key invariants, and protected contr
 - Modes must define a deterministic way to evaluate a winner and score targets (either globally or scoped per team).
 **Depends on:** Configuration values for constraints, Combat & Simulation to track eliminations.
 **Consumers:** MatchService (for match lifecycle and scoring), MatchmakerService (for queues), UI layer (for scoring and match flow).
+
+### Arena Startup & Asset Loading
+**Purpose:** Starts as much of the arena client as possible while isolating initialization and media failures.
+**Owner modules:** `places/arena/client/Modules/UI/ArenaLoadingClient.luau`, `places/arena/client/Scripts/SimulationClient.client.luau`, `places/arena/client/Scripts/ArenaUI.client.luau`
+**Key invariants:**
+- Client module load/start/render failures are diagnostics. Isolate and clean up the failed system without stopping healthy input, presentation, or UI systems. Generic startup errors must not create a failure screen or force a lobby return.
+- Install loading-screen handoff deadlines before loading UI dependencies. Stalled or missing presentation must not leave an arrival or bootstrap screen covering the game indefinitely.
+- UI presentation, voting visuals, and audio feedback are not match-admission requirements. Bound other client initialization waits and preserve continued play when initialization degrades.
+- Degraded startup never invents an authoritative session snapshot or grants server admission. Combat input still respects server readiness, active match phase, and game mode.
+- Preloading is a bounded warmup, not an authority on whether a player may enter a match. Missing preload-discovered objects must produce diagnostics and release the warmup gate; preload must not create a failure screen.
+- Audio, images, fonts, animations, and cosmetic media are best-effort presentation assets. Failed downloads or preload timeouts must not become fatal startup errors or permanently withhold readiness, including in Splashdown.
+- Preload media through instances with the appropriate content properties so Roblox requests the correct asset type.
+- Warmup waits are bounded. Diagnostics must identify failures without requiring the player to leave the match; late or cancelled work must not change a newer initialization attempt.
 
 ### Splashdown
 **Purpose:** Manages the racing-based obstacle course mode, handling checkpoints, course sequencing, and placements.

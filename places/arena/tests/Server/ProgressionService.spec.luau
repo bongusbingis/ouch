@@ -4,6 +4,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Data"))
+local Boosts = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
+)
 local serviceScript =
 	ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("ProgressionService")
 local ProgressionService = require(serviceScript)
@@ -66,6 +69,30 @@ return function()
 					expect(string.find(reason :: string, `Config.Progression.Data.{case.category}.{case.key}`, 1, true)).to.be.ok()
 				end)
 			end
+		end)
+
+		it("rejects a fraction in each XP and Bonks match reward leaf", function()
+			for _, category in { "ProgressionXP", "ProgressionBonks" } do
+				for _, key in { "MatchComplete", "Win", "Elim", "Catch" } do
+					withReward(category, key, 1.5, function()
+						local valid, reason = ProgressionService.validateRewardConfig()
+						expect(valid).to.equal(false)
+						expect(string.find(reason :: string, `Config.Progression.Data.{category}.{key}`, 1, true)).to.be.ok()
+						expect(string.find(reason :: string, "integer", 1, true)).to.be.ok()
+					end)
+				end
+			end
+		end)
+
+		it("keeps valid integer payouts integral with a 1.5 multiplier", function()
+			withReward("ProgressionXP", "MatchComplete", 3, function()
+				withReward("ProgressionBonks", "MatchComplete", 3, function()
+					local valid = ProgressionService.validateRewardConfig()
+					expect(valid).to.equal(true)
+					expect(Boosts.apply(DataConfig.ProgressionXP.MatchComplete, 1.5)).to.equal(4)
+					expect(Boosts.apply(DataConfig.ProgressionBonks.MatchComplete, 1.5)).to.equal(4)
+				end)
+			end)
 		end)
 
 		it("does not subscribe after an invalid startup", function()

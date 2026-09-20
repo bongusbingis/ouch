@@ -171,8 +171,14 @@ return {
 	-- Tiles stay anchored; the server removes collision after a visible warning.
 	-- RespawnSeconds = 0 means never; use a positive value on checkpoint routes.
 	FallingTile = { DropDelaySeconds = 0.65, RespawnSeconds = 5 },
-	-- Rider offsets drive a bounded kinematic tilt, not an unstable constraint.
-	Seesaw = { MaxTiltDegrees = 24, Response = 3, RiderWeight = 0.7, Axis = "Z" },
+	-- Native hinges keep active seesaw planks server owned.
+	Seesaw = {
+		Axis = "X",
+		AngularSpeed = 0.4,
+		AngularResponsiveness = 1,
+		ServoMaxTorque = 300,
+		PlankDensity = 0.01,
+	},
 	-- Attribute fans can face along an explicit local axis and push beach balls.
 	-- Unmarked fans keep the arena's upward-only launch and float behaviour.
 	CourseFan = { BallSpeed = 32, BallAcceleration = 45 },
@@ -223,8 +229,8 @@ return {
 		RespawnSeconds = "RespawnSeconds",
 		Seesaw = "Seesaw",
 		SeesawAxis = "SeesawAxis",
-		MaxTiltDegrees = "MaxTiltDegrees",
-		SeesawResponse = "SeesawResponse",
+		MaxTiltDegrees = "MaxTiltDegrees", -- legacy authored metadata; native hinge always uses +/-85
+		SeesawResponse = "SeesawResponse", -- legacy authored metadata; native servo tuning is centralized
 		ImpactVisual = "ImpactVisual", -- opt-in client-only ghost pulse for Rotor shoves
 		RisingLiquid = "RisingLiquid",
 		StartDelaySeconds = "StartDelaySeconds",

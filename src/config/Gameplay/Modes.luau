@@ -55,7 +55,7 @@ return {
 		PreserveDodgeballs = true,
 	},
 	Splashdown = {
-		MinPlayers = 2,
+		MinPlayers = 1,
 		-- Points, not eliminations, decide the race; there is no target to reach.
 		ScoreTarget = math.huge,
 		-- Outer safety net only. SplashdownService ends the match itself after the

@@ -29,7 +29,7 @@ The repository is structured to share common modules while keeping place-specifi
 * **`src/scripts/`** — Lune build/release scripts, Studio authoring scripts.
 * **`src/tests/`** — Shared test infrastructure.
 * **`tools/`** — Python tooling (asset pipeline, visual review, deployment).
-* **`generated/`** — Auto-generated files (e.g., `ThirdPartyCredits.luau`).
+* **`generated/`** — Auto-generated build artifacts.
 
 ## 4. Rojo Project Composition
 The DataModel is composed dynamically from scattered source paths via Rojo project files.

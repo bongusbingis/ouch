@@ -124,6 +124,17 @@ local function _migrateEmoteSlots(data)
 	data.Cosmetics.EmoteSlots = dense
 end
 
+local function readyConversionCheck(record, id): (boolean, string?)
+	if type(record) ~= "table" or type(record.Ready) ~= "boolean" then
+		local received = if type(record) == "table" then record.Ready else record
+		return false, `MatchAwards.Pending.{tostring(id)}.Ready: expected boolean, received {tostring(received)}; repair the persisted V1 award before replay`
+	end
+	if not record.Ready then
+		return MatchAwards.validateMarkers(record, tostring(id))
+	end
+	return true, nil
+end
+
 local function _loadPlayerData(player)
 	return Promise.new(function(resolve, reject)
 		local profile = _dataStore:StartSessionAsync(`Player_{player.UserId}`, {
@@ -143,6 +154,16 @@ local function _loadPlayerData(player)
 		profile:Reconcile()
 		_migrateEmoteSlots(profile.Data)
 		local journal = MatchAwards.ensure(profile.Data)
+		for id, record in journal.Pending do
+			local valid, reason = readyConversionCheck(record, id)
+			if not valid then
+				warn(`[Data] user {player.UserId} award {tostring(id)}: {reason}`)
+				profile:EndSession()
+				reject(reason)
+				player:Kick("Data load failed.\nPlease rejoin!")
+				return
+			end
+		end
 		for _, record in journal.Pending do
 			record.Ready = true
 		end
@@ -429,9 +450,17 @@ function Data.resolveMatchAward(player, id, awarded, multipliers)
 	local data = Data.get(player)
 	local record = data and MatchAwards.ensure(data).Pending[id]
 	if record == nil then
-		return nil
+		return nil, `MatchAwards.Pending.{tostring(id)}: journal record is missing`
+	end
+	local valid, reason = MatchAwards.validatePending(record, tostring(id))
+	if not valid then
+		return nil, reason
 	end
 	if record.Awarded == nil then
+		valid, reason = MatchAwards.validateDelta(awarded, `MatchAwards.Pending.{tostring(id)}.Awarded`)
+		if not valid then
+			return nil, reason
+		end
 		record.Awarded = awarded
 		record.Multipliers = multipliers
 		record.FirstMatch = data.Progression.MatchesPlayed == 0
@@ -439,11 +468,104 @@ function Data.resolveMatchAward(player, id, awarded, multipliers)
 	return record
 end
 
-function Data.applyMatchAward(player, id): boolean
+-- Read-only V1 eligibility, shared by career preflight and the season write.
+-- The award write lease keeps this raw target stable between those calls.
+local function seasonCreditPlan(raw, id, requireProgressionApplied): (any?, string?)
+	if type(raw) ~= "table" then
+		return nil, `MatchAwards.Pending.{tostring(id)}: active raw profile required before award payout`
+	end
+	local journal = raw.MatchAwards
+	if type(journal) ~= "table" or journal.Version ~= 1 then
+		local version = if type(journal) == "table" then journal.Version else nil
+		return nil, `MatchAwards.Version: expected V1 (1), received {tostring(version)}; repair the persisted journal before award replay`
+	end
+	local record = if type(journal.Pending) == "table" then journal.Pending[id] else nil
+	if type(id) ~= "string" or id == "" or type(record) ~= "table" then
+		return nil, `MatchAwards.Pending.{tostring(id)}: nonempty award ID and persisted V1 record required`
+	end
+	local markersValid, markerReason = MatchAwards.validateMarkers(record, id)
+	if not markersValid then
+		return nil, markerReason
+	end
+	if not record.Ready then
+		return nil, `MatchAwards.Pending.{id}.Ready: expected true before award payout; finish the persisted award before replay`
+	end
+	if requireProgressionApplied and not record.ProgressionApplied then
+		return nil, `MatchAwards.Pending.{id}.ProgressionApplied: expected true before season credit; apply career payout first`
+	end
+	local amount = if type(record.Awarded) == "table" then record.Awarded.XP else nil
+	if type(amount) ~= "number" or amount < 0 or amount % 1 ~= 0 or math.abs(amount) == math.huge then
+		return nil, `MatchAwards.Pending.{id}.Awarded.XP: expected finite nonnegative integer, received {tostring(amount)}; repair the persisted V1 award before replay`
+	end
+	local seasonId = record.SeasonId
+	if type(seasonId) ~= "string" or (seasonId ~= "" and Seasons.Definitions[seasonId] == nil) then
+		return nil, `MatchAwards.Pending.{id}.SeasonId: unknown season {tostring(seasonId)}; restore its definition or repair this persisted award`
+	end
+	if type(raw.Season) ~= "table" then
+		return nil, `Season: expected table before award {id} credit; repair persisted season state`
+	end
+	if type(raw.SeasonHistory) ~= "table" then
+		return nil, `SeasonHistory: expected table before award {id} credit; repair persisted season state`
+	end
+	local activeValid, activeReason = BattlePassLogic.validateStoredState(raw.Season, "Season")
+	if not activeValid then
+		return nil, `{activeReason}; repair persisted season state before award replay`
+	end
+	local target: any = nil
+	local newArchive = false
+	if seasonId ~= "" then
+		local targetPath = `SeasonHistory.{seasonId}`
+		if raw.Season.Id == seasonId then
+			target = raw.Season
+			targetPath = "Season"
+		else
+			target = raw.SeasonHistory[seasonId]
+			if target ~= nil then
+				local valid, reason = BattlePassLogic.validateStoredState(target, targetPath, seasonId)
+				if not valid then
+					return nil, `{reason}; repair persisted season state before award replay`
+				end
+			elseif record.SeasonApplied and amount > 0 then
+				return nil, `SeasonHistory.{seasonId}: missing for already season-applied positive-XP award {id}; inspect persisted credit before repair`
+			elseif not record.SeasonApplied and amount > 0 then
+				local count = 0
+				for _ in raw.SeasonHistory do
+					count += 1
+				end
+				if count >= DataConfig.Persistence.MaxSeasonArchives then
+					return nil, `SeasonHistory.{seasonId}: archive capacity {DataConfig.Persistence.MaxSeasonArchives} reached before award {id} XP credit; settle or migrate an archive through an approved data operation`
+				end
+				newArchive = true
+			end
+		end
+		if not record.SeasonApplied and amount > 0 then
+			local current = if target ~= nil then target.XP else 0
+			local nextXp = current + amount
+			if nextXp < 0 or nextXp % 1 ~= 0 or math.abs(nextXp) == math.huge then
+				return nil, `{targetPath}.XP: current {tostring(current)} + award {tostring(amount)} is nonfinite or noninteger; repair stored season state or award`
+			end
+		end
+	end
+	return { seasonId = seasonId, amount = amount, target = target, newArchive = newArchive }, nil
+end
+
+function Data.applyMatchAward(player, id): (boolean, string?)
 	local journal = Data.matchAwards(player)
 	local record = journal and journal.Pending[id]
-	if record == nil or record.Awarded == nil then
-		return false
+	if record == nil then
+		return false, `MatchAwards.Pending.{tostring(id)}: journal record is missing`
+	end
+	local valid, reason = MatchAwards.validatePending(record, tostring(id))
+	if not valid then
+		return false, reason
+	end
+	if record.Awarded == nil then
+		return false, `MatchAwards.Pending.{tostring(id)}.Awarded: required before career payout`
+	end
+	local entry = Data._profiles[player.UserId]
+	local plan, planReason = seasonCreditPlan(entry and entry.Profile and entry.Profile.Data, id, false)
+	if plan == nil then
+		return false, planReason
 	end
 	if record.ProgressionApplied then
 		return true
@@ -475,50 +597,17 @@ function Data.creditMatchSeasonXp(player, id): (boolean, string?)
 		return false, `award {tostring(id)}: active profile and award write lease required`
 	end
 	local raw = entry.Profile.Data
-	local journal = raw.MatchAwards
-	local record = journal and journal.Pending and journal.Pending[id]
-	if type(id) ~= "string" or id == "" or record == nil or record.Ready ~= true or record.ProgressionApplied ~= true then
-		return false, `award {tostring(id)}: ready, progression-applied V1 journal record required`
+	local plan, planReason = seasonCreditPlan(raw, id, true)
+	if plan == nil then
+		return false, planReason
 	end
-	if journal.Version ~= 1 or type(record.SeasonApplied) ~= "boolean" then
-		return false, `award {id}: invalid V1 season journal marker`
-	end
-	local amount = record.Awarded and record.Awarded.XP
-	if type(amount) ~= "number" or amount < 0 or amount % 1 ~= 0 or amount == math.huge then
-		return false, `award {id}: invalid awarded season XP {tostring(amount)}`
-	end
-	local seasonId = record.SeasonId
-	if type(seasonId) ~= "string" or (seasonId ~= "" and Seasons.Definitions[seasonId] == nil) then
-		return false, `award {id}: unknown season {tostring(seasonId)}`
-	end
-	local target: any = nil
-	local newArchive = false
-	if seasonId ~= "" and amount > 0 then
-		if type(raw.Season) ~= "table" or type(raw.SeasonHistory) ~= "table" then
-			return false, `award {id} season {seasonId}: season profile data missing`
-		end
-		if raw.Season.Id == seasonId then
-			target = raw.Season
-		else
-			target = raw.SeasonHistory[seasonId]
-			if target == nil then
-				local count = 0
-				for _ in raw.SeasonHistory do
-					count += 1
-				end
-				if count >= DataConfig.Persistence.MaxSeasonArchives then
-					return false, `award {id} season {seasonId}: SeasonHistory archive capacity {DataConfig.Persistence.MaxSeasonArchives} reached`
-				end
-				newArchive = true
-			end
-		end
-		if target ~= nil and (type(target.XP) ~= "number" or target.XP < 0 or target.XP == math.huge) then
-			return false, `award {id} season {seasonId}: invalid stored XP {tostring(target.XP)}`
-		end
-	end
+	local record = raw.MatchAwards.Pending[id]
+	local seasonId = plan.seasonId
+	local amount = plan.amount
 	if not record.SeasonApplied then
 		if seasonId ~= "" and amount > 0 then
-			if newArchive then
+			local target = plan.target
+			if plan.newArchive then
 				target = BattlePassLogic.blankState(seasonId)
 				raw.SeasonHistory[seasonId] = target
 			end
@@ -533,10 +622,10 @@ function Data.creditMatchSeasonXp(player, id): (boolean, string?)
 			if seasonId ~= "" and amount > 0 then
 				if raw.Season.Id == seasonId then
 					entry.Replica:Set({ "Season", "XP" }, raw.Season.XP)
-				elseif newArchive then
-					entry.Replica:Set({ "SeasonHistory", seasonId }, raw.SeasonHistory[seasonId])
 				else
-					entry.Replica:Set({ "SeasonHistory", seasonId, "XP" }, raw.SeasonHistory[seasonId].XP)
+					-- The first archive notification may have failed, so a retry must
+					-- send the whole entry rather than assuming the client has its path.
+					entry.Replica:Set({ "SeasonHistory", seasonId }, raw.SeasonHistory[seasonId])
 				end
 			end
 			entry.Replica:Set({ "MatchAwards", "Pending", id, "SeasonApplied" }, true)
@@ -732,8 +821,13 @@ function Data.save(player)
 	if not entry or Data._pendingSaves[userId] ~= nil then
 		return
 	end
-	for _, record in MatchAwards.ensure(entry.Data).Pending do
-		record.Ready = true
+	for id, record in MatchAwards.ensure(entry.Data).Pending do
+		local valid, reason = readyConversionCheck(record, id)
+		if not valid then
+			warn(`[Data] user {userId} award {tostring(id)}: {reason}`)
+		else
+			record.Ready = true
+		end
 	end
 	Data._loaded[userId] = nil
 	Data._loadGeneration[userId] = (Data._loadGeneration[userId] or 0) + 1

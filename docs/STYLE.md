@@ -104,7 +104,7 @@ The approved Backpack is the baseline for the Shop, item inspection, crate odds/
 
 ## Settings
 
-Settings uses the same cream candy panel and pink title sticker as the Backpack and Shop. Its single pale-blue scroll well holds upright yellow-striped section headings and cream puffy setting cards; row labels use plum Builder Sans, while controls keep the pink primary state and a yellow slider knob. Toggle, saving, focus, persistence, and asset-credit behavior are unchanged. Slider mouse/touch tracking starts inside its 44-pixel hit target, stays claimed outside the control, and ends only on release; vertical touch movement still yields to page scrolling. `Tokens.Settings` owns the page-specific spacing and control geometry, and all interactive targets remain at least 44 logical pixels.
+Settings uses the same cream candy panel and pink title sticker as the Backpack and Shop. Its single pale-blue scroll well holds upright yellow-striped section headings and cream puffy setting cards; row labels use plum Builder Sans, while controls keep the pink primary state and a yellow slider knob. Toggle, saving, focus, and persistence behavior are unchanged. Slider mouse/touch tracking starts inside its 44-pixel hit target, stays claimed outside the control, and ends only on release; vertical touch movement still yields to page scrolling. `Tokens.Settings` owns the page-specific spacing and control geometry, and all interactive targets remain at least 44 logical pixels.
 
 ## Arena HUD
 

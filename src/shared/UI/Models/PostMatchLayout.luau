@@ -54,7 +54,42 @@ local function rect(x: number, y: number, width: number, height: number): Rect
 	}
 end
 
-function PostMatchLayout.resolve(safeSize: Vector2, wantShop: boolean): Layout
+local function personalHeight(result: any, rowHeight: number, chipHeight: number, inset: number): number
+	local sections = 1
+	local contentHeight = chipHeight
+	local rewards = result.rewards
+	if rewards and ((rewards.xpMultiplier or 1) > 1 or (rewards.bonksMultiplier or 1) > 1) then
+		sections += 1
+		contentHeight += 18
+	end
+	local statCount = 0
+	for _, stat in result.personalStats or {} do
+		if stat.id ~= "Placement" then
+			statCount += 1
+		end
+	end
+	if statCount > 0 then
+		sections += 1
+		contentHeight += statCount * rowHeight + (statCount - 1) * 2 + 12
+	end
+	if result.seasonProgress then
+		sections += 1
+		contentHeight += R.SeasonHeight
+	end
+	local challengeCount = if result.challenges then #result.challenges else 0
+	if challengeCount > 0 then
+		sections += 1
+		contentHeight += challengeCount * rowHeight + (challengeCount - 1) * 2 + 12
+	end
+	local unlockCount = if result.unlocks then #result.unlocks else 0
+	sections += unlockCount
+	contentHeight += unlockCount * (rowHeight + 8)
+	contentHeight += (sections - 1) * R.RowGap
+	local scrollTop = inset + R.SectionHeight + 2
+	return scrollTop + R.PersonalScrollInset * 2 + contentHeight + inset
+end
+
+function PostMatchLayout.resolve(safeSize: Vector2, wantShop: boolean, result: any?): Layout
 	local compact = safeSize.X < R.NarrowWidth or safeSize.Y < R.ShortHeight
 	local portrait = safeSize.Y > safeSize.X
 	local stacked = portrait or safeSize.X < R.StackWidth
@@ -142,7 +177,21 @@ function PostMatchLayout.resolve(safeSize: Vector2, wantShop: boolean): Layout
 		end
 	else
 		stage = rect(0, bodyTop, canvasWidth - personalWidth - gap, bodyHeight)
-		personal = rect(canvasWidth - personalWidth, bodyTop, personalWidth, bodyHeight)
+		local panelHeight = if result
+			then math.min(
+				bodyHeight,
+				math.max(
+					R.PersonalComfortHeight,
+					personalHeight(
+						result,
+						if compact then R.CompactStatRowHeight else R.StatRowHeight,
+						if compact then R.CompactRewardChipHeight else R.RewardChipHeight,
+						inset
+					)
+				)
+			)
+			else bodyHeight
+		personal = rect(canvasWidth - personalWidth, bodyTop, personalWidth, panelHeight)
 	end
 
 	return {

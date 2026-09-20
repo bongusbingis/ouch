@@ -32,13 +32,31 @@ local SOUND_IDS: { [string]: SoundIdConfig } = {
 	Click = UIConfig.Feedback.ClickSoundId,
 }
 
-local function getSoundIds(config: SoundIdConfig): { string }
+local function getSoundIds(name: string, config: any): { string }
 	if type(config) == "string" then
-		return { config }
+		if config ~= "" then
+			return { config }
+		end
+		warn(`[UIFeedback] {name} feedback sound is empty; skipping this cue`)
+		return {}
+	end
+	if type(config) ~= "table" then
+		warn(`[UIFeedback] {name} feedback sound is missing or invalid; skipping this cue`)
+		return {}
 	end
 
-	assert(#config > 0, "[UIFeedback] Sound ID arrays cannot be empty")
-	return config
+	local soundIds: { string } = {}
+	for index, soundId in config do
+		if type(soundId) == "string" and soundId ~= "" then
+			table.insert(soundIds, soundId)
+		else
+			warn(`[UIFeedback] {name} feedback sound at index {tostring(index)} is invalid; skipping it`)
+		end
+	end
+	if #soundIds == 0 then
+		warn(`[UIFeedback] {name} feedback sound has no usable entries; skipping this cue`)
+	end
+	return soundIds
 end
 
 local function playSound(options: { Sound }?)
@@ -71,10 +89,9 @@ function UIFeedback.start()
 	end
 
 	for name, soundIdConfig in SOUND_IDS do
-		local soundIds = getSoundIds(soundIdConfig)
+		local soundIds = getSoundIds(name, soundIdConfig)
 		local options: { Sound } = {}
 		for index, soundId in soundIds do
-			assert(soundId ~= "", "[UIFeedback] Sound IDs cannot be empty")
 			local sound = Instance.new("Sound")
 			sound.Name = if #soundIds == 1 then `UI{name}` else `UI{name}{index}`
 			sound.SoundId = soundId

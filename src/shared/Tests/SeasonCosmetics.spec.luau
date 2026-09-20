@@ -53,6 +53,17 @@ T.describe("Supplemental season cosmetics", function()
 		T.expect(state.CosmeticClaims[original.key]):toBeTruthy()
 		T.expect(state.ClaimedFree["1"]):toBeTruthy()
 	end)
+
+	T.it("treats only absent historical cosmetic claims as empty", function()
+		local season, state = fixture()
+		state.ClaimedFree["1"] = true
+		state.CosmeticClaims = nil :: any
+		T.expect(#SeasonCosmetics.pending(season, state, false)):toEqual(1)
+		T.expect(SeasonCosmetics.public(season, state, 1, "Free")[1].claimed):toBeFalsy()
+		state.CosmeticClaims = false :: any
+		local ok = pcall(SeasonCosmetics.pending, season, state, false)
+		T.expect(ok):toBeFalsy()
+	end)
 end)
 
 return true

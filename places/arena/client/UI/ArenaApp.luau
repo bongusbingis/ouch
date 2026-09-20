@@ -96,9 +96,6 @@ local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 			return "RETURNING TO LOBBY", "TRAVELING FROM THE ARENA"
 		end
 	end
-	if loading.fatalError then
-		return "ARENA COULD NOT LOAD", "CHECK YOUR CONNECTION AND TRY AGAIN"
-	end
 	if loading.admission == "Rejected" then
 		return "UNABLE TO JOIN MATCH", "PLEASE RETURN TO THE LOBBY"
 	elseif not loading.localReady then
@@ -210,7 +207,10 @@ return function(props: Props)
 			or (not fixedMode and (phase == "Starting" or phase == "Intermission"))
 		)
 	local returning = teleportStatus ~= nil and teleportStatus.state ~= "Complete"
-	local loadingVisible = not hostPresented or returning or (not votePresented and not matchVisible)
+	-- Once the bounded startup deadline releases a degraded client, keep the
+	-- healthy HUD/root visible instead of leaving a generic loading overlay up.
+	local loadingVisible = returning
+		or (not loading.initializationDegraded and (not hostPresented or (not votePresented and not matchVisible)))
 	local hudAvailable = not loadingVisible and loading.matchPhase == "Active" and not menu.open
 	local hudVisible = not loadingVisible
 		and (loading.matchPhase == "Active" or loading.matchPhase == "Starting")
@@ -237,7 +237,7 @@ return function(props: Props)
 	local progress: number? = nil
 	if not loading.preloadReady and loading.preloadProgress > 0 then
 		progress = loading.preloadProgress
-	elseif loading.localReady and not loading.gateReleased and not returning and loading.fatalError == nil then
+	elseif loading.localReady and not loading.gateReleased and not returning then
 		local count = if loading.arrivedPlayerCount < loading.expectedPlayerCount
 			then loading.arrivedPlayerCount
 			else loading.readyPlayerCount
@@ -255,19 +255,6 @@ return function(props: Props)
 			Text = "STAY",
 			Style = "Secondary",
 			OnActivated = ArenaTeleportClient.stay,
-		}
-	elseif loading.fatalError then
-		primaryAction = if loading.fatalError == "INITIALIZATION_TIMED_OUT" and loading.simulationReady
-			then {
-				Text = "TRY AGAIN",
-				Style = "Primary",
-				OnActivated = ArenaLoadingClient.retryInitialization,
-			}
-			else nil
-		secondaryAction = {
-			Text = "RETURN",
-			Style = "Secondary",
-			OnActivated = ArenaTeleportClient.returnToLobby,
 		}
 	elseif loading.admission == "Rejected" then
 		primaryAction = {

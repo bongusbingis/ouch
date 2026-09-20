@@ -15,6 +15,8 @@ The workflow has four goals:
 
 ## Core operating principles
 
+- **Monetization, engagement, retention, and CCU are the four highest product priorities.** Every design, implementation, and review decision must serve those outcomes above architectural purity, defensive strictness, or agent convenience. Preserve purchase, ownership, server-authority, and data-integrity contracts. See `CONVENTIONS.md` for the governing philosophy.
+- **Preserve play through failures; Jack approves blockers.** Default to continued play with bounded waits and isolated failures, even when gameplay is degraded or broken. Showing a failure screen or deliberately blocking match entry requires Jack's explicit approval, including for gameplay-critical errors. A feature/fix request does not implicitly authorize that product decision. Preserve purchase, ownership, server-authority, and data-integrity protections. The arena incident where font/audio/image preload failures blocked match entry is a concrete prohibited design pattern, including during Roblox asset-delivery outages.
 - **Jack is the final authority.** Every agent, including Prime, operates under Jack's direction. Decisions that cannot be made in good faith — ambiguous product intent, unresolvable tradeoffs, scope questions, or anything that risks an incorrect irreversible action — must be escalated to Jack rather than guessed at.
 - Prime owns the overall goal, task graph, priorities, integration decisions, and final answer, subject to Jack's authority.
 - Specialists receive bounded assignments rather than the entire conversation or repository history.
@@ -356,6 +358,7 @@ Prime grants and releases these resources explicitly. A waiting task should rele
 Require explicit authorization from Jack for material external or irreversible actions, including:
 
 - publishing a live place or release;
+- introducing or retaining a proposed failure screen or deliberate match-entry block as the response to an error, including a gameplay-critical error;
 - changing monetization, prices, probabilities, or rewards;
 - executing a destructive data migration;
 - uploading or deleting production assets;
@@ -404,6 +407,7 @@ Prime selects gates according to risk. Not every task requires every gate.
 ### Review gate
 
 - Sentry reviewed the final diff and affected execution path.
+- Startup, loading, and dependency changes preserve continued play through failures, including degraded or broken gameplay. Any proposed failure screen or deliberate match-entry block has Jack's explicit approval; severity alone is not approval. Review the failure, exception, timeout, and late-completion paths, and require behavioral regression evidence for changed readiness gates. Flag existing blockers encountered during review instead of silently treating them as approved precedent.
 - Material findings are fixed, explicitly accepted, or converted into tracked work.
 - The reviewer is independent from the implementation assignment.
 

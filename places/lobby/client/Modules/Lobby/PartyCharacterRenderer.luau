@@ -38,6 +38,12 @@ local EmotePlayer = require(
 local PartyBubblePolicy = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("PartyBubblePolicy")
 )
+local PartyVisibilityPolicy = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("UI")
+		:WaitForChild("Models")
+		:WaitForChild("PartyVisibilityPolicy")
+)
 
 local USERNAME_LOOKUP_ATTEMPTS = 3
 local USERNAME_RETRY_DELAY = 1
@@ -617,9 +623,18 @@ function PartyCharacterRenderer:_updateNametagPresentation()
 	local localCharacter = self._characters[self._localUserId]
 	local localLeader = localCharacter and localCharacter.crownLabel.Visible
 	for _, character in self._characters do
+		local visible =
+			PartyVisibilityPolicy.shouldShowCharacter(character.userId, self._localUserId, self._backpackActive)
+		local parent = if visible then self._characterContainer else nil
+		if character.rig.Parent ~= parent then
+			character.rig.Parent = parent
+		end
+		if character.bubbleAnchor.Parent ~= parent then
+			character.bubbleAnchor.Parent = parent
+		end
 		local canKick = not self._compactParty and localLeader and not character.crownLabel.Visible
 		-- Compact layouts show names and leadership in the party modal at readable sizes.
-		character.nametag.Enabled = not self._compactParty
+		character.nametag.Enabled = not self._compactParty and visible
 		character.usernameLabel.Visible = not self._compactParty
 		character.kickButton.Visible = canKick == true
 		character.kickButton.Active = canKick == true
@@ -931,6 +946,7 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	idleTrack:Play(0, 1, IDLE_PLAYBACK_SPEED)
 
 	self._characters[userId] = {
+		userId = userId,
 		rig = rig,
 		appearance = CharacterAppearance.create(
 			rig,
@@ -1026,6 +1042,7 @@ end
 function PartyCharacterRenderer:SetBackpackActive(value)
 	self._backpackActive = value
 	self._candyStage.setEnabled(value)
+	self:_updateNametagPresentation()
 	local background = Workspace.Views.Party.Background
 	background:SetAttribute("CandyBackpackActive", value)
 end

@@ -101,26 +101,19 @@ function ArenaService.start(): Arena
 	local root = requireFolder(assets, "Arena", "Workspace.Assets.Arena")
 	local origin = root:WaitForChild("MapOrigin")
 	assert(origin:IsA("BasePart"), "[ArenaService] Workspace.Assets.Arena.MapOrigin must be a BasePart")
-	local function projectOrigin()
-		root:SetAttribute("MapOriginPosition", origin.Position)
-		root:SetAttribute("MapOriginCFrame", origin.CFrame)
-	end
-	projectOrigin()
-	origin:GetPropertyChangedSignal("CFrame"):Connect(projectOrigin)
 	local playerSpawnsFolder = requireFolder(root, "PlayerSpawns", "Workspace.Assets.Arena.PlayerSpawns")
 	local teamSpawnsFolder = requireFolder(root, "TeamSpawns", "Workspace.Assets.Arena.TeamSpawns")
 	local redSpawns = requireFolder(teamSpawnsFolder, "Red", "Workspace.Assets.Arena.TeamSpawns.Red")
 	local blueSpawns = requireFolder(teamSpawnsFolder, "Blue", "Workspace.Assets.Arena.TeamSpawns.Blue")
 
 	local scriptables = requireFolder(root, "Scriptables", "Workspace.Assets.Arena.Scriptables")
-	ScriptableRoots.tag(scriptables)
 	local playerSpawns = spawnParts(playerSpawnsFolder, "Workspace.Assets.Arena.PlayerSpawns", origin.Position)
 	local teamSpawns = {
 		Red = spawnParts(redSpawns, "Workspace.Assets.Arena.TeamSpawns.Red", origin.Position),
 		Blue = spawnParts(blueSpawns, "Workspace.Assets.Arena.TeamSpawns.Blue", origin.Position),
 	}
 
-	arena = {
+	local resolved: Arena = {
 		root = root,
 		map = requireFolder(root, "Map", "Workspace.Assets.Arena.Map"),
 		scriptables = scriptables,
@@ -129,14 +122,23 @@ function ArenaService.start(): Arena
 		teamSpawns = teamSpawns,
 		ballSpawns = ballSpawnParts(scriptables, playerSpawns, teamSpawns),
 	}
-	assert(#arena.playerSpawns >= GameModes.MatchCapacity, "[ArenaService] PlayerSpawns must cover MatchCapacity")
-	for teamId, spawns in arena.teamSpawns do
+	assert(#resolved.playerSpawns >= GameModes.MatchCapacity, "[ArenaService] PlayerSpawns must cover MatchCapacity")
+	for teamId, spawns in resolved.teamSpawns do
 		assert(
 			#spawns >= math.ceil(GameModes.MatchCapacity / 2),
 			`[ArenaService] {teamId} requires half MatchCapacity spawns`
 		)
 	end
-	return arena
+	local function projectOrigin()
+		root:SetAttribute("MapOriginPosition", origin.Position)
+		root:SetAttribute("MapOriginCFrame", origin.CFrame)
+	end
+	projectOrigin()
+	local tagged, reason = ScriptableRoots.tag(scriptables)
+	assert(tagged, `[ArenaService] rejected Workspace.Assets.Arena.Scriptables:\n{reason}`)
+	origin:GetPropertyChangedSignal("CFrame"):Connect(projectOrigin)
+	arena = resolved
+	return resolved
 end
 
 function ArenaService.get(): Arena

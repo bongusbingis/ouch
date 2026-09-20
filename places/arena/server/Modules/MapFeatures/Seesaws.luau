@@ -1,84 +1,199 @@
--- Kinematic local-axis tilt from normalized rider offsets, sampled once per frame.
+-- Native, server-owned hinges. The authored course parts stay anchored until activation.
 --!strict
-local RS = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Config = require(RS.Config.Gameplay.MapFeatures)
+
+local Config = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
 local Parts = require(script.Parent.FeatureParts)
+local Collision = require(script.Parent.SeesawCollision)
 local Kit = require(script.Parent.MapFeatureKit)
+
 local Seesaws = { folderName = "Rotating", instanceClass = "Folder" }
 Seesaws.folderNames = { "Seesaws", "Rotating" }
-type State = { base: CFrame, angle: number, moment: number, followers: { { part: BasePart, offset: CFrame } } }
+
+type State = {
+	board: BasePart,
+	rest: CFrame,
+	anchored: boolean,
+	group: string,
+	canCollide: boolean,
+	canQuery: boolean,
+	physicalProperties: PhysicalProperties?,
+	authoredTilt: any,
+	authoredResponse: any,
+	boardAttachment: Attachment,
+	pedestalAttachment: Attachment,
+	hinge: HingeConstraint,
+	noCollision: NoCollisionConstraint,
+	gravityAttachment: Attachment,
+	gravityForce: VectorForce,
+}
+
 local states: { [BasePart]: State } = {}
-local ray = RaycastParams.new()
-ray.FilterType = Enum.RaycastFilterType.Exclude
-ray.RespectCanCollide = true
-local function apply(part: BasePart, state: State, angle: number)
-	local axis = Parts.axis(part:GetAttribute("SeesawAxis") or Config.Seesaw.Axis)
-	local center = state.base * CFrame.fromAxisAngle(axis, angle)
-	for _, follower in state.followers do
-		if follower.part.Parent then
-			follower.part.CFrame = center * follower.offset
-		end
-	end
+
+local function serverOwns(board: BasePart)
+	local canSet, reason = board:CanSetNetworkOwnership()
+	assert(canSet, `[Seesaws] {board:GetFullName()} cannot set server ownership: {tostring(reason)}`)
+	board:SetNetworkOwner(nil)
+	assert(board:GetNetworkOwner() == nil, `[Seesaws] {board:GetFullName()} must be server owned: {tostring(reason)}`)
 end
+
+local function setup(board: BasePart): State
+	local pedestal = board.Parent
+	assert(pedestal and pedestal:IsA("BasePart"), `[Seesaws] {board:GetFullName()} needs a BasePart pedestal parent`)
+	assert(pedestal.Anchored, `[Seesaws] {pedestal:GetFullName()} must be anchored`)
+	assert(
+		Parts.axis(board, "SeesawAxis", Config.Seesaw.Axis) == Vector3.xAxis,
+		`[Seesaws] {board:GetFullName()} axle must use local X`
+	)
+	local rest = board.CFrame
+	local boardAttachment = Instance.new("Attachment")
+	boardAttachment.Name = "SeesawAxle"
+	boardAttachment.CFrame = CFrame.identity
+	boardAttachment.Parent = board
+	local pedestalAttachment = Instance.new("Attachment")
+	pedestalAttachment.Name = "SeesawAxle"
+	pedestalAttachment.CFrame = pedestal.CFrame:ToObjectSpace(rest)
+	pedestalAttachment.Parent = pedestal
+
+	local hinge = Instance.new("HingeConstraint")
+	hinge.Name = "SeesawHinge"
+	hinge.Attachment0 = pedestalAttachment
+	hinge.Attachment1 = boardAttachment
+	hinge.ActuatorType = Enum.ActuatorType.Servo
+	hinge.TargetAngle = 0
+	hinge.AngularSpeed = Config.Seesaw.AngularSpeed
+	hinge.AngularResponsiveness = Config.Seesaw.AngularResponsiveness
+	hinge.ServoMaxTorque = Config.Seesaw.ServoMaxTorque
+	hinge.Restitution = 0
+	-- Set distinct bounds before enabling limits; equal interim bounds can lock the joint.
+	hinge.UpperAngle = 85
+	hinge.LowerAngle = -85
+	hinge.LimitsEnabled = true
+	assert(
+		hinge.LowerAngle == -85 and hinge.UpperAngle == 85,
+		`[Seesaws] {board:GetFullName()} hinge limits did not initialize`
+	)
+	hinge.Parent = pedestal
+
+	local noCollision = Instance.new("NoCollisionConstraint")
+	noCollision.Name = "SeesawPedestalNoCollision"
+	noCollision.Part0 = board
+	noCollision.Part1 = pedestal
+	noCollision.Parent = pedestal
+
+	local state: State = {
+		board = board,
+		rest = rest,
+		anchored = board.Anchored,
+		group = board.CollisionGroup,
+		canCollide = board.CanCollide,
+		canQuery = board.CanQuery,
+		physicalProperties = board.CustomPhysicalProperties,
+		authoredTilt = board:GetAttribute("MaxTiltDegrees"),
+		authoredResponse = board:GetAttribute("SeesawResponse"),
+		boardAttachment = boardAttachment,
+		pedestalAttachment = pedestalAttachment,
+		hinge = hinge,
+		noCollision = noCollision,
+		gravityAttachment = Instance.new("Attachment"),
+		gravityForce = Instance.new("VectorForce"),
+	}
+	board.CollisionGroup = Collision.PLANK_GROUP
+	board:SetAttribute("MaxTiltDegrees", 85)
+	board:SetAttribute("SeesawResponse", nil)
+	board.CanCollide = true
+	board.CanQuery = true
+	local material = board.CurrentPhysicalProperties
+	board.CustomPhysicalProperties = PhysicalProperties.new(
+		Config.Seesaw.PlankDensity,
+		material.Friction,
+		material.Elasticity,
+		material.FrictionWeight,
+		material.ElasticityWeight
+	)
+	state.gravityAttachment.Name = "SeesawGravityAttachment"
+	state.gravityAttachment.Parent = board
+	state.gravityForce.Name = "SeesawGravityCompensation"
+	state.gravityForce.Attachment0 = state.gravityAttachment
+	state.gravityForce.RelativeTo = Enum.ActuatorRelativeTo.World
+	state.gravityForce.ApplyAtCenterOfMass = true
+	state.gravityForce.Force = Vector3.yAxis * board:GetMass() * Workspace.Gravity
+	state.gravityForce.Parent = board
+	board.Anchored = false
+	serverOwns(board)
+	return state
+end
+
+local function teardown(state: State)
+	local board = state.board
+	if board.Parent then
+		board.Anchored = true
+		board.CFrame = state.rest
+		board.AssemblyAngularVelocity = Vector3.zero
+		board.AssemblyLinearVelocity = Vector3.zero
+		board.CollisionGroup = state.group
+		board.CanCollide = state.canCollide
+		board.CanQuery = state.canQuery
+		board.CustomPhysicalProperties = state.physicalProperties
+		board:SetAttribute("MaxTiltDegrees", state.authoredTilt)
+		board:SetAttribute("SeesawResponse", state.authoredResponse)
+		board.Anchored = state.anchored
+	end
+	state.hinge:Destroy()
+	state.noCollision:Destroy()
+	state.boardAttachment:Destroy()
+	state.pedestalAttachment:Destroy()
+	state.gravityForce:Destroy()
+	state.gravityAttachment:Destroy()
+end
+
 function Seesaws.tickWorld(context: Kit.Context)
-	local active = {}
-	for _, part in Parts.collect(context.instances, Config.Attributes.Seesaw) do
-		active[part] = true
-		local state = states[part]
-		if not state then
-			local base = part:GetPivot()
-			local followers = { { part = part, offset = base:ToObjectSpace(part.CFrame) } }
-			for _, child in part:GetDescendants() do
-				if child:IsA("BasePart") then
-					table.insert(followers, { part = child, offset = base:ToObjectSpace(child.CFrame) })
-				end
-			end
-			state = { base = base, angle = 0, moment = 0, followers = followers }
-			states[part] = state
-		end
-		local limit = math.rad(Parts.number(part, "MaxTiltDegrees", Config.Seesaw.MaxTiltDegrees, 1, 40))
-		local target = math.clamp(state.moment * Config.Seesaw.RiderWeight, -1, 1) * limit
-		state.angle += (target - state.angle) * (1 - math.exp(
-			-Parts.number(part, "SeesawResponse", Config.Seesaw.Response, 0.1, 10) * math.min(context.deltaTime, 0.2)
-		))
-		state.moment = 0
-		apply(part, state, state.angle)
+	local active: { [BasePart]: boolean } = {}
+	local boards = Parts.collect(context.instances, Config.Attributes.Seesaw)
+	if #boards > 0 and next(states) == nil then
+		Collision.start()
 	end
-	for part, state in states do
-		if not active[part] then
-			apply(part, state, 0)
-			states[part] = nil
+	for _, board in boards do
+		if not board:IsDescendantOf(Workspace) then
+			continue
 		end
+		active[board] = true
+		local state = states[board]
+		if state == nil then
+			state = setup(board)
+			states[board] = state
+		else
+			assert(
+				Parts.axis(board, "SeesawAxis", Config.Seesaw.Axis) == Vector3.xAxis,
+				`[Seesaws] {board:GetFullName()} axle must use local X`
+			)
+			assert(
+				state.hinge.LowerAngle == -85 and state.hinge.UpperAngle == 85,
+				`[Seesaws] {board:GetFullName()} hinge limits changed`
+			)
+		end
+	end
+	for board, state in states do
+		if not active[board] then
+			teardown(state)
+			states[board] = nil
+		end
+	end
+	if next(states) == nil then
+		Collision.stop()
 	end
 end
-function Seesaws.tickPlayer(_context: Kit.Context, _player: Player, root: BasePart)
-	local humanoid = if root.Parent then root.Parent:FindFirstChildOfClass("Humanoid") else nil
-	if not humanoid or humanoid.Health <= 0 or root.Anchored then
-		return
-	end
-	ray.FilterDescendantsInstances = { root.Parent :: Instance }
-	local hit = Workspace:Raycast(root.Position, -Vector3.yAxis * (humanoid.HipHeight + root.Size.Y / 2 + 1), ray)
-	if not hit or hit.Normal.Y < 0.5 then
-		return
-	end
-	for part, state in states do
-		if hit.Instance == part or hit.Instance:IsDescendantOf(part) then
-			local offset = state.base:PointToObjectSpace(root.Position)
-			local axis = part:GetAttribute("SeesawAxis") or Config.Seesaw.Axis
-			-- Downward torque: positive X lowers the positive-X side of a Z axle.
-			state.moment += if axis == "X" then offset.Z / (part.Size.Z / 2) else -offset.X / (part.Size.X / 2)
-			return
-		end
-	end
-end
+
 function Seesaws.forget(player: Player?)
 	if player then
 		return
 	end
-	for part, state in states do
-		apply(part, state, 0)
+	for board, state in states do
+		teardown(state)
+		states[board] = nil
 	end
-	table.clear(states)
+	Collision.stop()
 end
+
 return Seesaws

@@ -10,6 +10,7 @@ local MapFeatures =
 local Features = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures")
 local RotatingPlatforms = require(Features:WaitForChild("RotatingPlatforms"))
 local RiderSupport = require(Features:WaitForChild("RiderSupport"))
+local SeesawQuery = require(Features:WaitForChild("SeesawQuery"))
 
 local PlatformRider = {}
 local connection: RBXScriptConnection? = nil
@@ -34,6 +35,9 @@ end
 
 local function platformFor(hit: RaycastResult?): (RotatingPlatforms.Platform?, RotatingPlatforms.LocalRotor?)
 	if hit == nil or hit.Normal.Y < MapFeatures.Rotating.MinSupportNormalY then
+		return nil, nil
+	end
+	if hit.Instance:GetAttribute(MapFeatures.Attributes.Seesaw) == true then
 		return nil, nil
 	end
 	for _, platform in RotatingPlatforms.all() do
@@ -71,6 +75,7 @@ local function step(dt: number)
 		clear()
 	end
 	rayParams.FilterDescendantsInstances = { character }
+	rayParams.CollisionGroup = SeesawQuery.groupFor(root)
 	local contactDistance = humanoid.HipHeight + root.Size.Y / 2 + config.ContactTolerance
 	local supportHit = Workspace:Raycast(root.Position, Vector3.new(0, -contactDistance, 0), rayParams)
 	local platform, rotor = platformFor(supportHit)

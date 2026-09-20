@@ -36,7 +36,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = REPO_ROOT / "src" / "config" / "LiveConfig.luau"
 
 # Module name as it appears in a config key -> the Luau file that defines it.
@@ -50,6 +50,7 @@ MODULE_SOURCES = {
     "GameModes": _CONFIG / "Gameplay" / "GameModes.luau",
     "MapFeatures": _CONFIG / "Gameplay" / "MapFeatures.luau",
     "Modes": _CONFIG / "Gameplay" / "Modes.luau",
+    "Progression": _CONFIG / "Progression" / "Data.luau",
     "Shop": _CONFIG / "Economy" / "Shop.luau",
     "Crates": _CONFIG / "Economy" / "Crates.luau",
     "Matchmaking": REPO_ROOT / "places" / "lobby" / "shared" / "Matchmaking" / "Config.luau",
@@ -221,19 +222,61 @@ def read_leaf(clean: str, source: str, path: list[str], key: str) -> str:
 
 
 def parse_registry(text: str) -> list[dict[str, Any]]:
-    pattern = re.compile(
-        r"\{\s*Key\s*=\s*\"(?P<key>[^\"]+)\"\s*,\s*Type\s*=\s*\"(?P<type>[^\"]+)\""
-        r"(?:\s*,\s*Minimum\s*=\s*(?P<min>-?[\d.]+))?"
-        r"(?:\s*,\s*Maximum\s*=\s*(?P<max>-?[\d.]+))?"
-    )
+    pattern = re.compile(r'\{\s*Key\s*=\s*"(?P<key>[^"]+)"(?P<fields>[^{}]*)\}')
     entries = []
     for match in pattern.finditer(text):
+        key = match.group("key")
+        fields: dict[str, str] = {}
+        for piece in match.group("fields").split(","):
+            piece = piece.strip()
+            if not piece:
+                continue
+            field = re.fullmatch(r"([A-Za-z_]\w*)\s*=\s*(.+)", piece)
+            if field is None:
+                raise ConfigError(key + ": malformed registry metadata '" + piece + "'")
+            name, value = field.groups()
+            if name not in {"Type", "Integer", "Minimum", "Maximum"} or name in fields:
+                raise ConfigError(key + ": unsupported or duplicate registry metadata '" + name + "'")
+            fields[name] = value.strip()
+        kind = fields.get("Type", "")
+        if not re.fullmatch(r'"(number|boolean|string)"', kind):
+            raise ConfigError(key + ": Type must be a declared number, boolean, or string")
+        integer = fields.get("Integer")
+        if integer is not None and integer not in {"true", "false"}:
+            raise ConfigError(key + ": Integer must be true or false")
+        if integer == "true" and kind != '"number"':
+            raise ConfigError(key + ": Integer requires Type = \"number\"")
+
+        def bound(name: str) -> float | None:
+            literal = fields.get(name)
+            if literal is None:
+                return None
+            if re.fullmatch(r"-?\d+(?:\.\d+)?", literal):
+                return float(literal)
+            reference = re.fullmatch(r"([A-Za-z_]\w*)\.([A-Za-z_]\w*)", literal)
+            if reference is None or reference.group(1) not in MODULE_SOURCES:
+                raise ConfigError(key + ": " + name + " has unsupported numeric bound '" + literal + "'")
+            source_path = MODULE_SOURCES[reference.group(1)]
+            if not source_path.exists():
+                raise ConfigError(key + ": " + name + " source not found: " + str(source_path))
+            source = source_path.read_text(encoding="utf-8")
+            value = read_leaf(strip_noise(source), source, [reference.group(2)], key + "." + name)
+            try:
+                return eval_number(value)
+            except ValueError as error:
+                raise ConfigError(key + ": " + name + " reference '" + literal + "' is not numeric") from error
+
+        minimum = bound("Minimum")
+        maximum = bound("Maximum")
+        if minimum is not None and maximum is not None and minimum > maximum:
+            raise ConfigError(key + ": Minimum exceeds Maximum")
         entries.append(
             {
-                "key": match.group("key"),
-                "type": match.group("type"),
-                "minimum": float(match.group("min")) if match.group("min") else None,
-                "maximum": float(match.group("max")) if match.group("max") else None,
+                "key": key,
+                "type": kind[1:-1],
+                "integer": integer == "true",
+                "minimum": minimum,
+                "maximum": maximum,
             }
         )
     return entries
@@ -278,6 +321,8 @@ def coerce(entry: dict[str, Any], literal: str) -> Any:
             value: Any = eval_number(literal)
         except ValueError as error:
             raise ConfigError(key + ": '" + literal + "' is not a number") from error
+        if entry.get("integer") and not value.is_integer():
+            raise ConfigError(key + ": baked default " + str(value) + " must be an integer")
         if value.is_integer():
             value = int(value)
         if entry["minimum"] is not None and value < entry["minimum"]:

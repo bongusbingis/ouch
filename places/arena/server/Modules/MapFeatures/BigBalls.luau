@@ -95,18 +95,24 @@ function BigBalls.tickPlayer(context: Kit.Context, player: Player, root: BasePar
 	local ball = contact
 	local offset = root.Position - ball.Position
 	local cap = contactNormal:Dot(ball.CFrame.UpVector)
-		>= math.cos(math.rad(Parts.number(ball, "CapDegrees", settings.CapDegrees, 10, 80)))
+		>= math.cos(math.rad(Parts.number(ball, "CapDegrees", settings.CapDegrees)))
 	local bounce = cap and root.AssemblyLinearVelocity.Y <= 5
+	local retriggerCooldown = Parts.number(ball, "RetriggerCooldown", settings.RetriggerCooldown)
+	local speed = if bounce
+		then Parts.number(ball, "BounceSpeed", settings.BounceSpeed)
+		else Parts.number(ball, "RollOffSpeed", settings.RollOffSpeed)
+	local floatFactor = if bounce then Parts.number(ball, "FloatFactor", settings.FloatFactor) else 0
+	local hold = if bounce then 0 else Parts.number(ball, "ShoveSeconds", settings.ShoveSeconds)
+	local guardSeconds = if bounce then 0 else Parts.number(ball, "GuardSeconds", settings.GuardSeconds)
 	visit = { root = root, ball = ball, expires = context.now, leftGround = false, bounced = bounce }
 	visits[player] = visit
-	cooldowns[player] = context.now + Parts.number(ball, "RetriggerCooldown", settings.RetriggerCooldown, 0.1, 10)
+	cooldowns[player] = context.now + retriggerCooldown
 	local attachment = Instance.new("Attachment")
 	attachment.Name = if bounce then "BigBallFloatAttachment" else "BigBallShoveAttachment"
 	attachment.Parent = root
 	visit.attachment = attachment
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	if bounce then
-		local speed = Parts.number(ball, "BounceSpeed", settings.BounceSpeed, 1, 160)
 		local current = root.AssemblyLinearVelocity
 		root.AssemblyLinearVelocity = Vector3.new(current.X, speed, current.Z)
 		visit.expires = context.now + settings.MaxFloatSeconds
@@ -120,15 +126,13 @@ function BigBalls.tickPlayer(context: Kit.Context, player: Player, root: BasePar
 			force.Force = Vector3.yAxis
 				* root.AssemblyMass
 				* Workspace.Gravity
-				* Parts.number(ball, "FloatFactor", settings.FloatFactor, 0, 0.9)
+				* floatFactor
 			force.Parent = attachment
 		end
 		Guard.allow(root, "BigBall", settings.MaxFloatSeconds + 1, humanoid.WalkSpeed * 1.3, speed * 1.3, ball)
 	else
 		local flat = Vector3.new(offset.X, 0, offset.Z)
 		local direction = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis
-		local speed = Parts.number(ball, "RollOffSpeed", settings.RollOffSpeed, 8, 80)
-		local hold = Parts.number(ball, "ShoveSeconds", settings.ShoveSeconds, 0.08, 0.4)
 		local target = direction * speed + Vector3.yAxis * math.max(root.AssemblyLinearVelocity.Y, settings.UpwardSpeed)
 		root.AssemblyLinearVelocity = target
 		local velocity = Instance.new("LinearVelocity")
@@ -141,7 +145,7 @@ function BigBalls.tickPlayer(context: Kit.Context, player: Player, root: BasePar
 		Guard.allow(
 			root,
 			"BigBall",
-			math.max(hold + 0.3, Parts.number(ball, "GuardSeconds", settings.GuardSeconds, 0.3, 10)),
+			math.max(hold + 0.3, guardSeconds),
 			speed * 1.3,
 			math.max(target.Y, 0) * 1.3,
 			ball

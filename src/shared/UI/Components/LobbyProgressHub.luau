@@ -115,6 +115,9 @@ local function seasonContent(props)
 	end
 	local maxed = (state.tier or 0) >= (state.tierCount or 0)
 	local ready = SeasonClaims.count(state)
+	local actionHeight = if landscape then 44 else 48
+	local actionInset = 4
+	local actionY = if landscape then 76 else 86
 	return c(
 		"Frame",
 		{ BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, if landscape then 120 else S.SeasonContentHeight) },
@@ -146,40 +149,44 @@ local function seasonContent(props)
 				Position = UDim2.fromOffset(0, if landscape then 46 else 58),
 				Size = UDim2.new(1, 0, 0, 24),
 			}),
-			View = c(Button, {
-				Text = "VIEW REWARDS",
-				TextSize = 18,
-				TextColor = C.Ink,
-				Color = C.Surface,
-				LipColor = C.WellLine,
-				Shadow = false,
-				Enabled = props.OnViewSeasonRewards ~= nil,
-				OnActivated = props.OnViewSeasonRewards,
-				Native = {
-					Position = UDim2.fromOffset(0, if landscape then 76 else 86),
-					Size = UDim2.new(
-						if ready > 0 then 0.58 else 1,
-						if ready > 0 then -8 else 0,
-						0,
-						if landscape then 44 else 48
-					),
-				},
-			}),
-			Claim = if ready > 0
-				then c(Button, {
-					Text = if props.PendingClaims and props.PendingClaims.Season then "WAIT..." else `CLAIM {ready}`,
+			Actions = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(actionInset, actionY),
+				Size = UDim2.new(1, -actionInset * 2, 0, actionHeight),
+			}, {
+				View = c(Button, {
+					Text = "VIEW REWARDS",
 					TextSize = 18,
-					Color = C.Pink,
-					LipColor = C.PinkLip,
+					TextColor = C.Ink,
+					Color = C.Surface,
+					LipColor = C.WellLine,
 					Shadow = false,
-					Enabled = props.OnClaimSeason ~= nil and not (props.PendingClaims and props.PendingClaims.Season),
-					OnActivated = props.OnClaimSeason,
+					Enabled = props.OnViewSeasonRewards ~= nil,
+					OnActivated = props.OnViewSeasonRewards,
 					Native = {
-						Position = UDim2.new(0.58, 8, 0, if landscape then 76 else 86),
-						Size = UDim2.new(0.42, -8, 0, if landscape then 44 else 48),
+						Position = UDim2.fromScale(0, 0),
+						Size = UDim2.new(if ready > 0 then 0.58 else 1, if ready > 0 then -8 else 0, 1, 0),
 					},
-				})
-				else nil,
+				}),
+				Claim = if ready > 0
+					then c(Button, {
+						Text = if props.PendingClaims and props.PendingClaims.Season
+							then "WAIT..."
+							else `CLAIM {ready}`,
+						TextSize = 18,
+						Color = C.Pink,
+						LipColor = C.PinkLip,
+						Shadow = false,
+						Enabled = props.OnClaimSeason ~= nil
+							and not (props.PendingClaims and props.PendingClaims.Season),
+						OnActivated = props.OnClaimSeason,
+						Native = {
+							Position = UDim2.new(0.58, 8, 0, 0),
+							Size = UDim2.new(0.42, -8, 1, 0),
+						},
+					})
+					else nil,
+			}),
 		}
 	)
 end

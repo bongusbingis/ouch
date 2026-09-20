@@ -16,7 +16,9 @@ local DamageEffects = require(script.Parent.Imported.DamageEffects)
 local EggEffects = require(script.Parent.Imported.EggEffects)
 
 export type ScriptEffect = {
-	play: (context: any) -> (),
+	-- A selected script may explicitly report a classified synchronous playback
+	-- failure as false/reason; shipped effects currently return nil on success.
+	play: (context: any) -> (boolean?, string?),
 }
 
 local productionIds = {

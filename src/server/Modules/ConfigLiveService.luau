@@ -131,7 +131,7 @@ local function install(force: boolean?)
 		warn(`[ConfigLiveService] Rejected config revision {nextRevision}: {reason}; keeping revision {revision}`)
 		return
 	end
-	ensureStateFolder()(stateValue :: StringValue).Value = encoded
+	(stateValue :: StringValue).Value = encoded
 	revision = nextRevision
 end
 

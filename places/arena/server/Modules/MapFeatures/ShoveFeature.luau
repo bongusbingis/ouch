@@ -255,8 +255,8 @@ local function applyBumper(
 	local current = root.AssemblyLinearVelocity
 	local target = direction * settings.KnockbackSpeed + Vector3.yAxis * math.max(current.Y, settings.UpwardSpeed)
 	local guardSeconds =
-		math.max(settings.GuardSeconds, Parts.number(bumper, "GuardSeconds", settings.GuardSeconds, 0.3, 10))
-	local retriggerCooldown = Parts.number(bumper, "RetriggerCooldown", MapFeatures.Bumper.RetriggerCooldown, 0.1, 10)
+		math.max(settings.GuardSeconds, Parts.number(bumper, "GuardSeconds", settings.GuardSeconds))
+	local retriggerCooldown = Parts.number(bumper, "RetriggerCooldown", MapFeatures.Bumper.RetriggerCooldown)
 	return target, settings.KnockbackSpeed, "Bumper", guardSeconds, retriggerCooldown
 end
 
@@ -296,9 +296,9 @@ local function applyRotor(contact: RotorContact, root: BasePart): (Vector3, numb
 	local target = direction * response.KnockbackSpeed + Vector3.yAxis * math.max(current.Y, response.UpwardSpeed)
 	local guardSeconds = math.max(
 		response.GuardSeconds,
-		Parts.number(contact.rotor.part, "GuardSeconds", response.GuardSeconds, 0.3, 10)
+		Parts.number(contact.rotor.part, "GuardSeconds", response.GuardSeconds)
 	)
-	local retriggerCooldown = Parts.number(contact.rotor.part, "RetriggerCooldown", settings.RetriggerCooldown, 0.1, 10)
+	local retriggerCooldown = Parts.number(contact.rotor.part, "RetriggerCooldown", settings.RetriggerCooldown)
 	return target, response.KnockbackSpeed, "RotorBump", guardSeconds, retriggerCooldown
 end
 

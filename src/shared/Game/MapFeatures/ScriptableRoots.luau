@@ -16,8 +16,14 @@ local ScriptableRoots = {}
 
 local TAG = MapFeatures.Attributes.ScriptableRoot
 
-function ScriptableRoots.tag(root: Instance)
+function ScriptableRoots.tag(root: Instance): (boolean, string?)
+	local Audit = require(script.Parent.AttributeAudit)
+	local errors = Audit.checkFeatureValues(root)
+	if #errors > 0 then
+		return false, table.concat(errors, "\n")
+	end
 	CollectionService:AddTag(root, TAG)
+	return true, nil
 end
 
 function ScriptableRoots.untag(root: Instance)

@@ -10,6 +10,7 @@ local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
+local Parts = require(script.Parent.FeatureParts)
 local MovementGuard = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("MovementGuard")
 )
@@ -61,10 +62,8 @@ end
 
 local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: Model)
 	local settings = config()
-	local launchSpeed =
-		math.clamp(tonumber(pad:GetAttribute(MapFeatures.Attributes.LaunchSpeed)) or settings.BouncePower, 1, 160)
-	local floatFactor =
-		math.clamp(tonumber(pad:GetAttribute(MapFeatures.Attributes.FloatFactor)) or settings.FloatFactor, 0, 0.9)
+	local launchSpeed = Parts.number(pad, MapFeatures.Attributes.LaunchSpeed, settings.BouncePower)
+	local floatFactor = Parts.number(pad, MapFeatures.Attributes.FloatFactor, settings.FloatFactor)
 
 	clearBounce(player)
 
@@ -99,6 +98,7 @@ local function launch(player: Player, root: BasePart, humanoid: Humanoid, pad: M
 end
 
 local castParams = RaycastParams.new()
+local SeesawQuery = require(game:GetService("ReplicatedStorage").Shared.Game.MapFeatures.SeesawQuery)
 castParams.FilterType = Enum.RaycastFilterType.Exclude
 castParams.RespectCanCollide = true
 
@@ -134,6 +134,7 @@ function JumpPads.tickPlayer(context: MapFeatureKit.Context, player: Player, roo
 		return
 	end
 	castParams.FilterDescendantsInstances = { character }
+	castParams.CollisionGroup = SeesawQuery.groupFor(root)
 	local distance = humanoid.HipHeight + root.Size.Y / 2 + config().ContactTolerance
 	local support = Workspace:Raycast(root.Position, Vector3.new(0, -distance, 0), castParams)
 	if support == nil then

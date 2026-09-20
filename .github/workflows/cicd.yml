@@ -48,7 +48,12 @@ jobs:
           wally install
           git diff --exit-code -- wally.lock
       - name: Run tests
-        run: lune run src/scripts/lune/run-tests.luau
+        run: |
+          lune run src/scripts/lune/run-tests.luau
+          lune run src/scripts/lune/test-arena-loading-client-preload.luau
+          lune run src/scripts/lune/test-arena-startup-simulation.luau
+          lune run src/scripts/lune/test-arena-startup-ui.luau
+          lune run src/scripts/lune/test-arena-startup-feedback.luau
       - name: Test deployment tooling
         run: |
           bash src/scripts/shell/test-changed-places.sh

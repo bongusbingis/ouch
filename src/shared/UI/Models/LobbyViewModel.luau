@@ -73,7 +73,7 @@ function LobbyViewModel.partyPresentation(
 	local isLeader = snapshot.leaderUserId == userId
 	if snapshot.phase == "Lobby" and snapshot.returnQueuePending then
 		return {
-			partyState = "REGROUPING TO FIND PLAYERS",
+			partyState = "MATCHMAKING IN PROGRESS — REGROUPING PARTY",
 			playText = "CANCEL",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = true,
@@ -92,7 +92,7 @@ function LobbyViewModel.partyPresentation(
 		}
 	elseif snapshot.phase == "Queued" then
 		return {
-			partyState = "SEARCHING FOR PLAYERS",
+			partyState = "MATCHMAKING IN PROGRESS — SEARCHING FOR PLAYERS",
 			playText = "CANCEL",
 			playEnabled = isLeader and not busy,
 			showMatchmakingActivity = true,
@@ -100,7 +100,7 @@ function LobbyViewModel.partyPresentation(
 		}
 	elseif snapshot.phase == "Claimed" then
 		return {
-			partyState = "ROUND COMING UP",
+			partyState = "PLAYERS FOUND — PREPARING YOUR MATCH",
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = true,
@@ -108,7 +108,7 @@ function LobbyViewModel.partyPresentation(
 		}
 	elseif snapshot.phase == "Assigned" then
 		return {
-			partyState = "MATCH FOUND!",
+			partyState = "MATCH READY — JOINING SOON",
 			playText = "PLAY",
 			playEnabled = false,
 			showMatchmakingActivity = false,
@@ -116,7 +116,7 @@ function LobbyViewModel.partyPresentation(
 		}
 	end
 	return {
-		partyState = "HEADING TO THE MATCH",
+		partyState = "MATCH READY — TELEPORTING",
 		playText = "PLAY",
 		playEnabled = false,
 		showMatchmakingActivity = false,

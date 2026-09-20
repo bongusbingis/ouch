@@ -5,27 +5,23 @@
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactSpring = require(Packages:WaitForChild("react-spring"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local GameModeCard = require(script.Parent.GameModeCard)
-local ResponsiveText = require(script.Parent.ResponsiveText)
+local CandyTitle = require(script.Parent.CandyTitle)
 local VoteLoadingBar = require(script.Parent.VoteLoadingBar)
 local Motion = require(script.Parent.Parent.Motion)
-local TextMetrics = require(script.Parent.Parent.TextMetrics)
+local T = require(script.Parent.Parent.Tokens)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
-local REFERENCE_VIEWPORT = Vector2.new(1890, 1200)
-local VOTE_TEXT_BOUNDS = TextMetrics.scaleBounds(REFERENCE_VIEWPORT, Vector2.new(0.967519, 0.0574598))
-	- Vector2.new(2, 2)
-local VOTE_TEXT_STROKE =
-	TextMetrics.scaledTextStroke(3.8, "VOTE FOR A GAME MODE!", Enum.Font.LuckiestGuy, VOTE_TEXT_BOUNDS)
+local TITLE = "VOTE FOR A MODE"
 
 export type Props = {
 	Active: boolean,
@@ -40,9 +36,15 @@ export type Props = {
 
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.None)
-	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
-	local short = safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, 1)
+	local short = safeArea.size.Y <= 500
 	local compact = not portrait and short
+	local cardHeight = math.clamp(safeArea.size.Y * 0.56 - 24, 288, 350)
+	local titleSize = if portrait then 28 else if compact then 30 else 44
+	local titleWidth = math.min(
+		TextService:GetTextSize(TITLE, titleSize, T.Type.Display, Vector2.new(100000, 1000)).X + 36,
+		safeArea.size.X * 0.88
+	)
 	local present, setPresent = React.useState(props.Active or props.Prepared == true)
 	local revision = React.useRef(0)
 	local focusRevision = React.useRef(0)
@@ -156,10 +158,18 @@ return function(props: Props)
 			FillDirection = if portrait then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			HorizontalFlex = if portrait then Enum.UIFlexAlignment.None else Enum.UIFlexAlignment.SpaceEvenly,
-			Padding = if portrait then UDim.new(0, UIConfig.Layout.GameMode.CardGapPx) else UDim.new(0, 0),
+			Padding = if portrait then UDim.new(0, 16) else UDim.new(0, 0),
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
+			VerticalAlignment = if portrait then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Center,
 		}),
+		Padding = if portrait
+			then c("UIPadding", {
+				PaddingTop = UDim.new(0, 10),
+				PaddingBottom = UDim.new(0, 12),
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 12),
+			})
+			else nil,
 	}
 	for index, mode in props.Modes do
 		cards[mode.Id] = c(GameModeCard, {
@@ -169,13 +179,10 @@ return function(props: Props)
 			ButtonRef = if index == 1 then firstButtonRef else nil,
 			Portrait = portrait,
 			Compact = short,
+			CardHeight = cardHeight,
 		})
 	end
-	local holderHeight = math.min(
-		#props.Modes * UIConfig.Layout.GameMode.CardHeightPx
-			+ math.max(#props.Modes - 1, 0) * UIConfig.Layout.GameMode.CardGapPx,
-		safeArea.size.Y * 0.66
-	)
+	local holderHeight = safeArea.size.Y * 0.56
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
@@ -205,25 +212,16 @@ return function(props: Props)
 					AspectRatio = 1.55,
 				}),
 			}),
-			VoteText = c(ResponsiveText, {
-				HostName = "VoteText",
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 54,
+			VoteText = c(CandyTitle, {
+				Text = TITLE,
+				TextSize = titleSize,
+				Tilt = T.Shape.TiltTitle,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, if portrait then 0.225 else if compact then 0.23 else 0.300167),
-					Size = UDim2.fromScale(0.94, if portrait then 0.065 else if compact then 0.075 else 0.0574598),
-					Text = "VOTE FOR A GAME MODE!",
-					TextColor3 = Color3.new(1, 1, 1),
+					Position = UDim2.fromScale(0.5, if portrait then 0.285 else if compact then 0.225 else 0.27),
+					Size = UDim2.fromOffset(titleWidth, if portrait then 45 else if compact then 48 else 66),
+					ZIndex = 10,
 				},
-			}, {
-				UIStroke = c("UIStroke", {
-					Color = UIConfig.ProgressionStyle.Ink,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-					Thickness = VOTE_TEXT_STROKE,
-				}),
 			}),
 			ModesHolder = c(if portrait then "ScrollingFrame" else "Frame", {
 				Active = if portrait then true else nil,
@@ -231,22 +229,20 @@ return function(props: Props)
 				AutomaticCanvasSize = if portrait then Enum.AutomaticSize.Y else nil,
 				BackgroundTransparency = 1,
 				CanvasSize = if portrait then UDim2.fromOffset(0, 0) else nil,
-				Position = UDim2.fromScale(0.5, if portrait or compact then 0.57 else 0.573),
-				ScrollBarImageColor3 = if portrait then Color3.new(1, 1, 1) else nil,
-				ScrollBarThickness = if portrait then 5 else nil,
+				Position = UDim2.fromScale(0.5, if portrait then 0.6 else if compact then 0.57 else 0.573),
+				ScrollBarImageColor3 = if portrait then T.Colors.InkSoft else nil,
+				ScrollBarThickness = if portrait then 6 else nil,
 				Size = if portrait
-					then UDim2.new(0.94, 0, 0, holderHeight)
-					else UDim2.fromScale(0.944456, if compact then 0.64 else 0.562031),
+					then UDim2.new(0.92, 0, 0, holderHeight)
+					else UDim2.fromScale(0.94, if compact then 0.60 else 0.56),
 				VerticalScrollBarInset = if portrait then Enum.ScrollBarInset.ScrollBar else nil,
 			}, cards),
 			LoadingBar = c(VoteLoadingBar, {
 				Active = props.Active,
 				EndsAt = props.EndsAt,
 				DurationSeconds = props.DurationSeconds,
-				Position = if portrait or compact then UDim2.fromScale(0.5, 0.96) else nil,
-				Size = if portrait
-					then UDim2.new(0.84, 0, 0, 20)
-					else if compact then UDim2.new(0.6, 0, 0, 12) else nil,
+				Position = UDim2.fromScale(0.5, 0.975),
+				Size = UDim2.fromOffset(math.min(540, safeArea.size.X * 0.82), if portrait or compact then 48 else 56),
 			}),
 		}),
 	})

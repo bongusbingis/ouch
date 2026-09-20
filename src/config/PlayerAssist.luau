@@ -4,7 +4,8 @@
 -- LiveConfig's one global snapshot, these leaves resolve per player through
 -- ConfigService:GetConfigForPlayerAsync, so an experience-config condition can
 -- hold half the population at a different strength. Defaults apply when no
--- override does, the service is unavailable, or a value fails validation.
+-- override does or the service is initially unavailable. A malformed present
+-- value rejects the entire candidate and retains the last accepted projection.
 --
 -- Convention: <Feature>Enabled is a kill switch, <Feature>Strength a 0-1 scalar,
 -- and Strength 0 behaves exactly like Enabled = false.

@@ -1,4 +1,4 @@
--- Description: Aim-assist device scaling on top of the generic PlayerConfigResolver: turns a resolved 0-1 strength into a per-device strength (a zero device scale reads as off), and re-exports the generic resolve/coerce/bucket so aim consumers keep one import.
+-- Description: Aim-assist device scaling and shared per-player candidate validation.
 
 --!strict
 
@@ -8,7 +8,6 @@ local AssistResolver = {}
 
 export type Entry = PlayerConfigResolver.Entry
 
-AssistResolver.coerce = PlayerConfigResolver.coerce
 AssistResolver.resolve = PlayerConfigResolver.resolve
 AssistResolver.bucket = PlayerConfigResolver.bucket
 

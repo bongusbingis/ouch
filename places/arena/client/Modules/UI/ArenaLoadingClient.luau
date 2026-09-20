@@ -1,4 +1,4 @@
--- Description: Owns the arena loading gate on the client: preloads critical assets, tracks streaming and initialization progress, reports readiness to the server, and publishes a snapshot the loading screen renders.
+-- Description: Owns the arena loading gate on the client: validates available gameplay hierarchy, warms optional media in the background, tracks streaming and initialization progress, reports readiness to the server, and publishes a snapshot the loading screen renders.
 
 --!strict
 
@@ -46,13 +46,14 @@ export type Snapshot = {
 	preloadProgress: number,
 	worldReady: boolean,
 	streamReady: boolean,
+	initializationDegraded: boolean,
 	expectedPlayerCount: number,
 	arrivedPlayerCount: number,
 	readyPlayerCount: number,
 	deadlineAt: number,
 	gateReleased: boolean,
 	modeOptions: { string },
-	queueId: string,
+	queueId: string?,
 	fixedModeId: string?,
 	matchPhase: string,
 	fatalError: string?,
@@ -91,19 +92,23 @@ local localState = {
 	preloadProgress = 0,
 	worldReady = false,
 	streamReady = false,
+	initializationDegraded = false,
 	fatalError = nil,
 }
 
-local serverState: ServerSnapshot = {
-	expectedPlayerCount = 1,
-	arrivedPlayerCount = 0,
-	readyPlayerCount = 0,
-	deadlineAt = 0,
-	gateReleased = false,
-	modeOptions = table.clone(GameModes.VoteOptions),
-	queueId = Queues.DefaultQueueId,
-	fixedModeId = nil,
-}
+-- A missing projection is a waiting state. It cannot supply a queue or satisfy
+-- readiness until a complete authoritative snapshot has been validated.
+local serverState: ServerSnapshot? = nil
+local snapshotError: string? = nil
+local lastAcceptedRevision = 0
+local lastAcceptedProjection: ServerSnapshot? = nil
+local generalPreloadReady = false
+local generalWorldReady = false
+local generalPreloadGeneration = 0
+local coursePreloadReady = true
+local courseWorldReady = true
+local coursePreloadGeneration = 0
+local onServerSnapshotAccepted: ((boolean) -> ())? = nil
 local startedAt = 0
 local preloadStartedAt = 0
 local reportedLocalReady = false
@@ -129,19 +134,20 @@ end
 local function baseReady(): boolean
 	local admission = exactAdmission()
 	return (admission == "Matched" or admission == "Direct")
+		and serverState ~= nil
+		and serverState.expectedPlayerCount > 0
 		and localState.gameLoaded
-		and localState.uiPresented
-		and localState.votePrepared
 		and localState.simulationReady
 		and localState.preloadReady
 		and localState.streamReady
 end
 
 local function isLocalReady(): boolean
-	return localState.fatalError == nil and baseReady()
+	return snapshotError == nil and baseReady()
 end
 
 local function currentSnapshot(): Snapshot
+	local projected = serverState
 	return {
 		admission = exactAdmission(),
 		serverReady = player:GetAttribute("ArenaReady") == true,
@@ -156,16 +162,17 @@ local function currentSnapshot(): Snapshot
 		preloadProgress = localState.preloadProgress,
 		worldReady = localState.worldReady,
 		streamReady = localState.streamReady,
-		expectedPlayerCount = serverState.expectedPlayerCount,
-		arrivedPlayerCount = serverState.arrivedPlayerCount,
-		readyPlayerCount = serverState.readyPlayerCount,
-		deadlineAt = serverState.deadlineAt,
-		gateReleased = serverState.gateReleased,
-		modeOptions = table.clone(serverState.modeOptions),
-		queueId = serverState.queueId,
-		fixedModeId = serverState.fixedModeId,
+		initializationDegraded = localState.initializationDegraded,
+		expectedPlayerCount = if projected then projected.expectedPlayerCount else 0,
+		arrivedPlayerCount = if projected then projected.arrivedPlayerCount else 0,
+		readyPlayerCount = if projected then projected.readyPlayerCount else 0,
+		deadlineAt = if projected then projected.deadlineAt else 0,
+		gateReleased = if projected then projected.gateReleased else false,
+		modeOptions = if projected then table.clone(projected.modeOptions) else {},
+		queueId = if projected then projected.queueId else nil,
+		fixedModeId = if projected then projected.fixedModeId else nil,
 		matchPhase = if matchState then (matchState:GetAttribute("phase") :: string?) or "Idle" else "Idle",
-		fatalError = localState.fatalError,
+		fatalError = snapshotError,
 	}
 end
 
@@ -207,60 +214,230 @@ local function tryReady()
 end
 
 local function changed()
-	if localState.fatalError == "INITIALIZATION_TIMED_OUT" and baseReady() then
-		localState.fatalError = nil
-	end
 	notify()
 	tryReady()
 end
 
+local LOAD_SNAPSHOT_PATH = "ReplicatedStorage.ArenaLoadState.Snapshot"
+
 local function scheduleInitializationTimeout(currentGeneration: number)
 	task.delay(Loading.CriticalInitializationTimeoutSeconds, function()
-		if destroyed or generation ~= currentGeneration or isLocalReady() or localState.fatalError ~= nil then
+		if destroyed or generation ~= currentGeneration or isLocalReady() then
 			return
 		end
-		localState.fatalError = "INITIALIZATION_TIMED_OUT"
+		ArenaLoadingClient.reportStartupIssue(
+			"ArenaLoadingClient.initialization",
+			"initialization timed out; continuing with available client systems"
+		)
+		-- The deadline only releases client-owned work. It never creates or
+		-- accepts a server projection, so trusted admission remains required.
+		localState.gameLoaded = true
+		localState.simulationReady = true
+		localState.preloadReady = true
+		localState.streamReady = true
+		if serverState == nil then
+			warn(
+				`[ArenaLoadingClient] {LOAD_SNAPSHOT_PATH}: authoritative server snapshot is unavailable; waiting without reporting ready`
+			)
+			changed()
+			return
+		end
 		changed()
 	end)
 end
 
-local function number(value: any, fallback: number): number
-	return if typeof(value) == "number" then value else fallback
+local function countField(decoded: { [string]: any }, name: string): (number?, string?)
+	local value = decoded[name]
+	if typeof(value) ~= "number" or value % 1 ~= 0 or value < 0 or value > 100 then
+		return nil, `{name} must be an integer from 0 to 100`
+	end
+	return value, nil
+end
+
+local function validateLoadSnapshot(decoded: any): (ServerSnapshot?, number?, string?)
+	if typeof(decoded) ~= "table" then
+		return nil, nil, "root must be an object"
+	end
+	if decoded.schemaVersion ~= 2 then
+		return nil, nil, `schemaVersion must be 2; received {tostring(decoded.schemaVersion)}`
+	end
+	local revision = decoded.revision
+	if typeof(revision) ~= "number" or revision % 1 ~= 0 or revision < 1 then
+		return nil, nil, "revision must be a positive integer"
+	end
+	local expected, expectedError = countField(decoded, "expectedPlayerCount")
+	if expected == nil then
+		return nil, nil, expectedError
+	end
+	local arrived, arrivedError = countField(decoded, "arrivedPlayerCount")
+	if arrived == nil then
+		return nil, nil, arrivedError
+	end
+	local ready, readyError = countField(decoded, "readyPlayerCount")
+	if ready == nil then
+		return nil, nil, readyError
+	end
+	if ready > arrived then
+		return nil, nil, `readyPlayerCount ({ready}) exceeds arrivedPlayerCount ({arrived})`
+	end
+	local deadlineAt = decoded.deadlineAt
+	if typeof(deadlineAt) ~= "number" or deadlineAt ~= deadlineAt or deadlineAt < 0 or deadlineAt == math.huge then
+		return nil, nil, "deadlineAt must be a finite nonnegative number"
+	end
+	if typeof(decoded.gateReleased) ~= "boolean" then
+		return nil, nil, "gateReleased must be a boolean"
+	end
+	if expected == 0 and (arrived ~= 0 or ready ~= 0 or deadlineAt ~= 0 or decoded.gateReleased) then
+		return nil,
+			nil,
+			"expectedPlayerCount is 0 but gate counters, deadlineAt, or gateReleased indicate an active gate"
+	end
+	local queueId = decoded.queueId
+	if typeof(queueId) ~= "string" or not Queues.isEnabled(queueId) then
+		return nil, nil, `queueId must name an enabled queue; received {tostring(queueId)}`
+	end
+	local rawOptions = decoded.modeOptions
+	if typeof(rawOptions) ~= "table" or #rawOptions == 0 then
+		return nil, nil, "modeOptions must be a nonempty array of mode IDs"
+	end
+	local options: { string } = {}
+	local seen = {}
+	local optionCount = 0
+	for index, modeId in rawOptions do
+		optionCount += 1
+		if typeof(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #rawOptions then
+			return nil, nil, `modeOptions has an invalid index {tostring(index)}`
+		end
+		if typeof(modeId) ~= "string" or modeId == "" then
+			return nil, nil, `modeOptions[{index}] must be a nonempty mode ID`
+		end
+		if seen[modeId] then
+			return nil, nil, `modeOptions[{index}] duplicates {modeId}`
+		end
+		local definition = GameModes.Modes[modeId]
+		if definition == nil or definition.Enabled ~= true then
+			return nil, nil, `modeOptions[{index}] names unavailable mode {modeId}`
+		end
+		if definition.Queue ~= queueId then
+			return nil, nil, `modeOptions[{index}] mode {modeId} belongs to queue {definition.Queue}, not {queueId}`
+		end
+		seen[modeId] = true
+		options[index] = modeId
+	end
+	if optionCount ~= #rawOptions then
+		return nil, nil, "modeOptions must have contiguous numeric indices"
+	end
+	local resolved = ModeOptions.resolve(options)
+	if not ModeOptions.equals(options, resolved) then
+		return nil, nil, `modeOptions contains an unavailable registered mode; received {table.concat(options, ", ")}`
+	end
+	local fixedModeId = decoded.fixedModeId
+	if fixedModeId ~= nil and (typeof(fixedModeId) ~= "string" or fixedModeId == "") then
+		return nil, nil, "fixedModeId must be a nonempty mode ID when present"
+	end
+	local selection = Queues.get(queueId).ModeSelection
+	if selection.Strategy == "Fixed" then
+		if fixedModeId ~= selection.ModeId or #options ~= 1 or options[1] ~= fixedModeId then
+			return nil, nil, `fixedModeId and modeOptions must name {selection.ModeId} for queueId {queueId}`
+		end
+	elseif fixedModeId ~= nil then
+		return nil, nil, `fixedModeId must be absent for vote queueId {queueId}`
+	end
+	return {
+		expectedPlayerCount = expected,
+		arrivedPlayerCount = arrived,
+		readyPlayerCount = ready,
+		deadlineAt = deadlineAt,
+		gateReleased = decoded.gateReleased,
+		modeOptions = options,
+		queueId = queueId,
+		fixedModeId = fixedModeId,
+	},
+		revision,
+		nil
+end
+
+local function sameProjection(first: ServerSnapshot, second: ServerSnapshot): boolean
+	return first.expectedPlayerCount == second.expectedPlayerCount
+		and first.arrivedPlayerCount == second.arrivedPlayerCount
+		and first.readyPlayerCount == second.readyPlayerCount
+		and first.deadlineAt == second.deadlineAt
+		and first.gateReleased == second.gateReleased
+		and first.queueId == second.queueId
+		and first.fixedModeId == second.fixedModeId
+		and ModeOptions.equals(first.modeOptions, second.modeOptions)
+end
+
+local function rejectLoadSnapshot(path: string, reason: string)
+	local diagnostic = `{path}: {reason}`
+	warn(`[ArenaLoadingClient] rejected {diagnostic}`)
+	snapshotError = diagnostic
+	serverState = nil
+	generation += 1
+	readyTaskRunning = false
+	generalPreloadReady = false
+	generalWorldReady = false
+	coursePreloadReady = true
+	courseWorldReady = true
+	localState.preloadReady = false
+	localState.preloadTimedOut = false
+	localState.preloadFailed = false
+	localState.preloadProgress = 0
+	localState.worldReady = false
+	localState.streamReady = false
+	changed()
 end
 
 local function decodeLoadSnapshot(value: string)
 	local ok, decoded = pcall(HttpService.JSONDecode, HttpService, value)
-	if not ok or typeof(decoded) ~= "table" then
+	if not ok then
+		rejectLoadSnapshot(LOAD_SNAPSHOT_PATH, `malformed JSON: {decoded}`)
 		return
 	end
-	local options = {}
-	if typeof(decoded.modeOptions) == "table" then
-		for _, modeId in decoded.modeOptions do
-			if typeof(modeId) == "string" then
-				table.insert(options, modeId)
-			end
-		end
+	local projected, revision, reason = validateLoadSnapshot(decoded)
+	if projected == nil or revision == nil then
+		rejectLoadSnapshot(
+			LOAD_SNAPSHOT_PATH,
+			reason or "validator returned no reason; fix ArenaLoadingClient.validateLoadSnapshot"
+		)
+		return
 	end
-	local fixedModeId = if typeof(decoded.fixedModeId) == "string" and decoded.fixedModeId ~= ""
-		then decoded.fixedModeId
-		else nil
-	serverState = {
-		expectedPlayerCount = math.max(1, number(decoded.expectedPlayerCount, 1)),
-		arrivedPlayerCount = math.max(0, number(decoded.arrivedPlayerCount, 0)),
-		readyPlayerCount = math.max(0, number(decoded.readyPlayerCount, 0)),
-		deadlineAt = number(decoded.deadlineAt, 0),
-		gateReleased = decoded.gateReleased == true,
-		modeOptions = if fixedModeId then { fixedModeId } else ModeOptions.resolve(options),
-		queueId = if Queues.isEnabled(decoded.queueId) then decoded.queueId else Queues.DefaultQueueId,
-		fixedModeId = fixedModeId,
-	}
+	if revision < lastAcceptedRevision then
+		rejectLoadSnapshot(
+			LOAD_SNAPSHOT_PATH,
+			`revision {revision} is older than accepted revision {lastAcceptedRevision}`
+		)
+		return
+	end
+	if revision == lastAcceptedRevision then
+		if lastAcceptedProjection ~= nil and sameProjection(lastAcceptedProjection, projected) then
+			return
+		end
+		rejectLoadSnapshot(LOAD_SNAPSHOT_PATH, `revision {revision} contradicts the accepted projection`)
+		return
+	end
+	local previousError = snapshotError
+	serverState = projected
+	lastAcceptedRevision = revision
+	lastAcceptedProjection = projected
+	snapshotError = nil
+	if previousError then
+		warn(`[ArenaLoadingClient] {LOAD_SNAPSHOT_PATH} recovered at revision {revision} after {previousError}`)
+	end
+	if onServerSnapshotAccepted then
+		onServerSnapshotAccepted(previousError ~= nil)
+	end
 	changed()
 end
 
 local function attachLoadState(folder: Folder)
 	loadState = folder
 	local function attachSnapshot(child: Instance)
-		if child.Name ~= "Snapshot" or not child:IsA("StringValue") then
+		if child.Name ~= "Snapshot" then
+			return
+		end
+		if not child:IsA("StringValue") then
+			rejectLoadSnapshot(LOAD_SNAPSHOT_PATH, "required StringValue has the wrong class")
 			return
 		end
 		table.insert(
@@ -286,8 +463,12 @@ end
 
 local function watchRuntimeState()
 	local existingLoadState = ReplicatedStorage:FindFirstChild("ArenaLoadState")
-	if existingLoadState and existingLoadState:IsA("Folder") then
-		attachLoadState(existingLoadState)
+	if existingLoadState then
+		if existingLoadState:IsA("Folder") then
+			attachLoadState(existingLoadState)
+		else
+			rejectLoadSnapshot("ReplicatedStorage.ArenaLoadState", "required Folder has the wrong class")
+		end
 	end
 	local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
 	if existingMatchState and existingMatchState:IsA("Folder") then
@@ -296,8 +477,12 @@ local function watchRuntimeState()
 	table.insert(
 		connections,
 		ReplicatedStorage.ChildAdded:Connect(function(child)
-			if child.Name == "ArenaLoadState" and child:IsA("Folder") and loadState == nil then
-				attachLoadState(child)
+			if child.Name == "ArenaLoadState" and loadState == nil then
+				if child:IsA("Folder") then
+					attachLoadState(child)
+				else
+					rejectLoadSnapshot("ReplicatedStorage.ArenaLoadState", "required Folder has the wrong class")
+				end
 			elseif child.Name == "MatchState" and child:IsA("Folder") and matchState == nil then
 				attachMatchState(child)
 			end
@@ -305,158 +490,317 @@ local function watchRuntimeState()
 	)
 end
 
-local function criticalContentIds(): { string }
-	local ids = table.clone(Loading.CriticalContentIds)
-	local seen = {}
-	for _, contentId in ids do
-		seen[contentId] = true
+local function optionalMediaInstances(): ({ Instance }, { Instance })
+	local media: { Instance } = {}
+	local transient: { Instance } = {}
+	local seen: { [string]: boolean } = {}
+	local seenInstances: { [Instance]: boolean } = {}
+	local function contentId(value: any, path: string, allowBareNumber: boolean): string?
+		local resolved = value
+		if
+			allowBareNumber
+			and (typeof(value) == "number" or (typeof(value) == "string" and string.match(value, "^[1-9]%d*$")))
+		then
+			resolved = `rbxassetid://{value}`
+		end
+		if
+			typeof(resolved) ~= "string"
+			or (
+				string.match(resolved, "^rbxassetid://[1-9]%d*$") == nil
+				and string.match(resolved, "^rbxasset://fonts/families/[%w]+%.json$") == nil
+			)
+		then
+			warn(
+				`[ArenaLoadingClient] optional media skipped: {path} ({tostring(value)}) is not a supported content ID`
+			)
+			return nil
+		end
+		return resolved
 	end
-	local function add(contentId: string)
-		if contentId ~= "" and not seen[contentId] then
-			seen[contentId] = true
-			table.insert(ids, contentId)
+	local function add(instance: Instance, key: string)
+		if seen[key] then
+			instance:Destroy()
+			return
+		end
+		seen[key] = true
+		instance.Name = "ArenaOptionalMediaWarmup"
+		table.insert(media, instance)
+		table.insert(transient, instance)
+	end
+	local function addExisting(instance: Instance)
+		if not seenInstances[instance] then
+			seenInstances[instance] = true
+			table.insert(media, instance)
 		end
 	end
-	add("rbxasset://fonts/families/LuckiestGuy.json")
-	add("rbxasset://fonts/families/HighwayGothic.json")
-	for _, definition in Audio.Gameplay do
-		for _, contentId in definition.AssetIds do
-			add(contentId)
+	local function addSound(value: any, path: string)
+		local id = contentId(value, path, false)
+		if id then
+			local sound = Instance.new("Sound")
+			sound.SoundId = id
+			add(sound, `Sound:{id}`)
 		end
 	end
-	for _, modeId in GameModes.VoteOptions do
-		local definition = GameModes.Modes[modeId]
-		if definition and definition.ThumbnailId ~= nil and definition.ThumbnailId ~= "" then
-			local value = tostring(definition.ThumbnailId)
-			add(if string.find(value, "rbxassetid://", 1, true) == 1 then value else `rbxassetid://{value}`)
+	local function addImage(value: any, path: string, allowBareNumber: boolean)
+		local id = contentId(value, path, allowBareNumber)
+		if id then
+			local image = Instance.new("ImageLabel")
+			image.Image = id
+			add(image, `ImageLabel:{id}`)
 		end
 	end
-	return ids
-end
-
-local function criticalInstances(): { Instance }
-	local result = {}
-	local seen: { [Instance]: boolean } = {}
-	local function add(instance: Instance)
-		if not seen[instance] then
-			seen[instance] = true
-			table.insert(result, instance)
-		end
-	end
-	for _, instance in CollectionService:GetTagged(Loading.CriticalPreloadTag) do
-		add(instance)
-	end
-	local assets = ReplicatedStorage:WaitForChild("Assets")
-	local rig = assets:WaitForChild("Rigs"):WaitForChild("CharacterRig")
-	assert(rig:IsA("Model"), "[ArenaLoadingClient] Assets.Rigs.CharacterRig must be a Model")
-	add(rig)
-	local animations = assets:WaitForChild(Animations.FolderName)
-	for _, clips in Animations.Clips do
-		for _, clip in clips do
-			if clip.Required then
-				add(animations:WaitForChild(clip.Name))
+	local function addFont(id: string, path: string)
+		local font = contentId(id, path, false)
+		if font then
+			local label = Instance.new("TextLabel")
+			local set, reason = pcall(function()
+				label.FontFace = Font.new(font)
+			end)
+			if set then
+				add(label, `TextLabel:{font}`)
+			else
+				label:Destroy()
+				warn(`[ArenaLoadingClient] optional font skipped: {path}: {reason}`)
 			end
 		end
 	end
-	local cosmetics = assets:WaitForChild("Cosmetics")
-	local templates = cosmetics:WaitForChild("Templates")
-	for name in Cosmetics.VisualTemplates do
-		add(templates:WaitForChild(name))
-	end
-	for _, folder in Cosmetics.VisualFolders do
-		add(cosmetics:WaitForChild(folder))
-	end
-	-- A race server stands its courses from these templates the moment the
-	-- match starts, so they warm with everything else rather than on the pads.
-	if serverState.fixedModeId == "Splashdown" then
-		local courses: Instance? = assets
-		for _, name in Splashdown.TemplatesPath do
-			courses = if courses then courses:FindFirstChild(name) else nil
+	local collected, reason = pcall(function()
+		for index, value in Loading.CriticalContentIds do
+			addImage(value, `Config.Interface.Loading.CriticalContentIds[{index}]`, false)
 		end
-		if courses and courses ~= assets then
-			add(courses)
+		addFont("rbxasset://fonts/families/LuckiestGuy.json", "ArenaLoadingClient.LuckiestGuyFont")
+		addFont("rbxasset://fonts/families/HighwayGothic.json", "ArenaLoadingClient.HighwayGothicFont")
+		for name, definition in Audio.Gameplay do
+			if typeof(definition) ~= "table" or typeof(definition.AssetIds) ~= "table" then
+				warn(
+					`[ArenaLoadingClient] optional media skipped: Config.Infra.Audio.Gameplay.{name}.AssetIds is not a table`
+				)
+			else
+				for index, value in definition.AssetIds do
+					addSound(value, `Config.Infra.Audio.Gameplay.{name}.AssetIds[{index}]`)
+				end
+			end
 		end
+		for _, modeId in GameModes.VoteOptions do
+			local definition = GameModes.Modes[modeId]
+			if definition == nil then
+				warn(`[ArenaLoadingClient] optional media skipped: Config.Gameplay.GameModes.Modes.{modeId} is missing`)
+			elseif definition.ThumbnailId ~= "" then
+				addImage(definition.ThumbnailId, `Config.Gameplay.GameModes.Modes.{modeId}.ThumbnailId`, true)
+			end
+		end
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if assets == nil then
+			return
+		end
+		local animations = assets:FindFirstChild(Animations.FolderName)
+		if animations and animations:IsA("Folder") then
+			for _, clips in Animations.Clips do
+				for _, clip in clips do
+					local animation = animations:FindFirstChild(clip.Name)
+					if animation and animation:IsA("Animation") then
+						addExisting(animation)
+					end
+				end
+			end
+		end
+		local cosmetics = assets:FindFirstChild("Cosmetics")
+		if cosmetics and cosmetics:IsA("Folder") then
+			local templates = cosmetics:FindFirstChild("Templates")
+			if templates and templates:IsA("Folder") then
+				for name in Cosmetics.VisualTemplates do
+					local template = templates:FindFirstChild(name)
+					if template and template:IsA("MeshPart") then
+						addExisting(template)
+					end
+				end
+			end
+			for _, name in Cosmetics.VisualFolders do
+				local folder = cosmetics:FindFirstChild(name)
+				if folder and folder:IsA("Folder") then
+					addExisting(folder)
+				end
+			end
+		end
+		for _, instance in CollectionService:GetTagged(Loading.CriticalPreloadTag) do
+			addExisting(instance)
+		end
+	end)
+	if not collected then
+		warn(`[ArenaLoadingClient] optional media collection stopped: {reason}`)
+		for _, instance in transient do
+			instance:Destroy()
+		end
+		return {}, {}
 	end
-	return result
+	return media, transient
 end
 
-local function beginPreload(currentGeneration: number)
-	local ids = criticalContentIds()
-	local totalUnits = #ids + 1
-	local completedIds = 0
-	local instancesComplete = false
-	local completedBatches = 0
-	local function updateProgress()
-		local completedUnits = completedIds + if instancesComplete then 1 else 0
-		localState.preloadProgress = math.clamp(completedUnits / totalUnits, 0, 1)
-		changed()
+local function requiredGameplayInstances(deadlineAt: number)
+	local function required(parent: Instance, name: string, className: string): Instance
+		local path = `{parent:GetFullName()}.{name}`
+		local child = parent:WaitForChild(name, math.max(0.001, deadlineAt - os.clock()))
+		assert(child ~= nil, `{path} is missing; restore the required {className} and republish Arena`)
+		assert(
+			child:IsA(className),
+			`{path} must have class {className} (found {child.ClassName}); restore the authored instance and republish Arena`
+		)
+		return child
 	end
-	local function batchComplete(kind: "Ids" | "Instances")
+	local assets = required(ReplicatedStorage, "Assets", "Folder")
+	local rigs = required(assets, "Rigs", "Folder")
+	required(rigs, "CharacterRig", "Model")
+end
+
+local function splashdownTemplates(deadlineAt: number): Folder
+	local current: Instance = ReplicatedStorage
+	local path = "ReplicatedStorage"
+	for _, name in Splashdown.TemplatesPath do
+		path ..= `.{name}`
+		local child = current:WaitForChild(name, math.max(0.001, deadlineAt - os.clock()))
+		assert(
+			child and child:IsA("Folder"),
+			`[ArenaLoadingClient] {path} must be a Folder; restore the authored Splashdown templates and republish Arena`
+		)
+		current = child
+	end
+	for _, courseId in Splashdown.CourseOrder do
+		local coursePath = `{path}.{courseId}`
+		local course = current:WaitForChild(courseId, math.max(0.001, deadlineAt - os.clock()))
+		assert(
+			course and course:IsA("Model"),
+			`[ArenaLoadingClient] {coursePath} must be a Model; restore the authored course template and republish Arena`
+		)
+	end
+	return current :: Folder
+end
+
+local function updatePreloadReady()
+	localState.preloadReady = generalPreloadReady and coursePreloadReady
+	localState.worldReady = generalWorldReady and courseWorldReady
+	changed()
+end
+
+local function warmOptionalMedia(
+	currentGeneration: number,
+	media: { Instance },
+	transient: { Instance },
+	ownerPath: string
+)
+	if #media == 0 then
+		return
+	end
+	local terminal = false
+	local failures: { string } = {}
+	local function active(): boolean
+		return not terminal and not destroyed and generation == currentGeneration
+	end
+	local function cleanup()
+		for _, instance in transient do
+			instance:Destroy()
+		end
+	end
+	local function finish(outcome: "Completed" | "Failed" | "Timeout", reason: string?)
+		if terminal then
+			return
+		end
+		terminal = true
+		cleanup()
 		if destroyed or generation ~= currentGeneration then
 			return
 		end
-		if kind == "Ids" then
-			completedIds = #ids
-		else
-			instancesComplete = true
+		if outcome == "Timeout" then
+			localState.preloadTimedOut = true
+		elseif outcome == "Failed" then
+			localState.preloadFailed = true
 		end
-		completedBatches += 1
-		updateProgress()
-		if completedBatches == 2 then
-			localState.worldReady = true
-			localState.preloadReady = true
-			report("Preload", {
-				outcome = if localState.preloadTimedOut
-					then "CompletedAfterTimeout"
-					else if localState.preloadFailed then "Failed" else "Completed",
-				durationMs = math.floor((os.clock() - preloadStartedAt) * 1000 + 0.5),
-			})
-			changed()
+		if reason then
+			warn(`[ArenaLoadingClient] optional media warmup at {ownerPath}: {reason}`)
 		end
-	end
-
-	task.delay(Loading.CriticalPreloadTimeoutSeconds, function()
-		if destroyed or generation ~= currentGeneration or localState.preloadReady then
-			return
-		end
-		localState.preloadReady = true
-		localState.preloadTimedOut = true
 		report("Preload", {
-			outcome = "Timeout",
+			outcome = outcome,
 			durationMs = math.floor((os.clock() - preloadStartedAt) * 1000 + 0.5),
 		})
 		changed()
-	end)
-
-	task.spawn(function()
-		local seen = {}
-		pcall(function()
-			ContentProvider:PreloadAsync(ids, function(contentId, status)
-				if destroyed or generation ~= currentGeneration then
-					return
-				end
-				if status ~= Enum.AssetFetchStatus.Success then
-					localState.preloadFailed = true
-				end
-				if not seen[contentId] then
-					seen[contentId] = true
-					completedIds += 1
-					updateProgress()
-				end
-			end)
-		end)
-		batchComplete("Ids")
-	end)
-
-	task.spawn(function()
-		local instances = criticalInstances()
-		if #instances > 0 then
-			local success = pcall(ContentProvider.PreloadAsync, ContentProvider, instances)
-			if not success and not destroyed and generation == currentGeneration then
-				localState.preloadFailed = true
-			end
+	end
+	task.delay(Loading.CriticalPreloadTimeoutSeconds, function()
+		if not terminal then
+			finish("Timeout", `did not finish within {Loading.CriticalPreloadTimeoutSeconds}s`)
 		end
-		batchComplete("Instances")
+	end)
+	task.spawn(function()
+		local succeeded, reason = pcall(
+			ContentProvider.PreloadAsync,
+			ContentProvider,
+			media,
+			function(contentId, status)
+				if active() and contentId ~= "" and status ~= Enum.AssetFetchStatus.Success then
+					table.insert(failures, `{contentId} returned {status}`)
+				end
+			end
+		)
+		if not active() then
+			if not terminal then
+				finish("Completed", nil)
+			end
+			return
+		end
+		if not succeeded then
+			finish("Failed", `PreloadAsync threw: {reason}`)
+		elseif #failures > 0 then
+			finish("Failed", table.concat(failures, "; "))
+		else
+			finish("Completed", nil)
+		end
+	end)
+end
+
+local function beginCoursePreload(currentGeneration: number)
+	if coursePreloadGeneration == currentGeneration then
+		return
+	end
+	coursePreloadGeneration = currentGeneration
+	coursePreloadReady = false
+	courseWorldReady = false
+	updatePreloadReady()
+	task.spawn(function()
+		local found, templatesOrError = pcall(splashdownTemplates, os.clock() + Loading.CriticalPreloadTimeoutSeconds)
+		if destroyed or generation ~= currentGeneration then
+			return
+		end
+		if not found then
+			warn(`[ArenaLoadingClient] optional Splashdown preload hierarchy unavailable: {templatesOrError}`)
+			coursePreloadReady = true
+			updatePreloadReady()
+			return
+		end
+		coursePreloadReady = true
+		courseWorldReady = true
+		updatePreloadReady()
+		warmOptionalMedia(currentGeneration, { templatesOrError }, {}, "ReplicatedStorage.Assets.Maps.Splashdown")
+	end)
+end
+
+local function beginPreload(currentGeneration: number)
+	if destroyed or generation ~= currentGeneration then
+		return
+	end
+	task.spawn(function()
+		local found, instancesOrError =
+			pcall(requiredGameplayInstances, preloadStartedAt + Loading.CriticalPreloadTimeoutSeconds)
+		if destroyed or generation ~= currentGeneration then
+			return
+		end
+		if not found then
+			warn(`[ArenaLoadingClient] preload gameplay hierarchy unavailable: {instancesOrError}`)
+		else
+			generalWorldReady = true
+		end
+		generalPreloadReady = true
+		localState.preloadProgress = 1
+		updatePreloadReady()
+		local media, transient = optionalMediaInstances()
+		warmOptionalMedia(currentGeneration, media, transient, "ArenaLoadingClient.optionalMedia")
 	end)
 end
 
@@ -471,6 +815,41 @@ local function beginStreaming(currentGeneration: number)
 		localState.streamReady = true
 		changed()
 	end)
+end
+
+local function maybeBeginCoursePreload(currentGeneration: number)
+	if destroyed or generation ~= currentGeneration or not localState.gameLoaded then
+		return
+	end
+	local projected = serverState
+	if projected == nil or projected.expectedPlayerCount == 0 then
+		return
+	end
+	if projected.fixedModeId == "Splashdown" then
+		beginCoursePreload(currentGeneration)
+	elseif not coursePreloadReady then
+		coursePreloadReady = true
+		updatePreloadReady()
+	end
+end
+
+onServerSnapshotAccepted = function(recovered)
+	if destroyed or not localState.gameLoaded then
+		return
+	end
+	if generalPreloadGeneration ~= generation then
+		generalPreloadGeneration = generation
+		preloadStartedAt = os.clock()
+		maybeBeginCoursePreload(generation)
+		beginPreload(generation)
+		beginStreaming(generation)
+		scheduleInitializationTimeout(generation)
+		return
+	end
+	maybeBeginCoursePreload(generation)
+	if recovered then
+		scheduleInitializationTimeout(generation)
+	end
 end
 
 function ArenaLoadingClient.getSnapshot(): Snapshot
@@ -504,16 +883,17 @@ function ArenaLoadingClient.markSimulationReady()
 	end
 end
 
-function ArenaLoadingClient.failStartup(ownerPath: string, reason: string)
+function ArenaLoadingClient.reportStartupIssue(ownerPath: string, reason: string)
 	local diagnostic = `{ownerPath}: {reason}`
-	warn(`[ArenaLoadingClient] required startup failed at {diagnostic}`)
-	if localState.fatalError ~= nil then
-		return
-	end
-	localState.fatalError = diagnostic
-	generation += 1
-	readyTaskRunning = false
+	warn(`[ArenaLoadingClient] startup issue at {diagnostic}`)
+	localState.initializationDegraded = true
 	changed()
+end
+
+-- Compatibility for existing client systems while callers move to the explicit
+-- nonfatal diagnostic name. Client faults do not deny an admitted player entry.
+function ArenaLoadingClient.failStartup(ownerPath: string, reason: string)
+	ArenaLoadingClient.reportStartupIssue(ownerPath, reason)
 end
 
 function ArenaLoadingClient.markBallotPresented(startsAt: number)
@@ -525,19 +905,24 @@ function ArenaLoadingClient.markBallotPresented(startsAt: number)
 end
 
 function ArenaLoadingClient.retryInitialization()
-	if destroyed or localState.fatalError ~= "INITIALIZATION_TIMED_OUT" or not localState.simulationReady then
+	if destroyed or serverState == nil or snapshotError ~= nil then
 		return
 	end
 	generation += 1
 	readyTaskRunning = false
-	localState.fatalError = nil
 	localState.preloadReady = false
 	localState.preloadProgress = 0
 	localState.preloadFailed = false
 	localState.preloadTimedOut = false
 	localState.streamReady = false
 	localState.worldReady = false
+	generalPreloadReady = false
+	generalWorldReady = false
+	coursePreloadReady = true
+	courseWorldReady = true
+	generalPreloadGeneration = generation
 	preloadStartedAt = os.clock()
+	maybeBeginCoursePreload(generation)
 	beginPreload(generation)
 	beginStreaming(generation)
 	changed()
@@ -552,7 +937,6 @@ function ArenaLoadingClient.start()
 	destroyed = false
 	readyTaskRunning = false
 	generation += 1
-	local currentGeneration = generation
 	startedAt = os.clock()
 	preloadStartedAt = startedAt
 
@@ -564,9 +948,10 @@ function ArenaLoadingClient.start()
 		if not game:IsLoaded() then
 			game.Loaded:Wait()
 		end
-		if destroyed or generation ~= currentGeneration then
+		if destroyed then
 			return
 		end
+		local currentGeneration = generation
 		localState.gameLoaded = true
 		report("Stage", {
 			stage = "GameLoaded",
@@ -574,11 +959,14 @@ function ArenaLoadingClient.start()
 		})
 		preloadStartedAt = os.clock()
 		changed()
+		generalPreloadGeneration = currentGeneration
+		maybeBeginCoursePreload(currentGeneration)
 		beginPreload(currentGeneration)
 		beginStreaming(currentGeneration)
 		scheduleInitializationTimeout(currentGeneration)
 	end)
 
+	scheduleInitializationTimeout(generation)
 	changed()
 end
 

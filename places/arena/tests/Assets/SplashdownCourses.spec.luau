@@ -7,8 +7,10 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
 local Splashdown = require(Config:WaitForChild("Gameplay"):WaitForChild("Splashdown"))
 local MapFeatures = require(Config:WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
+local AttributeAudit = require(ReplicatedStorage.Shared.Game.MapFeatures.AttributeAudit)
 local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
 
 local BOWL_RADIUS = 380
@@ -26,7 +28,23 @@ end
 return function()
 	describe("Splashdown course templates", function()
 		local folder = TestAssets.get(ReplicatedStorage, "Assets", "Maps", "Splashdown")
+		local queueId = GameModes.Modes.Splashdown.Queue
+		local queue = Queues.Queues[queueId]
+		it("maps Splashdown to an authored full-queue pad capacity", function()
+			expect(queue ~= nil).to.equal(true)
+			expect(queue.ModeSelection.Strategy).to.equal("Fixed")
+			expect(queue.ModeSelection.ModeId).to.equal("Splashdown")
+			expect(typeof(queue.MatchCapacity) == "number" and queue.MatchCapacity > 0 and queue.MatchCapacity % 1 == 0).to.equal(
+				true
+			)
+		end)
 		for _, courseId in Splashdown.CourseOrder do
+			it(`accepts {courseId} authored attributes`, function()
+				local model = TestAssets.get(folder, courseId)
+				local errors, warnings = AttributeAudit.checkSplashdownCourse(model, Splashdown.Courses[courseId])
+				expect(#errors).to.equal(0)
+				expect(#warnings).to.equal(0)
+			end)
 			it(`authors {courseId} to the course contract`, function()
 				local model = TestAssets.get(folder, courseId)
 				expect(model:IsA("Model")).to.equal(true)
@@ -36,7 +54,7 @@ return function()
 				TestAssets.get(model, "Geometry")
 
 				local pads = TestAssets.get(model, "Start", "Pads")
-				expect(partCount(pads) >= GameModes.QueueCapacity("Splashdown")).to.equal(true)
+				expect(partCount(pads) >= queue.MatchCapacity).to.equal(true)
 
 				local checkpoints = TestAssets.get(model, "Checkpoints")
 				local count = 0
@@ -94,5 +112,61 @@ return function()
 				end
 			end)
 		end
+		it("keeps both seesaw asset variants builder-ready for native activation", function()
+			local counts = { obstacle_25_001 = 0, obstacle_11_001 = 0 }
+			for _, model in folder:GetChildren() do
+				local errors = AttributeAudit.checkSplashdownCourse(model, Splashdown.Courses[model.Name] or {})
+				for _, message in errors do
+					expect(string.find(string.lower(message), "seesaw", 1, true)).to.equal(nil)
+				end
+				for _, part in model:GetDescendants() do
+					if part:IsA("BasePart") and part:GetAttribute("Seesaw") == true then
+						local source = part:GetAttribute("SourceAsset")
+						counts[source] = (counts[source] or 0) + 1
+						expect(part.Anchored).to.equal(true)
+						expect(part.Parent:IsA("BasePart") and part.Parent.Anchored).to.equal(true)
+						expect(part:GetAttribute("SeesawAxis")).to.equal("X")
+					end
+				end
+			end
+			expect(counts.obstacle_25_001 > 0).to.equal(true)
+			expect(counts.obstacle_11_001 > 0).to.equal(true)
+		end)
+		it("accepts profile-specific rotor fields and rejects malformed periods", function()
+			local course = Instance.new("Model")
+			course.Name = "ProfileContract"
+			local scriptables = Instance.new("Folder")
+			scriptables.Name = "Scriptables"
+			scriptables.Parent = course
+			local motion = Instance.new("Folder")
+			motion.Name = "Motion"
+			motion.Parent = scriptables
+			local spin = Instance.new("Part")
+			spin.Name = "Spin"
+			spin.Anchored = true
+			spin:SetAttribute("Rotor", "spin")
+			spin:SetAttribute("RotorAxis", "Y")
+			spin:SetAttribute("RotorSpeed", 90)
+			spin.Parent = motion
+			local piston = Instance.new("Part")
+			piston.Name = "Piston"
+			piston.Anchored = true
+			piston:SetAttribute("Rotor", "slide")
+			piston:SetAttribute("RotorAxis", "Z")
+			piston:SetAttribute("RotorProfile", "piston")
+			piston:SetAttribute("PistonPeriod", 2)
+			piston:SetAttribute("PistonExtendStuds", 5)
+			piston.Parent = motion
+			local errors = AttributeAudit.checkSplashdownCourse(course, {})
+			expect(#errors).to.equal(0)
+			spin:SetAttribute("RotorPeriod", 0.04)
+			errors = AttributeAudit.checkSplashdownCourse(course, {})
+			expect(table.concat(errors, "\n"):find("RotorPeriod", 1, true) ~= nil).to.equal(true)
+			spin:SetAttribute("RotorPeriod", nil)
+			piston:SetAttribute("PistonPeriod", 0.09)
+			errors = AttributeAudit.checkSplashdownCourse(course, {})
+			expect(table.concat(errors, "\n"):find("PistonPeriod", 1, true) ~= nil).to.equal(true)
+			course:Destroy()
+		end)
 	end)
 end

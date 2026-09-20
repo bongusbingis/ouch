@@ -174,6 +174,18 @@ end
 
 local MINIMUM_TURN_RADIANS = 1e-5
 
+local function containsSeesaw(assembly: Model | BasePart): boolean
+	if assembly:IsA("BasePart") and assembly:GetAttribute(Attributes.Seesaw) == true then
+		return true
+	end
+	for _, descendant in assembly:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant:GetAttribute(Attributes.Seesaw) == true then
+			return true
+		end
+	end
+	return false
+end
+
 local function motionAt(platform: Platform, rotor: LocalRotor, now: number): (number, number)
 	if rotor.profile == "hammer" then
 		return MotionProfile.hammer(now, rotor.amplitude, rotor.windup :: number, rotor.strike :: number, rotor.phase)
@@ -242,6 +254,10 @@ end
 
 -- Applies a compiled assembly without depending on a running heartbeat.
 function RotatingPlatforms.applyAt(platform: Platform, now: number)
+	-- A physical board must never be reset by a kinematic group pivot.
+	if containsSeesaw(platform.assembly) then
+		return
+	end
 	local angle = Rotation.angleAt(now, platform.degreesPerSecond)
 	local pose = platform.motionPivot * CFrame.Angles(0, angle, 0) * platform.relativePivot
 	if platform.appliedAngle == nil or math.abs(angle - platform.appliedAngle) >= MINIMUM_TURN_RADIANS then
@@ -299,11 +315,15 @@ local function attributeRotor(part: BasePart): RotorOptions?
 	end
 	local axis = part:GetAttribute(Attributes.RotorAxis)
 	assert(axis == "X" or axis == "Y" or axis == "Z", `[RotatingPlatforms] {part:GetFullName()}.RotorAxis is required`)
-	local amplitude = if mode == "spin"
+	local profile = part:GetAttribute(Attributes.RotorProfile)
+	local amplitude = if mode == "spin" or profile == "piston"
 		then optionalNumber(Attributes.RotorAmplitude, 0)
 		else requiredNumber(Attributes.RotorAmplitude, 0)
-	local profile = part:GetAttribute(Attributes.RotorProfile)
-	local period = requiredNumber(Attributes.RotorPeriod, 0.05)
+	-- Spin uses RotorSpeed, while a piston has its own period and extent.
+	-- Validate optional generic values when present without requiring duplicates.
+	local period = if mode == "spin" or profile == "piston"
+		then optionalNumber(Attributes.RotorPeriod, 1, 0.05)
+		else requiredNumber(Attributes.RotorPeriod, 0.05)
 	local phase = optionalNumber(Attributes.RotorPhase, 0)
 	if profile == "piston" and mode == "slide" then
 		period = requiredNumber(Attributes.PistonPeriod, 0.1)
@@ -321,7 +341,10 @@ local function attributeRotor(part: BasePart): RotorOptions?
 	local windup = if profile == "hammer" then requiredNumber(Attributes.WindupSeconds, 0.05) else 0.05
 	local strike = if profile == "hammer" then requiredNumber(Attributes.StrikeSeconds, 0.05) else 0.05
 	local hold = if profile == "piston" then optionalNumber(Attributes.HoldSeconds, 0, 0) else 0
-	assert(hold >= 0 and hold < period, `[RotatingPlatforms] {part:GetFullName()}.HoldSeconds must be less than its period`)
+	assert(
+		hold >= 0 and hold < period,
+		`[RotatingPlatforms] {part:GetFullName()}.HoldSeconds must be less than its period`
+	)
 	return {
 		axis = axis,
 		mode = mode,
@@ -413,8 +436,8 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 	end
 
 	local function checkBase(base: BasePart)
-	local allowLegacy = legacyOrigin ~= nil
-	if allowLegacy and MapFeatures.Spinner.EnabledNames[base.Name] then
+		local allowLegacy = legacyOrigin ~= nil
+		if allowLegacy and MapFeatures.Spinner.EnabledNames[base.Name] then
 			local center = base.CFrame.Rotation + base.CFrame:PointToWorldSpace(base.PivotOffset.Position)
 			addRotor(base, center, {
 				axis = "Y",
@@ -423,7 +446,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 				carriesRiders = false,
 			})
 		end
-	if allowLegacy and isFan(base) then
+		if allowLegacy and isFan(base) then
 			local fanAxis = base:GetAttribute(Attributes.FanAxis)
 			local axis: Axis = if fanAxis == "X" or fanAxis == "Z" then fanAxis else "Y"
 			for _, blade in base:GetChildren() do
@@ -441,7 +464,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 				end
 			end
 		end
-	if allowLegacy and base.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1 then
+		if allowLegacy and base.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1 then
 			for _, plate in base:GetChildren() do
 				if plate:IsA("BasePart") and plate.Name:find(MapFeatures.Disc.PlatePrefix, 1, true) == 1 then
 					local center = base.CFrame.Rotation + plate.Position
@@ -454,7 +477,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 				end
 			end
 		end
-	if allowLegacy and base.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1 then
+		if allowLegacy and base.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1 then
 			local suffix = tonumber(base.Name:match("%.(%d+)$")) or 0
 			for _, panel in base:GetChildren() do
 				if panel:IsA("BasePart") and panel.Name:find(MapFeatures.SwingPanel.PanelPrefix, 1, true) == 1 then
@@ -627,6 +650,9 @@ local function register(state: RootState, key: Instance, assembly: Model | BaseP
 	if state.platforms[key] then
 		return
 	end
+	if containsSeesaw(assembly) then
+		return
+	end
 	local platform = build(assembly, legacyOrigin)
 	state.platforms[key] = platform
 	table.insert(platforms, platform)
@@ -653,7 +679,12 @@ local function scan(state: RootState)
 			for _, child in folder:GetChildren() do
 				local origin = child:FindFirstChild("Origin")
 				local assembly = child:FindFirstChild("Assembly")
-				if origin and origin:IsA("BasePart") and assembly and (assembly:IsA("Model") or assembly:IsA("BasePart")) then
+				if
+					origin
+					and origin:IsA("BasePart")
+					and assembly
+					and (assembly:IsA("Model") or assembly:IsA("BasePart"))
+				then
 					legacy[child] = { origin = origin, assembly = assembly :: Model | BasePart }
 				elseif origin ~= nil or assembly ~= nil then
 					rejected += 1
@@ -664,31 +695,31 @@ local function scan(state: RootState)
 	end
 	local candidates = 0
 	for _, folder in state.folders do
-	 for _, descendant in folder:GetDescendants() do
-		local isLegacyMember = false
-		for _, entry in legacy do
-			if descendant == entry.assembly or descendant:IsDescendantOf(entry.assembly) then
-				isLegacyMember = true
-				break
+		for _, descendant in folder:GetDescendants() do
+			local isLegacyMember = false
+			for _, entry in legacy do
+				if descendant == entry.assembly or descendant:IsDescendantOf(entry.assembly) then
+					isLegacyMember = true
+					break
+				end
+			end
+			local candidate = if not isLegacyMember
+					and descendant:IsA("Model")
+					and hasMotionMarker(descendant, allowLegacy)
+				then descendant
+				elseif
+					not isLegacyMember
+					and descendant:IsA("BasePart")
+					and descendant.Parent == folder
+					and hasPartMotionMarker(descendant, allowLegacy)
+				then descendant
+				else nil
+			if candidate then
+				candidates += 1
+				seen[candidate] = true
+				register(state, candidate, candidate :: Model | BasePart, nil)
 			end
 		end
-		local candidate = if not isLegacyMember
-				and descendant:IsA("Model")
-				and hasMotionMarker(descendant, allowLegacy)
-			then descendant
-			elseif
-				not isLegacyMember
-				and descendant:IsA("BasePart")
-				and descendant.Parent == folder
-				and hasPartMotionMarker(descendant, allowLegacy)
-			then descendant
-			else nil
-		if candidate then
-			candidates += 1
-			seen[candidate] = true
-			register(state, candidate, candidate :: Model | BasePart, nil)
-		end
-	 end
 	end
 	-- Explicitly bounded legacy adapter: only a direct Rotating child with both
 	-- named members is treated as an old group. Category folders are ignored.

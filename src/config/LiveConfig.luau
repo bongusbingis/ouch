@@ -2,8 +2,10 @@
 
 -- Declares which Config leaves Roblox experience configs (ConfigService) may
 -- override. A leaf that is not listed here can never be changed live, and every
--- listed leaf keeps its baked value whenever the config APIs are unavailable,
--- absent, or return a value that fails validation.
+-- listed leaf starts at its baked value. An accepted snapshot with no override
+-- restores that value. If ConfigService is unavailable at startup, baked values
+-- remain active; later read failures and rejected snapshots retain the last
+-- applied values and revision.
 --
 -- Key is both the Roblox config key and the path to the leaf:
 -- "<Module>.<field>[.<field>...]". Modules in SimCritical are read by the
@@ -13,6 +15,7 @@
 export type Entry = {
 	Key: string,
 	Type: "number" | "boolean" | "string",
+	Integer: boolean?,
 	Minimum: number?,
 	Maximum: number?,
 }
@@ -118,14 +121,14 @@ local entries: { Entry } = {
 	-- paths by string segment only, so they are not reachable without changing that
 	-- shared pure module. They are also the smaller term -- 1,625 Bonks per weekly
 	-- daily cycle against 600-2,800 earned per hour of play.
-	{ Key = "Progression.ProgressionXP.MatchComplete", Type = "number", Minimum = 1, Maximum = 200 },
-	{ Key = "Progression.ProgressionXP.Win", Type = "number", Minimum = 1, Maximum = 500 },
-	{ Key = "Progression.ProgressionXP.Elim", Type = "number", Minimum = 0, Maximum = 100 },
-	{ Key = "Progression.ProgressionXP.Catch", Type = "number", Minimum = 0, Maximum = 100 },
-	{ Key = "Progression.ProgressionBonks.MatchComplete", Type = "number", Minimum = 1, Maximum = 400 },
-	{ Key = "Progression.ProgressionBonks.Win", Type = "number", Minimum = 1, Maximum = 500 },
-	{ Key = "Progression.ProgressionBonks.Elim", Type = "number", Minimum = 0, Maximum = 100 },
-	{ Key = "Progression.ProgressionBonks.Catch", Type = "number", Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionXP.MatchComplete", Type = "number", Integer = true, Minimum = 1, Maximum = 200 },
+	{ Key = "Progression.ProgressionXP.Win", Type = "number", Integer = true, Minimum = 1, Maximum = 500 },
+	{ Key = "Progression.ProgressionXP.Elim", Type = "number", Integer = true, Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionXP.Catch", Type = "number", Integer = true, Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionBonks.MatchComplete", Type = "number", Integer = true, Minimum = 1, Maximum = 400 },
+	{ Key = "Progression.ProgressionBonks.Win", Type = "number", Integer = true, Minimum = 1, Maximum = 500 },
+	{ Key = "Progression.ProgressionBonks.Elim", Type = "number", Integer = true, Minimum = 0, Maximum = 100 },
+	{ Key = "Progression.ProgressionBonks.Catch", Type = "number", Integer = true, Minimum = 0, Maximum = 100 },
 
 	-- Shop A/B levers, tested at server granularity: Roblox hands different servers
 	-- different snapshots (GetConfigAsync), so a whole server runs one variant and

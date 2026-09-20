@@ -1,6 +1,5 @@
 """Generate deterministic attribution and license notices from production provenance."""
 
-import json
 from asset_policy import check_provenance
 from workflow_common import ROOT, atomic_write, file_lock, read_json, write_json
 
@@ -19,16 +18,8 @@ def generate():
         notices.extend([f"## {entry['production_file']}", "", f"{entry['source_id']} — {entry['author']}", f"Source: {entry['source_url']}", f"License: {entry['license']} ({entry['license_url']})", "Modifications: " + (", ".join(entry["modifications"]) or "None"), "", entry["license_text"], ""])
     if not entries:
         notices.append("No attribution-requiring assets have been registered in this pipeline yet. Existing Studio assets have not been audited by this bootstrap.")
-    lines = ["--!strict", "-- Generated asset credits; provenance is owned by the manifests.", "return {"]
-    for entry in entries:
-        lines.append("\t{")
-        for key in ("production_file", "author", "source_id", "source_url", "license", "license_url", "license_text"):
-            lines.append(f"\t\t{key} = {json.dumps(entry[key] or '', ensure_ascii=False)},")
-        lines.append("\t},")
-    lines.append("}")
     write_json(ROOT / "manifests/attribution.json", {"schema_version": 1, "entries": entries})
     atomic_write(ROOT / "THIRD_PARTY_NOTICES.md", "\n".join(notices).rstrip() + "\n")
-    atomic_write(ROOT / "generated/ThirdPartyCredits.luau", "\n".join(lines) + "\n")
     return len(entries)
 
 

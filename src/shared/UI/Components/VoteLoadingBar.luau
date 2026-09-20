@@ -1,18 +1,16 @@
--- Description: The countdown bar on the mode ballot, filling from server time so every client shows the same remaining window.
-
 --!strict
-
+-- A compact candy countdown, filled from the authoritative server deadline.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local GameModeVoteViewModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
+local CandyProgressBar = require(script.Parent.CandyProgressBar)
+local CandySurface = require(script.Parent.CandySurface)
+local VoteModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
+local T = require(script.Parent.Parent.Tokens)
 
 local c = React.createElement
-local REFERENCE_HEIGHT = 1200
-local STROKE_THICKNESS = 3 / (REFERENCE_HEIGHT * 0.027)
 
 export type Props = {
 	Active: boolean,
@@ -24,12 +22,13 @@ export type Props = {
 
 return function(props: Props)
 	local progress, setProgress = React.useBinding(1)
+	local seconds, setSeconds = React.useBinding(0)
 
 	React.useEffect(function()
 		local function update()
-			setProgress(
-				GameModeVoteViewModel.progress(Workspace:GetServerTimeNow(), props.EndsAt, props.DurationSeconds)
-			)
+			local now = Workspace:GetServerTimeNow()
+			setProgress(VoteModel.progress(now, props.EndsAt, props.DurationSeconds))
+			setSeconds(math.ceil(math.max(0, props.EndsAt - now)))
 		end
 		update()
 		if not props.Active then
@@ -43,49 +42,48 @@ return function(props: Props)
 
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
-		BackgroundTransparency = 0.35,
-		BorderSizePixel = 0,
-		Position = props.Position or UDim2.fromScale(0.5, 0.895087),
-		Size = props.Size or UDim2.fromScale(0.6, 0.027),
+		BackgroundTransparency = 1,
+		Position = props.Position or UDim2.fromScale(0.5, 0.975),
+		Size = props.Size or UDim2.fromOffset(540, 56),
 	}, {
-		UICorner = c("UICorner", {
-			BottomLeftRadius = UDim.new(1, 0),
-			BottomRightRadius = UDim.new(1, 0),
-			TopLeftRadius = UDim.new(1, 0),
-			TopRightRadius = UDim.new(1, 0),
+		Surface = c(CandySurface, {
+			Color = T.Colors.SurfaceWarm,
+			LipColor = T.Colors.WellLine,
+			Radius = T.Shape.RadiusCard,
+			ZIndex = 1,
 		}),
-		InnerBar = c("ImageLabel", {
-			AnchorPoint = Vector2.new(0, 0.5),
-			BackgroundColor3 = UIConfig.ProgressionStyle.Cyan,
-			BorderSizePixel = 0,
-			Image = "rbxassetid://10051822476",
-			ImageColor3 = UIConfig.ProgressionStyle.Track,
-			Position = UDim2.fromScale(0, 0.5),
-			ResampleMode = Enum.ResamplerMode.Pixelated,
-			ScaleType = Enum.ScaleType.Tile,
-			Size = progress:map(function(value: number)
-				return UDim2.fromScale(value, 1)
+		Caption = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = T.Type.Label,
+			Position = UDim2.fromOffset(18, 7),
+			Size = UDim2.new(1, -104, 0, 20),
+			Text = "VOTING ENDS",
+			TextColor3 = T.Colors.Ink,
+			TextSize = 18,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 6,
+		}),
+		Seconds = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = T.Type.Display,
+			Position = UDim2.new(1, -84, 0, 5),
+			Size = UDim2.fromOffset(66, 23),
+			Text = seconds:map(function(value: number)
+				return `{value}s`
 			end),
-			TileSize = UDim2.fromOffset(200, 200),
-		}, {
-			UICorner = c("UICorner", {
-				BottomLeftRadius = UDim.new(1, 0),
-				BottomRightRadius = UDim.new(1, 0),
-				TopLeftRadius = UDim.new(1, 0),
-				TopRightRadius = UDim.new(1, 0),
-			}),
+			TextColor3 = T.Colors.Pink,
+			TextSize = 21,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = 6,
 		}),
-		UIPadding = c("UIPadding", {
-			PaddingBottom = UDim.new(0.05, 0),
-			PaddingLeft = UDim.new(0.003, 0),
-			PaddingRight = UDim.new(0.003, 0),
-			PaddingTop = UDim.new(0.05, 0),
-		}),
-		UIStroke = c("UIStroke", {
-			Color = UIConfig.ProgressionStyle.White,
-			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-			Thickness = STROKE_THICKNESS,
+		Bar = c(CandyProgressBar, {
+			Progress = progress,
+			Color = T.Colors.Pink,
+			Native = {
+				Position = UDim2.new(0, 18, 1, -20),
+				Size = UDim2.new(1, -36, 0, 11),
+				ZIndex = 6,
+			},
 		}),
 	})
 end

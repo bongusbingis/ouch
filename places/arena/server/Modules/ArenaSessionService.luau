@@ -469,6 +469,7 @@ local LOADING_STAGES = {
 }
 local PRELOAD_OUTCOMES = {
 	Completed = true,
+	CompletedWithAssetFailures = true,
 	Failed = true,
 	Timeout = true,
 	CompletedAfterTimeout = true,

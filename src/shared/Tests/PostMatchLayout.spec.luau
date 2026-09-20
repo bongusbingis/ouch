@@ -56,6 +56,16 @@ local function checkComposition(layout)
 end
 
 T.describe("PostMatchLayout", function()
+	local roundResult = {
+		rewards = { matchXp = 65, bonks = 95 },
+		personalStats = {
+			{ id = "Eliminations" },
+			{ id = "Catches" },
+			{ id = "Deaths" },
+		},
+		seasonProgress = { afterTier = 1 },
+	}
+
 	T.it("pairs the stage with a bounded personal panel on desktop and keeps the shop shortcut", function()
 		local layout = Layout.resolve(Vector2.new(1920, 1080), true)
 		T.expect(layout.compact):toBeFalsy()
@@ -70,6 +80,31 @@ T.describe("PostMatchLayout", function()
 		T.expect(layout.stage.position.X + layout.stage.size.X < layout.personal.position.X):toBeTruthy()
 		T.expect(layout.personal.position.Y):toEqual(layout.stage.position.Y)
 		checkComposition(layout)
+	end)
+
+	T.it("fits the desktop reward card to its content without leaving an empty body", function()
+		local layout = Layout.resolve(Vector2.new(1920, 1080), true, roundResult)
+		T.expect(layout.personal.size.Y):toEqual(366)
+		T.expect(layout.personal.size.Y < layout.stage.size.Y):toBeTruthy()
+		checkComposition(layout)
+	end)
+
+	T.it("caps crowded rewards at the available body height so their scroll viewport remains bounded", function()
+		local unlocks = {}
+		for index = 1, 16 do
+			unlocks[index] = { id = tostring(index) }
+		end
+		local crowded = {
+			rewards = roundResult.rewards,
+			personalStats = roundResult.personalStats,
+			seasonProgress = roundResult.seasonProgress,
+			unlocks = unlocks,
+		}
+		for _, viewport in { Vector2.new(1920, 1080), Vector2.new(956, 440) } do
+			local layout = Layout.resolve(viewport, true, crowded)
+			T.expect(layout.personal.size.Y):toEqual(layout.stage.size.Y)
+			checkComposition(layout)
+		end
 	end)
 
 	T.it("keeps two columns with compact metrics on a landscape phone", function()

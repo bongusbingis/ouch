@@ -9,8 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
 local Splashdown = require(Config:WaitForChild("Gameplay"):WaitForChild("Splashdown"))
-local MapFeatures = require(Config:WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local ScriptableRoots = require(
 	ReplicatedStorage:WaitForChild("Shared")
 		:WaitForChild("Game")
@@ -66,7 +66,43 @@ export type LiveCourse = {
 }
 
 local templates: { [string]: Model } = {}
+local templateCapacity: number? = nil
 local started = false
+
+local function requiredCapacity(): number
+	local modes: any = GameModes.Modes
+	local mode: any = if typeof(modes) == "table" then modes.Splashdown else nil
+	local queueId = if mode then mode.Queue else nil
+	local modePath = "Config.Gameplay.GameModes.Modes.Splashdown.Queue"
+	assert(
+		typeof(queueId) == "string" and queueId ~= "",
+		`[SplashdownCourses] {modePath} received {tostring(queueId)} ({typeof(queueId)}); expected a nonempty queue ID; set the Splashdown mode's queue`
+	)
+	local queuePath = `Config.Gameplay.Queues.Queues.{queueId}`
+	local queueDefinitions: any = Queues.Queues
+	local queue: any = if typeof(queueDefinitions) == "table" then queueDefinitions[queueId] else nil
+	assert(
+		typeof(queue) == "table",
+		`[SplashdownCourses] {queuePath} is missing or malformed; define the queue selected by {modePath}`
+	)
+	local selection = queue.ModeSelection
+	local strategy = if typeof(selection) == "table" then selection.Strategy else nil
+	local fixedModeId = if typeof(selection) == "table" then selection.ModeId else nil
+	assert(
+		strategy == "Fixed" and fixedModeId == "Splashdown",
+		`[SplashdownCourses] {queuePath}.ModeSelection received Strategy={tostring(strategy)}, ModeId={tostring(fixedModeId)}; expected Fixed mode Splashdown; correct the selected queue's ModeSelection`
+	)
+	local capacity = queue.MatchCapacity
+	assert(
+		typeof(capacity) == "number"
+			and capacity == capacity
+			and capacity ~= math.huge
+			and capacity > 0
+			and capacity % 1 == 0,
+		`[SplashdownCourses] {queuePath}.MatchCapacity received {tostring(capacity)} ({typeof(capacity)}); expected a positive integer; set the selected queue's MatchCapacity`
+	)
+	return capacity
+end
 
 local function requireChild(parent: Instance, name: string, path: string, className: string): Instance
 	local child = parent:WaitForChild(name, 10)
@@ -115,14 +151,13 @@ end
 
 -- Resolves a course model's markers; the same walk validates a template at
 -- boot and binds the live clone, so nothing the race depends on can differ.
-local function resolve(courseId: string, model: Model, path: string): LiveCourse
+local function resolve(courseId: string, model: Model, path: string, capacity: number): LiveCourse
 	local definition = Splashdown.Courses[courseId]
 	assert(definition, `[SplashdownCourses] no course config for {courseId}`)
 	local scriptables = requireChild(model, "Scriptables", `{path}.Scriptables`, "Folder") :: Folder
 	local start = requireChild(model, "Start", `{path}.Start`, "Folder")
 	local padsFolder = requireChild(start, "Pads", `{path}.Start.Pads`, "Folder")
 	local pads = sortedParts(padsFolder)
-	local capacity = GameModes.QueueCapacity(GameModes.ModeQueue("Splashdown") or "Splashdown")
 	assert(#pads >= capacity, `[SplashdownCourses] {path}.Start.Pads must hold at least {capacity} pads`)
 	local checkpointsFolder = requireChild(model, "Checkpoints", `{path}.Checkpoints`, "Folder")
 	local checkpoints = sortedCheckpoints(checkpointsFolder, `{path}.Checkpoints`)
@@ -233,16 +268,20 @@ function SplashdownCourses.start()
 	if started then
 		return
 	end
-	started = true
+	local capacity = requiredCapacity()
 	local folder = SplashdownCourses.templatesFolder()
 	local path = folder:GetFullName()
+	local candidates: { [string]: Model } = {}
 	for _, courseId in Splashdown.CourseOrder do
 		local template = requireChild(folder, courseId, `{path}.{courseId}`, "Model") :: Model
 		local errors = AttributeAudit.checkSplashdownCourse(template, Splashdown.Courses[courseId])
 		assert(#errors == 0, `[SplashdownCourses] rejected {template:GetFullName()}:\n{table.concat(errors, "\n")}`)
-		resolve(courseId, template, `{path}.{courseId}`)
-		templates[courseId] = template
+		resolve(courseId, template, `{path}.{courseId}`, capacity)
+		candidates[courseId] = template
 	end
+	templates = candidates
+	templateCapacity = capacity
+	started = true
 end
 
 function SplashdownCourses.template(courseId: string): Model
@@ -252,20 +291,48 @@ end
 
 function SplashdownCourses.checkpointCount(courseId: string): number
 	local template = SplashdownCourses.template(courseId)
-	return (template:GetAttribute("CheckpointCount") :: number?) or 0
+	local count = template:GetAttribute("CheckpointCount")
+	assert(
+		typeof(count) == "number" and count > 0 and count % 1 == 0,
+		`[SplashdownCourses] {template:GetFullName()}.CheckpointCount received {tostring(count)}; restore its positive authored checkpoint count`
+	)
+	return count
 end
 
 -- Clones the template into the bowl, pinned to the arena's MapOrigin, and
 -- tags its Scriptables so the kits and rotors pick the course up.
 function SplashdownCourses.instantiate(courseId: string, parent: Instance, origin: CFrame): LiveCourse
 	local template = SplashdownCourses.template(courseId)
+	local capacity = assert(templateCapacity, "[SplashdownCourses] no committed queue capacity after template start")
 	local clone = template:Clone()
 	clone.Name = Splashdown.ActiveCourseName
-	clone:PivotTo(origin)
-	local live = resolve(courseId, clone, `{parent:GetFullName()}.{Splashdown.ActiveCourseName}`)
-	ScriptableRoots.tag(live.scriptables)
-	clone.Parent = parent
-	return live
+	local taggedRoot: Folder? = nil
+	-- Resolve and tag while staged; cleanup always rethrows the original failure.
+	local ok, result = pcall(function(): LiveCourse
+		clone:PivotTo(origin)
+		local live = resolve(
+			courseId,
+			clone,
+			`{parent:GetFullName()}.{Splashdown.ActiveCourseName}`,
+			capacity
+		)
+		local tagged, reason = ScriptableRoots.tag(live.scriptables)
+		assert(
+			tagged,
+			`[SplashdownCourses] rejected staged {parent:GetFullName()}.{Splashdown.ActiveCourseName}.Scriptables:\n{reason}`
+		)
+		taggedRoot = live.scriptables
+		clone.Parent = parent
+		return live
+	end)
+	if not ok then
+		if taggedRoot then
+			ScriptableRoots.untag(taggedRoot)
+		end
+		clone:Destroy()
+		error(result, 0)
+	end
+	return result :: LiveCourse
 end
 
 function SplashdownCourses.destroy(live: LiveCourse)

@@ -101,6 +101,23 @@ local function fixture(now)
 	return { player = player, profile = profile, granted = granted, fired = fired, clock = clock, options = options }
 end
 
+local function pendingAward(f, seasonId, xp)
+	f.profile.MatchAwards = {
+		Version = 1,
+		Pending = {
+			award = {
+				Ready = true,
+				ProgressionApplied = true,
+				SeasonApplied = true,
+				SeasonId = seasonId,
+				Awarded = { XP = xp },
+			},
+		},
+		Completed = {},
+	}
+	return f.profile.MatchAwards.Pending.award
+end
+
 return function()
 	describe("BattlePassService", function()
 		beforeEach(function()
@@ -270,6 +287,75 @@ return function()
 			expect(f.profile.Season.XP).to.equal(0)
 		end)
 
+		it("settles an applied zero-XP award without inventing an archive", function()
+			local f = fixture(3500)
+			pendingAward(f, "S1", 0)
+			BattlePassService.start(f.options)
+			local settled, reason = BattlePassService.settleArchivedSeason(f.player, "S1", "award")
+			expect(settled).to.equal(true)
+			expect(reason).to.equal(nil)
+			expect(f.profile.SeasonHistory.S1).to.equal(nil)
+			expect(#f.granted).to.equal(0)
+		end)
+
+		it("rejects positive XP and invalid journal preconditions when an archive is absent", function()
+			local cases = {
+				{ "positive XP", function(record) record.Awarded.XP = 1 end, "Awarded.XP" },
+				{ "wrong award ID", function() end, "record required" },
+				{ "empty award ID", function() end, "nonempty award ID" },
+				{ "unknown season", function() end, "known nonempty season ID" },
+				{ "missing journal", function(_record, f) f.profile.MatchAwards = nil end, "V1 Pending journal" },
+				{ "wrong journal version", function(_record, f) f.profile.MatchAwards.Version = 2 end, "V1 Pending journal" },
+				{ "missing pending", function(_record, f) f.profile.MatchAwards.Pending = nil end, "V1 Pending journal" },
+				{ "unready", function(record) record.Ready = false end, "ready, progression-applied" },
+				{ "unapplied progression", function(record) record.ProgressionApplied = false end, "ready, progression-applied" },
+				{ "unapplied season", function(record) record.SeasonApplied = false end, "ready, progression-applied" },
+				{ "wrong season", function(record) record.SeasonId = "S2" end, ".SeasonId" },
+				{ "nonnumeric zero", function(record) record.Awarded.XP = "0" end, ".Awarded.XP" },
+				{ "nonfinite zero", function(record) record.Awarded.XP = 0 / 0 end, ".Awarded.XP" },
+				{ "missing awarded", function(record) record.Awarded = nil end, ".Awarded.XP" },
+			}
+			for _, case in cases do
+				BattlePassService._resetForTest()
+				local f = fixture(3500)
+				local record = pendingAward(f, "S1", 0)
+				case[2](record, f)
+				BattlePassService.start(f.options)
+				local awardId = if case[1] == "wrong award ID" then "other" else if case[1] == "empty award ID" then "" else "award"
+				local seasonId = if case[1] == "unknown season" then "Retired" else "S1"
+				local settled, reason = BattlePassService.settleArchivedSeason(f.player, seasonId, awardId)
+				expect(settled).to.equal(false)
+				expect(string.find(reason, `SeasonHistory.{seasonId}`, 1, true)).to.be.ok()
+				expect(string.find(reason, case[3], 1, true)).to.be.ok()
+				expect(f.profile.SeasonHistory.S1).to.equal(nil)
+				expect(#f.granted).to.equal(0)
+			end
+		end)
+
+		it("settles an existing archive's owed tiers even for a zero-XP award", function()
+			local f = fixture(3500)
+			pendingAward(f, "S1", 0)
+			f.profile.SeasonHistory = {
+				S1 = { Id = "S1", XP = 500, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {} },
+			}
+			local fail = true
+			f.options.rewardService.grant = function(_player, reward)
+				if reward.amount == 75 and fail then
+					return false, "reward unavailable"
+				end
+				table.insert(f.granted, reward)
+				return true
+			end
+			BattlePassService.start(f.options)
+			local settled, reason = BattlePassService.settleArchivedSeason(f.player, "S1", "award")
+			expect(settled).to.equal(false)
+			expect(string.find(reason, "tier 2 Free Bonks 75", 1, true)).to.be.ok()
+			expect(f.profile.MatchAwards.Pending.award).to.be.ok()
+			fail = false
+			expect(BattlePassService.settleArchivedSeason(f.player, "S1", "award")).to.equal(true)
+			expect(#f.granted).to.equal(2)
+		end)
+
 		it("keeps an archived award pending after a partial tier grant failure", function()
 			local f = fixture(3500)
 			f.profile.SeasonHistory = {
@@ -317,6 +403,55 @@ return function()
 			fail = false
 			expect(BattlePassService.settleArchivedSeason(f.player, "S1", "award-18")).to.equal(true)
 			expect(#f.granted).to.equal(2)
+		end)
+
+		it("rejects malformed archived claim state before granting a tier", function()
+			local f = fixture(3500)
+			f.profile.SeasonHistory = {
+				S1 = { Id = "S1", XP = 500, ClaimedPremium = {}, CosmeticClaims = {} },
+			}
+			BattlePassService.start(f.options)
+			local ok, reason = pcall(BattlePassService.settleArchivedSeason, f.player, "S1", "award-19")
+			expect(ok).to.equal(false)
+			expect(string.find(tostring(reason), "SeasonHistory.S1.ClaimedFree", 1, true)).to.be.ok()
+			expect(#f.granted).to.equal(0)
+		end)
+
+		it("rejects an archive key and stored Id mismatch before any tier grant", function()
+			local f = fixture(3500)
+			f.profile.SeasonHistory = {
+				S1 = { Id = "", XP = 500, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {} },
+			}
+			BattlePassService.start(f.options)
+			local ok, reason = pcall(BattlePassService.settleArchivedSeason, f.player, "S1", "award-20")
+			expect(ok).to.equal(false)
+			expect(string.find(tostring(reason), "SeasonHistory.S1.Id", 1, true)).to.be.ok()
+			expect(#f.granted).to.equal(0)
+		end)
+
+		it("keeps malformed active state intact instead of rolling it over", function()
+			local f = fixture(1500)
+			BattlePassService.start(f.options)
+			BattlePassService.stateFor(f.player)
+			f.profile.Season.XP = 0 / 0
+			f.clock.value = 3500
+			local ok, reason = pcall(BattlePassService.stateFor, f.player)
+			expect(ok).to.equal(false)
+			expect(string.find(tostring(reason), "Season.XP", 1, true)).to.be.ok()
+			expect(f.profile.Season.Id).to.equal("S1")
+			expect(f.profile.SeasonHistory.S1).to.equal(nil)
+			expect(#f.granted).to.equal(0)
+		end)
+
+		it("upgrades an old archived missing CosmeticClaims field after validation", function()
+			local f = fixture(3500)
+			f.profile.SeasonHistory = {
+				S1 = { Id = "S1", XP = 100, ClaimedFree = { [1] = true, ["2"] = false }, ClaimedPremium = {} },
+			}
+			BattlePassService.start(f.options)
+			expect(BattlePassService.settleArchivedSeason(f.player, "S1", "award-21")).to.equal(true)
+			expect(type(f.profile.SeasonHistory.S1.CosmeticClaims)).to.equal("table")
+			expect(#f.granted).to.equal(0)
 		end)
 
 		it("does not mark a tier claimed when the grant fails", function()

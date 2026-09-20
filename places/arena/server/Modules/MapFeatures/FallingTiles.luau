@@ -5,6 +5,7 @@ local Workspace = game:GetService("Workspace")
 local Config = require(RS.Config.Gameplay.MapFeatures)
 local Network = require(RS.Shared.Network)
 local Parts = require(script.Parent.FeatureParts)
+local SeesawQuery = require(RS.Shared.Game.MapFeatures.SeesawQuery)
 local Kit = require(script.Parent.MapFeatureKit)
 local FallingTiles = { folderName = "Rotating", instanceClass = "Folder" }
 FallingTiles.folderNames = { "FallingTiles", "Rotating" }
@@ -56,6 +57,7 @@ function FallingTiles.tickWorld(context: Kit.Context)
 			continue
 		end
 		if state.dropAt and not state.hidden and context.now >= state.dropAt then
+			local respawn = Parts.number(tile, "RespawnSeconds", Config.FallingTile.RespawnSeconds)
 			state.hidden = true
 			for _, v in state.original do
 				v.part.CanCollide = false
@@ -63,7 +65,6 @@ function FallingTiles.tickWorld(context: Kit.Context)
 				v.part.CanTouch = false
 				v.part.Transparency = 1
 			end
-			local respawn = Parts.number(tile, "RespawnSeconds", Config.FallingTile.RespawnSeconds, 0, 120)
 			state.restoreAt = if respawn > 0 then context.now + respawn else nil
 		elseif state.restoreAt and context.now >= state.restoreAt then
 			restore(state)
@@ -76,13 +77,14 @@ function FallingTiles.tickPlayer(context: Kit.Context, _player: Player, root: Ba
 		return
 	end
 	ray.FilterDescendantsInstances = { root.Parent :: Instance }
+	ray.CollisionGroup = SeesawQuery.groupFor(root)
 	local hit = Workspace:Raycast(root.Position, Vector3.yAxis * -(humanoid.HipHeight + root.Size.Y / 2 + 0.75), ray)
 	if not hit or hit.Normal.Y < 0.5 then
 		return
 	end
 	for tile, state in tiles do
 		if (hit.Instance == tile or hit.Instance:IsDescendantOf(tile)) and not state.dropAt then
-			local delay = Parts.number(tile, "DropDelaySeconds", Config.FallingTile.DropDelaySeconds, 0.1, 10)
+			local delay = Parts.number(tile, "DropDelaySeconds", Config.FallingTile.DropDelaySeconds)
 			state.dropAt = context.now + delay
 			Network.fire("HazardVisual", nil, tile, "shake", delay)
 			return

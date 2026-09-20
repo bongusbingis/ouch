@@ -4,6 +4,7 @@
 
 local T = require(script.Parent.TestKit)
 local ConfigOverrides = require(script.Parent.Parent.Game.Config.ConfigOverrides)
+local LiveConfig = require(script.Parent.Parent.Parent.Config.LiveConfig)
 
 local entries = {
 	{ Key = "Combat.Dodgeball.ThrowSpeed", Type = "number", Minimum = 10, Maximum = 1000 },
@@ -101,6 +102,43 @@ T.describe("ConfigOverrides", function()
 		T.expect(unknown):toBeNil()
 		local malformed = ConfigOverrides.validateSnapshot(entries, { revision = 4, overrides = "bad" }, 2)
 		T.expect(malformed):toBeNil()
+	end)
+
+	T.it("rejects fractions in all eight match reward overrides but permits other decimals", function()
+		local checked = 0
+		for _, entry in LiveConfig.Entries do
+			if
+				string.match(entry.Key, "^Progression%.ProgressionXP%.")
+				or string.match(entry.Key, "^Progression%.ProgressionBonks%.")
+			then
+				checked += 1
+				local value, reason = ConfigOverrides.validate(entry, 1.5)
+				T.expect(value):toBeNil()
+				T.expect(reason):toEqual("expected integer")
+				T.expect(ConfigOverrides.validate(entry, 2)):toEqual(2)
+			end
+		end
+		T.expect(checked):toEqual(8)
+		for _, entry in LiveConfig.Entries do
+			if entry.Key == "Combat.Dodgeball.ThrowCooldown" then
+				T.expect(ConfigOverrides.validate(entry, 0.5)):toEqual(0.5)
+				return
+			end
+		end
+		error("missing decimal-capable cooldown entry")
+	end)
+
+	T.it("rejects a mixed valid and fractional reward revision as one value", function()
+		local revision, accepted, reason = ConfigOverrides.validateSnapshot(LiveConfig.Entries, {
+			revision = 2,
+			overrides = {
+				["Combat.Dodgeball.ThrowCooldown"] = 0.5,
+				["Progression.ProgressionXP.Win"] = 1.5,
+			},
+		}, 1)
+		T.expect(revision):toBeNil()
+		T.expect(accepted):toBeNil()
+		T.expect(string.find(reason :: string, "Progression.ProgressionXP.Win", 1, true) ~= nil):toBeTruthy()
 	end)
 end)
 

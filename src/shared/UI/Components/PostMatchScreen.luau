@@ -346,7 +346,7 @@ return function(props)
 		return nil
 	end
 
-	local layout = Layout.resolve(safe.size, props.OnOpenShop ~= nil)
+	local layout = Layout.resolve(safe.size, props.OnOpenShop ~= nil, result)
 	local party = if props.Status and props.Status.party then props.Status.party else result.party
 	local actions = Model.actions(
 		Players.LocalPlayer.UserId,

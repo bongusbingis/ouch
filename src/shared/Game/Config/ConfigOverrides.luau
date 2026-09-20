@@ -7,6 +7,7 @@ local ConfigOverrides = {}
 export type Entry = {
 	Key: string,
 	Type: "number" | "boolean" | "string",
+	Integer: boolean?,
 	Minimum: number?,
 	Maximum: number?,
 }
@@ -38,6 +39,9 @@ function ConfigOverrides.validate(entry: Entry, value: any): (any?, string?)
 		local numeric = value :: number
 		if numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
 			return nil, "not a finite number"
+		end
+		if entry.Integer and numeric % 1 ~= 0 then
+			return nil, "expected integer"
 		end
 		if entry.Minimum and numeric < entry.Minimum then
 			return nil, `below minimum {entry.Minimum}`

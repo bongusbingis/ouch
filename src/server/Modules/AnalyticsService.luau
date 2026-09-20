@@ -51,6 +51,9 @@ local funnelSessionIds: { [number]: { [string]: string } } = {}
 local combatDedup = EventDedup.new()
 local matchStartedAt = 0
 local started = false
+local assistErrors: { [Player]: string } = {}
+local assistMissingSince: { [Player]: number } = {}
+local ASSIST_FOLDER_GRACE_SECONDS = 10
 
 type CombatTally = { throws: number, hits: number, catches: number, deaths: number }
 
@@ -76,8 +79,45 @@ local function withDimensions(
 	fields[dimensions.DeviceClass] = (player:GetAttribute("DeviceClass") :: string?) or "Mouse"
 
 	local projected = player:FindFirstChild(PlayerAssist.FolderName)
-	local folder = if projected and projected:IsA("Folder") then projected else nil
-	fields[dimensions.AssistBucket] = AssistResolver.bucket(PlayerAssist.Entries, AssistProjection.resolved(folder))
+	local folder: Folder? = nil
+	local folderReason: string? = nil
+	if projected == nil then
+		local missingSince = assistMissingSince[player]
+		if missingSince == nil then
+			missingSince = os.clock()
+			assistMissingSince[player] = missingSince
+		end
+		-- Early events can precede the first server-owned projection.
+		if os.clock() - missingSince >= ASSIST_FOLDER_GRACE_SECONDS then
+			folderReason =
+				`{player:GetFullName()}.{PlayerAssist.FolderName}: missing Folder after {ASSIST_FOLDER_GRACE_SECONDS}s; check PlayerConfigService projection`
+		end
+	elseif not projected:IsA("Folder") then
+		assistMissingSince[player] = nil
+		folderReason =
+			`{projected:GetFullName()}: expected Folder; received {projected.ClassName}; check PlayerConfigService projection`
+	else
+		assistMissingSince[player] = nil
+		folder = projected
+	end
+	local assistOk: boolean
+	local assistReason: string?
+	local resolvedAssist: { [string]: any }?
+	if folderReason == nil then
+		assistOk, assistReason, resolvedAssist = AssistProjection.resolved(folder)
+	else
+		assistOk, assistReason, resolvedAssist = false, folderReason, nil
+	end
+	if assistOk and resolvedAssist ~= nil then
+		fields[dimensions.AssistBucket] = AssistResolver.bucket(PlayerAssist.Entries, resolvedAssist)
+		if assistErrors[player] ~= nil then
+			warn(`[AnalyticsService] assist projection recovered for player.UserId={player.UserId}`)
+			assistErrors[player] = nil
+		end
+	elseif assistErrors[player] ~= assistReason then
+		warn(`[AnalyticsService] omitted assist bucket for player.UserId={player.UserId}: {assistReason}`)
+		assistErrors[player] = assistReason or "unknown assist projection error"
+	end
 	fields.variantId = if ShopConfig.VariantId == "" then "Default" else ShopConfig.VariantId
 	local schemas = AnalyticsConfig.FieldSchemas
 	local schema = if eventName == "Economy"
@@ -265,6 +305,8 @@ local function onPlayerRemoving(player: Player)
 	sessionStart[player.UserId] = nil
 	funnelSessionIds[player.UserId] = nil
 	combatTallies[player.UserId] = nil
+	assistErrors[player] = nil
+	assistMissingSince[player] = nil
 end
 
 local function matchStateAttribute(name: string): any

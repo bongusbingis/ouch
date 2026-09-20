@@ -3,7 +3,6 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local GuiService = game:GetService("GuiService")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
@@ -14,10 +13,8 @@ local SettingsStore = require(Game:WaitForChild("Settings"):WaitForChild("Settin
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local SectionHeader = require(script.Parent.SectionHeader)
 local SettingRow = require(script.Parent.Settings.SettingRow)
-local AssetCredits = require(script.Parent.Settings.AssetCredits)
 local CandyPanel = require(script.Parent.CandyPanel)
 local CandyTitle = require(script.Parent.CandyTitle)
-local PuffyButton = require(script.Parent.PuffyButton)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Tokens = require(script.Parent.Parent.Tokens)
@@ -57,33 +54,7 @@ return function(props: Props)
 		then Tokens.LobbyLandscape.PanelHeader
 		else if compact then SETTINGS.CompactHeaderHeight else SETTINGS.HeaderHeight
 	local revision, setRevision = React.useState(0)
-	local creditsOpen, setCreditsOpen = React.useState(false)
-	local titleWidth = if creditsOpen
-		then if compact or short then SETTINGS.CompactCreditsTitleWidth else SETTINGS.CreditsTitleWidth
-		else if compact or short then SETTINGS.CompactTitleWidth else SETTINGS.TitleWidth
-	local scrollRef = React.useRef(nil)
-	local creditsButtonRef = React.useRef(nil)
-	local creditsBackRef = React.useRef(nil)
-	local settingsScroll = React.useRef(Vector2.zero)
-	local restoreFocus = React.useRef(false)
-
-	local function showCredits(open: boolean)
-		if open and scrollRef.current then
-			settingsScroll.current = scrollRef.current.CanvasPosition
-		end
-		restoreFocus.current = GuiService.SelectedObject ~= nil
-		setCreditsOpen(open)
-	end
-
-	React.useEffect(function()
-		if scrollRef.current then
-			scrollRef.current.CanvasPosition = if creditsOpen then Vector2.zero else settingsScroll.current
-		end
-		if restoreFocus.current then
-			GuiService.SelectedObject = if creditsOpen then creditsBackRef.current else creditsButtonRef.current
-			restoreFocus.current = false
-		end
-	end, { creditsOpen })
+	local titleWidth = if compact or short then SETTINGS.CompactTitleWidth else SETTINGS.TitleWidth
 
 	React.useEffect(function()
 		return SettingsStore.subscribe(function(_id)
@@ -216,35 +187,6 @@ return function(props: Props)
 		end
 	end
 
-	content.AssetCredits = c(PuffyButton, {
-		ButtonRef = creditsButtonRef,
-		Text = "ASSET CREDITS",
-		TextSize = Tokens.Type.Minimum,
-		TextColor = C.Ink,
-		Color = C.SurfaceWarm,
-		LipColor = C.WellLine,
-		Shadow = false,
-		OnActivated = function()
-			showCredits(true)
-		end,
-		Native = {
-			LayoutOrder = layoutOrder + 1,
-			Position = if columns then UDim2.fromOffset(0, math.max(columnHeights[1], columnHeights[2])) else nil,
-			Size = UDim2.new(1, 0, 0, SETTINGS.CreditsButtonHeight),
-			ZIndex = 6,
-		},
-	})
-	local creditsContent = {
-		Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }),
-		Padding = c("UIPadding", {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 16),
-			PaddingTop = UDim.new(0, 8),
-			PaddingBottom = UDim.new(0, 24),
-		}),
-		Credits = c(AssetCredits),
-	}
-
 	return c(CandyPanel, {
 		Tilt = if short then 0 else nil,
 		Native = {
@@ -257,7 +199,7 @@ return function(props: Props)
 		EntranceScale = if props.TransitionScale then c("UIScale", { Scale = props.TransitionScale }) else nil,
 		Title = c(CandyTitle, {
 			Tilt = if short then 0 else nil,
-			Text = if creditsOpen then "ASSET CREDITS" else "SETTINGS",
+			Text = "SETTINGS",
 			TextSize = if short then 26 elseif compact then 38 else 46,
 			Native = {
 				Position = UDim2.fromOffset(inset + 12, if short then 2 else -18),
@@ -274,7 +216,6 @@ return function(props: Props)
 			},
 		}, {
 			Content = c("ScrollingFrame", {
-				ref = scrollRef,
 				Active = true,
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
@@ -286,38 +227,11 @@ return function(props: Props)
 				ScrollBarImageColor3 = C.Pink,
 				ScrollBarImageTransparency = 0,
 				ScrollBarThickness = SETTINGS.ScrollBar,
-				Selectable = creditsOpen,
-				Size = UDim2.new(
-					1,
-					-8,
-					1,
-					if creditsOpen
-						then -(SETTINGS.CreditsButtonHeight + SETTINGS.SectionGap + 8)
-						elseif saveStatus ~= "" then -(SETTINGS.StatusHeight + 8)
-						else -8
-				),
+				Size = UDim2.new(1, -8, 1, if saveStatus ~= "" then -(SETTINGS.StatusHeight + 8) else -8),
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 				ZIndex = 4,
-			}, if creditsOpen then creditsContent else content),
-			CreditsBack = if creditsOpen
-				then c(PuffyButton, {
-					ButtonRef = creditsBackRef,
-					Text = "BACK TO SETTINGS",
-					TextSize = Tokens.Type.Minimum,
-					Color = C.Pink,
-					Shadow = false,
-					OnActivated = function()
-						showCredits(false)
-					end,
-					Native = {
-						AnchorPoint = Vector2.new(0, 1),
-						Position = UDim2.new(0, SETTINGS.ContentInset, 1, -SETTINGS.ContentInset),
-						Size = UDim2.new(1, -SETTINGS.ContentInset * 2, 0, SETTINGS.CreditsButtonHeight),
-						ZIndex = 6,
-					},
-				})
-				else nil,
-			SaveStatus = if not creditsOpen and saveStatus ~= ""
+			}, content),
+			SaveStatus = if saveStatus ~= ""
 				then c(ResponsiveText, {
 					MeasurementFont = UIConfig.Text.BodyFont,
 					MaxTextSize = 16,

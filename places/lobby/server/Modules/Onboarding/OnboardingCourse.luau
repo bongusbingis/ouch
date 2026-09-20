@@ -32,8 +32,7 @@ function Course.localPosition(arena: Course, position: Vector3): Vector3
 	return Vector3.new(delta:Dot(arena.frame.forward), delta.Y, delta:Dot(arena.frame.right))
 end
 
-function Course.build(index: number): Course
-	local arena = Arena.build(index) :: Course
+local function buildInto(arena: Course): Course
 	arena.origin = arena.frame.origin
 	arena.hazards = {}
 	local templates = RS:WaitForChild("SplashdownTraining")
@@ -125,8 +124,20 @@ function Course.build(index: number): Course
 	table.insert(arena.hazards, blade)
 
 	scriptables.Parent = arena.model
-	ScriptableRoots.tag(scriptables)
+	local tagged, reason = ScriptableRoots.tag(scriptables)
+	assert(tagged, `[OnboardingCourse] rejected {scriptables:GetFullName()}:\n{reason}`)
 	return arena
+end
+
+function Course.build(index: number): Course
+	local arena = Arena.build(index) :: Course
+	-- Arena.build parents its clone; construction failures must release that staged model.
+	local ok, result = pcall(buildInto, arena)
+	if not ok then
+		Arena.destroy(arena)
+		error(result, 0)
+	end
+	return result :: Course
 end
 
 function Course.destroy(arena: Course?)

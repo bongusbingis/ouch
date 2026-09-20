@@ -190,16 +190,18 @@ class WorkflowTests(WorkflowFixture):
             with self.assertRaises(RuntimeError):
                 gate.credential()
 
-    def test_credits_are_deterministic_and_include_license(self):
+    def test_attribution_is_deterministic_and_includes_license(self):
         record = {**self.proposal["provenance"], "provider": "Iconify", "license": "MIT", "license_text": "Copyright Fixture\nPermission fixture", "attribution_required": True}
         write_json(self.project / "manifests/external-assets.json", {"assets": {"asset.png": record}})
         write_json(self.project / "manifests/assets.json", {"assets": {}})
         with patch.object(generate_credits, "ROOT", self.project):
             generate_credits.generate()
-            first = (self.project / "generated/ThirdPartyCredits.luau").read_bytes()
+            first_manifest = (self.project / "manifests/attribution.json").read_bytes()
+            first_notices = (self.project / "THIRD_PARTY_NOTICES.md").read_bytes()
             generate_credits.generate()
-            self.assertEqual(first, (self.project / "generated/ThirdPartyCredits.luau").read_bytes())
-        self.assertIn(b"Copyright Fixture", first)
+            self.assertEqual(first_manifest, (self.project / "manifests/attribution.json").read_bytes())
+            self.assertEqual(first_notices, (self.project / "THIRD_PARTY_NOTICES.md").read_bytes())
+        self.assertIn(b"Copyright Fixture", first_notices)
 
     def test_reconcile_applies_once(self):
         record = {**self.record, "demo": False, "state": "COMPLETE", "moderation_state": "MODERATION_STATE_APPROVED", "asset_id": "42", "production_ready": True}

@@ -93,6 +93,9 @@ local function rewardAmount(category: string, key: string): (number?, string?)
 	if type(amount) ~= "number" or amount ~= amount or amount == math.huge or amount == -math.huge then
 		return nil, `[{path}] expected a finite number, got {tostring(amount)}`
 	end
+	if amount % 1 ~= 0 then
+		return nil, `[{path}] expected an integer reward, got {amount}`
+	end
 	if amount < (if key == "MatchComplete" or key == "Win" then 1 else 0) then
 		return nil,
 			`[{path}] expected {if key == "MatchComplete" or key == "Win" then "a positive" else "a nonnegative"} reward, got {amount}`

@@ -58,15 +58,60 @@ function BattlePassLogic.blankState(seasonId: string): SeasonState
 	}
 end
 
-function BattlePassLogic.readState(raw: any): SeasonState
+function BattlePassLogic.validateStoredState(raw: any, path: string, expectedId: string?): (boolean, string?)
 	if type(raw) ~= "table" then
+		return false, `{path}: expected table`
+	end
+	if type(raw.Id) ~= "string" or (expectedId ~= nil and raw.Id ~= expectedId) then
+		return false, `{path}.Id: expected {if expectedId ~= nil then expectedId else "string"}, got {tostring(raw.Id)}`
+	end
+	local xp = raw.XP
+	if type(xp) ~= "number" or xp < 0 or xp % 1 ~= 0 or xp == math.huge then
+		return false, `{path}.XP: expected finite nonnegative integer, got {tostring(xp)}`
+	end
+	for _, field in { "ClaimedFree", "ClaimedPremium" } do
+		local claims = raw[field]
+		if type(claims) ~= "table" then
+			return false, `{path}.{field}: expected table`
+		end
+		for key, claimed in claims do
+			local numeric = if type(key) == "number" then key else if type(key) == "string" then tonumber(key) else nil
+			if numeric == nil or numeric < 1 or numeric % 1 ~= 0 or (type(key) == "string" and tostring(numeric) ~= key) then
+				return false, `{path}.{field}.{tostring(key)}: expected positive integer tier key`
+			end
+			if type(claimed) ~= "boolean" then
+				return false, `{path}.{field}.{tostring(key)}: expected boolean marker`
+			end
+		end
+	end
+	local cosmetics = raw.CosmeticClaims
+	if cosmetics ~= nil then
+		if type(cosmetics) ~= "table" then
+			return false, `{path}.CosmeticClaims: expected table`
+		end
+		for key, claimed in cosmetics do
+			if type(key) ~= "string" then
+				return false, `{path}.CosmeticClaims.{tostring(key)}: expected string key`
+			end
+			if type(claimed) ~= "boolean" then
+				return false, `{path}.CosmeticClaims.{key}: expected boolean marker`
+			end
+		end
+	end
+	return true, nil
+end
+
+function BattlePassLogic.readState(raw: any): SeasonState
+	if raw == nil then
 		return BattlePassLogic.blankState("")
 	end
-	local state = BattlePassLogic.blankState(if type(raw.Id) == "string" then raw.Id else "")
-	state.XP = if type(raw.XP) == "number" then raw.XP else 0
+	local valid, reason = BattlePassLogic.validateStoredState(raw, "Season")
+	assert(valid, reason)
+	local state = BattlePassLogic.blankState(raw.Id)
+	state.XP = raw.XP
 	for _, field in { "ClaimedFree", "ClaimedPremium", "CosmeticClaims" } do
 		local source = raw[field]
-		if type(source) == "table" then
+		if source ~= nil then
 			for tier, claimed in source do
 				if claimed == true then
 					(state :: any)[field][tostring(tier)] = true

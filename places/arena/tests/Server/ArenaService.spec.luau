@@ -5,6 +5,9 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MapFeatures = require(ReplicatedStorage.Config.Gameplay.MapFeatures)
 
 local ArenaService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("ArenaService"))
@@ -30,6 +33,7 @@ return function()
 			expect(arena.root).to.equal(Workspace.Assets.Arena)
 			expect(arena.root.Parent).to.equal(Workspace.Assets)
 			expect(#arena.root:GetChildren()).to.equal(childCount)
+			expect(CollectionService:HasTag(arena.scriptables, MapFeatures.Attributes.ScriptableRoot)).to.equal(true)
 		end)
 
 		it("uses general spawns for non-team modes", function()

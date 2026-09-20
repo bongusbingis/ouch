@@ -54,6 +54,25 @@ T.describe("LiveConfig registry", function()
 		T.expect(#LiveConfig.Entries <= 100):toBeTruthy()
 	end)
 
+	T.it("marks exactly the eight match reward leaves as integer-only", function()
+		local expected: { [string]: boolean } = {}
+		for _, category in { "ProgressionXP", "ProgressionBonks" } do
+			for _, key in { "MatchComplete", "Win", "Elim", "Catch" } do
+				expected[`Progression.{category}.{key}`] = true
+			end
+		end
+		local found = 0
+		for _, entry in LiveConfig.Entries do
+			if entry.Integer == true then
+				T.expect(expected[entry.Key]):toBeTruthy()
+				found += 1
+			else
+				T.expect(expected[entry.Key]):toBeNil()
+			end
+		end
+		T.expect(found):toEqual(8)
+	end)
+
 	-- The faucet is tunable, but not down to nothing: a completed match and a win
 	-- must always pay, or a player finishes the loop and sees no reward at all.
 	T.it("keeps completing a match and winning payable at every allowed award rate", function()

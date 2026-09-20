@@ -152,8 +152,8 @@ function MatchAudio.start()
 		return
 	end
 	started = true
-	local state = ReplicatedStorage:WaitForChild("MatchState")
-	assert(state:IsA("Folder"), "[MatchAudio] ReplicatedStorage.MatchState must be a Folder")
+	local state = ReplicatedStorage:WaitForChild("MatchState", 15)
+	assert(state and state:IsA("Folder"), "[MatchAudio] ReplicatedStorage.MatchState must be a Folder")
 	matchState = state
 	lastPhase = state:GetAttribute("phase")
 	setMusicMode(MatchAudioLogic.musicMode(lastPhase))

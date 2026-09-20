@@ -90,6 +90,10 @@ return function(props: Props)
 	local actionWidth = if short then S.CompactActionWidth else S.ActionWidth
 	local minimumHeight = if short then S.CompactMinHeight else S.MinHeight
 	local memberStrokeInset = S.MemberStrokeInset
+	-- Keep each card inside the padded canvas area. The scrolling frame reserves
+	-- the scrollbar inset on the right, but a full-width child would still span
+	-- the unpadded canvas and be clipped at that edge.
+	local rowWidth = UDim2.new(1, -(S.ScrollBar + memberStrokeInset * 2 + 2), 0, rowHeight)
 	local width = math.min(legacyLayout.MaxWidthPx, math.max(safeArea.size.X - edge * 2, 1))
 	local listTop = contentInset + codeHeight + gap + sectionHeight + sectionGap
 	local rowCount = math.max(#props.Members, 1)
@@ -190,7 +194,7 @@ return function(props: Props)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			LayoutOrder = index,
-			Size = UDim2.new(1, 0, 0, rowHeight),
+			Size = rowWidth,
 			ZIndex = 5,
 		}, {
 			Surface = c(CandySurface, {
@@ -269,7 +273,7 @@ return function(props: Props)
 	if #props.Members == 0 then
 		rows.Empty = c("Frame", {
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, rowHeight),
+			Size = rowWidth,
 		}, {
 			Surface = c(CandySurface, {
 				Color = C.SurfaceWarm,

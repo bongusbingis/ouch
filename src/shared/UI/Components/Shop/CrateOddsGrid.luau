@@ -3,6 +3,8 @@ local RS = game:GetService("ReplicatedStorage")
 local React = require(RS.Packages.react)
 local T = require(script.Parent.Parent.Parent.Tokens)
 local Summary = require(script.Parent.Parent.Parent.Models.CrateOddsSummary)
+local Layout = require(script.Parent.Parent.Parent.Models.CrateOddsLayout)
+local Selection = require(script.Parent.Parent.Parent.Services.Selection)
 local number = require(script.Parent.Parent.Parent.Models.NumberText)
 local Button = require(script.Parent.Parent.PuffyButton)
 local Preview = require(script.Parent.ShopPreview)
@@ -30,6 +32,24 @@ local function Tile(props)
 		else ""
 	return c(Button, {
 		OnActivated = props.OnActivated,
+		OnSelectionGained = function(button)
+			Selection.scrollIntoView(button)
+			local scroll = button:FindFirstAncestorWhichIsA("ScrollingFrame")
+			if scroll then
+				local position = scroll.CanvasPosition
+				scroll.CanvasPosition = Vector2.new(
+					position.X,
+					Layout.reveal(
+						button.AbsolutePosition.Y - scroll.AbsolutePosition.Y + position.Y,
+						button.AbsoluteSize.Y,
+						props.Inset,
+						position.Y,
+						scroll.AbsoluteWindowSize.Y,
+						scroll.AbsoluteCanvasSize.Y
+					)
+				)
+			end
+		end,
 		Style = "Card",
 		Color = C.NeutralTile:Lerp(C.Surface, 0.4),
 		Radius = T.Shape.RadiusCard,
@@ -90,10 +110,8 @@ local function Tile(props)
 	})
 end
 return function(props)
-	local width = props.Columns * props.TilePx + (props.Columns - 1) * props.GapPx
-	local columns = math.max(1, math.floor((width + T.Shop.CardGap) / (T.Shop.CardMin + T.Shop.CardGap)))
-	local tileWidth = math.floor((width - (columns - 1) * T.Shop.CardGap) / columns)
-	local height = if width < 400 then T.Shop.OddsCompactHeight else T.Shop.CardHeight
+	local layout = props.Layout
+	local columns, tileWidth, height = layout.columns, layout.tileWidth, layout.tileHeight
 	local groups, byRarity = {}, {}
 	for _, entry in props.Odds do
 		local group = byRarity[entry.rarity]
@@ -145,8 +163,13 @@ return function(props)
 			}),
 		})
 		local tiles = {
+			-- Include hover clearance in each group's canvas height, including the last row.
+			Padding = c("UIPadding", {
+				PaddingTop = UDim.new(0, layout.inset),
+				PaddingBottom = UDim.new(0, layout.inset),
+			}),
 			Grid = c("UIGridLayout", {
-				CellPadding = UDim2.fromOffset(T.Shop.CardGap, T.Shop.CardGap),
+				CellPadding = UDim2.fromOffset(layout.gap, layout.gap),
 				CellSize = UDim2.fromOffset(tileWidth, height),
 				FillDirectionMaxCells = columns,
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -158,6 +181,7 @@ return function(props)
 				Order = order,
 				Width = tileWidth,
 				Height = height,
+				Inset = layout.inset,
 				Selected = props.SelectedId == entry.itemId,
 				ColorId = props.ColorId,
 				CostumeId = props.CostumeId,

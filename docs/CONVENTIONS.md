@@ -1,6 +1,12 @@
 # Ouch! Development Conventions
 
 ## 1. Philosophy
+**The four highest product priorities are monetization, engagement, retention, and concurrent player count (CCU).** These take precedence over code elegance, architectural purity, strict validation for its own sake, and implementation convenience. Judge product and system design by its effect on those four outcomes. Preserve the existing server-authority, ownership, purchase, and data-integrity contracts that make those outcomes sustainable.
+
+**Keep players playing, even when gameplay is degraded or broken.** Missing sounds, images, decals, fonts, animations, cosmetic effects, and even gameplay errors should default to bounded waits, useful diagnostics, isolated failures, and as much continued play as possible. Do not automatically substitute a failure screen or deny match entry because a check failed. Showing a failure screen or deliberately blocking match entry requires Jack's explicit approval, including for gameplay-critical errors. Agents must not infer that approval from permission to implement a feature or fix a bug. Test failure and timeout paths for continued play. Preserve purchase, ownership, server-authority, and data-integrity protections; continued play does not authorize granting purchases, corrupting saves, or accepting untrusted game state.
+
+**Example to prevent repeating:** Arena asset preloading once promoted font/audio/image fetch failures into fatal startup errors. An optional media request could lock players out of the entire match, including during an asset-delivery outage. That design directly violates all four product priorities and these conventions. Correct request types, graceful degradation, and regression coverage are required; successful asset delivery alone is not proof that the startup design is acceptable.
+
 **Simplicity over sophistication.** This codebase is maintained by one person. Agents must write simpler code, not more complicated code. Abstraction should reduce complexity, not add layers.
 **Player-facing quality over code elegance.** The player experience is what matters. Implementation elegance behind the scenes is secondary.
 **Pragmatism over purity.** It's acceptable to use approaches that might be considered "bad practice" if the "correct" alternative would waste significant tokens and effort while producing the same player-facing result.

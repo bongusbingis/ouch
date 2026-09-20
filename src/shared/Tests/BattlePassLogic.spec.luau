@@ -135,9 +135,81 @@ T.describe("BattlePassLogic", function()
 		T.expect(state.ClaimedPremium["2"]):toEqual(true)
 	end)
 
-	T.it("returns a blank state for missing or malformed storage", function()
+	T.it("returns a blank state only for absent storage", function()
 		T.expect(BattlePassLogic.readState(nil).XP):toEqual(0)
-		T.expect(BattlePassLogic.readState("nope").Id):toEqual("")
+		local ok, reason = pcall(BattlePassLogic.readState, "nope")
+		T.expect(ok):toBeFalsy()
+		T.expect(string.find(tostring(reason), "Season: expected table", 1, true) ~= nil):toBeTruthy()
+	end)
+
+	T.it("validates saved IDs and finite integral XP with exact paths", function()
+		local state = BattlePassLogic.blankState("S1")
+		T.expect(BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")):toEqual(true)
+		for _, id in { "", "S2" } do
+			state.Id = id
+			local valid, reason = BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")
+			T.expect(valid):toBeFalsy()
+			T.expect(string.find(reason or "", "SeasonHistory.S1.Id", 1, true) ~= nil):toBeTruthy()
+		end
+		state.Id = "S1"
+		for _, xp in { 0 / 0, math.huge, -math.huge, -1, 1.5, "20" } do
+			state.XP = xp :: any
+			local valid, reason = BattlePassLogic.validateStoredState(state, "Season", nil)
+			T.expect(valid):toBeFalsy()
+			T.expect(string.find(reason or "", "Season.XP", 1, true) ~= nil):toBeTruthy()
+		end
+		local valid, reason = BattlePassLogic.validateStoredState(false, "SeasonHistory.S1", "S1")
+		T.expect(valid):toBeFalsy()
+		T.expect(reason):toEqual("SeasonHistory.S1: expected table")
+	end)
+
+	T.it("accepts historical numeric tier keys and false markers but rejects malformed claim maps", function()
+		local state = BattlePassLogic.blankState("S1")
+		local claims: any = state.ClaimedFree
+		claims[1] = true
+		state.ClaimedFree["2"] = false
+		T.expect(BattlePassLogic.validateStoredState(state, "Season")):toEqual(true)
+		T.expect(BattlePassLogic.readState(state).ClaimedFree["1"]):toEqual(true)
+		T.expect(BattlePassLogic.readState(state).ClaimedFree["2"]):toBeNil()
+		state.ClaimedFree["bad"] = true
+		local valid, reason = BattlePassLogic.validateStoredState(state, "Season")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "Season.ClaimedFree.bad", 1, true) ~= nil):toBeTruthy()
+		state.ClaimedFree["bad"] = nil
+		claims[0] = true
+		valid, reason = BattlePassLogic.validateStoredState(state, "Season")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "Season.ClaimedFree.0", 1, true) ~= nil):toBeTruthy()
+		claims[0] = nil
+		claims[1.5] = false
+		valid, reason = BattlePassLogic.validateStoredState(state, "Season")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "Season.ClaimedFree.1.5", 1, true) ~= nil):toBeTruthy()
+		claims[1.5] = nil
+		state.ClaimedPremium["3"] = "yes" :: any
+		valid, reason = BattlePassLogic.validateStoredState(state, "Season")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "Season.ClaimedPremium.3", 1, true) ~= nil):toBeTruthy()
+	end)
+
+	T.it("allows old absent cosmetic claims and rejects malformed present markers", function()
+		local state = BattlePassLogic.blankState("S1")
+		state.CosmeticClaims = nil :: any
+		T.expect(BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")):toEqual(true)
+		state.CosmeticClaims = { ["Free:1:launch:Hat"] = false }
+		T.expect(BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")):toEqual(true)
+		state.CosmeticClaims["Free:1:launch:Hat"] = "claimed" :: any
+		local valid, reason = BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "SeasonHistory.S1.CosmeticClaims.Free:1:launch:Hat", 1, true) ~= nil):toBeTruthy()
+		state.CosmeticClaims = { [4] = true } :: any
+		valid, reason = BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "SeasonHistory.S1.CosmeticClaims.4", 1, true) ~= nil):toBeTruthy()
+		state.CosmeticClaims = false :: any
+		valid, reason = BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")
+		T.expect(valid):toBeFalsy()
+		T.expect(string.find(reason or "", "SeasonHistory.S1.CosmeticClaims", 1, true) ~= nil):toBeTruthy()
 	end)
 
 	T.it("builds a client payload covering every tier", function()

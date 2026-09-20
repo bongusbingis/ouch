@@ -5,7 +5,6 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StarterPlayer = game:GetService("StarterPlayer")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
@@ -31,13 +30,11 @@ local Palette = UI.ProgressionStyle
 local WHITE = Color3.new(1, 1, 1)
 local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
 
-local function registerExclusion(name: string, rect: any)
-	local ok, module = pcall(require, StarterPlayer:WaitForChild("PlayerModule"))
-	local combat = if ok and type(module) == "table" then module.Combat else nil
-	if combat and type(combat.registerHudExclusion) == "function" then
-		pcall(combat.registerHudExclusion, name, rect)
-	end
-end
+export type TouchRect = { minX: number, minY: number, maxX: number, maxY: number }
+type RegisterTouchExclusion = (TouchRect?) -> (boolean, string?)
+
+-- Only the currently mounted touch button may clear the shared Combat key.
+local activeTouchOwner: {}? = nil
 
 local function thumbnailFor(emoteId: string?): string?
 	local item = if emoteId then Cosmetics.Items[emoteId] else nil
@@ -235,27 +232,109 @@ local function Wedge(props: {
 	})
 end
 
-local function TouchButton(props)
+local function TouchButton(props: {
+	SizePx: number?,
+	BottomPx: number,
+	Position: UDim2?,
+	AnchorPoint: Vector2?,
+	ZIndex: number,
+	RegisterTouchExclusion: RegisterTouchExclusion?,
+})
 	local ref = React.useRef(nil)
+	local owner = React.useRef({})
+	local registered = React.useRef(false)
+	local available, setAvailable = React.useState(false)
 	React.useEffect(function()
-		local button = ref.current
-		if button == nil or not props.Visible then
-			registerExclusion("EmoteButton", nil)
-			return
+		local positionConnection: RBXScriptConnection? = nil
+		local sizeConnection: RBXScriptConnection? = nil
+		local cancelled = false
+		local faulted = false
+		local callback = props.RegisterTouchExclusion
+		local function clear()
+			if activeTouchOwner ~= owner.current then
+				return
+			end
+			activeTouchOwner = nil
+			if callback then
+				local ok, success, reason = pcall(callback, nil)
+				if not ok or not success then
+					faulted = true
+					warn(`[EmoteWheel] ArenaEmoteRoot.EmoteWheel.RegisterTouchExclusion: failed to clear EmoteButton touch exclusion: {if ok then tostring(reason) else tostring(success)}; restore the Arena Combat registration`)
+				end
+			end
 		end
-		local function register()
+		local function fail(reason: string)
+			if faulted or cancelled then
+				return
+			end
+			faulted = true
+			registered.current = false
+			setAvailable(false)
+			warn(`[EmoteWheel] ArenaEmoteRoot.EmoteWheel.RegisterTouchExclusion: required EmoteButton touch exclusion failed: {reason}; restore the Arena Combat registration`)
+			clear()
+		end
+		local function register(button: GuiButton)
+			if cancelled or faulted then
+				return
+			end
 			local p, s = button.AbsolutePosition, button.AbsoluteSize
-			registerExclusion("EmoteButton", { minX = p.X, minY = p.Y, maxX = p.X + s.X, maxY = p.Y + s.Y })
+			if callback == nil then
+				fail("visible touch button has no required callback")
+				return
+			end
+			if s.X <= 0 or s.Y <= 0 then
+				registered.current = false
+				setAvailable(false)
+				clear()
+				return
+			end
+			registered.current = false
+			local rect: TouchRect = { minX = p.X, minY = p.Y, maxX = p.X + s.X, maxY = p.Y + s.Y }
+			activeTouchOwner = owner.current
+			local ok, success, reason = pcall(callback, rect)
+			if not ok or not success then
+				fail(if ok then tostring(reason) else tostring(success))
+				return
+			end
+			registered.current = true
+			setAvailable(true)
 		end
-		register()
-		local p = button:GetPropertyChangedSignal("AbsolutePosition"):Connect(register)
-		local s = button:GetPropertyChangedSignal("AbsoluteSize"):Connect(register)
+		local function attach(deferred: boolean)
+			if cancelled or faulted then
+				return
+			end
+			local button = ref.current
+			if button == nil then
+				if deferred then
+					fail("touch button ref was unavailable after mount")
+				else
+					task.defer(function()
+						attach(true)
+					end)
+				end
+				return
+			end
+			register(button)
+			positionConnection = button:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+				register(button)
+			end)
+			sizeConnection = button:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				register(button)
+			end)
+		end
+		attach(false)
 		return function()
-			p:Disconnect()
-			s:Disconnect()
-			registerExclusion("EmoteButton", nil)
+			cancelled = true
+			registered.current = false
+			if positionConnection then
+				positionConnection:Disconnect()
+			end
+			if sizeConnection then
+				sizeConnection:Disconnect()
+			end
+			clear()
 		end
-	end, { props.Visible })
+	end, { props.RegisterTouchExclusion })
 	local px = props.SizePx or WheelConfig.TouchButtonPx
 	local dots = {}
 	for index = 1, 4 do
@@ -278,16 +357,22 @@ local function TouchButton(props)
 			AnchorPoint = props.AnchorPoint or Vector2.new(1, 1),
 			Position = props.Position or UDim2.new(1, -16, 1, -props.BottomPx),
 			Size = UDim2.fromOffset(px, px),
-			Visible = props.Visible,
+			Visible = available,
 			Selectable = false,
 			ZIndex = props.ZIndex,
 		},
-		OnActivated = EmoteWheelController.openTouch,
+		Enabled = available,
+		OnActivated = function()
+			if registered.current and activeTouchOwner == owner.current then
+				EmoteWheelController.openTouch()
+			end
+		end,
 	}, dots)
 end
 
 export type Props = {
 	ShowTouchButton: boolean?,
+	RegisterTouchExclusion: RegisterTouchExclusion?,
 	TouchButtonPosition: UDim2?,
 	TouchButtonAnchor: Vector2?,
 	-- "BesideToolbar" parks the button just left of the combat toolbar, in the
@@ -353,14 +438,14 @@ return function(props: Props)
 		touchPosition, touchAnchor = UDim2.fromOffset(position.X, position.Y), Vector2.zero
 	end
 	return c(React.Fragment, nil, {
-		Button = c(TouchButton, {
+		Button = if touchVisible then c(TouchButton, {
 			SizePx = if props.TouchButtonPlacement == "BesideToolbar" then T.ArenaHUD.EmoteSize else nil,
-			Visible = touchVisible,
 			BottomPx = WheelConfig.TouchButtonBottomPx,
 			Position = touchPosition,
 			AnchorPoint = touchAnchor,
 			ZIndex = z,
-		}),
+			RegisterTouchExclusion = props.RegisterTouchExclusion,
+		}) else nil,
 		Surface = if snapshot.open
 			then ModalSurface({
 				ClassName = "TextButton",

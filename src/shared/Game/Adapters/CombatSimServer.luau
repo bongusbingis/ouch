@@ -37,6 +37,9 @@ local BALLS_FOLDER_NAME = "Balls"
 
 local listeners: { (SimEvent) -> () } = {}
 local pendingWeaponResets: { [string]: boolean } = {}
+local assistErrors: { [Player]: string } = {}
+local assistMissingSince: { [Player]: number } = {}
+local ASSIST_FOLDER_GRACE_SECONDS = 10
 local matchState: Folder? = nil
 local started = false
 
@@ -259,7 +262,46 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 		local aimDir = vector.normalize(intent.aimDir)
 		local deviceClass = (entry.player:GetAttribute("DeviceClass") :: string?) or "Mouse"
 		local projected = entry.player:FindFirstChild(PlayerAssist.FolderName)
-		local assistFolder = if projected and projected:IsA("Folder") then projected else nil
+		local assistFolder: Folder? = nil
+		local folderReason: string? = nil
+		if projected == nil then
+			local missingSince = assistMissingSince[entry.player]
+			if missingSince == nil then
+				missingSince = os.clock()
+				assistMissingSince[entry.player] = missingSince
+			end
+			-- Initial player replication can precede the server-owned projection.
+			if os.clock() - missingSince >= ASSIST_FOLDER_GRACE_SECONDS then
+				folderReason =
+					`{entry.player:GetFullName()}.{PlayerAssist.FolderName}: missing Folder after {ASSIST_FOLDER_GRACE_SECONDS}s; check PlayerConfigService projection`
+			end
+		elseif not projected:IsA("Folder") then
+			assistMissingSince[entry.player] = nil
+			folderReason =
+				`{projected:GetFullName()}: expected Folder; received {projected.ClassName}; check PlayerConfigService projection`
+		else
+			assistMissingSince[entry.player] = nil
+			assistFolder = projected
+		end
+		if folderReason ~= nil then
+			if assistErrors[entry.player] ~= folderReason then
+				warn(`[CombatSimServer] skipped aim command for player.UserId={entry.player.UserId}: {folderReason}`)
+				assistErrors[entry.player] = folderReason
+			end
+			continue
+		end
+		local assistOk, assistReason, assist = AssistProjection.strengths(assistFolder, deviceClass)
+		if not assistOk or assist == nil then
+			if assistErrors[entry.player] ~= assistReason then
+				warn(`[CombatSimServer] skipped aim command for player.UserId={entry.player.UserId}: {assistReason}`)
+				assistErrors[entry.player] = assistReason or "unknown assist projection error"
+			end
+			continue
+		end
+		if assistErrors[entry.player] ~= nil then
+			warn(`[CombatSimServer] aim projection recovered for player.UserId={entry.player.UserId}`)
+			assistErrors[entry.player] = nil
+		end
 		table.insert(commands, {
 			playerId = intent.playerId,
 			kind = intent.kind,
@@ -269,7 +311,7 @@ local function buildCommands(entries: { [string]: CharacterEntry }): { InputComm
 			targetId = intent.targetId,
 			charge = intent.charge,
 			deviceClass = deviceClass,
-			assist = AssistProjection.strengths(assistFolder, deviceClass),
+			assist = assist,
 		})
 	end
 	return commands
@@ -375,6 +417,8 @@ function CombatSimServer.start()
 	matchState = resolvedMatchState
 
 	Players.PlayerRemoving:Connect(function(player)
+		assistErrors[player] = nil
+		assistMissingSince[player] = nil
 		local id = PlayerIds.toId(player)
 		pendingWeaponResets[id] = nil
 		pendingEquips[id] = nil

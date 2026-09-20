@@ -20,6 +20,25 @@ local function emitWarnings(warnings: { string })
 	end
 end
 
+-- Activation-only scan. Legacy Arena geometry and the strict Splashdown rotor
+-- contract stay in their existing audit paths.
+function Audit.checkFeatureValues(root: Instance): { string }
+	local errors = {}
+	local all = root:GetDescendants()
+	table.insert(all, root)
+	for _, instance in all do
+		for key, value in instance:GetAttributes() do
+			if Rules.isFeatureValueKey(key) then
+				local reason = Rules.checkPresentValue(instance:GetFullName(), key, value)
+				if reason then
+					table.insert(errors, reason)
+				end
+			end
+		end
+	end
+	return errors
+end
+
 function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): ({ string }, { string })
 	local allowed = table.clone(metadata)
 	for key, value in extraMetadata or {} do
@@ -34,9 +53,9 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): ({ 
 		local function fail(message: string)
 			table.insert(errors, part:GetFullName() .. ": " .. message)
 		end
-		local ruleErrors, ruleWarnings = Rules.validate(a, Config.Attributes, allowed)
+		local ruleErrors, ruleWarnings = Rules.validate(a, Config.Attributes, allowed, part:GetFullName())
 		for _, message in ruleErrors do
-			fail(message)
+			table.insert(errors, message)
 		end
 		for _, message in ruleWarnings do
 			table.insert(warnings, part:GetFullName() .. ": " .. message)
@@ -165,6 +184,13 @@ end
 splashdownLegacyAttributes.RotationSpeed = true
 splashdownLegacyAttributes.ServerCarries = true
 
+-- Published course templates carry display/timing metadata alongside the
+-- active Splashdown config. It is valid only on the course model itself.
+local splashdownCourseMetadata = table.clone(splashdownLegacyAttributes)
+splashdownCourseMetadata.DisplayName = true
+splashdownCourseMetadata.CapSeconds = true
+splashdownCourseMetadata.CloseWindowSeconds = true
+
 local function finiteNumber(value: any): boolean
 	return typeof(value) == "number" and value == value and math.abs(value) < math.huge
 end
@@ -180,14 +206,19 @@ local function canonicalRotorErrors(part: Instance, attributes: { [string]: any 
 	if attributes.RotorAxis ~= "X" and attributes.RotorAxis ~= "Y" and attributes.RotorAxis ~= "Z" then
 		fail("RotorAxis is required and must be X, Y, or Z")
 	end
-	if not finiteNumber(attributes.RotorPeriod) or attributes.RotorPeriod <= 0 then
-		fail("RotorPeriod is required and must be a positive finite number")
+	-- Spin is speed driven, and a piston uses PistonPeriod. Any optional
+	-- RotorPeriod still has to satisfy the runtime's minimum period.
+	if
+		(attributes.RotorPeriod ~= nil or (attributes.Rotor ~= "spin" and attributes.RotorProfile ~= "piston"))
+		and (not finiteNumber(attributes.RotorPeriod) or attributes.RotorPeriod < 0.05)
+	then
+		fail("RotorPeriod is required when used and must be a finite number at least 0.05")
 	end
 	if attributes.Rotor == "spin" then
 		if not finiteNumber(attributes.RotorSpeed) then
 			fail("RotorSpeed is required for spin rotors")
 		end
-	elseif not finiteNumber(attributes.RotorAmplitude) then
+	elseif attributes.RotorProfile ~= "piston" and not finiteNumber(attributes.RotorAmplitude) then
 		fail("RotorAmplitude is required for rock and slide rotors")
 	end
 	if attributes.RotorProfile == "hammer" then
@@ -198,8 +229,8 @@ local function canonicalRotorErrors(part: Instance, attributes: { [string]: any 
 			fail("StrikeSeconds is required for hammer rotors")
 		end
 	elseif attributes.RotorProfile == "piston" then
-		if not finiteNumber(attributes.PistonPeriod) or attributes.PistonPeriod <= 0 then
-			fail("PistonPeriod is required for piston rotors")
+		if not finiteNumber(attributes.PistonPeriod) or attributes.PistonPeriod < 0.1 then
+			fail("PistonPeriod is required for piston rotors and must be at least 0.1")
 		end
 		if not finiteNumber(attributes.PistonExtendStuds) or attributes.PistonExtendStuds <= 0 then
 			fail("PistonExtendStuds is required for piston rotors")
@@ -220,9 +251,14 @@ function Audit.checkSplashdownCourse(course: Instance, definition: { [string]: a
 	end
 	local function checkAttributes(instance: Instance)
 		local attributes = instance:GetAttributes()
-		local ruleErrors, ruleWarnings = Rules.validate(attributes, Config.Attributes, splashdownLegacyAttributes)
+		local ruleErrors, ruleWarnings = Rules.validate(
+			attributes,
+			Config.Attributes,
+			if instance == course then splashdownCourseMetadata else splashdownLegacyAttributes,
+			instance:GetFullName()
+		)
 		for _, message in ruleErrors do
-			fail(instance, message)
+			table.insert(errors, message)
 		end
 		for _, message in ruleWarnings do
 			warning(instance, message)
@@ -234,6 +270,25 @@ function Audit.checkSplashdownCourse(course: Instance, definition: { [string]: a
 		end
 		if attributes.RotationSpeed ~= nil or attributes.ServerCarries ~= nil then
 			warning(instance, "Arena legacy motion metadata is stale in Splashdown and is ignored")
+		end
+		if instance == course then
+			if
+				attributes.DisplayName ~= nil
+				and (typeof(attributes.DisplayName) ~= "string" or attributes.DisplayName == "")
+			then
+				fail(instance, "DisplayName must be a nonempty string")
+			end
+			if
+				attributes.CapSeconds ~= nil and (not finiteNumber(attributes.CapSeconds) or attributes.CapSeconds <= 0)
+			then
+				fail(instance, "CapSeconds must be a positive finite number")
+			end
+			if
+				attributes.CloseWindowSeconds ~= nil
+				and (not finiteNumber(attributes.CloseWindowSeconds) or attributes.CloseWindowSeconds < 0)
+			then
+				fail(instance, "CloseWindowSeconds must be a nonnegative finite number")
+			end
 		end
 	end
 
@@ -261,6 +316,16 @@ function Audit.checkSplashdownCourse(course: Instance, definition: { [string]: a
 		end
 		if instance:IsA("BasePart") or instance:IsA("Model") then
 			local attributes = instance:GetAttributes()
+			if attributes.Seesaw == true then
+				if not instance:IsA("BasePart") then
+					fail(instance, "Seesaw marker belongs on the plank BasePart")
+				elseif not instance.Parent or not instance.Parent:IsA("BasePart") or not instance.Parent.Anchored then
+					fail(instance, "Seesaw plank requires an anchored BasePart pedestal parent")
+				end
+				if attributes.SeesawAxis ~= "X" then
+					fail(instance, "SeesawAxis must be X for the authored plank axle")
+				end
+			end
 			canonicalRotorErrors(instance, attributes, function(message)
 				fail(instance, message)
 			end)

@@ -83,9 +83,10 @@ local function heightInColumn(fan: BasePart, root: BasePart): number?
 	local offset = fan.CFrame:PointToObjectSpace(root.Position)
 	local axis = fan:GetAttribute(MapFeatures.Attributes.FanAxis)
 	if axis ~= nil then
-		local direction = Parts.axis(axis) * Parts.number(fan, "FanDirection", 1, -1, 1)
+		local fanAxis = Parts.axis(fan, "FanAxis", "Y")
+		local direction = fanAxis * Parts.number(fan, "FanDirection", 1)
 		local axial = offset:Dot(direction)
-		local half = fan.Size:Dot(Parts.axis(axis)) / 2
+		local half = fan.Size:Dot(fanAxis) / 2
 		local transverse = offset - direction * axial
 		local radius = (
 			if axis == "X"
@@ -98,7 +99,7 @@ local function heightInColumn(fan: BasePart, root: BasePart): number?
 		local height = axial - half
 		if
 			height >= -settings.BottomTolerance
-			and height <= Parts.number(fan, "FanColumnHeight", settings.ColumnHeight, 1, 100)
+			and height <= Parts.number(fan, "FanColumnHeight", settings.ColumnHeight)
 			and transverse.Magnitude <= radius
 		then
 			return height
@@ -129,9 +130,9 @@ function FanUpdraft.tickWorld(context: MapFeatureKit.Context)
 	for _, ball in BeachBalls.active() do
 		for _, fan in fans do
 			if fan:GetAttribute(MapFeatures.Attributes.Fan) == true and heightInColumn(fan, ball) ~= nil then
-				local direction = fan.CFrame:VectorToWorldSpace(Parts.axis(fan:GetAttribute("FanAxis")))
-					* Parts.number(fan, "FanDirection", 1, -1, 1)
-				local deficit = Parts.number(fan, "FanBallSpeed", MapFeatures.CourseFan.BallSpeed, 0, 80)
+				local direction = fan.CFrame:VectorToWorldSpace(Parts.axis(fan, "FanAxis", "Y"))
+					* Parts.number(fan, "FanDirection", 1)
+				local deficit = Parts.number(fan, "FanBallSpeed", MapFeatures.CourseFan.BallSpeed)
 					- ball.AssemblyLinearVelocity:Dot(direction)
 				if deficit > 0 then
 					ball:ApplyImpulse(
@@ -148,28 +149,25 @@ end
 local function launch(context: MapFeatureKit.Context, visit: Visit, humanoid: Humanoid)
 	local settings = MapFeatures.Fan
 	local root = visit.root
+	local speed = Parts.number(visit.fan, "LaunchSpeed", settings.LaunchSpeed)
+	local direction = if visit.fan:GetAttribute("FanAxis") ~= nil
+		then visit.fan.CFrame:VectorToWorldSpace(Parts.axis(visit.fan, "FanAxis", "Y"))
+			* Parts.number(visit.fan, "FanDirection", 1)
+		else Vector3.yAxis
+	local guardSeconds = Parts.number(visit.fan, "GuardSeconds", settings.GuardSeconds)
+	local floatFactor = Parts.number(visit.fan, "FloatFactor", settings.FloatFactor)
 	visit.launched = true
 	visit.expiresAt = context.now + settings.MaxLiftSeconds
 
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	local velocity = root.AssemblyLinearVelocity
-	local speed = Parts.number(visit.fan, "LaunchSpeed", settings.LaunchSpeed, 1, 160)
-	local direction = if visit.fan:GetAttribute("FanAxis") ~= nil
-		then visit.fan.CFrame:VectorToWorldSpace(Parts.axis(visit.fan:GetAttribute("FanAxis"))) * Parts.number(
-			visit.fan,
-			"FanDirection",
-			1,
-			-1,
-			1
-		)
-		else Vector3.yAxis
 	-- Setting a floor rather than adding an impulse prevents speed stacking on
 	-- re-entry and preserves any stronger launch owned by another mechanic.
 	root.AssemblyLinearVelocity = velocity + direction * math.max(0, speed - velocity:Dot(direction))
 	MovementGuard.allow(
 		root,
 		"Fan",
-		Parts.number(visit.fan, "GuardSeconds", settings.GuardSeconds, 0.3, 10),
+		guardSeconds,
 		if direction.Y < 0.99 then speed * 1.3 else 0,
 		speed * 1.3
 	)
@@ -189,7 +187,7 @@ local function launch(context: MapFeatureKit.Context, visit: Visit, humanoid: Hu
 	force.RelativeTo = Enum.ActuatorRelativeTo.World
 	force.Force = Vector3.new(
 		0,
-		root.AssemblyMass * Workspace.Gravity * Parts.number(visit.fan, "FloatFactor", settings.FloatFactor, 0, 0.9),
+		root.AssemblyMass * Workspace.Gravity * floatFactor,
 		0
 	)
 	force.Parent = root
@@ -250,9 +248,9 @@ function FanUpdraft.tickPlayer(context: MapFeatureKit.Context, player: Player, r
 		and currentHeight <= MapFeatures.Fan.EntryHeight
 		and context.now >= (cooldowns[player] or 0)
 	then
-		cooldowns[player] = context.now
-			+ Parts.number(currentFan, "RetriggerCooldown", MapFeatures.Fan.RetriggerCooldown, 0.1, 10)
+		local retriggerCooldown = Parts.number(currentFan, "RetriggerCooldown", MapFeatures.Fan.RetriggerCooldown)
 		launch(context, visit, humanoid)
+		cooldowns[player] = context.now + retriggerCooldown
 	end
 end
 

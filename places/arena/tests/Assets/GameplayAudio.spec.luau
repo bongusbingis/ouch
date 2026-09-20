@@ -1,4 +1,4 @@
--- Description: In-place spec checking the gameplay audio config shape, since a malformed asset id or missing entry fails silently at runtime rather than erroring.
+-- Description: Checks published gameplay audio cues against the runtime's required entry and asset ID contract.
 
 --!strict
 
@@ -23,13 +23,20 @@ return function()
 			end
 		end)
 
-		it("gives every effect at least one well formed asset id", function()
+		it("gives every effect a dense array of well formed asset IDs", function()
 			for name, effect in Audio.Gameplay do
+				expect(type(name)).to.equal("string")
+				expect(type(effect.AssetIds)).to.equal("table")
 				expect(#effect.AssetIds > 0).to.equal(true)
-				for _, assetId in effect.AssetIds do
+				local count = 0
+				for index, assetId in effect.AssetIds do
+					expect(type(index)).to.equal("number")
+					expect(index >= 1 and index <= #effect.AssetIds and index % 1 == 0).to.equal(true)
 					expect(type(assetId)).to.equal("string")
 					expect(string.match(assetId, "^rbxassetid://%d+$") ~= nil).to.equal(true)
+					count += 1
 				end
+				expect(count).to.equal(#effect.AssetIds)
 			end
 		end)
 

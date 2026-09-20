@@ -1,6 +1,10 @@
 -- One cached scan per immutable course assembly and feature; no per-part loops.
 --!strict
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local AttributeRules = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures"):WaitForChild("AttributeRules")
+)
 local FeatureParts = {}
 local cache: { [Model]: { [string]: { BasePart } } } = {}
 function FeatureParts.collect(groups: { Instance }, attribute: string): { BasePart }
@@ -33,20 +37,22 @@ function FeatureParts.collect(groups: { Instance }, attribute: string): { BasePa
 	end
 	return result
 end
-function FeatureParts.number(part: Instance, key: string, fallback: number, minimum: number, maximum: number): number
-	local v = part:GetAttribute(key)
-	if typeof(v) ~= "number" or v ~= v or math.abs(v) == math.huge then
-		if part:FindFirstAncestor("SplashdownCourse") then
-			assert(false, `[FeatureParts] {part:GetFullName()}.{key} must be a finite number`)
-		end
+function FeatureParts.number(part: Instance, key: string, fallback: number): number
+	assert(AttributeRules.isFeatureValueKey(key), `[FeatureParts] {key} is not a registered feature value key`)
+	local value = part:GetAttribute(key)
+	if value == nil then
 		return fallback
 	end
-	return math.clamp(v, minimum, maximum)
+	local reason = AttributeRules.checkPresentValue(part:GetFullName(), key, value)
+	assert(reason == nil, `[FeatureParts] {reason}`)
+	return value :: number
 end
-function FeatureParts.axis(value: any): Vector3
-	if value ~= nil and value ~= "X" and value ~= "Y" and value ~= "Z" then
-		assert(false, "[FeatureParts] axis must be X, Y, or Z")
-	end
+function FeatureParts.axis(part: Instance, key: string, fallback: string): Vector3
+	assert(AttributeRules.isFeatureValueKey(key), `[FeatureParts] {key} is not a registered feature value key`)
+	local value = part:GetAttribute(key)
+	value = if value == nil then fallback else value
+	local reason = AttributeRules.checkPresentValue(part:GetFullName(), key, value)
+	assert(reason == nil, `[FeatureParts] {reason}`)
 	return if value == "X" then Vector3.xAxis elseif value == "Z" then Vector3.zAxis else Vector3.yAxis
 end
 return FeatureParts

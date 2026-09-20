@@ -21,6 +21,7 @@ local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local DetailsLayout = require(script.Parent.Parent.Models.ShopDetailsLayout)
+local CrateOddsLayout = require(script.Parent.Parent.Models.CrateOddsLayout)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local OuchPanel = require(script.Parent.CandyPanel)
 local PageTitle = require(script.Parent.CandyTitle)
@@ -778,7 +779,14 @@ local function CrateDetails(props)
 	local guaranteeHeight = if footerGuarantee and not shareFooter
 		then (if balanceWithGuarantee then 40 elseif short then 24 else if size.X < 620 then 44 else 28)
 		else 0
-	local footerCopyHeight = summaryHeight + guaranteeHeight + 8
+	local showBalance = hasBonks and not short
+	local balanceHeight = I.CompactChipHeight
+	if showBalance and not balanceWithGuarantee then
+		summaryHeight = math.max(summaryHeight, balanceHeight)
+	end
+	local balanceRowHeight = if balanceWithGuarantee then guaranteeHeight else summaryHeight
+	-- The wallet owns a full copy row, plus clearance for both its outline and button hover.
+	local footerCopyHeight = summaryHeight + guaranteeHeight + (if showBalance then T.Shop.CardGap else 8)
 	local actionHeight = if slots > 0 then rows * (buttonHeight + UIConfig.Spacing.ControlGapPx) else 0
 	local footerHeight = actionHeight + footerCopyHeight
 	local balanceWidth = if size.X < 620 then 120 else 252
@@ -810,30 +818,36 @@ local function CrateDetails(props)
 		if short or portrait then math.huge else 280,
 		math.max(if veryShort then 32 else 44, previewContentHeight - nameHeight - previewFooter - 16)
 	)
+	local previewStackTop = if portrait or short
+		then 0
+		else math.max(0, math.floor((previewContentHeight - artHeight - nameHeight - previewFooter - 16) / 2))
+	local scrollInset, scrollBarWidth = 8, 4
+	local gridViewport = (size.X - inset * 2) * listWidth - scrollInset * 2 - scrollBarWidth
+	-- Preserve the existing card-density budget while fitting motion inside that budget.
 	local gridGap = if short then 8 else UIConfig.Spacing.ControlGapPx
 	local gridListPx = (size.X - inset * 2) * listWidth - 26
 	local gridMinTile = if short then 112 else 124
 	local gridColumns = math.clamp(math.floor((gridListPx + gridGap) / (gridMinTile + gridGap)), 2, 6)
 	local gridTile =
 		math.min(if portrait then 124 else 136, math.floor((gridListPx - (gridColumns - 1) * gridGap) / gridColumns))
+	local gridLayout =
+		CrateOddsLayout.resolve(math.min(gridViewport, gridColumns * gridTile + (gridColumns - 1) * gridGap))
 	local contents = {
 		Layout = c(
 			"UIListLayout",
 			{ Padding = UDim.new(0, if short then 4 else 6), SortOrder = Enum.SortOrder.LayoutOrder }
 		),
 		Padding = c("UIPadding", {
-			PaddingTop = UDim.new(0, if short then 0 else 3),
-			PaddingLeft = UDim.new(0, 4),
-			PaddingRight = UDim.new(0, 4),
+			PaddingTop = UDim.new(0, T.Shape.StrokeTab),
+			PaddingBottom = UDim.new(0, T.Shape.StrokeTab),
+			PaddingLeft = UDim.new(0, gridLayout.inset),
+			PaddingRight = UDim.new(0, gridLayout.inset),
 		}),
 		Grid = c(CrateOddsGrid, {
 			Odds = card.odds or {},
 			SelectedId = selectedId,
 			OnSelect = setSelectedId,
-			TilePx = gridTile,
-			Columns = gridColumns,
-			GapPx = gridGap,
-			Short = short,
+			Layout = gridLayout,
 			ColorId = (props.Equipped or {}).CharacterColor,
 			CostumeId = (props.Equipped or {}).CostumeAssets,
 			ZIndex = 104,
@@ -886,7 +900,8 @@ local function CrateDetails(props)
 	end
 
 	return modalSurface(surfaceNative(props.Visible), {
-		Panel = c(OuchPanel, { Padding = 0, Native = panelNative(panelRef, size.X, size.Y) }, {
+		-- Keep the footer parallel to the shell; the title sticker retains its playful tilt.
+		Panel = c(OuchPanel, { Padding = 0, Tilt = 0, Native = panelNative(panelRef, size.X, size.Y) }, {
 			Scale = c("UIScale", { Scale = styles.Scale }),
 			Title = c(PageTitle, {
 				Text = titleText,
@@ -952,6 +967,7 @@ local function CrateDetails(props)
 						else nil,
 					Art = c("Frame", {
 						BackgroundTransparency = 1,
+						Position = UDim2.fromOffset(0, previewStackTop),
 						Size = if portrait
 							then UDim2.fromScale(0.4, 1)
 							else if compactEffect
@@ -978,7 +994,7 @@ local function CrateDetails(props)
 							then UDim2.new(0.43, 0, 0, 8)
 							else if compactEffect
 								then UDim2.new(0.36, 8, 0, 4)
-								else UDim2.fromOffset(10, artHeight + 8),
+								else UDim2.fromOffset(10, previewStackTop + artHeight + 8),
 						if portrait
 							then UDim2.new(0.53, 0, 0, previewHeight - previewFooter - 16)
 							else if compactEffect
@@ -1011,7 +1027,19 @@ local function CrateDetails(props)
 							Enabled = true,
 							Position = if portrait
 								then UDim2.new(0.7, 0, 1, -12)
-								else UDim2.new(0.5, 0, 0, previewContentHeight - 16),
+								else UDim2.new(
+									0.5,
+									0,
+									0,
+									if short
+										then previewContentHeight - 16
+										else previewStackTop
+											+ artHeight
+											+ 8
+											+ nameHeight
+											+ UIConfig.Spacing.ControlGapPx
+											+ 48
+								),
 							Size = if portrait then UDim2.new(0.55, -24, 0, 44) else UDim2.new(1, -32, 0, 48),
 							OnActivated = function()
 								props.OnPreviewEffect(preview)
@@ -1023,7 +1051,9 @@ local function CrateDetails(props)
 						then nil
 						else label(
 							"CHOOSE A REWARD",
-							if portrait then UDim2.new(0.43, 0, 1, -27) else UDim2.new(0, 10, 1, -32),
+							if portrait
+								then UDim2.new(0.43, 0, 1, -27)
+								else UDim2.fromOffset(10, previewStackTop + artHeight + 8 + nameHeight + 8),
 							if portrait then UDim2.new(0.53, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
 							UIConfig.Text.CaptionMinPx,
 							colors.White,
@@ -1053,9 +1083,11 @@ local function CrateDetails(props)
 						CanvasSize = UDim2.new(),
 						BackgroundTransparency = 1,
 						BorderSizePixel = 0,
-						Position = UDim2.fromOffset(8, if short then 8 else 40),
-						Size = UDim2.new(1, -16, 1, if short then -16 else -48),
-						ScrollBarThickness = 4,
+						Position = UDim2.fromOffset(scrollInset, if short then 8 else 40),
+						Size = UDim2.new(1, -scrollInset * 2, 1, if short then -16 else -48),
+						ScrollingDirection = Enum.ScrollingDirection.Y,
+						VerticalScrollBarInset = Enum.ScrollBarInset.Always,
+						ScrollBarThickness = scrollBarWidth,
 						ScrollBarImageColor3 = colors.White,
 						ZIndex = 103,
 					}, contents),
@@ -1112,14 +1144,14 @@ local function CrateDetails(props)
 					Size = UDim2.fromOffset(actionWidth, actionHeight),
 					ZIndex = 104,
 				}, buttons),
-				Balance = if hasBonks and not short
+				Balance = if showBalance
 					then c(BonksChip, {
 						Candy = true,
 						Amount = balance,
-						HeightPx = 34,
+						HeightPx = balanceHeight,
 						TextSize = 20,
 						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.new(1, 0, 0, 6),
+						Position = UDim2.new(1, 0, 0, (balanceRowHeight - balanceHeight) / 2),
 						ZIndex = 104,
 					})
 					else nil,

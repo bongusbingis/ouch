@@ -15,7 +15,7 @@ end
 
 function SeasonCosmetics.pending(season: any, state: any, premium: boolean): { any }
 	local pending = {}
-	local completed = state.CosmeticClaims or {}
+	local completed = if state.CosmeticClaims == nil then {} else state.CosmeticClaims
 	for tier = 1, season.TierCount do
 		for _, track in { "Free", "Premium" } do
 			local claimed = if track == "Free" then state.ClaimedFree else state.ClaimedPremium
@@ -34,11 +34,12 @@ end
 
 function SeasonCosmetics.public(season: any, state: any, tier: number, track: string): { any }
 	local rewards = {}
+	local completed = if state.CosmeticClaims == nil then {} else state.CosmeticClaims
 	for _, reward in SeasonCosmetics.at(season, tier, track) do
 		table.insert(rewards, {
 			kind = "Cosmetic",
 			itemId = reward.ItemId,
-			claimed = (state.CosmeticClaims or {})[SeasonCosmetics.key(tier, track, reward)] == true,
+			claimed = completed[SeasonCosmetics.key(tier, track, reward)] == true,
 		})
 	end
 	return rewards

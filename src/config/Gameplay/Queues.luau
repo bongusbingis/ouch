@@ -30,7 +30,7 @@ local queues = {
 		Description = "Race three obstacle courses. Fastest to the finish wins.",
 		SortOrder = 2,
 		MatchCapacity = 30,
-		MinPlayers = 2,
+		MinPlayers = 1,
 		MaxWaitSeconds = 30,
 		-- Give busy queues a short chance to fill, then favor getting the
 		-- waiting racers into a game. Two racers can play all three rounds.
@@ -40,7 +40,7 @@ local queues = {
 			{ AfterSeconds = 10, MinimumPlayers = 12 },
 			{ AfterSeconds = 15, MinimumPlayers = 8 },
 			{ AfterSeconds = 20, MinimumPlayers = 4 },
-			{ AfterSeconds = 30, MinimumPlayers = 2 },
+			{ AfterSeconds = 30, MinimumPlayers = 1 },
 		},
 		ModeSelection = { Strategy = "Fixed", ModeId = "Splashdown" },
 	},

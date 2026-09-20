@@ -8,6 +8,7 @@ local MapFeatures = require(RS.Config.Gameplay.MapFeatures)
 local Rotating = require(Features.RotatingPlatforms)
 local Motion = require(Features.CarryMotion)
 local RiderSupport = require(Features.RiderSupport)
+local SeesawQuery = require(Features.SeesawQuery)
 local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local ServerRiders = { folderName = "Rotating", instanceClass = "Folder" }
@@ -28,6 +29,7 @@ function ServerRiders.tickPlayer(context: MapFeatureKit.Context, player: Player,
 		return
 	end
 	ray.FilterDescendantsInstances = { character :: Instance }
+	ray.CollisionGroup = SeesawQuery.groupFor(root)
 	local distance = humanoid.HipHeight + root.Size.Y / 2 + config.ContactTolerance
 	local hit = Workspace:Raycast(root.Position, Vector3.new(0, -distance, 0), ray)
 	if not hit or hit.Normal.Y < MapFeatures.Rotating.MinSupportNormalY then
@@ -35,6 +37,10 @@ function ServerRiders.tickPlayer(context: MapFeatureKit.Context, player: Player,
 		return
 	end
 	local support = hit.Instance
+	if support:GetAttribute(MapFeatures.Attributes.Seesaw) == true then
+		rides[player] = nil
+		return
+	end
 	local eligible = false
 	for _, platform in Rotating.all() do
 		if platform.serverCarries and support:IsDescendantOf(platform.assembly) then

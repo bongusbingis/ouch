@@ -6,25 +6,32 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PlayerAssist = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("PlayerAssist"))
-local AssistResolver = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Config"):WaitForChild("AssistResolver")
-)
+local configFolder = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Config")
+local AssistResolver = require(configFolder:WaitForChild("AssistResolver"))
+local AssistProjection = require(configFolder:WaitForChild("AssistProjection"))
 
 local AssistConfig = {}
 
 local started = false
 local resolved: { [string]: any } = PlayerAssist.Defaults
 local connections: { RBXScriptConnection } = {}
+local lastError: string? = nil
 
-local function reread(folder: Folder)
-	local rawValues = {}
-	for _, entry in PlayerAssist.Entries do
-		local value = folder:FindFirstChild(entry.Key)
-		if value and value:IsA("ValueBase") then
-			rawValues[entry.Key] = (value :: any).Value
+local function reread(folder: Folder): (boolean, string?)
+	local ok, reason, candidate = AssistProjection.read(folder)
+	if not ok or candidate == nil then
+		if reason ~= lastError then
+			warn(`[AssistConfig] {reason}`)
+			lastError = reason
 		end
+		return false, reason
 	end
-	resolved = AssistResolver.resolve(PlayerAssist.Entries, rawValues)
+	if lastError ~= nil then
+		warn(`[AssistConfig] recovered {folder:GetFullName()} after a valid projection`)
+		lastError = nil
+	end
+	resolved = candidate
+	return true, nil
 end
 
 function AssistConfig.strength(feature: string, deviceClass: string): number
@@ -44,7 +51,17 @@ function AssistConfig.start()
 		`[AssistConfig] missing {player:GetFullName()}.{PlayerAssist.FolderName}; check PlayerConfigService projection`
 	)
 	assert(folder:IsA("Folder"), `[AssistConfig] {folder:GetFullName()} must be a Folder`)
-	started = true
+	local deadline = os.clock() + 10
+	for _, entry in PlayerAssist.Entries do
+		if folder:FindFirstChild(entry.Key) == nil then
+			local remaining = deadline - os.clock()
+			if remaining > 0 then
+				folder:WaitForChild(entry.Key, remaining)
+			end
+		end
+	end
+	local ok, reason = reread(folder)
+	assert(ok, `[AssistConfig] {reason}`)
 
 	local function watch(child: Instance)
 		if child:IsA("ValueBase") then
@@ -68,11 +85,17 @@ function AssistConfig.start()
 	)
 	table.insert(
 		connections,
+		folder.ChildRemoved:Connect(function()
+			reread(folder)
+		end)
+	)
+	table.insert(
+		connections,
 		folder.AttributeChanged:Connect(function()
 			reread(folder)
 		end)
 	)
-	reread(folder)
+	started = true
 end
 
 function AssistConfig.stop()
@@ -81,6 +104,7 @@ function AssistConfig.stop()
 	end
 	table.clear(connections)
 	resolved = PlayerAssist.Defaults
+	lastError = nil
 	started = false
 end
 

@@ -17,6 +17,8 @@ export type Scope = {
 	camera: (() -> CFrame)?,
 	destroyed: boolean,
 	roots: { [Instance]: RBXScriptConnection },
+	isAttempt: boolean?,
+	attemptOwner: Scope?,
 }
 
 export type Options = {
@@ -83,6 +85,13 @@ end
 function Runtime.createScope(parent: Instance, camera: (() -> CFrame)?): Scope
 	assert(parent:IsDescendantOf(Workspace), "[CosmeticEffectRuntime] scope must be in Workspace")
 	return { parent = parent, camera = camera, destroyed = false, roots = {} }
+end
+
+function Runtime.createAttempt(owner: Scope?): Scope
+	local attempt = Runtime.createScope(Runtime.container(owner), if owner then owner.camera else nil)
+	attempt.isAttempt = true
+	attempt.attemptOwner = owner
+	return attempt
 end
 
 function Runtime.mount(root: Instance, scope: Scope?)
@@ -180,15 +189,73 @@ local function freeHeroSlot(scope: Scope?): boolean
 	return false
 end
 
-function Runtime.canSpawn(layer: Layer?, scope: Scope?): boolean
-	local resolved = layer or "Secondary"
+local function budgetOwner(scope: Scope?): Scope?
+	return if scope ~= nil and scope.isAttempt then scope.attemptOwner else scope
+end
+
+local function budgetUsage(scope: Scope?): (number, number)
+	local owner = budgetOwner(scope)
 	local count = 0
+	local evictableLowerLayers = 0
 	for _, animation in active do
-		if animation.scope == scope then
+		if budgetOwner(animation.scope) == owner then
 			count += 1
+			if animation.layer ~= "Hero" and (animation.scope == owner or animation.scope == scope) then
+				evictableLowerLayers += 1
+			end
 		end
 	end
-	return (scope == nil or not scope.destroyed) and count < LAYER_LIMITS[resolved]
+	return count, evictableLowerLayers
+end
+
+-- A successful attempt joins the owner's budget before any old lower-layer
+-- animation is evicted. A failed attempt never evicts an existing effect.
+function Runtime.adoptScope(attempt: Scope, owner: Scope?)
+	assert(attempt.isAttempt and not attempt.destroyed, "[CosmeticEffectRuntime] invalid attempt scope")
+	assert(owner == attempt.attemptOwner and (owner == nil or not owner.destroyed), "[CosmeticEffectRuntime] invalid adoption owner")
+	local count, lowerLayers = budgetUsage(attempt)
+	local overflow = math.max(count - MAX_ACTIVE, 0)
+	if overflow > lowerLayers then
+		Runtime.destroyScope(attempt)
+		error("[CosmeticEffectRuntime] owner animation budget changed during cue attempt")
+	end
+	local roots = table.clone(attempt.roots)
+	for root, signal in roots do
+		signal:Disconnect()
+		attempt.roots[root] = nil
+		owners[root] = nil
+		if owner ~= nil then
+			owners[root] = owner
+			owner.roots[root] = root.Destroying:Once(function()
+				owners[root] = nil
+				owner.roots[root] = nil
+			end)
+		end
+	end
+	for _, animation in active do
+		if animation.scope == attempt then
+			animation.scope = owner
+		end
+	end
+	attempt.destroyed = true
+	for _ = 1, overflow do
+		assert(freeHeroSlot(owner), "[CosmeticEffectRuntime] missing lower-layer owner animation")
+	end
+	if overflow > 0 then
+		notify()
+	end
+end
+
+function Runtime.canSpawn(layer: Layer?, scope: Scope?): boolean
+	local resolved = layer or "Secondary"
+	local count, lowerLayers = budgetUsage(scope)
+	if scope ~= nil and scope.destroyed then
+		return false
+	end
+	if count < LAYER_LIMITS[resolved] then
+		return true
+	end
+	return scope ~= nil and scope.isAttempt == true and resolved == "Hero" and count - MAX_ACTIVE < lowerLayers
 end
 
 function Runtime.add(
@@ -200,7 +267,7 @@ function Runtime.add(
 	assert(duration > 0, "[CosmeticEffectRuntime] duration must be positive")
 	local layer = if options and options.layer then options.layer else "Secondary"
 	local scope = owners[root]
-	if not Runtime.canSpawn(layer, scope) and (layer ~= "Hero" or not freeHeroSlot(scope)) then
+	if not Runtime.canSpawn(layer, scope) and (layer ~= "Hero" or (scope ~= nil and scope.isAttempt == true) or not freeHeroSlot(scope)) then
 		root:Destroy()
 		return false
 	end
