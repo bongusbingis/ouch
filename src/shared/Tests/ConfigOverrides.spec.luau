@@ -70,6 +70,38 @@ T.describe("ConfigOverrides", function()
 		T.expect(ConfigOverrides.readPath(root, { "Dodgeball", "ThrowSpeed" })):toEqual(250)
 		T.expect(ConfigOverrides.readPath(root, { "Nope", "ThrowSpeed" })):toBeNil()
 	end)
+
+	T.it("validates a complete revision before returning any overrides", function()
+		local revision, accepted = ConfigOverrides.validateSnapshot(entries, {
+			revision = 0,
+			overrides = {},
+		}, -1)
+		T.expect(revision):toEqual(0)
+		T.expect(next(accepted :: { [string]: any })):toBeNil()
+
+		local invalidRevision, invalidOverrides, reason = ConfigOverrides.validateSnapshot(entries, {
+			revision = 1,
+			overrides = {
+				["Combat.Dodgeball.ThrowSpeed"] = 250,
+				["GameModes.VoteDurationSeconds"] = 900,
+			},
+		}, 0)
+		T.expect(invalidRevision):toBeNil()
+		T.expect(invalidOverrides):toBeNil()
+		T.expect(string.find(reason :: string, "GameModes.VoteDurationSeconds", 1, true) ~= nil):toBeTruthy()
+	end)
+
+	T.it("rejects stale revisions, unknown keys, and malformed projection shape", function()
+		local stale = ConfigOverrides.validateSnapshot(entries, { revision = 2, overrides = {} }, 2)
+		T.expect(stale):toBeNil()
+		local unknown = ConfigOverrides.validateSnapshot(entries, {
+			revision = 3,
+			overrides = { ["Combat.Dodgeball.Unlisted"] = 1 },
+		}, 2)
+		T.expect(unknown):toBeNil()
+		local malformed = ConfigOverrides.validateSnapshot(entries, { revision = 4, overrides = "bad" }, 2)
+		T.expect(malformed):toBeNil()
+	end)
 end)
 
 return true

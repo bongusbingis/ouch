@@ -191,7 +191,7 @@ end
 
 local function lavaTop(course: SplashdownCourses.LiveCourse): number?
 	local lava = course.lava
-	if lava == nil then
+	if lava == nil or course.lavaRise == nil then
 		return nil
 	end
 	return lava.Position.Y + lava.Size.Y / 2
@@ -282,7 +282,7 @@ end
 
 local function resetLava()
 	local course = live
-	if course and course.lava and course.lavaBase then
+	if course and course.lava and course.lavaBase and course.lavaRise then
 		course.lava.CFrame = course.lavaBase
 	end
 end

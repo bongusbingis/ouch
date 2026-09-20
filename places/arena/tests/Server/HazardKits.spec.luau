@@ -247,12 +247,18 @@ return function()
 			expect(
 				#Rules.validate({ Rotor = "rock", RotorAxis = "X", RotorProfile = "hammer", Shove = true }, Attributes)
 			).to.equal(0)
+			local staleErrors, staleWarnings = Rules.validate({ TypoSpeed = 7 }, Attributes)
+			expect(#staleErrors).to.equal(0)
+			expect(#staleWarnings).to.equal(1)
+			part("Stale", Vector3.one, Vector3.zero, group, { TypoSpeed = 7 })
+			local auditErrors, auditWarnings = Audit.check(group)
+			expect(#auditErrors).to.equal(0)
+			expect(#auditWarnings).to.equal(1)
 			for _, a in
 				{
 					{ Rotor = "spin", RotorAxis = "W" },
 					{ Rotor = "slide", Seesaw = true },
 					{ Rotor = "spin", RotorProfile = "hammer" },
-					{ TypoSpeed = 7 },
 					{ DoorRow = 0, DoorIndex = 1 },
 					{ FanDirection = 0 },
 					{ Bumper = true, Shove = true, Rotor = "spin" },

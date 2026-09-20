@@ -33,6 +33,9 @@ local function isBumper(part: BasePart): boolean
 	if part:GetAttribute(MapFeatures.Attributes.Bumper) == true then
 		return true
 	end
+	if part:FindFirstAncestor("SplashdownCourse") then
+		return false
+	end
 	for _, prefix in config().NamePrefixes do
 		if part.Name:find(prefix, 1, true) == 1 then
 			return true
@@ -42,11 +45,7 @@ local function isBumper(part: BasePart): boolean
 end
 
 local function trackGroup(group: Instance)
-	local assembly = group:FindFirstChild("Assembly")
-	if assembly == nil or not assembly:IsA("Model") then
-		return
-	end
-	for _, descendant in assembly:GetDescendants() do
+	for _, descendant in group:GetDescendants() do
 		if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
 			bumpers[descendant] = {
 				baseSize = descendant.Size,
@@ -92,14 +91,16 @@ end
 
 local function addRoot(root: Instance)
 	rootConnections[root] = {}
-	local folder = root:FindFirstChild("Rotating")
-	if folder then
-		trackFolder(root, folder)
+	for _, name in { "Bumpers", "Motion", "Rotating" } do
+		local folder = root:FindFirstChild(name)
+		if folder then
+			trackFolder(root, folder)
+		end
 	end
 	table.insert(
 		rootConnections[root],
 		root.ChildAdded:Connect(function(child)
-			if child.Name == "Rotating" then
+		if child.Name == "Bumpers" or child.Name == "Motion" or child.Name == "Rotating" then
 				trackFolder(root, child)
 			end
 		end)

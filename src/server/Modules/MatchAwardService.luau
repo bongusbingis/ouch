@@ -41,20 +41,37 @@ local function commit(player: Player, id: string): boolean
 	awarded.XP = Boosts.apply(awarded.XP, multipliers.Xp)
 	awarded.Bonks = Boosts.apply(awarded.Bonks, multipliers.Bonks)
 	record = PlayerData.resolveMatchAward(player, id, awarded, multipliers)
+	if record == nil then
+		warn(`[MatchAwardService] award {id}: journal record disappeared before resolution`)
+		return false
+	end
 	local before = BattlePassService.stateFor(player)
+	if before == nil then
+		warn(`[MatchAwardService] award {id} season {tostring(record.SeasonId)}: season state unavailable before payout`)
+		return false
+	end
 	if not PlayerData.applyMatchAward(player, id) then
 		return false
 	end
-	if not record.SeasonApplied then
-		if not BattlePassService.addSeasonXp(player, record.Awarded.XP, record.SeasonId) then
-			return false
-		end
-		PlayerData.markMatchSeasonApplied(player, id)
+	local credited, creditReason = PlayerData.creditMatchSeasonXp(player, id)
+	if not credited then
+		warn(`[MatchAwardService] {creditReason}`)
+		return false
+	end
+	local settled, settlementReason = BattlePassService.settleArchivedSeason(player, record.SeasonId, id)
+	if not settled then
+		warn(`[MatchAwardService] {settlementReason}`)
+		return false
 	end
 	if record.Progress.MatchesPlayed > 0 then
 		PlayerData.completeTutorial(player)
 	end
 	local after = BattlePassService.stateFor(player)
+	if after == nil then
+		warn(`[MatchAwardService] award {id} season {tostring(record.SeasonId)}: season state unavailable after payout`)
+		return false
+	end
+	BattlePassService.fireState(player)
 	if not PlayerData.completeMatchAward(player, id) then
 		return false
 	end

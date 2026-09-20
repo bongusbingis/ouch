@@ -17,7 +17,7 @@ BeachBalls.instanceClass = "Folder"
 
 type BallInfo = {
 	homeRelative: CFrame,
-	assembly: Model,
+	assembly: Model | BasePart,
 	parent: Instance,
 	anchored: boolean,
 	properties: PhysicalProperties?,
@@ -25,7 +25,7 @@ type BallInfo = {
 }
 
 local balls: { [BasePart]: BallInfo } = {}
-local initializedAssemblies: { [Model]: boolean } = {}
+local initializedAssemblies: { [Instance]: boolean } = {}
 local nextCheckAt = 0
 local mapOrigin: Vector3? = nil
 local warnedNoMapOrigin = false
@@ -33,7 +33,7 @@ local warnedNoMapOrigin = false
 -- Balls live beside their own Scriptables root -- the arena's or a course's --
 -- so a course's balls leave with the course instead of piling up under the
 -- arena folder.
-local function getRuntimeFolder(assembly: Model): Folder
+local function getRuntimeFolder(assembly: Model | BasePart): Folder
 	local scriptables = assembly:FindFirstAncestor("Scriptables") or ArenaService.get().scriptables
 	local existing = scriptables:FindFirstChild("BeachBalls")
 	if existing and existing:IsA("Folder") then
@@ -68,12 +68,20 @@ local function initGroup(assembly: Model)
 	local settings = MapFeatures.BeachBall
 	local folder = getRuntimeFolder(assembly)
 	local pivot = assembly:GetPivot()
-	for _, ball in assembly:GetDescendants() do
+	local descendants = assembly:GetDescendants()
+	if assembly:IsA("BasePart") then
+		table.insert(descendants, assembly)
+	end
+	for _, ball in descendants do
 		if
 			ball:IsA("BasePart")
 			and (
 				ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true
-				or (ball.Parent == assembly and ball.Name:find(settings.NamePrefix, 1, true) == 1)
+			or (
+				assembly:FindFirstAncestor("SplashdownCourse") == nil
+				and ball.Parent == assembly
+				and ball.Name:find(settings.NamePrefix, 1, true) == 1
+			)
 			)
 		then
 			balls[ball] = {
@@ -107,8 +115,16 @@ function BeachBalls.tickWorld(context: MapFeatureKit.Context)
 	end
 	for _, group in context.instances do
 		local assembly = group:FindFirstChild("Assembly")
-		if assembly and assembly:IsA("Model") and not initializedAssemblies[assembly] then
-			initGroup(assembly)
+		if assembly and assembly:IsA("Model") then
+			if not initializedAssemblies[assembly] then
+				initGroup(assembly)
+			end
+		elseif not assembly then
+			for _, child in group:GetChildren() do
+				if (child:IsA("Model") or child:IsA("BasePart")) and not initializedAssemblies[child] then
+					initGroup(child)
+				end
+			end
 		end
 	end
 

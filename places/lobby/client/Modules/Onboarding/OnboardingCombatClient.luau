@@ -11,108 +11,181 @@ local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
 
 local OnboardingCombatClient = {}
 
+type System = {
+	name: string,
+	parent: Instance,
+	start: boolean?,
+	combat: boolean?,
+	intent: boolean?,
+	options: any?,
+	module: any?,
+}
+
 local started = false
+local starting = false
 local connections: { RBXScriptConnection } = {}
 local disposers: { () -> () } = {}
-local optional: { [string]: any } = {}
+local activeModules: { { path: string, module: any } } = {}
+
+local function requiredChild(parent: Instance, name: string): Instance
+	local child = parent:WaitForChild(name, 10)
+	assert(
+		child,
+		`[OnboardingCombatClient] missing {parent:GetFullName()}.{name}; restore the Lobby Rojo mapping or Studio instance`
+	)
+	return child
+end
+
+local function requiredModule(parent: Instance, name: string): any
+	local source = requiredChild(parent, name)
+	assert(source:IsA("ModuleScript"), `[OnboardingCombatClient] {source:GetFullName()} must be a ModuleScript`)
+	local ok, result = pcall(require, source)
+	if not ok then
+		error(`[OnboardingCombatClient] failed to load {source:GetFullName()}: {result}`, 0)
+	end
+	assert(typeof(result) == "table", `[OnboardingCombatClient] {source:GetFullName()} must return a module table`)
+	return result
+end
+
+local function startModule(path: string, module: any, options: any?)
+	assert(typeof(module.start) == "function", `[OnboardingCombatClient] required {path}.start is missing`)
+	assert(
+		typeof(module.destroy or module.stop) == "function",
+		`[OnboardingCombatClient] required {path}.destroy or .stop is missing`
+	)
+	-- Track before calling start so a partially started module is also torn down.
+	table.insert(activeModules, { path = path, module = module })
+	local ok, err
+	if options ~= nil then
+		ok, err = pcall(module.start, options)
+	else
+		ok, err = pcall(module.start)
+	end
+	if not ok then
+		error(`[OnboardingCombatClient] failed to start {path}: {err}`, 0)
+	end
+end
 
 function OnboardingCombatClient.start()
 	if started then
 		return
 	end
-	started = true
+	assert(not starting, "[OnboardingCombatClient] startup is already in progress")
+	starting = true
 
-	local client = Players.LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
-	local modules = client:WaitForChild("Modules")
-	local input = modules:WaitForChild("Input")
-	local presentation = modules:WaitForChild("Presentation")
-	local ui = modules:WaitForChild("UI")
+	local ok, err = pcall(function()
+		local playerScripts = requiredChild(Players.LocalPlayer, "PlayerScripts")
+		local client = requiredChild(playerScripts, "Client")
+		local modules = requiredChild(client, "Modules")
+		local input = requiredChild(modules, "Input")
+		local presentation = requiredChild(modules, "Presentation")
+		local ui = requiredChild(modules, "UI")
 
-	local AssistConfig = require(input:WaitForChild("AssistConfig")) :: any
-	local CombatState = require(presentation:WaitForChild("CombatState")) :: any
-	local InputRouter = require(input:WaitForChild("InputRouter")) :: any
-	local CameraAssist = require(input:WaitForChild("CameraAssist")) :: any
-	local CombatInputSender = require(input:WaitForChild("CombatInputSender")) :: any
+		local AssistConfig = requiredModule(input, "AssistConfig")
+		local CombatState = requiredModule(presentation, "CombatState")
+		local InputRouter = requiredModule(input, "InputRouter")
+		local CameraAssist = requiredModule(input, "CameraAssist")
+		local CombatInputSender = requiredModule(input, "CombatInputSender")
 
-	-- Input stays disabled until the onboarding session actually opens; the
-	-- camera is handed over by OnboardingClient at the same moment.
-	Combat.setInputEnabled(false)
-
-	AssistConfig.start()
-	CombatState.start()
-	InputRouter.start()
-	CameraAssist.start()
-	CombatInputSender.start()
-
-	local presenters = {}
-	local systems = {
-		{ name = "BallVisuals", parent = presentation, start = true, combat = true },
-		{ name = "HammerVisuals", parent = presentation, start = true, combat = true },
-		{ name = "ThrowUXClient", parent = ui, start = true },
-		{ name = "ChargeAim", parent = presentation, start = true },
-		{ name = "ArmIK", parent = presentation, start = true, options = { replicate = false } },
-		{ name = "GameAudio", parent = presentation, combat = true },
-		{ name = "WeaponAnimations", parent = presentation, start = true, intent = true },
-	}
-	for _, system in systems do
-		local ok, result = pcall(function()
-			local module = require(system.parent:WaitForChild(system.name)) :: any
+		local systems: { System } = {
+			{ name = "BallVisuals", parent = presentation, start = true, combat = true },
+			{ name = "HammerVisuals", parent = presentation, start = true, combat = true },
+			{ name = "ThrowUXClient", parent = ui, start = true },
+			{ name = "ChargeAim", parent = presentation, start = true },
+			{ name = "ArmIK", parent = presentation, start = true, options = { replicate = false } },
+			{ name = "GameAudio", parent = presentation, combat = true },
+			{ name = "WeaponAnimations", parent = presentation, start = true, intent = true },
+		}
+		for _, system in systems do
+			local module = requiredModule(system.parent, system.name)
 			if system.start then
-				if system.options then
-					module.start(system.options)
-				else
-					module.start()
-				end
+				assert(
+					typeof(module.start) == "function" and typeof(module.destroy or module.stop) == "function",
+					`[OnboardingCombatClient] {system.parent:GetFullName()}.{system.name} needs start and destroy/stop`
+				)
+			end
+			if system.combat then
+				assert(
+					typeof(module.onEvent) == "function",
+					`[OnboardingCombatClient] {system.parent:GetFullName()}.{system.name}.onEvent is missing`
+				)
+			end
+			if system.intent then
+				assert(
+					typeof(module.onIntent) == "function",
+					`[OnboardingCombatClient] {system.parent:GetFullName()}.{system.name}.onIntent is missing`
+				)
+			end
+			system.module = module
+		end
+
+		-- Input stays disabled until the onboarding session opens; the camera
+		-- is handed over by OnboardingClient at the same moment.
+		Combat.setInputEnabled(false)
+		startModule(`{input:GetFullName()}.AssistConfig`, AssistConfig)
+		startModule(`{presentation:GetFullName()}.CombatState`, CombatState)
+		startModule(`{input:GetFullName()}.InputRouter`, InputRouter)
+		startModule(`{input:GetFullName()}.CameraAssist`, CameraAssist)
+		startModule(`{input:GetFullName()}.CombatInputSender`, CombatInputSender)
+
+		local presenters: { (any) -> () } = {}
+		for _, system in systems do
+			local module = system.module
+			if system.start then
+				startModule(`{system.parent:GetFullName()}.{system.name}`, module, system.options)
 			end
 			if system.intent then
 				table.insert(disposers, CombatInputSender.onIntent(module.onIntent))
 			end
-			return module
-		end)
-		if ok then
-			optional[system.name] = result or true
-			if result and system.combat then
-				table.insert(presenters, result.onEvent)
+			if system.combat then
+				table.insert(presenters, module.onEvent)
 			end
-		else
-			warn(`[OnboardingCombatClient] optional {system.name} unavailable: {result}`)
 		end
-	end
 
-	table.insert(
-		connections,
-		Network.on("CombatSimEvent", function(events)
-			for _, event in events do
-				for _, present in presenters do
-					present(event)
+		table.insert(
+			connections,
+			Network.on("CombatSimEvent", function(events)
+				for _, event in events do
+					for _, present in presenters do
+						present(event)
+					end
 				end
-			end
-		end)
-	)
+			end)
+		)
+	end)
+	starting = false
+	if not ok then
+		OnboardingCombatClient.destroy()
+		error(`[OnboardingCombatClient] startup failed: {err}`, 0)
+	end
+	started = true
 end
 
 function OnboardingCombatClient.destroy()
 	for _, connection in connections do
-		if typeof(connection) == "RBXScriptConnection" then
-			connection:Disconnect()
-		end
+		connection:Disconnect()
 	end
 	table.clear(connections)
 	for _, dispose in disposers do
-		pcall(dispose)
-	end
-	table.clear(disposers)
-	for _, module in optional do
-		if typeof(module) == "table" then
-			local teardown = (module :: any).destroy or (module :: any).stop
-			if teardown then
-				pcall(teardown)
-			end
+		local ok, err = pcall(dispose)
+		if not ok then
+			warn(`[OnboardingCombatClient] WeaponAnimations intent subscription teardown failed: {err}`)
 		end
 	end
-	table.clear(optional)
+	table.clear(disposers)
+	for index = #activeModules, 1, -1 do
+		local entry = activeModules[index]
+		local module = entry.module
+		local teardown = module.destroy or module.stop
+		local ok, err = pcall(teardown)
+		if not ok then
+			warn(`[OnboardingCombatClient] {entry.path} teardown failed: {err}`)
+		end
+	end
+	table.clear(activeModules)
 	Combat.setInputEnabled(false)
 	started = false
+	starting = false
 end
 
 return OnboardingCombatClient

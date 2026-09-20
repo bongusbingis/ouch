@@ -11,6 +11,8 @@ local function bounded(value: any, fallback: number, minimum: number, maximum: n
 end
 
 function ShoveTuning.resolve(defaults, speed: any, upward: any, seconds: any)
+	-- Splashdown templates are rejected before activation, so this fallback is
+	-- reserved for omitted optional values and the Arena compatibility path.
 	local hold = bounded(seconds, defaults.ShoveSeconds, 0.08, 0.4)
 	return {
 		KnockbackSpeed = bounded(speed, defaults.KnockbackSpeed, 8, 80),

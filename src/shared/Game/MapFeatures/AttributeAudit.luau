@@ -1,5 +1,6 @@
--- Engine-side authoring preflight. Runtime keeps legacy names; new course builders
--- call this before tagging/activating a clone and fail on any returned error.
+-- Engine-side authoring preflight. Invalid feature configuration is returned as
+-- errors; harmless stale attributes are returned as warnings and do not block
+-- tagging or activation.
 --!strict
 local RS = game:GetService("ReplicatedStorage")
 local Config = require(RS.Config.Gameplay.MapFeatures)
@@ -8,21 +9,24 @@ local Liquid = require(script.Parent.RisingLiquid)
 local Audit = {}
 local metadata = {
 	SourceAsset = true,
-	RotationSpeed = true,
-	RiseStuds = true,
-	RiseDelaySeconds = true,
-	RiseSeconds = true,
 	CheckpointCount = true,
 	CriticalRoute = true,
 }
 local rotatingMarkers =
 	{ "Rotor", "Fan", "FanBlade", "Bumper", "BigBall", "BeachBall", "Conveyor", "FallingTile", "Seesaw" }
-function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { string }
+local function emitWarnings(warnings: { string })
+	for _, message in warnings do
+		warn("[AttributeAudit] " .. message)
+	end
+end
+
+function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): ({ string }, { string })
 	local allowed = table.clone(metadata)
 	for key, value in extraMetadata or {} do
 		allowed[key] = value
 	end
 	local errors = {}
+	local warnings = {}
 	local all = root:GetDescendants()
 	table.insert(all, root)
 	for _, part in all do
@@ -30,8 +34,12 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 		local function fail(message: string)
 			table.insert(errors, part:GetFullName() .. ": " .. message)
 		end
-		for _, message in Rules.validate(a, Config.Attributes, allowed) do
+		local ruleErrors, ruleWarnings = Rules.validate(a, Config.Attributes, allowed)
+		for _, message in ruleErrors do
 			fail(message)
+		end
+		for _, message in ruleWarnings do
+			table.insert(warnings, part:GetFullName() .. ": " .. message)
 		end
 		if a.ScriptableRoot ~= nil then
 			fail("ScriptableRoot must be a CollectionService tag, not a boolean attribute")
@@ -114,6 +122,189 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 			end
 		end
 	end
-	return errors
+	emitWarnings(warnings)
+	return errors, warnings
 end
+
+local canonicalRoots = {
+	Motion = true,
+	Conveyors = true,
+	Fans = true,
+	Bumpers = true,
+	BigBalls = true,
+	FallingTiles = true,
+	Seesaws = true,
+	BeachBalls = true,
+	Static = true,
+	Doors = true,
+	JumpPads = true,
+}
+
+local markerRoots = {
+	Rotor = "Motion",
+	Fan = "Fans",
+	FanBlade = "Fans",
+	Conveyor = "Conveyors",
+	Bumper = "Bumpers",
+	BigBall = "BigBalls",
+	FallingTile = "FallingTiles",
+	Seesaw = "Seesaws",
+	BeachBall = "BeachBalls",
+}
+
+local legacyLiquidAttributes = {
+	RiseStuds = true,
+	RiseDelaySeconds = true,
+	RiseSeconds = true,
+}
+
+local splashdownLegacyAttributes = table.clone(metadata)
+for key in legacyLiquidAttributes do
+	splashdownLegacyAttributes[key] = true
+end
+splashdownLegacyAttributes.RotationSpeed = true
+splashdownLegacyAttributes.ServerCarries = true
+
+local function finiteNumber(value: any): boolean
+	return typeof(value) == "number" and value == value and math.abs(value) < math.huge
+end
+
+local function canonicalRotorErrors(part: Instance, attributes: { [string]: any }, fail: (string) -> ())
+	if attributes.Rotor == nil then
+		return
+	end
+	if not part:IsA("BasePart") then
+		fail("Rotor must be authored on a BasePart")
+		return
+	end
+	if attributes.RotorAxis ~= "X" and attributes.RotorAxis ~= "Y" and attributes.RotorAxis ~= "Z" then
+		fail("RotorAxis is required and must be X, Y, or Z")
+	end
+	if not finiteNumber(attributes.RotorPeriod) or attributes.RotorPeriod <= 0 then
+		fail("RotorPeriod is required and must be a positive finite number")
+	end
+	if attributes.Rotor == "spin" then
+		if not finiteNumber(attributes.RotorSpeed) then
+			fail("RotorSpeed is required for spin rotors")
+		end
+	elseif not finiteNumber(attributes.RotorAmplitude) then
+		fail("RotorAmplitude is required for rock and slide rotors")
+	end
+	if attributes.RotorProfile == "hammer" then
+		if not finiteNumber(attributes.WindupSeconds) or attributes.WindupSeconds <= 0 then
+			fail("WindupSeconds is required for hammer rotors")
+		end
+		if not finiteNumber(attributes.StrikeSeconds) or attributes.StrikeSeconds <= 0 then
+			fail("StrikeSeconds is required for hammer rotors")
+		end
+	elseif attributes.RotorProfile == "piston" then
+		if not finiteNumber(attributes.PistonPeriod) or attributes.PistonPeriod <= 0 then
+			fail("PistonPeriod is required for piston rotors")
+		end
+		if not finiteNumber(attributes.PistonExtendStuds) or attributes.PistonExtendStuds <= 0 then
+			fail("PistonExtendStuds is required for piston rotors")
+		end
+	end
+end
+
+-- Strict Splashdown-only audit. Arena's old Origin/Assembly contract is
+-- intentionally kept in check() until the Arena assets are migrated.
+function Audit.checkSplashdownCourse(course: Instance, definition: { [string]: any }): ({ string }, { string })
+	local errors = {}
+	local warnings = {}
+	local function fail(instance: Instance, message: string)
+		table.insert(errors, instance:GetFullName() .. ": " .. message)
+	end
+	local function warning(instance: Instance, message: string)
+		table.insert(warnings, instance:GetFullName() .. ": " .. message)
+	end
+	local function checkAttributes(instance: Instance)
+		local attributes = instance:GetAttributes()
+		local ruleErrors, ruleWarnings = Rules.validate(attributes, Config.Attributes, splashdownLegacyAttributes)
+		for _, message in ruleErrors do
+			fail(instance, message)
+		end
+		for _, message in ruleWarnings do
+			warning(instance, message)
+		end
+		for key in legacyLiquidAttributes do
+			if attributes[key] ~= nil then
+				warning(instance, key .. " is obsolete; remove it and use the explicit Splashdown liquid schema")
+			end
+		end
+		if attributes.RotationSpeed ~= nil or attributes.ServerCarries ~= nil then
+			warning(instance, "Arena legacy motion metadata is stale in Splashdown and is ignored")
+		end
+	end
+
+	local scriptables = course:FindFirstChild("Scriptables")
+	if not scriptables or not scriptables:IsA("Folder") then
+		fail(course, "Scriptables folder is required")
+		emitWarnings(warnings)
+		return errors, warnings
+	end
+	for _, child in scriptables:GetChildren() do
+		if not child:IsA("Folder") or not canonicalRoots[child.Name] then
+			fail(child, "unknown or legacy Scriptables root; use a canonical feature root")
+		end
+	end
+
+	local all = course:GetDescendants()
+	table.insert(all, course)
+	for _, instance in all do
+		checkAttributes(instance)
+		if instance:IsA("BasePart") and instance:IsDescendantOf(scriptables) and not instance.Anchored then
+			fail(instance, "authored feature parts must be anchored")
+		end
+		if instance:IsDescendantOf(scriptables) and (instance.Name == "Origin" or instance.Name == "Assembly") then
+			fail(instance, "Origin/Assembly wrappers are not allowed under Splashdown Scriptables")
+		end
+		if instance:IsA("BasePart") or instance:IsA("Model") then
+			local attributes = instance:GetAttributes()
+			canonicalRotorErrors(instance, attributes, function(message)
+				fail(instance, message)
+			end)
+			for marker, rootName in markerRoots do
+				if attributes[marker] ~= true then
+					continue
+				end
+				local owner: Instance? = instance
+				while owner and owner.Parent ~= scriptables do
+					owner = owner.Parent
+				end
+				if not owner or owner.Name ~= rootName then
+					fail(instance, marker .. " belongs under Scriptables/" .. rootName)
+				end
+			end
+		end
+	end
+
+	local hazards = course:FindFirstChild("Hazards")
+	local rising = {}
+	if hazards then
+		for _, instance in hazards:GetDescendants() do
+			if instance:IsA("BasePart") and instance:GetAttribute("RisingLiquid") == true then
+				table.insert(rising, instance)
+			end
+		end
+	end
+	if definition.LavaRise == nil then
+		if #rising > 0 then
+			for _, instance in rising do
+				fail(instance, "RisingLiquid is not allowed on a course without LavaRise configuration")
+			end
+		end
+	elseif #rising ~= 1 then
+		fail(hazards or course, "configured LavaRise requires exactly one Hazards part with RisingLiquid=true")
+	else
+		local liquid = rising[1]
+		local ok, reason = pcall(Liquid.resolve, liquid:GetAttributes())
+		if not ok then
+			fail(liquid, tostring(reason))
+		end
+	end
+	emitWarnings(warnings)
+	return errors, warnings
+end
+
 return Audit

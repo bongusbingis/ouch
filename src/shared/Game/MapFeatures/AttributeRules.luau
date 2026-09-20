@@ -1,4 +1,5 @@
--- Declarative course preflight; reports errors instead of silently defaulting typos.
+-- Declarative course preflight; reports invalid feature configuration as errors
+-- and harmless unknown attributes as warnings instead of stopping gameplay.
 --!strict
 local Rules = {}
 local booleans = {
@@ -48,8 +49,9 @@ function Rules.validate(
 	a: { [string]: any },
 	registered: { [string]: string },
 	metadata: { [string]: boolean }?
-): { string }
+): ({ string }, { string })
 	local errors = {}
+	local warnings = {}
 	local known = {}
 	for _, key in registered do
 		known[key] = true
@@ -60,7 +62,7 @@ function Rules.validate(
 	for key, value in a do
 		if not known[key] then
 			if not (metadata and metadata[key]) then
-				fail("unknown attribute " .. key)
+				table.insert(warnings, "unknown attribute " .. key)
 			end
 		elseif booleans[key] then
 			if typeof(value) ~= "boolean" then
@@ -150,6 +152,6 @@ function Rules.validate(
 	if (a.DoorRow == nil) ~= (a.DoorIndex == nil) then
 		fail("DoorRow and DoorIndex must be paired")
 	end
-	return errors
+	return errors, warnings
 end
 return Rules

@@ -167,7 +167,7 @@ function MatchAudio.getCurrentMusic(): Sound?
 	return currentMusic
 end
 
-function MatchAudio._resetForTest()
+function MatchAudio.stop()
 	if timeConnection then
 		timeConnection:Disconnect()
 	end
@@ -179,12 +179,16 @@ function MatchAudio._resetForTest()
 	phaseConnection = nil
 	musicGeneration += 1
 	stopCurrentMusic(0)
-	ClientAudio._resetForTest()
 	started = false
 	matchState = nil
 	currentMode = nil
 	lastPhase = nil
 	lastTrackIndex = nil
+end
+
+function MatchAudio._resetForTest()
+	MatchAudio.stop()
+	ClientAudio._resetForTest()
 	random = Random.new()
 end
 

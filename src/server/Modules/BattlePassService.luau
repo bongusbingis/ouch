@@ -84,39 +84,42 @@ local function premiumProductId(seasonId: string): number?
 	return nil
 end
 
-local function grantCosmetics(player: Player, data: any, stored: any): boolean
+local function grantCosmetics(player: Player, data: any, stored: any): (boolean, string?)
 	local season = activeSeasons.Definitions[stored.Id]
 	if season == nil then
-		return stored.Id == ""
+		return stored.Id == "", `unknown season {tostring(stored.Id)}`
 	end
 	local complete = true
+	local failure: string? = nil
 	stored.CosmeticClaims = stored.CosmeticClaims or {}
 	for _, reward in SeasonCosmetics.pending(season, stored, hasPremium(data, stored.Id)) do
-		local granted = activeRewardService.grant(player, {
+		local ok, granted, reason = pcall(activeRewardService.grant, player, {
 			kind = "Cosmetic",
 			itemId = reward.itemId,
 			duplicateRefund = false,
 		})
-		if granted then
+		if ok and granted then
 			stored.CosmeticClaims[reward.key] = true
 		else
 			complete = false
+			failure = failure or `season {stored.Id} cosmetic {reward.key} item {reward.itemId}: {tostring(if ok then reason else granted)}`
 		end
 	end
-	return complete
+	return complete, failure
 end
 
-local function grantUnclaimedTiers(player: Player, data: any, stored: any): boolean
+local function grantUnclaimedTiers(player: Player, data: any, stored: any): (boolean, string?)
 	local season = activeSeasons.Definitions[stored.Id]
 	if season == nil then
-		return stored.Id == ""
+		return stored.Id == "", `unknown season {tostring(stored.Id)}`
 	end
 	local complete = true
+	local failure: string? = nil
 	for _, owed in
 		BattlePassLogic.unclaimedTiers(season, BattlePassLogic.readState(stored), hasPremium(data, stored.Id))
 	do
-		local granted = activeRewardService.grant(player, owed.reward)
-		if granted then
+		local ok, granted, reason = pcall(activeRewardService.grant, player, owed.reward)
+		if ok and granted then
 			local field = if owed.track == "Premium" then "ClaimedPremium" else "ClaimedFree"
 			stored[field][tostring(owed.tier)] = true
 			if owed.reward.kind == "Bonks" then
@@ -134,9 +137,12 @@ local function grantUnclaimedTiers(player: Player, data: any, stored: any): bool
 			end
 		else
 			complete = false
+			failure = failure
+				or `season {stored.Id} tier {owed.tier} {owed.track} {owed.reward.kind} {tostring(owed.reward.itemId or owed.reward.amount)}: {tostring(if ok then reason else granted)}`
 		end
 	end
-	return grantCosmetics(player, data, stored) and complete
+	local cosmeticsComplete, cosmeticsReason = grantCosmetics(player, data, stored)
+	return complete and cosmeticsComplete, failure or cosmeticsReason
 end
 
 local function archive(data: any, stored: any): boolean
@@ -181,9 +187,15 @@ function BattlePassService.ensureData(player: Player): any
 		data.Season = BattlePassLogic.blankState(activeId)
 	end
 	for _, stored in data.SeasonHistory do
-		grantUnclaimedTiers(player, data, stored)
+		local settled, reason = grantUnclaimedTiers(player, data, stored)
+		if not settled then
+			warn(`[BattlePassService] archived settlement pending for {player.Name}: {reason}`)
+		end
 	end
-	grantCosmetics(player, data, data.Season)
+	local cosmeticsSettled, cosmeticsReason = grantCosmetics(player, data, data.Season)
+	if not cosmeticsSettled then
+		warn(`[BattlePassService] active cosmetic settlement pending for {player.Name}: {cosmeticsReason}`)
+	end
 	return data
 end
 
@@ -203,6 +215,28 @@ function BattlePassService.fireState(player: Player)
 	if state ~= nil then
 		activeNetwork.fire("SeasonPassStateChanged", player, state)
 	end
+end
+
+function BattlePassService.settleArchivedSeason(player: Player, seasonId: string, awardId: string): (boolean, string?)
+	if seasonId == "" then
+		return true, nil
+	end
+	local data = BattlePassService.ensureData(player)
+	if data == nil then
+		return false, `award {awardId} season {seasonId}: profile or archive unavailable`
+	end
+	if data.Season.Id == seasonId then
+		return true, nil
+	end
+	local stored = data.SeasonHistory[seasonId]
+	if stored == nil then
+		return false, `award {awardId} season {seasonId}: SeasonHistory.{seasonId} missing`
+	end
+	local settled, reason = grantUnclaimedTiers(player, data, stored)
+	if not settled then
+		return false, `award {awardId}: {reason}`
+	end
+	return true, nil
 end
 
 function BattlePassService.addSeasonXp(player: Player, amount: number, seasonId: string?): boolean
@@ -235,9 +269,15 @@ function BattlePassService.addSeasonXp(player: Player, amount: number, seasonId:
 	end
 	stored.XP += amount
 	if stored.Id ~= data.Season.Id then
-		pcall(grantUnclaimedTiers, player, data, stored)
+		local settled, reason = grantUnclaimedTiers(player, data, stored)
+		if not settled then
+			warn(`[BattlePassService] archived XP credited; settlement pending for {player.Name}: {reason}`)
+		end
 	end
-	pcall(BattlePassService.fireState, player)
+	local notified, err = pcall(BattlePassService.fireState, player)
+	if not notified then
+		warn(`[BattlePassService] season XP credited; state notification failed for {player.Name}: {err}`)
+	end
 	return true
 end
 

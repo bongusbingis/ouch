@@ -274,48 +274,83 @@ end
 
 local function attributeRotor(part: BasePart): RotorOptions?
 	local mode = part:GetAttribute(Attributes.Rotor)
-	if mode ~= "spin" and mode ~= "rock" and mode ~= "slide" then
+	if mode == nil then
 		return nil
 	end
+	local function requiredNumber(name: string, minimum: number?): number
+		local value = part:GetAttribute(name)
+		assert(
+			type(value) == "number" and value == value and math.abs(value) < math.huge,
+			`[RotatingPlatforms] {part:GetFullName()}.{name} must be a finite number`
+		)
+		if minimum then
+			assert(value >= minimum, `[RotatingPlatforms] {part:GetFullName()}.{name} is below its minimum`)
+		end
+		return value
+	end
+	local function optionalNumber(name: string, fallback: number, minimum: number?): number
+		if part:GetAttribute(name) == nil then
+			return fallback
+		end
+		return requiredNumber(name, minimum)
+	end
+	if mode ~= "spin" and mode ~= "rock" and mode ~= "slide" then
+		assert(false, `[RotatingPlatforms] {part:GetFullName()}.Rotor must be spin, rock, or slide`)
+	end
 	local axis = part:GetAttribute(Attributes.RotorAxis)
-	local amplitude = tonumber(part:GetAttribute(Attributes.RotorAmplitude)) or 0
+	assert(axis == "X" or axis == "Y" or axis == "Z", `[RotatingPlatforms] {part:GetFullName()}.RotorAxis is required`)
+	local amplitude = if mode == "spin"
+		then optionalNumber(Attributes.RotorAmplitude, 0)
+		else requiredNumber(Attributes.RotorAmplitude, 0)
 	local profile = part:GetAttribute(Attributes.RotorProfile)
-	local period = math.max(tonumber(part:GetAttribute(Attributes.RotorPeriod)) or 1, 0.05)
-	local phase = tonumber(part:GetAttribute(Attributes.RotorPhase)) or 0
+	local period = requiredNumber(Attributes.RotorPeriod, 0.05)
+	local phase = optionalNumber(Attributes.RotorPhase, 0)
 	if profile == "piston" and mode == "slide" then
-		period = math.max(tonumber(part:GetAttribute(Attributes.PistonPeriod)) or MapFeatures.Piston.PeriodSeconds, 0.1)
-		amplitude = tonumber(part:GetAttribute(Attributes.PistonExtendStuds)) or MapFeatures.Piston.ExtendStuds
-		phase = tonumber(part:GetAttribute(Attributes.PistonPhase)) or 0
+		period = requiredNumber(Attributes.PistonPeriod, 0.1)
+		amplitude = requiredNumber(Attributes.PistonExtendStuds, 0)
+		phase = optionalNumber(Attributes.PistonPhase, 0)
 	elseif profile ~= "hammer" or mode ~= "rock" then
 		profile = nil
 	end
+	if profile == "hammer" then
+		assert(mode == "rock", `[RotatingPlatforms] {part:GetFullName()}.RotorProfile=hammer requires rock mode`)
+	elseif profile == "piston" then
+		assert(mode == "slide", `[RotatingPlatforms] {part:GetFullName()}.RotorProfile=piston requires slide mode`)
+	end
+	local speed = if mode == "spin" then requiredNumber(Attributes.RotorSpeed) else 0
+	local windup = if profile == "hammer" then requiredNumber(Attributes.WindupSeconds, 0.05) else 0.05
+	local strike = if profile == "hammer" then requiredNumber(Attributes.StrikeSeconds, 0.05) else 0.05
+	local hold = if profile == "piston" then optionalNumber(Attributes.HoldSeconds, 0, 0) else 0
+	assert(hold >= 0 and hold < period, `[RotatingPlatforms] {part:GetFullName()}.HoldSeconds must be less than its period`)
 	return {
-		axis = if axis == "X" or axis == "Z" then axis else "Y",
+		axis = axis,
 		mode = mode,
-		degreesPerSecond = tonumber(part:GetAttribute(Attributes.RotorSpeed)) or 0,
+		degreesPerSecond = speed,
 		amplitude = if mode == "slide" then amplitude else math.rad(amplitude),
 		period = period,
 		phase = phase,
 		profile = profile :: string?,
-		windup = math.max(
-			tonumber(part:GetAttribute(Attributes.WindupSeconds)) or MapFeatures.Hammer.WindupSeconds,
-			0.05
-		),
-		strike = math.max(
-			tonumber(part:GetAttribute(Attributes.StrikeSeconds)) or MapFeatures.Hammer.StrikeSeconds,
-			0.05
-		),
-		hold = math.clamp(
-			tonumber(part:GetAttribute(Attributes.HoldSeconds)) or MapFeatures.Piston.HoldSeconds,
-			0,
-			period - 0.05
-		),
-		acceleration = tonumber(part:GetAttribute(Attributes.RotorAccel)) or 0,
-		phaseDegrees = tonumber(part:GetAttribute(Attributes.RotorPhaseDegrees)) or 0,
+		windup = windup,
+		strike = strike,
+		hold = hold,
+		acceleration = optionalNumber(Attributes.RotorAccel, 0),
+		phaseDegrees = optionalNumber(Attributes.RotorPhaseDegrees, 0),
 		carriesRiders = part:GetAttribute(Attributes.RotorCarries) == true,
 		shove = part:GetAttribute(Attributes.Shove) == true,
-		shoveSpeed = tonumber(part:GetAttribute(Attributes.ShoveSpeed)),
+		shoveSpeed = if part:GetAttribute(Attributes.ShoveSpeed) == nil
+			then nil
+			else requiredNumber(Attributes.ShoveSpeed, 0),
 	}
+end
+
+local function isArenaCompatibilityRoot(root: Instance): boolean
+	local arena = root.Parent
+	local assets = arena and arena.Parent
+	return root.Name == "Scriptables"
+		and arena ~= nil
+		and arena.Name == "Arena"
+		and assets ~= nil
+		and assets.Name == "Assets"
 end
 
 local function isFan(base: BasePart): boolean
@@ -378,7 +413,8 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 	end
 
 	local function checkBase(base: BasePart)
-		if MapFeatures.Spinner.EnabledNames[base.Name] then
+	local allowLegacy = legacyOrigin ~= nil
+	if allowLegacy and MapFeatures.Spinner.EnabledNames[base.Name] then
 			local center = base.CFrame.Rotation + base.CFrame:PointToWorldSpace(base.PivotOffset.Position)
 			addRotor(base, center, {
 				axis = "Y",
@@ -387,7 +423,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 				carriesRiders = false,
 			})
 		end
-		if isFan(base) then
+	if allowLegacy and isFan(base) then
 			local fanAxis = base:GetAttribute(Attributes.FanAxis)
 			local axis: Axis = if fanAxis == "X" or fanAxis == "Z" then fanAxis else "Y"
 			for _, blade in base:GetChildren() do
@@ -405,7 +441,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 				end
 			end
 		end
-		if base.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1 then
+	if allowLegacy and base.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1 then
 			for _, plate in base:GetChildren() do
 				if plate:IsA("BasePart") and plate.Name:find(MapFeatures.Disc.PlatePrefix, 1, true) == 1 then
 					local center = base.CFrame.Rotation + plate.Position
@@ -418,7 +454,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 				end
 			end
 		end
-		if base.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1 then
+	if allowLegacy and base.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1 then
 			local suffix = tonumber(base.Name:match("%.(%d+)$")) or 0
 			for _, panel in base:GetChildren() do
 				if panel:IsA("BasePart") and panel.Name:find(MapFeatures.SwingPanel.PanelPrefix, 1, true) == 1 then
@@ -552,9 +588,9 @@ local function forgetGroup(state: RootState, child: Instance)
 	end
 end
 
-local function hasMotionMarker(model: Model): boolean
+local function hasMotionMarker(model: Model, allowLegacy: boolean): boolean
 	if
-		model:GetAttribute("RotationSpeed") ~= nil
+		(allowLegacy and model:GetAttribute("RotationSpeed") ~= nil)
 		or model:GetAttribute(Attributes.MotionEpoch) ~= nil
 		or model:GetAttribute(Attributes.ServerCarries) ~= nil
 	then
@@ -564,10 +600,10 @@ local function hasMotionMarker(model: Model): boolean
 		if descendant:IsA("BasePart") then
 			if
 				attributeRotor(descendant) ~= nil
-				or MapFeatures.Spinner.EnabledNames[descendant.Name]
-				or isFan(descendant)
-				or descendant.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1
-				or descendant.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1
+				or (allowLegacy and MapFeatures.Spinner.EnabledNames[descendant.Name])
+				or (allowLegacy and isFan(descendant))
+				or (allowLegacy and descendant.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1)
+				or (allowLegacy and descendant.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1)
 			then
 				local owner = descendant:FindFirstAncestorOfClass("Model")
 				if owner == model then
@@ -579,12 +615,12 @@ local function hasMotionMarker(model: Model): boolean
 	return false
 end
 
-local function hasPartMotionMarker(part: BasePart): boolean
+local function hasPartMotionMarker(part: BasePart, allowLegacy: boolean): boolean
 	return attributeRotor(part) ~= nil
-		or MapFeatures.Spinner.EnabledNames[part.Name] == true
-		or isFan(part)
-		or part.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1
-		or part.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1
+		or (allowLegacy and MapFeatures.Spinner.EnabledNames[part.Name] == true)
+		or (allowLegacy and isFan(part))
+		or (allowLegacy and part.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1)
+		or (allowLegacy and part.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1)
 end
 
 local function register(state: RootState, key: Instance, assembly: Model | BasePart, legacyOrigin: BasePart?)
@@ -603,21 +639,26 @@ local function scan(state: RootState)
 	local seen: { [Instance]: boolean } = {}
 	local legacy: { [Instance]: { origin: BasePart, assembly: Model | BasePart } } = {}
 	local rejected = 0
+	local allowLegacy = isArenaCompatibilityRoot(state.root)
 	if state.folders.Rotating and not state.legacyWarned then
 		state.legacyWarned = true
-		warn(
-			`[RotatingPlatforms] {state.root:GetFullName()}.Rotating is a legacy compatibility folder; new authored motion belongs in Scriptables.Motion`
-		)
+		if allowLegacy then
+			warn(`[RotatingPlatforms] WARN temporary Arena legacy motion: {state.root:GetFullName()}.Rotating`)
+		else
+			warn(`[RotatingPlatforms] ERROR legacy Rotating root rejected outside Arena: {state.root:GetFullName()}`)
+		end
 	end
-	for _, folder in state.folders do
-		for _, child in folder:GetChildren() do
-			local origin = child:FindFirstChild("Origin")
-			local assembly = child:FindFirstChild("Assembly")
-			if origin and origin:IsA("BasePart") and assembly and (assembly:IsA("Model") or assembly:IsA("BasePart")) then
-				legacy[child] = { origin = origin, assembly = assembly :: Model | BasePart }
-			elseif origin ~= nil or assembly ~= nil then
-				rejected += 1
-				warn(`[RotatingPlatforms] rejected malformed legacy group {child:GetFullName()}`)
+	if allowLegacy then
+		for _, folder in state.folders do
+			for _, child in folder:GetChildren() do
+				local origin = child:FindFirstChild("Origin")
+				local assembly = child:FindFirstChild("Assembly")
+				if origin and origin:IsA("BasePart") and assembly and (assembly:IsA("Model") or assembly:IsA("BasePart")) then
+					legacy[child] = { origin = origin, assembly = assembly :: Model | BasePart }
+				elseif origin ~= nil or assembly ~= nil then
+					rejected += 1
+					warn(`[RotatingPlatforms] rejected malformed legacy group {child:GetFullName()}`)
+				end
 			end
 		end
 	end
@@ -633,13 +674,13 @@ local function scan(state: RootState)
 		end
 		local candidate = if not isLegacyMember
 				and descendant:IsA("Model")
-				and hasMotionMarker(descendant)
+				and hasMotionMarker(descendant, allowLegacy)
 			then descendant
 			elseif
 				not isLegacyMember
 				and descendant:IsA("BasePart")
 				and descendant.Parent == folder
-				and hasPartMotionMarker(descendant)
+				and hasPartMotionMarker(descendant, allowLegacy)
 			then descendant
 			else nil
 		if candidate then

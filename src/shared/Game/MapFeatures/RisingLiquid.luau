@@ -39,15 +39,6 @@ function Liquid.resolve(attributes: { [string]: any }): Config?
 			pauses = Liquid.parsePauses(attributes.PauseWaypoints or "", height),
 		}
 	end
-	-- Existing Summit attributes retain exactly their previous interpretation.
-	local studs = tonumber(attributes.RiseStuds)
-	if studs and studs > 0 then
-		return {
-			studs = studs,
-			delaySeconds = tonumber(attributes.RiseDelaySeconds) or 0,
-			seconds = math.max(tonumber(attributes.RiseSeconds) or 1, 1),
-		}
-	end
 	return nil
 end
 function Liquid.heightAt(elapsed: number, config: Config): number

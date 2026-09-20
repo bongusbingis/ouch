@@ -78,10 +78,11 @@ local function bumpersFor(group: Instance): { BasePart }
 		return cached
 	end
 	local found: { BasePart } = {}
+	local allowLegacy = group:FindFirstAncestor("SplashdownCourse") == nil
 	if group:IsA("BasePart") then
 		if group:GetAttribute(MapFeatures.Attributes.Bumper) == true then
 			table.insert(found, group)
-		else
+		elseif allowLegacy then
 			for _, prefix in MapFeatures.Bumper.NamePrefixes do
 				if group.Name:find(prefix, 1, true) == 1 then
 					table.insert(found, group)
@@ -98,10 +99,12 @@ local function bumpersFor(group: Instance): { BasePart }
 			table.insert(found, descendant)
 			continue
 		end
-		for _, prefix in MapFeatures.Bumper.NamePrefixes do
-			if descendant.Name:find(prefix, 1, true) == 1 then
-				table.insert(found, descendant)
-				break
+		if allowLegacy then
+			for _, prefix in MapFeatures.Bumper.NamePrefixes do
+				if descendant.Name:find(prefix, 1, true) == 1 then
+					table.insert(found, descendant)
+					break
+				end
 			end
 		end
 	end
@@ -208,6 +211,9 @@ function ShoveFeature.tickWorld(context: MapFeatureKit.Context)
 			testBumper(bumper)
 		end
 		for name, enabled in MapFeatures.Spinner.EnabledNames do
+			if group:FindFirstAncestor("SplashdownCourse") ~= nil then
+				continue
+			end
 			local spinner = if enabled then group:FindFirstChild(name, true) else nil
 			if spinner and spinner:IsA("BasePart") then
 				activeParts[spinner] = true

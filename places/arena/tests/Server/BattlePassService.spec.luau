@@ -270,6 +270,55 @@ return function()
 			expect(f.profile.Season.XP).to.equal(0)
 		end)
 
+		it("keeps an archived award pending after a partial tier grant failure", function()
+			local f = fixture(3500)
+			f.profile.SeasonHistory = {
+				S1 = { Id = "S1", XP = 500, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {} },
+			}
+			local fail = true
+			f.options.rewardService.grant = function(_player, reward)
+				if reward.amount == 75 and fail then
+					return false, "reward unavailable"
+				end
+				table.insert(f.granted, reward)
+				return true
+			end
+			BattlePassService.start(f.options)
+			local settled, reason = BattlePassService.settleArchivedSeason(f.player, "S1", "award-17")
+			expect(settled).to.equal(false)
+			expect(string.find(reason, "award-17", 1, true)).to.be.ok()
+			expect(string.find(reason, "tier 2 Free Bonks 75", 1, true)).to.be.ok()
+			expect(f.profile.SeasonHistory.S1.ClaimedFree["1"]).to.equal(true)
+			expect(f.profile.SeasonHistory.S1.ClaimedFree["2"]).to.equal(nil)
+			fail = false
+			expect(BattlePassService.settleArchivedSeason(f.player, "S1", "award-17")).to.equal(true)
+			expect(#f.granted).to.equal(2)
+		end)
+
+		it("reports a thrown archived grant with its tier and retries it", function()
+			local f = fixture(3500)
+			f.profile.SeasonHistory = {
+				S1 = { Id = "S1", XP = 500, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {} },
+			}
+			local fail = true
+			f.options.rewardService.grant = function(_player, reward)
+				if reward.amount == 75 and fail then
+					error("inventory offline")
+				end
+				table.insert(f.granted, reward)
+				return true
+			end
+			BattlePassService.start(f.options)
+			local settled, reason = BattlePassService.settleArchivedSeason(f.player, "S1", "award-18")
+			expect(settled).to.equal(false)
+			expect(string.find(reason, "award-18", 1, true)).to.be.ok()
+			expect(string.find(reason, "tier 2 Free Bonks 75", 1, true)).to.be.ok()
+			expect(string.find(reason, "inventory offline", 1, true)).to.be.ok()
+			fail = false
+			expect(BattlePassService.settleArchivedSeason(f.player, "S1", "award-18")).to.equal(true)
+			expect(#f.granted).to.equal(2)
+		end)
+
 		it("does not mark a tier claimed when the grant fails", function()
 			local f = fixture(1500)
 			f.options.rewardService.grant = function()

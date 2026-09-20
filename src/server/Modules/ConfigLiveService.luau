@@ -3,6 +3,7 @@
 --!strict
 
 local ConfigService = game:GetService("ConfigService")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
@@ -17,13 +18,9 @@ local started = false
 local snapshot: any = nil
 local holdSimOverrides: (() -> boolean)? = nil
 local stateFolder: Folder? = nil
+local stateValue: StringValue? = nil
 local revision = 0
-
-local VALUE_CLASS: { [string]: string } = {
-	number = "NumberValue",
-	boolean = "BoolValue",
-	string = "StringValue",
-}
+local entries: { ConfigOverrides.Entry } = {}
 
 local function ensureStateFolder(): Folder
 	if stateFolder then
@@ -31,48 +28,26 @@ local function ensureStateFolder(): Folder
 	end
 	local folder = Instance.new("Folder")
 	folder.Name = LiveConfig.StateFolderName
-	folder:SetAttribute(LiveConfig.RevisionAttribute, revision)
+	local value = Instance.new("StringValue")
+	value.Name = "Snapshot"
+	value.Value = HttpService:JSONEncode({ revision = 0, overrides = {} })
+	value.Parent = folder
 	folder.Parent = ReplicatedStorage
 	stateFolder = folder
+	stateValue = value
 	return folder
 end
 
-local function publish()
-	local folder = ensureStateFolder()
-	local active = ConfigRuntime.activeOverrides()
-	for _, entry in LiveConfig.Entries do
-		local name = ConfigOverrides.projectedName(entry.Key)
-		local existing = folder:FindFirstChild(name)
-		local value = active[entry.Key]
-		if value == nil then
-			if existing then
-				existing:Destroy()
-			end
-		else
-			local className = VALUE_CLASS[entry.Type]
-			if existing and not existing:IsA(className) then
-				existing:Destroy()
-				existing = nil
-			end
-			if existing == nil then
-				existing = Instance.new(className);
-				(existing :: any).Name = name;
-				(existing :: any).Parent = folder
-			end
-			(existing :: any).Value = value
-		end
-	end
-	revision += 1
-	folder:SetAttribute(LiveConfig.RevisionAttribute, revision)
-end
-
-local function shouldHold(): boolean
+local function shouldHold(): (boolean?, string?)
 	local predicate = holdSimOverrides
 	if predicate == nil then
-		return false
+		return false, nil
 	end
 	local ok, result = pcall(predicate)
-	return ok and result == true
+	if not ok then
+		return nil, `hold predicate failed: {result}`
+	end
+	return result == true, nil
 end
 
 local function readRawValues(): { [string]: any }?
@@ -81,7 +56,7 @@ local function readRawValues(): { [string]: any }?
 		return nil
 	end
 	local rawValues = {}
-	for _, entry in LiveConfig.Entries do
+	for _, entry in entries do
 		local ok, value = pcall(current.GetValue, current, entry.Key)
 		if not ok then
 			warn(`[ConfigLiveService] Could not read config key "{entry.Key}": {value}`)
@@ -109,13 +84,27 @@ local function install(force: boolean?)
 		return
 	end
 
-	local accepted, rejected = ConfigOverrides.resolve(LiveConfig.Entries, rawValues)
-	for _, rejection in rejected do
-		warn(`[ConfigLiveService] Ignored config key "{rejection.Key}": {rejection.Reason}`)
+	local accepted, rejected = ConfigOverrides.resolve(entries, rawValues)
+	if #rejected > 0 then
+		for _, rejection in rejected do
+			warn(
+				`[ConfigLiveService] Rejected config snapshot at "{rejection.Key}": {rejection.Reason}; keeping revision {revision}`
+			)
+		end
+		return
 	end
 
 	local immediate, simOverrides = ConfigOverrides.partition(accepted, LiveConfig.SimCritical)
-	if force or not shouldHold() then
+	local hold = false
+	if not force then
+		local result, holdError = shouldHold()
+		if holdError ~= nil then
+			warn(`[ConfigLiveService] {holdError}; keeping revision {revision}`)
+			return
+		end
+		hold = result == true
+	end
+	if force or not hold then
 		for key, value in simOverrides do
 			immediate[key] = value
 		end
@@ -128,8 +117,22 @@ local function install(force: boolean?)
 		end
 	end
 
-	ConfigRuntime.apply(immediate)
-	publish()
+	local nextRevision = revision + 1
+	local encodedOk, encoded = pcall(HttpService.JSONEncode, HttpService, {
+		revision = nextRevision,
+		overrides = immediate,
+	})
+	if not encodedOk then
+		warn(`[ConfigLiveService] Could not encode config revision {nextRevision}: {encoded}`)
+		return
+	end
+	local applied, reason = ConfigRuntime.apply(immediate)
+	if not applied then
+		warn(`[ConfigLiveService] Rejected config revision {nextRevision}: {reason}; keeping revision {revision}`)
+		return
+	end
+	ensureStateFolder()(stateValue :: StringValue).Value = encoded
+	revision = nextRevision
 end
 
 function ConfigLiveService.releaseLatched()
@@ -193,6 +196,12 @@ function ConfigLiveService.start(context: {
 
 	for name, moduleTable in context.modules do
 		ConfigRuntime.register(name, moduleTable)
+	end
+	for _, entry in LiveConfig.Entries do
+		local moduleName = ConfigOverrides.parseKey(entry.Key)
+		if moduleName ~= nil and context.modules[moduleName] ~= nil then
+			table.insert(entries, entry)
+		end
 	end
 	ensureStateFolder()
 

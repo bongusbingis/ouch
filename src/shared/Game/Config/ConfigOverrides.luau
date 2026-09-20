@@ -119,4 +119,57 @@ function ConfigOverrides.writePath(root: any, path: { string }, value: any): boo
 	return true
 end
 
+function ConfigOverrides.checkPath(root: any, path: { string }): (boolean, string?)
+	local cursor = root
+	for index = 1, #path - 1 do
+		if typeof(cursor) ~= "table" then
+			return false, `missing parent at {table.concat(path, ".", 1, index - 1)}`
+		end
+		cursor = cursor[path[index]]
+	end
+	local leaf = path[#path]
+	if typeof(cursor) ~= "table" or cursor[leaf] == nil then
+		return false, `missing leaf {table.concat(path, ".")}`
+	end
+	if table.isfrozen(cursor) then
+		return false, `frozen target {table.concat(path, ".")}`
+	end
+	return true, nil
+end
+
+function ConfigOverrides.validateSnapshot(
+	entries: { Entry },
+	decoded: any,
+	previousRevision: number
+): (number?, { [string]: any }?, string?)
+	if typeof(decoded) ~= "table" then
+		return nil, nil, "snapshot must be a table"
+	end
+	local revision = decoded.revision
+	if typeof(revision) ~= "number" or revision % 1 ~= 0 or revision < 0 or revision == math.huge then
+		return nil, nil, "revision must be a nonnegative integer"
+	end
+	if revision <= previousRevision then
+		return nil, nil, `stale revision {revision} after {previousRevision}`
+	end
+	local rawValues = decoded.overrides
+	if typeof(rawValues) ~= "table" then
+		return nil, nil, "overrides must be a table"
+	end
+	local allowed: { [string]: boolean } = {}
+	for _, entry in entries do
+		allowed[entry.Key] = true
+	end
+	for key in rawValues do
+		if typeof(key) ~= "string" or not allowed[key] then
+			return nil, nil, `unknown override key {tostring(key)}`
+		end
+	end
+	local accepted, rejected = ConfigOverrides.resolve(entries, rawValues)
+	if #rejected > 0 then
+		return nil, nil, `{rejected[1].Key}: {rejected[1].Reason}`
+	end
+	return revision, accepted, nil
+end
+
 return table.freeze(ConfigOverrides)

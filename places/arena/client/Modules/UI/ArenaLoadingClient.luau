@@ -207,7 +207,7 @@ local function tryReady()
 end
 
 local function changed()
-	if localState.fatalError ~= nil and baseReady() then
+	if localState.fatalError == "INITIALIZATION_TIMED_OUT" and baseReady() then
 		localState.fatalError = nil
 	end
 	notify()
@@ -216,7 +216,7 @@ end
 
 local function scheduleInitializationTimeout(currentGeneration: number)
 	task.delay(Loading.CriticalInitializationTimeoutSeconds, function()
-		if destroyed or generation ~= currentGeneration or isLocalReady() then
+		if destroyed or generation ~= currentGeneration or isLocalReady() or localState.fatalError ~= nil then
 			return
 		end
 		localState.fatalError = "INITIALIZATION_TIMED_OUT"
@@ -504,6 +504,18 @@ function ArenaLoadingClient.markSimulationReady()
 	end
 end
 
+function ArenaLoadingClient.failStartup(ownerPath: string, reason: string)
+	local diagnostic = `{ownerPath}: {reason}`
+	warn(`[ArenaLoadingClient] required startup failed at {diagnostic}`)
+	if localState.fatalError ~= nil then
+		return
+	end
+	localState.fatalError = diagnostic
+	generation += 1
+	readyTaskRunning = false
+	changed()
+end
+
 function ArenaLoadingClient.markBallotPresented(startsAt: number)
 	if startsAt <= 0 or reportedBallots[startsAt] then
 		return
@@ -513,7 +525,7 @@ function ArenaLoadingClient.markBallotPresented(startsAt: number)
 end
 
 function ArenaLoadingClient.retryInitialization()
-	if destroyed or isLocalReady() or not localState.simulationReady then
+	if destroyed or localState.fatalError ~= "INITIALIZATION_TIMED_OUT" or not localState.simulationReady then
 		return
 	end
 	generation += 1

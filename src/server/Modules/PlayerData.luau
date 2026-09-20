@@ -21,6 +21,10 @@ local MatchAwards = require(
 		:WaitForChild("Progression")
 		:WaitForChild("MatchAwards")
 )
+local BattlePassLogic = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Progression"):WaitForChild("BattlePassLogic")
+)
+local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
 
 local Data = {}
 Data._profiles = {}
@@ -460,6 +464,89 @@ function Data.markMatchSeasonApplied(player, id)
 	if record then
 		record.SeasonApplied = true
 	end
+end
+
+-- Match award writes hold acquireWriteLease. Profile.Data and Replica.Data share
+-- the raw tables; write XP and its V1 journal marker before either notification.
+-- A failed Replica send is retried in this session without repeating the credit.
+function Data.creditMatchSeasonXp(player, id): (boolean, string?)
+	local entry = Data._profiles[player.UserId]
+	if entry == nil or entry.Profile == nil or not entry.Profile:IsActive() or (Data._writeLeaseCounts[player.UserId] or 0) == 0 then
+		return false, `award {tostring(id)}: active profile and award write lease required`
+	end
+	local raw = entry.Profile.Data
+	local journal = raw.MatchAwards
+	local record = journal and journal.Pending and journal.Pending[id]
+	if type(id) ~= "string" or id == "" or record == nil or record.Ready ~= true or record.ProgressionApplied ~= true then
+		return false, `award {tostring(id)}: ready, progression-applied V1 journal record required`
+	end
+	if journal.Version ~= 1 or type(record.SeasonApplied) ~= "boolean" then
+		return false, `award {id}: invalid V1 season journal marker`
+	end
+	local amount = record.Awarded and record.Awarded.XP
+	if type(amount) ~= "number" or amount < 0 or amount % 1 ~= 0 or amount == math.huge then
+		return false, `award {id}: invalid awarded season XP {tostring(amount)}`
+	end
+	local seasonId = record.SeasonId
+	if type(seasonId) ~= "string" or (seasonId ~= "" and Seasons.Definitions[seasonId] == nil) then
+		return false, `award {id}: unknown season {tostring(seasonId)}`
+	end
+	local target: any = nil
+	local newArchive = false
+	if seasonId ~= "" and amount > 0 then
+		if type(raw.Season) ~= "table" or type(raw.SeasonHistory) ~= "table" then
+			return false, `award {id} season {seasonId}: season profile data missing`
+		end
+		if raw.Season.Id == seasonId then
+			target = raw.Season
+		else
+			target = raw.SeasonHistory[seasonId]
+			if target == nil then
+				local count = 0
+				for _ in raw.SeasonHistory do
+					count += 1
+				end
+				if count >= DataConfig.Persistence.MaxSeasonArchives then
+					return false, `award {id} season {seasonId}: SeasonHistory archive capacity {DataConfig.Persistence.MaxSeasonArchives} reached`
+				end
+				newArchive = true
+			end
+		end
+		if target ~= nil and (type(target.XP) ~= "number" or target.XP < 0 or target.XP == math.huge) then
+			return false, `award {id} season {seasonId}: invalid stored XP {tostring(target.XP)}`
+		end
+	end
+	if not record.SeasonApplied then
+		if seasonId ~= "" and amount > 0 then
+			if newArchive then
+				target = BattlePassLogic.blankState(seasonId)
+				raw.SeasonHistory[seasonId] = target
+			end
+			target.XP += amount
+		end
+		record.SeasonApplied = true
+		entry.SeasonReplicationPending = entry.SeasonReplicationPending or {}
+		entry.SeasonReplicationPending[id] = true
+	end
+	if entry.SeasonReplicationPending and entry.SeasonReplicationPending[id] then
+		local ok, err = pcall(function()
+			if seasonId ~= "" and amount > 0 then
+				if raw.Season.Id == seasonId then
+					entry.Replica:Set({ "Season", "XP" }, raw.Season.XP)
+				elseif newArchive then
+					entry.Replica:Set({ "SeasonHistory", seasonId }, raw.SeasonHistory[seasonId])
+				else
+					entry.Replica:Set({ "SeasonHistory", seasonId, "XP" }, raw.SeasonHistory[seasonId].XP)
+				end
+			end
+			entry.Replica:Set({ "MatchAwards", "Pending", id, "SeasonApplied" }, true)
+		end)
+		if not ok then
+			return false, `award {id} season {seasonId}: XP and marker committed; Replica notification failed: {err}`
+		end
+		entry.SeasonReplicationPending[id] = nil
+	end
+	return true, nil
 end
 
 function Data.completeMatchAward(player, id): boolean

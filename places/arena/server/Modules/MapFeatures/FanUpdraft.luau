@@ -29,23 +29,24 @@ type Visit = {
 }
 
 local fans: { BasePart } = {}
-local fansByAssembly: { [Model]: { BasePart } } = setmetatable({}, { __mode = "k" }) :: any
+local fansByAssembly: { [Instance]: { BasePart } } = setmetatable({}, { __mode = "k" }) :: any
 local visits: { [Player]: Visit } = {}
 local cooldowns: { [Player]: number } = {}
 
 -- Authored arena fans are named; course fans carry the attribute. Scanned once
 -- per assembly because a course assembly holds hundreds of parts.
-local function fansFor(assembly: Model): { BasePart }
+local function fansFor(assembly: Instance): { BasePart }
 	local cached = fansByAssembly[assembly]
 	if cached then
 		return cached
 	end
 	local found: { BasePart } = {}
+	local allowLegacy = assembly:FindFirstAncestor("SplashdownCourse") == nil
 	for _, descendant in assembly:GetDescendants() do
 		if
 			descendant:IsA("BasePart")
 			and (
-				MapFeatures.Fan.EnabledNames[descendant.Name] == true
+			(allowLegacy and MapFeatures.Fan.EnabledNames[descendant.Name] == true)
 				or descendant:GetAttribute(MapFeatures.Attributes.Fan) == true
 			)
 		then
@@ -119,12 +120,9 @@ end
 function FanUpdraft.tickWorld(context: MapFeatureKit.Context)
 	table.clear(fans)
 	for _, group in context.instances do
-		local assembly = group:FindFirstChild("Assembly")
-		if assembly and assembly:IsA("Model") then
-			for _, fan in fansFor(assembly) do
-				if fan.Parent ~= nil then
-					table.insert(fans, fan)
-				end
+		for _, fan in fansFor(group) do
+			if fan.Parent ~= nil then
+				table.insert(fans, fan)
 			end
 		end
 	end

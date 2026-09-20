@@ -83,8 +83,41 @@ local function add(player: Player?, delta: any)
 	end
 end
 
+local function rewardAmount(category: string, key: string): (number?, string?)
+	local path = `Config.Progression.Data.{category}.{key}`
+	local amounts = DataConfig[category]
+	if type(amounts) ~= "table" then
+		return nil, `[{path}] expected a reward table, got {typeof(amounts)}`
+	end
+	local amount = amounts[key]
+	if type(amount) ~= "number" or amount ~= amount or amount == math.huge or amount == -math.huge then
+		return nil, `[{path}] expected a finite number, got {tostring(amount)}`
+	end
+	if amount < (if key == "MatchComplete" or key == "Win" then 1 else 0) then
+		return nil,
+			`[{path}] expected {if key == "MatchComplete" or key == "Win" then "a positive" else "a nonnegative"} reward, got {amount}`
+	end
+	return amount, nil
+end
+
+function ProgressionService.validateRewardConfig(): (boolean, string?)
+	for _, category in { "ProgressionXP", "ProgressionBonks" } do
+		for _, key in { "MatchComplete", "Win", "Elim", "Catch" } do
+			local _, reason = rewardAmount(category, key)
+			if reason then
+				return false, reason
+			end
+		end
+	end
+	return true, nil
+end
+
 local function rewards(key: string): any
-	return { XP = DataConfig.ProgressionXP[key] or 0, Bonks = DataConfig.ProgressionBonks[key] or 0 }
+	local xp, xpReason = rewardAmount("ProgressionXP", key)
+	assert(xp, xpReason)
+	local bonks, bonksReason = rewardAmount("ProgressionBonks", key)
+	assert(bonks, bonksReason)
+	return { XP = xp, Bonks = bonks }
 end
 
 local function publish(player: Player, summary: MatchSummary, resultId: string)
@@ -158,8 +191,9 @@ local function commitMatch()
 			if won then
 				delta.Wins = 1
 				if eligible then
-					delta.XP += DataConfig.ProgressionXP.Win
-					delta.Bonks += DataConfig.ProgressionBonks.Win
+					local winReward = rewards("Win")
+					delta.XP += winReward.XP
+					delta.Bonks += winReward.Bonks
 				end
 			else
 				delta.Losses = 1
@@ -331,6 +365,8 @@ function ProgressionService.start(matchService: any)
 	if started then
 		return
 	end
+	local valid, reason = ProgressionService.validateRewardConfig()
+	assert(valid, reason)
 	started = true
 	activeMatchService = matchService
 	matchService.onEvent(handleEvent)

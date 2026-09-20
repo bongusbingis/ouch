@@ -72,4 +72,9 @@ function CosmeticEffects.start()
 	end
 end
 
+function CosmeticEffects.stop()
+	started = false
+	table.clear(dedups)
+end
+
 return CosmeticEffects

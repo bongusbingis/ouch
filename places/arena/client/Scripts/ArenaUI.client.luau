@@ -29,6 +29,7 @@ local bootstrapContainer = ReactRoot.create("ArenaLoadingBootstrap", Enum.Screen
 local bootstrapRoot = ReactRoblox.createRoot(bootstrapContainer)
 local bootstrapPresented = false
 local bootstrapDestroyed = false
+local uiReady = false
 local ArenaLoadingClient = nil
 
 local function markBootstrapPresented()
@@ -37,7 +38,7 @@ local function markBootstrapPresented()
 	end
 	bootstrapPresented = true
 	ReplicatedFirst:SetAttribute("ReactLoadingPresented", true)
-	if ArenaLoadingClient then
+	if uiReady and ArenaLoadingClient then
 		ArenaLoadingClient.markUiPresented()
 	end
 end

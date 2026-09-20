@@ -39,12 +39,12 @@ function Course.build(index: number): Course
 	local templates = RS:WaitForChild("SplashdownTraining")
 	local scriptables = Instance.new("Folder")
 	scriptables.Name = "TrainingScriptables"
-	local rotating = Instance.new("Folder")
-	rotating.Name = "Rotating"
-	rotating.Parent = scriptables
+	local motion = Instance.new("Folder")
+	motion.Name = "Motion"
+	motion.Parent = scriptables
 	local group = Instance.new("Folder")
 	group.Name = "Training"
-	group.Parent = rotating
+	group.Parent = motion
 	arena.group = group
 	local origin = Instance.new("Part")
 	origin.Name = "Origin"
@@ -101,6 +101,7 @@ function Course.build(index: number): Course
 	bar:SetAttribute("Rotor", "spin")
 	bar:SetAttribute("RotorAxis", "Y")
 	bar:SetAttribute("RotorSpeed", Config.SweeperSpeed)
+	bar:SetAttribute("RotorPeriod", 1)
 	bar:SetAttribute("Shove", true)
 	bar:SetAttribute("ShoveSpeed", Response.Rotor.Speed)
 	bar:SetAttribute("ShoveUpwardSpeed", Response.Rotor.UpwardSpeed)

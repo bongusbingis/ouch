@@ -24,8 +24,7 @@ local OnboardingCombat = require(script.Parent:WaitForChild("OnboardingCombat"))
 local Course = require(script.Parent.OnboardingCourse)
 local Progress = require(SharedGame.Onboarding.OnboardingProgress)
 local RotatingPlatforms = require(SharedGame.MapFeatures.RotatingPlatforms)
-local Bumpers = require(script.Parent.Parent.TrainingHazards.Bumpers)
-local RotorBump = require(script.Parent.Parent.TrainingHazards.RotorBump)
+local ShoveFeature = require(script.Parent.Parent.TrainingHazards.ShoveFeature)
 local L = OnboardingConfig.Course
 
 type Step = OnboardingState.Step
@@ -133,8 +132,7 @@ local function placeAtSafePoint(session: Session)
 	if not character or sessions[session.player] ~= session or session.finished then
 		return
 	end
-	Bumpers.forget(session.player)
-	RotorBump.forget(session.player)
+	ShoveFeature.forget(session.player)
 	character:PivotTo(Course.spawnAt(session.arena, session.checkpoint, targetFor(session)))
 	local root = characterRoot(session.player)
 	if root then
@@ -183,8 +181,7 @@ local function endSession(player: Player, reason: string)
 		connection:Disconnect()
 	end
 	table.clear(session.connections)
-	Bumpers.forget(player)
-	RotorBump.forget(player)
+	ShoveFeature.forget(player)
 	OnboardingCombat.clearBall(player)
 	OnboardingCombat.release(player)
 	local root = characterRoot(player)
@@ -490,16 +487,14 @@ function OnboardingService.start()
 			table.insert(groups, session.arena.group)
 		end
 		local context = { instances = groups, now = now, deltaTime = dt }
-		Bumpers.tickWorld(context)
-		RotorBump.tickWorld(context)
+		ShoveFeature.tickWorld(context)
 		for player, session in sessions do
 			if session.finished then
 				continue
 			end
 			local root = characterRoot(player)
 			if root and now >= session.graceUntil and not session.succeeded then
-				Bumpers.tickPlayer(context, player, root)
-				RotorBump.tickPlayer(context, player, root)
+				ShoveFeature.tickPlayer(context, player, root)
 			end
 			tickSession(session, now)
 		end

@@ -1,5 +1,7 @@
 -- Description: Arena client entry point for gameplay: starts every input, presentation, and audio module and wires them to the replicated match and combat state.
 
+--!strict
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Players = game:GetService("Players")
@@ -36,27 +38,75 @@ local MapFeatures = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ArenaLoadingClient = require(Client:WaitForChild("Modules"):WaitForChild("UI"):WaitForChild("ArenaLoadingClient"))
 
-local connections = {}
-local loadedModules = {}
-local combatPresenters = {}
-local damagePresenters = {}
-local DeathEffects
-local FanAirflow
+local connections: { any } = {}
+local loadedModules: { any } = {}
+local startedCore: { () -> () } = {}
+local combatPresenters: { any } = {}
+local damagePresenters: { any } = {}
+local DeathEffects: any = nil
+local FanAirflow: any = nil
+local matchState: Folder? = nil
+local matchStateConnection: RBXScriptConnection? = nil
+local matchStateModeConnection: RBXScriptConnection? = nil
+local cleaned = false
 
-ConfigReplication.startClient(LiveConfig.loadModules("arena"))
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
-Combat.setCameraEnabled(true)
 Combat.setInputEnabled(false)
 
-AssistConfig.start()
-CombatState.start()
-InputRouter.start()
-CameraAssist.start()
-CombatInputSender.start()
-VoteCamera.start()
-ArenaLoadingClient.markSimulationReady()
+local function cleanup()
+	if cleaned then
+		return
+	end
+	cleaned = true
+	Combat.setInputEnabled(false)
+	if matchStateConnection then
+		matchStateConnection:Disconnect()
+		matchStateConnection = nil
+	end
+	if matchStateModeConnection then
+		matchStateModeConnection:Disconnect()
+		matchStateModeConnection = nil
+	end
+	for _, connection in connections do
+		if typeof(connection) == "RBXScriptConnection" then
+			connection:Disconnect()
+		else
+			connection()
+		end
+	end
+	table.clear(connections)
+	for i = #loadedModules, 1, -1 do
+		local entry = loadedModules[i]
+		local module = entry.module
+		local stop = if typeof(module.destroy) == "function" then module.destroy else module.stop
+		if typeof(stop) == "function" then
+			local ok, reason = pcall(stop)
+			if not ok then
+				warn(`[SimulationClient] {entry.path} cleanup failed: {reason}`)
+			end
+		end
+	end
+	table.clear(loadedModules)
+	for i = #startedCore, 1, -1 do
+		local ok, reason = pcall(startedCore[i])
+		if not ok then
+			warn(`[SimulationClient] core cleanup failed: {reason}`)
+		end
+	end
+	table.clear(startedCore)
+end
 
-local systems = {
+script.Destroying:Connect(cleanup)
+
+local function startCore(name: string, start: () -> (), stop: () -> ())
+	table.insert(startedCore, stop)
+	local ok, reason = pcall(start)
+	if not ok then
+		error(`[SimulationClient] {name}.start failed: {reason}`, 0)
+	end
+end
+
+local systems: { any } = {
 	{ name = "ArmIK", parent = Presentation, method = "start" },
 	{ name = "BallVisuals", parent = Presentation, method = "start", combat = true },
 	{ name = "DamageFeedback", parent = Presentation, method = "start", damage = "onEvent" },
@@ -73,6 +123,7 @@ local systems = {
 	{ name = "SplatEffects", parent = Presentation, method = "start", combat = true },
 	{
 		name = "CosmeticEffects",
+		path = "ReplicatedStorage.Shared.Game.Cosmetics.CosmeticEffects",
 		load = function()
 			return require(
 				ReplicatedStorage:WaitForChild("Shared")
@@ -109,20 +160,91 @@ local systems = {
 	{ name = "WeaponAnimations", parent = Presentation, method = "start", intent = true },
 }
 if RunService:IsStudio() then
-	table.insert(systems, { name = "DebugVisuals", parent = DebugModules, method = "start", combat = true })
-	table.insert(systems, { name = "ThrowPoseTuner", parent = DebugModules, method = "start" })
-	table.insert(systems, { name = "CosmeticVFXGallery", parent = DebugModules, method = "start" })
-	table.insert(systems, { name = "DevMatchSkip", parent = DebugModules, method = "start" })
+	table.insert(systems, { name = "DebugVisuals", parent = DebugModules, method = "start", combat = true, optional = true })
+	table.insert(systems, { name = "ThrowPoseTuner", parent = DebugModules, method = "start", optional = true })
+	table.insert(systems, { name = "CosmeticVFXGallery", parent = DebugModules, method = "start", optional = true })
+	table.insert(systems, { name = "DevMatchSkip", parent = DebugModules, method = "start", optional = true })
 end
-for _, system in systems do
-	local ok, err = pcall(function()
-		local module = if system.load then system.load() else require(system.parent:WaitForChild(system.name))
-		table.insert(loadedModules, module)
+local function systemPath(system: any): string
+	return system.path or `{system.parent:GetFullName()}.{system.name}`
+end
+
+local function loadSystem(system: any): any
+	local path = systemPath(system)
+	local ok, module = pcall(function()
+		if system.load then
+			return system.load()
+		end
+		local child = system.parent:WaitForChild(system.name, 15)
+		assert(child and child:IsA("ModuleScript"), `{path} must be a ModuleScript`)
+		return require(child)
+	end)
+	if not ok then
+		error(`[SimulationClient] {path} failed to load: {module}`, 0)
+	end
+	assert(typeof(module) == "table", `[SimulationClient] {path} must return a table`)
+	if system.method then
+		assert(typeof(module[system.method]) == "function", `[SimulationClient] {path}.{system.method} must be a function`)
+	end
+	if system.combat then
+		assert(typeof(module.onEvent) == "function", `[SimulationClient] {path}.onEvent must be a function`)
+	end
+	if system.damage then
+		assert(typeof(module[system.damage]) == "function", `[SimulationClient] {path}.{system.damage} must be a function`)
+	end
+	if system.intent then
+		assert(typeof(module.onIntent) == "function", `[SimulationClient] {path}.onIntent must be a function`)
+	end
+	return module
+end
+
+local startupOk, startupError = pcall(function()
+	ConfigReplication.startClient(LiveConfig.loadModules("arena"))
+	Combat.setCameraEnabled(true)
+	-- Loading every required module before starting presenters prevents a missing
+	-- module from leaving an earlier presenter running during partial startup.
+	for _, system in systems do
+		if system.optional then
+			local ok, module = pcall(loadSystem, system)
+			if ok then
+				system.module = module
+			else
+				warn(`[SimulationClient] Studio-only {systemPath(system)} unavailable: {module}`)
+			end
+		else
+			system.module = loadSystem(system)
+		end
+	end
+	startCore("AssistConfig", AssistConfig.start, AssistConfig.stop)
+	startCore("CombatState", CombatState.start, CombatState.destroy)
+	startCore("InputRouter", InputRouter.start, InputRouter.destroy)
+	startCore("CameraAssist", CameraAssist.start, CameraAssist.stop)
+	startCore("CombatInputSender", CombatInputSender.start, CombatInputSender.destroy)
+	startCore("VoteCamera", VoteCamera.start, VoteCamera.destroy)
+	for _, system in systems do
+		local module = system.module
+		if module == nil then
+			continue
+		end
+		local path = systemPath(system)
+		if system.method then
+			table.insert(loadedModules, { module = module, path = path })
+			local ok, reason = pcall(module[system.method])
+			if not ok then
+				if system.optional then
+					warn(`[SimulationClient] Studio-only {path}.{system.method} failed: {reason}`)
+					local stop = if typeof(module.destroy) == "function" then module.destroy else module.stop
+					if typeof(stop) == "function" then
+						pcall(stop)
+					end
+					table.remove(loadedModules)
+					continue
+				end
+				error(`[SimulationClient] {path}.{system.method} failed: {reason}`, 0)
+			end
+		end
 		if system.onLoaded then
 			system.onLoaded(module)
-		end
-		if system.method then
-			module[system.method]()
 		end
 		if system.combat then
 			table.insert(combatPresenters, module.onEvent)
@@ -133,15 +255,13 @@ for _, system in systems do
 		if system.intent then
 			table.insert(connections, CombatInputSender.onIntent(module.onIntent))
 		end
-	end)
-	if not ok then
-		warn(`[SimulationClient] Optional {system.name} unavailable: {err}`)
 	end
+end)
+if not startupOk then
+	cleanup()
+	ArenaLoadingClient.failStartup(script:GetFullName(), tostring(startupError))
+	error(startupError, 0)
 end
-
-local matchState: Folder? = nil
-local matchStateConnection: RBXScriptConnection? = nil
-local matchStateModeConnection: RBXScriptConnection? = nil
 local function updateCombatInput()
 	Combat.setInputEnabled(
 		Players.LocalPlayer:GetAttribute("ArenaReady") == true
@@ -164,20 +284,6 @@ local function attachMatchState(folder: Folder)
 	updateCombatInput()
 end
 
-local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
-if existingMatchState and existingMatchState:IsA("Folder") then
-	attachMatchState(existingMatchState)
-end
-table.insert(
-	connections,
-	ReplicatedStorage.ChildAdded:Connect(function(child)
-		if child.Name == "MatchState" and child:IsA("Folder") then
-			attachMatchState(child)
-		end
-	end)
-)
-table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
-
 local function presentCombatEvent(event)
 	for _, present in combatPresenters do
 		present(event)
@@ -187,64 +293,49 @@ local function presentCombatEvent(event)
 	end
 end
 
-table.insert(
-	connections,
-	Network.on("CombatSimEvent", function(events)
-		for _, event in events do
-			presentCombatEvent(event)
-		end
-	end)
-)
-
-table.insert(
-	connections,
-	Network.on("CombatFeed", function(event)
-		if event.kind == "Elim" then
-			presentCombatEvent(event)
-		end
-	end)
-)
-
-table.insert(
-	connections,
-	Network.on("DamageFeedback", function(event)
-		for _, present in damagePresenters do
-			present(event)
-		end
-	end)
-)
-
-script.Destroying:Connect(function()
-	Combat.setInputEnabled(false)
-	CameraAssist.stop()
-	for i = #loadedModules, 1, -1 do
-		local module = loadedModules[i]
-		if typeof(module) == "table" then
-			if typeof(module.destroy) == "function" then
-				pcall(module.destroy)
-			elseif typeof(module.stop) == "function" then
-				pcall(module.stop)
+local wiringOk, wiringError = pcall(function()
+	local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
+	if existingMatchState and existingMatchState:IsA("Folder") then
+		attachMatchState(existingMatchState)
+	end
+	table.insert(
+		connections,
+		ReplicatedStorage.ChildAdded:Connect(function(child)
+			if child.Name == "MatchState" and child:IsA("Folder") then
+				attachMatchState(child)
 			end
-		end
-	end
-	if matchStateConnection then
-		matchStateConnection:Disconnect()
-		matchStateConnection = nil
-	end
-	if matchStateModeConnection then
-		matchStateModeConnection:Disconnect()
-		matchStateModeConnection = nil
-	end
-	for _, connection in connections do
-		if typeof(connection) == "RBXScriptConnection" then
-			connection:Disconnect()
-		else
-			connection()
-		end
-	end
-	table.clear(connections)
-	InputRouter.destroy()
-	CombatInputSender.destroy()
-	CombatState.destroy()
-	VoteCamera.destroy()
+		end)
+	)
+	table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("ArenaReady"):Connect(updateCombatInput))
+	table.insert(
+		connections,
+		Network.on("CombatSimEvent", function(events)
+			for _, event in events do
+				presentCombatEvent(event)
+			end
+		end)
+	)
+	table.insert(
+		connections,
+		Network.on("CombatFeed", function(event)
+			if event.kind == "Elim" then
+				presentCombatEvent(event)
+			end
+		end)
+	)
+	table.insert(
+		connections,
+		Network.on("DamageFeedback", function(event)
+			for _, present in damagePresenters do
+				present(event)
+			end
+		end)
+	)
 end)
+if not wiringOk then
+	cleanup()
+	ArenaLoadingClient.failStartup(script:GetFullName(), `event wiring failed: {wiringError}`)
+	error(wiringError, 0)
+end
+
+ArenaLoadingClient.markSimulationReady()

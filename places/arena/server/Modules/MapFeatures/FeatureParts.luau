@@ -36,11 +36,17 @@ end
 function FeatureParts.number(part: Instance, key: string, fallback: number, minimum: number, maximum: number): number
 	local v = part:GetAttribute(key)
 	if typeof(v) ~= "number" or v ~= v or math.abs(v) == math.huge then
+		if part:FindFirstAncestor("SplashdownCourse") then
+			assert(false, `[FeatureParts] {part:GetFullName()}.{key} must be a finite number`)
+		end
 		return fallback
 	end
 	return math.clamp(v, minimum, maximum)
 end
 function FeatureParts.axis(value: any): Vector3
+	if value ~= nil and value ~= "X" and value ~= "Y" and value ~= "Z" then
+		assert(false, "[FeatureParts] axis must be X, Y, or Z")
+	end
 	return if value == "X" then Vector3.xAxis elseif value == "Z" then Vector3.zAxis else Vector3.yAxis
 end
 return FeatureParts

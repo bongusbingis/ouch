@@ -20,44 +20,64 @@ function ConfigRuntime.subscribe(listener: ({ [string]: any }) -> ())
 	table.insert(listeners, listener)
 end
 
-local function write(key: string, value: any): boolean
+local function target(key: string): (any?, { string }?, string?)
 	local moduleName, path = ConfigOverrides.parseKey(key)
 	if moduleName == nil or path == nil then
-		return false
+		return nil, nil, `malformed key "{key}"`
 	end
 	local moduleTable = modules[moduleName]
 	if moduleTable == nil then
-		return false
+		return nil, nil, `missing module "{moduleName}" for "{key}"`
 	end
-	if defaults[key] == nil then
-		local baked = ConfigOverrides.readPath(moduleTable, path)
-		if baked == nil then
-			return false
-		end
-		defaults[key] = baked
+	local valid, reason = ConfigOverrides.checkPath(moduleTable, path)
+	if not valid then
+		return nil, nil, `"{key}": {reason}`
 	end
-	return ConfigOverrides.writePath(moduleTable, path, value)
+	return moduleTable, path, nil
 end
 
-function ConfigRuntime.apply(accepted: { [string]: any }): { [string]: any }
+function ConfigRuntime.apply(accepted: { [string]: any }): (boolean, string?, { [string]: any }?)
 	local changed = {}
+	local writes = {}
 
 	for key in applied do
 		if accepted[key] == nil then
 			local baked = defaults[key]
-			if baked ~= nil and write(key, baked) then
-				changed[key] = baked
+			if baked == nil then
+				return false, `missing baked value for "{key}"`, nil
 			end
-			applied[key] = nil
+			writes[key] = baked
 		end
 	end
 
 	for key, value in accepted do
-		if applied[key] ~= value and write(key, value) then
-			applied[key] = value
-			changed[key] = value
+		if applied[key] ~= value then
+			writes[key] = value
 		end
 	end
+
+	-- Config modules are plain dictionaries. Preflight every changed target before
+	-- writing any leaf, including leaves being restored to their baked value.
+	for key in writes do
+		local _, _, reason = target(key)
+		if reason ~= nil then
+			return false, reason, nil
+		end
+	end
+
+	for key, value in writes do
+		local moduleTable, path = target(key)
+		local resolvedPath = path :: { string }
+		if defaults[key] == nil then
+			defaults[key] = ConfigOverrides.readPath(moduleTable, resolvedPath)
+		end
+		assert(
+			ConfigOverrides.writePath(moduleTable, resolvedPath, value),
+			`[ConfigRuntime] preflighted target changed: "{key}"`
+		)
+		changed[key] = value
+	end
+	applied = table.clone(accepted)
 
 	if next(changed) ~= nil then
 		for _, listener in listeners do
@@ -67,7 +87,7 @@ function ConfigRuntime.apply(accepted: { [string]: any }): { [string]: any }
 			end
 		end
 	end
-	return changed
+	return true, nil, changed
 end
 
 function ConfigRuntime.activeOverrides(): { [string]: any }
@@ -75,7 +95,8 @@ function ConfigRuntime.activeOverrides(): { [string]: any }
 end
 
 function ConfigRuntime.clear()
-	ConfigRuntime.apply({})
+	local ok, reason = ConfigRuntime.apply({})
+	assert(ok, `[ConfigRuntime] clear failed: {reason}`)
 	modules = {}
 	defaults = {}
 	applied = {}

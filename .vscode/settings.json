@@ -9,5 +9,5 @@
     "luau-lsp.sourcemap.rojoPath": "/home/jackc714/.cargo/bin/rojo",
     "luau-lsp.sourcemap.rojoProjectFile": "lobby.project.json",
     "chat.sessionSync.enabled": true,
-    "lmstudioCode.minContextLength": 262144
+    "lmstudioCode.minContextLength": 131072
 }

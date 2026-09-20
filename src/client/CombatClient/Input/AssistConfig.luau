@@ -14,6 +14,7 @@ local AssistConfig = {}
 
 local started = false
 local resolved: { [string]: any } = PlayerAssist.Defaults
+local connections: { RBXScriptConnection } = {}
 
 local function reread(folder: Folder)
 	local rawValues = {}
@@ -35,29 +36,52 @@ function AssistConfig.start()
 	if started then
 		return
 	end
-	started = true
 
-	local folder = Players.LocalPlayer:WaitForChild(PlayerAssist.FolderName)
-	assert(folder:IsA("Folder"), "[AssistConfig] Player.AssistConfig must be a Folder")
+	local player = Players.LocalPlayer
+	local folder = player:WaitForChild(PlayerAssist.FolderName, 10)
+	assert(
+		folder,
+		`[AssistConfig] missing {player:GetFullName()}.{PlayerAssist.FolderName}; check PlayerConfigService projection`
+	)
+	assert(folder:IsA("Folder"), `[AssistConfig] {folder:GetFullName()} must be a Folder`)
+	started = true
 
 	local function watch(child: Instance)
 		if child:IsA("ValueBase") then
-			child.Changed:Connect(function()
-				reread(folder)
-			end)
+			table.insert(
+				connections,
+				child.Changed:Connect(function()
+					reread(folder)
+				end)
+			)
 		end
 	end
 	for _, child in folder:GetChildren() do
 		watch(child)
 	end
-	folder.ChildAdded:Connect(function(child)
-		watch(child)
-		reread(folder)
-	end)
-	folder.AttributeChanged:Connect(function()
-		reread(folder)
-	end)
+	table.insert(
+		connections,
+		folder.ChildAdded:Connect(function(child)
+			watch(child)
+			reread(folder)
+		end)
+	)
+	table.insert(
+		connections,
+		folder.AttributeChanged:Connect(function()
+			reread(folder)
+		end)
+	)
 	reread(folder)
+end
+
+function AssistConfig.stop()
+	for _, connection in connections do
+		connection:Disconnect()
+	end
+	table.clear(connections)
+	resolved = PlayerAssist.Defaults
+	started = false
 end
 
 return AssistConfig

@@ -1,4 +1,7 @@
--- Description: Validates the authored Splashdown course templates at boot with the same fail-fast style as the arena, and stands one in the bowl on request, resolving every marker the race reads so the race itself never searches the course.
+-- Description: Validates the authored Splashdown course templates at boot,
+-- blocking invalid feature configuration while allowing harmless stale
+-- attributes to warn, and stands one in the bowl on request, resolving every
+-- marker the race reads so the race itself never searches the course.
 
 --!strict
 
@@ -13,6 +16,12 @@ local ScriptableRoots = require(
 		:WaitForChild("Game")
 		:WaitForChild("MapFeatures")
 		:WaitForChild("ScriptableRoots")
+)
+local AttributeAudit = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("AttributeAudit")
 )
 
 local SplashdownCourses = {}
@@ -30,6 +39,13 @@ export type LavaRise = {
 	delaySeconds: number,
 	seconds: number,
 	pauses: { RisingLiquid.Pause }?,
+}
+
+type LavaDefinition = {
+	MaxHeight: number,
+	RiseStudsPerSecond: number,
+	StartDelaySeconds: number?,
+	PauseWaypoints: string?,
 }
 
 export type LiveCourse = {
@@ -112,12 +128,7 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local checkpoints = sortedCheckpoints(checkpointsFolder, `{path}.Checkpoints`)
 	assert(#checkpoints > 0, `[SplashdownCourses] {path}.Checkpoints must hold at least one checkpoint`)
 	local declared = model:GetAttribute("CheckpointCount")
-	if declared ~= #checkpoints then
-		warn(
-			`[SplashdownCourses] {path} declares {tostring(declared)} checkpoints, but has {#checkpoints}; using actual count`
-		)
-		model:SetAttribute("CheckpointCount", #checkpoints)
-	end
+	assert(declared == #checkpoints, `[SplashdownCourses] {path}.CheckpointCount must equal {#checkpoints}`)
 	local finish = requireChild(model, "Finish", `{path}.Finish`, "Folder")
 	local finishTrigger = requireChild(finish, "Trigger", `{path}.Finish.Trigger`, "BasePart") :: BasePart
 	local finishDeck = requireChild(finish, "Deck", `{path}.Finish.Deck`, "BasePart") :: BasePart
@@ -130,16 +141,41 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 
 	local lava: BasePart? = nil
 	local lavaRise: LavaRise? = nil
+	local lavaDefinition = definition.LavaRise :: LavaDefinition?
+	local configuredLiquid = {}
 	for _, hazard in hazards do
-		local rise = RisingLiquid.resolve(hazard:GetAttributes())
-		if rise then
-			lava = hazard
-			lavaRise = rise
-			break
+		if hazard:GetAttribute("RisingLiquid") == true then
+			table.insert(configuredLiquid, hazard)
 		end
 	end
-	if lava == nil then
-		lava = hazards[1]
+	if lavaDefinition then
+		assert(
+			#configuredLiquid == 1,
+			`[SplashdownCourses] {path}.Hazards must contain exactly one RisingLiquid=true part for configured LavaRise`
+		)
+		lava = configuredLiquid[1]
+		local authored = assert(RisingLiquid.resolve(lava:GetAttributes()))
+		local configured = assert(
+			RisingLiquid.resolve({
+				RisingLiquid = true,
+				MaxHeight = lavaDefinition.MaxHeight,
+				RiseStudsPerSecond = lavaDefinition.RiseStudsPerSecond,
+				StartDelaySeconds = lavaDefinition.StartDelaySeconds,
+				PauseWaypoints = lavaDefinition.PauseWaypoints or "",
+			})
+		)
+		assert(
+			math.abs(authored.studs - configured.studs) < 1e-6
+				and math.abs(authored.seconds - configured.seconds) < 1e-6
+				and math.abs(authored.delaySeconds - configured.delaySeconds) < 1e-6,
+			`[SplashdownCourses] {path}.Hazards liquid schedule disagrees with course LavaRise configuration`
+		)
+		lavaRise = configured
+	else
+		assert(
+			#configuredLiquid == 0,
+			`[SplashdownCourses] {path} has RisingLiquid=true but no LavaRise configuration`
+		)
 	end
 
 	local doorsFolder = scriptables:FindFirstChild("Doors")
@@ -202,6 +238,8 @@ function SplashdownCourses.start()
 	local path = folder:GetFullName()
 	for _, courseId in Splashdown.CourseOrder do
 		local template = requireChild(folder, courseId, `{path}.{courseId}`, "Model") :: Model
+		local errors = AttributeAudit.checkSplashdownCourse(template, Splashdown.Courses[courseId])
+		assert(#errors == 0, `[SplashdownCourses] rejected {template:GetFullName()}:\n{table.concat(errors, "\n")}`)
 		resolve(courseId, template, `{path}.{courseId}`)
 		templates[courseId] = template
 	end

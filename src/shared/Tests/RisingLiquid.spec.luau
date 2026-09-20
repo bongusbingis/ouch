@@ -2,12 +2,12 @@
 local T = require(script.Parent.TestKit)
 local L = require(script.Parent.Parent.Game.MapFeatures.RisingLiquid)
 T.describe("RisingLiquid", function()
-	T.it("preserves Summit's existing 60 stud / 140 second trajectory", function()
-		local c = L.resolve({ RiseStuds = 60, RiseDelaySeconds = 20, RiseSeconds = 140 })
-		T.expect(c.delaySeconds):toEqual(20)
-		for _, t in { -20, 0, 1, 70, 140, 200 } do
-			T.expect(L.heightAt(t, c)):toBeNear(math.clamp(t / 140, 0, 1) * 60, 1e-9)
-		end
+	T.it("ignores the removed legacy liquid schema", function()
+		T.expect(L.resolve({ RiseStuds = 60, RiseDelaySeconds = 20, RiseSeconds = 140 }) == nil):toEqual(true)
+	end)
+	T.it("requires the explicit liquid marker and fields", function()
+		T.expect(L.resolve({ MaxHeight = 60, RiseStudsPerSecond = 2 }) == nil):toEqual(true)
+		T.expect(pcall(L.resolve, { RisingLiquid = true, MaxHeight = 60 })):toEqual(false)
 	end)
 	T.it("waits at optional waypoints without a frame accumulator", function()
 		local c = L.resolve({

@@ -257,7 +257,7 @@ return function(props: Props)
 			OnActivated = ArenaTeleportClient.stay,
 		}
 	elseif loading.fatalError then
-		primaryAction = if loading.simulationReady
+		primaryAction = if loading.fatalError == "INITIALIZATION_TIMED_OUT" and loading.simulationReady
 			then {
 				Text = "TRY AGAIN",
 				Style = "Primary",
