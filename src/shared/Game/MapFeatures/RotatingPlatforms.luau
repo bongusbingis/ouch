@@ -14,7 +14,17 @@ local ScriptableRoots = require(script.Parent.ScriptableRoots)
 
 local RotatingPlatforms = {}
 
-local FOLDER_NAME = "Rotating"
+local FOLDER_NAMES = {
+	"Motion",
+	"Fans",
+	"BigBalls",
+	"BeachBalls",
+	"Conveyors",
+	"FallingTiles",
+	"Seesaws",
+	"Bumpers",
+	"Rotating",
+}
 local Attributes = MapFeatures.Attributes
 
 export type Axis = "X" | "Y" | "Z"
@@ -69,10 +79,13 @@ type RotorOptions = {
 }
 
 export type Platform = {
-	origin: BasePart,
-	assembly: Model,
+	assembly: Model | BasePart,
+	referencePivot: CFrame,
+	motionPivot: CFrame,
 	relativePivot: CFrame,
 	degreesPerSecond: number,
+	motionEpoch: number?,
+	serverCarries: boolean,
 	boundsSize: Vector3,
 	pivotToBounds: CFrame,
 	reach: number,
@@ -81,9 +94,12 @@ export type Platform = {
 }
 
 type RootState = {
-	folder: Folder?,
+	root: Instance,
+	folders: { [string]: Folder },
 	connections: { RBXScriptConnection },
-	platforms: { [Folder]: Platform },
+	platforms: { [Instance]: Platform },
+	lastSummary: string?,
+	legacyWarned: boolean,
 }
 
 local platforms: { Platform } = {}
@@ -104,7 +120,7 @@ end
 
 function RotatingPlatforms.poseAt(platform: Platform, now: number): CFrame
 	local angle = Rotation.angleAt(now, platform.degreesPerSecond)
-	return platform.origin.CFrame * CFrame.Angles(0, angle, 0) * platform.relativePivot
+	return platform.motionPivot * CFrame.Angles(0, angle, 0) * platform.relativePivot
 end
 
 function RotatingPlatforms.all(): { Platform }
@@ -112,7 +128,7 @@ function RotatingPlatforms.all(): { Platform }
 end
 
 function RotatingPlatforms.currentBounds(platform: Platform): CFrame
-	return platform.assembly:GetPivot() * platform.pivotToBounds
+	return RotatingPlatforms.poseAt(platform, Workspace:GetServerTimeNow()) * platform.pivotToBounds
 end
 
 local function rotorOwns(rotor: LocalRotor, part: BasePart): boolean
@@ -164,7 +180,7 @@ local function motionAt(platform: Platform, rotor: LocalRotor, now: number): (nu
 	elseif rotor.profile == "piston" then
 		return MotionProfile.piston(now, rotor.amplitude, rotor.period, rotor.hold :: number, rotor.phase)
 	elseif rotor.mode == "spin" then
-		local epoch = tonumber(platform.origin:GetAttribute(Attributes.MotionEpoch))
+		local epoch = platform.motionEpoch
 		-- Never accelerate against the absolute Unix clock when a builder forgets its epoch.
 		return MotionProfile.spin(
 			now,
@@ -210,8 +226,8 @@ function RotatingPlatforms.surfaceVelocityAt(
 	position: Vector3,
 	now: number
 ): Vector3
-	local ringAxis = platform.origin.CFrame.UpVector * math.rad(platform.degreesPerSecond)
-	local velocity = ringAxis:Cross(position - platform.origin.Position)
+	local ringAxis = platform.motionPivot.UpVector * math.rad(platform.degreesPerSecond)
+	local velocity = ringAxis:Cross(position - platform.motionPivot.Position)
 	local current: LocalRotor? = rotor
 	while current do
 		local centerFrame = rotorBasePoseAt(platform, current, now)
@@ -227,7 +243,7 @@ end
 -- Applies a compiled assembly without depending on a running heartbeat.
 function RotatingPlatforms.applyAt(platform: Platform, now: number)
 	local angle = Rotation.angleAt(now, platform.degreesPerSecond)
-	local pose = platform.origin.CFrame * CFrame.Angles(0, angle, 0) * platform.relativePivot
+	local pose = platform.motionPivot * CFrame.Angles(0, angle, 0) * platform.relativePivot
 	if platform.appliedAngle == nil or math.abs(angle - platform.appliedAngle) >= MINIMUM_TURN_RADIANS then
 		platform.appliedAngle = angle
 		platform.assembly:PivotTo(pose)
@@ -319,8 +335,20 @@ local function getBounds(instance: Model | BasePart): (CFrame, Vector3)
 	return CFrame.identity, Vector3.zero
 end
 
-local function build(origin: BasePart, assembly: Model | BasePart): Platform
-	local pivot = assembly:GetPivot()
+local function build(first: Model | BasePart, second: (Model | BasePart)?): Platform
+	-- The two-argument form is the bounded Arena compatibility adapter. New
+	-- assemblies use their authored pivot as both the reference and motion pivot.
+	local legacyOrigin: BasePart? = nil
+	local assembly: Model | BasePart
+	if second ~= nil and first:IsA("BasePart") then
+		legacyOrigin = first
+		assembly = second
+	else
+		assembly = first
+	end
+	local referencePivot = assembly:GetPivot()
+	local motionPivot = if legacyOrigin then legacyOrigin.CFrame else referencePivot
+	local pivot = referencePivot
 	local boundsCFrame, boundsSize = getBounds(assembly)
 	local localRotors: { LocalRotor } = {}
 	-- Imported pivot orientations are arbitrary; use only the authored center so
@@ -348,10 +376,10 @@ local function build(origin: BasePart, assembly: Model | BasePart): Platform
 			shoveSpeed = options.shoveSpeed,
 		})
 	end
-	
+
 	local function checkBase(base: BasePart)
 		if MapFeatures.Spinner.EnabledNames[base.Name] then
-			local center = CFrame.new(base.CFrame:PointToWorldSpace(base.PivotOffset.Position))
+			local center = base.CFrame.Rotation + base.CFrame:PointToWorldSpace(base.PivotOffset.Position)
 			addRotor(base, center, {
 				axis = "Y",
 				mode = "spin",
@@ -380,7 +408,8 @@ local function build(origin: BasePart, assembly: Model | BasePart): Platform
 		if base.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1 then
 			for _, plate in base:GetChildren() do
 				if plate:IsA("BasePart") and plate.Name:find(MapFeatures.Disc.PlatePrefix, 1, true) == 1 then
-					addRotor(plate, CFrame.new(plate.Position), {
+					local center = base.CFrame.Rotation + plate.Position
+					addRotor(plate, center, {
 						axis = "Y",
 						mode = "spin",
 						degreesPerSecond = MapFeatures.Disc.DegreesPerSecond,
@@ -393,7 +422,8 @@ local function build(origin: BasePart, assembly: Model | BasePart): Platform
 			local suffix = tonumber(base.Name:match("%.(%d+)$")) or 0
 			for _, panel in base:GetChildren() do
 				if panel:IsA("BasePart") and panel.Name:find(MapFeatures.SwingPanel.PanelPrefix, 1, true) == 1 then
-					addRotor(panel, CFrame.new(base.Position), {
+					local center = base.CFrame.Rotation + base.Position
+					addRotor(panel, center, {
 						axis = "X",
 						mode = "rock",
 						amplitude = math.rad(MapFeatures.SwingPanel.AmplitudeDegrees),
@@ -409,7 +439,13 @@ local function build(origin: BasePart, assembly: Model | BasePart): Platform
 		-- post is authored as a plain hierarchy with one attribute set.
 		local declared = attributeRotor(base)
 		if declared then
-			local center = base:GetPivot()
+			-- RotorAxis is authored in the part's own frame. A mesh can use a
+			-- rotated PivotOffset to place its hinge, as Ball Barrage's axes do;
+			-- using GetPivot()'s rotation here applies that offset rotation twice
+			-- and changes the swing plane. Keep the pivot position, but preserve
+			-- the part CFrame orientation for the rotor basis.
+			local authoredPivot = base:GetPivot()
+			local center = base.CFrame.Rotation + authoredPivot.Position
 			local followers: { Follower } = {}
 			for _, descendant in base:GetDescendants() do
 				if descendant:IsA("BasePart") then
@@ -471,14 +507,31 @@ local function build(origin: BasePart, assembly: Model | BasePart): Platform
 		rotor.followers = followers
 	end
 
+	local metadata = assembly :: Instance
+	local legacyMetadata = legacyOrigin :: Instance?
+	local function attribute(name: string): any
+		local value = metadata:GetAttribute(name)
+		if value == nil and legacyMetadata then
+			value = legacyMetadata:GetAttribute(name)
+		end
+		return value
+	end
 	return {
-		origin = origin,
-		assembly = assembly :: any,
-		relativePivot = origin.CFrame:Inverse() * pivot,
-		degreesPerSecond = (origin:GetAttribute("RotationSpeed") :: number?) or MapFeatures.Rotating.DegreesPerSecond,
+		assembly = assembly,
+		referencePivot = referencePivot,
+		motionPivot = motionPivot,
+		relativePivot = motionPivot:Inverse() * pivot,
+		-- New moving models own their motion through explicit rotor parts. The
+		-- legacy assembly default is only valid when the Origin adapter exists;
+		-- otherwise every piston/hammer model would slowly orbit its own pivot.
+		degreesPerSecond = if legacyOrigin
+			then (attribute("RotationSpeed") :: number?) or MapFeatures.Rotating.DegreesPerSecond
+			else (attribute("RotationSpeed") :: number?) or 0,
+		motionEpoch = tonumber(attribute(Attributes.MotionEpoch)),
+		serverCarries = attribute(Attributes.ServerCarries) == true,
 		boundsSize = boundsSize,
 		pivotToBounds = pivot:Inverse() * boundsCFrame,
-		reach = (boundsCFrame.Position - origin.Position).Magnitude + boundsSize.Magnitude / 2,
+		reach = (boundsCFrame.Position - motionPivot.Position).Magnitude + boundsSize.Magnitude / 2,
 		localRotors = localRotors,
 	}
 end
@@ -499,64 +552,157 @@ local function forgetGroup(state: RootState, child: Instance)
 	end
 end
 
--- Origin and Assembly stream in independently of their parent Folder, so each platform builds off the main thread and only joins the live list once both have arrived; a build resolving after a stop() is dropped by the generation guard.
-local function trackGroup(state: RootState, child: Instance)
-	if state.platforms[child] then
+local function hasMotionMarker(model: Model): boolean
+	if
+		model:GetAttribute("RotationSpeed") ~= nil
+		or model:GetAttribute(Attributes.MotionEpoch) ~= nil
+		or model:GetAttribute(Attributes.ServerCarries) ~= nil
+	then
+		return true
+	end
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			if
+				attributeRotor(descendant) ~= nil
+				or MapFeatures.Spinner.EnabledNames[descendant.Name]
+				or isFan(descendant)
+				or descendant.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1
+				or descendant.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1
+			then
+				local owner = descendant:FindFirstAncestorOfClass("Model")
+				if owner == model then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function hasPartMotionMarker(part: BasePart): boolean
+	return attributeRotor(part) ~= nil
+		or MapFeatures.Spinner.EnabledNames[part.Name] == true
+		or isFan(part)
+		or part.Name:find(MapFeatures.Disc.HubPrefix, 1, true) == 1
+		or part.Name:find(MapFeatures.SwingPanel.AxlePrefix, 1, true) == 1
+end
+
+local function register(state: RootState, key: Instance, assembly: Model | BasePart, legacyOrigin: BasePart?)
+	if state.platforms[key] then
 		return
 	end
-	local currentGeneration = generation
-	task.spawn(function()
-		local origin: BasePart? = nil
-		local assembly: (Model | BasePart)? = nil
-		if child:IsA("Folder") then
-			origin = child:WaitForChild("Origin") :: BasePart
-			assembly = child:WaitForChild("Assembly") :: Model
-		elseif child:IsA("Model") then
-			origin = child.PrimaryPart
-			assembly = child
-		elseif child:IsA("BasePart") then
-			origin = child
-			assembly = child
-		end
+	local platform = build(assembly, legacyOrigin)
+	state.platforms[key] = platform
+	table.insert(platforms, platform)
+end
 
-		if
-			not started
-			or generation ~= currentGeneration
-			or child.Parent == nil
-			or state.platforms[child]
-			or roots[child.Parent.Parent :: Instance] ~= state
-		then
-			return
+local function scan(state: RootState)
+	if not started or roots[state.root] ~= state or not state.root:IsDescendantOf(Workspace) then
+		return
+	end
+	local seen: { [Instance]: boolean } = {}
+	local legacy: { [Instance]: { origin: BasePart, assembly: Model | BasePart } } = {}
+	local rejected = 0
+	if state.folders.Rotating and not state.legacyWarned then
+		state.legacyWarned = true
+		warn(
+			`[RotatingPlatforms] {state.root:GetFullName()}.Rotating is a legacy compatibility folder; new authored motion belongs in Scriptables.Motion`
+		)
+	end
+	for _, folder in state.folders do
+		for _, child in folder:GetChildren() do
+			local origin = child:FindFirstChild("Origin")
+			local assembly = child:FindFirstChild("Assembly")
+			if origin and origin:IsA("BasePart") and assembly and (assembly:IsA("Model") or assembly:IsA("BasePart")) then
+				legacy[child] = { origin = origin, assembly = assembly :: Model | BasePart }
+			elseif origin ~= nil or assembly ~= nil then
+				rejected += 1
+				warn(`[RotatingPlatforms] rejected malformed legacy group {child:GetFullName()}`)
+			end
 		end
-		
-		if not origin or not assembly then
-			return
+	end
+	local candidates = 0
+	for _, folder in state.folders do
+	 for _, descendant in folder:GetDescendants() do
+		local isLegacyMember = false
+		for _, entry in legacy do
+			if descendant == entry.assembly or descendant:IsDescendantOf(entry.assembly) then
+				isLegacyMember = true
+				break
+			end
 		end
-
-		local platform = build(origin, assembly)
-		state.platforms[child] = platform
-		table.insert(platforms, platform)
-	end)
+		local candidate = if not isLegacyMember
+				and descendant:IsA("Model")
+				and hasMotionMarker(descendant)
+			then descendant
+			elseif
+				not isLegacyMember
+				and descendant:IsA("BasePart")
+				and descendant.Parent == folder
+				and hasPartMotionMarker(descendant)
+			then descendant
+			else nil
+		if candidate then
+			candidates += 1
+			seen[candidate] = true
+			register(state, candidate, candidate :: Model | BasePart, nil)
+		end
+	 end
+	end
+	-- Explicitly bounded legacy adapter: only a direct Rotating child with both
+	-- named members is treated as an old group. Category folders are ignored.
+	for child, entry in legacy do
+		seen[child] = true
+		register(state, child, entry.assembly, entry.origin)
+	end
+	for key in state.platforms do
+		local inMotionFolder = false
+		for _, folder in state.folders do
+			if key:IsDescendantOf(folder) then
+				inMotionFolder = true
+				break
+			end
+		end
+		if not seen[key] or key.Parent == nil or not inMotionFolder then
+			forgetGroup(state, key)
+		end
+	end
+	local rotorCount = 0
+	local registeredCount = 0
+	for _, platform in state.platforms do
+		registeredCount += 1
+		rotorCount += #platform.localRotors
+	end
+	local summary = `{candidates}|{registeredCount}|{rotorCount}|{rejected}`
+	if summary ~= state.lastSummary then
+		state.lastSummary = summary
+		print(
+			`[RotatingPlatforms] root={state.root:GetFullName()} candidates={candidates} registered={registeredCount} rotors={rotorCount} rejected={rejected}`
+		)
+		if candidates > 0 and registeredCount == 0 then
+			warn(
+				`[RotatingPlatforms] motion markers found but no platforms registered under {state.root:GetFullName()}`
+			)
+		end
+	end
 end
 
 local function attachFolder(state: RootState, folder: Folder)
-	if state.folder ~= nil then
+	if state.folders[folder.Name] ~= nil then
 		return
 	end
-	state.folder = folder
-	for _, child in folder:GetChildren() do
-		trackGroup(state, child)
-	end
+	state.folders[folder.Name] = folder
+	scan(state)
 	table.insert(
 		state.connections,
-		folder.ChildAdded:Connect(function(child)
-			trackGroup(state, child)
+		folder.DescendantAdded:Connect(function()
+			task.defer(scan, state)
 		end)
 	)
 	table.insert(
 		state.connections,
-		folder.ChildRemoved:Connect(function(child)
-			forgetGroup(state, child)
+		folder.DescendantRemoving:Connect(function()
+			task.defer(scan, state)
 		end)
 	)
 end
@@ -565,16 +711,25 @@ local function addRoot(root: Instance)
 	if roots[root] then
 		return
 	end
-	local state: RootState = { folder = nil, connections = {}, platforms = {} }
+	local state: RootState = {
+		root = root,
+		folders = {},
+		connections = {},
+		platforms = {},
+		lastSummary = nil,
+		legacyWarned = false,
+	}
 	roots[root] = state
-	local folder = root:FindFirstChild(FOLDER_NAME)
-	if folder and folder:IsA("Folder") then
-		attachFolder(state, folder)
+	for _, folderName in FOLDER_NAMES do
+		local folder = root:FindFirstChild(folderName)
+		if folder and folder:IsA("Folder") then
+			attachFolder(state, folder)
+		end
 	end
 	table.insert(
 		state.connections,
 		root.ChildAdded:Connect(function(child)
-			if child.Name == FOLDER_NAME and child:IsA("Folder") then
+			if table.find(FOLDER_NAMES, child.Name) and child:IsA("Folder") then
 				attachFolder(state, child)
 			end
 		end)
@@ -590,8 +745,8 @@ local function removeRoot(root: Instance)
 	for _, connection in state.connections do
 		connection:Disconnect()
 	end
-	for folder in state.platforms do
-		forgetGroup(state, folder)
+	for key in state.platforms do
+		forgetGroup(state, key)
 	end
 end
 

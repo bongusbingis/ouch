@@ -6,6 +6,7 @@ local Parts = require(script.Parent.FeatureParts)
 local Kit = require(script.Parent.MapFeatureKit)
 local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local Conveyors = { folderName = "Rotating", instanceClass = "Folder" }
+Conveyors.folderNames = { "Conveyors", "Rotating" }
 local original: { [BasePart]: Vector3 } = {}
 local lastOrientation: { [BasePart]: CFrame } = {}
 local ray = RaycastParams.new()

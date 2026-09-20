@@ -8,6 +8,7 @@ local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local Parts = require(script.Parent.FeatureParts)
 local Kit = require(script.Parent.MapFeatureKit)
 local BigBalls = { folderName = "Rotating", instanceClass = "Folder" }
+BigBalls.folderNames = { "BigBalls", "Rotating" }
 type Visit = {
 	root: BasePart,
 	ball: BasePart,

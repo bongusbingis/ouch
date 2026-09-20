@@ -22,7 +22,7 @@ type RootState = {
 	folders: { [string]: Folder },
 }
 
-local partsByKit: { [string]: { Instance } } = {}
+local partsByKit: { [MapFeatureKit.MapFeatureKit]: { Instance } } = {}
 local roots: { [Instance]: RootState } = {}
 local connections: { RBXScriptConnection } = {}
 local unwatch: (() -> ())? = nil
@@ -38,50 +38,67 @@ local function aliveRoot(player: Player): BasePart?
 	return if root and root:IsA("BasePart") then root else nil
 end
 
+local function folderNames(kit: MapFeatureKit.MapFeatureKit): { string }
+	return kit.folderNames or { kit.folderName }
+end
+
+local function usesFolder(kit: MapFeatureKit.MapFeatureKit, name: string): boolean
+	for _, folderName in folderNames(kit) do
+		if folderName == name then
+			return true
+		end
+	end
+	return false
+end
+
 local function rebuild(kit: MapFeatureKit.MapFeatureKit)
 	local collected = {}
+	local seen: { [Instance]: boolean } = {}
 	local className = kit.instanceClass or "BasePart"
 	for _, state in roots do
-		local folder = state.folders[kit.folderName]
-		if folder == nil then
-			continue
-		end
-		for _, child in folder:GetChildren() do
-			if child:IsA(className) then
-				table.insert(collected, child)
+		for _, folderName in folderNames(kit) do
+			local folder = state.folders[folderName]
+			if folder then
+				for _, child in folder:GetChildren() do
+					if child:IsA(className) and not seen[child] then
+						seen[child] = true
+						table.insert(collected, child)
+					end
+				end
 			end
 		end
 	end
-	partsByKit[kit.folderName] = collected
-	if #collected == 0 then
-		-- Several kits share Rotating, but the folder has only one listener.
-		-- Unloading its last group must release every kit's state/constraints.
-		for _, sibling in MapFeatureRegistry.all() do
-			if sibling.folderName == kit.folderName and sibling.forget then
-				sibling.forget(nil)
-			end
-		end
+	partsByKit[kit] = collected
+	if #collected == 0 and kit.forget then
+		kit.forget(nil)
 	end
 end
 
 local function attachFolder(state: RootState, kit: MapFeatureKit.MapFeatureKit, folder: Folder)
-	if state.folders[kit.folderName] ~= nil then
+	if state.folders[folder.Name] ~= nil then
 		return
 	end
-	state.folders[kit.folderName] = folder
+	state.folders[folder.Name] = folder
+	local function rebuildFolderUsers()
+		for _, sibling in MapFeatureRegistry.all() do
+			if usesFolder(sibling, folder.Name) then
+				rebuild(sibling)
+			end
+		end
+	end
 	table.insert(
 		state.connections,
 		folder.ChildAdded:Connect(function()
-			rebuild(kit)
+			rebuildFolderUsers()
 		end)
 	)
 	table.insert(
 		state.connections,
 		folder.ChildRemoved:Connect(function()
-			rebuild(kit)
+			rebuildFolderUsers()
 		end)
 	)
-	rebuild(kit)
+	rebuildFolderUsers()
 end
 
 local function addRoot(root: Instance)
@@ -91,9 +108,11 @@ local function addRoot(root: Instance)
 	local state: RootState = { connections = {}, folders = {} }
 	roots[root] = state
 	for _, kit in MapFeatureRegistry.all() do
-		local folder = root:FindFirstChild(kit.folderName)
-		if folder and folder:IsA("Folder") then
-			attachFolder(state, kit, folder)
+		for _, folderName in folderNames(kit) do
+			local folder = root:FindFirstChild(folderName)
+			if folder and folder:IsA("Folder") then
+				attachFolder(state, kit, folder)
+			end
 		end
 	end
 	table.insert(
@@ -103,7 +122,7 @@ local function addRoot(root: Instance)
 				return
 			end
 			for _, kit in MapFeatureRegistry.all() do
-				if kit.folderName == child.Name then
+				if usesFolder(kit, child.Name) then
 					attachFolder(state, kit, child)
 				end
 			end
@@ -121,7 +140,14 @@ local function removeRoot(root: Instance)
 		connection:Disconnect()
 	end
 	for _, kit in MapFeatureRegistry.all() do
-		if state.folders[kit.folderName] then
+		local found = false
+		for _, folderName in folderNames(kit) do
+			if state.folders[folderName] then
+				found = true
+				break
+			end
+		end
+		if found then
 			rebuild(kit)
 		end
 	end
@@ -151,7 +177,7 @@ local function step(deltaTime: number)
 	context.now = os.clock()
 	context.deltaTime = deltaTime
 	for _, kit in MapFeatureRegistry.all() do
-		local instances = partsByKit[kit.folderName]
+		local instances = partsByKit[kit]
 		if instances == nil or #instances == 0 then
 			continue
 		end

@@ -7,6 +7,7 @@ local Network = require(RS.Shared.Network)
 local Parts = require(script.Parent.FeatureParts)
 local Kit = require(script.Parent.MapFeatureKit)
 local FallingTiles = { folderName = "Rotating", instanceClass = "Folder" }
+FallingTiles.folderNames = { "FallingTiles", "Rotating" }
 type Original = { part: BasePart, transparency: number, collide: boolean, query: boolean, touch: boolean }
 type Tile = { original: { Original }, dropAt: number?, restoreAt: number?, hidden: boolean }
 local tiles: { [BasePart]: Tile } = {}

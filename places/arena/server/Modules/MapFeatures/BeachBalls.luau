@@ -12,6 +12,7 @@ local ArenaService = require(script.Parent.Parent.ArenaService)
 
 local BeachBalls = {}
 BeachBalls.folderName = "Rotating"
+BeachBalls.folderNames = { "BeachBalls", "Rotating" }
 BeachBalls.instanceClass = "Folder"
 
 type BallInfo = {

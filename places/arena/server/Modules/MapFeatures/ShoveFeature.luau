@@ -29,6 +29,7 @@ local MapFeatureKit = require(script.Parent.MapFeatureKit)
 
 local ShoveFeature = {}
 ShoveFeature.folderName = "Rotating"
+ShoveFeature.folderNames = { "Bumpers", "Motion", "Rotating" }
 ShoveFeature.instanceClass = "Folder"
 
 type BumperContact = {

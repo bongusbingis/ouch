@@ -117,7 +117,10 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 		end
 	end
 	for _, platform in Rotating.all() do
-		if (root.Position - platform.origin.Position).Magnitude <= platform.reach + Config.PlatformReachPadding then
+		if
+			(root.Position - platform.referencePivot.Position).Magnitude
+			<= platform.reach + Config.PlatformReachPadding
+		then
 			horizontal = math.max(
 				horizontal,
 				base * Config.WalkTolerance + math.rad(math.abs(platform.degreesPerSecond)) * platform.reach

@@ -190,7 +190,7 @@ return {
 		RotorPeriod = "RotorPeriod", -- seconds per full swing
 		RotorPhase = "RotorPhase", -- seconds
 		RotorCarries = "RotorCarries", -- riders are carried with the part
-		ServerCarries = "ServerCarries", -- true on course Origin; client carry is disabled for this group
+		ServerCarries = "ServerCarries", -- true on moving model; legacy Origin is accepted during migration
 		RotorProfile = "RotorProfile", -- "hammer" (rock) or "piston" (slide)
 		WindupSeconds = "WindupSeconds",
 		StrikeSeconds = "StrikeSeconds",
@@ -198,9 +198,9 @@ return {
 		PistonPhase = "PistonPhase",
 		PistonExtendStuds = "PistonExtendStuds",
 		HoldSeconds = "HoldSeconds",
-		RotorAccel = "RotorAccel", -- degrees/s^2; requires MotionEpoch on Origin
+		RotorAccel = "RotorAccel", -- degrees/s^2; requires MotionEpoch on the moving model
 		RotorPhaseDegrees = "RotorPhaseDegrees", -- spin's initial angle, independent of rock/slide phase
-		MotionEpoch = "MotionEpoch", -- synchronized start time on Origin
+		MotionEpoch = "MotionEpoch", -- synchronized start time on the moving model
 		JumpPad = "JumpPad", -- marker on a model in Scriptables/JumpPads
 		LaunchSpeed = "LaunchSpeed",
 		FloatFactor = "FloatFactor",

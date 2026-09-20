@@ -16,6 +16,7 @@ local BeachBalls = require(script.Parent.BeachBalls)
 
 local FanUpdraft = {}
 FanUpdraft.folderName = "Rotating"
+FanUpdraft.folderNames = { "Fans", "Rotating" }
 FanUpdraft.instanceClass = "Folder"
 
 type Visit = {

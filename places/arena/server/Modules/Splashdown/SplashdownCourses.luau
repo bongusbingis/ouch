@@ -36,7 +36,6 @@ export type LiveCourse = {
 	id: string,
 	displayName: string,
 	model: Model,
-	origin: BasePart,
 	scriptables: Folder,
 	pads: { BasePart },
 	checkpoints: { Checkpoint },
@@ -103,7 +102,6 @@ end
 local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local definition = Splashdown.Courses[courseId]
 	assert(definition, `[SplashdownCourses] no course config for {courseId}`)
-	local origin = requireChild(model, "Origin", `{path}.Origin`, "BasePart") :: BasePart
 	local scriptables = requireChild(model, "Scriptables", `{path}.Scriptables`, "Folder") :: Folder
 	local start = requireChild(model, "Start", `{path}.Start`, "Folder")
 	local padsFolder = requireChild(start, "Pads", `{path}.Start.Pads`, "Folder")
@@ -171,7 +169,6 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 		id = courseId,
 		displayName = if typeof(definition.DisplayName) == "string" then definition.DisplayName else courseId,
 		model = model,
-		origin = origin,
 		scriptables = scriptables,
 		pads = pads,
 		checkpoints = checkpoints,

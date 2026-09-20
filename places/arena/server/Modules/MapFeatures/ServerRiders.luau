@@ -11,6 +11,7 @@ local RiderSupport = require(Features.RiderSupport)
 local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local ServerRiders = { folderName = "Rotating", instanceClass = "Folder" }
+ServerRiders.folderNames = { "Motion", "Rotating" }
 type Ride = { root: BasePart, support: BasePart, frame: CFrame, position: Vector3 }
 local rides: { [Player]: Ride } = {}
 local ray = RaycastParams.new()
@@ -36,10 +37,7 @@ function ServerRiders.tickPlayer(context: MapFeatureKit.Context, player: Player,
 	local support = hit.Instance
 	local eligible = false
 	for _, platform in Rotating.all() do
-		if
-			platform.origin:GetAttribute(MapFeatures.Attributes.ServerCarries) == true
-			and support:IsDescendantOf(platform.assembly)
-		then
+		if platform.serverCarries and support:IsDescendantOf(platform.assembly) then
 			local _, rotor = Rotating.rotorFor(support)
 			-- A static follower still belongs to a whole-assembly rotating ride.
 			local _, owner = Rotating.rotorOwning(support)

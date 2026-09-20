@@ -39,6 +39,10 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 		local assembly = part:FindFirstAncestor("Assembly")
 		local group = assembly and assembly.Parent
 		local origin = group and group:FindFirstChild("Origin")
+		local model = part:FindFirstAncestorOfClass("Model")
+		local modelIsMoving = model ~= nil
+		local motionOwner = if modelIsMoving then model else assembly
+		local metadataOwner = if modelIsMoving then model else origin
 		if part.Name == "Origin" and part.Parent and part.Parent:FindFirstChild("Assembly") then
 			if a.RotationSpeed ~= 0 then
 				fail("course Origins use RotationSpeed=0; put motion on attribute Rotors")
@@ -54,7 +58,14 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 			if not part:IsA("BasePart") then
 				fail("rotating-folder markers require BaseParts")
 			end
-			if not assembly or not assembly:IsA("Model") or not origin or not origin:IsA("BasePart") then
+			if not motionOwner then
+				fail("motion marker is not beneath a discoverable rotating assembly")
+			elseif modelIsMoving and model ~= root and not model:IsDescendantOf(root) then
+				fail("moving model is outside the audited root")
+			elseif
+				not modelIsMoving
+				and (not assembly or not assembly:IsA("Model") or not origin or not origin:IsA("BasePart"))
+			then
 				fail("missing Rotating/<group>/Origin + Assembly")
 			end
 			if part:IsA("BasePart") and not part.Anchored then
@@ -62,19 +73,19 @@ function Audit.check(root: Instance, extraMetadata: { [string]: boolean }?): { s
 			end
 		end
 		if a.RotorCarries or a.Seesaw then
-			if not origin or origin:GetAttribute("ServerCarries") ~= true then
-				fail("course rides require ServerCarries=true on Origin")
+			if not metadataOwner or metadataOwner:GetAttribute("ServerCarries") ~= true then
+				fail("course rides require ServerCarries=true on the moving model or legacy Origin")
 			end
 		end
 		if
 			a.RotorAccel
 			and a.RotorAccel ~= 0
-			and (not origin or typeof(origin:GetAttribute("MotionEpoch")) ~= "number")
+			and (not metadataOwner or typeof(metadataOwner:GetAttribute("MotionEpoch")) ~= "number")
 		then
-			fail("accelerating rotors require synchronized MotionEpoch on Origin")
+			fail("accelerating rotors require synchronized MotionEpoch on the moving model or legacy Origin")
 		end
-		if a.Seesaw and origin and origin:GetAttribute("RotationSpeed") ~= 0 then
-			fail("Seesaw requires a stationary group Origin")
+		if a.Seesaw and metadataOwner and metadataOwner:GetAttribute("RotationSpeed") ~= 0 then
+			fail("Seesaw requires a stationary moving model or legacy Origin")
 		end
 		if a.Seesaw or a.BeachBall or a.Conveyor or a.FallingTile then
 			local ancestor = part.Parent

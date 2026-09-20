@@ -10,6 +10,7 @@ export type Context = {
 
 export type MapFeatureKit = {
 	folderName: string,
+	folderNames: { string }?,
 	instanceClass: string?,
 	tickPlayer: ((context: Context, player: Player, root: BasePart) -> ())?,
 	tickWorld: ((context: Context) -> ())?,

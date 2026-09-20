@@ -100,9 +100,10 @@ local function step(dt: number)
 		clear()
 		return
 	end
+	local now = Workspace:GetServerTimeNow()
 	local pivot = if rotor
-		then RotatingPlatforms.rotorPoseAt(platform, rotor, Workspace:GetServerTimeNow())
-		else platform.assembly:GetPivot()
+		then RotatingPlatforms.rotorPoseAt(platform, rotor, now)
+		else RotatingPlatforms.poseAt(platform, now)
 	if ridingPlatform == platform and ridingRotor == rotor and ridingPivot then
 		local current = root.CFrame
 		local carried = pivot:PointToWorldSpace(ridingPivot:PointToObjectSpace(current.Position))

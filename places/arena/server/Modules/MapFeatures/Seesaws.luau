@@ -6,6 +6,7 @@ local Config = require(RS.Config.Gameplay.MapFeatures)
 local Parts = require(script.Parent.FeatureParts)
 local Kit = require(script.Parent.MapFeatureKit)
 local Seesaws = { folderName = "Rotating", instanceClass = "Folder" }
+Seesaws.folderNames = { "Seesaws", "Rotating" }
 type State = { base: CFrame, angle: number, moment: number, followers: { { part: BasePart, offset: CFrame } } }
 local states: { [BasePart]: State } = {}
 local ray = RaycastParams.new()

@@ -391,7 +391,7 @@ local function splash(player: Player, root: BasePart)
 end
 
 local function inHazard(course: SplashdownCourses.LiveCourse, position: Vector3): boolean
-	if position.Y < course.origin.Position.Y - Splashdown.VoidDepthStuds then
+	if position.Y < course.model:GetPivot().Position.Y - Splashdown.VoidDepthStuds then
 		return true
 	end
 	for _, hazard in course.hazards do
