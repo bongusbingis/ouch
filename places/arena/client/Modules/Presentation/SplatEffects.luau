@@ -18,7 +18,7 @@ local SplatEffects = {}
 local defaultSplatColor = Cosmetics.Defaults.BallAssets.SplatColor
 assert(defaultSplatColor ~= nil, "[SplatEffects] Cosmetics.Defaults.BallAssets.SplatColor must be set")
 
-local seen = EventDedup.new(4096)
+local seen = EventDedup.new(64)
 local started = false
 
 local tintedEmitters = {
@@ -189,6 +189,11 @@ function SplatEffects.start()
 		return
 	end
 	started = true
+end
+
+function SplatEffects.destroy()
+	seen.clear()
+	started = false
 end
 
 return SplatEffects

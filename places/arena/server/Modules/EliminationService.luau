@@ -8,27 +8,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 
-type HumanoidState = {
-	EvaluateStateMachine: boolean?,
-	AutoRotate: boolean,
-	PlatformStand: boolean,
-	RequiresNeck: boolean,
-	BreakJointsOnDeath: boolean,
-	GettingUpEnabled: boolean,
-}
-
-type PartState = {
-	CanCollide: boolean,
-	CanQuery: boolean,
-	CanTouch: boolean,
-	Massless: boolean,
-}
-
 type RagdollState = {
 	Motors: { Motor6D },
 	Instances: { Instance },
-	HumanoidState: HumanoidState?,
-	PartStates: { [BasePart]: PartState },
 	CleanupConnection: RBXScriptConnection?,
 	RemovalConnection: RBXScriptConnection?,
 }
@@ -93,19 +75,13 @@ local function claimCharacter(character: Model, player: Player)
 	end
 end
 
-local function applyPartPhysics(character: Model, state: RagdollState)
+local function applyPartPhysics(character: Model)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	for _, descendant in character:GetDescendants() do
 		if not descendant:IsA("BasePart") then
 			continue
 		end
 
-		state.PartStates[descendant] = {
-			CanCollide = descendant.CanCollide,
-			CanQuery = descendant.CanQuery,
-			CanTouch = descendant.CanTouch,
-			Massless = descendant.Massless,
-		}
 		descendant.Anchored = false
 		setNetworkOwnerServer(descendant)
 
@@ -121,33 +97,37 @@ local function applyPartPhysics(character: Model, state: RagdollState)
 	end
 end
 
-local function restorePartPhysics(state: RagdollState)
-	for part, partState in state.PartStates do
-		if part.Parent == nil then
+local function restorePartPhysics(character: Model)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	for _, descendant in character:GetDescendants() do
+		if not descendant:IsA("BasePart") then
 			continue
 		end
-		part.CanCollide = partState.CanCollide
-		part.CanQuery = partState.CanQuery
-		part.CanTouch = partState.CanTouch
-		part.Massless = partState.Massless
-		part.AssemblyLinearVelocity = Vector3.zero
-		part.AssemblyAngularVelocity = Vector3.zero
+		if descendant.Parent ~= character then
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			descendant.Massless = true
+		elseif
+			descendant ~= root
+			and (descendant.Name == "UpperTorso" or descendant.Name == "LowerTorso" or descendant.Name == "Head")
+		then
+			descendant.CanCollide = true
+			descendant.CanQuery = true
+			descendant.CanTouch = true
+			descendant.Massless = false
+		else
+			descendant.CanCollide = false
+			descendant.CanQuery = true
+			descendant.CanTouch = true
+			descendant.Massless = false
+		end
+		descendant.AssemblyLinearVelocity = Vector3.zero
+		descendant.AssemblyAngularVelocity = Vector3.zero
 	end
 end
 
-local function applyHumanoidPhysics(humanoid: Humanoid, state: RagdollState)
-	local canReadEvaluation, evaluation = pcall(function()
-		return humanoid.EvaluateStateMachine
-	end)
-	state.HumanoidState = {
-		EvaluateStateMachine = if canReadEvaluation then evaluation else nil,
-		AutoRotate = humanoid.AutoRotate,
-		PlatformStand = humanoid.PlatformStand,
-		RequiresNeck = humanoid.RequiresNeck,
-		BreakJointsOnDeath = humanoid.BreakJointsOnDeath,
-		GettingUpEnabled = humanoid:GetStateEnabled(Enum.HumanoidStateType.GettingUp),
-	}
-
+local function applyHumanoidPhysics(humanoid: Humanoid)
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = true
 	humanoid.RequiresNeck = false
@@ -159,22 +139,19 @@ local function applyHumanoidPhysics(humanoid: Humanoid, state: RagdollState)
 	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 end
 
-local function restoreHumanoidPhysics(humanoid: Humanoid?, state: RagdollState)
-	local humanoidState = state.HumanoidState
-	if humanoid == nil or humanoidState == nil then
+local function restoreHumanoidPhysics(humanoid: Humanoid?)
+	if humanoid == nil then
 		return
 	end
 
-	humanoid.AutoRotate = humanoidState.AutoRotate
-	humanoid.PlatformStand = humanoidState.PlatformStand
-	humanoid.RequiresNeck = humanoidState.RequiresNeck
-	humanoid.BreakJointsOnDeath = humanoidState.BreakJointsOnDeath
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, humanoidState.GettingUpEnabled)
-	if humanoidState.EvaluateStateMachine ~= nil then
-		pcall(function()
-			humanoid.EvaluateStateMachine = humanoidState.EvaluateStateMachine
-		end)
-	end
+	humanoid.AutoRotate = true
+	humanoid.PlatformStand = false
+	humanoid.RequiresNeck = true
+	humanoid.BreakJointsOnDeath = true
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+	pcall(function()
+		humanoid.EvaluateStateMachine = true
+	end)
 	humanoid:ChangeState(if humanoid.Health <= 0 then Enum.HumanoidStateType.Dead else Enum.HumanoidStateType.GettingUp)
 end
 
@@ -274,8 +251,6 @@ function EliminationService.down(player: Player, impulseVelocity: Vector3?): boo
 	local state: RagdollState = {
 		Motors = {},
 		Instances = {},
-		HumanoidState = nil,
-		PartStates = {},
 	}
 	active[character] = state
 	state.RemovalConnection = player.CharacterRemoving:Connect(function(removed)
@@ -289,8 +264,8 @@ function EliminationService.down(player: Player, impulseVelocity: Vector3?): boo
 		end
 	end)
 
-	applyHumanoidPhysics(humanoid, state)
-	applyPartPhysics(character, state)
+	applyHumanoidPhysics(humanoid)
+	applyPartPhysics(character)
 	for _, motor in character:GetDescendants() do
 		if motor:IsA("Motor6D") then
 			buildJoint(motor, state)
@@ -327,8 +302,8 @@ function EliminationService.up(player: Player): boolean
 				motor.Enabled = true
 			end
 		end
-		restorePartPhysics(state)
-		restoreHumanoidPhysics(humanoid, state)
+		restorePartPhysics(character)
+		restoreHumanoidPhysics(humanoid)
 	elseif humanoid and humanoid.Health > 0 then
 		humanoid.PlatformStand = false
 		humanoid.AutoRotate = true
@@ -364,8 +339,8 @@ function EliminationService.forget(character: Model): boolean
 			motor.Enabled = true
 		end
 	end
-	restorePartPhysics(state)
-	restoreHumanoidPhysics(humanoidOf(character), state)
+	restorePartPhysics(character)
+	restoreHumanoidPhysics(humanoidOf(character))
 	return true
 end
 

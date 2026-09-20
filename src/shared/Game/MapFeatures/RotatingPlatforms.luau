@@ -310,9 +310,18 @@ local function isFanBlade(blade: BasePart): boolean
 	return blade.Name:find("propeller_trampoline_2_", 1, true) == 1 or blade:GetAttribute(Attributes.FanBlade) == true
 end
 
-local function build(origin: BasePart, assembly: Model): Platform
+local function getBounds(instance: Model | BasePart): (CFrame, Vector3)
+	if instance:IsA("Model") then
+		return instance:GetBoundingBox()
+	elseif instance:IsA("BasePart") then
+		return instance.CFrame, instance.Size
+	end
+	return CFrame.identity, Vector3.zero
+end
+
+local function build(origin: BasePart, assembly: Model | BasePart): Platform
 	local pivot = assembly:GetPivot()
-	local boundsCFrame, boundsSize = assembly:GetBoundingBox()
+	local boundsCFrame, boundsSize = getBounds(assembly)
 	local localRotors: { LocalRotor } = {}
 	-- Imported pivot orientations are arbitrary; use only the authored center so
 	-- the local rotation stays around a stable axis within the moving ring.
@@ -339,10 +348,8 @@ local function build(origin: BasePart, assembly: Model): Platform
 			shoveSpeed = options.shoveSpeed,
 		})
 	end
-	for _, base in assembly:GetDescendants() do
-		if not base:IsA("BasePart") then
-			continue
-		end
+	
+	local function checkBase(base: BasePart)
 		if MapFeatures.Spinner.EnabledNames[base.Name] then
 			local center = CFrame.new(base.CFrame:PointToWorldSpace(base.PivotOffset.Position))
 			addRotor(base, center, {
@@ -417,6 +424,16 @@ local function build(origin: BasePart, assembly: Model): Platform
 		end
 	end
 
+	if assembly:IsA("BasePart") then
+		checkBase(assembly)
+	else
+		for _, base in assembly:GetDescendants() do
+			if base:IsA("BasePart") then
+				checkBase(base)
+			end
+		end
+	end
+
 	-- Each part has exactly one motion owner. An explicit attribute replaces a
 	-- legacy name match on that same part; unrelated arena paths stay unchanged.
 	local byPart: { [BasePart]: LocalRotor } = {}
@@ -456,7 +473,7 @@ local function build(origin: BasePart, assembly: Model): Platform
 
 	return {
 		origin = origin,
-		assembly = assembly,
+		assembly = assembly :: any,
 		relativePivot = origin.CFrame:Inverse() * pivot,
 		degreesPerSecond = (origin:GetAttribute("RotationSpeed") :: number?) or MapFeatures.Rotating.DegreesPerSecond,
 		boundsSize = boundsSize,
@@ -471,9 +488,6 @@ end
 RotatingPlatforms.build = build
 
 local function forgetGroup(state: RootState, child: Instance)
-	if not child:IsA("Folder") then
-		return
-	end
 	local platform = state.platforms[child]
 	if platform == nil then
 		return
@@ -487,30 +501,40 @@ end
 
 -- Origin and Assembly stream in independently of their parent Folder, so each platform builds off the main thread and only joins the live list once both have arrived; a build resolving after a stop() is dropped by the generation guard.
 local function trackGroup(state: RootState, child: Instance)
-	if not child:IsA("Folder") then
-		return
-	end
 	if state.platforms[child] then
 		return
 	end
-	local folder = child
 	local currentGeneration = generation
 	task.spawn(function()
-		local origin = folder:WaitForChild("Origin")
-		local assembly = folder:WaitForChild("Assembly")
+		local origin: BasePart? = nil
+		local assembly: (Model | BasePart)? = nil
+		if child:IsA("Folder") then
+			origin = child:WaitForChild("Origin") :: BasePart
+			assembly = child:WaitForChild("Assembly") :: Model
+		elseif child:IsA("Model") then
+			origin = child.PrimaryPart
+			assembly = child
+		elseif child:IsA("BasePart") then
+			origin = child
+			assembly = child
+		end
+
 		if
 			not started
 			or generation ~= currentGeneration
-			or folder.Parent == nil
-			or state.platforms[folder]
-			or roots[folder.Parent.Parent :: Instance] ~= state
+			or child.Parent == nil
+			or state.platforms[child]
+			or roots[child.Parent.Parent :: Instance] ~= state
 		then
 			return
 		end
-		assert(origin:IsA("BasePart"), `[RotatingPlatforms] {folder.Name}.Origin must be a BasePart`)
-		assert(assembly:IsA("Model"), `[RotatingPlatforms] {folder.Name}.Assembly must be a Model`)
+		
+		if not origin or not assembly then
+			return
+		end
+
 		local platform = build(origin, assembly)
-		state.platforms[folder] = platform
+		state.platforms[child] = platform
 		table.insert(platforms, platform)
 	end)
 end

@@ -39,26 +39,6 @@ local stateConnections: { RBXScriptConnection } = {}
 local heartbeat: RBXScriptConnection? = nil
 local elapsed = 0
 
-local function same(a: any, b: any): boolean
-	if type(a) ~= type(b) then
-		return false
-	end
-	if type(a) ~= "table" then
-		return a == b
-	end
-	for key, value in a do
-		if not same(value, b[key]) then
-			return false
-		end
-	end
-	for key in b do
-		if a[key] == nil then
-			return false
-		end
-	end
-	return true
-end
-
 local function names(): { [string]: string }
 	local result = {}
 	for _, member in Players:GetPlayers() do
@@ -78,11 +58,25 @@ local function rebuildView()
 		roundPoints = player:GetAttribute(Attributes.RoundPoints) :: number?,
 		names = names(),
 	}, Workspace:GetServerTimeNow())
-	if same(nextView, view) then
-		return
-	end
 	view = nextView
 	viewListeners.emit(view)
+end
+
+local function updateHeartbeat()
+	local active = snapshot.phase == SplashdownState.Phases.Racing or snapshot.phase == SplashdownState.Phases.Countdown
+	if active and heartbeat == nil then
+		elapsed = 0
+		heartbeat = RunService.Heartbeat:Connect(function(dt)
+			elapsed += dt
+			if elapsed >= Presentation.HUD.UpdateSeconds then
+				elapsed = 0
+				rebuildView()
+			end
+		end)
+	elseif not active and heartbeat ~= nil then
+		heartbeat:Disconnect()
+		heartbeat = nil
+	end
 end
 
 local function decode(value: string)
@@ -96,6 +90,7 @@ local function decode(value: string)
 	end
 	snapshot = decoded
 	snapshotListeners.emit(snapshot)
+	updateHeartbeat()
 	rebuildView()
 end
 
@@ -117,19 +112,6 @@ local function attach(folder: Folder)
 		attachValue(existing)
 	end
 	table.insert(stateConnections, folder.ChildAdded:Connect(attachValue))
-end
-
-local function ensureHeartbeat()
-	if heartbeat then
-		return
-	end
-	heartbeat = RunService.Heartbeat:Connect(function(dt)
-		elapsed += dt
-		if elapsed >= Presentation.HUD.UpdateSeconds then
-			elapsed = 0
-			rebuildView()
-		end
-	end)
 end
 
 function SplashdownClient.start()
@@ -161,7 +143,7 @@ function SplashdownClient.start()
 			eventListeners.emit(payload)
 		end)
 	)
-	ensureHeartbeat()
+	updateHeartbeat()
 end
 
 function SplashdownClient.getSnapshot(): Snapshot

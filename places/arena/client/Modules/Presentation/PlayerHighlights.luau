@@ -1,4 +1,5 @@
 -- Description: Applies and clears the team and teammate outline highlights on other players' characters as they spawn, change team, and leave.
+-- Viewport and distance culling is managed via VisibilityCuller, rendering highlights only when the character is inside the player's view, with a capacity fallback.
 
 --!strict
 
@@ -7,6 +8,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local VisibilityCuller = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util"):WaitForChild("VisibilityCuller")
+)
 
 local PlayerHighlights = {}
 
@@ -15,10 +19,13 @@ local config = UI.PlayerHighlight
 local started = false
 local highlights: { [Player]: Highlight } = {}
 local connections: { [Player]: { RBXScriptConnection } } = {}
+local playerLifecycleConnections: { RBXScriptConnection } = {}
 local matchState: Folder? = nil
 local matchStateConnection: RBXScriptConnection? = nil
 local matchStateChildAdded: RBXScriptConnection? = nil
 local combatMode = true
+
+local culler: VisibilityCuller.Group? = nil
 
 local function clear(player: Player)
 	local highlight = highlights[player]
@@ -43,6 +50,9 @@ local function apply(player: Player, character: Model)
 end
 
 local function forget(player: Player)
+	if culler then
+		culler.untrack(player)
+	end
 	clear(player)
 	local playerConnections = connections[player]
 	if playerConnections then
@@ -53,40 +63,41 @@ local function forget(player: Player)
 	end
 end
 
+local function trackCharacter(player: Player, character: Model)
+	if culler == nil then
+		return
+	end
+	culler.track(player, {
+		target = character,
+		onVisible = function()
+			if combatMode then
+				apply(player, character)
+			end
+		end,
+		onHidden = function()
+			clear(player)
+		end,
+	})
+end
+
 local function watch(player: Player)
 	if player == Players.LocalPlayer then
 		return
 	end
 	connections[player] = {
 		player.CharacterAdded:Connect(function(character)
-			if combatMode then
-				apply(player, character)
-			end
+			trackCharacter(player, character)
 		end),
 		player.CharacterRemoving:Connect(function()
+			if culler then
+				culler.untrack(player)
+			end
 			clear(player)
 		end),
 	}
 	local character = player.Character
-	if character and combatMode then
-		apply(player, character)
-	end
-end
-
--- Splashdown and any other non-combat mode has no enemies to spot, so the
--- enemy outline goes fully dark rather than tinting a race with combat UI.
-local function refreshHighlights()
-	if combatMode then
-		for _, player in Players:GetPlayers() do
-			local character = player.Character
-			if player ~= Players.LocalPlayer and character then
-				apply(player, character)
-			end
-		end
-	else
-		for player in highlights do
-			clear(player)
-		end
+	if character then
+		trackCharacter(player, character)
 	end
 end
 
@@ -97,7 +108,18 @@ local function updateCombatMode()
 		return
 	end
 	combatMode = nextCombatMode
-	refreshHighlights()
+
+	if not combatMode then
+		for player in highlights do
+			clear(player)
+		end
+	elseif culler then
+		for _, player in Players:GetPlayers() do
+			if player ~= Players.LocalPlayer and culler.isTargetVisible(player) and player.Character then
+				apply(player, player.Character)
+			end
+		end
+	end
 end
 
 local function attachMatchState(folder: Folder)
@@ -115,6 +137,14 @@ function PlayerHighlights.start()
 	end
 	started = true
 
+	culler = VisibilityCuller.createGroup({
+		activateDistance = 160,
+		deactivateDistance = 185,
+		viewportMarginPx = 48,
+		maxVisible = 20, -- Fallback hard limit, safely under Roblox engine's 31-limit
+		checkHz = 10,
+	})
+
 	local existingMatchState = ReplicatedStorage:FindFirstChild("MatchState")
 	if existingMatchState and existingMatchState:IsA("Folder") then
 		attachMatchState(existingMatchState)
@@ -125,20 +155,28 @@ function PlayerHighlights.start()
 		end
 	end)
 
-	Players.PlayerAdded:Connect(watch)
-	Players.PlayerRemoving:Connect(forget)
+	table.insert(playerLifecycleConnections, Players.PlayerAdded:Connect(watch))
+	table.insert(playerLifecycleConnections, Players.PlayerRemoving:Connect(forget))
 	for _, player in Players:GetPlayers() do
 		watch(player)
 	end
 end
 
 function PlayerHighlights.destroy()
+	if culler then
+		culler.destroy()
+		culler = nil
+	end
 	for player in connections do
 		forget(player)
 	end
 	for player in highlights do
 		clear(player)
 	end
+	for _, conn in playerLifecycleConnections do
+		conn:Disconnect()
+	end
+	table.clear(playerLifecycleConnections)
 	if matchStateConnection then
 		matchStateConnection:Disconnect()
 		matchStateConnection = nil
@@ -148,6 +186,7 @@ function PlayerHighlights.destroy()
 		matchStateChildAdded = nil
 	end
 	matchState = nil
+	started = false
 end
 
 return PlayerHighlights

@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 while ReplicatedFirst:GetAttribute("ReactLoadingPresented") ~= true do
 	ReplicatedFirst:GetAttributeChangedSignal("ReactLoadingPresented"):Wait()
@@ -104,13 +105,15 @@ local systems = {
 	},
 	{ name = "RotatingPlatforms", parent = MapFeatures, method = "load" },
 	{ name = "PlatformRider", parent = Movement, method = "start" },
-	{ name = "DebugVisuals", parent = DebugModules, method = "start", combat = true },
-	{ name = "ThrowPoseTuner", parent = DebugModules, method = "start" },
-	{ name = "CosmeticVFXGallery", parent = DebugModules, method = "start" },
-	{ name = "DevMatchSkip", parent = DebugModules, method = "start" },
 	{ name = "ChargeAim", parent = Presentation, method = "start" },
 	{ name = "WeaponAnimations", parent = Presentation, method = "start", intent = true },
 }
+if RunService:IsStudio() then
+	table.insert(systems, { name = "DebugVisuals", parent = DebugModules, method = "start", combat = true })
+	table.insert(systems, { name = "ThrowPoseTuner", parent = DebugModules, method = "start" })
+	table.insert(systems, { name = "CosmeticVFXGallery", parent = DebugModules, method = "start" })
+	table.insert(systems, { name = "DevMatchSkip", parent = DebugModules, method = "start" })
+end
 for _, system in systems do
 	local ok, err = pcall(function()
 		local module = if system.load then system.load() else require(system.parent:WaitForChild(system.name))

@@ -20,6 +20,7 @@ local MatchService = require(script.Parent.MatchService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local Env = require(script.Parent.Parent.Env)
+local GoodSignal = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("goodsignal"))
 
 local ArenaReturnService = {}
 
@@ -28,11 +29,84 @@ local staying: { [Player]: boolean } = {}
 local pendingReturn: { [Player]: boolean } = {}
 local separatingReturn: { [Player]: boolean } = {}
 local presentationReady: { [number]: boolean } = {}
+local presentationReadySignal = GoodSignal.new()
 local preparing: { [Player]: number | "Manual" } = {}
 local retainedPartyIds: { [string]: boolean } = {}
 local interruptedListeners: { (Player, string) -> () } = {}
 local returnGeneration = 0
 local coordinator = TeleportRetryCoordinator.new("Lobby")
+
+local function awaitPlayerPresentation(player: Player, timeout: number)
+	local remaining = math.max(timeout, 0)
+	if presentationReady[player.UserId] or player.Parent ~= Players or remaining == 0 then
+		return
+	end
+	local thread = coroutine.running()
+	local conn: any = nil
+	local timer: thread? = nil
+	timer = task.delay(remaining, function()
+		if conn then
+			conn:Disconnect()
+			conn = nil
+		end
+		task.spawn(thread)
+	end)
+	conn = presentationReadySignal:Connect(function(readyPlayer: Player?)
+		if readyPlayer == player or player.Parent ~= Players then
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
+			if timer then
+				task.cancel(timer)
+				timer = nil
+			end
+			task.spawn(thread)
+		end
+	end)
+	coroutine.yield()
+end
+
+local function awaitPreparedPresentation(prepared: { Player }, generation: number?, timeout: number)
+	local function allPresented(): boolean
+		for _, player in prepared do
+			if player.Parent == Players and not presentationReady[player.UserId] then
+				return false
+			end
+		end
+		return true
+	end
+
+	local remaining = math.max(timeout, 0)
+	if allPresented() or remaining == 0 or (generation ~= nil and generation ~= returnGeneration) then
+		return
+	end
+
+	local thread = coroutine.running()
+	local conn: any = nil
+	local timer: thread? = nil
+	timer = task.delay(remaining, function()
+		if conn then
+			conn:Disconnect()
+			conn = nil
+		end
+		task.spawn(thread)
+	end)
+	conn = presentationReadySignal:Connect(function()
+		if allPresented() or (generation ~= nil and generation ~= returnGeneration) then
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
+			if timer then
+				task.cancel(timer)
+				timer = nil
+			end
+			task.spawn(thread)
+		end
+	end)
+	coroutine.yield()
+end
 
 local function setPartyEligible(player: Player, eligible: boolean)
 	for _, member in ArenaSessionService.partyPlayersFor(player) do
@@ -111,20 +185,7 @@ local function sendGroup(
 		preparing[player] = generation or "Manual"
 	end
 
-	local deadline = os.clock() + Loading.TeleportPresentationFallbackSeconds
-	while (generation == nil or generation == returnGeneration) and os.clock() < deadline do
-		local allPresented = true
-		for _, player in prepared do
-			if player.Parent == Players and not presentationReady[player.UserId] then
-				allPresented = false
-				break
-			end
-		end
-		if allPresented then
-			break
-		end
-		task.wait(0.1)
-	end
+	awaitPreparedPresentation(prepared, generation, Loading.TeleportPresentationFallbackSeconds)
 	if generation ~= nil and generation ~= returnGeneration then
 		for _, player in prepared do
 			preparing[player] = nil
@@ -156,6 +217,7 @@ local function returnParties()
 		table.clear(retainedPartyIds)
 	end
 	returnGeneration += 1
+	presentationReadySignal:Fire(nil)
 	local generation = returnGeneration
 	for player, preparation in preparing do
 		if preparation ~= "Manual" then
@@ -231,10 +293,7 @@ local function returnPlayer(player: Player, separateFromParty: boolean, queueOnA
 		local prepared = coordinator:Prepare(Env.LobbyPlaceId, { player }, function(_retryPlayers)
 			return returnOptionsFor(player, separateFromParty, queueOnArrival)
 		end, rewardPreflight())
-		local deadline = os.clock() + Loading.TeleportPresentationFallbackSeconds
-		while player.Parent == Players and not presentationReady[player.UserId] and os.clock() < deadline do
-			task.wait(0.1)
-		end
+		awaitPlayerPresentation(player, Loading.TeleportPresentationFallbackSeconds)
 		pendingReturn[player] = nil
 		coordinator:StartPrepared(prepared)
 	end)
@@ -388,11 +447,13 @@ function ArenaReturnService.start()
 		separatingReturn[player] = nil
 		preparing[player] = nil
 		presentationReady[player.UserId] = nil
+		presentationReadySignal:Fire(player)
 	end)
 
 	Network.handleProtected("TeleportPresentationReady", { rateLimit = 4 }, function(player)
 		presentationReady[player.UserId] = true
 		player:SetAttribute("TeleportPresentationReady", true)
+		presentationReadySignal:Fire(player)
 	end)
 
 	Network.handleProtected("RequestLobbyReturn", {

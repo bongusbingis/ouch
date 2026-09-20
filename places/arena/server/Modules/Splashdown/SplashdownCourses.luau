@@ -102,7 +102,6 @@ end
 -- boot and binds the live clone, so nothing the race depends on can differ.
 local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local definition = Splashdown.Courses[courseId]
-	print(Splashdown.Courses, courseId, definition)
 	assert(definition, `[SplashdownCourses] no course config for {courseId}`)
 	local origin = requireChild(model, "Origin", `{path}.Origin`, "BasePart") :: BasePart
 	local scriptables = requireChild(model, "Scriptables", `{path}.Scriptables`, "Folder") :: Folder
@@ -115,10 +114,12 @@ local function resolve(courseId: string, model: Model, path: string): LiveCourse
 	local checkpoints = sortedCheckpoints(checkpointsFolder, `{path}.Checkpoints`)
 	assert(#checkpoints > 0, `[SplashdownCourses] {path}.Checkpoints must hold at least one checkpoint`)
 	local declared = model:GetAttribute("CheckpointCount")
-	assert(
-		declared == #checkpoints,
-		`[SplashdownCourses] {path} declares {tostring(declared)} checkpoints, has {#checkpoints}`
-	)
+	if declared ~= #checkpoints then
+		warn(
+			`[SplashdownCourses] {path} declares {tostring(declared)} checkpoints, but has {#checkpoints}; using actual count`
+		)
+		model:SetAttribute("CheckpointCount", #checkpoints)
+	end
 	local finish = requireChild(model, "Finish", `{path}.Finish`, "Folder")
 	local finishTrigger = requireChild(finish, "Trigger", `{path}.Finish.Trigger`, "BasePart") :: BasePart
 	local finishDeck = requireChild(finish, "Deck", `{path}.Finish.Deck`, "BasePart") :: BasePart

@@ -16,7 +16,7 @@ local JumpPads = require(Kits.JumpPads)
 local Audit = require(game.ReplicatedStorage.Shared.Game.MapFeatures.AttributeAudit)
 return function()
 	describe("Attribute hazard kits", function()
-		local folder, assembly, group, context, character, root, humanoid, player
+		local folder, group, group, context, character, root, humanoid, player
 		local function part(name, size, position, parent, attributes)
 			local p = Instance.new("Part")
 			p.Name = name
@@ -39,9 +39,6 @@ return function()
 			group = Instance.new("Folder")
 			group.Name = "TestGroup"
 			group.Parent = rotating
-			assembly = Instance.new("Model")
-			assembly.Name = "Assembly"
-			assembly.Parent = group
 			context = { instances = { group }, now = os.clock(), deltaTime = 1 / 60 }
 			character = Instance.new("Model")
 			character.Parent = folder
@@ -65,7 +62,7 @@ return function()
 				"RenamedBelt",
 				Vector3.new(20, 1, 20),
 				Vector3.new(0, 1500, 0),
-				assembly,
+				group,
 				{ Conveyor = true, ConveyorAxis = "X", ConveyorSpeed = -15.6 }
 			)
 			Conveyor.tickWorld(context)
@@ -78,7 +75,7 @@ return function()
 				"RenamedSphere",
 				Vector3.one * 10,
 				Vector3.new(0, 1495, 0),
-				assembly,
+				group,
 				{ BigBall = true, BounceSpeed = 57 }
 			)
 			root.AssemblyLinearVelocity = Vector3.new(0, -10, 0)
@@ -92,7 +89,7 @@ return function()
 			expect(root:FindFirstChild("BigBallFloatAttachment")).to.equal(nil)
 		end)
 		it("rolls a side contact outward and never hits sphere-box corners", function()
-			part("Sphere", Vector3.one * 10, Vector3.new(0, 1500, 0), assembly, { BigBall = true, RollOffSpeed = 39 })
+			part("Sphere", Vector3.one * 10, Vector3.new(0, 1500, 0), group, { BigBall = true, RollOffSpeed = 39 })
 			root.Position = Vector3.new(5.5, 1500, 0)
 			Balls.tickWorld(context)
 			Balls.tickPlayer(context, player, root)
@@ -104,7 +101,7 @@ return function()
 			expect(root.AssemblyLinearVelocity.Magnitude).to.equal(0)
 		end)
 		it("measures the cap at the feet contact, not the elevated root center", function()
-			part("Sphere", Vector3.one * 10, Vector3.new(0, 1500, 0), assembly, { BigBall = true, CapDegrees = 40 })
+			part("Sphere", Vector3.one * 10, Vector3.new(0, 1500, 0), group, { BigBall = true, CapDegrees = 40 })
 			root.Position = Vector3.new(5 * math.sin(math.rad(50)), 1500 + 5 * math.cos(math.rad(50)) + 3, 0)
 			root.AssemblyLinearVelocity = -Vector3.yAxis * 10
 			Balls.tickWorld(context)
@@ -117,7 +114,7 @@ return function()
 				"Tile",
 				Vector3.new(10, 1, 10),
 				Vector3.new(0, 1500, 0),
-				assembly,
+				group,
 				{ FallingTile = true, DropDelaySeconds = 0.5, RespawnSeconds = 2 }
 			)
 			Tiles.tickWorld(context)
@@ -138,7 +135,7 @@ return function()
 				"Tile",
 				Vector3.new(10, 1, 10),
 				Vector3.new(0, 1500, 0),
-				assembly,
+				group,
 				{ FallingTile = true, DropDelaySeconds = 0.1, RespawnSeconds = 0 }
 			)
 			Tiles.tickWorld(context)
@@ -156,7 +153,7 @@ return function()
 				"Board",
 				Vector3.new(20, 1, 8),
 				Vector3.new(0, 1500, 0),
-				assembly,
+				group,
 				{ Seesaw = true, MaxTiltDegrees = 20 }
 			)
 			root.Position = Vector3.new(6, 1503.5, 0)
@@ -174,14 +171,14 @@ return function()
 			expect(board.CFrame.RightVector.Y).to.equal(0)
 		end)
 		it("finds multiple renamed beach balls and restores their parent", function()
-			local a = part("BeachA", Vector3.one * 4, Vector3.new(0, 1500, 0), assembly, { BeachBall = true })
-			local b = part("BeachB", Vector3.one * 4, Vector3.new(6, 1500, 0), assembly, { BeachBall = true })
+			local a = part("BeachA", Vector3.one * 4, Vector3.new(0, 1500, 0), group, { BeachBall = true })
+			local b = part("BeachB", Vector3.one * 4, Vector3.new(6, 1500, 0), group, { BeachBall = true })
 			Beaches.tickWorld(context)
 			expect(#Beaches.active()).to.equal(2)
 			expect(a.Anchored).to.equal(false)
 			expect(b:GetNetworkOwner()).to.equal(nil)
 			Beaches.forget(nil)
-			expect(a.Parent).to.equal(assembly)
+			expect(a.Parent).to.equal(group)
 			expect(a.Anchored).to.equal(true)
 		end)
 		it("launches a renamed directional fan without stacking speed", function()
@@ -189,7 +186,7 @@ return function()
 				"Fan",
 				Vector3.new(20, 2, 20),
 				Vector3.new(0, 1500, 0),
-				assembly,
+				group,
 				{ Fan = true, FanAxis = "Y", LaunchSpeed = 47, FloatFactor = 0 }
 			)
 			Fans.tickWorld(context)
@@ -272,7 +269,7 @@ return function()
 				"Ride",
 				Vector3.one,
 				Vector3.zero,
-				assembly,
+				group,
 				{ Rotor = "spin", RotorAxis = "Y", RotorSpeed = 30, RotorCarries = true }
 			)
 			expect(#Audit.check(group) > 0).to.equal(true)

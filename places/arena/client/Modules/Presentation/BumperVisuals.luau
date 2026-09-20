@@ -1,59 +1,32 @@
--- Description: Renders the ring and course bumpers, tracking their authored parts under every tagged Scriptables root, squashing them on a metronome locked to the playing track's tempo, and playing a stronger squash and impact sound when the server broadcasts a bumper hit.
+-- Description: Renders the ring and course bumpers, tracking their authored parts under every tagged Scriptables root, and playing a squash-and-rebound animation and impact sound when the server broadcasts a bumper hit.
 
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ScriptableRoots = require(Game:WaitForChild("MapFeatures"):WaitForChild("ScriptableRoots"))
-local Spring = require(Game:WaitForChild("Util"):WaitForChild("Spring"))
-local BeatClock = require(Game:WaitForChild("Util"):WaitForChild("BeatClock"))
 local GameAudio = require(script.Parent.GameAudio)
-local MatchAudio = require(script.Parent.MatchAudio)
 
 local BumperVisuals = {}
 
 type BumperState = {
 	baseSize: Vector3,
-	spring: Spring.Spring,
+	activeTween: Tween?,
 }
 
 local bumpers: { [BasePart]: BumperState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
-local renderConnection: RBXScriptConnection? = nil
 local remoteConnection: RBXScriptConnection? = nil
 local started = false
-local beatSound: Sound? = nil
-local beatClock: BeatClock.Clock? = nil
 
 local function config()
 	return MapFeatures.Bumper
-end
-
--- The clock only needs the tempo half of the bumper settings, named without the
--- Beat prefix the config uses to keep them apart from the squash values.
-local function beatSettings(): BeatClock.Settings
-	local settings = config()
-	return {
-		DefaultPeriodSeconds = settings.BeatDefaultPeriodSeconds,
-		MinPeriodSeconds = settings.BeatMinPeriodSeconds,
-		MaxPeriodSeconds = settings.BeatMaxPeriodSeconds,
-		EnvelopeResponseHz = settings.BeatEnvelopeResponseHz,
-		LoudnessFloor = settings.BeatLoudnessFloor,
-		Sensitivity = settings.BeatSensitivity,
-		OnsetGapSeconds = settings.BeatOnsetGapSeconds,
-		TempoSamples = settings.BeatTempoSamples,
-		TempoAdaptRate = settings.BeatTempoAdaptRate,
-		PhaseCorrection = settings.BeatPhaseCorrection,
-		PhaseWindow = settings.BeatPhaseWindow,
-		LockedScale = settings.BeatLockedScale,
-		BeatsPerPulse = settings.BeatsPerPulse,
-	}
 end
 
 local function isBumper(part: BasePart): boolean
@@ -77,7 +50,7 @@ local function trackGroup(group: Instance)
 		if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
 			bumpers[descendant] = {
 				baseSize = descendant.Size,
-				spring = Spring.new(0),
+				activeTween = nil,
 			}
 		end
 	end
@@ -107,7 +80,10 @@ local function trackFolder(root: Instance, folder: Instance)
 			connections,
 			folder.DescendantAdded:Connect(function(descendant)
 				if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
-					bumpers[descendant] = { baseSize = descendant.Size, spring = Spring.new(0) }
+					bumpers[descendant] = {
+						baseSize = descendant.Size,
+						activeTween = nil,
+					}
 				end
 			end)
 		)
@@ -145,63 +121,47 @@ local function hitImpulse(part: BasePart)
 	if state == nil then
 		return
 	end
-	Spring.impulse(state.spring, config().SquashImpulse)
+	if state.activeTween then
+		state.activeTween:Cancel()
+		state.activeTween = nil
+	end
+
 	GameAudio.play("JumpPadBounce", part)
-end
 
-local function resetBeatClock(sound: Sound?)
-	beatSound = sound
-	if sound == nil then
-		beatClock = nil
-		return
-	end
-	local settings = beatSettings()
-	local clock = BeatClock.new(settings)
-	BeatClock.reset(clock, settings, sound.TimePosition, sound.PlaybackLoudness)
-	beatClock = clock
-end
-
-local function pulseBeat()
-	for _, state in bumpers do
-		Spring.impulse(state.spring, config().BeatImpulse)
-	end
-end
-
-local function updateBeat(deltaTime: number)
-	local sound = MatchAudio.getCurrentMusic()
-	if sound ~= beatSound then
-		resetBeatClock(sound)
-		return
-	end
-	local clock = beatClock
-	if sound == nil or clock == nil or not sound.IsPlaying then
-		return
-	end
-	local pulses = BeatClock.advance(clock, beatSettings(), sound.TimePosition, sound.PlaybackLoudness, deltaTime)
-	-- Several beats can only land in one frame after a hitch, and the bumpers
-	-- should read as one squash rather than a stack of them.
-	if pulses > 0 then
-		pulseBeat()
-	end
-end
-
-local function step(deltaTime: number)
-	updateBeat(deltaTime)
 	local settings = config()
-	for part, state in bumpers do
-		if part.Parent == nil then
-			bumpers[part] = nil
-			continue
+	local vertical = settings.MinimumSquash
+	local widen = 1 - (vertical - 1) * settings.WidenScale
+	local squashSize = state.baseSize * Vector3.new(widen, vertical, widen)
+
+	local squashTween = TweenService:Create(
+		part,
+		TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Size = squashSize }
+	)
+	local reboundTween = TweenService:Create(
+		part,
+		TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Size = state.baseSize }
+	)
+
+	squashTween.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed and state.activeTween == squashTween then
+			state.activeTween = reboundTween
+			reboundTween:Play()
 		end
-		Spring.step(state.spring, settings.SquashFrequencyHz, settings.SquashDampingRatio, deltaTime)
-		local s = state.spring.position
-		if math.abs(s) < 1e-3 and part.Size == state.baseSize then
-			continue
+	end)
+
+	reboundTween.Completed:Connect(function(playbackState)
+		if state.activeTween == reboundTween then
+			state.activeTween = nil
+			if playbackState == Enum.PlaybackState.Completed then
+				part.Size = state.baseSize
+			end
 		end
-		local vertical = math.max(1 + s, settings.MinimumSquash)
-		local widen = 1 - (vertical - 1) * settings.WidenScale
-		part.Size = state.baseSize * Vector3.new(widen, vertical, widen)
-	end
+	end)
+
+	state.activeTween = squashTween
+	squashTween:Play()
 end
 
 function BumperVisuals.start()
@@ -217,15 +177,9 @@ function BumperVisuals.start()
 			hitImpulse(part)
 		end
 	end)
-
-	renderConnection = RunService.RenderStepped:Connect(step)
 end
 
 function BumperVisuals.stop()
-	if renderConnection then
-		renderConnection:Disconnect()
-		renderConnection = nil
-	end
 	if remoteConnection then
 		remoteConnection:Disconnect()
 		remoteConnection = nil
@@ -237,7 +191,14 @@ function BumperVisuals.stop()
 	for root in rootConnections do
 		removeRoot(root)
 	end
-	resetBeatClock(nil)
+	for part, state in bumpers do
+		if state.activeTween then
+			state.activeTween:Cancel()
+			state.activeTween = nil
+		end
+		part.Size = state.baseSize
+	end
+	table.clear(bumpers)
 	started = false
 end
 

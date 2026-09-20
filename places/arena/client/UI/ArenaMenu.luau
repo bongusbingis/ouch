@@ -40,10 +40,10 @@ return function(props)
 	local vote = useExternalStore(ModeVoteClient.getSnapshot, ModeVoteClient.subscribe)
 	local teleportStatus = useExternalStore(ArenaTeleportClient.getSnapshot, ArenaTeleportClient.subscribe)
 	local postMatch = useExternalStore(PostMatchClient.getSnapshot, PostMatchClient.subscribe)
-	local race = useExternalStore(SplashdownClient.getView, SplashdownClient.subscribeView)
+	local race = useExternalStore(SplashdownClient.getSnapshot, SplashdownClient.subscribe)
 
 	return c(CombatMenu, {
-		Available = not race.intro and menuAvailable(loading, vote, teleportStatus, postMatch.result ~= nil),
+		Available = race.phase ~= "Intro" and menuAvailable(loading, vote, teleportStatus, postMatch.result ~= nil),
 		ShopClient = props.ShopClient,
 		Place = "Arena",
 	})

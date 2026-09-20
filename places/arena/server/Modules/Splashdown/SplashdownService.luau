@@ -26,7 +26,6 @@ local SplashdownState = require(Race:WaitForChild("SplashdownState"))
 local ArenaService = require(script.Parent.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.Parent.ArenaSessionService)
 local MatchService = require(script.Parent.Parent.MatchService)
-local SpawnRouter = require(script.Parent.Parent.SpawnRouter)
 local VenueService = require(script.Parent.Parent.VenueService)
 local Doors = require(script.Parent.Parent.MapFeatures.Doors)
 local SplashdownCourses = require(script.Parent.SplashdownCourses)
@@ -606,7 +605,7 @@ local function stopRounds()
 	publish()
 end
 
-local function spawnHandler(character: Model, player: Player?, reason: SpawnRouter.Reason): boolean
+local function spawnHandler(character: Model, player: Player?, reason: ArenaService.SpawnReason): boolean
 	local course = live
 	local root = rootOf(character)
 	if course == nil or root == nil then
@@ -661,7 +660,7 @@ function SplashdownService.start()
 	started = true
 	ensureSnapshotValue()
 	publish()
-	SpawnRouter.registerCourseHandler(spawnHandler)
+	ArenaService.registerCourseHandler(spawnHandler)
 	VenueService.onChanged(function(venue)
 		if venue == "Splashdown" then
 			activate()

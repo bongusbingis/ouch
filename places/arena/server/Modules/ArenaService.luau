@@ -231,4 +231,27 @@ function ArenaService.teleport(character: Model, teamId: string?)
 	MovementGuard.reset(root)
 end
 
+export type SpawnReason = "MatchStart" | "Join" | "Respawn" | "Cleanup" | "Idle" | "Admin"
+export type CourseHandler = (character: Model, player: Player?, reason: SpawnReason) -> boolean
+
+local courseHandler: CourseHandler? = nil
+
+function ArenaService.registerCourseHandler(handler: CourseHandler?)
+	courseHandler = handler
+end
+
+function ArenaService.routeSpawn(character: Model, player: Player?, teamId: string?, reason: SpawnReason)
+	local current = ArenaService.start()
+	if current.root:GetAttribute("Venue") == "Splashdown" then
+		if courseHandler then
+			courseHandler(character, player, reason)
+		end
+		return
+	end
+	if reason == "Idle" then
+		return
+	end
+	ArenaService.teleport(character, teamId)
+end
+
 return ArenaService

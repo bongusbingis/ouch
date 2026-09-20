@@ -8,43 +8,26 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local GameModes = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes"))
-local Presentation =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local Model = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Models"):WaitForChild("MatchHUDModel")
 )
 local ModeRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
 )
+
 local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)
 local listeners: { (any) -> () } = {}
 local connection: RBXScriptConnection? = nil
 local focusConnection: RBXScriptConnection? = nil
 local textFocusConnection: RBXScriptConnection? = nil
+local eventConnections: { RBXScriptConnection } = {}
+local characterConnections: { RBXScriptConnection } = {}
+local memberConnections: { [Player]: RBXScriptConnection } = {}
 local scoreboardOpen = false
 local available = false
 local action = "ArenaScoreboard"
-
-local function same(a, b): boolean
-	if type(a) ~= type(b) then
-		return false
-	end
-	if type(a) ~= "table" then
-		return a == b
-	end
-	for key, value in a do
-		if not same(value, b[key]) then
-			return false
-		end
-	end
-	for key in b do
-		if a[key] == nil then
-			return false
-		end
-	end
-	return true
-end
+local pendingUpdate = false
 
 local function update()
 	local player = Players.LocalPlayer
@@ -84,7 +67,7 @@ local function update()
 			})
 		end
 	end
-	local nextSnapshot = Model.build({
+	snapshot = Model.build({
 		phase = state:GetAttribute("phase"),
 		title = if mode then mode.Title else "MATCH",
 		timeRemaining = state:GetAttribute("timeRemaining"),
@@ -103,13 +86,55 @@ local function update()
 		players = players,
 		scoreboardOpen = scoreboardOpen,
 	}, Workspace:GetServerTimeNow())
-	if same(nextSnapshot, snapshot) then
-		return
-	end
-	snapshot = nextSnapshot
 	for _, listener in table.clone(listeners) do
 		pcall(listener, snapshot)
 	end
+end
+
+local function scheduleUpdate()
+	if pendingUpdate then
+		return
+	end
+	pendingUpdate = true
+	task.defer(function()
+		pendingUpdate = false
+		update()
+	end)
+end
+
+local function hookMember(member: Player)
+	if memberConnections[member] then
+		return
+	end
+	memberConnections[member] = member.AttributeChanged:Connect(function(name)
+		if name == "MatchScore" or name == "TeamId" or name == "ArenaRoundEligible" then
+			scheduleUpdate()
+		end
+	end)
+end
+
+local function unhookMember(member: Player)
+	local conn = memberConnections[member]
+	if conn then
+		conn:Disconnect()
+		memberConnections[member] = nil
+	end
+end
+
+local function hookCharacter(character: Model?)
+	for _, conn in characterConnections do
+		conn:Disconnect()
+	end
+	table.clear(characterConnections)
+	if character == nil then
+		return
+	end
+	table.insert(characterConnections, character:GetAttributeChangedSignal("CombatAlive"):Connect(scheduleUpdate))
+	table.insert(characterConnections, character:GetAttributeChangedSignal("minv"):Connect(scheduleUpdate))
+end
+
+local function attachMatchState(state: Folder)
+	table.insert(eventConnections, state.AttributeChanged:Connect(scheduleUpdate))
 end
 
 -- The board is a hold-to-view overlay: it never asks for the cursor, so the
@@ -141,14 +166,65 @@ end
 function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 	table.insert(listeners, callback)
 	if connection == nil then
-		local elapsed = 0
+		local timerElapsed = 0
 		connection = RunService.Heartbeat:Connect(function(dt)
-			elapsed += dt
-			if elapsed >= Presentation.HUD.UpdateSeconds then
-				elapsed = 0
+			timerElapsed += dt
+			if timerElapsed >= 1.0 then
+				timerElapsed = 0
 				update()
 			end
 		end)
+
+		local player = Players.LocalPlayer
+		table.insert(eventConnections, player.AttributeChanged:Connect(scheduleUpdate))
+		table.insert(
+			eventConnections,
+			player.CharacterAdded:Connect(function(char)
+				hookCharacter(char)
+				scheduleUpdate()
+			end)
+		)
+		table.insert(
+			eventConnections,
+			player.CharacterRemoving:Connect(function()
+				hookCharacter(nil)
+				scheduleUpdate()
+			end)
+		)
+		hookCharacter(player.Character)
+
+		for _, member in Players:GetPlayers() do
+			hookMember(member)
+		end
+		table.insert(
+			eventConnections,
+			Players.PlayerAdded:Connect(function(member)
+				hookMember(member)
+				scheduleUpdate()
+			end)
+		)
+		table.insert(
+			eventConnections,
+			Players.PlayerRemoving:Connect(function(member)
+				unhookMember(member)
+				scheduleUpdate()
+			end)
+		)
+
+		local matchState = ReplicatedStorage:FindFirstChild("MatchState")
+		if matchState and matchState:IsA("Folder") then
+			attachMatchState(matchState)
+		end
+		table.insert(
+			eventConnections,
+			ReplicatedStorage.ChildAdded:Connect(function(child)
+				if child.Name == "MatchState" and child:IsA("Folder") then
+					attachMatchState(child)
+					scheduleUpdate()
+				end
+			end)
+		)
+
 		ContextActionService:BindActionAtPriority(action, function(_, inputState)
 			-- A release must close the board even if chat gained focus while held.
 			if inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
@@ -163,6 +239,7 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 			end
 			return Enum.ContextActionResult.Sink
 		end, false, Enum.ContextActionPriority.High.Value + 2, Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect)
+
 		focusConnection = UserInputService.WindowFocusReleased:Connect(function()
 			setOpen(false)
 		end)
@@ -170,8 +247,10 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 			setOpen(false)
 		end)
 	end
+
 	update()
 	callback(snapshot)
+
 	return function()
 		local index = table.find(listeners, callback)
 		if index then
@@ -188,6 +267,18 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 				textFocusConnection:Disconnect()
 				textFocusConnection = nil
 			end
+			for _, conn in eventConnections do
+				conn:Disconnect()
+			end
+			table.clear(eventConnections)
+			for _, conn in characterConnections do
+				conn:Disconnect()
+			end
+			table.clear(characterConnections)
+			for _, conn in memberConnections do
+				conn:Disconnect()
+			end
+			table.clear(memberConnections)
 			ContextActionService:UnbindAction(action)
 			MatchHUDClient.setAvailable(false)
 		end

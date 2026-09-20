@@ -18,7 +18,7 @@ local SettingsStore = require(
 local DamageFeedback = {}
 
 local localPlayer = Players.LocalPlayer
-local seen = EventDedup.new(4096)
+local seen = EventDedup.new(32)
 local cameraShake: any = nil
 
 local function shake()
@@ -36,13 +36,23 @@ local function shake()
 end
 
 function DamageFeedback.start()
-	cameraShake = CameraShaker.new(Enum.RenderPriority.Camera.Value + 1, function(shakeCFrame: CFrame)
-		local camera = Workspace.CurrentCamera
-		if camera then
-			camera.CFrame *= shakeCFrame
-		end
-	end)
-	cameraShake:Start()
+	if cameraShake == nil then
+		cameraShake = CameraShaker.new(Enum.RenderPriority.Camera.Value + 1, function(shakeCFrame: CFrame)
+			local camera = Workspace.CurrentCamera
+			if camera then
+				camera.CFrame *= shakeCFrame
+			end
+		end)
+		cameraShake:Start()
+	end
+end
+
+function DamageFeedback.destroy()
+	if cameraShake then
+		cameraShake:Stop()
+		cameraShake = nil
+	end
+	seen.clear()
 end
 
 function DamageFeedback.onEvent(event: any)

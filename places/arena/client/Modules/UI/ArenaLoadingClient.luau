@@ -188,12 +188,15 @@ local function tryReady()
 	end
 	local currentGeneration = generation
 	task.spawn(function()
+		local attempts = 0
 		while
 			not destroyed
 			and generation == currentGeneration
 			and isLocalReady()
 			and player:GetAttribute("ArenaReady") ~= true
+			and attempts < 5
 		do
+			attempts += 1
 			Network.fireServer("ArenaClientReady")
 			task.wait(Loading.ArenaReadyRetrySeconds)
 		end

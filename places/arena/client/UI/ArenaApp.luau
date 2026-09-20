@@ -123,9 +123,40 @@ local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
 	return "JOINING MATCH", nil
 end
 
-return function(props: Props)
+local function ConnectedTeammates(props: { Visible: boolean })
 	local matchHUD = useExternalStore(MatchHUDClient.getSnapshot, MatchHUDClient.subscribe)
+	return ReactRoblox.createPortal(
+		c(TeammateMarkers, {
+			Snapshot = matchHUD,
+			Visible = props.Visible and not matchHUD.scoreboardOpen,
+		}),
+		playerGui
+	)
+end
+
+local function ConnectedMatchHUD(props: { Visible: boolean })
+	local matchHUD = useExternalStore(MatchHUDClient.getSnapshot, MatchHUDClient.subscribe)
+	return c(MatchHUD, {
+		Snapshot = matchHUD,
+		Visible = props.Visible,
+		OnToggleScores = MatchHUDClient.toggleScoreboard,
+		OnCloseScores = MatchHUDClient.closeScoreboard,
+	})
+end
+
+local function ConnectedSplashdownHUD(props: { Visible: boolean })
 	local race = useExternalStore(SplashdownClient.getView, SplashdownClient.subscribeView)
+	local matchHUD = useExternalStore(MatchHUDClient.getSnapshot, MatchHUDClient.subscribe)
+	return c(SplashdownHUD, {
+		Snapshot = race,
+		Match = matchHUD,
+		Visible = props.Visible and race.visible,
+		OnToggleScores = MatchHUDClient.toggleScoreboard,
+		OnCloseScores = MatchHUDClient.closeScoreboard,
+	})
+end
+
+return function(props: Props)
 	local menu = useExternalStore(CombatMenuClient.getSnapshot, CombatMenuClient.subscribe)
 	local loading = useExternalStore(ArenaLoadingClient.getSnapshot, ArenaLoadingClient.subscribe)
 	local vote = useExternalStore(ModeVoteClient.getSnapshot, ModeVoteClient.subscribe)
@@ -184,9 +215,10 @@ return function(props: Props)
 	local hudVisible = not loadingVisible
 		and (loading.matchPhase == "Active" or loading.matchPhase == "Starting")
 		and not menu.open
-	-- The race HUD replaces the brawl HUD for the whole non-combat mode; the
-	-- match HUD's own combat flag comes from the same replicated mode id.
-	local raceMode = matchHUD.combat == false or loading.fixedModeId == "Splashdown"
+	local matchState = ReplicatedStorage:FindFirstChild("MatchState")
+	local currentModeId = loading.fixedModeId or (if matchState then matchState:GetAttribute("modeId") else nil)
+	local raceMode = loading.fixedModeId == "Splashdown"
+		or (currentModeId ~= nil and GameModes.IsCombat(currentModeId) == false)
 	React.useEffect(function()
 		MatchHUDClient.setAvailable(hudAvailable)
 		return function()
@@ -287,27 +319,9 @@ return function(props: Props)
 				end,
 			}),
 		GameVersion = c(GameVersion),
-		Teammates = ReactRoblox.createPortal(
-			c(TeammateMarkers, { Snapshot = matchHUD, Visible = hudAvailable and not matchHUD.scoreboardOpen }),
-			playerGui
-		),
-		MatchHUD = if raceMode
-			then nil
-			else c(MatchHUD, {
-				Snapshot = matchHUD,
-				Visible = hudVisible,
-				OnToggleScores = MatchHUDClient.toggleScoreboard,
-				OnCloseScores = MatchHUDClient.closeScoreboard,
-			}),
-		SplashdownHUD = if raceMode
-			then c(SplashdownHUD, {
-				Snapshot = race,
-				Match = matchHUD,
-				Visible = hudVisible and race.visible,
-				OnToggleScores = MatchHUDClient.toggleScoreboard,
-				OnCloseScores = MatchHUDClient.closeScoreboard,
-			})
-			else nil,
+		Teammates = c(ConnectedTeammates, { Visible = hudAvailable }),
+		MatchHUD = if raceMode then nil else c(ConnectedMatchHUD, { Visible = hudVisible }),
+		SplashdownHUD = if raceMode then c(ConnectedSplashdownHUD, { Visible = hudVisible }) else nil,
 		LoadingScreen = c(LoadingScreen, {
 			Visible = loadingVisible,
 			ParentScreenInsets = Enum.ScreenInsets.None,

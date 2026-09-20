@@ -7,6 +7,7 @@ local Kit = require(script.Parent.MapFeatureKit)
 local Guard = require(RS.Shared.Game.Adapters.MovementGuard)
 local Conveyors = { folderName = "Rotating", instanceClass = "Folder" }
 local original: { [BasePart]: Vector3 } = {}
+local lastOrientation: { [BasePart]: CFrame } = {}
 local ray = RaycastParams.new()
 ray.FilterType = Enum.RaycastFilterType.Exclude
 ray.RespectCanCollide = true
@@ -17,9 +18,12 @@ function Conveyors.tickWorld(context: Kit.Context)
 		if not original[part] then
 			original[part] = part.AssemblyLinearVelocity
 		end
-		local axis = Parts.axis(part:GetAttribute(Config.Attributes.ConveyorAxis) or Config.Conveyor.Axis)
-		part.AssemblyLinearVelocity = part.CFrame:VectorToWorldSpace(axis)
-			* Parts.number(part, "ConveyorSpeed", Config.Conveyor.Speed, -80, 80)
+		if lastOrientation[part] ~= part.CFrame then
+			lastOrientation[part] = part.CFrame
+			local axis = Parts.axis(part:GetAttribute(Config.Attributes.ConveyorAxis) or Config.Conveyor.Axis)
+			part.AssemblyLinearVelocity = part.CFrame:VectorToWorldSpace(axis)
+				* Parts.number(part, "ConveyorSpeed", Config.Conveyor.Speed, -80, 80)
+		end
 	end
 	for part, value in original do
 		if not active[part] then
@@ -27,6 +31,7 @@ function Conveyors.tickWorld(context: Kit.Context)
 				part.AssemblyLinearVelocity = value
 			end
 			original[part] = nil
+			lastOrientation[part] = nil
 		end
 	end
 end
@@ -52,5 +57,6 @@ function Conveyors.forget(player: Player?)
 		end
 	end
 	table.clear(original)
+	table.clear(lastOrientation)
 end
 return Conveyors

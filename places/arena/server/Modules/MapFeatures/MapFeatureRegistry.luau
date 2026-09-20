@@ -6,9 +6,7 @@ local MapFeatureKit = require(script.Parent.MapFeatureKit)
 local JumpPads = require(script.Parent.JumpPads)
 local ElimZones = require(script.Parent.ElimZones)
 local FanUpdraft = require(script.Parent.FanUpdraft)
-local SpinnerBump = require(script.Parent.SpinnerBump)
-local RotorBump = require(script.Parent.RotorBump)
-local Bumpers = require(script.Parent.Bumpers)
+local ShoveFeature = require(script.Parent.ShoveFeature)
 local BeachBalls = require(script.Parent.BeachBalls)
 local Doors = require(script.Parent.Doors)
 local ServerRiders = require(script.Parent.ServerRiders)
@@ -21,9 +19,7 @@ local kits: { MapFeatureKit.MapFeatureKit } = {
 	ElimZones,
 	JumpPads,
 	FanUpdraft,
-	SpinnerBump,
-	RotorBump,
-	Bumpers,
+	ShoveFeature,
 	BeachBalls,
 	Doors,
 	Conveyors,

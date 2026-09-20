@@ -4,30 +4,29 @@ local Workspace = game:GetService("Workspace")
 local FeatureParts = {}
 local cache: { [Model]: { [string]: { BasePart } } } = {}
 function FeatureParts.collect(groups: { Instance }, attribute: string): { BasePart }
-	for assembly in cache do
-		if not assembly:IsDescendantOf(Workspace) then
-			cache[assembly] = nil
+	for group in cache do
+		if not group:IsDescendantOf(Workspace) then
+			cache[group] = nil
 		end
 	end
 	local result = {}
 	for _, group in groups do
-		local assembly = group:FindFirstChild("Assembly")
-		if not assembly or not assembly:IsA("Model") then
-			continue
-		end
-		cache[assembly] = cache[assembly] or {}
-		local found = cache[assembly][attribute]
+		cache[group] = cache[group] or {}
+		local found = cache[group][attribute]
 		if not found then
 			found = {}
-			for _, part in assembly:GetDescendants() do
+			if group:IsA("BasePart") and group:GetAttribute(attribute) == true then
+				table.insert(found, group)
+			end
+			for _, part in group:GetDescendants() do
 				if part:IsA("BasePart") and part:GetAttribute(attribute) == true then
 					table.insert(found, part)
 				end
 			end
-			cache[assembly][attribute] = found
+			cache[group][attribute] = found
 		end
 		for _, part in found do
-			if part:IsDescendantOf(assembly) then
+			if part == group or part:IsDescendantOf(group) then
 				table.insert(result, part)
 			end
 		end

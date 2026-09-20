@@ -37,50 +37,6 @@ local function groupsFor(entrants: { Entrant }): { Group }
 	return groups
 end
 
-local function assignTwoTeams(groups: { Group }, teams: { string }): { [string]: string }
-	local reachable: { [number]: { [number]: boolean } } = { [0] = {} }
-	local total = 0
-	for groupIndex, group in groups do
-		local size = #group.members
-		total += size
-		local additions = {}
-		for sum = 0, total - size do
-			local selected = reachable[sum]
-			if selected == nil then
-				continue
-			end
-			local nextSum = sum + size
-			if reachable[nextSum] == nil and additions[nextSum] == nil then
-				local nextSelected = table.clone(selected)
-				nextSelected[groupIndex] = true
-				additions[nextSum] = nextSelected
-			end
-		end
-		for sum, selected in additions do
-			reachable[sum] = selected
-		end
-	end
-
-	local bestSum = 0
-	for sum in reachable do
-		local difference = math.abs(total - 2 * sum)
-		local bestDifference = math.abs(total - 2 * bestSum)
-		if difference < bestDifference or (difference == bestDifference and sum > bestSum) then
-			bestSum = sum
-		end
-	end
-
-	local firstTeamGroups = assert(reachable[bestSum], "[PartyTeamAllocator] selected partition must exist")
-	local assignments = {}
-	for groupIndex, group in groups do
-		local teamId = if firstTeamGroups[groupIndex] then teams[1] else teams[2]
-		for _, entrantId in group.members do
-			assignments[entrantId] = teamId
-		end
-	end
-	return assignments
-end
-
 local function assignManyTeams(groups: { Group }, teams: { string }): { [string]: string }
 	table.sort(groups, function(first, second)
 		if #first.members ~= #second.members then
@@ -112,9 +68,6 @@ end
 function PartyTeamAllocator.assign(entrants: { Entrant }, teams: { string }): { [string]: string }
 	assert(#teams > 0, "[PartyTeamAllocator] at least one team is required")
 	local groups = groupsFor(entrants)
-	if #teams == 2 then
-		return assignTwoTeams(groups, teams)
-	end
 	return assignManyTeams(groups, teams)
 end
 

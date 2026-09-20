@@ -30,7 +30,6 @@ local ArenaService = require(script.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local BallService = require(script.Parent.BallService)
 local EliminationService = require(script.Parent.EliminationService)
-local SpawnRouter = require(script.Parent.SpawnRouter)
 
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -57,7 +56,6 @@ local watchedPlayers: { [number]: RBXScriptConnection } = {}
 local nativeDeathConnections: { [number]: RBXScriptConnection } = {}
 local lastResult: PostMatchResult.GlobalResult? = nil
 local resultRosterByUserId: { [number]: PostMatchResult.Contestant } = {}
-local contestantStatsByUserId: { [number]: { [string]: number } } = {}
 local opponentDeadline: number? = nil
 local refreshPopulation: () -> ()
 
@@ -133,6 +131,7 @@ local function setPlayerTeam(player: Player, teamId: string?)
 end
 
 local function rememberContestant(player: Player)
+	local existing = resultRosterByUserId[player.UserId]
 	resultRosterByUserId[player.UserId] = {
 		playerId = PlayerIds.toId(player),
 		userId = player.UserId,
@@ -145,7 +144,7 @@ local function rememberContestant(player: Player)
 		ballId = player:GetAttribute("Equip_BallAssets"),
 		hammerId = player:GetAttribute("Equip_HammerAssets"),
 		contribution = playerMatchElims[PlayerIds.toId(player)] or 0,
-		stats = contestantStatsByUserId[player.UserId],
+		stats = if existing then existing.stats else nil,
 	}
 end
 
@@ -385,7 +384,6 @@ end
 local function startMatch(events: { MatchSim.MatchEvent })
 	local activeMode = assert(mode, "[MatchService] startMatch requires a selected mode")
 	table.clear(resultRosterByUserId)
-	table.clear(contestantStatsByUserId)
 	table.clear(spawnedThisMatch)
 	table.clear(playerMatchElims)
 	table.clear(pendingWaveRespawns)
@@ -402,7 +400,7 @@ local function startMatch(events: { MatchSim.MatchEvent })
 			respawnGeneration[key] = (respawnGeneration[key] or 0) + 1
 			EliminationService.up(player)
 			spawnedThisMatch[key] = true
-			SpawnRouter.spawn(character, player, playerTeam(player), "MatchStart")
+			ArenaService.routeSpawn(character, player, playerTeam(player), "MatchStart")
 			grantSpawnProtection(character)
 		end
 	end
@@ -433,7 +431,7 @@ local function cleanupMatch()
 		local character = player.Character
 		if character then
 			EliminationService.up(player)
-			SpawnRouter.spawn(character, player, nil, "Cleanup")
+			ArenaService.routeSpawn(character, player, nil, "Cleanup")
 		end
 	end
 end
@@ -514,37 +512,17 @@ local function onCharacterAdded(player: Player, character: Model)
 	end)
 	syncCharacterTeam(player, character)
 	local key = PlayerIds.toId(player)
-	local deadline = player:GetAttribute("MatchRespawnAt")
-	if type(deadline) == "number" and state.phase == "Active" and mode and mode.rules.WaveRespawnSeconds then
-		EliminationService.down(player)
-		pendingWaveRespawns[key] = player
-		player:SetAttribute("MatchRespawnAt", Workspace:GetServerTimeNow() + math.max(waveTimer, 0))
-		return
-	end
-	if type(deadline) == "number" and deadline > Workspace:GetServerTimeNow() then
-		EliminationService.down(player)
-		local generation = respawnGeneration[key]
-		task.delay(deadline - Workspace:GetServerTimeNow(), function()
-			if
-				player.Character == character
-				and respawnGeneration[key] == generation
-				and player:GetAttribute("MatchRespawnAt") == deadline
-			then
-				onCharacterAdded(player, character)
-			end
-		end)
-		return
-	end
+	EliminationService.forget(character)
+	player:SetAttribute("MatchRespawnAt", nil)
 	if humanoid.Health <= 0 then
 		return
 	end
 	EliminationService.up(player)
-	player:SetAttribute("MatchRespawnAt", nil)
 	if not isArenaJoinPhase() then
-		SpawnRouter.spawn(character, player, playerTeam(player), "Idle")
+		ArenaService.routeSpawn(character, player, playerTeam(player), "Idle")
 		return
 	end
-	SpawnRouter.spawn(character, player, playerTeam(player), "Join")
+	ArenaService.routeSpawn(character, player, playerTeam(player), "Join")
 	grantSpawnProtection(character)
 
 	local isFirstSpawn = not spawnedThisMatch[key]
@@ -608,7 +586,7 @@ local function respawnPlayer(player: Player)
 	end
 	player:SetAttribute("MatchRespawnAt", nil)
 	if state.phase == "Active" then
-		SpawnRouter.spawn(character, player, playerTeam(player), "Respawn")
+		ArenaService.routeSpawn(character, player, playerTeam(player), "Respawn")
 	end
 	grantSpawnProtection(character)
 	if state.phase == "Active" then
@@ -1030,7 +1008,7 @@ function MatchService.teleportToSpawnForAdmin(player: Player): (boolean, string?
 	if character == nil then
 		return false, "no_character"
 	end
-	SpawnRouter.spawn(character, player, playerTeam(player), "Admin")
+	ArenaService.routeSpawn(character, player, playerTeam(player), "Admin")
 	return true
 end
 
@@ -1063,10 +1041,13 @@ function MatchService.finishMatch(winnerId: string?, reason: string): boolean
 end
 
 function MatchService.setContestantStats(player: Player, stats: { [string]: number })
-	contestantStatsByUserId[player.UserId] = table.clone(stats)
 	local contestant = resultRosterByUserId[player.UserId]
+	if not contestant then
+		rememberContestant(player)
+		contestant = resultRosterByUserId[player.UserId]
+	end
 	if contestant then
-		contestant.stats = contestantStatsByUserId[player.UserId]
+		contestant.stats = table.clone(stats)
 	end
 end
 

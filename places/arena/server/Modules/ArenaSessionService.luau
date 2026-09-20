@@ -74,9 +74,6 @@ local identity: Identity? = nil
 local gate: ArenaReadinessGate.State? = nil
 local partyByUserId: { [number]: string } = {}
 local partyById: { [string]: PartyContext } = {}
-local admissionByUserId: { [number]: Admission } = {}
-local clientReadyByUserId: { [number]: boolean } = {}
-local roundEligibleByUserId: { [number]: boolean } = {}
 local readyListeners: { (Player) -> () } = {}
 local roundEligibilityListeners: { (Player, boolean) -> () } = {}
 local gateReleasedListeners: { (string) -> () } = {}
@@ -295,8 +292,7 @@ local function createGate(kind: ArenaReadinessGate.Kind, expectedPlayerCount: nu
 end
 
 local function setAdmission(player: Player, admission: Admission)
-	local previous = admissionByUserId[player.UserId]
-	admissionByUserId[player.UserId] = admission
+	local previous = player:GetAttribute("ArenaAdmission")
 	player:SetAttribute("ArenaAdmission", admission)
 	if previous ~= admission then
 		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ArenaArrival, 1, {
@@ -312,7 +308,7 @@ local function markReady(player: Player)
 	if
 		activeGate == nil
 		or not ArenaSessionService.isAdmitted(player)
-		or not clientReadyByUserId[player.UserId]
+		or player:GetAttribute("ArenaClientReady") ~= true
 		or not PlayerData.isLoaded(player)
 		or not ArenaReadinessGate.markReady(activeGate, player.UserId)
 	then
@@ -339,10 +335,8 @@ end
 local function addArrival(player: Player, admission: Admission)
 	local count = 0
 	for _, current in Players:GetPlayers() do
-		if
-			current ~= player
-			and (admissionByUserId[current.UserId] == "Direct" or admissionByUserId[current.UserId] == "Matched")
-		then
+		local currentAdmission = current:GetAttribute("ArenaAdmission")
+		if current ~= player and (currentAdmission == "Direct" or currentAdmission == "Matched") then
 			count += 1
 		end
 	end
@@ -355,10 +349,9 @@ local function addArrival(player: Player, admission: Admission)
 	local activeGate = assert(gate, "[ArenaSessionService] admission requires a readiness gate")
 	ArenaReadinessGate.arrive(activeGate, player.UserId)
 	setAdmission(player, admission)
-	if roundEligibleByUserId[player.UserId] == nil then
-		roundEligibleByUserId[player.UserId] = true
+	if player:GetAttribute("ArenaRoundEligible") == nil then
+		player:SetAttribute("ArenaRoundEligible", true)
 	end
-	player:SetAttribute("ArenaRoundEligible", roundEligibleByUserId[player.UserId])
 	publishLoadState()
 	markReady(player)
 end
@@ -466,7 +459,7 @@ local function clientReady(player: Player)
 	if not ArenaSessionService.isAdmitted(player) then
 		return
 	end
-	clientReadyByUserId[player.UserId] = true
+	player:SetAttribute("ArenaClientReady", true)
 	markReady(player)
 end
 
@@ -537,7 +530,6 @@ function ArenaSessionService.start()
 
 	Players.PlayerAdded:Connect(receive)
 	Players.PlayerRemoving:Connect(function(player)
-		clientReadyByUserId[player.UserId] = nil
 		local activeGate = gate
 		if activeGate and ArenaReadinessGate.leave(activeGate, player.UserId) then
 			publishLoadState()
@@ -626,7 +618,7 @@ function ArenaSessionService.effectiveLeaderUserIdFor(player: Player): number
 end
 
 function ArenaSessionService.isAdmitted(player: Player): boolean
-	local admission = admissionByUserId[player.UserId]
+	local admission = player:GetAttribute("ArenaAdmission")
 	return admission == "Direct" or admission == "Matched"
 end
 
@@ -639,14 +631,13 @@ function ArenaSessionService.isPlayable(player: Player): boolean
 end
 
 function ArenaSessionService.isRoundEligible(player: Player): boolean
-	return ArenaSessionService.isPlayable(player) and roundEligibleByUserId[player.UserId] ~= false
+	return ArenaSessionService.isPlayable(player) and player:GetAttribute("ArenaRoundEligible") ~= false
 end
 
 function ArenaSessionService.setRoundEligible(player: Player, eligible: boolean)
-	if not ArenaSessionService.isAdmitted(player) or roundEligibleByUserId[player.UserId] == eligible then
+	if not ArenaSessionService.isAdmitted(player) or player:GetAttribute("ArenaRoundEligible") == eligible then
 		return
 	end
-	roundEligibleByUserId[player.UserId] = eligible
 	player:SetAttribute("ArenaRoundEligible", eligible)
 	for _, listener in table.clone(roundEligibilityListeners) do
 		local ok, err = pcall(listener, player, eligible)

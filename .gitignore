@@ -26,6 +26,9 @@
 /prod-finished/
 .agent-cache/
 asset-library/kenney/raw/
+.mcp/
+.antigravity/
+.agents/
 
 # Durable local request handoff (gate state stays outside the repository)
 .asset-requests/

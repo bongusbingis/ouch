@@ -3,6 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -14,6 +15,7 @@ local DevMatchSkip = {}
 local started = false
 local tapCount = 0
 local lastTapAt = 0
+local inputConnection: RBXScriptConnection? = nil
 
 local function config()
 	return Debug.DevMatchSkip
@@ -58,12 +60,21 @@ local function onInputBegan(input: InputObject)
 end
 
 function DevMatchSkip.start()
-	if started then
+	if started or not RunService:IsStudio() then
 		return
 	end
 	started = true
 
-	UserInputService.InputBegan:Connect(onInputBegan)
+	inputConnection = UserInputService.InputBegan:Connect(onInputBegan)
+end
+
+function DevMatchSkip.stop()
+	if inputConnection then
+		inputConnection:Disconnect()
+		inputConnection = nil
+	end
+	started = false
+	tapCount = 0
 end
 
 return DevMatchSkip

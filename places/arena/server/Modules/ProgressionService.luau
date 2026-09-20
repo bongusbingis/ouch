@@ -16,6 +16,7 @@ local EventDedup = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("EventDedup")
 )
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
+local GoodSignal = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("goodsignal"))
 local PlayerData = require(script.Parent.PlayerData)
 local MatchAwardService = require(script.Parent.MatchAwardService)
 local BattlePassService = require(script.Parent.BattlePassService)
@@ -45,6 +46,7 @@ local awardId: string? = nil
 local currentResultId: string? = nil
 local summaryByPlayerId: { [string]: MatchSummary } = {}
 local summaryListeners: { (Player, MatchSummary, string) -> () } = {}
+local awardCommittedSignal = GoodSignal.new()
 local seenEvents = EventDedup.new()
 local activeMatchService: any = nil
 local participation: { [Player]: any } = {}
@@ -128,6 +130,7 @@ local function committed(player: Player, record: any, before: any, after: any)
 		seasonBefore = before,
 		seasonAfter = after,
 	}, record.ResultId)
+	awardCommittedSignal:Fire(player, record.ResultId)
 end
 
 local function commitMatch()
@@ -219,32 +222,92 @@ local function handleEvent(event: any)
 	end
 end
 
-function ProgressionService.awaitCommitted(players: { Player }, resultId: string, timeoutSeconds: number): boolean
-	local deadline = os.clock() + math.max(timeoutSeconds, 0)
-	repeat
-		local waiting = false
-		for _, player in players do
-			local journal = PlayerData.matchAwards(player)
-			if journal == nil and player.Parent == Players then
-				waiting = true
-			elseif journal then
-				for _, record in journal.Pending do
-					if record.ResultId == resultId then
-						waiting = true
-						MatchAwardService.flush(player)
-						break
-					end
-				end
-			end
-		end
-		if not waiting then
+local function isPending(player: Player, resultId: string): boolean
+	if player.Parent ~= Players then
+		return false
+	end
+	local journal = PlayerData.matchAwards(player)
+	if journal == nil then
+		return true
+	end
+	for _, record in journal.Pending do
+		if record.ResultId == resultId then
 			return true
 		end
-		if os.clock() >= deadline then
-			return false
+	end
+	return false
+end
+
+local function anyPending(players: { Player }, resultId: string): boolean
+	for _, player in players do
+		if isPending(player, resultId) then
+			return true
 		end
-		task.wait(DataConfig.Persistence.SavePollSeconds)
-	until false
+	end
+	return false
+end
+
+function ProgressionService.awaitCommitted(players: { Player }, resultId: string, timeoutSeconds: number): boolean
+	if not anyPending(players, resultId) then
+		return true
+	end
+	local remaining = math.max(timeoutSeconds, 0)
+	if remaining == 0 then
+		return false
+	end
+
+	for _, player in players do
+		if isPending(player, resultId) then
+			MatchAwardService.flush(player)
+		end
+	end
+
+	local thread = coroutine.running()
+	local conn: any = nil
+	local removingConn: any = nil
+	local timer: thread? = nil
+
+	local function check()
+		if not anyPending(players, resultId) then
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
+			if removingConn then
+				removingConn:Disconnect()
+				removingConn = nil
+			end
+			if timer then
+				task.cancel(timer)
+				timer = nil
+			end
+			task.spawn(thread, true)
+		end
+	end
+
+	timer = task.delay(remaining, function()
+		if conn then
+			conn:Disconnect()
+			conn = nil
+		end
+		if removingConn then
+			removingConn:Disconnect()
+			removingConn = nil
+		end
+		task.spawn(thread, not anyPending(players, resultId))
+	end)
+
+	conn = awardCommittedSignal:Connect(function(_player: Player, committedResultId: string)
+		if committedResultId == resultId then
+			check()
+		end
+	end)
+
+	removingConn = Players.PlayerRemoving:Connect(function()
+		check()
+	end)
+
+	return coroutine.yield()
 end
 
 function ProgressionService.summaryFor(player: Player, resultId: string?): MatchSummary?
