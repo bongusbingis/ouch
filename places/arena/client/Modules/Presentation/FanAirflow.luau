@@ -2,6 +2,7 @@
 -- Rising wind particles and client-only spinning blades make authored fans readable.
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -24,10 +25,14 @@ type RootWatch = {
 }
 
 local fans: { [BasePart]: Attachment } = {}
+local fanTransforms: { [BasePart]: RBXScriptConnection } = {}
 local blades: { [BasePart]: BladeVisual } = {}
 local rootWatches: { [Instance]: RootWatch } = {}
 local unwatch: (() -> ())? = nil
 local renderConnection: RBXScriptConnection? = nil
+local motionConnection: RBXScriptConnection? = nil
+local budgetConnection: RBXScriptConnection? = nil
+local budgetElapsed = 0
 local visualFolder: Folder? = nil
 local started = false
 
@@ -57,6 +62,11 @@ local function forget(instance: Instance)
 		return
 	end
 	fans[instance :: BasePart] = nil
+	local transform = fanTransforms[instance :: BasePart]
+	if transform then
+		transform:Disconnect()
+		fanTransforms[instance :: BasePart] = nil
+	end
 	attachment:Destroy()
 end
 
@@ -82,6 +92,78 @@ local function clearGameplayMetadata(instance: Instance)
 	end
 	for _, tag in CollectionService:GetTags(instance) do
 		CollectionService:RemoveTag(instance, tag)
+	end
+end
+
+local function updateAirflow(base: BasePart, attachment: Attachment)
+	local axis = base:GetAttribute(MapFeatures.Attributes.FanAxis)
+	local direction = base:GetAttribute(MapFeatures.Attributes.FanDirection)
+	local sign = if typeof(direction) == "number" and direction < 0 then -1 else 1
+	local localAxis = if axis == "X" then Vector3.xAxis elseif axis == "Z" then Vector3.zAxis else Vector3.yAxis
+	local localDirection = if axis == "X"
+			or axis == "Y"
+			or axis == "Z"
+		then localAxis * sign
+		else base.CFrame:VectorToObjectSpace(Vector3.yAxis)
+	local offset = if axis == "X"
+			or axis == "Y"
+			or axis == "Z"
+		then localAxis * sign * (base.Size * localAxis).Magnitude / 2
+		else Vector3.new(0, base.Size.Y / 2, 0)
+	local reference = if math.abs(localDirection:Dot(Vector3.xAxis)) < 0.9 then Vector3.xAxis else Vector3.zAxis
+	local right = reference:Cross(localDirection).Unit
+	attachment.CFrame = CFrame.fromMatrix(offset, right, localDirection, right:Cross(localDirection))
+end
+
+local function updateParticleTravel(base: BasePart, attachment: Attachment)
+	local emitter = attachment:FindFirstChild("FanAirflowParticles")
+	if not emitter or not emitter:IsA("ParticleEmitter") then
+		return
+	end
+	local axis = base:GetAttribute(MapFeatures.Attributes.FanAxis)
+	local height = if axis == "X"
+			or axis == "Y"
+			or axis == "Z"
+		then base:GetAttribute(MapFeatures.Attributes.FanColumnHeight)
+		else nil
+	if height == nil then
+		height = MapFeatures.Fan.ColumnHeight
+	end
+	emitter:Clear()
+	if typeof(height) ~= "number" or height ~= height or height < 1 or height == math.huge then
+		emitter.Enabled = false
+		return
+	end
+	-- Keep the whole particle inside even a one-stud authored column.
+	local maximumSpeed = math.min(8, (height - 0.15) / 1.1)
+	emitter.Speed = NumberRange.new(maximumSpeed * 0.75, maximumSpeed)
+	emitter.Lifetime = NumberRange.new(0.8, 1.1)
+	emitter.Enabled = true
+end
+
+local function updateBudget()
+	local camera = Workspace.CurrentCamera
+	local near: { { base: BasePart, distance: number } } = {}
+	if camera then
+		for base in fans do
+			local distance = math.max(0, (camera.CFrame.Position - base.Position).Magnitude - base.Size.Magnitude / 2)
+			if base:IsDescendantOf(Workspace) and distance <= 140 then
+				table.insert(near, { base = base, distance = distance })
+			end
+		end
+		table.sort(near, function(a, b)
+			return a.distance < b.distance
+		end)
+	end
+	local selected: { [BasePart]: boolean } = {}
+	for index = 1, math.min(8, #near) do
+		selected[near[index].base] = true
+	end
+	for base, attachment in fans do
+		local emitter = attachment:FindFirstChild("FanAirflowParticles")
+		if emitter and emitter:IsA("ParticleEmitter") then
+			emitter.Rate = if selected[base] then (if GuiService.ReducedMotionEnabled then 2 else 5) else 0
+		end
 	end
 end
 
@@ -138,15 +220,14 @@ local function track(instance: Instance)
 
 	local attachment = Instance.new("Attachment")
 	attachment.Name = "FanAirflowAttachment"
-	attachment.Position = Vector3.new(0, instance.Size.Y / 2, 0)
 	attachment.Parent = instance
 
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Name = "FanAirflowParticles"
 	emitter.Speed = NumberRange.new(6, 8)
 	emitter.Lifetime = NumberRange.new(0.8, 1.1)
-	emitter.SpreadAngle = Vector2.new(6, 6)
-	emitter.Rate = 5
+	emitter.SpreadAngle = Vector2.new(2, 2)
+	emitter.Rate = 0
 	emitter.Size = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.25),
 		NumberSequenceKeypoint.new(1, 0.08),
@@ -163,6 +244,13 @@ local function track(instance: Instance)
 	emitter.Parent = attachment
 
 	fans[instance] = attachment
+	updateAirflow(instance, attachment)
+	updateParticleTravel(instance, attachment)
+	fanTransforms[instance] = instance:GetPropertyChangedSignal("CFrame"):Connect(function()
+		if instance:GetAttribute(MapFeatures.Attributes.FanAxis) == nil then
+			updateAirflow(instance, attachment)
+		end
+	end)
 	for _, child in instance:GetChildren() do
 		if isFanBlade(child) then
 			trackBlade(child :: BasePart, instance)
@@ -209,6 +297,19 @@ local function addRoot(root: Instance)
 						track(instance)
 					else
 						forgetBlade(instance)
+					end
+				elseif name == MapFeatures.Attributes.FanAxis or name == MapFeatures.Attributes.FanDirection then
+					local attachment = fans[instance]
+					if attachment then
+						updateAirflow(instance, attachment)
+						if name == MapFeatures.Attributes.FanAxis then
+							updateParticleTravel(instance, attachment)
+						end
+					end
+				elseif name == MapFeatures.Attributes.FanColumnHeight then
+					local attachment = fans[instance]
+					if attachment then
+						updateParticleTravel(instance, attachment)
 					end
 				end
 			end)
@@ -265,7 +366,19 @@ function FanAirflow.start()
 	visualFolder.Name = "FanBladeVisuals"
 	visualFolder.Parent = Workspace
 	renderConnection = RunService.PreRender:Connect(renderBlades)
+	motionConnection = GuiService:GetPropertyChangedSignal("ReducedMotionEnabled"):Connect(function()
+		updateBudget()
+	end)
+	budgetElapsed = 0
+	budgetConnection = RunService.Heartbeat:Connect(function(delta)
+		budgetElapsed += delta
+		if budgetElapsed >= 0.5 then
+			budgetElapsed = 0
+			updateBudget()
+		end
+	end)
 	unwatch = ScriptableRoots.watch(addRoot, removeRoot)
+	updateBudget()
 end
 
 function FanAirflow.stop()
@@ -273,6 +386,14 @@ function FanAirflow.stop()
 	if renderConnection then
 		renderConnection:Disconnect()
 		renderConnection = nil
+	end
+	if motionConnection then
+		motionConnection:Disconnect()
+		motionConnection = nil
+	end
+	if budgetConnection then
+		budgetConnection:Disconnect()
+		budgetConnection = nil
 	end
 	if unwatch then
 		unwatch()

@@ -4,13 +4,11 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
 
-local MapFeatures =
-	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ScriptableRoots = require(Game:WaitForChild("MapFeatures"):WaitForChild("ScriptableRoots"))
-local Spring = require(Game:WaitForChild("Util"):WaitForChild("Spring"))
 local GameAudio = require(script.Parent.GameAudio)
 local HazardVisuals = require(script.Parent.HazardVisuals)
 
@@ -21,14 +19,13 @@ local FOLDER_NAME = "JumpPads"
 
 type PartState = {
 	baseSize: Vector3,
-	spring: Spring.Spring,
+	inner: boolean,
 	clear: () -> (),
 }
 
 type PadState = {
 	parts: { [BasePart]: PartState },
-	outer: Spring.Spring,
-	inner: Spring.Spring,
+	started: number?,
 	connections: { RBXScriptConnection },
 }
 
@@ -40,17 +37,13 @@ local renderConnection: RBXScriptConnection? = nil
 local remoteConnection: RBXScriptConnection? = nil
 local started = false
 
-local function config()
-	return MapFeatures.JumpPad
-end
-
 local function trackPart(state: PadState, instance: Instance)
 	if not instance:IsA("BasePart") then
 		return
 	end
 	state.parts[instance] = {
 		baseSize = instance.Size,
-		spring = if instance.Name == INNER_PART_NAME then state.inner else state.outer,
+		inner = instance.Name == INNER_PART_NAME,
 		clear = HazardVisuals.setEffect(instance, "jumpPad"),
 	}
 end
@@ -75,8 +68,7 @@ local function trackPad(pad: Model)
 	end
 	local state: PadState = {
 		parts = {},
-		outer = Spring.new(0),
-		inner = Spring.new(0),
+		started = nil,
 		connections = {},
 	}
 	pads[pad] = state
@@ -194,31 +186,61 @@ local function impulse(pad: Model)
 	if state == nil then
 		return
 	end
-	Spring.impulse(state.outer, config().OuterImpulse)
-	Spring.impulse(state.inner, config().InnerImpulse)
+	state.started = os.clock()
+	for part, partState in state.parts do
+		if partState.inner then
+			HazardVisuals.pulse(part, 0.18, 0.12)
+		end
+	end
 	GameAudio.play("JumpPadBounce", pad)
 end
 
-local function step(deltaTime: number)
-	local settings = config()
-	for _, state in pads do
-		Spring.step(state.outer, settings.OuterFrequencyHz, settings.OuterDampingRatio, deltaTime)
-		Spring.step(state.inner, settings.InnerFrequencyHz, settings.InnerDampingRatio, deltaTime)
+local function smoothstep(value: number): number
+	local s = math.clamp(value, 0, 1)
+	return s * s * (3 - 2 * s)
+end
 
+local function amountAt(t: number): number
+	if t < 0.05 then
+		return smoothstep(t / 0.05)
+	elseif t < 0.13 then
+		return 1 - 1.3125 * smoothstep((t - 0.05) / 0.08)
+	end
+	return -0.3125 * (1 - smoothstep((t - 0.13) / 0.19))
+end
+
+local function step()
+	for _, state in pads do
+		local startedAt = state.started
+		if not startedAt then
+			continue
+		end
+		local t = os.clock() - startedAt
+		local finished = t >= 0.32
 		for part, partState in state.parts do
-			if part.Parent == nil then
+			if not part:IsDescendantOf(workspace) then
+				partState.clear()
 				state.parts[part] = nil
 				continue
 			end
-			local baseSize = partState.baseSize
-			local s = partState.spring.position
-			if math.abs(s) < 1e-3 then
+			if part.Transparency >= 1 then
 				continue
 			end
-			local height = math.max(baseSize.Y + s, baseSize.Y * settings.MinimumSquash)
-			local spread = 1 / math.sqrt(height / baseSize.Y)
-			local scale = Vector3.new(spread, height / baseSize.Y, spread)
-			HazardVisuals.setEffect(part, "jumpPad", CFrame.new(0, (height - baseSize.Y) / 2, 0), scale)
+			local baseSize = partState.baseSize
+			local q = if finished or GuiService.ReducedMotionEnabled
+				then 0
+				else math.min(0.08, 0.12 / baseSize.Y, 0.5 / baseSize.X, 0.5 / baseSize.Z)
+			if not partState.inner then
+				q *= 0.5
+			end
+			local amount = if finished then 0 else amountAt(t)
+			local heightChange = -baseSize.Y * q * amount
+			local lateral = math.min(0.02, q * 0.25) * amount
+			local scale = Vector3.new(1 + lateral, 1 + heightChange / baseSize.Y, 1 + lateral)
+			partState.clear = HazardVisuals.setEffect(part, "jumpPad", CFrame.new(0, heightChange / 2, 0), scale)
+		end
+		if finished then
+			state.started = nil
 		end
 	end
 end

@@ -4,6 +4,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
 
 local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
@@ -174,6 +175,21 @@ local function hitImpulse(part: BasePart)
 	end
 	GameAudio.play("JumpPadBounce", part)
 	state.started = os.clock()
+	HazardVisuals.pulse(part, 0.18, 0.12)
+end
+
+local function smoothstep(value: number): number
+	local s = math.clamp(value, 0, 1)
+	return s * s * (3 - 2 * s)
+end
+
+local function amountAt(t: number): number
+	if t < 0.045 then
+		return smoothstep(t / 0.045)
+	elseif t < 0.13 then
+		return 1 - 1.35 * smoothstep((t - 0.045) / 0.085)
+	end
+	return -0.35 * (1 - smoothstep((t - 0.13) / 0.13))
 end
 
 function BumperVisuals.start()
@@ -190,19 +206,31 @@ function BumperVisuals.start()
 		end
 	end)
 	renderConnection = RunService.RenderStepped:Connect(function()
-		local settings = config()
 		for part, state in bumpers do
 			local startedAt = state.started
 			if startedAt then
 				local t = os.clock() - startedAt
-				if t >= 0.28 or not part.Parent then
+				if not part:IsDescendantOf(workspace) then
 					state.started = nil
-					HazardVisuals.setEffect(part, "bumper")
+					state.clear()
+				elseif t >= 0.26 then
+					state.started = nil
+					state.clear = HazardVisuals.setEffect(part, "bumper")
+				elseif part.Transparency >= 1 then
+					continue
 				else
-					local pulse = math.sin(math.min(t / 0.28, 1) * math.pi)
-					local vertical = 1 + (settings.MinimumSquash - 1) * pulse
-					local widen = 1 - (vertical - 1) * settings.WidenScale
-					HazardVisuals.setEffect(part, "bumper", CFrame.identity, Vector3.new(widen, vertical, widen))
+					local size = part.Size
+					local q = if GuiService.ReducedMotionEnabled
+						then 0
+						else math.min(0.08, 0.5 / size.Y, 0.5 / size.X, 0.5 / size.Z)
+					local amount = amountAt(t)
+					local lateral = math.min(0.03, q * 0.375) * amount
+					state.clear = HazardVisuals.setEffect(
+						part,
+						"bumper",
+						CFrame.identity,
+						Vector3.new(1 + lateral, 1 - q * amount, 1 + lateral)
+					)
 				end
 			end
 		end

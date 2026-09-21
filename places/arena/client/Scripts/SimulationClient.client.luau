@@ -274,6 +274,7 @@ start(
 	"startClientMover"
 )
 start("Client.Modules.Presentation.PhysicalHazardVisuals", presentation, "PhysicalHazardVisuals", "start")
+start("Client.Modules.Presentation.MotionHazardVisuals", presentation, "MotionHazardVisuals", "start")
 
 for _, system in systems do
 	task.spawn(function()
