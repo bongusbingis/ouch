@@ -18,6 +18,7 @@ local PlayerIds = require(Game:WaitForChild("Adapters"):WaitForChild("PlayerIds"
 local SplashdownState = require(Game:WaitForChild("Splashdown"):WaitForChild("SplashdownState"))
 local SplashdownHUDModel = require(Shared:WaitForChild("UI"):WaitForChild("Models"):WaitForChild("SplashdownHUDModel"))
 local Network = require(Shared:WaitForChild("Network"))
+local RisingLiquidClient = require(script.Parent:WaitForChild("RisingLiquidClient"))
 
 local SplashdownClient = {}
 
@@ -119,6 +120,7 @@ function SplashdownClient.start()
 		return
 	end
 	started = true
+	RisingLiquidClient.start()
 	local existing = ReplicatedStorage:FindFirstChild(Splashdown.StateFolderName)
 	if existing and existing:IsA("Folder") then
 		attach(existing)
@@ -193,6 +195,7 @@ function SplashdownClient.destroy()
 	snapshotListeners.clear()
 	viewListeners.clear()
 	eventListeners.clear()
+	RisingLiquidClient.destroy()
 	started = false
 end
 

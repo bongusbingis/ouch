@@ -6,6 +6,7 @@ local Parts = require(Kits.FeatureParts)
 local Conveyor = require(Kits.Conveyors)
 local Balls = require(Kits.BigBalls)
 local Tiles = require(Kits.FallingTiles)
+local BreakDoors = require(Kits.Doors)
 local Seesaws = require(Kits.Seesaws)
 local ServerRiders = require(Kits.ServerRiders)
 local Rotating = require(game.ReplicatedStorage.Shared.Game.MapFeatures.RotatingPlatforms)
@@ -58,6 +59,7 @@ return function()
 			for _, kit in { Conveyor, Balls, Tiles, Seesaws, ServerRiders, Fans, Beaches, JumpPads } do
 				kit.forget(nil)
 			end
+			BreakDoors.reset()
 			folder:Destroy()
 		end)
 		it("sets signed conveyor velocity and restores it on unload", function()
@@ -162,16 +164,20 @@ return function()
 			)
 			Tiles.tickWorld(context)
 			Tiles.tickPlayer(context, player, root)
+			expect(tile:GetAttribute("HazardTileState")).to.equal("armed")
+			expect(tile:GetAttribute("HazardTileDropAt") > workspace:GetServerTimeNow()).to.equal(true)
 			context.now += 0.49
 			Tiles.tickWorld(context)
 			expect(tile.CanCollide).to.equal(true)
 			context.now += 0.02
 			Tiles.tickWorld(context)
 			expect(tile.CanCollide).to.equal(false)
+			expect(tile:GetAttribute("HazardTileState")).to.equal("hidden")
 			context.now += 2
 			Tiles.tickWorld(context)
 			expect(tile.CanCollide).to.equal(true)
 			expect(tile.Transparency).to.equal(0)
+			expect(tile:GetAttribute("HazardTileState")).to.equal("solid")
 		end)
 		it("supports never-respawn tiles but reset always restores them", function()
 			local tile = part(
@@ -190,6 +196,36 @@ return function()
 			expect(tile.CanCollide).to.equal(false)
 			Tiles.forget(nil)
 			expect(tile.CanCollide).to.equal(true)
+		end)
+		it("forgets a streamed-out armed tile without publishing to a removed part", function()
+			local tile = part(
+				"TemporaryTile",
+				Vector3.new(10, 1, 10),
+				Vector3.new(0, 1500, 0),
+				group,
+				{ FallingTile = true, DropDelaySeconds = 0.5 }
+			)
+			Tiles.tickWorld(context)
+			Tiles.tickPlayer(context, player, root)
+			expect(tile:GetAttribute("HazardTileState")).to.equal("armed")
+			tile:Destroy()
+			expect(pcall(Tiles.tickWorld, context)).to.equal(true)
+		end)
+		it("replicates only public broken-door state and restores it", function()
+			local chosen = part("Chosen", Vector3.new(6, 8, 1), Vector3.new(0, 1500, 0), group)
+			local decoy = part("Decoy", Vector3.new(6, 8, 1), Vector3.new(10, 1500, 0), group)
+			context.instances = { chosen, decoy }
+			root.Position = chosen.Position
+			BreakDoors.setPlan({ [chosen] = true, [decoy] = false })
+			expect(chosen:GetAttribute("HazardDoorState")).to.equal(nil)
+			expect(decoy:GetAttribute("HazardDoorState")).to.equal(nil)
+			BreakDoors.tickPlayer(context, player, root)
+			expect(chosen.CanCollide).to.equal(false)
+			expect(chosen:GetAttribute("HazardDoorState")).to.equal("broken")
+			expect(decoy:GetAttribute("HazardDoorState")).to.equal(nil)
+			BreakDoors.reset()
+			expect(chosen.CanCollide).to.equal(true)
+			expect(chosen:GetAttribute("HazardDoorState")).to.equal("solid")
 		end)
 		it("builds one native 85-degree hinge and restores the authored board", function()
 			local pedestal = part("Pedestal", Vector3.new(3, 5, 3), Vector3.new(0, 1497, 0), group)
@@ -255,7 +291,7 @@ return function()
 			expect(a.Parent).to.equal(group)
 			expect(a.Anchored).to.equal(true)
 		end)
-		it("launches a renamed directional fan without stacking speed", function()
+		it("lifts inside a renamed directional fan without an entry velocity spike", function()
 			part(
 				"Fan",
 				Vector3.new(20, 2, 20),
@@ -263,11 +299,19 @@ return function()
 				group,
 				{ Fan = true, FanAxis = "Y", LaunchSpeed = 47, FloatFactor = 0 }
 			)
+			root.AssemblyLinearVelocity = Vector3.new(3, -4, 0)
+			local before = root.AssemblyLinearVelocity
 			Fans.tickWorld(context)
 			Fans.tickPlayer(context, player, root)
-			expect(root.AssemblyLinearVelocity.Y).to.equal(47)
+			expect(root.AssemblyLinearVelocity).to.equal(before)
+			local force = root:FindFirstChild("FanFloatForce")
+			expect(force ~= nil).to.equal(true)
+			expect(force.Force.Y / root.AssemblyMass > workspace.Gravity).to.equal(true)
 			Fans.tickPlayer(context, player, root)
-			expect(root.AssemblyLinearVelocity.Y).to.equal(47)
+			expect(root:FindFirstChild("FanFloatForce")).to.equal(force)
+			root.Position = Vector3.new(30, 1503.5, 0)
+			Fans.tickPlayer(context, player, root)
+			expect(root:FindFirstChild("FanFloatForce")).to.equal(nil)
 		end)
 		it("honours per-pad launch and float overrides on a renamed pad", function()
 			local pad = Instance.new("Model")
@@ -304,7 +348,7 @@ return function()
 			Balls.tickPlayer(context, player, root)
 			expect(root.AssemblyLinearVelocity.Y).to.equal(57)
 		end)
-		it("keeps world-up launch for a fan with no axis override", function()
+		it("keeps world-up airflow for a fan with no axis override", function()
 			part(
 				"Fan",
 				Vector3.new(20, 2, 20),
@@ -314,7 +358,41 @@ return function()
 			)
 			Fans.tickWorld(context)
 			Fans.tickPlayer(context, player, root)
-			expect(root.AssemblyLinearVelocity.Y).to.equal(47)
+			local force = root:FindFirstChild("FanFloatForce")
+			expect(force ~= nil).to.equal(true)
+			expect(force.Force.X).to.equal(0)
+			expect(force.Force.Y / root.AssemblyMass > workspace.Gravity).to.equal(true)
+		end)
+		it("follows a signed local fan axis and yields to a jump pad", function()
+			part(
+				"Fan",
+				Vector3.new(20, 20, 20),
+				Vector3.new(0, 1500, 0),
+				group,
+				{ Fan = true, FanAxis = "X", FanDirection = -1, LaunchSpeed = 47 }
+			)
+			root.Position = Vector3.new(-12, 1500, 0)
+			Fans.tickWorld(context)
+			Fans.tickPlayer(context, player, root)
+			local force = root:FindFirstChild("FanFloatForce")
+			expect(force ~= nil).to.equal(true)
+			expect(force.Force.X < 0).to.equal(true)
+			expect(force.Force.Y / root.AssemblyMass > 0).to.equal(true)
+			local jumpForce = Instance.new("VectorForce")
+			jumpForce.Name = "JumpPadFloatForce"
+			jumpForce.Parent = root
+			Fans.tickPlayer(context, player, root)
+			expect(root:FindFirstChild("FanFloatForce")).to.equal(nil)
+			jumpForce:Destroy()
+			Fans.tickPlayer(context, player, root)
+			expect(root:FindFirstChild("FanFloatForce") ~= nil).to.equal(true)
+			humanoid.PlatformStand = true
+			Fans.tickPlayer(context, player, root)
+			expect(root:FindFirstChild("FanFloatForce")).to.equal(nil)
+			humanoid.PlatformStand = false
+			humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+			Fans.tickPlayer(context, player, root)
+			expect(root:FindFirstChild("FanFloatForce") ~= nil).to.equal(true)
 		end)
 		it("rejects a seesaw axis changed after activation", function()
 			local pedestal = part("Pedestal", Vector3.new(3, 5, 3), Vector3.new(0, 1497, 0), group)

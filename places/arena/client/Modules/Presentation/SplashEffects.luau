@@ -5,8 +5,9 @@
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
 
 local Config = ReplicatedStorage:WaitForChild("Config")
 local Splashdown = require(Config:WaitForChild("Gameplay"):WaitForChild("Splashdown"))
@@ -15,6 +16,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Network = require(Shared:WaitForChild("Network"))
 local PlayerIds = require(Shared:WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("PlayerIds"))
 local GameAudio = require(script.Parent.GameAudio)
+local HazardVisuals = require(script.Parent.HazardVisuals)
 local SplashdownClient = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("SplashdownClient"))
 local PresentationCamera = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -31,7 +33,11 @@ local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local localPlayer = Players.LocalPlayer
 local started = false
 local connections: { RBXScriptConnection | () -> () } = {}
-local doorOrigins: { [BasePart]: { cframe: CFrame, transparency: number, watch: RBXScriptConnection } } = {}
+local doorEffects: { [BasePart]: { clear: () -> (), connections: { RBXScriptConnection } } } = {}
+type DoorState = { revision: number, state: string }
+local doorStates: { [BasePart]: DoorState } = {}
+local doorWatches: { [BasePart]: { RBXScriptConnection } } = {}
+local doorRootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local template: BasePart? = nil
 local lavaCameraLease: PresentationCamera.Token? = nil
 local lavaCameraGeneration = 0
@@ -155,59 +161,127 @@ local function startLavaCamera(character: Model)
 end
 
 local function restoreDoor(door: BasePart)
-	local origin = doorOrigins[door]
-	if origin == nil then
-		return
+	local effect = doorEffects[door]
+	if effect then
+		for _, connection in effect.connections do
+			connection:Disconnect()
+		end
+		effect.clear()
+		doorEffects[door] = nil
 	end
-	door.CFrame = origin.cframe
-	door.Transparency = origin.transparency
 end
 
 local function forgetDoor(door: BasePart)
-	local origin = doorOrigins[door]
-	if origin then
-		origin.watch:Disconnect()
-		doorOrigins[door] = nil
+	restoreDoor(door)
+	local watch = doorWatches[door]
+	if watch then
+		for _, connection in watch do
+			connection:Disconnect()
+		end
+		doorWatches[door] = nil
 	end
+	doorStates[door] = nil
 end
 
 -- The door tips over away from whoever broke it, hinged on its bottom edge,
 -- and fades; the server's later CanCollide reset is what stands it back up.
 local function breakDoor(door: BasePart, from: Vector3)
-	if doorOrigins[door] == nil then
-		doorOrigins[door] = {
-			cframe = door.CFrame,
-			transparency = door.Transparency,
-			watch = door:GetPropertyChangedSignal("CanCollide"):Connect(function()
-				if door.CanCollide then
-					restoreDoor(door)
-				end
-			end),
-		}
-		door.AncestryChanged:Connect(function()
-			if door.Parent == nil then
-				forgetDoor(door)
-			end
-		end)
-	end
-	local origin = doorOrigins[door].cframe
-	local toBreaker = origin:PointToObjectSpace(from)
+	restoreDoor(door)
+	local toBreaker = door.CFrame:PointToObjectSpace(from)
 	local away = if toBreaker.Z > 0 then -1 else 1
 	local halfHeight = door.Size.Y / 2
-	local hinge = origin * CFrame.new(0, -halfHeight, 0)
-	local fallen = hinge * CFrame.Angles(math.rad(88) * away, 0, 0) * CFrame.new(0, halfHeight, 0)
+	local fallenOffset = CFrame.new(0, -halfHeight, 0)
+		* CFrame.Angles(math.rad(88) * away, 0, 0)
+		* CFrame.new(0, halfHeight, 0)
 	local seconds = MapFeatures.Door.BrokenSeconds
-	TweenService:Create(door, TweenInfo.new(seconds * 0.45, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {
-		CFrame = fallen,
-	}):Play()
-	TweenService:Create(
-		door,
-		TweenInfo.new(seconds * 0.55, Enum.EasingStyle.Linear, Enum.EasingDirection.In, 0, false, seconds * 0.45),
-		{
-			Transparency = 1,
-		}
-	):Play()
+	local clear = HazardVisuals.setEffect(door, "door")
+	local startedAt = os.clock()
+	local render: RBXScriptConnection? = nil
+	render = RunService.RenderStepped:Connect(function()
+		local elapsed = os.clock() - startedAt
+		if not door.Parent or elapsed >= seconds then
+			if render then
+				render:Disconnect()
+			end
+			HazardVisuals.setEffect(door, "door", CFrame.identity, Vector3.one, true)
+			return
+		end
+		local alpha = math.clamp(elapsed / math.max(seconds * 0.45, 0.01), 0, 1)
+		HazardVisuals.setEffect(door, "door", CFrame.new():Lerp(fallenOffset, alpha))
+	end)
+	doorEffects[door] = { clear = clear, connections = { render } }
 	GameAudio.play("JumpPadBounce", door)
+end
+
+local function reconcileDoor(door: BasePart)
+	local revision, state = door:GetAttribute("HazardDoorRevision"), door:GetAttribute("HazardDoorState")
+	if typeof(revision) ~= "number" or typeof(state) ~= "string" then
+		return
+	end
+	local observed = doorStates[door]
+	if observed and observed.revision == revision and observed.state == state then
+		return
+	end
+	doorStates[door] = { revision = revision, state = state }
+	if state == "solid" then
+		restoreDoor(door)
+	elseif state == "broken" and not doorEffects[door] then
+		-- A late join sees the current authoritative result, without replaying a cue.
+		local clear = HazardVisuals.setEffect(door, "door", CFrame.identity, Vector3.one, true)
+		doorEffects[door] = { clear = clear, connections = {} }
+	end
+end
+
+local function watchDoor(instance: Instance)
+	if not instance:IsA("BasePart") or doorWatches[instance] or not instance:FindFirstAncestor("Doors") then
+		return
+	end
+	doorWatches[instance] = {
+		instance:GetAttributeChangedSignal("HazardDoorRevision"):Connect(function()
+			reconcileDoor(instance)
+		end),
+		instance:GetAttributeChangedSignal("HazardDoorState"):Connect(function()
+			reconcileDoor(instance)
+		end),
+		instance.AncestryChanged:Connect(function()
+			if not instance.Parent then
+				forgetDoor(instance)
+			end
+		end),
+	}
+	reconcileDoor(instance)
+end
+
+local function addDoorRoot(root: Instance)
+	if doorRootConnections[root] then
+		return
+	end
+	doorRootConnections[root] = {
+		root.DescendantAdded:Connect(watchDoor),
+		root.DescendantRemoving:Connect(function(instance)
+			if instance:IsA("BasePart") then
+				forgetDoor(instance)
+			end
+		end),
+	}
+	for _, instance in root:GetDescendants() do
+		watchDoor(instance)
+	end
+end
+
+local function removeDoorRoot(root: Instance)
+	local rootWatch = doorRootConnections[root]
+	if rootWatch then
+		for _, connection in rootWatch do
+			connection:Disconnect()
+		end
+		doorRootConnections[root] = nil
+	end
+	for door in doorWatches do
+		if door:IsDescendantOf(root) then
+			forgetDoor(door)
+		end
+	end
 end
 
 function SplashEffects.start()
@@ -238,6 +312,11 @@ function SplashEffects.start()
 			end
 		end)
 	)
+	for _, root in CollectionService:GetTagged("ScriptableRoot") do
+		addDoorRoot(root)
+	end
+	table.insert(connections, CollectionService:GetInstanceAddedSignal("ScriptableRoot"):Connect(addDoorRoot))
+	table.insert(connections, CollectionService:GetInstanceRemovedSignal("ScriptableRoot"):Connect(removeDoorRoot))
 	table.insert(
 		connections,
 		Network.on("DoorBroken", function(door, from)
@@ -263,9 +342,14 @@ function SplashEffects.destroy()
 		end
 	end
 	table.clear(connections)
-	for door in doorOrigins do
+	for door in doorEffects do
 		forgetDoor(door)
 	end
+	for root in doorRootConnections do
+		removeDoorRoot(root)
+	end
+	table.clear(doorWatches)
+	table.clear(doorStates)
 	stopLavaCamera()
 	started = false
 end

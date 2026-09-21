@@ -24,6 +24,7 @@ local ShoveTuning = require(
 		:WaitForChild("MapFeatures")
 		:WaitForChild("ShoveTuning")
 )
+local EliminationService = require(script.Parent.Parent:WaitForChild("EliminationService"))
 local Parts = require(script.Parent.FeatureParts)
 local MapFeatureKit = require(script.Parent.MapFeatureKit)
 
@@ -63,6 +64,7 @@ local cooldowns: { [Player]: number } = {}
 local roots: { Instance } = {}
 local overlap = OverlapParams.new()
 overlap.FilterType = Enum.RaycastFilterType.Include
+local IMPACT_RAGDOLL_SECONDS = 2
 
 local function clearShove(player: Player)
 	local shove = shoves[player]
@@ -254,8 +256,7 @@ local function applyBumper(
 	local direction = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis
 	local current = root.AssemblyLinearVelocity
 	local target = direction * settings.KnockbackSpeed + Vector3.yAxis * math.max(current.Y, settings.UpwardSpeed)
-	local guardSeconds =
-		math.max(settings.GuardSeconds, Parts.number(bumper, "GuardSeconds", settings.GuardSeconds))
+	local guardSeconds = math.max(settings.GuardSeconds, Parts.number(bumper, "GuardSeconds", settings.GuardSeconds))
 	local retriggerCooldown = Parts.number(bumper, "RetriggerCooldown", MapFeatures.Bumper.RetriggerCooldown)
 	return target, settings.KnockbackSpeed, "Bumper", guardSeconds, retriggerCooldown
 end
@@ -294,10 +295,8 @@ local function applyRotor(contact: RotorContact, root: BasePart): (Vector3, numb
 		else outward
 	local current = root.AssemblyLinearVelocity
 	local target = direction * response.KnockbackSpeed + Vector3.yAxis * math.max(current.Y, response.UpwardSpeed)
-	local guardSeconds = math.max(
-		response.GuardSeconds,
-		Parts.number(contact.rotor.part, "GuardSeconds", response.GuardSeconds)
-	)
+	local guardSeconds =
+		math.max(response.GuardSeconds, Parts.number(contact.rotor.part, "GuardSeconds", response.GuardSeconds))
 	local retriggerCooldown = Parts.number(contact.rotor.part, "RetriggerCooldown", settings.RetriggerCooldown)
 	return target, response.KnockbackSpeed, "RotorBump", guardSeconds, retriggerCooldown
 end
@@ -369,6 +368,7 @@ local function bump(
 	cooldowns[player] = context.now + retriggerCooldown
 
 	MovementGuard.allow(root, guardName, guardSeconds, speed * 1.3, target.Y * 1.3, contact.part)
+	EliminationService.impact(player, IMPACT_RAGDOLL_SECONDS)
 
 	if contact.kind == "Bumper" then
 		Network.fire("BumperHit", nil, contact.part)

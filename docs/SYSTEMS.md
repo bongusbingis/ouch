@@ -135,11 +135,19 @@ All systems serve the four highest product priorities: **monetization, engagemen
 **Owner modules:**
 - `places/arena/server/Modules/MapFeatures/MapFeatureRegistry.luau`
 - `places/arena/server/Modules/MapFeatures/MapFeatureKit.luau`
+- `src/shared/Game/MapFeatures/RotatingPlatforms.luau`
+- `src/shared/Game/MapFeatures/PlatformRider.luau`
+- `places/arena/client/Modules/Presentation/PhysicalHazardVisuals.luau`
 **Key invariants:**
 - Map features must fail gracefully if dependencies are missing, maintaining the match loop.
 - They must not dictate core combat outcomes directly, but rather feed events into the simulation.
+- The server owns hazard state, collision, hits, and physical simulation. Deterministic moving assemblies publish versioned authored-rest descriptors; clients sample the same motion from `Workspace:GetServerTimeNow()` and move only their local replicas, including before physics and before rendering. Streaming or incomplete descriptors must not make a client invent rest poses.
+- Free beach balls and seesaws remain server-physical; their client copies are cosmetic only. Door and falling-tile clients receive public outcome/timing attributes, never an unrevealed door plan. Splashdown liquid uses a server-published schedule while elimination remains server-authoritative.
+- Client-only effects must not resize or tween replicated collision sources. Rider carry requires support contact and bounded motion; it does not attach airborne players to a hazard.
+- Fan updrafts apply bounded continuous server force inside their authored columns; jump-pad effects and temporary ragdoll suspend that force. Fan blades spin only as noncolliding client visuals while their authored source parts retain server-owned collision.
+- Authoritative bumper, spinner, and `Shove=true` rotor contacts apply a two-second temporary ragdoll without changing combat-alive state. Recovery restores saved character physics and network ownership; a real elimination supersedes any pending impact recovery.
 **Depends on:** The active game mode, arena workspace layout.
-**Consumers:** Active arena matches.
+**Consumers:** Active arena matches, Splashdown courses, and lobby onboarding motion.
 
 ### Settings
 **Purpose:** Maintains a localized registry of player preferences (audio, UI, controls).

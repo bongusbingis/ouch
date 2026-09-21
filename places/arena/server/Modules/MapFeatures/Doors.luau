@@ -3,6 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
@@ -19,11 +20,19 @@ Doors.folderName = "Doors"
 local breakable: { [BasePart]: boolean } = {}
 local broken: { [BasePart]: boolean } = {}
 
+local function publishState(door: BasePart, state: string)
+	local revision = door:GetAttribute("HazardDoorRevision")
+	door:SetAttribute("HazardDoorChangedAt", Workspace:GetServerTimeNow())
+	door:SetAttribute("HazardDoorState", state)
+	door:SetAttribute("HazardDoorRevision", (if typeof(revision) == "number" then revision else 0) + 1)
+end
+
 function Doors.reset()
 	for door in broken do
 		if door.Parent ~= nil then
 			door.CanCollide = true
 			door.CanQuery = true
+			publishState(door, "solid")
 		end
 	end
 	table.clear(broken)
@@ -47,6 +56,7 @@ local function breakDoor(door: BasePart, position: Vector3)
 	broken[door] = true
 	door.CanCollide = false
 	door.CanQuery = false
+	publishState(door, "broken")
 	Network.fire("DoorBroken", nil, door, position)
 end
 

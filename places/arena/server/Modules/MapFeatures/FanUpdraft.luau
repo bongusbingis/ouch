@@ -1,4 +1,4 @@
--- Description: Gives the authored fans a bounded upward launch and local airflow while preserving horizontal steering.
+-- Description: Gives authored fans continuous, bounded airflow while preserving horizontal steering.
 
 --!strict
 
@@ -22,8 +22,6 @@ FanUpdraft.instanceClass = "Folder"
 type Visit = {
 	root: BasePart,
 	fan: BasePart,
-	launched: boolean,
-	expiresAt: number,
 	force: VectorForce?,
 	attachment: Attachment?,
 }
@@ -31,7 +29,6 @@ type Visit = {
 local fans: { BasePart } = {}
 local fansByAssembly: { [Instance]: { BasePart } } = setmetatable({}, { __mode = "k" }) :: any
 local visits: { [Player]: Visit } = {}
-local cooldowns: { [Player]: number } = {}
 
 -- Authored arena fans are named; course fans carry the attribute. Scanned once
 -- per assembly because a course assembly holds hundreds of parts.
@@ -46,7 +43,7 @@ local function fansFor(assembly: Instance): { BasePart }
 		if
 			descendant:IsA("BasePart")
 			and (
-			(allowLegacy and MapFeatures.Fan.EnabledNames[descendant.Name] == true)
+				(allowLegacy and MapFeatures.Fan.EnabledNames[descendant.Name] == true)
 				or descendant:GetAttribute(MapFeatures.Attributes.Fan) == true
 			)
 		then
@@ -146,53 +143,52 @@ function FanUpdraft.tickWorld(context: MapFeatureKit.Context)
 	end
 end
 
-local function launch(context: MapFeatureKit.Context, visit: Visit, humanoid: Humanoid)
+local function lift(visit: Visit, humanoid: Humanoid)
 	local settings = MapFeatures.Fan
 	local root = visit.root
-	local speed = Parts.number(visit.fan, "LaunchSpeed", settings.LaunchSpeed)
+	local targetSpeed = Parts.number(visit.fan, "LaunchSpeed", settings.LaunchSpeed) * settings.LiftSpeedScale
 	local direction = if visit.fan:GetAttribute("FanAxis") ~= nil
-		then visit.fan.CFrame:VectorToWorldSpace(Parts.axis(visit.fan, "FanAxis", "Y"))
-			* Parts.number(visit.fan, "FanDirection", 1)
+		then visit.fan.CFrame:VectorToWorldSpace(Parts.axis(visit.fan, "FanAxis", "Y")) * Parts.number(
+			visit.fan,
+			"FanDirection",
+			1
+		)
 		else Vector3.yAxis
 	local guardSeconds = Parts.number(visit.fan, "GuardSeconds", settings.GuardSeconds)
 	local floatFactor = Parts.number(visit.fan, "FloatFactor", settings.FloatFactor)
-	visit.launched = true
-	visit.expiresAt = context.now + settings.MaxLiftSeconds
+	local response = settings.LiftResponseSeconds * (1 - 0.3 * floatFactor)
+	local acceleration = math.clamp(
+		(targetSpeed - root.AssemblyLinearVelocity:Dot(direction)) / response,
+		-settings.MaxLiftAcceleration,
+		settings.MaxLiftAcceleration
+	)
 
-	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-	local velocity = root.AssemblyLinearVelocity
-	-- Setting a floor rather than adding an impulse prevents speed stacking on
-	-- re-entry and preserves any stronger launch owned by another mechanic.
-	root.AssemblyLinearVelocity = velocity + direction * math.max(0, speed - velocity:Dot(direction))
+	local force = visit.force
+	if force == nil then
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+		local attachment = Instance.new("Attachment")
+		attachment.Name = "FanFloatAttachment"
+		attachment.Parent = root
+		force = Instance.new("VectorForce")
+		force.Name = "FanFloatForce"
+		force.Attachment0 = attachment
+		force.ApplyAtCenterOfMass = true
+		force.RelativeTo = Enum.ActuatorRelativeTo.World
+		force.Parent = root
+		visit.attachment = attachment
+		visit.force = force
+	end
+
+	-- Counter gravity in the column, then smoothly approach the directional
+	-- airflow speed. No velocity is assigned on entry or re-entry.
+	force.Force = root.AssemblyMass * (Vector3.yAxis * Workspace.Gravity + direction * acceleration)
 	MovementGuard.allow(
 		root,
 		"Fan",
 		guardSeconds,
-		if direction.Y < 0.99 then speed * 1.3 else 0,
-		speed * 1.3
+		if direction.Y < 0.99 then targetSpeed * 1.5 else 0,
+		targetSpeed * 1.5
 	)
-
-	-- JumpPads owns its longer float effect. Never add a second gravity cancel
-	-- to it or destroy its constraints when leaving the fan.
-	if root:FindFirstChild("JumpPadFloatForce", true) then
-		return
-	end
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "FanFloatAttachment"
-	attachment.Parent = root
-	local force = Instance.new("VectorForce")
-	force.Name = "FanFloatForce"
-	force.Attachment0 = attachment
-	force.ApplyAtCenterOfMass = true
-	force.RelativeTo = Enum.ActuatorRelativeTo.World
-	force.Force = Vector3.new(
-		0,
-		root.AssemblyMass * Workspace.Gravity * floatFactor,
-		0
-	)
-	force.Parent = root
-	visit.attachment = attachment
-	visit.force = force
 end
 
 function FanUpdraft.tickPlayer(context: MapFeatureKit.Context, player: Player, root: BasePart)
@@ -201,6 +197,8 @@ function FanUpdraft.tickPlayer(context: MapFeatureKit.Context, player: Player, r
 	if
 		humanoid == nil
 		or humanoid.Health <= 0
+		or humanoid.PlatformStand
+		or humanoid:GetState() == Enum.HumanoidStateType.Physics
 		or root.Anchored
 		or (character and character:GetAttribute("CombatAlive") == false)
 	then
@@ -215,12 +213,10 @@ function FanUpdraft.tickPlayer(context: MapFeatureKit.Context, player: Player, r
 	end
 
 	local currentFan: BasePart? = nil
-	local currentHeight: number? = nil
 	for _, fan in fans do
 		local height = heightInColumn(fan, root)
 		if height ~= nil then
 			currentFan = fan
-			currentHeight = height
 			break
 		end
 	end
@@ -228,42 +224,35 @@ function FanUpdraft.tickPlayer(context: MapFeatureKit.Context, player: Player, r
 		clearVisit(player)
 		visit = nil
 	end
-	if currentFan == nil or currentHeight == nil then
+	if currentFan == nil then
+		return
+	end
+	-- A jump pad may carry a player through the same column. Its own float force
+	-- and trajectory take precedence until that effect expires.
+	if root:FindFirstChild("JumpPadFloatForce", true) then
+		if visit then
+			clearLift(visit)
+		end
 		return
 	end
 	if visit == nil then
 		visit = {
 			root = root,
 			fan = currentFan,
-			launched = false,
-			expiresAt = 0,
 		}
 		visits[player] = visit
 	end
-	if visit.force and (context.now >= visit.expiresAt or root:FindFirstChild("JumpPadFloatForce", true)) then
-		clearLift(visit)
-	end
-	if
-		not visit.launched
-		and currentHeight <= MapFeatures.Fan.EntryHeight
-		and context.now >= (cooldowns[player] or 0)
-	then
-		local retriggerCooldown = Parts.number(currentFan, "RetriggerCooldown", MapFeatures.Fan.RetriggerCooldown)
-		launch(context, visit, humanoid)
-		cooldowns[player] = context.now + retriggerCooldown
-	end
+	lift(visit, humanoid)
 end
 
 function FanUpdraft.forget(player: Player?)
 	if player then
 		clearVisit(player)
-		cooldowns[player] = nil
 		return
 	end
 	for existing in visits do
 		clearVisit(existing)
 	end
-	table.clear(cooldowns)
 	table.clear(fans)
 end
 

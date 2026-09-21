@@ -251,11 +251,9 @@ local systems: { any } = {
 	{ name = "SplashdownAudio", parent = presentation, method = "start" },
 	{ name = "JumpPadVisuals", parent = presentation, method = "start" },
 	{ name = "BumperVisuals", parent = presentation, method = "start" },
-	{ name = "HazardVisuals", parent = presentation, method = "start" },
 	{ name = "HazardCarriers", parent = presentation, method = "start" },
 	{ name = "EmotePlayback", parent = presentation, method = "start" },
 	{ name = "FanAirflow", parent = presentation, method = "start" },
-	{ name = "RotatingPlatforms", parent = mapFeatures, method = "load" },
 	{ name = "PlatformRider", parent = movement, method = "start" },
 	{ name = "ChargeAim", parent = presentation, method = "start" },
 	{ name = "WeaponAnimations", parent = presentation, method = "start", intent = true },
@@ -266,6 +264,16 @@ if RunService:IsStudio() then
 	table.insert(systems, { name = "CosmeticVFXGallery", parent = debugModules, method = "start" })
 	table.insert(systems, { name = "DevMatchSkip", parent = debugModules, method = "start" })
 end
+
+-- Establish the render registries before effects start. Each startup remains isolated.
+start("Client.Modules.Presentation.HazardVisuals", presentation, "HazardVisuals", "start")
+start(
+	"ReplicatedStorage.Shared.Game.MapFeatures.RotatingPlatforms",
+	mapFeatures,
+	"RotatingPlatforms",
+	"startClientMover"
+)
+start("Client.Modules.Presentation.PhysicalHazardVisuals", presentation, "PhysicalHazardVisuals", "start")
 
 for _, system in systems do
 	task.spawn(function()

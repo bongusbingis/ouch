@@ -3,7 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local MapFeatures =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("MapFeatures"))
@@ -11,18 +11,21 @@ local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ScriptableRoots = require(Game:WaitForChild("MapFeatures"):WaitForChild("ScriptableRoots"))
 local GameAudio = require(script.Parent.GameAudio)
+local HazardVisuals = require(script.Parent.HazardVisuals)
 
 local BumperVisuals = {}
 
 type BumperState = {
-	baseSize: Vector3,
-	activeTween: Tween?,
+	started: number?,
+	clear: () -> (),
 }
 
 local bumpers: { [BasePart]: BumperState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
+local folderConnections: { [Folder]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
 local remoteConnection: RBXScriptConnection? = nil
+local renderConnection: RBXScriptConnection? = nil
 local started = false
 
 local function config()
@@ -48,10 +51,18 @@ local function trackGroup(group: Instance)
 	for _, descendant in group:GetDescendants() do
 		if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
 			bumpers[descendant] = {
-				baseSize = descendant.Size,
-				activeTween = nil,
+				started = nil,
+				clear = HazardVisuals.setEffect(descendant, "bumper"),
 			}
 		end
+	end
+end
+
+local function forgetBumper(part: BasePart)
+	local state = bumpers[part]
+	if state then
+		state.clear()
+		bumpers[part] = nil
 	end
 end
 
@@ -59,33 +70,54 @@ local function trackFolder(root: Instance, folder: Instance)
 	if not folder:IsA("Folder") then
 		return
 	end
+	if folderConnections[folder] then
+		return
+	end
 	for _, child in folder:GetChildren() do
 		if child:IsA("Folder") then
 			trackGroup(child)
 		end
 	end
-	local connections = rootConnections[root]
+	local connections = {
+		folder.ChildAdded:Connect(function(child)
+			if child:IsA("Folder") then
+				-- Origin and Assembly stream in after their folder.
+				task.defer(function()
+					if started and folderConnections[folder] and child:IsDescendantOf(folder) then
+						trackGroup(child)
+					end
+				end)
+			end
+		end),
+		folder.DescendantAdded:Connect(function(descendant)
+			if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
+				bumpers[descendant] = {
+					started = nil,
+					clear = HazardVisuals.setEffect(descendant, "bumper"),
+				}
+			end
+		end),
+		folder.DescendantRemoving:Connect(function(descendant)
+			if descendant:IsA("BasePart") then
+				forgetBumper(descendant)
+			end
+		end),
+	}
+	folderConnections[folder] = connections
+end
+
+local function untrackFolder(folder: Folder)
+	local connections = folderConnections[folder]
 	if connections then
-		table.insert(
-			connections,
-			folder.ChildAdded:Connect(function(child)
-				if child:IsA("Folder") then
-					-- Origin and Assembly stream in after their folder.
-					task.defer(trackGroup, child)
-				end
-			end)
-		)
-		table.insert(
-			connections,
-			folder.DescendantAdded:Connect(function(descendant)
-				if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
-					bumpers[descendant] = {
-						baseSize = descendant.Size,
-						activeTween = nil,
-					}
-				end
-			end)
-		)
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+		folderConnections[folder] = nil
+	end
+	for part in bumpers do
+		if part:IsDescendantOf(folder) then
+			forgetBumper(part)
+		end
 	end
 end
 
@@ -100,8 +132,16 @@ local function addRoot(root: Instance)
 	table.insert(
 		rootConnections[root],
 		root.ChildAdded:Connect(function(child)
-		if child.Name == "Bumpers" or child.Name == "Motion" or child.Name == "Rotating" then
+			if child.Name == "Bumpers" or child.Name == "Motion" or child.Name == "Rotating" then
 				trackFolder(root, child)
+			end
+		end)
+	)
+	table.insert(
+		rootConnections[root],
+		root.ChildRemoved:Connect(function(child)
+			if child:IsA("Folder") then
+				untrackFolder(child)
 			end
 		end)
 	)
@@ -115,6 +155,16 @@ local function removeRoot(root: Instance)
 		end
 		rootConnections[root] = nil
 	end
+	for folder in folderConnections do
+		if folder:IsDescendantOf(root) then
+			untrackFolder(folder)
+		end
+	end
+	for part, state in bumpers do
+		if part:IsDescendantOf(root) or part.Parent == nil then
+			forgetBumper(part)
+		end
+	end
 end
 
 local function hitImpulse(part: BasePart)
@@ -122,47 +172,8 @@ local function hitImpulse(part: BasePart)
 	if state == nil then
 		return
 	end
-	if state.activeTween then
-		state.activeTween:Cancel()
-		state.activeTween = nil
-	end
-
 	GameAudio.play("JumpPadBounce", part)
-
-	local settings = config()
-	local vertical = settings.MinimumSquash
-	local widen = 1 - (vertical - 1) * settings.WidenScale
-	local squashSize = state.baseSize * Vector3.new(widen, vertical, widen)
-
-	local squashTween = TweenService:Create(
-		part,
-		TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Size = squashSize }
-	)
-	local reboundTween = TweenService:Create(
-		part,
-		TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Size = state.baseSize }
-	)
-
-	squashTween.Completed:Connect(function(playbackState)
-		if playbackState == Enum.PlaybackState.Completed and state.activeTween == squashTween then
-			state.activeTween = reboundTween
-			reboundTween:Play()
-		end
-	end)
-
-	reboundTween.Completed:Connect(function(playbackState)
-		if state.activeTween == reboundTween then
-			state.activeTween = nil
-			if playbackState == Enum.PlaybackState.Completed then
-				part.Size = state.baseSize
-			end
-		end
-	end)
-
-	state.activeTween = squashTween
-	squashTween:Play()
+	state.started = os.clock()
 end
 
 function BumperVisuals.start()
@@ -178,12 +189,34 @@ function BumperVisuals.start()
 			hitImpulse(part)
 		end
 	end)
+	renderConnection = RunService.RenderStepped:Connect(function()
+		local settings = config()
+		for part, state in bumpers do
+			local startedAt = state.started
+			if startedAt then
+				local t = os.clock() - startedAt
+				if t >= 0.28 or not part.Parent then
+					state.started = nil
+					HazardVisuals.setEffect(part, "bumper")
+				else
+					local pulse = math.sin(math.min(t / 0.28, 1) * math.pi)
+					local vertical = 1 + (settings.MinimumSquash - 1) * pulse
+					local widen = 1 - (vertical - 1) * settings.WidenScale
+					HazardVisuals.setEffect(part, "bumper", CFrame.identity, Vector3.new(widen, vertical, widen))
+				end
+			end
+		end
+	end)
 end
 
 function BumperVisuals.stop()
 	if remoteConnection then
 		remoteConnection:Disconnect()
 		remoteConnection = nil
+	end
+	if renderConnection then
+		renderConnection:Disconnect()
+		renderConnection = nil
 	end
 	if unwatch then
 		unwatch()
@@ -193,11 +226,7 @@ function BumperVisuals.stop()
 		removeRoot(root)
 	end
 	for part, state in bumpers do
-		if state.activeTween then
-			state.activeTween:Cancel()
-			state.activeTween = nil
-		end
-		part.Size = state.baseSize
+		state.clear()
 	end
 	table.clear(bumpers)
 	started = false

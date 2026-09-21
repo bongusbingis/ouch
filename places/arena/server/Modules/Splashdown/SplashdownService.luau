@@ -56,6 +56,7 @@ local phaseGeneration = 0
 local raceStartedAt = 0
 local lavaRiseStartsAt = 0
 local RisingLiquid = require(ReplicatedStorage.Shared.Game.MapFeatures.RisingLiquid)
+local lavaScheduleRevision = 0
 local holds: { [Model]: Hold } = {}
 local pendingRespawns: { [Player]: Pending } = {}
 local respawnGeneration = 0
@@ -278,12 +279,55 @@ local function standCourse(courseId: string)
 		SplashdownCourses.destroy(previous)
 	end
 	live = SplashdownCourses.instantiate(courseId, arena.root, arena.origin.CFrame)
+	local course = live
+	if course.lava and course.lavaBase and course.lavaRise then
+		local rise = course.lavaRise
+		course.lava:SetAttribute("SplashdownLavaBase", course.lavaBase)
+		course.lava:SetAttribute(
+			"SplashdownLavaConfig",
+			HttpService:JSONEncode({
+				studs = rise.studs,
+				seconds = rise.seconds,
+				delaySeconds = rise.delaySeconds,
+				pauses = rise.pauses or {},
+			})
+		)
+		lavaScheduleRevision += 1
+		course.lava:SetAttribute(
+			"SplashdownLavaState",
+			HttpService:JSONEncode({
+				revision = lavaScheduleRevision,
+				active = false,
+				startsAt = 0,
+				frozenAt = 0,
+			})
+		)
+	end
+end
+
+local function publishLavaState(activeState: boolean, startsAt: number, frozenAt: number?)
+	local course = live
+	if course == nil or course.lava == nil or course.lavaBase == nil or course.lavaRise == nil then
+		return
+	end
+	lavaScheduleRevision += 1
+	course.lava:SetAttribute(
+		"SplashdownLavaState",
+		HttpService:JSONEncode({
+			revision = lavaScheduleRevision,
+			active = activeState,
+			startsAt = startsAt,
+			frozenAt = frozenAt,
+		})
+	)
 end
 
 local function resetLava()
 	local course = live
 	if course and course.lava and course.lavaBase and course.lavaRise then
 		course.lava.CFrame = course.lavaBase
+		lavaRiseStartsAt = 0
+		publishLavaState(false, 0, 0)
 	end
 end
 
@@ -297,6 +341,15 @@ local function stepLava(now: number)
 	if (course.lava.CFrame.Position - target.Position).Magnitude > 1e-3 then
 		course.lava.CFrame = target
 	end
+end
+
+local function freezeLava(now: number)
+	local course = live
+	if course == nil or course.lava == nil or course.lavaBase == nil or course.lavaRise == nil then
+		return
+	end
+	stepLava(now)
+	publishLavaState(false, lavaRiseStartsAt, now)
 end
 
 local function planDoors()
@@ -492,6 +545,7 @@ closeRound = function()
 	if current == nil or course == nil or current.phase ~= "Racing" then
 		return
 	end
+	freezeLava(Workspace:GetServerTimeNow())
 	local outcome = RaceRound.close(current)
 	local placements = RacePoints.placements(outcome.finishers, Splashdown.PointsForFirst)
 	table.insert(rounds, { courseId = course.id, capSeconds = current.capSeconds, placements = placements })
@@ -544,6 +598,7 @@ local function beginRacing()
 	local course = live
 	if course and course.lavaRise then
 		lavaRiseStartsAt = now + course.lavaRise.delaySeconds
+		publishLavaState(true, lavaRiseStartsAt, nil)
 	end
 	releaseAll()
 	setPhase(Phases.Racing)

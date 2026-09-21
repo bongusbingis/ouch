@@ -29,6 +29,32 @@ local initializedAssemblies: { [Instance]: boolean } = {}
 local nextCheckAt = 0
 local mapOrigin: Vector3? = nil
 local warnedNoMapOrigin = false
+local warnedOwnership: { [BasePart]: boolean } = {}
+local pendingOwnership: { [BasePart]: boolean } = {}
+
+local function setServerOwnership(ball: BasePart)
+	local ok, canSet, reason = pcall(function()
+		return ball:CanSetNetworkOwnership()
+	end)
+	if not ok then
+		reason = canSet
+	end
+	if ok and canSet then
+		local setOk, setReason = pcall(function()
+			ball:SetNetworkOwner(nil)
+		end)
+		if setOk then
+			pendingOwnership[ball] = nil
+			return
+		end
+		reason = setReason
+	end
+	pendingOwnership[ball] = true
+	if not warnedOwnership[ball] then
+		warnedOwnership[ball] = true
+		warn(`[BeachBalls] Server ownership unavailable for {ball:GetFullName()}: {tostring(reason)}`)
+	end
+end
 
 -- Balls live beside their own Scriptables root -- the arena's or a course's --
 -- so a course's balls leave with the course instead of piling up under the
@@ -77,11 +103,11 @@ local function initGroup(assembly: Model)
 			ball:IsA("BasePart")
 			and (
 				ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true
-			or (
-				assembly:FindFirstAncestor("SplashdownCourse") == nil
-				and ball.Parent == assembly
-				and ball.Name:find(settings.NamePrefix, 1, true) == 1
-			)
+				or (
+					assembly:FindFirstAncestor("SplashdownCourse") == nil
+					and ball.Parent == assembly
+					and ball.Name:find(settings.NamePrefix, 1, true) == 1
+				)
 			)
 		then
 			balls[ball] = {
@@ -98,9 +124,7 @@ local function initGroup(assembly: Model)
 			ball.Parent = folder
 			ball.Anchored = false
 			ball.CanCollide = true
-			if ball:GetAttribute(MapFeatures.Attributes.BeachBall) == true then
-				ball:SetNetworkOwner(nil)
-			end
+			setServerOwnership(ball)
 			ball.CustomPhysicalProperties =
 				PhysicalProperties.new(settings.Density, settings.Friction, settings.Elasticity, 1, 1)
 		end
@@ -132,6 +156,13 @@ function BeachBalls.tickWorld(context: MapFeatureKit.Context)
 		return
 	end
 	nextCheckAt = context.now + MapFeatures.BeachBall.CheckIntervalSeconds
+	for ball in pendingOwnership do
+		if ball.Parent then
+			setServerOwnership(ball)
+		else
+			pendingOwnership[ball] = nil
+		end
+	end
 
 	local origin = mapOriginPosition()
 	if origin == nil then
@@ -144,6 +175,8 @@ function BeachBalls.tickWorld(context: MapFeatureKit.Context)
 				ball:Destroy()
 			end
 			balls[ball] = nil
+			pendingOwnership[ball] = nil
+			warnedOwnership[ball] = nil
 			initializedAssemblies[info.assembly] = nil
 			continue
 		end
@@ -176,6 +209,8 @@ function BeachBalls.forget(player: Player?)
 	end
 	table.clear(balls)
 	table.clear(initializedAssemblies)
+	table.clear(warnedOwnership)
+	table.clear(pendingOwnership)
 	nextCheckAt = 0
 end
 

@@ -4,6 +4,7 @@ local R = require(game.ReplicatedStorage.Shared.Game.MapFeatures.RotatingPlatfor
 return function()
 	describe("Rotating composition", function()
 		local model, origin
+		local temporaryRoot, temporaryFolder
 		local function part(name, cf, parent, mode, axis, value)
 			local p = Instance.new("Part")
 			p.Name = name
@@ -25,6 +26,13 @@ return function()
 			origin:SetAttribute("RotationSpeed", 0)
 		end)
 		afterEach(function()
+			if temporaryRoot then
+				R.stop()
+				game:GetService("CollectionService"):RemoveTag(temporaryRoot, "ScriptableRoot")
+				temporaryRoot:Destroy()
+				temporaryFolder:Destroy()
+				temporaryRoot, temporaryFolder = nil, nil
+			end
 			model:Destroy()
 			origin:Destroy()
 		end)
@@ -37,6 +45,51 @@ return function()
 			expect((parent.Position - Vector3.new(10, 0, 0)).Magnitude < 1e-4).to.equal(true)
 			expect((child.Position - Vector3.new(10, 3, 0)).Magnitude < 1e-4).to.equal(true)
 			expect((tip.Position - Vector3.new(10, 3, -4)).Magnitude < 1e-4).to.equal(true)
+		end)
+		it("moves a BasePart root rotor with its follower and nested rotor", function()
+			local root = part("Mover", CFrame.identity, nil, "slide", "X", 10)
+			local child = part("Sweeper", CFrame.new(0, 3, 0), root, "spin", "Y", 90)
+			local tip = part("Tip", CFrame.new(4, 3, 0), child)
+			local platform = R.build(root)
+			expect(#platform.localRotors).to.equal(2)
+			expect(platform.localRotors[2].parentRotor).to.equal(platform.localRotors[1])
+			R.applyAt(platform, 1)
+			expect((root.Position - Vector3.new(10, 0, 0)).Magnitude < 1e-4).to.equal(true)
+			expect((child.Position - Vector3.new(10, 3, 0)).Magnitude < 1e-4).to.equal(true)
+			expect((tip.Position - Vector3.new(10, 3, -4)).Magnitude < 1e-4).to.equal(true)
+			root:Destroy()
+		end)
+		it("registers a replacement Motion folder under the same tagged root", function()
+			local CollectionService = game:GetService("CollectionService")
+			local Workspace = game:GetService("Workspace")
+			local MapFeatures = require(game.ReplicatedStorage.Config.Gameplay.MapFeatures)
+			local scriptables = Instance.new("Folder")
+			scriptables.Name = "Scriptables"
+			local firstFolder = Instance.new("Folder")
+			firstFolder.Name = "Motion"
+			firstFolder.Parent = scriptables
+			temporaryRoot, temporaryFolder = scriptables, firstFolder
+			local first = part("First", CFrame.identity, firstFolder, "slide", "X", 10)
+			scriptables.Parent = Workspace
+			R.stop()
+			CollectionService:AddTag(scriptables, MapFeatures.Attributes.ScriptableRoot)
+			R.load()
+			local function registered(assembly)
+				for _, platform in R.all() do
+					if platform.assembly == assembly then
+						return true
+					end
+				end
+				return false
+			end
+			expect(registered(first)).to.equal(true)
+			firstFolder.Parent = nil
+			local replacement = Instance.new("Folder")
+			replacement.Name = "Motion"
+			local second = part("Second", CFrame.identity, replacement, "slide", "X", 10)
+			replacement.Parent = scriptables
+			expect(registered(first)).to.equal(false)
+			expect(registered(second)).to.equal(true)
 		end)
 		it("compiles spin and piston without unused generic motion fields", function()
 			local spin = part("Spin", CFrame.identity, model, "spin", "Y", 90)

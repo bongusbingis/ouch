@@ -117,6 +117,76 @@ return function()
 			expect(EliminationService.down(player, nil)).to.equal(false)
 		end)
 
+		it("temporarily ragdolls an impact without changing combat state", function()
+			rig:SetAttribute("CombatAlive", true)
+			rig:SetAttribute("CombatHealth", 100)
+			player:SetAttribute("CombatAlive", true)
+			player:SetAttribute("CombatHealth", 100)
+
+			expect(EliminationService.impact(player, 0.05)).to.equal(true)
+			expect(rig:GetAttribute("CombatAlive")).to.equal(true)
+			expect(player:GetAttribute("CombatAlive")).to.equal(true)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_") > 0).to.equal(true)
+			task.wait(0.1)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_")).to.equal(0)
+			expect(testMotor.Enabled).to.equal(true)
+		end)
+
+		it("restores an impact's saved physics flags and keeps its momentum", function()
+			local humanoid = rig:FindFirstChildOfClass("Humanoid")
+			local root = rig:FindFirstChild("HumanoidRootPart")
+			local part = testMotor.Part1
+			root.Anchored = false
+			part.Anchored = true
+			part.CanCollide = false
+			part.CanTouch = true
+			part.CanQuery = false
+			part.Massless = true
+			humanoid.AutoRotate = false
+			humanoid.PlatformStand = true
+			humanoid.RequiresNeck = false
+			humanoid.BreakJointsOnDeath = false
+			humanoid.EvaluateStateMachine = false
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+
+			expect(EliminationService.impact(player, 0.05)).to.equal(true)
+			task.wait(0.02)
+			expect(EliminationService.impact(player, 0.1)).to.equal(true)
+			root.AssemblyLinearVelocity = Vector3.new(30, 12, 0)
+			task.wait(0.12)
+
+			expect(part.Anchored).to.equal(true)
+			expect(part.CanCollide).to.equal(false)
+			expect(part.CanTouch).to.equal(true)
+			expect(part.CanQuery).to.equal(false)
+			expect(part.Massless).to.equal(true)
+			expect(humanoid.AutoRotate).to.equal(false)
+			expect(humanoid.PlatformStand).to.equal(true)
+			expect(humanoid.RequiresNeck).to.equal(false)
+			expect(humanoid.BreakJointsOnDeath).to.equal(false)
+			expect(humanoid.EvaluateStateMachine).to.equal(false)
+			expect(humanoid:GetStateEnabled(Enum.HumanoidStateType.GettingUp)).to.equal(false)
+			expect(root.AssemblyLinearVelocity.Magnitude > 0).to.equal(true)
+		end)
+
+		it("does not let an earlier impact expiry restore a later impact", function()
+			expect(EliminationService.impact(player, 0.05)).to.equal(true)
+			task.wait(0.02)
+			expect(EliminationService.impact(player, 0.12)).to.equal(true)
+			task.wait(0.06)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_") > 0).to.equal(true)
+			task.wait(0.1)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_")).to.equal(0)
+		end)
+
+		it("does not let an impact expiry revive a real elimination", function()
+			expect(EliminationService.impact(player, 0.05)).to.equal(true)
+			expect(EliminationService.down(player, nil)).to.equal(true)
+			task.wait(0.1)
+			expect(rig:GetAttribute("CombatAlive")).to.equal(false)
+			expect(countDescendants(rig, "BallSocketConstraint", "Ragdoll_") > 0).to.equal(true)
+		end)
+
 		it("preserves native death evaluation so Roblox can replace a dead character", function()
 			local humanoid = rig:FindFirstChildOfClass("Humanoid")
 			humanoid.BreakJointsOnDeath = false
@@ -131,6 +201,9 @@ return function()
 
 		it("restores native death evaluation when health reaches zero during a ragdoll", function()
 			local humanoid = rig:FindFirstChildOfClass("Humanoid")
+			-- The shared fixture anchors its root for deterministic tests, but a live
+			-- character is unanchored when native death state evaluation runs.
+			rig.HumanoidRootPart.Anchored = false
 			EliminationService.down(player)
 			humanoid.Health = 0
 			expect(EliminationService.forget(rig)).to.equal(true)

@@ -15,7 +15,14 @@ local tiles: { [BasePart]: Tile } = {}
 local ray = RaycastParams.new()
 ray.FilterType = Enum.RaycastFilterType.Exclude
 ray.RespectCanCollide = true
-local function restore(state: Tile)
+local function publishState(tile: BasePart, stage: string, dropAt: number?, restoreAt: number?)
+	local revision = tile:GetAttribute("HazardTileRevision")
+	tile:SetAttribute("HazardTileDropAt", dropAt or 0)
+	tile:SetAttribute("HazardTileRestoreAt", restoreAt or 0)
+	tile:SetAttribute("HazardTileState", stage)
+	tile:SetAttribute("HazardTileRevision", (if typeof(revision) == "number" then revision else 0) + 1)
+end
+local function restore(tile: BasePart, state: Tile)
 	for _, v in state.original do
 		if v.part.Parent then
 			v.part.Transparency = v.transparency
@@ -27,6 +34,9 @@ local function restore(state: Tile)
 	state.dropAt = nil
 	state.restoreAt = nil
 	state.hidden = false
+	if tile.Parent then
+		publishState(tile, "solid", nil, nil)
+	end
 end
 function FallingTiles.tickWorld(context: Kit.Context)
 	local active = {}
@@ -52,7 +62,7 @@ function FallingTiles.tickWorld(context: Kit.Context)
 	end
 	for tile, state in tiles do
 		if not active[tile] then
-			restore(state)
+			restore(tile, state)
 			tiles[tile] = nil
 			continue
 		end
@@ -66,8 +76,9 @@ function FallingTiles.tickWorld(context: Kit.Context)
 				v.part.Transparency = 1
 			end
 			state.restoreAt = if respawn > 0 then context.now + respawn else nil
+			publishState(tile, "hidden", nil, if respawn > 0 then Workspace:GetServerTimeNow() + respawn else nil)
 		elseif state.restoreAt and context.now >= state.restoreAt then
-			restore(state)
+			restore(tile, state)
 		end
 	end
 end
@@ -86,6 +97,7 @@ function FallingTiles.tickPlayer(context: Kit.Context, _player: Player, root: Ba
 		if (hit.Instance == tile or hit.Instance:IsDescendantOf(tile)) and not state.dropAt then
 			local delay = Parts.number(tile, "DropDelaySeconds", Config.FallingTile.DropDelaySeconds)
 			state.dropAt = context.now + delay
+			publishState(tile, "armed", Workspace:GetServerTimeNow() + delay, nil)
 			Network.fire("HazardVisual", nil, tile, "shake", delay)
 			return
 		end
@@ -95,8 +107,8 @@ function FallingTiles.forget(player: Player?)
 	if player then
 		return
 	end
-	for _, state in tiles do
-		restore(state)
+	for tile, state in tiles do
+		restore(tile, state)
 	end
 	table.clear(tiles)
 end

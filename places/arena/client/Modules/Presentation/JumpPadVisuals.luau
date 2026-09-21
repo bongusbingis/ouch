@@ -12,6 +12,7 @@ local Game = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game")
 local ScriptableRoots = require(Game:WaitForChild("MapFeatures"):WaitForChild("ScriptableRoots"))
 local Spring = require(Game:WaitForChild("Util"):WaitForChild("Spring"))
 local GameAudio = require(script.Parent.GameAudio)
+local HazardVisuals = require(script.Parent.HazardVisuals)
 
 local JumpPadVisuals = {}
 
@@ -20,8 +21,8 @@ local FOLDER_NAME = "JumpPads"
 
 type PartState = {
 	baseSize: Vector3,
-	baseCFrame: CFrame,
 	spring: Spring.Spring,
+	clear: () -> (),
 }
 
 type PadState = {
@@ -33,6 +34,7 @@ type PadState = {
 
 local pads: { [Model]: PadState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
+local folderConnections: { [Folder]: { RBXScriptConnection } } = {}
 local unwatch: (() -> ())? = nil
 local renderConnection: RBXScriptConnection? = nil
 local remoteConnection: RBXScriptConnection? = nil
@@ -48,8 +50,8 @@ local function trackPart(state: PadState, instance: Instance)
 	end
 	state.parts[instance] = {
 		baseSize = instance.Size,
-		baseCFrame = instance.CFrame,
 		spring = if instance.Name == INNER_PART_NAME then state.inner else state.outer,
+		clear = HazardVisuals.setEffect(instance, "jumpPad"),
 	}
 end
 
@@ -61,6 +63,9 @@ local function forgetPad(pad: Model)
 	pads[pad] = nil
 	for _, connection in state.connections do
 		connection:Disconnect()
+	end
+	for _, partState in state.parts do
+		partState.clear()
 	end
 end
 
@@ -88,6 +93,10 @@ local function trackPad(pad: Model)
 		state.connections,
 		pad.DescendantRemoving:Connect(function(descendant)
 			if descendant:IsA("BasePart") then
+				local partState = state.parts[descendant]
+				if partState then
+					partState.clear()
+				end
 				state.parts[descendant] = nil
 			end
 		end)
@@ -98,29 +107,41 @@ local function trackFolder(root: Instance, folder: Instance)
 	if not folder:IsA("Folder") then
 		return
 	end
+	if folderConnections[folder] then
+		return
+	end
 	for _, child in folder:GetChildren() do
 		if child:IsA("Model") then
 			trackPad(child)
 		end
 	end
-	local connections = rootConnections[root]
+	local connections = {
+		folder.ChildAdded:Connect(function(child)
+			if child:IsA("Model") then
+				trackPad(child)
+			end
+		end),
+		folder.ChildRemoved:Connect(function(child)
+			if child:IsA("Model") then
+				forgetPad(child)
+			end
+		end),
+	}
+	folderConnections[folder] = connections
+end
+
+local function untrackFolder(folder: Folder)
+	local connections = folderConnections[folder]
 	if connections then
-		table.insert(
-			connections,
-			folder.ChildAdded:Connect(function(child)
-				if child:IsA("Model") then
-					trackPad(child)
-				end
-			end)
-		)
-		table.insert(
-			connections,
-			folder.ChildRemoved:Connect(function(child)
-				if child:IsA("Model") then
-					forgetPad(child)
-				end
-			end)
-		)
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+		folderConnections[folder] = nil
+	end
+	for pad in pads do
+		if pad:IsDescendantOf(folder) then
+			forgetPad(pad)
+		end
 	end
 end
 
@@ -138,6 +159,14 @@ local function addRoot(root: Instance)
 			end
 		end)
 	)
+	table.insert(
+		rootConnections[root],
+		root.ChildRemoved:Connect(function(child)
+			if child:IsA("Folder") and child.Name == FOLDER_NAME then
+				untrackFolder(child)
+			end
+		end)
+	)
 end
 
 local function removeRoot(root: Instance)
@@ -147,6 +176,11 @@ local function removeRoot(root: Instance)
 			connection:Disconnect()
 		end
 		rootConnections[root] = nil
+	end
+	for folder in folderConnections do
+		if folder:IsDescendantOf(root) then
+			untrackFolder(folder)
+		end
 	end
 	for pad in pads do
 		if pad:IsDescendantOf(root) or pad.Parent == nil then
@@ -178,13 +212,13 @@ local function step(deltaTime: number)
 			end
 			local baseSize = partState.baseSize
 			local s = partState.spring.position
-			if math.abs(s) < 1e-3 and part.Size == baseSize then
+			if math.abs(s) < 1e-3 then
 				continue
 			end
 			local height = math.max(baseSize.Y + s, baseSize.Y * settings.MinimumSquash)
 			local spread = 1 / math.sqrt(height / baseSize.Y)
-			part.Size = Vector3.new(baseSize.X * spread, height, baseSize.Z * spread)
-			part.CFrame = partState.baseCFrame + Vector3.new(0, (height - baseSize.Y) / 2, 0)
+			local scale = Vector3.new(spread, height / baseSize.Y, spread)
+			HazardVisuals.setEffect(part, "jumpPad", CFrame.new(0, (height - baseSize.Y) / 2, 0), scale)
 		end
 	end
 end

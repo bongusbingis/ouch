@@ -44,14 +44,14 @@ return {
 			["propeller_trampoline_1_001.004"] = true,
 		},
 		BladeDegreesPerSecond = 300,
-		LaunchSpeed = 65,
-		FloatFactor = 0.65,
+		LaunchSpeed = 65, -- legacy authored speed; scaled into the airflow's steady travel speed
+		FloatFactor = 0.65, -- larger values make the airflow approach its travel speed more quickly
+		LiftSpeedScale = 0.25,
+		LiftResponseSeconds = 0.35,
+		MaxLiftAcceleration = 80,
 		RadiusScale = 0.7, -- central opening, relative to the base's half-width
-		EntryHeight = 6, -- root height above the grate that can begin a launch
 		ColumnHeight = 18,
 		BottomTolerance = 0.5,
-		MaxLiftSeconds = 0.45,
-		RetriggerCooldown = 0.75,
 		GuardSeconds = 3, -- covers the residual arc after leaving the airflow
 	},
 	Spinner = {
@@ -180,7 +180,7 @@ return {
 		PlankDensity = 0.01,
 	},
 	-- Attribute fans can face along an explicit local axis and push beach balls.
-	-- Unmarked fans keep the arena's upward-only launch and float behaviour.
+	-- Unmarked fans keep the arena's world-up airflow direction.
 	CourseFan = { BallSpeed = 32, BallAcceleration = 45 },
 	-- Course-level liquid trajectory: height is an offset above its authored pose.
 	-- Start/stop still belongs to the race; pauses are "height:seconds,...".
@@ -211,7 +211,7 @@ return {
 		LaunchSpeed = "LaunchSpeed",
 		FloatFactor = "FloatFactor",
 		BeachBall = "BeachBall",
-		FanAxis = "FanAxis", -- local X/Y/Z; omit for legacy world-up launch
+		FanAxis = "FanAxis", -- local X/Y/Z; omit for legacy world-up airflow
 		FanDirection = "FanDirection", -- +1 or -1
 		FanColumnHeight = "FanColumnHeight",
 		FanBallSpeed = "FanBallSpeed",

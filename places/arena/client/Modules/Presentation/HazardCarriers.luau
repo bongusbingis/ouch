@@ -108,6 +108,13 @@ local SOURCE_TYPES = {
 
 local carriers: { any } = {}
 local connection: RBXScriptConnection? = nil
+local discoveryConnection: RBXScriptConnection? = nil
+local courseConnections: { RBXScriptConnection } = {}
+local partConnections: { [BasePart]: { RBXScriptConnection } } = {}
+local carrierFolder: Folder? = nil
+local currentCourse: Instance? = nil
+local rebuildQueued = false
+local lifecycle = 0
 local sinceCheck = 0
 
 local function hash(text: string): number
@@ -288,24 +295,46 @@ local function visible(entry: any, camera: Camera): boolean
 	return onScreen
 end
 
-function HazardCarriers.start()
-	HazardCarriers.stop()
+local function clearCarriers()
+	for _, entry in carriers do
+		if entry.model then
+			entry.model:Destroy()
+		end
+		if entry.cable then
+			entry.cable:Destroy()
+		end
+	end
+	table.clear(carriers)
+end
 
-	local course = workspace:FindFirstChild("Assets")
-	course = course and course:FindFirstChild("Arena")
-	course = course and course:FindFirstChild("SplashdownCourse")
-	if not course then
+local function clearCourseWatch()
+	for _, courseConnection in courseConnections do
+		courseConnection:Disconnect()
+	end
+	table.clear(courseConnections)
+	for _, connections in partConnections do
+		for _, partConnection in connections do
+			partConnection:Disconnect()
+		end
+	end
+	table.clear(partConnections)
+	currentCourse = nil
+end
+
+local function findCourse(): Instance?
+	local rootAssets = workspace:FindFirstChild("Assets")
+	local arena = rootAssets and rootAssets:FindFirstChild("Arena")
+	return arena and arena:FindFirstChild("SplashdownCourse") or nil
+end
+
+local function discover(course: Instance)
+	local parent = carrierFolder
+	if not parent or not course:IsDescendantOf(workspace) then
 		return
 	end
-
-	local parent = Instance.new("Folder")
-	parent.Name = "HazardCarriers"
-	parent.Parent = workspace.CurrentCamera
-
+	clearCarriers()
 	-- Discovery keys on the hazard's identity, not its motion mode: a pendulum is a
-	-- "rock" rotor but the spiked roller is a slide parent with a spin child, and
-	-- both need carrying. Every in-scope hazard has exactly one HoverMount, so the
-	-- mount is the unit of discovery.
+	-- "rock" rotor but the spiked roller is a slide parent with a spin child.
 	for _, mount in course:GetDescendants() do
 		if mount:IsA("BasePart") and mount.Name == "HoverMount" then
 			local kind, swing = nil, nil
@@ -321,19 +350,119 @@ function HazardCarriers.start()
 				end
 			end
 			if kind then
-				-- A pendulum hangs from its own axle; a roller has no swing axle, so
-				-- the mount itself is the point the carrier holds.
 				buildCarrier(kind, (swing or mount) :: BasePart, mount, parent)
 			end
 		end
 	end
-
 	for _, entry in carriers do
 		place(entry)
 	end
+end
 
-	local camera = workspace.CurrentCamera
+local queueRebuild: () -> ()
+
+local function watchCoursePart(part: BasePart)
+	if partConnections[part] then
+		return
+	end
+	partConnections[part] = {
+		part:GetAttributeChangedSignal("SourceAsset"):Connect(queueRebuild),
+		part:GetAttributeChangedSignal("Rotor"):Connect(queueRebuild),
+	}
+end
+
+local function unwatchCoursePart(part: BasePart)
+	local connections = partConnections[part]
+	if not connections then
+		return
+	end
+	for _, partConnection in connections do
+		partConnection:Disconnect()
+	end
+	partConnections[part] = nil
+end
+
+queueRebuild = function()
+	if rebuildQueued then
+		return
+	end
+	rebuildQueued = true
+	local queuedLifecycle = lifecycle
+	task.defer(function()
+		if queuedLifecycle ~= lifecycle then
+			return
+		end
+		rebuildQueued = false
+		local course = findCourse()
+		if course ~= currentCourse then
+			clearCourseWatch()
+			clearCarriers()
+			currentCourse = course
+			if course then
+				table.insert(
+					courseConnections,
+					course.DescendantAdded:Connect(function(instance)
+						if instance:IsA("BasePart") then
+							watchCoursePart(instance)
+							queueRebuild()
+						elseif instance.Name == "HoverMount" then
+							queueRebuild()
+						end
+					end)
+				)
+				table.insert(
+					courseConnections,
+					course.DescendantRemoving:Connect(function(instance)
+						if instance:IsA("BasePart") then
+							unwatchCoursePart(instance)
+							queueRebuild()
+						elseif instance.Name == "HoverMount" then
+							queueRebuild()
+						end
+					end)
+				)
+				table.insert(
+					courseConnections,
+					course.AncestryChanged:Connect(function()
+						if not course:IsDescendantOf(workspace) then
+							queueRebuild()
+						end
+					end)
+				)
+				for _, instance in course:GetDescendants() do
+					if instance:IsA("BasePart") then
+						watchCoursePart(instance)
+					end
+				end
+			end
+		end
+		if course then
+			discover(course)
+		end
+	end)
+end
+
+function HazardCarriers.start()
+	HazardCarriers.stop()
+	lifecycle += 1
+	discoveryConnection = workspace.DescendantAdded:Connect(function(instance)
+		if instance.Name == "SplashdownCourse" then
+			queueRebuild()
+		end
+	end)
+
+	local parent = Instance.new("Folder")
+	parent.Name = "HazardCarriers"
+	-- Keep the cosmetic world-owned: replacing CurrentCamera must not orphan it.
+	parent.Parent = workspace
+	carrierFolder = parent
+	queueRebuild()
+
 	connection = RunService.RenderStepped:Connect(function(delta: number)
+		local camera = workspace.CurrentCamera
+		if camera == nil then
+			return
+		end
 		sinceCheck += delta
 		local recheck = sinceCheck >= 1 / TUNING.CheckHz
 		if recheck then
@@ -352,16 +481,22 @@ function HazardCarriers.start()
 end
 
 function HazardCarriers.stop()
+	lifecycle += 1
 	if connection then
 		connection:Disconnect()
 		connection = nil
 	end
-	local camera = workspace.CurrentCamera
-	local existing = camera and camera:FindFirstChild("HazardCarriers")
-	if existing then
-		existing:Destroy()
+	if discoveryConnection then
+		discoveryConnection:Disconnect()
+		discoveryConnection = nil
 	end
-	table.clear(carriers)
+	clearCourseWatch()
+	clearCarriers()
+	if carrierFolder then
+		carrierFolder:Destroy()
+	end
+	carrierFolder = nil
+	rebuildQueued = false
 	sinceCheck = 0
 end
 

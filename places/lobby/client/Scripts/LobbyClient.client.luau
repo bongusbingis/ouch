@@ -42,6 +42,18 @@ local ConfigReplication = require(
 		:WaitForChild("Adapters")
 		:WaitForChild("ConfigReplication")
 )
+local RotatingPlatforms = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("RotatingPlatforms")
+)
+local PlatformRider = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("PlatformRider")
+)
 
 local lobby = script.Parent.Parent:WaitForChild("Modules"):WaitForChild("Lobby")
 local PartyBackgroundController = require(lobby:WaitForChild("PartyBackgroundController"))
@@ -128,6 +140,14 @@ UIFeedback.start()
 partyClient:start()
 OnboardingCombatClient.start()
 OnboardingClient.start()
+local motionStarted, motionError = pcall(RotatingPlatforms.startClientMover)
+if not motionStarted then
+	warn("[LobbyClient] rotating platform presentation unavailable: " .. tostring(motionError))
+end
+local riderStarted, riderError = pcall(PlatformRider.start)
+if not riderStarted then
+	warn("[LobbyClient] platform carry unavailable: " .. tostring(riderError))
+end
 OnboardingTargets.start()
 OnboardingWaypoint.start()
 OnboardingTargetMarkers.start()
@@ -207,6 +227,8 @@ end
 Replica.RequestData()
 
 script.Destroying:Connect(function()
+	PlatformRider.stop()
+	RotatingPlatforms.stop()
 	root:unmount()
 	container:Destroy()
 	combatRoot:unmount()
