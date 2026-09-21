@@ -46,9 +46,9 @@ return {
 		BladeDegreesPerSecond = 300,
 		LaunchSpeed = 65, -- legacy authored speed; scaled into the airflow's steady travel speed
 		FloatFactor = 0.65, -- larger values make the airflow approach its travel speed more quickly
-		LiftSpeedScale = 0.25,
-		LiftResponseSeconds = 0.35,
-		MaxLiftAcceleration = 80,
+		LiftSpeedScale = 0.4,
+		LiftResponseSeconds = 0.18,
+		MaxLiftAcceleration = 220,
 		RadiusScale = 0.7, -- central opening, relative to the base's half-width
 		ColumnHeight = 18,
 		BottomTolerance = 0.5,

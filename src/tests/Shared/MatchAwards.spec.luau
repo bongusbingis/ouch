@@ -2,7 +2,12 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlayerData = require(game:GetService("ServerScriptService").Server.Modules.PlayerData)
-local MatchAwards = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Progression"):WaitForChild("MatchAwards"))
+local MatchAwards = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("MatchAwards")
+)
 local WriteThroughProxy = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Data"):WaitForChild("WriteThroughProxy")
 )
@@ -115,13 +120,15 @@ return function()
 				},
 			}
 			local writer = { Set = function() end }
-			PlayerData._profiles[player.UserId] = { Profile = { Data = data }, Data = WriteThroughProxy.wrap(data, writer) }
+			PlayerData._profiles[player.UserId] =
+				{ Profile = { Data = data }, Data = WriteThroughProxy.wrap(data, writer) }
 			PlayerData.beginMatchAward(player, "match-one", "S1")
 			PlayerData.addMatchProgress(player, "match-one", { Elims = 1, XP = 20, Bonks = 10 })
 			PlayerData.finishMatchAward(player, "match-one", "result-one", false)
 			PlayerData.resolveMatchAward(player, "match-one", { Elims = 1, XP = 40, Bonks = 20 }, { Xp = 2, Bonks = 2 })
 			expect(PlayerData.applyMatchAward(player, "match-one")).to.equal(true)
-			PlayerData._profiles[player.UserId] = { Profile = { Data = data }, Data = WriteThroughProxy.wrap(data, writer) }
+			PlayerData._profiles[player.UserId] =
+				{ Profile = { Data = data }, Data = WriteThroughProxy.wrap(data, writer) }
 			expect(PlayerData.applyMatchAward(player, "match-one")).to.equal(true)
 			expect(data.Bonks).to.equal(20)
 			expect(data.Level.Points).to.equal(40)

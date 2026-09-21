@@ -212,7 +212,10 @@ end
 -- animation is evicted. A failed attempt never evicts an existing effect.
 function Runtime.adoptScope(attempt: Scope, owner: Scope?)
 	assert(attempt.isAttempt and not attempt.destroyed, "[CosmeticEffectRuntime] invalid attempt scope")
-	assert(owner == attempt.attemptOwner and (owner == nil or not owner.destroyed), "[CosmeticEffectRuntime] invalid adoption owner")
+	assert(
+		owner == attempt.attemptOwner and (owner == nil or not owner.destroyed),
+		"[CosmeticEffectRuntime] invalid adoption owner"
+	)
 	local count, lowerLayers = budgetUsage(attempt)
 	local overflow = math.max(count - MAX_ACTIVE, 0)
 	if overflow > lowerLayers then
@@ -267,7 +270,10 @@ function Runtime.add(
 	assert(duration > 0, "[CosmeticEffectRuntime] duration must be positive")
 	local layer = if options and options.layer then options.layer else "Secondary"
 	local scope = owners[root]
-	if not Runtime.canSpawn(layer, scope) and (layer ~= "Hero" or (scope ~= nil and scope.isAttempt == true) or not freeHeroSlot(scope)) then
+	if
+		not Runtime.canSpawn(layer, scope)
+		and (layer ~= "Hero" or (scope ~= nil and scope.isAttempt == true) or not freeHeroSlot(scope))
+	then
 		root:Destroy()
 		return false
 	end

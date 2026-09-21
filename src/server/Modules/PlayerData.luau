@@ -22,7 +22,10 @@ local MatchAwards = require(
 		:WaitForChild("MatchAwards")
 )
 local BattlePassLogic = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Progression"):WaitForChild("BattlePassLogic")
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("BattlePassLogic")
 )
 local Seasons = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Progression"):WaitForChild("Seasons"))
 
@@ -127,7 +130,8 @@ end
 local function readyConversionCheck(record, id): (boolean, string?)
 	if type(record) ~= "table" or type(record.Ready) ~= "boolean" then
 		local received = if type(record) == "table" then record.Ready else record
-		return false, `MatchAwards.Pending.{tostring(id)}.Ready: expected boolean, received {tostring(received)}; repair the persisted V1 award before replay`
+		return false,
+			`MatchAwards.Pending.{tostring(id)}.Ready: expected boolean, received {tostring(received)}; repair the persisted V1 award before replay`
 	end
 	if not record.Ready then
 		return MatchAwards.validateMarkers(record, tostring(id))
@@ -477,7 +481,8 @@ local function seasonCreditPlan(raw, id, requireProgressionApplied): (any?, stri
 	local journal = raw.MatchAwards
 	if type(journal) ~= "table" or journal.Version ~= 1 then
 		local version = if type(journal) == "table" then journal.Version else nil
-		return nil, `MatchAwards.Version: expected V1 (1), received {tostring(version)}; repair the persisted journal before award replay`
+		return nil,
+			`MatchAwards.Version: expected V1 (1), received {tostring(version)}; repair the persisted journal before award replay`
 	end
 	local record = if type(journal.Pending) == "table" then journal.Pending[id] else nil
 	if type(id) ~= "string" or id == "" or type(record) ~= "table" then
@@ -488,18 +493,22 @@ local function seasonCreditPlan(raw, id, requireProgressionApplied): (any?, stri
 		return nil, markerReason
 	end
 	if not record.Ready then
-		return nil, `MatchAwards.Pending.{id}.Ready: expected true before award payout; finish the persisted award before replay`
+		return nil,
+			`MatchAwards.Pending.{id}.Ready: expected true before award payout; finish the persisted award before replay`
 	end
 	if requireProgressionApplied and not record.ProgressionApplied then
-		return nil, `MatchAwards.Pending.{id}.ProgressionApplied: expected true before season credit; apply career payout first`
+		return nil,
+			`MatchAwards.Pending.{id}.ProgressionApplied: expected true before season credit; apply career payout first`
 	end
 	local amount = if type(record.Awarded) == "table" then record.Awarded.XP else nil
 	if type(amount) ~= "number" or amount < 0 or amount % 1 ~= 0 or math.abs(amount) == math.huge then
-		return nil, `MatchAwards.Pending.{id}.Awarded.XP: expected finite nonnegative integer, received {tostring(amount)}; repair the persisted V1 award before replay`
+		return nil,
+			`MatchAwards.Pending.{id}.Awarded.XP: expected finite nonnegative integer, received {tostring(amount)}; repair the persisted V1 award before replay`
 	end
 	local seasonId = record.SeasonId
 	if type(seasonId) ~= "string" or (seasonId ~= "" and Seasons.Definitions[seasonId] == nil) then
-		return nil, `MatchAwards.Pending.{id}.SeasonId: unknown season {tostring(seasonId)}; restore its definition or repair this persisted award`
+		return nil,
+			`MatchAwards.Pending.{id}.SeasonId: unknown season {tostring(seasonId)}; restore its definition or repair this persisted award`
 	end
 	if type(raw.Season) ~= "table" then
 		return nil, `Season: expected table before award {id} credit; repair persisted season state`
@@ -526,14 +535,16 @@ local function seasonCreditPlan(raw, id, requireProgressionApplied): (any?, stri
 					return nil, `{reason}; repair persisted season state before award replay`
 				end
 			elseif record.SeasonApplied and amount > 0 then
-				return nil, `SeasonHistory.{seasonId}: missing for already season-applied positive-XP award {id}; inspect persisted credit before repair`
+				return nil,
+					`SeasonHistory.{seasonId}: missing for already season-applied positive-XP award {id}; inspect persisted credit before repair`
 			elseif not record.SeasonApplied and amount > 0 then
 				local count = 0
 				for _ in raw.SeasonHistory do
 					count += 1
 				end
 				if count >= DataConfig.Persistence.MaxSeasonArchives then
-					return nil, `SeasonHistory.{seasonId}: archive capacity {DataConfig.Persistence.MaxSeasonArchives} reached before award {id} XP credit; settle or migrate an archive through an approved data operation`
+					return nil,
+						`SeasonHistory.{seasonId}: archive capacity {DataConfig.Persistence.MaxSeasonArchives} reached before award {id} XP credit; settle or migrate an archive through an approved data operation`
 				end
 				newArchive = true
 			end
@@ -542,7 +553,8 @@ local function seasonCreditPlan(raw, id, requireProgressionApplied): (any?, stri
 			local current = if target ~= nil then target.XP else 0
 			local nextXp = current + amount
 			if nextXp < 0 or nextXp % 1 ~= 0 or math.abs(nextXp) == math.huge then
-				return nil, `{targetPath}.XP: current {tostring(current)} + award {tostring(amount)} is nonfinite or noninteger; repair stored season state or award`
+				return nil,
+					`{targetPath}.XP: current {tostring(current)} + award {tostring(amount)} is nonfinite or noninteger; repair stored season state or award`
 			end
 		end
 	end
@@ -593,7 +605,12 @@ end
 -- A failed Replica send is retried in this session without repeating the credit.
 function Data.creditMatchSeasonXp(player, id): (boolean, string?)
 	local entry = Data._profiles[player.UserId]
-	if entry == nil or entry.Profile == nil or not entry.Profile:IsActive() or (Data._writeLeaseCounts[player.UserId] or 0) == 0 then
+	if
+		entry == nil
+		or entry.Profile == nil
+		or not entry.Profile:IsActive()
+		or (Data._writeLeaseCounts[player.UserId] or 0) == 0
+	then
 		return false, `award {tostring(id)}: active profile and award write lease required`
 	end
 	local raw = entry.Profile.Data

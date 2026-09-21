@@ -76,7 +76,12 @@ function BattlePassLogic.validateStoredState(raw: any, path: string, expectedId:
 		end
 		for key, claimed in claims do
 			local numeric = if type(key) == "number" then key else if type(key) == "string" then tonumber(key) else nil
-			if numeric == nil or numeric < 1 or numeric % 1 ~= 0 or (type(key) == "string" and tostring(numeric) ~= key) then
+			if
+				numeric == nil
+				or numeric < 1
+				or numeric % 1 ~= 0
+				or (type(key) == "string" and tostring(numeric) ~= key)
+			then
 				return false, `{path}.{field}.{tostring(key)}: expected positive integer tier key`
 			end
 			if type(claimed) ~= "boolean" then

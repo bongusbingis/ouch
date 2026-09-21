@@ -29,22 +29,48 @@ local random = Random.new()
 local seenEvents = EventDedup.new()
 
 local function definition(effectName: string)
-	assert(typeof(Audio.Gameplay) == "table", "Config.Infra.Audio.Gameplay: expected cue dictionary; correct the configuration and republish Arena")
+	assert(
+		typeof(Audio.Gameplay) == "table",
+		"Config.Infra.Audio.Gameplay: expected cue dictionary; correct the configuration and republish Arena"
+	)
 	local effect = (Audio.Gameplay :: any)[effectName]
-	assert(typeof(effect) == "table", `Config.Infra.Audio.Gameplay.{effectName}: required cue is missing or malformed; correct the configuration and republish Arena`)
-	assert(effect.Scope == "Local" or effect.Scope == "World", `Config.Infra.Audio.Gameplay.{effectName}.Scope: expected Local or World, received {tostring(effect.Scope)}; correct the configuration and republish Arena`)
-	assert(typeof(effect.Volume) == "number" and effect.Volume == effect.Volume and effect.Volume > 0 and math.abs(effect.Volume) < math.huge, `Config.Infra.Audio.Gameplay.{effectName}.Volume: expected finite positive number, received {tostring(effect.Volume)}; correct the configuration and republish Arena`)
+	assert(
+		typeof(effect) == "table",
+		`Config.Infra.Audio.Gameplay.{effectName}: required cue is missing or malformed; correct the configuration and republish Arena`
+	)
+	assert(
+		effect.Scope == "Local" or effect.Scope == "World",
+		`Config.Infra.Audio.Gameplay.{effectName}.Scope: expected Local or World, received {tostring(effect.Scope)}; correct the configuration and republish Arena`
+	)
+	assert(
+		typeof(effect.Volume) == "number"
+			and effect.Volume == effect.Volume
+			and effect.Volume > 0
+			and math.abs(effect.Volume) < math.huge,
+		`Config.Infra.Audio.Gameplay.{effectName}.Volume: expected finite positive number, received {tostring(
+			effect.Volume
+		)}; correct the configuration and republish Arena`
+	)
 	return effect
 end
 
 local function pickAssetId(effect, effectName: string): string
 	local assetIds = effect.AssetIds
 	local path = `Config.Infra.Audio.Gameplay.{effectName}.AssetIds`
-	assert(typeof(assetIds) == "table" and #assetIds > 0, `{path}: expected nonempty asset ID array; publish a valid cue ID and republish Arena`)
+	assert(
+		typeof(assetIds) == "table" and #assetIds > 0,
+		`{path}: expected nonempty asset ID array; publish a valid cue ID and republish Arena`
+	)
 	local count = 0
 	for index, assetId in assetIds do
-		assert(typeof(index) == "number" and index % 1 == 0 and index >= 1 and index <= #assetIds, `{path}[{tostring(index)}]: expected dense numeric array; correct the configuration and republish Arena`)
-		assert(typeof(assetId) == "string" and string.match(assetId, "^rbxassetid://%d+$") ~= nil, `{path}[{index}]: expected rbxassetid:// followed by digits, received {tostring(assetId)}; publish the correct asset ID and republish Arena`)
+		assert(
+			typeof(index) == "number" and index % 1 == 0 and index >= 1 and index <= #assetIds,
+			`{path}[{tostring(index)}]: expected dense numeric array; correct the configuration and republish Arena`
+		)
+		assert(
+			typeof(assetId) == "string" and string.match(assetId, "^rbxassetid://%d+$") ~= nil,
+			`{path}[{index}]: expected rbxassetid:// followed by digits, received {tostring(assetId)}; publish the correct asset ID and republish Arena`
+		)
 		count += 1
 	end
 	assert(count == #assetIds, `{path}: expected dense numeric array; correct the configuration and republish Arena`)
@@ -54,7 +80,10 @@ end
 local function emitterFor(host: Instance): (AudioEmitter, boolean)
 	local existing = host:FindFirstChild(EMITTER_NAME)
 	if existing then
-		assert(existing:IsA("AudioEmitter"), `{existing:GetFullName()}: expected AudioEmitter; remove the conflicting child and republish Arena`)
+		assert(
+			existing:IsA("AudioEmitter"),
+			`{existing:GetFullName()}: expected AudioEmitter; remove the conflicting child and republish Arena`
+		)
 		return existing, false
 	end
 	local emitter = Instance.new("AudioEmitter")
@@ -78,7 +107,13 @@ local function anchorAt(position: Vector3): BasePart
 	return anchor
 end
 
-local function playWorld(effect, assetId: string, effectName: string, host: Instance, transientAnchor: BasePart?): (boolean, string?)
+local function playWorld(
+	effect,
+	assetId: string,
+	effectName: string,
+	host: Instance,
+	transientAnchor: BasePart?
+): (boolean, string?)
 	local emitter, createdEmitter = emitterFor(host)
 	local player = Instance.new("AudioPlayer")
 	player.AssetId = assetId
@@ -100,8 +135,11 @@ local function playWorld(effect, assetId: string, effectName: string, host: Inst
 		if transientAnchor ~= nil then
 			transientAnchor:Destroy()
 		end
-		local reason = `Config.Infra.Audio.Gameplay.{effectName} asset {assetId} at {hostPath}: AudioPlayer:Play() failed: {err}`
-		warn(`[GameAudio] {reason}; cleaned this attempt's player, wire, new emitter and transient anchor; verify asset access and republish Arena`)
+		local reason =
+			`Config.Infra.Audio.Gameplay.{effectName} asset {assetId} at {hostPath}: AudioPlayer:Play() failed: {err}`
+		warn(
+			`[GameAudio] {reason}; cleaned this attempt's player, wire, new emitter and transient anchor; verify asset access and republish Arena`
+		)
 		return false, reason
 	end
 	Debris:AddItem(player, math.max(player.TimeLength, 3) + 0.25)
@@ -134,7 +172,10 @@ function GameAudio.play(effectName: string, at: (Instance | Vector3)?): (boolean
 		transientAnchor = anchorAt(at)
 		host = transientAnchor
 	end
-	assert(host ~= nil, `Config.Infra.Audio.Gameplay.{effectName}: World cue requires an Instance or Vector3 host; fix the caller before playback`)
+	assert(
+		host ~= nil,
+		`Config.Infra.Audio.Gameplay.{effectName}: World cue requires an Instance or Vector3 host; fix the caller before playback`
+	)
 	return playWorld(effect, assetId, effectName, host, transientAnchor)
 end
 
@@ -173,7 +214,10 @@ function GameAudio.onEvent(event: { [string]: any })
 
 	if kind == "Elim" then
 		local position = toVector3(event.position)
-		assert(position ~= nil, "[GameAudio] Elim event.position: expected authoritative Vector3; correct event producer before playback")
+		assert(
+			position ~= nil,
+			"[GameAudio] Elim event.position: expected authoritative Vector3; correct event producer before playback"
+		)
 		local effectName, fallbackName = EliminationAudio.soundFor(Cosmetics, elimEffectItemId(event), event)
 		local started, reason = GameAudio.play(effectName, position)
 		-- Permanent cosmetic contract: only a classified synchronous start failure

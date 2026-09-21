@@ -259,7 +259,11 @@ local function TouchButton(props: {
 				local ok, success, reason = pcall(callback, nil)
 				if not ok or not success then
 					faulted = true
-					warn(`[EmoteWheel] ArenaEmoteRoot.EmoteWheel.RegisterTouchExclusion: failed to clear EmoteButton touch exclusion: {if ok then tostring(reason) else tostring(success)}; restore the Arena Combat registration`)
+					warn(
+						`[EmoteWheel] ArenaEmoteRoot.EmoteWheel.RegisterTouchExclusion: failed to clear EmoteButton touch exclusion: {if ok
+							then tostring(reason)
+							else tostring(success)}; restore the Arena Combat registration`
+					)
 				end
 			end
 		end
@@ -270,7 +274,9 @@ local function TouchButton(props: {
 			faulted = true
 			registered.current = false
 			setAvailable(false)
-			warn(`[EmoteWheel] ArenaEmoteRoot.EmoteWheel.RegisterTouchExclusion: required EmoteButton touch exclusion failed: {reason}; restore the Arena Combat registration`)
+			warn(
+				`[EmoteWheel] ArenaEmoteRoot.EmoteWheel.RegisterTouchExclusion: required EmoteButton touch exclusion failed: {reason}; restore the Arena Combat registration`
+			)
 			clear()
 		end
 		local function register(button: GuiButton)
@@ -438,14 +444,16 @@ return function(props: Props)
 		touchPosition, touchAnchor = UDim2.fromOffset(position.X, position.Y), Vector2.zero
 	end
 	return c(React.Fragment, nil, {
-		Button = if touchVisible then c(TouchButton, {
-			SizePx = if props.TouchButtonPlacement == "BesideToolbar" then T.ArenaHUD.EmoteSize else nil,
-			BottomPx = WheelConfig.TouchButtonBottomPx,
-			Position = touchPosition,
-			AnchorPoint = touchAnchor,
-			ZIndex = z,
-			RegisterTouchExclusion = props.RegisterTouchExclusion,
-		}) else nil,
+		Button = if touchVisible
+			then c(TouchButton, {
+				SizePx = if props.TouchButtonPlacement == "BesideToolbar" then T.ArenaHUD.EmoteSize else nil,
+				BottomPx = WheelConfig.TouchButtonBottomPx,
+				Position = touchPosition,
+				AnchorPoint = touchAnchor,
+				ZIndex = z,
+				RegisterTouchExclusion = props.RegisterTouchExclusion,
+			})
+			else nil,
 		Surface = if snapshot.open
 			then ModalSurface({
 				ClassName = "TextButton",

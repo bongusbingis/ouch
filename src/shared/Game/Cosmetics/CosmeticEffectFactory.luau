@@ -5,7 +5,7 @@
 local Config = script.Parent.Parent.Parent.Parent.Config
 local CosmeticEffectsConfig = require(Config:WaitForChild("Cosmetics"):WaitForChild("CosmeticEffects"))
 -- The pure effect-id resolver is also loaded by Lune without Roblox services.
-local Runtime = if game ~= nil then require(script.Parent.Effects.Runtime) else ({} :: any)
+local Runtime = if game ~= nil then require(script.Parent.Effects.Runtime) else {} :: any
 
 local CosmeticEffectFactory = {}
 
@@ -35,7 +35,12 @@ function CosmeticEffectFactory.effectIdForItem(items: { [string]: ItemDef }, slo
 end
 
 local function validCount(value: any): boolean
-	return typeof(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge and value >= 0 and value % 1 == 0
+	return typeof(value) == "number"
+		and value == value
+		and value ~= math.huge
+		and value ~= -math.huge
+		and value >= 0
+		and value % 1 == 0
 end
 
 local function emitCountFor(instance: Instance, fallback: number): number
@@ -45,7 +50,9 @@ local function emitCountFor(instance: Instance, fallback: number): number
 	end
 	assert(
 		validCount(attribute),
-		`{instance:GetFullName()}.EmitCount: expected finite nonnegative integer, received {typeof(attribute)} {tostring(attribute)}; correct the Studio attribute and republish Arena/Lobby`
+		`{instance:GetFullName()}.EmitCount: expected finite nonnegative integer, received {typeof(attribute)} {tostring(
+			attribute
+		)}; correct the Studio attribute and republish Arena/Lobby`
 	)
 	return attribute
 end
@@ -147,10 +154,22 @@ end
 local function categoryFor(categoryId: string)
 	local path = `Config.Cosmetics.CosmeticEffects.Categories.{categoryId}`
 	local category = CosmeticEffectsConfig.Categories[categoryId]
-	assert(typeof(category) == "table", `{path}: required category is missing or malformed; correct the configuration and republish Arena/Lobby`)
-	assert(typeof(category.DefaultEffectId) == "string" and category.DefaultEffectId ~= "", `{path}.DefaultEffectId: expected nonempty effect id; correct the configuration and republish Arena/Lobby`)
-	assert(typeof(category.FolderName) == "string" and category.FolderName ~= "", `{path}.FolderName: expected nonempty folder name; correct the configuration and republish Arena/Lobby`)
-	assert(validCount(category.DefaultEmitCount), `{path}.DefaultEmitCount: expected finite nonnegative integer, received {tostring(category.DefaultEmitCount)}; correct the configuration and republish Arena/Lobby`)
+	assert(
+		typeof(category) == "table",
+		`{path}: required category is missing or malformed; correct the configuration and republish Arena/Lobby`
+	)
+	assert(
+		typeof(category.DefaultEffectId) == "string" and category.DefaultEffectId ~= "",
+		`{path}.DefaultEffectId: expected nonempty effect id; correct the configuration and republish Arena/Lobby`
+	)
+	assert(
+		typeof(category.FolderName) == "string" and category.FolderName ~= "",
+		`{path}.FolderName: expected nonempty folder name; correct the configuration and republish Arena/Lobby`
+	)
+	assert(
+		validCount(category.DefaultEmitCount),
+		`{path}.DefaultEmitCount: expected finite nonnegative integer, received {tostring(category.DefaultEmitCount)}; correct the configuration and republish Arena/Lobby`
+	)
 	return category
 end
 
@@ -164,7 +183,13 @@ local function cueFor(scriptEffects, category, effectId: string)
 	return nil, template
 end
 
-local function playAttempt(scripted, template: Instance?, effectId: string, context: EffectContext, defaultEmit: number): (boolean, string?)
+local function playAttempt(
+	scripted,
+	template: Instance?,
+	effectId: string,
+	context: EffectContext,
+	defaultEmit: number
+): (boolean, string?)
 	local attempt = Runtime.createAttempt(context.scope)
 	local attemptContext = table.clone(context)
 	attemptContext.scope = attempt
@@ -182,7 +207,10 @@ local function playAttempt(scripted, template: Instance?, effectId: string, cont
 	end
 	if result == false then
 		Runtime.destroyScope(attempt)
-		assert(typeof(reason) == "string" and reason ~= "", `[CosmeticEffectFactory] {effectId}: classified playback failure requires a nonempty reason`)
+		assert(
+			typeof(reason) == "string" and reason ~= "",
+			`[CosmeticEffectFactory] {effectId}: classified playback failure requires a nonempty reason`
+		)
 		return false, reason
 	end
 	Runtime.adoptScope(attempt, context.scope)
@@ -206,24 +234,34 @@ function CosmeticEffectFactory.play(categoryId: string, effectId: string?, conte
 	if resolvedId ~= category.DefaultEffectId then
 		selectedScript, selectedTemplate = cueFor(ScriptEffects, category, resolvedId)
 	end
-	local selectedOk, selectedReason = playAttempt(selectedScript, selectedTemplate, resolvedId, context, category.DefaultEmitCount)
+	local selectedOk, selectedReason =
+		playAttempt(selectedScript, selectedTemplate, resolvedId, context, category.DefaultEmitCount)
 	if selectedOk then
 		return true, nil
 	end
 	if resolvedId == category.DefaultEffectId then
-		warn(`[CosmeticEffectFactory] default effect {resolvedId} failed: {selectedReason}; correct the authored effect`)
+		warn(
+			`[CosmeticEffectFactory] default effect {resolvedId} failed: {selectedReason}; correct the authored effect`
+		)
 		return false, selectedReason
 	end
-	warn(`[CosmeticEffectFactory] selected effect {resolvedId} failed: {selectedReason}; cleaned its attempt and starting default {category.DefaultEffectId}`)
-	local callOk, defaultOk, defaultReason = pcall(playAttempt, defaultScript, defaultTemplate, category.DefaultEffectId, context, category.DefaultEmitCount)
+	warn(
+		`[CosmeticEffectFactory] selected effect {resolvedId} failed: {selectedReason}; cleaned its attempt and starting default {category.DefaultEffectId}`
+	)
+	local callOk, defaultOk, defaultReason =
+		pcall(playAttempt, defaultScript, defaultTemplate, category.DefaultEffectId, context, category.DefaultEmitCount)
 	if not callOk then
-		warn(`[CosmeticEffectFactory] default {category.DefaultEffectId} failed after selected {resolvedId}: {defaultOk}`)
+		warn(
+			`[CosmeticEffectFactory] default {category.DefaultEffectId} failed after selected {resolvedId}: {defaultOk}`
+		)
 		error(defaultOk, 0)
 	end
 	if defaultOk then
 		warn(`[CosmeticEffectFactory] default {category.DefaultEffectId} started after selected {resolvedId} failed`)
 	else
-		warn(`[CosmeticEffectFactory] default {category.DefaultEffectId} failed after selected {resolvedId}: {defaultReason}`)
+		warn(
+			`[CosmeticEffectFactory] default {category.DefaultEffectId} failed after selected {resolvedId}: {defaultReason}`
+		)
 	end
 	return false, selectedReason
 end

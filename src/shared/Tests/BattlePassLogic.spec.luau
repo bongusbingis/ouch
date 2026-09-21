@@ -201,7 +201,8 @@ T.describe("BattlePassLogic", function()
 		state.CosmeticClaims["Free:1:launch:Hat"] = "claimed" :: any
 		local valid, reason = BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")
 		T.expect(valid):toBeFalsy()
-		T.expect(string.find(reason or "", "SeasonHistory.S1.CosmeticClaims.Free:1:launch:Hat", 1, true) ~= nil):toBeTruthy()
+		T.expect(string.find(reason or "", "SeasonHistory.S1.CosmeticClaims.Free:1:launch:Hat", 1, true) ~= nil)
+			:toBeTruthy()
 		state.CosmeticClaims = { [4] = true } :: any
 		valid, reason = BattlePassLogic.validateStoredState(state, "SeasonHistory.S1", "S1")
 		T.expect(valid):toBeFalsy()

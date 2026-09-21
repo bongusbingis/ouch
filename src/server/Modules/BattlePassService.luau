@@ -84,7 +84,13 @@ local function premiumProductId(seasonId: string): number?
 	return nil
 end
 
-local function grantCosmetics(player: Player, data: any, stored: any, path: string, expectedId: string?): (boolean, string?)
+local function grantCosmetics(
+	player: Player,
+	data: any,
+	stored: any,
+	path: string,
+	expectedId: string?
+): (boolean, string?)
 	local valid, validationReason = BattlePassLogic.validateStoredState(stored, path, expectedId)
 	if not valid then
 		return false, validationReason
@@ -96,7 +102,9 @@ local function grantCosmetics(player: Player, data: any, stored: any, path: stri
 	local complete = true
 	local failure: string? = nil
 	if stored.CosmeticClaims == nil then
-		warn(`[BattlePassService] {path}.CosmeticClaims for {player.Name}: historical field absent; initializing empty claim map`)
+		warn(
+			`[BattlePassService] {path}.CosmeticClaims for {player.Name}: historical field absent; initializing empty claim map`
+		)
 		stored.CosmeticClaims = {}
 	end
 	for _, reward in SeasonCosmetics.pending(season, stored, hasPremium(data, stored.Id)) do
@@ -109,7 +117,10 @@ local function grantCosmetics(player: Player, data: any, stored: any, path: stri
 			stored.CosmeticClaims[reward.key] = true
 		else
 			complete = false
-			failure = failure or `season {stored.Id} cosmetic {reward.key} item {reward.itemId}: {tostring(if ok then reason else granted)}`
+			failure = failure
+				or `season {stored.Id} cosmetic {reward.key} item {reward.itemId}: {tostring(
+					if ok then reason else granted
+				)}`
 		end
 	end
 	return complete, failure
@@ -153,7 +164,9 @@ local function grantUnclaimedTiers(player: Player, data: any, stored: any, archi
 		else
 			complete = false
 			failure = failure
-				or `season {stored.Id} tier {owed.tier} {owed.track} {owed.reward.kind} {tostring(owed.reward.itemId or owed.reward.amount)}: {tostring(if ok then reason else granted)}`
+				or `season {stored.Id} tier {owed.tier} {owed.track} {owed.reward.kind} {tostring(
+					owed.reward.itemId or owed.reward.amount
+				)}: {tostring(if ok then reason else granted)}`
 		end
 	end
 	local cosmeticsComplete, cosmeticsReason = grantCosmetics(player, data, stored, path, archiveKey)
@@ -197,7 +210,9 @@ function BattlePassService.ensureData(player: Player): any
 		end
 		for archiveKey, stored in data.SeasonHistory do
 			if type(archiveKey) ~= "string" or archiveKey == "" then
-				error(`[BattlePassService] SeasonHistory.{tostring(archiveKey)} for {player.Name}: expected nonempty string archive key; repair persisted profile`)
+				error(
+					`[BattlePassService] SeasonHistory.{tostring(archiveKey)} for {player.Name}: expected nonempty string archive key; repair persisted profile`
+				)
 			end
 			local valid, reason = BattlePassLogic.validateStoredState(stored, `SeasonHistory.{archiveKey}`, archiveKey)
 			if not valid then
@@ -267,7 +282,8 @@ function BattlePassService.settleArchivedSeason(player: Player, seasonId: string
 	end
 	local stored = data.SeasonHistory[seasonId]
 	if stored == nil then
-		local missing = `award {tostring(awardId)} season {tostring(seasonId)}: SeasonHistory.{tostring(seasonId)} missing`
+		local missing =
+			`award {tostring(awardId)} season {tostring(seasonId)}: SeasonHistory.{tostring(seasonId)} missing`
 		if type(awardId) ~= "string" or awardId == "" then
 			return false, `{missing}; nonempty award ID required`
 		end
@@ -283,7 +299,8 @@ function BattlePassService.settleArchivedSeason(player: Player, seasonId: string
 			return false, `{missing}; MatchAwards.Pending.{awardId} record required`
 		end
 		if record.Ready ~= true or record.ProgressionApplied ~= true or record.SeasonApplied ~= true then
-			return false, `{missing}; MatchAwards.Pending.{awardId} must be ready, progression-applied, and season-applied`
+			return false,
+				`{missing}; MatchAwards.Pending.{awardId} must be ready, progression-applied, and season-applied`
 		end
 		if record.SeasonId ~= seasonId then
 			return false, `{missing}; MatchAwards.Pending.{awardId}.SeasonId must equal {seasonId}`

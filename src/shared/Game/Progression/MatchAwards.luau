@@ -11,18 +11,21 @@ end
 
 function MatchAwards.validateDelta(delta: any, path: string): (boolean, string?)
 	if type(delta) ~= "table" then
-		return false, `{path}: expected V1 award table, received {typeof(delta)}; repair the persisted V1 award before replay`
+		return false,
+			`{path}: expected V1 award table, received {typeof(delta)}; repair the persisted V1 award before replay`
 	end
 	for _, field in { "XP", "Bonks" } do
 		local value = delta[field]
 		if not validAmount(value) then
-			return false, `{path}.{field}: expected finite nonnegative integer, received {tostring(value)}; repair the persisted V1 award before replay`
+			return false,
+				`{path}.{field}: expected finite nonnegative integer, received {tostring(value)}; repair the persisted V1 award before replay`
 		end
 	end
 	for _, field in OPTIONAL_COUNTERS do
 		local value = delta[field]
 		if value ~= nil and not validAmount(value) then
-			return false, `{path}.{field}: expected finite nonnegative integer when present, received {tostring(value)}; repair the persisted V1 award before replay`
+			return false,
+				`{path}.{field}: expected finite nonnegative integer when present, received {tostring(value)}; repair the persisted V1 award before replay`
 		end
 	end
 	return true, nil
@@ -31,19 +34,23 @@ end
 function MatchAwards.validateMarkers(record: any, id: string): (boolean, string?)
 	local path = `MatchAwards.Pending.{id}`
 	if type(record) ~= "table" then
-		return false, `{path}: expected V1 award table, received {typeof(record)}; repair the persisted V1 award before replay`
+		return false,
+			`{path}: expected V1 award table, received {typeof(record)}; repair the persisted V1 award before replay`
 	end
 	for _, field in { "Ready", "ProgressionApplied", "SeasonApplied" } do
 		if type(record[field]) ~= "boolean" then
-			return false, `{path}.{field}: expected boolean, received {tostring(record[field])}; repair the persisted V1 award before replay`
+			return false,
+				`{path}.{field}: expected boolean, received {tostring(record[field])}; repair the persisted V1 award before replay`
 		end
 	end
 	if record.SeasonApplied and not record.ProgressionApplied then
-		return false, `{path}.SeasonApplied: true requires ProgressionApplied=true; inspect the persisted credit before repair`
+		return false,
+			`{path}.SeasonApplied: true requires ProgressionApplied=true; inspect the persisted credit before repair`
 	end
 	if not record.Ready then
 		if record.ProgressionApplied then
-			return false, `{path}.ProgressionApplied: true requires Ready=true; inspect the persisted payout before repair`
+			return false,
+				`{path}.ProgressionApplied: true requires Ready=true; inspect the persisted payout before repair`
 		end
 		if record.Awarded ~= nil then
 			return false, `{path}.Awarded: must be absent while Ready=false; inspect the persisted payout before repair`
@@ -59,7 +66,8 @@ function MatchAwards.validatePending(record: any, id: string): (boolean, string?
 		return false, markerReason
 	end
 	if type(record.SeasonId) ~= "string" then
-		return false, `{path}.SeasonId: expected string, received {tostring(record.SeasonId)}; repair the persisted V1 award before replay`
+		return false,
+			`{path}.SeasonId: expected string, received {tostring(record.SeasonId)}; repair the persisted V1 award before replay`
 	end
 	local valid, reason = MatchAwards.validateDelta(record.Progress, `{path}.Progress`)
 	if not valid then
@@ -69,7 +77,8 @@ function MatchAwards.validatePending(record: any, id: string): (boolean, string?
 		return MatchAwards.validateDelta(record.Awarded, `{path}.Awarded`)
 	end
 	if record.ProgressionApplied then
-		return false, `{path}.Awarded: required after progression was applied; repair the persisted V1 award before replay`
+		return false,
+			`{path}.Awarded: required after progression was applied; repair the persisted V1 award before replay`
 	end
 	return true, nil
 end

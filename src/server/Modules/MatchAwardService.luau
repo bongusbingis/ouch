@@ -8,7 +8,10 @@ local Boosts = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("Boosts")
 )
 local MatchAwards = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Progression"):WaitForChild("MatchAwards")
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Progression")
+		:WaitForChild("MatchAwards")
 )
 local PlayerData = require(script.Parent.PlayerData)
 local EntitlementService = require(script.Parent.EntitlementService)
@@ -81,7 +84,9 @@ local function commit(player: Player, id: string): (boolean, string?)
 	end
 	local before = BattlePassService.stateFor(player)
 	if before == nil then
-		warn(`[MatchAwardService] award {id} season {tostring(record.SeasonId)}: season state unavailable before payout`)
+		warn(
+			`[MatchAwardService] award {id} season {tostring(record.SeasonId)}: season state unavailable before payout`
+		)
 		return false
 	end
 	local applied, applyReason = PlayerData.applyMatchAward(player, id)
@@ -147,7 +152,11 @@ function MatchAwardService.flush(player: Player)
 			for id, record in journal.Pending do
 				local valid, reason = MatchAwards.validatePending(record, id)
 				if not valid then
-					reportRejected(player, id, assert(reason, "MatchAwards.validatePending rejected without a path diagnostic"))
+					reportRejected(
+						player,
+						id,
+						assert(reason, "MatchAwards.validatePending rejected without a path diagnostic")
+					)
 					waiting = true
 					continue
 				end
