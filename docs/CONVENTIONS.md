@@ -61,7 +61,7 @@
 ## 8. Things NOT To Do
 - **DON'T** modify the upstream PlayerModule files (under `src/client/PlayerModule/CameraModule/`, `ControlModule/`, `CommonUtils/`, `ServerAuthority/`, `init.luau`). Additions under `Combat/` are fine.
 - **DON'T** invent new visual palettes — use `Tokens.luau` and the candy system from `docs/STYLE.md`.
-- **DON'T** create task-specific docs in `docs/` — use `.review/` for task evidence.
+- **DON'T** create task-specific docs in `docs/`. Put task evidence and docs in `.review/agent-workflow/tasks/<ID>/`; finished tasks move to `.review/agent-workflow/archive/<ID>/` (see "Artifact layout" in `AI_AGENT_WORKFLOW.md`).
 - **DON'T** duplicate Rojo project paths independently — both project.json files must stay in sync for shared modules.
 - **DON'T** add packages without updating `wally.toml`.
 - **DON'T** bypass server authority for economy, progression, or cosmetic ownership.

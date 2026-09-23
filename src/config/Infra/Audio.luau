@@ -18,8 +18,6 @@ return {
 				-- "rbxassetid://1847683526",
 				"rbxassetid://103042163423595",
 			},
-			Volume = 1,
-			FadeInSeconds = 0.8,
 		},
 		Lobby = {
 			AssetId = "rbxassetid://100890928902177",

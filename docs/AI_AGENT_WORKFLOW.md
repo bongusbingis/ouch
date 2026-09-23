@@ -242,7 +242,7 @@ A failed test with a known repair path is READY work, not a blocker.
 
 Execution is represented by a lease separate from task status. A READY task may have an active lease containing the worker, leased paths, leased resources, start time, and expiry.
 
-Completed work leaves the live board and is appended to a completed ledger with its result, evidence, and follow-up tasks. This preserves a three-state live queue without losing history.
+Completed work leaves the live board and is appended to a completed ledger with its result, evidence, and follow-up tasks. This preserves a three-state live queue without losing history. Its evidence folder moves from `tasks/` to `archive/` once its goal is finished (see Artifact layout).
 
 ## Prime's scheduling loop
 
@@ -295,7 +295,7 @@ acceptance:
   - observable pass conditions
 checks:
   - commands or runtime scenarios
-evidence_dir: .review/agent-workflow/FEAT-001
+evidence_dir: .review/agent-workflow/tasks/FEAT-001
 forbidden:
   - explicit out-of-scope actions
 return_format: standard-result-v1
@@ -534,7 +534,7 @@ Jack's subscriptions have daily and monthly usage limits that agents cannot dire
 ### Reusable memory
 
 - Record stable architectural decisions, commands, and project rules in repository documentation.
-- Record task-specific evidence under the task artifact directory.
+- Record task-specific evidence under `.review/agent-workflow/tasks/<ID>/`.
 - Reuse verified memos while their referenced commit and environment remain current.
 - Invalidate memos when affected files, configuration, or runtime state changes.
 
@@ -544,23 +544,31 @@ Jack's subscriptions have daily and monthly usage limits that agents cannot dire
 - Do not repeat the same failed action without a changed condition.
 - Convert repeated uncertainty into a focused Scout task or a clear blocker.
 
-## Suggested artifact layout
+## Artifact layout
 
-The orchestration mechanism may use any storage format. A practical repository-local layout is:
+All task-specific files live under `.review/agent-workflow/`:
 
 ```text
 .review/agent-workflow/
   board.json
   completed.ndjson
   decisions.md
-  tasks/
+  tasks/              # active, in-progress, or unfinished work only
     FEAT-001/
       scout-memo.md
       design.md
       test-output.txt
       review.md
       screenshots/
+      FEAT-001A/      # subtask of FEAT-001
+  archive/            # finished work and work no longer being pursued
+    PERF-001/
 ```
+
+- Every task-specific file belongs in its task folder: memos, designs, plans, reviews, audit reports, test output, and screenshots. Never put one in `docs/`, at the `.review/` root, or at the `.review/agent-workflow/` root.
+- Subtasks nest inside their goal's folder, so one move archives the whole goal.
+- `tasks/` holds only work that is active, in progress, or unfinished. When a goal is completed and verified, or Jack stops pursuing it, Prime moves its whole folder to `archive/`. To reopen archived work, move the folder back to `tasks/`.
+- Record evidence paths in `board.json` and `completed.ndjson` relative to the task folder (e.g. `FEAT-001/review.md`) so they stay valid after archiving.
 
 The live board is operational state and may remain untracked. Stable decisions, specifications, and approved behavior should be moved into the repository's durable documentation.
 
