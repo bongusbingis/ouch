@@ -99,8 +99,8 @@ local WORLD_CAMERA_PAGE = { Settings = "Inventory" }
 -- One crashing page, modal or header piece must never unmount the rest of the
 -- lobby UI: each independent layer sits in its own boundary and drops to
 -- nothing on error, leaving the player able to keep playing.
-local function guard(name: string, element: any, resetKey: any?)
-	return c(ErrorBoundary, { Name = `LobbyApp.{name}`, ResetKey = resetKey }, { [name] = element })
+local function guard(name: string, element: any, resetKey: any?, onError: ((err: any) -> ())?)
+	return c(ErrorBoundary, { Name = `LobbyApp.{name}`, OnError = onError, ResetKey = resetKey }, { [name] = element })
 end
 
 local QUEUE_OPTIONS = {}
@@ -1259,7 +1259,12 @@ local function LobbyContent(props)
 						OnChoose = notifications.close,
 						FocusEnabled = not effectPreview.active,
 					}),
-					notifications.request
+					notifications.request,
+					-- A crashed modal must not leave an undismissable request that blocks the
+					-- daily reward, tab cycling and the emote wheel.
+					function()
+						notifications.close(false)
+					end
 				),
 				Economy = guard(
 					"Economy",

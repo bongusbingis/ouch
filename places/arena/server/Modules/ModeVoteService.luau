@@ -49,6 +49,9 @@ local started = false
 local random = Random.new()
 local beginVote: () -> ()
 local strandedReturnPending = false
+local strandedSince: number? = nil
+local settleUntil = 0
+local settleRescheduled = false
 
 local function playablePlayers(): { Player }
 	local result = {}
@@ -163,21 +166,44 @@ end
 -- or left), nothing will ever open a ballot and the loading overlay never
 -- clears. After a short grace for a late arrival, send them back to the lobby
 -- rather than leave them waiting on a match that cannot start.
+local function loadingAdmittedCount(): number
+	local count = 0
+	for _, player in admittedPlayers() do
+		if not ArenaSessionService.isReady(player) then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function returnStrandedPlayers()
 	if strandedReturnPending then
 		return
 	end
 	strandedReturnPending = true
+	local now = os.clock()
+	local since = strandedSince or now
+	strandedSince = since
 	task.delay(GameModes.OpponentGraceSeconds, function()
 		strandedReturnPending = false
 		local phase = MatchService.phase()
 		if vote ~= nil or pendingWinner ~= nil or (phase ~= "Idle" and phase ~= "Intermission") then
+			strandedSince = nil
 			return
 		end
 		if configuredOptions() ~= nil then
+			strandedSince = nil
 			beginVote()
 			return
 		end
+		-- An admitted player who is still loading may yet make this a playable
+		-- match; wait for them, bounded by the readiness deadline so a client
+		-- that never readies cannot hold the others forever.
+		if ModeVote.strandedAction(loadingAdmittedCount(), os.clock() - since, Loading.ArenaWaitSeconds) == "rearm" then
+			returnStrandedPlayers()
+			return
+		end
+		strandedSince = nil
 		for _, player in playablePlayers() do
 			ArenaReturnService.returnPlayer(player)
 		end
@@ -187,6 +213,19 @@ end
 local function startWinner()
 	local winner = pendingWinner
 	if winner == nil or MatchService.phase() ~= "Idle" then
+		return
+	end
+	-- A map swap just resolved: every start path waits out the settle window,
+	-- rescheduling once; the match always starts after it.
+	local settleRemaining = settleUntil - os.clock()
+	if settleRemaining > 0 then
+		if not settleRescheduled then
+			settleRescheduled = true
+			task.delay(settleRemaining, function()
+				settleRescheduled = false
+				startWinner()
+			end)
+		end
 		return
 	end
 	local accepted, reason = MatchService.beginMode(winner)
@@ -311,7 +350,8 @@ local function finishVote(expectedRevision: number)
 		-- A fresh server resolves its first ballot in Idle and would start the
 		-- match this frame; give a newly swapped map a moment to stream in.
 		if mapChanged then
-			task.delay(ArenaMaps.SwapSettleSeconds, startWinner)
+			settleUntil = os.clock() + ArenaMaps.SwapSettleSeconds
+			startWinner()
 		else
 			startWinner()
 		end
