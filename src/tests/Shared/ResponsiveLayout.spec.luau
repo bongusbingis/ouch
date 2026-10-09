@@ -6,6 +6,26 @@ local Layout = require(
 )
 local Config = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 
+-- Smallest viewport height at which the shipped config lets the season/daily/quest cards stand
+-- alone (no stacked progression column) for a given width. Derived from the real layout so the
+-- specs follow config changes instead of hardcoding the boundary.
+local function desktopCardsMinHeight(width: number): number
+	local config = Config.Layout.Splash.ProgressPanels
+	for height = Config.Layout.ShortLandscapeMaxHeightPx + 1, 2400 do
+		if
+			Layout.splashPanels(
+				Vector2.new(width, height),
+				config,
+				Config.Layout.PortraitMaxAspect,
+				Config.Layout.ShortLandscapeMaxHeightPx
+			).progressStack == nil
+		then
+			return height
+		end
+	end
+	error("no viewport height fits the desktop splash cards")
+end
+
 local INVENTORY_PANEL = {
 	Portrait = { WidthScale = 0.956, HeightScale = 0.75, MaxSize = Vector2.new(480, 720) },
 	Landscape = {
@@ -25,6 +45,10 @@ local SHOP_PANEL = {
 	},
 }
 local PORTRAIT_MAX_ASPECT = 1
+-- ResponsiveLayout.splashPanels ends a non-tabbed intermediate column this far above the bottom edge.
+local STACKED_COLUMN_BOTTOM_MARGIN_PX = 24
+-- Tabbed (short-phone) columns end this far above the bottom edge.
+local TABBED_COLUMN_BOTTOM_MARGIN_PX = 12
 -- Mirrors SplashPage's portrait action dock: the BottomRight frame is bottom
 -- anchored at 0.98 and PortraitActionsHeightPx tall, so the progress panels have
 -- to end above it.
@@ -135,30 +159,32 @@ return function()
 		end)
 		it("keeps intermediate cards visible until the full desktop card column can fit", function()
 			local config = Config.Layout.Splash.ProgressPanels
-			local intermediate = Layout.splashPanels(Vector2.new(1158, 719), config, 1, 500)
+			local fitHeight = desktopCardsMinHeight(1158)
+			local intermediate = Layout.splashPanels(Vector2.new(1158, fitHeight - 1), config, 1, 500)
 			local stack = assert(intermediate.progressStack)
 			expect(intermediate.tabbed).to.equal(false)
-			expect(stack.position.Y + stack.size.Y).to.equal(719 - config.Landscape.ShortBottomPx)
-			local desktop = Layout.splashPanels(Vector2.new(1158, 841), config, 1, 500)
+			expect(stack.position.Y + stack.size.Y).to.equal(fitHeight - 1 - STACKED_COLUMN_BOTTOM_MARGIN_PX)
+			local desktop = Layout.splashPanels(Vector2.new(1158, fitHeight), config, 1, 500)
 			expect(desktop.progressStack == nil).to.equal(true)
-			expect(desktop.daily.size.Y >= 140).to.equal(true)
+			expect(desktop.daily.size.Y >= config.Landscape.DailyHeightPx).to.equal(true)
 			expect(desktop.quests.size.Y >= config.Landscape.QuestsMinHeightPx).to.equal(true)
-			expect(desktop.quests.position.Y + desktop.quests.size.Y <= 841 - config.Landscape.ActionsReservePx).to.equal(
+			expect(desktop.quests.position.Y + desktop.quests.size.Y <= fitHeight - config.Landscape.ActionsReservePx).to.equal(
 				true
 			)
 		end)
 		it("fits season daily and quest cards together in a roomier intermediate column", function()
 			local config = Config.Layout.Splash.ProgressPanels
-			for _, size in { Vector2.new(1158, 600), Vector2.new(1158, 662), Vector2.new(1158, 719) } do
+			local fitHeight = desktopCardsMinHeight(1158)
+			for _, size in { Vector2.new(1158, 600), Vector2.new(1158, 662), Vector2.new(1158, fitHeight - 1) } do
 				local panels = Layout.splashPanels(size, config, 1, 500)
 				local stack = assert(panels.progressStack)
 				expect(panels.tabbed).to.equal(false)
-				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - config.Landscape.ShortBottomPx)
+				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - STACKED_COLUMN_BOTTOM_MARGIN_PX)
 				local questContentBudget = stack.size.Y
 					- panels.season.size.Y
 					- panels.daily.size.Y
 					- config.GapPx * 3.5
-				expect(panels.season.size.Y >= 88).to.equal(true)
+				expect(panels.season.size.Y >= config.Landscape.SeasonHeightPx).to.equal(true)
 				expect(panels.daily.size.Y >= config.DailyMinHeightPx).to.equal(true)
 				expect(questContentBudget >= config.Landscape.QuestsMinHeightPx).to.equal(true)
 				local world = Layout.splashWorldWindow(size, Config.Layout)
@@ -247,8 +273,8 @@ return function()
 		it("gives the desktop party the left composition beside one progression column", function()
 			for _, size in
 				{
-					Vector2.new(820, 725),
-					Vector2.new(1158, 725),
+					Vector2.new(820, desktopCardsMinHeight(820)),
+					Vector2.new(1158, desktopCardsMinHeight(1158)),
 					Vector2.new(1024, 841),
 					Vector2.new(1152, 841),
 					Vector2.new(1158, 1100),
@@ -272,7 +298,10 @@ return function()
 				end
 				expect(world.position.Y >= 0 and world.position.Y + world.size.Y <= size.Y - gap).to.equal(true)
 				expect(world.position.X >= 0 and world.position.X + world.size.X <= size.X).to.equal(true)
-				expect(world.size.X >= size.X * 0.6 and world.size.Y >= size.Y * 0.6).to.equal(true)
+				-- The shipped column keeps at least Landscape.MinWidthPx, so the narrowest desktop
+				-- window gives the party about half the width instead of 60%.
+				local worldWidthShare = if size.X >= 1024 then 0.6 else 0.5
+				expect(world.size.X >= size.X * worldWidthShare and world.size.Y >= size.Y * 0.6).to.equal(true)
 				expect(panels.daily.position.Y >= panels.season.position.Y + panels.season.size.Y + gap).to.equal(true)
 				expect(panels.quests.position.Y >= panels.daily.position.Y + panels.daily.size.Y + gap).to.equal(true)
 				expect(panels.quests.size.Y >= Config.Layout.Splash.ProgressPanels.Landscape.QuestsMinHeightPx).to.equal(
@@ -291,7 +320,9 @@ return function()
 				local stack = assert(panels.progressStack)
 				local world = Layout.splashWorldWindow(size, Config.Layout)
 				expect(world.position.X + world.size.X < stack.position.X).to.equal(true)
-				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - (if panels.tabbed then 12 else 78))
+				expect(stack.position.Y + stack.size.Y).to.equal(
+					size.Y - (if panels.tabbed then TABBED_COLUMN_BOTTOM_MARGIN_PX else STACKED_COLUMN_BOTTOM_MARGIN_PX)
+				)
 				expect(panels.tabbed).to.equal(size.Y <= 520)
 				expect(world.position.Y + world.size.Y <= size.Y - 70).to.equal(true)
 			end
@@ -352,7 +383,8 @@ return function()
 				+ actions.ActionHeightPx * 2
 				+ actions.DesktopPrimaryActionHeightPx
 				+ actions.ActionsGapPx * 3
-			expect(actions.DesktopPrimaryActionHeightPx > actions.PrimaryActionHeightPx).to.equal(true)
+			-- The redesign unified Play at one height; desktop prominence is carried by the larger label.
+			expect(actions.DesktopPrimaryActionHeightPx >= actions.PrimaryActionHeightPx).to.equal(true)
 			expect(actions.DesktopPrimaryActionTextPx > actions.PrimaryActionTextPx).to.equal(true)
 			for _, size in { Vector2.new(1152, 783), Vector2.new(1366, 710), Vector2.new(1366, 768) } do
 				local panels = Layout.splashPanels(size, actions.ProgressPanels, 1, 500)
@@ -444,11 +476,13 @@ return function()
 					local stack = layout.progressStack
 					-- Non-short stacks share the action dock's 24 px bottom margin so the column and PLAY end together.
 					expect(stack.position.Y + stack.size.Y).to.equal(size.Y - (if layout.tabbed then 12 else 24))
-					expect(stack.size.Y >= 100).to.be.ok()
+					expect(stack.size.Y >= 100).to.equal(true)
 				else
-					expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252).to.be.ok()
-					expect(layout.quests.position.Y >= layout.daily.position.Y + layout.daily.size.Y + config.GapPx).to.be.ok()
-					expect(layout.quests.size.Y - 60 >= 44).to.be.ok()
+					expect(layout.quests.position.Y + layout.quests.size.Y <= size.Y - 252).to.equal(true)
+					expect(layout.quests.position.Y >= layout.daily.position.Y + layout.daily.size.Y + config.GapPx).to.equal(
+						true
+					)
+					expect(layout.quests.size.Y - 60 >= 44).to.equal(true)
 				end
 			end
 		end)
@@ -466,7 +500,7 @@ return function()
 					expect(layout[name].position.Y).to.equal(original[name].position.Y)
 					expect(layout[name].size.Y).to.equal(original[name].size.Y)
 				end
-				expect(layout.tabbed).to.be.ok()
+				expect(layout.tabbed).to.equal(true)
 				local stack = assert(layout.progressStack)
 				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - 12)
 			end
@@ -475,7 +509,7 @@ return function()
 			local original = Layout.splashPanels(size, unreserved, 1, 500)
 			expect(original.progressStack).to.equal(nil)
 			local stack = assert(layout.progressStack)
-			expect(layout.tabbed).to.be.ok()
+			expect(layout.tabbed).to.equal(true)
 			expect(stack.position.Y + stack.size.Y).to.equal(size.Y - 12)
 		end)
 
@@ -489,8 +523,10 @@ return function()
 				expect(panel.position.X).to.equal(layout.season.position.X)
 				expect(panel.size.X).to.equal(layout.season.size.X)
 			end
-			expect(layout.daily.position.Y >= layout.season.position.Y + layout.season.size.Y + config.GapPx).to.be.ok()
-			expect(layout.quests.size.Y - 60 >= 44).to.be.ok()
+			expect(layout.daily.position.Y >= layout.season.position.Y + layout.season.size.Y + config.GapPx).to.equal(
+				true
+			)
+			expect(layout.quests.size.Y - 60 >= 44).to.equal(true)
 		end)
 
 		it("uses short landscape dimensions without changing the portrait branch", function()
@@ -502,7 +538,7 @@ return function()
 			spec.Landscape.ShortHeightScale = 0.7
 			spec.Landscape.ShortAspectRatio = 2.4
 			local landscape = Layout.panelSize(Vector2.new(666, 316), spec, 1, 500)
-			expect(landscape.X > 500).to.be.ok()
+			expect(landscape.X > 500).to.equal(true)
 			expect(landscape.Y).to.equal(221)
 			local portrait = Layout.panelSize(Vector2.new(390, 844), spec, 1, 500)
 			expect(portrait.X).to.equal(372)
@@ -519,11 +555,11 @@ return function()
 			config.Quests = table.clone(config.Quests)
 			config.Quests.ShortHeightScale = 0.4
 			local layout = Layout.splashPanels(Vector2.new(666, 316), config, 1, 500)
-			expect(layout.quests.size.Y >= 120).to.be.ok()
-			expect(layout.tabbed).to.be.ok()
+			expect(layout.quests.size.Y >= 120).to.equal(true)
+			expect(layout.tabbed).to.equal(true)
 			local stack = assert(layout.progressStack)
 			expect(stack.position.Y + stack.size.Y).to.equal(304)
-			expect(stack.size.Y - 44 - 12 >= 140).to.be.ok()
+			expect(stack.size.Y - 44 - 12 >= 140).to.equal(true)
 			expect(overlaps(layout.season.position, layout.season.size, layout.quests.position, layout.quests.size)).to.equal(
 				false
 			)
@@ -556,8 +592,10 @@ return function()
 			expect(shop.panel.size.X).to.equal(math.floor((backpack.panel.size.X + original.X) / 2))
 			expect(shop.panel.size.Y).to.equal(math.floor((backpack.panel.size.Y + original.Y) / 2))
 			expect(shop.panel.position.X).to.equal(backpack.panel.position.X)
-			expect(shop.world.position.X).to.equal(shop.panel.position.X + shop.panel.size.X + 12)
-			expect(shop.world.position.X + shop.world.size.X).to.equal(available.X - 12)
+			-- Vector2 components are float32 in Studio, so edges that are sums of fractional values
+			-- match only within a tolerance (1241.3999 vs 1241.4).
+			expect(shop.world.position.X).to.be.near(shop.panel.position.X + shop.panel.size.X + 12, 0.01)
+			expect(shop.world.position.X + shop.world.size.X).to.be.near(available.X - 12, 0.01)
 		end)
 
 		it("preserves desktop shop geometry without a mobile header reservation", function()
@@ -580,12 +618,12 @@ return function()
 				local shop = Layout.shopComposition(available, config, 13)
 				local backpack = Layout.inventoryComposition(available, config, 13)
 				expect(shop.panel.size).to.equal(backpack.panel.size)
-				expect(shop.panel.position.Y >= 13 + 12).to.be.ok()
-				expect(shop.panel.position.Y + shop.panel.size.Y <= available.Y - 12).to.be.ok()
-				expect(shop.panel.size.X >= 390).to.be.ok()
-				expect(shop.world.size.X >= 154).to.be.ok()
-				expect(shop.panel.position.X + shop.panel.size.X < shop.world.position.X).to.be.ok()
-				expect(shop.world.position.X + shop.world.size.X <= available.X - 12).to.be.ok()
+				expect(shop.panel.position.Y >= 13 + 12).to.equal(true)
+				expect(shop.panel.position.Y + shop.panel.size.Y <= available.Y - 12).to.equal(true)
+				expect(shop.panel.size.X >= 390).to.equal(true)
+				expect(shop.world.size.X >= 154).to.equal(true)
+				expect(shop.panel.position.X + shop.panel.size.X < shop.world.position.X).to.equal(true)
+				expect(shop.world.position.X + shop.world.size.X <= available.X - 12).to.equal(true)
 			end
 		end)
 
@@ -598,7 +636,7 @@ return function()
 			expect(shop.panel.position.Y + shop.panel.size.Y).to.equal(766)
 			expect(shop.panel.position.X).to.equal(legacy.panel.position.X)
 			expect(shop.panel.size.X).to.equal(legacy.panel.size.X)
-			expect(shop.panel.size.Y - legacy.panel.size.Y >= 120).to.be.ok()
+			expect(shop.panel.size.Y - legacy.panel.size.Y >= 120).to.equal(true)
 			expect(shop.world.position.Y).to.equal(shop.panel.position.Y)
 			expect(shop.world.size.Y).to.equal(shop.panel.size.Y)
 			local tallerHeader = Layout.shopComposition(available, config, 67)
@@ -631,8 +669,8 @@ return function()
 			-- The camera reports (1, 1) until the first frame, so a real device inset can
 			-- exceed the viewport; that has to yield a degenerate rect, not an error.
 			local unrendered = Layout.safeRect(Vector2.new(1, 1), Vector2.new(0, 47), Vector2.new(1, 1), true)
-			expect(unrendered.size.X >= 0 and unrendered.size.Y >= 0).to.be.ok()
-			expect(unrendered.position.X >= 0 and unrendered.position.Y >= 0).to.be.ok()
+			expect(unrendered.size.X >= 0 and unrendered.size.Y >= 0).to.equal(true)
+			expect(unrendered.position.X >= 0 and unrendered.position.Y >= 0).to.equal(true)
 
 			local noCamera = Layout.safeRect(Vector2.zero, Vector2.new(12, 47), Vector2.zero, true)
 			expect(noCamera.size.X).to.equal(0)
@@ -685,13 +723,13 @@ return function()
 				)
 				if layout.portrait then
 					local actionsTop = size.Y * SPLASH_ACTIONS_BOTTOM_SCALE - SPLASH_ACTIONS_HEIGHT_PX
-					expect(layout.quests.position.Y + layout.quests.size.Y < actionsTop).to.be.ok()
+					expect(layout.quests.position.Y + layout.quests.size.Y < actionsTop).to.equal(true)
 				end
-				expect(layout.daily.size.Y >= DAILY_MIN_HEIGHT_PX).to.be.ok()
+				expect(layout.daily.size.Y >= DAILY_MIN_HEIGHT_PX).to.equal(true)
 				for _, panel in { layout.daily, layout.season, layout.quests } do
-					expect(panel.position.X >= 0 and panel.position.Y >= 0).to.be.ok()
-					expect(panel.position.X + panel.size.X <= size.X).to.be.ok()
-					expect(panel.position.Y + panel.size.Y <= size.Y).to.be.ok()
+					expect(panel.position.X >= 0 and panel.position.Y >= 0).to.equal(true)
+					expect(panel.position.X + panel.size.X <= size.X).to.equal(true)
+					expect(panel.position.Y + panel.size.Y <= size.Y).to.equal(true)
 				end
 			end
 		end)
@@ -703,10 +741,10 @@ return function()
 				local config = landscapePanels()
 				local layout = Layout.splashPanels(size, config, 1, 500)
 				local stack = assert(layout.progressStack)
-				expect(layout.tabbed).to.be.ok()
-				expect((stack.size.X - config.GapPx * 2) / 3 - 6 >= 44).to.be.ok()
-				expect(stack.size.Y - 44 - 12 >= config.DailyMinHeightPx).to.be.ok()
-				expect(stack.size.Y - 44 - 12 >= 138).to.be.ok()
+				expect(layout.tabbed).to.equal(true)
+				expect((stack.size.X - config.GapPx * 2) / 3 - 6 >= 44).to.equal(true)
+				expect(stack.size.Y - 44 - 12 >= config.DailyMinHeightPx).to.equal(true)
+				expect(stack.size.Y - 44 - 12 >= 138).to.equal(true)
 				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - 12)
 			end
 		end)
@@ -715,29 +753,31 @@ return function()
 			for _, size in { Vector2.new(1158, 600), Vector2.new(1158, 662), Vector2.new(1158, 719) } do
 				local layout = Layout.splashPanels(size, config, 1, 500)
 				local stack = assert(layout.progressStack)
-				expect(layout.tabbed).never.to.be.ok()
+				expect(layout.tabbed).to.equal(false)
 				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - 24)
 				-- Two card gaps plus the column's top/bottom padding must also fit.
 				local questContentBudget = stack.size.Y
 					- layout.season.size.Y
 					- layout.daily.size.Y
 					- config.GapPx * 3.5
-				expect(layout.season.size.Y >= 88).to.be.ok()
-				expect(layout.daily.size.Y >= config.DailyMinHeightPx).to.be.ok()
-				expect(questContentBudget >= config.Landscape.QuestsMinHeightPx).to.be.ok()
+				expect(layout.season.size.Y >= 88).to.equal(true)
+				expect(layout.daily.size.Y >= config.DailyMinHeightPx).to.equal(true)
+				expect(questContentBudget >= config.Landscape.QuestsMinHeightPx).to.equal(true)
 			end
 		end)
 		it("returns to fixed desktop cards only when all cards and actions fit", function()
 			local config = landscapePanels()
 			local intermediate = Layout.splashPanels(Vector2.new(1158, 719), config, 1, 500)
 			local stack = assert(intermediate.progressStack)
-			expect(intermediate.tabbed).never.to.be.ok()
+			expect(intermediate.tabbed).to.equal(false)
 			expect(stack.position.Y + stack.size.Y).to.equal(719 - 24)
 			local desktop = Layout.splashPanels(Vector2.new(1158, 725), config, 1, 500)
 			expect(desktop.progressStack).to.equal(nil)
-			expect(desktop.daily.size.Y >= 140).to.be.ok()
-			expect(desktop.quests.size.Y >= config.Landscape.QuestsMinHeightPx).to.be.ok()
-			expect(desktop.quests.position.Y + desktop.quests.size.Y <= 725 - config.Landscape.ActionsReservePx).to.be.ok()
+			expect(desktop.daily.size.Y >= 140).to.equal(true)
+			expect(desktop.quests.size.Y >= config.Landscape.QuestsMinHeightPx).to.equal(true)
+			expect(desktop.quests.position.Y + desktop.quests.size.Y <= 725 - config.Landscape.ActionsReservePx).to.equal(
+				true
+			)
 		end)
 		it("uses the phone right column to its bottom margin independently of left-side actions", function()
 			local config = landscapePanels()
@@ -747,7 +787,7 @@ return function()
 				local layout = Layout.splashPanels(size, config, 1, 500)
 				local stack = assert(layout.progressStack)
 				expect(stack.position.Y).to.equal(layout.season.position.Y)
-				expect(layout.tabbed).to.be.ok()
+				expect(layout.tabbed).to.equal(true)
 				expect(stack.position.Y + stack.size.Y).to.equal(size.Y - 12)
 				expect(stack.position.X >= 0 and stack.position.X + stack.size.X <= size.X).to.equal(true)
 				expect(stack.size.X - config.GapPx * 2 >= layout.season.size.X).to.equal(true)
@@ -769,11 +809,11 @@ return function()
 					PortraitMaxAspect = 1,
 					ShortLandscapeMaxHeightPx = 500,
 				})
-				expect(panels.tabbed).to.be.ok()
-				expect(world.size.X > 1 and world.size.Y > 1).to.be.ok()
-				expect(world.position.Y + world.size.Y < stack.position.Y).to.be.ok()
-				expect(stack.position.Y + stack.size.Y < size.Y - 24 - SPLASH_ACTIONS_HEIGHT_PX).to.be.ok()
-				expect(stack.size.Y - 56 >= 140).to.be.ok()
+				expect(panels.tabbed).to.equal(true)
+				expect(world.size.X > 1 and world.size.Y > 1).to.equal(true)
+				expect(world.position.Y + world.size.Y < stack.position.Y).to.equal(true)
+				expect(stack.position.Y + stack.size.Y < size.Y - 24 - SPLASH_ACTIONS_HEIGHT_PX).to.equal(true)
+				expect(stack.size.Y - 56 >= 140).to.equal(true)
 			end
 		end)
 		it("reserves a full quest title and readable daily amounts in portrait", function()

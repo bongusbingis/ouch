@@ -376,7 +376,6 @@ return function()
 			ball._attributes.ph = 2
 			ball._attributes.ow = "player_1"
 			ball._attributes.hb = nil
-			ball._attributes.tg = "player_2"
 			ball._attributes.vel = vector.create(10, 20, 30)
 
 			local decoded = SimStateCodec.decodeProjectile(ball :: any)
@@ -385,7 +384,8 @@ return function()
 				expect(decoded.id).to.equal("ball_0042")
 				expect(decoded.phase).to.equal("InFlight")
 				expect(decoded.ownerId).to.equal("player_1")
-				expect(decoded.targetId).to.equal("player_2")
+				-- target is no longer replicated via attributes (F-03 removed the write-only "tg").
+				expect(decoded.targetId).to.equal(nil)
 				expect(decoded.velocity).to.equal(vector.create(10, 20, 30))
 			end
 

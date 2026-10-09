@@ -191,7 +191,7 @@ function ShopCardStyle.resolve(card: any, seasonState: any?, options: Options?):
 		sticker = ShopCardStyle.sticker(card, opts.SectionTitle),
 		rarity = if T.Rarity[card.badge] then card.badge else nil,
 		owned = (card.owned == true or card.purchased == true) and not season,
-		ownedText = if card.purchased then "✓ PURCHASED" else "✓ OWNED",
+		ownedText = if card.purchased then "PURCHASED" else "OWNED",
 		accent = accent,
 		tileColor = tileColor,
 		-- A tonal recess edge from the tile's own fill, never a saturated accent outline.

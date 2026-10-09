@@ -180,7 +180,7 @@ return function()
 			local events =
 				SimCore.step(state, { command({ assist = { AutoFace = 0, Lunge = 0 } }) }, offAxisWorld(6), DT)
 			local swing = swingEvent(events)
-			expect(swing ~= nil).to.be.ok()
+			expect(swing ~= nil).to.equal(true)
 			expect(swing.direction.x).to.be.near(1, 1e-6)
 			expect(swing.direction.z).to.be.near(0, 1e-6)
 		end)
@@ -196,7 +196,7 @@ return function()
 			local state = SimCore.newState()
 			local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, offAxisWorld(6), DT)
 			local direction = swingEvent(events).direction
-			expect(direction.z > 0).to.be.ok()
+			expect(direction.z > 0).to.equal(true)
 			expect(vector.magnitude(direction)).to.be.near(1, 1e-5)
 		end)
 
@@ -205,7 +205,7 @@ return function()
 			local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, offAxisWorld(6), DT)
 			local direction = swingEvent(events).direction
 			local turned = math.deg(math.acos(math.clamp(vector.dot(direction, vector.create(1, 0, 0)), -1, 1)))
-			expect(turned <= MobileInput.Assist.AutoFaceMaxAngleDeg + 0.5).to.be.ok()
+			expect(turned <= MobileInput.Assist.AutoFaceMaxAngleDeg + 0.5).to.equal(true)
 		end)
 
 		it("keeps the swing flat when the target is above the player", function()
@@ -219,7 +219,7 @@ return function()
 			local state = SimCore.newState()
 			local far = world({ e1 = MockWorld.character(vector.create(Combat.Hammer.Range + 2, 2.5, 0)) })
 			local events = SimCore.step(state, { command({ assist = { Lunge = 1 } }) }, far, DT)
-			expect(swingEvent(events).magnitude > Combat.Hammer.DashSpeed).to.be.ok()
+			expect(swingEvent(events).magnitude > Combat.Hammer.DashSpeed).to.equal(true)
 		end)
 
 		it("does not lunge at a target already inside the swing box", function()
@@ -249,8 +249,8 @@ return function()
 				local direction = swingEvent(events).direction
 				return math.acos(math.clamp(vector.dot(direction, vector.create(1, 0, 0)), -1, 1))
 			end
-			expect(turnFor(0.5) < turnFor(1)).to.be.ok()
-			expect(turnFor(0.5) > 0).to.be.ok()
+			expect(turnFor(0.5) < turnFor(1)).to.equal(true)
+			expect(turnFor(0.5) > 0).to.equal(true)
 		end)
 	end)
 end

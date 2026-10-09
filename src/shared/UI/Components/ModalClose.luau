@@ -30,8 +30,8 @@ return function(props)
 			then React.createElement(InputHint.Component, {
 				Binding = BACK,
 				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.new(0, T.InputHint.CornerInset, 1, -T.InputHint.CornerInset),
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(0, -T.InputHint.Gap, 0.5, 0),
 					ZIndex = z + 10,
 				},
 			})

@@ -8,7 +8,9 @@ local Capacity = require(
 	game:GetService("ReplicatedStorage"):WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("GameModes")
 ).MatchCapacity
 
-local TestAssets = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("TestAssets"))
+local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
+local TestAssets = require(Helpers:WaitForChild("TestAssets"))
+local LiveSession = require(Helpers:WaitForChild("LiveSession"))
 
 local function directPartCount(folder: Instance): number
 	local count = 0
@@ -22,7 +24,10 @@ end
 
 return function()
 	describe("Arena assets", function()
-		it("authors one neutral native spawn on the permanent map", function()
+		-- Counts every SpawnLocation in the world and reads the permanent Map interior, which the
+		-- live arena/map services park and swap during a Play session; the cloud run is authoritative.
+		local pristineWorldIt = LiveSession.guardedIt(it, itSKIP)
+		pristineWorldIt("authors one neutral native spawn on the permanent map", function()
 			local spawn = TestAssets.get(Workspace, "Assets", "Arena", "Map", "ArenaSpawn")
 			expect(spawn:IsA("SpawnLocation")).to.equal(true)
 			expect(spawn.Enabled and spawn.Neutral and spawn.Anchored).to.equal(true)

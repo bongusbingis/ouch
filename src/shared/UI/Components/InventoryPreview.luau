@@ -105,15 +105,27 @@ local function setScale(object: Model | BasePart, scale: number)
 	end
 end
 
-local function centerObject(object: Model | BasePart): CFrame
+-- Poses the object (optional fixed Z tilt) then centres its posed bounding box on
+-- the origin. Returns the base pivot and the AABB extent of that posed shape.
+local function centerObject(object: Model | BasePart, tiltDegrees: number?): (CFrame, Vector3)
+	local tilt = CFrame.Angles(0, 0, math.rad(tiltDegrees or 0))
 	if object:IsA("Model") then
-		object:PivotTo(CFrame.identity)
-		local bounds = object:GetBoundingBox()
+		object:PivotTo(tilt)
+		local bounds, extent = object:GetBoundingBox()
 		object:PivotTo(CFrame.new(-bounds.Position) * object:GetPivot())
-		return object:GetPivot()
+		return object:GetPivot(), extent
 	end
-	object.CFrame = CFrame.identity
-	return object.CFrame
+	object.CFrame = tilt
+	local half = object.Size / 2
+	local r = tilt.RightVector
+	local u = tilt.UpVector
+	local l = tilt.LookVector
+	local extent = Vector3.new(
+		2 * (math.abs(r.X) * half.X + math.abs(u.X) * half.Y + math.abs(l.X) * half.Z),
+		2 * (math.abs(r.Y) * half.X + math.abs(u.Y) * half.Y + math.abs(l.Y) * half.Z),
+		2 * (math.abs(r.Z) * half.X + math.abs(u.Z) * half.Y + math.abs(l.Z) * half.Z)
+	)
+	return object.CFrame, extent
 end
 
 export type Props = {
@@ -165,8 +177,7 @@ local ViewportPreview = React.memo(function(props: Props)
 			object = prepared
 			setScale(prepared, config.Scale)
 			prepared.Parent = world
-			local basePivot = centerObject(prepared)
-			local extent = if prepared:IsA("Model") then select(2, prepared:GetBoundingBox()) else prepared.Size
+			local basePivot, extent = centerObject(prepared, config.TiltDegrees)
 			local function frameCamera()
 				local size = viewport.AbsoluteSize
 				local aspect = math.max(size.X, 1) / math.max(size.Y, 1)
@@ -176,7 +187,10 @@ local ViewportPreview = React.memo(function(props: Props)
 				local distance = math.max((extent.Y / 2 + math.abs(target.Y)) / tangent, radius / (tangent * aspect))
 					+ radius
 				camera.CFrame = CFrame.lookAt(
-					target + config.CameraOffset.Unit * distance * (if props.Candy then 0.76 else 1),
+					target
+						+ config.CameraOffset.Unit
+							* distance
+							* (if props.Candy and config.TiltDegrees == nil then 0.76 else 1),
 					target
 				)
 			end

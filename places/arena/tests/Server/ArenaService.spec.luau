@@ -13,6 +13,7 @@ local ArenaService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("ArenaService"))
 local Helpers = ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers")
 local CharacterFixture = require(Helpers:WaitForChild("CharacterFixture"))
+local LiveSession = require(Helpers:WaitForChild("LiveSession"))
 
 local function landedAt(rig: Model, spawns: { BasePart }): boolean
 	local pivot = rig:GetPivot().Position
@@ -136,7 +137,9 @@ return function()
 		end)
 
 		describe("refresh", function()
-			it("re-resolves a replaced interior and stops following the old origin", function()
+			-- Replaces the singleton arena interior and origin listener the live match is using in Play.
+			local ownsArenaIt = LiveSession.guardedIt(it, itSKIP)
+			ownsArenaIt("re-resolves a replaced interior and stops following the old origin", function()
 				local original = ArenaService.get()
 				local root = original.root
 				local originalOrigin = original.origin

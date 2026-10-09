@@ -325,7 +325,7 @@ return function()
 			local state = stateWithHeldBall(world)
 			SimCore.step(state, { throwCommand({ assist = { ConeSnap = 1, Lead = 1 } }) }, world, DT)
 			local ball = state.projectiles.ball_0001
-			expect(ball.releaseAim.z > 0).to.be.ok()
+			expect(ball.releaseAim.z > 0).to.equal(true)
 		end)
 
 		it("does not lead a target whose movement has been erratic", function()
@@ -399,7 +399,7 @@ return function()
 				throwCommand(),
 			}, world, DT)
 			expect(countEvents(events, "CatchStarted")).to.equal(0)
-			expect(state.players.p1.weapons.Hammer.cooldown > 0).to.be.ok()
+			expect(state.players.p1.weapons.Hammer.cooldown > 0).to.equal(true)
 		end)
 
 		it("catches an incoming opponent ball during the explicit catch window", function()

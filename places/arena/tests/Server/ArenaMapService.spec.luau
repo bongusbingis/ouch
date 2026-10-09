@@ -12,6 +12,7 @@ local ArenaMaps = require(ReplicatedStorage.Config.Gameplay.ArenaMaps)
 local Modules = ServerScriptService:WaitForChild("Server"):WaitForChild("Modules")
 local ArenaService = require(Modules:WaitForChild("ArenaService"))
 local ArenaMapService = require(Modules:WaitForChild("ArenaMapService"))
+local LiveSession = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("LiveSession"))
 
 -- Deliberately not a configured map, so a staged real map is never swapped by tests.
 local FIXTURE_ID = "SpecFixtureMap"
@@ -110,7 +111,9 @@ return function()
 			end
 		end)
 
-		it("swaps a staged map in, parks the live interior and swaps back without residue", function()
+		-- Swaps the singleton Workspace.Assets.Arena interior, which a live match is using in Play.
+		local ownsArenaIt = LiveSession.guardedIt(it, itSKIP)
+		ownsArenaIt("swaps a staged map in, parks the live interior and swaps back without residue", function()
 			local original = childSet(root)
 			local originalCount = #root:GetChildren()
 			local originalScriptables = ArenaService.get().scriptables

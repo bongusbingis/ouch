@@ -543,7 +543,7 @@ return function()
 			local half = vector.magnitude(release({ releaseCharge = 0.5 }).velocity)
 			local none = vector.magnitude(release({}).velocity)
 			local full = vector.magnitude(release({ releaseCharge = 1 }).velocity)
-			expect(half > none and half < full).to.be.ok()
+			expect(half > none and half < full).to.equal(true)
 		end)
 
 		it("does not let an out-of-range charge exceed the full-charge throw", function()

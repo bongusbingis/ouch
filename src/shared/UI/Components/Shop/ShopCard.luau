@@ -111,7 +111,9 @@ return React.memo(function(props)
 	local stickerHeight = if short then L.CompactStickerHeight else L.StickerHeight
 	local stickerText = T.Type.Minimum
 	local ribbonHeight = T.Layout.RarityHeight
-	local ownedWidth = labelWidth(style.ownedText, stickerText, L.StickerPadding)
+	-- The owned stamp leads with the shared Check icon (never a Unicode tick).
+	local checkSize = stickerText
+	local ownedWidth = labelWidth(style.ownedText, stickerText, L.StickerPadding) + checkSize + 4
 	local stickerWidth = if style.sticker then labelWidth(style.sticker.Text, stickerText, L.StickerPadding) else 0
 	local stackedStamp = style.owned and style.sticker ~= nil and width < stickerWidth + ownedWidth + L.StickerPadding
 	local ownedY = if stackedStamp then stickerHeight + 2 else -L.StickerOverhang
@@ -330,7 +332,9 @@ return React.memo(function(props)
 			BackgroundTransparency = 1,
 			Text = "",
 			AutoButtonColor = false,
-			Selectable = false,
+			-- Selectable only when the footer is a muted status (not focusable) so the
+			-- card still has exactly one controller/keyboard stop.
+			Selectable = style.actionState == "Muted",
 			Size = UDim2.new(1, 0, 0, actionTop - S.StrokeCard * 2),
 			ZIndex = 14,
 			[React.Event.Activated] = function()
@@ -385,10 +389,30 @@ return React.memo(function(props)
 				},
 			}, {
 				Stamp = c(Badge, {
-					Text = style.ownedText,
+					Text = "",
 					Color = C.Yellow,
-					TextSize = stickerText,
 					Native = { Size = UDim2.fromScale(1, 1), ZIndex = 15 },
+				}),
+				Check = c(Icon, {
+					Name = "Check",
+					Color = C.Ink,
+					Native = {
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, L.StickerPadding / 2, 0.5, 0),
+						Size = UDim2.fromOffset(checkSize, checkSize),
+						ZIndex = 17,
+					},
+				}),
+				Label = c("TextLabel", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.fromScale(1, 0),
+					Size = UDim2.new(1, -(L.StickerPadding / 2 + checkSize + 4), 1, 0),
+					Font = T.Type.Label,
+					Text = style.ownedText,
+					TextSize = stickerText,
+					TextColor3 = C.Ink,
+					ZIndex = 17,
 				}),
 			})
 			else nil,

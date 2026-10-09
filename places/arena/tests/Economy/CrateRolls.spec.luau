@@ -173,8 +173,8 @@ return function()
 				counters = result.pity
 				sinceRare = if RARITIES[result.rarity].Weight <= RARITIES.Rare.Weight then 0 else sinceRare + 1
 				sinceLegendary = if result.rarity == "Legendary" then 0 else sinceLegendary + 1
-				expect(sinceRare < 5).to.be.ok()
-				expect(sinceLegendary < 25).to.be.ok()
+				expect(sinceRare < 5).to.equal(true)
+				expect(sinceLegendary < 25).to.equal(true)
 			end
 		end)
 	end)

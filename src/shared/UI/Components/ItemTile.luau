@@ -151,7 +151,7 @@ return function(props)
 		}),
 		Checkmark = c(Badge, {
 			Visible = props.Equipped == true,
-			Text = if props.SlotIndex then tostring(props.SlotIndex) else "✓",
+			Text = if props.SlotIndex then tostring(props.SlotIndex) else nil,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = if props.Compact

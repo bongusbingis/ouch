@@ -32,6 +32,12 @@ return function()
 		local simulationIt = if RunService:IsRunning() then it else itSKIP
 		local rigs = {}
 
+		local function resetBalls()
+			BallService.stopGroundSpawns()
+			BallService.clearRecovery()
+			BallService.clearAll()
+		end
+
 		local function rigFor(player)
 			local rig = CharacterFixture.create(player.Name)
 			table.insert(rigs, rig)
@@ -39,10 +45,11 @@ return function()
 			return rig
 		end
 
+		-- Start from an empty ball supply even when a live match already seeded the Balls folder.
+		beforeEach(resetBalls)
+
 		afterEach(function()
-			BallService.stopGroundSpawns()
-			BallService.clearRecovery()
-			BallService.clearAll()
+			resetBalls()
 			for _, rig in rigs do
 				CharacterFixture.destroy(rig)
 			end
@@ -188,9 +195,14 @@ return function()
 			local spawned = nil
 			for _ = 1, 120 do
 				task.wait()
-				local balls = ballsIn(folder)
-				if #balls > 0 then
-					spawned = balls[1]
+				-- Only count balls this test's spawn point produced, never a live match's supply.
+				for _, ball in ballsIn(folder) do
+					if (ball.Position - point.Position).Magnitude < 20 then
+						spawned = ball
+						break
+					end
+				end
+				if spawned then
 					break
 				end
 			end
@@ -200,11 +212,20 @@ return function()
 			local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
 			expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
 
-			local before = #ballsIn(folder)
+			local function nearbyCount()
+				local count = 0
+				for _, ball in ballsIn(folder) do
+					if (ball.Position - point.Position).Magnitude < 20 then
+						count += 1
+					end
+				end
+				return count
+			end
+			local before = nearbyCount()
 			for _ = 1, 10 do
 				task.wait()
 			end
-			expect(#ballsIn(folder)).to.equal(before)
+			expect(nearbyCount()).to.equal(before)
 
 			BallService.stopGroundSpawns()
 			point:Destroy()

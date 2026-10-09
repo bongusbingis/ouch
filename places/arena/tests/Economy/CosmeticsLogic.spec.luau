@@ -94,14 +94,14 @@ return function()
 					local rarities = {}
 					for _, itemId in crate.ItemPool do
 						local item = Cosmetics.Items[itemId]
-						expect(item ~= nil).to.be.ok()
+						expect(item ~= nil).to.equal(true)
 						rarities[item.Rarity] = true
 					end
 					local distinct = 0
 					for _ in rarities do
 						distinct += 1
 					end
-					expect(distinct > 1).to.be.ok()
+					expect(distinct > 1).to.equal(true)
 				end
 			end
 		end)
@@ -114,31 +114,31 @@ return function()
 				end
 			end
 			for slot in populated do
-				expect(Cosmetics.Defaults[slot] ~= nil).to.be.ok()
+				expect(Cosmetics.Defaults[slot] ~= nil).to.equal(true)
 			end
 		end)
 
 		it("gives the default elimination effect sounds that Config.Audio actually defines", function()
 			local default = Cosmetics.Defaults.ElimEffectAssets
-			expect(default ~= nil).to.be.ok()
+			expect(default ~= nil).to.equal(true)
 			local effect = default.ElimEffect
-			expect(effect ~= nil).to.be.ok()
-			expect(Audio.Gameplay[effect.DodgeballSound] ~= nil).to.be.ok()
-			expect(Audio.Gameplay[effect.HammerSound] ~= nil).to.be.ok()
+			expect(effect ~= nil).to.equal(true)
+			expect(Audio.Gameplay[effect.DodgeballSound] ~= nil).to.equal(true)
+			expect(Audio.Gameplay[effect.HammerSound] ~= nil).to.equal(true)
 		end)
 
 		it("points every elimination effect cosmetic at real audio entries", function()
 			for _, item in Cosmetics.Items do
 				if item.Category == "ElimEffectAssets" then
-					expect(item.ElimEffect ~= nil).to.be.ok()
+					expect(item.ElimEffect ~= nil).to.equal(true)
 					local dodgeball = Audio.Gameplay[item.ElimEffect.DodgeballSound]
 					local hammer = Audio.Gameplay[item.ElimEffect.HammerSound]
-					expect(dodgeball ~= nil).to.be.ok()
-					expect(hammer ~= nil).to.be.ok()
+					expect(dodgeball ~= nil).to.equal(true)
+					expect(hammer ~= nil).to.equal(true)
 					expect(dodgeball.Scope).to.equal("World")
 					expect(hammer.Scope).to.equal("World")
-					expect(#dodgeball.AssetIds > 0).to.be.ok()
-					expect(#hammer.AssetIds > 0).to.be.ok()
+					expect(#dodgeball.AssetIds > 0).to.equal(true)
+					expect(#hammer.AssetIds > 0).to.equal(true)
 				end
 			end
 		end)
@@ -179,7 +179,7 @@ return function()
 				end
 				for _, itemId in definition.EntitlementItemIds do
 					local item = Cosmetics.Items[itemId]
-					expect(item ~= nil).to.be.ok()
+					expect(item ~= nil).to.equal(true)
 					expect(allowed[item.Category]).to.equal(true)
 				end
 			end
@@ -189,8 +189,8 @@ return function()
 			for _, crate in Crates do
 				for _, itemId in crate.ItemPool do
 					local item = Cosmetics.Items[itemId]
-					expect(item ~= nil).to.be.ok()
-					expect(item.Rarity ~= "Exclusive").to.be.ok()
+					expect(item ~= nil).to.equal(true)
+					expect(item.Rarity ~= "Exclusive").to.equal(true)
 				end
 			end
 		end)

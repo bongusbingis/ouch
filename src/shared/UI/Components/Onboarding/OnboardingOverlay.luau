@@ -14,6 +14,7 @@ local UIConfig = require(RS.Config.Interface.UI)
 local Config = require(RS.Config.Interface.Onboarding)
 local CandySurface = require(script.Parent.Parent.CandySurface)
 local PuffyButton = require(script.Parent.Parent.PuffyButton)
+local InputHint = require(script.Parent.Parent.InputHint)
 local SKIP = require(RS.Config.Interface.Input).Hints.Skip
 local c, C, L = React.createElement, T.Colors, T.Onboarding
 
@@ -76,9 +77,19 @@ return function(props)
 				TextColor = C.Ink,
 				Text = view.skip,
 				TextSize = T.Type.Minimum,
-				Hint = SKIP,
 				OnActivated = props.OnSkip,
 				Shadow = false,
+				-- "SKIP [X]": the key trails the verb so it reads as a prompt, never a close icon.
+				children = {
+					Key = c(InputHint.Component, {
+						Binding = SKIP,
+						Native = {
+							AnchorPoint = Vector2.new(1, 0.5),
+							Position = UDim2.new(1, -T.InputHint.CornerInset * 2, 0.5, -T.Shape.LipHeight / 2),
+							ZIndex = 74,
+						},
+					}),
+				},
 				Native = {
 					AnchorPoint = Vector2.new(1, 0),
 					Position = UDim2.fromOffset(safe.position.X + safe.size.X - layout.edge, top),

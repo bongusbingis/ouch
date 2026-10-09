@@ -83,7 +83,7 @@ return table.freeze({
 		Edge = 20,
 		CompactEdge = 12,
 		Inset = 14,
-		SkipWidth = 88,
+		SkipWidth = 128,
 		Gap = 20,
 		Title = 30,
 		CompactTitle = 26,

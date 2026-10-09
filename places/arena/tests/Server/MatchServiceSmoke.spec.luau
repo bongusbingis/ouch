@@ -4,12 +4,16 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ServerStorage = game:GetService("ServerStorage")
+local LiveSession = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("LiveSession"))
 local MatchService =
 	require(ServerScriptService:WaitForChild("Server"):WaitForChild("Modules"):WaitForChild("MatchService"))
 
 return function()
 	describe("MatchService smoke", function()
-		it("start exposes the replicated MatchState surface and stays Idle", function()
+		-- Debug.StudioQueue auto-starts a match for the Play player, so Idle is only guaranteed headless.
+		local idleServerIt = LiveSession.guardedIt(it, itSKIP)
+		idleServerIt("start exposes the replicated MatchState surface and stays Idle", function()
 			MatchService.start()
 
 			local stateFolder = ReplicatedStorage:FindFirstChild("MatchState")
