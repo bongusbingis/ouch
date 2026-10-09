@@ -195,7 +195,6 @@ task.spawn(function()
 						Visible = true,
 						ParentScreenInsets = Enum.ScreenInsets.None,
 						Title = "LOADING ARENA",
-						Detail = "PREPARING THE ARENA",
 						OnPresented = function()
 							releaseArrivalLoading()
 							if loadingClient and type(loadingClient.markUiPresented) == "function" then

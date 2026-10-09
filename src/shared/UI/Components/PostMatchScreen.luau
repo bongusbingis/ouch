@@ -24,11 +24,13 @@ local CandyPanel = require(script.Parent.CandyPanel)
 local CandySurface = require(script.Parent.CandySurface)
 local CandyTitle = require(script.Parent.CandyTitle)
 local PuffyButton = require(script.Parent.PuffyButton)
+local Icon = require(script.Parent.Icon)
 local Podium = require(script.Parent.Arena.ResultsPodium)
 local Rewards = require(script.Parent.Arena.ResultProgress)
 local c, C, R = React.createElement, T.Colors, T.Results
 
 local PILL_PAD = 14
+local DETAIL_MIN_WIDTH = 120
 
 local function errorText(code)
 	if code == nil then
@@ -79,24 +81,59 @@ local function Reveal(props)
 	return c("Frame", native, props.children)
 end
 
+local ICON_GAP = 8
+
 local function pill(props)
 	local z = props.ZIndex or 12
 	local native = table.clone(props.Native)
 	native.BackgroundTransparency = 1
 	native.ZIndex = z
+	local label = {
+		BackgroundTransparency = 1,
+		Font = props.Font,
+		Text = props.Text,
+		TextColor3 = props.TextColor or C.Ink,
+		TextSize = props.TextSize,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = z + 6,
+	}
+	local content
+	if props.Icon then
+		-- Text and a tinted icon centred together as one unit.
+		label.AutomaticSize = Enum.AutomaticSize.X
+		label.LayoutOrder = 1
+		label.Size = UDim2.fromScale(0, 1)
+		content = c("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 1, -T.Shape.LipHeight),
+			ZIndex = z + 6,
+		}, {
+			Layout = c("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, ICON_GAP),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+			Text = c("TextLabel", label),
+			Icon = c(Icon, {
+				Name = props.Icon,
+				Color = props.TextColor or C.Ink,
+				Native = {
+					LayoutOrder = 2,
+					Size = UDim2.fromOffset(props.TextSize, props.TextSize),
+					ZIndex = z + 6,
+				},
+			}),
+		})
+	else
+		label.Position = UDim2.fromOffset(PILL_PAD, 0)
+		label.Size = UDim2.new(1, -PILL_PAD * 2, 1, -T.Shape.LipHeight)
+		content = c("TextLabel", label)
+	end
 	return c("Frame", native, {
 		Surface = c(CandySurface, { Color = props.Color, LipColor = props.LipColor, Shadow = false, ZIndex = z }),
-		Text = c("TextLabel", {
-			BackgroundTransparency = 1,
-			Font = props.Font,
-			Text = props.Text,
-			TextColor3 = props.TextColor or C.Ink,
-			TextSize = props.TextSize,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Position = UDim2.fromOffset(PILL_PAD, 0),
-			Size = UDim2.new(1, -PILL_PAD * 2, 1, -T.Shape.LipHeight),
-			ZIndex = z + 6,
-		}),
+		Content = content,
 	})
 end
 
@@ -114,7 +151,7 @@ local function standingsRows(result, rowHeight: number)
 		Layout = c("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 	}
 	local circle = rowHeight - 12
-	local textSize = if rowHeight < 40 then 15 else 18
+	local textSize = if rowHeight < 40 then T.Type.HudMinimum else T.Type.Minimum
 	local nameLeft = if teamMode then 14 else circle + 16
 	for index, score in result.scores do
 		local isLocal = if teamMode then score.id == localTeam else score.id == localId
@@ -126,8 +163,11 @@ local function standingsRows(result, rowHeight: number)
 			Size = UDim2.new(1, 0, 0, rowHeight),
 			ZIndex = 17,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
-			Outline = c("UIStroke", { Color = if isLocal then C.PinkLip else C.WellLine, Thickness = 2 }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
+			Outline = c("UIStroke", {
+				Color = if isLocal then C.PinkLip else C.WellLine,
+				Thickness = T.Shape.StrokeInner,
+			}),
 			Rank = if not teamMode
 				then c("Frame", {
 					BackgroundColor3 = R.PlacementColors[rank] or C.Well,
@@ -137,7 +177,7 @@ local function standingsRows(result, rowHeight: number)
 					ZIndex = 18,
 				}, {
 					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-					Outline = c("UIStroke", { Color = C.Ink, Thickness = 2 }),
+					Outline = c("UIStroke", { Color = C.Ink, Thickness = T.Shape.StrokeInner }),
 					Text = c("TextLabel", {
 						BackgroundTransparency = 1,
 						Font = T.Type.Display,
@@ -179,6 +219,15 @@ local function standingsRows(result, rowHeight: number)
 end
 
 local function countdownChip(countdown, drain: number, rectPosition: Vector2, rectSize: Vector2)
+	-- Same face as the other post-match captions; the condensed face is only a fit fallback for narrow chips.
+	local captionFont = T.Type.Label
+	local captionRoom = rectSize.X - 8
+	if
+		TextService:GetTextSize(countdown.caption, T.Type.HudMinimum, captionFont, Vector2.new(100000, 100)).X
+		> captionRoom
+	then
+		captionFont = T.Type.CompactLabel
+	end
 	return c("Frame", {
 		BackgroundColor3 = C.Well,
 		BorderSizePixel = 0,
@@ -186,17 +235,17 @@ local function countdownChip(countdown, drain: number, rectPosition: Vector2, re
 		Size = UDim2.fromOffset(rectSize.X, rectSize.Y),
 		ZIndex = 15,
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, 16) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 		Outline = c("UIStroke", { Color = C.WellLine, Thickness = T.Shape.StrokeInner }),
 		Caption = c("TextLabel", {
 			BackgroundTransparency = 1,
-			Font = T.Type.CompactLabel,
+			Font = captionFont,
 			Text = countdown.caption,
 			TextColor3 = C.InkSoft,
-			TextSize = 13,
+			TextSize = T.Type.HudMinimum,
 			TextTruncate = Enum.TextTruncate.AtEnd,
-			Position = UDim2.fromOffset(6, 5),
-			Size = UDim2.new(1, -12, 0, 14),
+			Position = UDim2.fromOffset(4, 2),
+			Size = UDim2.new(1, -8, 0, 18),
 			ZIndex = 16,
 		}),
 		Value = c("TextLabel", {
@@ -205,8 +254,8 @@ local function countdownChip(countdown, drain: number, rectPosition: Vector2, re
 			Text = countdown.value,
 			TextColor3 = C.Ink,
 			TextSize = 24,
-			Position = UDim2.fromOffset(0, 17),
-			Size = UDim2.new(1, 0, 0, 24),
+			Position = UDim2.fromOffset(0, 19),
+			Size = UDim2.new(1, 0, 0, 22),
 			ZIndex = 16,
 		}),
 		Track = c("Frame", {
@@ -367,10 +416,24 @@ return function(props)
 	local podium = result.podium or {}
 	local heading = Model.stageHeading(teamMode, #podium, tied, standings)
 	local kicker = Model.kicker(result.modeName, result.presentation.eyebrow)
-	local kickerWidth = pillWidth(kicker, T.Type.Minimum, T.Type.CompactLabel, layout.kicker.size.X)
-	local detail = result.presentation.detail
+	if pillWidth(kicker, T.Type.Minimum, T.Type.Label, 100000) > layout.kicker.size.X then
+		kicker = string.upper(result.modeName)
+	end
+	local kickerWidth = pillWidth(kicker, T.Type.Minimum, T.Type.Label, layout.kicker.size.X)
+	local detail = Model.detail(result.presentation.detail, result.presentation.eyebrow)
 	local detailWidth = if detail then pillWidth(detail, layout.detailSize, T.Type.Label, layout.detail.size.X) else 0
-	local headingWidth = pillWidth(heading, T.Type.Minimum, T.Type.CompactLabel, layout.stage.size.X - 16)
+	local headingWidth = pillWidth(heading, T.Type.Minimum, T.Type.Label, layout.stage.size.X - 16)
+	if detail then
+		-- A bare score such as "0  -  0" would otherwise shrink to a cramped chip.
+		detailWidth = math.max(detailWidth, math.min(DETAIL_MIN_WIDTH, layout.detail.size.X))
+	end
+	if detail and layout.showStage then
+		-- The detail and stage-heading pills stack in one column: give them a shared width so a
+		-- short score line never sits beside a wider caption as a ragged pair.
+		local shared = math.max(detailWidth, headingWidth)
+		detailWidth = math.min(shared, layout.detail.size.X)
+		headingWidth = math.min(shared, layout.stage.size.X - 16)
+	end
 	local stageTop = R.StageHeadingHeight + 8
 	local done = actions.primaryStyle == "Done"
 	local primaryEnabled = interactive and actions.primaryEnabled
@@ -427,7 +490,7 @@ return function(props)
 					Text = kicker,
 					Color = C.Yellow,
 					LipColor = C.YellowLip,
-					Font = T.Type.CompactLabel,
+					Font = T.Type.Label,
 					TextSize = T.Type.Minimum,
 					Native = {
 						Position = kickerPosition,
@@ -457,6 +520,7 @@ return function(props)
 				Scores = if layout.showStage
 					then c(PuffyButton, {
 						ButtonRef = scoresRef,
+						FocusHint = true,
 						Text = if standings then "PODIUM" else "SCORES",
 						TextSize = 20,
 						TextColor = C.Ink,
@@ -506,16 +570,17 @@ return function(props)
 							Text = heading,
 							Color = C.SurfaceWarm,
 							LipColor = C.WellLine,
-							Font = T.Type.CompactLabel,
+							Font = T.Type.Label,
 							TextSize = T.Type.Minimum,
 							Native = { Size = UDim2.fromScale(1, 1) },
 						}),
 					}),
 					Podium = c(Podium, {
 						Entries = podium,
+						Fallback = result.personalAppearance,
 						ResultId = key,
 						ShowLabels = not standings,
-						ScoreLabel = result.scoreLabel,
+						ScoreLabel = Model.podiumScoreLabel(teamMode, result.scoreLabel),
 						PlateWidth = layout.nameplateWidth,
 						PlateHeight = layout.nameplateHeight,
 						BadgeSize = layout.nameplateBadge,
@@ -538,7 +603,7 @@ return function(props)
 								CanvasSize = UDim2.new(),
 								Position = UDim2.fromOffset(8, 8),
 								ScrollBarImageColor3 = C.Pink,
-								ScrollBarThickness = 4,
+								ScrollBarThickness = T.Layout.ScrollBar,
 								ScrollingDirection = Enum.ScrollingDirection.Y,
 								Selectable = false,
 								Size = UDim2.new(1, -16, 1, -16),
@@ -577,7 +642,7 @@ return function(props)
 							Font = T.Type.Label,
 							Text = message,
 							TextColor3 = if props.Error and not departing then C.PinkLip else C.InkSoft,
-							TextSize = if layout.compact then 15 else 18,
+							TextSize = if layout.compact then T.Type.HudMinimum else T.Type.Minimum,
 							TextWrapped = true,
 							TextXAlignment = Enum.TextXAlignment.Left,
 							TextYAlignment = Enum.TextYAlignment.Center,
@@ -589,6 +654,7 @@ return function(props)
 					Secondary = if not departing
 						then c(PuffyButton, {
 							ButtonRef = returnRef,
+							FocusHint = true,
 							Text = actions.returnText,
 							TextSize = if layout.compact then 20 else T.Type.Tab,
 							TextColor = C.Ink,
@@ -606,12 +672,14 @@ return function(props)
 							Color = C.Lime,
 							LipColor = C.LimeLip,
 							Font = T.Type.Display,
+							Icon = actions.primaryIcon,
 							TextSize = if layout.compact then 20 else T.Type.Tab,
 							ZIndex = 15,
 							Native = { Position = primaryPosition, Size = primarySize },
 						})
 						else c(PuffyButton, {
 							ButtonRef = primaryRef,
+							FocusHint = true,
 							Text = actions.primaryText,
 							TextSize = if layout.compact then 20 else T.Type.Tab,
 							TextColor = C.Surface,

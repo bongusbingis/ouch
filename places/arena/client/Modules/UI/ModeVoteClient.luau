@@ -29,6 +29,11 @@ export type Snapshot = {
 	scoreTargets: { [string]: number },
 	selectedModeId: string?,
 	winnerModeId: string?,
+	mapOptions: { string },
+	mapVoteCounts: { [string]: number },
+	selectedMapId: string?,
+	winnerMapId: string?,
+	currentMapId: string?,
 	revision: number,
 }
 
@@ -47,6 +52,10 @@ local projected = {
 	voteCounts = {},
 	scoreTargets = {},
 	winnerModeId = nil,
+	mapOptions = {},
+	mapVoteCounts = {},
+	winnerMapId = nil,
+	currentMapId = nil,
 	revision = 0,
 }
 
@@ -58,6 +67,7 @@ end
 local function snapshot(): Snapshot
 	local counts = table.clone(projected.voteCounts)
 	local selectedModeId = player:GetAttribute("ModeVoteSelection")
+	local selectedMapId = player:GetAttribute("MapVoteSelection")
 	return {
 		admitted = admitted(),
 		open = projected.open,
@@ -69,6 +79,11 @@ local function snapshot(): Snapshot
 		scoreTargets = table.clone(projected.scoreTargets),
 		selectedModeId = if typeof(selectedModeId) == "string" then selectedModeId else nil,
 		winnerModeId = projected.winnerModeId,
+		mapOptions = table.clone(projected.mapOptions),
+		mapVoteCounts = table.clone(projected.mapVoteCounts),
+		selectedMapId = if typeof(selectedMapId) == "string" then selectedMapId else nil,
+		winnerMapId = projected.winnerMapId,
+		currentMapId = projected.currentMapId,
 		revision = projected.revision,
 	}
 end
@@ -107,6 +122,22 @@ local function decode(value: string)
 			end
 		end
 	end
+	local mapOptions = {}
+	local mapCounts = {}
+	if typeof(data.mapOptions) == "table" then
+		for _, mapId in data.mapOptions do
+			if typeof(mapId) == "string" then
+				table.insert(mapOptions, mapId)
+			end
+		end
+	end
+	if typeof(data.mapVoteCounts) == "table" then
+		for mapId, count in data.mapVoteCounts do
+			if typeof(mapId) == "string" and typeof(count) == "number" then
+				mapCounts[mapId] = count
+			end
+		end
+	end
 	projected = {
 		open = data.open == true,
 		startsAt = if typeof(data.startsAt) == "number" then data.startsAt else 0,
@@ -117,6 +148,12 @@ local function decode(value: string)
 		scoreTargets = targets,
 		winnerModeId = if typeof(data.winnerModeId) == "string" and data.winnerModeId ~= ""
 			then data.winnerModeId
+			else nil,
+		mapOptions = mapOptions,
+		mapVoteCounts = mapCounts,
+		winnerMapId = if typeof(data.winnerMapId) == "string" and data.winnerMapId ~= "" then data.winnerMapId else nil,
+		currentMapId = if typeof(data.currentMapId) == "string" and data.currentMapId ~= ""
+			then data.currentMapId
 			else nil,
 		revision = if typeof(data.revision) == "number" then data.revision else 0,
 	}
@@ -144,6 +181,10 @@ local function decodeLegacy(folder: Folder)
 		voteCounts = counts,
 		scoreTargets = {},
 		winnerModeId = if typeof(winnerModeId) == "string" and winnerModeId ~= "" then winnerModeId else nil,
+		mapOptions = {},
+		mapVoteCounts = {},
+		winnerMapId = nil,
+		currentMapId = nil,
 		revision = (folder:GetAttribute("revision") :: number?) or 0,
 	}
 	notify()
@@ -199,6 +240,7 @@ function ModeVoteClient.start()
 		end)
 	)
 	table.insert(connections, player:GetAttributeChangedSignal("ModeVoteSelection"):Connect(notify))
+	table.insert(connections, player:GetAttributeChangedSignal("MapVoteSelection"):Connect(notify))
 	table.insert(connections, player:GetAttributeChangedSignal("ArenaAdmission"):Connect(notify))
 end
 
@@ -216,6 +258,12 @@ end
 function ModeVoteClient.vote(modeId: string)
 	if admitted() then
 		Network.fireServer("SubmitModeVote", modeId)
+	end
+end
+
+function ModeVoteClient.voteMap(mapId: string)
+	if admitted() then
+		Network.fireServer("SubmitMapVote", mapId)
 	end
 end
 

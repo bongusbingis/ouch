@@ -1,5 +1,9 @@
 --!strict
--- All Backpack categories share one surface and state recipe. Rarity is a named ribbon.
+-- All Backpack categories share one surface and state recipe: the collectible
+-- card face (art window, seam rarity tag, CAPS name) on a cream body whose
+-- outline is ink at rest, yellow on hover/focus/selection and pink when equipped.
+-- Equipped always wins: an equipped card keeps its pink ring and only thickens it
+-- under hover/focus, so the "this is on you" cue never flips to yellow.
 local RS = game:GetService("ReplicatedStorage")
 local React = require(RS.Packages.react)
 local TweenService = game:GetService("TweenService")
@@ -7,21 +11,15 @@ local GuiService = game:GetService("GuiService")
 local PuffyButton = require(script.Parent.PuffyButton)
 local Badge = require(script.Parent.Badge)
 local InventoryPreview = require(script.Parent.InventoryPreview)
+local CollectibleFace = require(script.Parent.CollectibleFace)
+local Ribbon = require(script.Parent.RarityRibbon)
 local T = require(script.Parent.Parent.Tokens)
+local Layout = require(script.Parent.Parent.Models.CollectibleLayout)
 local Drag = require(script.Parent.Parent.Services.EmoteAssignmentDrag)
 local c, C, S = React.createElement, T.Colors, T.Shape
-
-local function shortName(entry)
-	local name = string.gsub(entry.displayName, "^Default%s+", "")
-	local suffix = if entry.category == "BallAssets"
-		then " Ball"
-		elseif entry.category == "HammerAssets" then " Hammer"
-		else nil
-	if suffix and string.sub(name, -#suffix) == suffix and #name > #suffix then
-		return string.sub(name, 1, #name - #suffix)
-	end
-	return name
-end
+-- Outfit swatch windows: paler than a rarity window so a full-colour (red, pink)
+-- character keeps contrast against its own colour.
+local SWATCH_TINT = T.Collectible.WellTint + 0.12
 
 return function(props)
 	local buttonRef = React.useRef(nil)
@@ -30,14 +28,14 @@ return function(props)
 	local seen, setSeen = React.useState(false)
 	local ringRef = React.useRef(nil)
 	local selected = props.Selected == true
-	local rarity = T.Rarity[entry.rarity] or T.Rarity.Common
-	local fill = if entry.category == "CharacterColor" then entry.definition.PreviewColor or C.Cyan else C.NeutralTile
+	local swatch = entry.category == "CharacterColor"
+	local fill = C.SurfaceWarm
 	if props.Locked then
 		fill = fill:Lerp(C.WellLine, 0.4)
 	end
-	local label = shortName(entry)
+	local label = Layout.label(entry)
 	local size = props.CardSize
-	local labelHeight = T.Layout.NameHeight
+	local faceHeight = props.CardHeight - S.LipHeight
 	React.useEffect(function()
 		local button = buttonRef.current
 		local scroller = if button then button:FindFirstAncestorWhichIsA("ScrollingFrame") else nil
@@ -75,7 +73,9 @@ return function(props)
 			tween:Cancel()
 		end
 	end, { selected })
-	local ringColor = if hovering or selected then C.Yellow elseif props.Equipped then C.Pink else C.Ink
+	local equipped = props.Equipped == true
+	local ringColor = if equipped then C.Pink elseif hovering or selected then C.Yellow else C.Ink
+	local K = T.Collectible
 	return c(PuffyButton, {
 		Style = "Card",
 		ButtonRef = buttonRef,
@@ -123,53 +123,22 @@ return function(props)
 			Outline = c("UIStroke", {
 				ref = ringRef,
 				Color = ringColor,
-				Thickness = S.StrokeCard,
-				Transparency = if selected or props.Equipped or hovering then 0 else 1,
+				Thickness = if equipped and hovering then S.StrokePanel else S.StrokeCard,
+				Transparency = if selected or equipped or hovering then 0 else 1,
 			}),
 		}),
-		Rarity = if entry.category ~= "CharacterColor"
-			then c("Frame", {
-				BackgroundColor3 = rarity.Color,
-				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(T.Layout.CompactGap, S.StrokeCard),
-				Size = UDim2.new(
-					1,
-					-T.Layout.CompactGap * 2
-						- (if props.Equipped and not props.Compact then T.Layout.SmallBadgeSize else 0),
-					0,
-					T.Layout.RarityHeight
-				),
-				ZIndex = 8,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0, S.RadiusPill) }),
-				Text = c("TextLabel", {
-					BackgroundTransparency = 1,
-					Size = UDim2.fromScale(1, 1),
-					Text = string.upper(entry.rarity),
-					TextSize = T.Type.Minimum,
-					Font = T.Type.Label,
-					TextColor3 = C.Ink,
-					ZIndex = 9,
-				}),
-			})
-			else nil,
-		Preview = c("Frame", {
-			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(
-				T.Layout.CompactGap,
-				if entry.category == "CharacterColor" then S.StrokeCard else T.Layout.RarityHeight + S.StrokeCard
-			),
-			Size = UDim2.new(
-				1,
-				-T.Layout.CompactGap * 2,
-				1,
-				-labelHeight
-					- (if entry.category == "CharacterColor" then S.StrokeCard else T.Layout.RarityHeight)
-					- S.LipHeight
-			),
+		Face = c(CollectibleFace, {
+			Width = size,
+			Height = faceHeight,
+			-- Outfit colours are swatches: the window takes a pale tint of the colour (so
+			-- the full-colour character still reads against it) and carries no tier tag.
+			Rarity = if swatch then nil else entry.rarity,
+			WellColor = if swatch then (entry.definition.PreviewColor or C.Cyan):Lerp(C.Surface, SWATCH_TINT) else nil,
+			Name = label,
+			NameSize = props.NameSize,
+			NameHeight = props.NameHeight,
 			ZIndex = 6,
-		}, {
-			Content = c(InventoryPreview, {
+			Art = c(InventoryPreview, {
 				ItemId = entry.itemId,
 				Category = entry.category,
 				Definition = entry.definition,
@@ -177,28 +146,7 @@ return function(props)
 				CostumeId = props.CostumeId,
 				Playing = hovering,
 				Candy = true,
-				ZIndex = 6,
-			}),
-		}),
-		NameBand = c("Frame", {
-			BackgroundColor3 = C.Ink,
-			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, S.StrokeCard),
-			Size = UDim2.new(1, -T.Layout.CompactGap, 0, labelHeight),
-			ZIndex = 9,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, S.RadiusPill) }),
-			ItemName = c("TextLabel", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(S.StrokeCard, 0),
-				Size = UDim2.new(1, -S.StrokeCard * 2, 1, 0),
-				Font = T.Type.Label,
-				Text = label,
-				TextSize = if size < 190 then T.Type.Minimum else T.Type.TileLabel,
-				TextWrapped = true,
-				TextColor3 = C.Surface,
-				ZIndex = 10,
+				ZIndex = 7,
 			}),
 		}),
 		Checkmark = c(Badge, {
@@ -206,9 +154,9 @@ return function(props)
 			Text = if props.SlotIndex then tostring(props.SlotIndex) else "✓",
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = if props.Compact and entry.category ~= "CharacterColor"
-					then UDim2.new(1, -16, 0, 48)
-					else UDim2.fromScale(0.96, 0.04),
+				Position = if props.Compact
+					then UDim2.new(1, -T.Layout.SmallBadgeSize / 2, 0, T.Layout.SmallBadgeSize / 2)
+					else UDim2.new(1, -T.Layout.BadgeSize / 4, 0, T.Layout.BadgeSize / 4),
 				Size = if props.Compact
 					then UDim2.fromOffset(T.Layout.SmallBadgeSize, T.Layout.SmallBadgeSize)
 					else nil,
@@ -228,35 +176,33 @@ return function(props)
 		Lock = if props.Locked
 			then c(Badge, { Lock = true, Native = { Position = UDim2.fromOffset(-S.StrokeCard, -S.StrokeCard) } })
 			else nil,
+		-- Locked price and Shop hint use the same candy chip as the rarity tag.
 		Price = if props.Locked and props.Price
-			then c("TextLabel", {
-				BackgroundColor3 = C.Yellow,
-				BorderSizePixel = 0,
-				AnchorPoint = Vector2.new(1, 1),
-				Position = UDim2.new(1, -S.StrokeCard, 1, -labelHeight),
-				Size = UDim2.new(0.7, 0, 0, T.Layout.SmallBadgeSize),
+			then c(Ribbon, {
 				Text = tostring(props.Price),
-				Font = T.Type.Label,
-				TextSize = T.Type.Minimum,
-				TextColor3 = C.Ink,
-				ZIndex = 12,
-			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Outline = c("UIStroke", { Color = C.Ink, Thickness = S.StrokeInner }),
+				Color = C.Yellow,
+				Native = {
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.fromOffset(size - K.Pad - K.TagInset, K.Pad + K.TagInset),
+					Size = UDim2.fromOffset(
+						Layout.tagWidth(tostring(props.Price), T.Type.Minimum, size - (K.Pad + K.TagInset) * 2),
+						K.TagHeight
+					),
+					ZIndex = 12,
+				},
 			})
 			else nil,
 		Tooltip = if props.Locked and hovering
-			then c("TextLabel", {
-				BackgroundColor3 = C.Ink,
-				BorderSizePixel = 0,
-				TextColor3 = C.Surface,
-				Font = T.Type.Label,
-				TextSize = T.Type.Minimum,
-				Text = "Get it in the Shop",
-				Size = UDim2.new(1, 0, 0, T.Layout.MinTarget),
-				Position = UDim2.new(0, 0, 1, S.LipHeight),
-				ZIndex = 20,
-			}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, S.RadiusPill) }) })
+			then c(Ribbon, {
+				Text = "GET IT IN THE SHOP",
+				Color = C.Surface,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.new(0.5, 0, 1, S.LipHeight),
+					Size = UDim2.fromOffset(Layout.tagWidth("GET IT IN THE SHOP", T.Type.Minimum, size), K.TagHeight),
+					ZIndex = 20,
+				},
+			})
 			else nil,
 	})
 end

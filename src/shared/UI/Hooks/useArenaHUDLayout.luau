@@ -4,6 +4,8 @@ local RS = game:GetService("ReplicatedStorage")
 local React = require(RS.Packages.react)
 local DeviceClass = require(RS.Shared.Game.Input.DeviceClass)
 local Layout = require(script.Parent.Parent.Models.ArenaHUDLayout)
+local InputHint = require(script.Parent.Parent.Components.InputHint)
+local Hints = require(RS:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints
 local useViewportSize = require(script.Parent.useViewportSize)
 
 return function(parentInsets: Enum.ScreenInsets?)
@@ -28,6 +30,11 @@ return function(parentInsets: Enum.ScreenInsets?)
 		topbar = GuiService.TopbarInset
 		origin = GuiService:GetInsetArea(parentInsets or Enum.ScreenInsets.None).Min
 	end)
-	local layout = Layout.resolve(viewport, device, topbar, DeviceClass.current() == "Touch")
+	local class = DeviceClass.current()
+	local hints = {
+		menu = InputHint.reserve(class, Hints.Menu),
+		scores = InputHint.reserve(class, Hints.Scores),
+	}
+	local layout = Layout.resolve(viewport, device, topbar, class == "Touch", hints)
 	return layout, origin
 end

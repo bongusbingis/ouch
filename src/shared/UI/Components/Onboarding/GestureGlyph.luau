@@ -8,13 +8,12 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local useLoopPhase = require(script.Parent.Parent.Parent.Hooks.useLoopPhase)
 local useReducedMotion = require(script.Parent.Parent.Parent.Hooks.useReducedMotion)
-local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
+local T = require(script.Parent.Parent.Parent.Tokens)
 
 local c = React.createElement
 
-local ACCENT = Color3.fromRGB(97, 255, 237)
-local INK = Color3.fromRGB(24, 41, 48)
-local LABEL_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local ACCENT = T.Colors.Cyan
+local INK = T.Colors.Ink
 
 export type Kind = "Tap" | "Hold" | "Swipe"
 
@@ -71,7 +70,7 @@ end
 local function contactDot(): any
 	return circle({
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundColor3 = T.Colors.Surface,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -225,22 +224,18 @@ return function(props: Props)
 	return c("Frame", native, {
 		Body = body,
 		Label = if props.Label and props.Label ~= ""
-			then c(ResponsiveText, {
-				MeasurementFont = Enum.Font.SourceSansBold,
-				MaxTextSize = 18,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
-					BackgroundTransparency = 1,
-					FontFace = LABEL_FONT,
-					Position = UDim2.fromScale(0.5, 1.2),
-					Size = UDim2.fromScale(2.4, 0.5),
-					Text = props.Label,
-					TextColor3 = Color3.new(1, 1, 1),
-					ZIndex = 6,
-				},
+			then c("TextLabel", {
+				AnchorPoint = Vector2.new(0.5, 0),
+				BackgroundTransparency = 1,
+				Font = T.Type.Display,
+				Position = UDim2.fromScale(0.5, 1.2),
+				Size = UDim2.new(2.4, 0, 0, T.Layout.SmallBadgeSize),
+				Text = props.Label,
+				TextColor3 = T.Colors.Surface,
+				TextSize = T.Type.Minimum,
+				ZIndex = 6,
 			}, {
-				Stroke = stroke(INK, 0.08),
-				Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
+				Stroke = c("UIStroke", { Color = INK, Thickness = T.Type.Outline }),
 			})
 			else nil,
 	})

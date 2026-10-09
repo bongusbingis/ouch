@@ -17,20 +17,23 @@ local DeviceClass = require(script.Parent.Parent.Parent.Game.Input.DeviceClass)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local Palette = require(script.Parent.Parent.EconomyPalette)
 
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 
 local modalSurface = require(script.Parent.ModalSurface)
 
-local Well = require(script.Parent.Well)
+local Icon = require(script.Parent.Icon)
+local ModalClose = require(script.Parent.ModalClose)
+local CollectibleFace = require(script.Parent.CollectibleFace)
+local ShopPreview = require(script.Parent.Shop.ShopPreview)
+local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 local c = React.createElement
 local Title = require(script.Parent.CandyTitle)
 
 local Surface = require(script.Parent.CandyPanel)
-local artwork = UIConfig.LobbyArtwork.Action
+local K = T.Collectible
 
 export type PublicDay = {
 	day: number,
@@ -58,50 +61,61 @@ export type Props = {
 	OnClose: (() -> ())?,
 }
 
-local function label(text: string, position: UDim2, size: UDim2, maximum: number, left: boolean?)
+local function label(text: string, position: UDim2, size: UDim2, maximum: number, color: Color3?)
+	local light = color == T.Colors.Surface
 	return c(ResponsiveText, {
-		MeasurementFont = Enum.Font.FredokaOne,
+		MeasurementFont = T.Type.Display,
+		MinTextSize = T.Type.Minimum,
 		MaxTextSize = maximum,
 		Native = {
 			BackgroundTransparency = 1,
 			Position = position,
 			Size = size,
-			Font = Enum.Font.FredokaOne,
+			Font = T.Type.Display,
 			Text = text,
-			TextColor3 = T.Colors.Ink,
-			TextXAlignment = if left then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center,
+			TextColor3 = color or T.Colors.Ink,
 			ZIndex = 3,
 		},
 	}, {
-		Outline = c(
-			"UIStroke",
-			{ Color = Palette.Ink, Thickness = 0, StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize }
-		),
+		Outline = if light then c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Type.Outline }) else nil,
 	})
 end
 
+-- Today is pink with a white outlined number, claimed days are lime with an ink
+-- check, and days still to come stay pale with a soft ink number.
 local function MiniDay(dayProps: { Day: PublicDay, Order: number })
 	local day = dayProps.Day
 	local claimed = day.claimed and not day.available
+	local fill = if day.available then T.Colors.Pink elseif claimed then T.Colors.Lime else T.Colors.Surface
 	return c("Frame", {
-		BackgroundColor3 = if day.available then Palette.Pink else Palette.Claimed,
+		BackgroundColor3 = fill,
 		BorderSizePixel = 0,
 		LayoutOrder = dayProps.Order,
 		Size = UDim2.new(1 / 7, -36 / 7, 1, 0),
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
-		Outline = c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Shape.StrokeInner }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, K.WellRadius) }),
+		Outline = c("UIStroke", {
+			Color = if day.available or claimed then T.Colors.Ink else T.Colors.WellLine,
+			Thickness = T.Shape.StrokeInner,
+		}),
 		Number = if claimed
-			then c("ImageLabel", {
-				BackgroundTransparency = 1,
-				Image = "rbxassetid://168702841",
-				ImageColor3 = T.Colors.Ink,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromScale(0.55, 0.65),
-				ScaleType = Enum.ScaleType.Fit,
-			})
-			else label(tostring(day.day), UDim2.fromOffset(2, 1), UDim2.new(1, -4, 1, -2), 23),
+			then c(Icon, {
+				Name = "Check",
+				Color = T.Colors.Ink,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromScale(0.62, 0.62),
+					ZIndex = 3,
+				},
+			}, { Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }) })
+			else label(
+				tostring(day.day),
+				UDim2.fromOffset(2, 1),
+				UDim2.new(1, -4, 1, -2),
+				T.Type.TileLabel,
+				if day.available then T.Colors.Surface else T.Colors.InkSoft
+			),
 	})
 end
 
@@ -202,6 +216,8 @@ return function(props: Props)
 	local actionY = height - padding - actionHeight
 	local rewardHeight = actionY - gap - rewardY
 	local enabled = not props.Pending and props.FocusEnabled ~= false
+	local actionText = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM" else "DONE"
+	local rewardItem = if currentReward and currentReward.itemId then Cosmetics.Items[currentReward.itemId] else nil
 	local miniDays = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
@@ -222,8 +238,8 @@ return function(props: Props)
 		ZIndex = 120,
 	}, {
 		Panel = c(Surface, {
-			Color = Palette.Panel,
-			Radius = UIConfig.Radius.Panel,
+			Color = T.Colors.SurfaceWarm,
+			Radius = T.Shape.RadiusPanel,
 			Native = {
 				Active = true,
 				ZIndex = 121,
@@ -244,92 +260,106 @@ return function(props: Props)
 			ModalScale = c("UIScale", { Scale = styles.Scale }),
 			Title = c(Title, {
 				Text = "DAILY REWARDS",
-				TextSize = if width < 420 then 24 else 30,
+				TextSize = T.Type.ModalTitle,
 				Native = {
 					Position = UDim2.fromOffset(padding - 4, padding - 12),
 					Size = UDim2.fromOffset(innerWidth - 54, 52),
 					ZIndex = 10,
 				},
 			}),
-			CloseButton = c(AnimatedButton, {
-				Text = "X",
-				TextSize = 26,
-				TextColor = T.Colors.Ink,
-				Color = T.Colors.Surface,
-				Shadow = false,
+			CloseButton = c(ModalClose, {
 				ButtonRef = actionRef,
-				SelectionRadius = UDim.new(0, artwork.CornerPx),
-				Enabled = props.OnClose ~= nil and props.FocusEnabled ~= false,
+				Enabled = props.FocusEnabled ~= false,
 				OnActivated = props.OnClose,
-				Native = {
-					BackgroundTransparency = 1,
-					Image = artwork.Pink,
-					ScaleType = Enum.ScaleType.Slice,
-					SliceCenter = artwork.PinkSlice,
-					SliceScale = artwork.SliceScale,
-					Position = UDim2.fromOffset(width - padding - 44, padding),
-					Size = UDim2.fromOffset(44, 44),
-					ZIndex = 4,
-				},
-			}, { Label = label("X", UDim2.fromOffset(0, 1), UDim2.fromScale(1, 1), 30) }),
+				Position = UDim2.new(1, -padding, 0, padding),
+				ZIndex = 4,
+			}),
 			DayStrip = c("Frame", {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromOffset(padding, dayY),
 				Size = UDim2.fromOffset(innerWidth, dayHeight),
 			}, miniDays),
-			RewardArea = c(Well, {
-				Candy = true,
-				Color = Palette.Claimed,
-				Radius = UIConfig.Radius.Control,
-				Native = {
-					Position = UDim2.fromOffset(padding, rewardY),
-					Size = UDim2.fromOffset(innerWidth, rewardHeight),
-				},
+			-- Today's prize is a collectible window: a tinted art well with the day (or
+			-- CLAIMED!) on its seam tag, the same card language as every cosmetic.
+			RewardArea = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(padding - K.Pad, rewardY - K.Pad),
+				Size = UDim2.fromOffset(innerWidth + K.Pad * 2, rewardHeight + K.Pad * 2),
+				ZIndex = 2,
 			}, {
-				Status = label(
-					props.ErrorText or (if claimed then "CLAIMED!" else `DAY {currentDayNumber}`),
-					UDim2.fromOffset(10, 6),
-					UDim2.new(1, -20, 0, 22),
-					if props.ErrorText then 16 else 20
-				),
-				Reward = if currentReward and currentReward.kind == "Bonks"
-					then c(BonksLabel, {
-						Amount = currentReward.amount or 0,
-						MaxTextSize = if compact then 52 else 68,
-						TextColor = T.Colors.Ink,
-						TextStroke = 0,
-						Native = { Position = UDim2.fromOffset(12, 27), Size = UDim2.new(1, -24, 1, -33), ZIndex = 3 },
-					}, { Pop = c("UIScale", { Scale = rewardStyles.Scale }) })
-					else nil,
+				Card = c(CollectibleFace, {
+					Width = innerWidth + K.Pad * 2,
+					Height = rewardHeight + K.Pad * 2,
+					Rarity = if rewardItem then rewardItem.Rarity else nil,
+					WellColor = if rewardItem then nil else T.Colors.Yellow:Lerp(T.Colors.Surface, K.WellTint),
+					TagText = if claimed then "CLAIMED!" else `DAY {currentDayNumber}`,
+					TagColor = if claimed then T.Colors.Lime else T.Colors.Pink,
+					Art = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 4 }, {
+						Error = if props.ErrorText
+							then c("TextLabel", {
+								BackgroundTransparency = 1,
+								Size = UDim2.new(1, 0, 0, K.FooterHeight),
+								Font = T.Type.Label,
+								Text = props.ErrorText,
+								TextSize = T.Type.Minimum,
+								TextColor3 = T.Colors.Ink,
+								TextTruncate = Enum.TextTruncate.AtEnd,
+								ZIndex = 5,
+							})
+							else nil,
+						Reward = if currentReward and currentReward.kind == "Bonks"
+							then c(BonksLabel, {
+								Amount = currentReward.amount or 0,
+								MaxTextSize = if compact then 52 else 68,
+								TextColor = T.Colors.Ink,
+								TextStroke = 0,
+								Native = {
+									Position = UDim2.fromOffset(0, if props.ErrorText then K.FooterHeight else 0),
+									Size = UDim2.new(1, 0, 1, if props.ErrorText then -K.FooterHeight else 0),
+									ZIndex = 5,
+								},
+							}, { Pop = c("UIScale", { Scale = rewardStyles.Scale }) })
+							elseif rewardItem then c("Frame", {
+								BackgroundTransparency = 1,
+								Position = UDim2.fromOffset(0, if props.ErrorText then K.FooterHeight else 0),
+								Size = UDim2.new(1, 0, 1, if props.ErrorText then -K.FooterHeight else 0),
+								ZIndex = 5,
+							}, {
+								Pop = c("UIScale", { Scale = rewardStyles.Scale }),
+								Preview = c(ShopPreview, {
+									Items = {
+										{
+											itemId = currentReward and currentReward.itemId,
+											category = rewardItem.Category,
+											definition = rewardItem,
+										},
+									},
+									TextColor = T.Colors.Ink,
+									TextStroke = 0,
+									ZIndex = 6,
+								}),
+							})
+							else nil,
+					}),
+					ZIndex = 3,
+				}),
 			}),
+			-- The pink primary uses white outlined Fredoka like every other pink primary.
 			ActionButton = c(AnimatedButton, {
-				Text = if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM" else "DONE",
-				TextSize = 26,
-				TextColor = T.Colors.Ink,
+				Text = actionText,
+				TextSize = if compact then T.Type.Tab else T.Type.Section,
+				TextColor = if state.canClaim then T.Colors.Surface else T.Colors.Ink,
 				Color = if state.canClaim then T.Colors.Pink else T.Colors.Surface,
+				LipColor = if state.canClaim then T.Colors.PinkLip else T.Colors.WellLine,
 				Shadow = false,
-				SelectionRadius = UDim.new(0, artwork.CornerPx),
 				Enabled = enabled and (if state.canClaim then props.OnClaim ~= nil else props.OnClose ~= nil),
 				Style = "Primary",
 				OnActivated = if state.canClaim then props.OnClaim else props.OnClose,
 				Native = {
-					BackgroundTransparency = 1,
-					Image = if state.canClaim then artwork.Pink else artwork.Cyan,
-					ImageColor3 = if enabled then Palette.White else Color3.fromRGB(140, 140, 140),
-					ScaleType = Enum.ScaleType.Slice,
-					SliceCenter = if state.canClaim then artwork.PinkSlice else artwork.CyanSlice,
-					SliceScale = artwork.SliceScale,
 					Position = UDim2.fromOffset(padding, actionY),
 					Size = UDim2.fromOffset(innerWidth, actionHeight),
 					ZIndex = 4,
 				},
-			}, {
-				Label = label(
-					if props.Pending then "CLAIMING…" elseif state.canClaim then "CLAIM" else "DONE",
-					UDim2.fromOffset(10, 2),
-					UDim2.new(1, -20, 1, -4),
-					if compact then 28 else 32
-				),
 			}),
 		}),
 	})

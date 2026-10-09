@@ -273,7 +273,7 @@ local function Trajectory()
 				dotRefs.current[index] = instance
 			end,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundColor3 = T.Colors.Surface,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Visible = false,
@@ -283,7 +283,7 @@ local function Trajectory()
 	children.Endpoint = c("Frame", {
 		ref = endpointRef,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(255, 224, 78),
+		BackgroundColor3 = T.Colors.Yellow,
 		BackgroundTransparency = 0.82,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(ThrowUX.Trajectory.EndpointPixels, ThrowUX.Trajectory.EndpointPixels * 0.55),
@@ -292,7 +292,7 @@ local function Trajectory()
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 		Stroke = c("UIStroke", {
-			Color = Color3.fromRGB(255, 255, 255),
+			Color = T.Colors.Surface,
 			StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			Thickness = 0.1,
 			Transparency = ThrowUX.Trajectory.EndpointTransparency,
@@ -312,7 +312,7 @@ local function SwipeFeedback(props: { snapshot: ThrowUXClient.Snapshot })
 	local endPosition = gesture.origin + direction * length
 	local midpoint = gesture.origin:Lerp(endPosition, 0.5)
 	local recognized = gesture.kind == "SwipeRecognized" or gesture.kind == "TapRecognized"
-	local color = if recognized then ThrowUX.Reticle.TargetColor else Color3.new(1, 1, 1)
+	local color = if recognized then ThrowUX.Reticle.TargetColor else T.Colors.Surface
 	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 30 }, {
 		Origin = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -514,13 +514,13 @@ return function()
 		Debug = c(ResponsiveText, {
 			MeasurementFont = Enum.Font.Code,
 			Native = {
-				BackgroundColor3 = Color3.new(),
+				BackgroundColor3 = T.Colors.Ink,
 				BackgroundTransparency = 0.35,
 				FontFace = Font.fromEnum(Enum.Font.Code),
 				Position = UDim2.fromScale(0.01, 0.1),
 				Size = UDim2.fromScale(0.55, 0.05),
 				Text = debugText,
-				TextColor3 = Color3.new(1, 1, 1),
+				TextColor3 = T.Colors.Surface,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				Visible = snapshot.debugEnabled,
 				ZIndex = 100,

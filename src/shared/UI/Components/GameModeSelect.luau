@@ -13,6 +13,9 @@ local ReactSpring = require(Packages:WaitForChild("react-spring"))
 local GameModeCard = require(script.Parent.GameModeCard)
 local CandyTitle = require(script.Parent.CandyTitle)
 local VoteLoadingBar = require(script.Parent.VoteLoadingBar)
+local Badge = require(script.Parent.Badge)
+local MapVoteChip = require(script.Parent.MapVoteChip)
+local VoteModel = require(script.Parent.Parent.Models.GameModeVoteViewModel)
 local Motion = require(script.Parent.Parent.Motion)
 local T = require(script.Parent.Parent.Tokens)
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
@@ -21,7 +24,6 @@ local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
 
 local c = React.createElement
-local TITLE = "VOTE FOR A MODE"
 
 export type Props = {
 	Active: boolean,
@@ -30,6 +32,8 @@ export type Props = {
 	EndsAt: number,
 	DurationSeconds: number,
 	OnVote: (string) -> (),
+	Maps: { MapVoteChip.Map }?,
+	OnVoteMap: ((string) -> ())?,
 	OnPrepared: (() -> ())?,
 	OnPresented: (() -> ())?,
 }
@@ -37,12 +41,16 @@ export type Props = {
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.None)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, 1)
-	local short = safeArea.size.Y <= 500
+	local short = VoteModel.isShort(safeArea.size)
 	local compact = not portrait and short
+	local maps = props.Maps or {}
+	local hasMaps = #maps >= 2 and props.OnVoteMap ~= nil
+	local title = VoteModel.title(hasMaps)
+	local dock = if hasMaps then VoteModel.dockLayout(safeArea.size, #maps) else nil
 	local cardHeight = math.clamp(safeArea.size.Y * 0.56 - 24, 288, 350)
-	local titleSize = if portrait then 28 else if compact then 30 else 44
+	local titleSize = if portrait or compact then T.Type.ModalTitle else T.Type.Title
 	local titleWidth = math.min(
-		TextService:GetTextSize(TITLE, titleSize, T.Type.Display, Vector2.new(100000, 1000)).X + 36,
+		TextService:GetTextSize(title, titleSize, T.Type.Display, Vector2.new(100000, 1000)).X + 36,
 		safeArea.size.X * 0.88
 	)
 	local present, setPresent = React.useState(props.Active or props.Prepared == true)
@@ -164,10 +172,10 @@ return function(props: Props)
 		}),
 		Padding = if portrait
 			then c("UIPadding", {
-				PaddingTop = UDim.new(0, 10),
-				PaddingBottom = UDim.new(0, 12),
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 12),
+				PaddingTop = UDim.new(0, T.Layout.CompactGap),
+				PaddingBottom = UDim.new(0, T.Layout.CompactGap),
+				PaddingLeft = UDim.new(0, T.Layout.CompactGap),
+				PaddingRight = UDim.new(0, T.Layout.CompactGap),
 			})
 			else nil,
 	}
@@ -183,6 +191,64 @@ return function(props: Props)
 		})
 	end
 	local holderHeight = safeArea.size.Y * 0.56
+	local shrink = if dock then dock.holderShrink else 0
+
+	-- Map dock: one row with the countdown bar when it fits, else its own row above.
+	local barWidth = math.min(T.MapVote.BarMaxWidth, safeArea.size.X * 0.82)
+	local barHeight = if portrait or compact then T.MapVote.CompactBarHeight else T.MapVote.BarHeight
+	local barPosition = UDim2.fromScale(0.5, 0.975)
+	local dockChildren: { [string]: any }? = nil
+	local dockSize = UDim2.new()
+	local dockPosition = UDim2.new()
+	local dockAnchor = Vector2.new(0, 1)
+	if dock then
+		local chipsWidth = #maps * dock.chipWidth + (#maps - 1) * dock.gap
+		barWidth = dock.barWidth
+		barHeight = dock.barHeight
+		dockSize = UDim2.fromOffset(chipsWidth, dock.chipHeight)
+		if dock.stacked then
+			dockAnchor = Vector2.new(0.5, 1)
+			dockPosition = UDim2.new(0.5, 0, 0.975, -(dock.barHeight + dock.gap))
+		else
+			local rowLeft = math.floor((safeArea.size.X - (chipsWidth + dock.gap + barWidth)) / 2)
+			dockPosition = UDim2.new(0, rowLeft, 0.975, 0)
+			barPosition = UDim2.new(0, rowLeft + chipsWidth + dock.gap + barWidth / 2, 0.975, 0)
+		end
+		local sticker = if compact then T.Shop.CompactStickerHeight else T.Shop.StickerHeight
+		local chips: { [string]: any } = {
+			Layout = c("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				Padding = UDim.new(0, dock.gap),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			}),
+		}
+		for index, map in maps do
+			chips[map.Id] = c(MapVoteChip, {
+				Map = map,
+				Enabled = props.Active,
+				OnVote = props.OnVoteMap :: (string) -> (),
+				Height = dock.chipHeight,
+				Width = dock.chipWidth,
+				Compact = short or portrait,
+				EntranceDelay = (#props.Modes + index - 1) * 0.025,
+				LayoutOrder = index,
+			})
+		end
+		dockChildren = {
+			Chips = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, chips),
+			Sticker = c(Badge, {
+				Text = "MAP",
+				TextSize = T.Type.Minimum,
+				Tilt = T.Shop.StickerTilt,
+				Native = {
+					Position = UDim2.fromOffset(-T.Shop.StickerOverhang, -math.floor(sticker / 2)),
+					Size = UDim2.fromOffset(T.Shop.StickerPadding + 34, sticker),
+					ZIndex = 20,
+				},
+			}),
+		}
+	end
 
 	return c("Frame", {
 		BackgroundTransparency = 1,
@@ -203,7 +269,7 @@ return function(props: Props)
 			Logo = c("ImageLabel", {
 				BackgroundTransparency = 1,
 				Image = "rbxassetid://78333957912633",
-				Position = if portrait then UDim2.fromScale(0.04, 0.015) else UDim2.fromScale(0, -0.000749383),
+				Position = if portrait then UDim2.fromScale(0.04, 0.015) else UDim2.fromScale(0, 0),
 				Size = if portrait
 					then UDim2.fromScale(0.5, 0.2)
 					else if compact then UDim2.fromScale(0.25, 0.2) else UDim2.fromScale(0.321542, 0.301659),
@@ -213,13 +279,16 @@ return function(props: Props)
 				}),
 			}),
 			VoteText = c(CandyTitle, {
-				Text = TITLE,
+				Text = title,
 				TextSize = titleSize,
 				Tilt = T.Shape.TiltTitle,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
 					Position = UDim2.fromScale(0.5, if portrait then 0.285 else if compact then 0.225 else 0.27),
-					Size = UDim2.fromOffset(titleWidth, if portrait then 45 else if compact then 48 else 66),
+					Size = UDim2.fromOffset(
+						titleWidth,
+						if portrait or compact then T.Layout.CompactTitleHeight else T.Layout.TitleHeight
+					),
 					ZIndex = 10,
 				},
 			}),
@@ -229,20 +298,33 @@ return function(props: Props)
 				AutomaticCanvasSize = if portrait then Enum.AutomaticSize.Y else nil,
 				BackgroundTransparency = 1,
 				CanvasSize = if portrait then UDim2.fromOffset(0, 0) else nil,
-				Position = UDim2.fromScale(0.5, if portrait then 0.6 else if compact then 0.57 else 0.573),
+				Position = UDim2.new(
+					0.5,
+					0,
+					if portrait then 0.6 else if compact then 0.57 else 0.573,
+					-math.floor(shrink / 2)
+				),
 				ScrollBarImageColor3 = if portrait then T.Colors.InkSoft else nil,
-				ScrollBarThickness = if portrait then 6 else nil,
+				ScrollBarThickness = if portrait then T.Layout.ScrollBar else nil,
 				Size = if portrait
-					then UDim2.new(0.92, 0, 0, holderHeight)
-					else UDim2.fromScale(0.94, if compact then 0.60 else 0.56),
+					then UDim2.new(0.92, 0, 0, holderHeight - shrink)
+					else UDim2.new(0.94, 0, if compact then 0.60 else 0.56, -shrink),
 				VerticalScrollBarInset = if portrait then Enum.ScrollBarInset.ScrollBar else nil,
 			}, cards),
+			MapDock = if dockChildren
+				then c("Frame", {
+					AnchorPoint = dockAnchor,
+					BackgroundTransparency = 1,
+					Position = dockPosition,
+					Size = dockSize,
+				}, dockChildren)
+				else nil,
 			LoadingBar = c(VoteLoadingBar, {
 				Active = props.Active,
 				EndsAt = props.EndsAt,
 				DurationSeconds = props.DurationSeconds,
-				Position = UDim2.fromScale(0.5, 0.975),
-				Size = UDim2.fromOffset(math.min(540, safeArea.size.X * 0.82), if portrait or compact then 48 else 56),
+				Position = barPosition,
+				Size = UDim2.fromOffset(barWidth, barHeight),
 			}),
 		}),
 	})

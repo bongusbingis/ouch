@@ -10,15 +10,80 @@ local Preview = require(script.Parent.ShopPreview)
 local PriceButton = require(script.Parent.ShopPriceButton)
 local ArtTile = require(script.Parent.ShopArtTile)
 local Ribbon = require(script.Parent.Parent.RarityRibbon)
+local CollectibleLayout = require(script.Parent.Parent.Parent.Models.CollectibleLayout)
 local Badge = require(script.Parent.Parent.Badge)
 local Clipped = require(script.Parent.ScrollerClipped)
 local Surface = require(script.Parent.Parent.CandySurface)
 local Progress = require(script.Parent.Parent.CandyProgressBar)
 local UIFeedback = require(script.Parent.Parent.Parent.Services.UIFeedback)
+local Icon = require(script.Parent.Parent.Icon)
 local c, C, L, S = React.createElement, T.Colors, T.Shop, T.Shape
 
 local function labelWidth(text: string, textSize: number, padding: number): number
 	return math.ceil(TextService:GetTextSize(text, textSize, T.Type.Label, Vector2.new(4096, 200)).X) + padding
+end
+
+local function textHeight(text: string, textSize: number, font: Enum.Font, width: number): number
+	return math.ceil(TextService:GetTextSize(text, textSize, font, Vector2.new(math.max(width, 1), 10000)).Y)
+end
+
+-- A soft silhouette of what is coming holds the art tile while a 3D preview or
+-- thumbnail is still being built, so cards never pop in from an empty well.
+local SILHOUETTES: { [string]: string } = {
+	BallAssets = "Ball",
+	HammerAssets = "Hammer",
+	CostumeAssets = "Celebration",
+	CharacterColor = "Celebration",
+	EmoteAssets = "Celebration",
+}
+
+local function placeholderIcon(items: { any }, thumbnail: string?): string?
+	local first = items[1]
+	if first ~= nil then
+		-- Effect seals are drawn immediately and need no stand-in.
+		return SILHOUETTES[first.category]
+	end
+	return if thumbnail ~= nil and thumbnail ~= "" then "Star" else nil
+end
+
+local function useArtReady(artRef: any, key: string): boolean
+	local ready, setReady = React.useState(false)
+	React.useEffect(function()
+		setReady(false)
+		local root = artRef.current
+		if root == nil then
+			setReady(true)
+			return nil
+		end
+		local connections = {}
+		local function done()
+			setReady(true)
+		end
+		local image = root:FindFirstChildWhichIsA("ImageLabel", true)
+		local viewport = root:FindFirstChildWhichIsA("ViewportFrame", true)
+		local world = if viewport then viewport:FindFirstChildWhichIsA("WorldModel") else nil
+		if world ~= nil then
+			if #world:GetChildren() > 0 then
+				done()
+			else
+				table.insert(connections, world.ChildAdded:Connect(done))
+			end
+		elseif image ~= nil then
+			if image.IsLoaded then
+				done()
+			else
+				table.insert(connections, image:GetPropertyChangedSignal("IsLoaded"):Connect(done))
+			end
+		else
+			done()
+		end
+		return function()
+			for _, connection in connections do
+				connection:Disconnect()
+			end
+		end
+	end, { key })
+	return ready
 end
 
 return React.memo(function(props)
@@ -32,7 +97,13 @@ return React.memo(function(props)
 		Headline = props.Headline == true,
 		ShowProgress = height >= 220,
 		RobuxSymbol = ShopConfig.RobuxSymbol,
+		SectionTitle = props.SectionTitle,
 	})
+	local artRef = React.useRef(nil)
+	local hero = style.previewItems[1]
+	local artKey = (if hero then `{hero.category}:{hero.itemId}` else "") .. (card.thumbnail or "")
+	local artReady = useArtReady(artRef, artKey)
+	local silhouette = placeholderIcon(style.previewItems, card.thumbnail)
 	local split = (props.Class.Layout == "Split" or style.season) and width >= L.PromoMin
 	local pad = L.CardPadding
 	local actionHeight = L.ActionHeight
@@ -47,6 +118,10 @@ return React.memo(function(props)
 
 	local tileX, tileY = pad, pad
 	local tileW, tileH, infoX, infoWidth
+	-- Stacked cards use the collectible face order: art tile, rarity tag pinned
+	-- on its lower seam, then the CAPS name in plum Fredoka on the cream body.
+	local half = if style.rarity then math.ceil(ribbonHeight / 2) else 0
+	local stackNameHeight = if short then T.Type.Minimum + 8 else L.BandHeight - S.StrokeCard
 	if split then
 		infoX = math.floor(width * L.SplitArtScale)
 		tileW = infoX - pad - L.CopyGap
@@ -56,50 +131,66 @@ return React.memo(function(props)
 		infoX = pad
 		infoWidth = width - pad * 2
 		tileW = infoWidth
-		tileH = actionY - pad - S.StrokeCard - tileY
+		tileH = actionY - 4 - stackNameHeight - half - tileY
 		if style.progress ~= nil then
 			tileH -= L.StackProgressReserve
 		end
 	end
 
 	local tile = {}
+	local stacked = {}
 	local artTop, artBottom
 	if split then
 		artTop, artBottom = 6, tileH - 6
 	else
-		local ribbonWidth = tileW
-			- T.Layout.CompactGap * 2
-			- (if style.owned then ownedWidth - T.Layout.CompactGap else 0)
+		artTop = S.StrokeCard + 4
+		artBottom = tileH - half - 6
 		if style.rarity then
-			tile.Rarity = c(Ribbon, {
+			stacked.Rarity = c(Ribbon, {
 				Rarity = style.rarity,
 				Native = {
-					Position = UDim2.fromOffset(T.Layout.CompactGap, S.StrokeCard),
-					Size = UDim2.fromOffset(math.max(ribbonWidth, 60), ribbonHeight),
-					ZIndex = 12,
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.fromOffset(tileX + tileW / 2, tileY + tileH - half),
+					Size = UDim2.fromOffset(
+						CollectibleLayout.tagWidth(string.upper(style.rarity), T.Type.Minimum, tileW - 12),
+						ribbonHeight
+					),
+					ZIndex = 13,
 				},
 			})
 		end
-		artTop = if style.rarity then ribbonHeight + S.StrokeCard + 4 else S.StrokeCard + 4
-		artBottom = tileH - L.BandHeight + S.StrokeCard - 6
-		tile.Name = c("TextLabel", {
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundColor3 = C.Ink,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, 0, 1, S.StrokeCard),
-			Size = UDim2.new(1, -T.Layout.CompactGap, 0, L.BandHeight),
-			Font = T.Type.Label,
+		local nameTop = tileY + tileH + (if half > 0 then half + T.Collectible.NameGap else 4)
+		stacked.Name = c("TextLabel", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(infoX, nameTop),
+			Size = UDim2.fromOffset(infoWidth, math.max(T.Type.Minimum + 4, stackNameHeight)),
+			Font = T.Type.Display,
 			Text = style.name,
 			TextSize = if width < 190 then T.Type.Minimum else T.Type.TileLabel,
-			TextColor3 = C.Surface,
+			TextColor3 = C.Ink,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextWrapped = true,
 			ZIndex = 12,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, S.RadiusPill) }),
-			Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
+		})
+	end
+	if silhouette and not artReady then
+		tile.Placeholder = c(Icon, {
+			Name = silhouette,
+			Color = style.tileLine,
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				ImageTransparency = 0.45,
+				Position = UDim2.fromOffset(tileW / 2, (artTop + artBottom) / 2),
+				Size = UDim2.fromOffset(
+					math.floor(math.min(tileW, artBottom - artTop) * 0.46),
+					math.floor(math.min(tileW, artBottom - artTop) * 0.46)
+				),
+				ZIndex = 9,
+			},
 		})
 	end
 	tile.Artwork = c("Frame", {
+		ref = artRef,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(6, artTop),
 		Size = UDim2.fromOffset(math.max(tileW - 12, 1), math.max(artBottom - artTop, 28)),
@@ -127,6 +218,9 @@ return React.memo(function(props)
 			},
 		})
 	end
+	-- The action sits on the card's bottom line so siblings in a row align; only a
+	-- currency pack, whose copy is one fixed line, centres name and price together.
+	local actionTop = actionY
 	if split then
 		local nameSize = if short then T.Type.Minimum elseif props.Headline then T.Type.Tab else T.Type.TileLabel
 		local top = pad + (if style.owned then stickerHeight - 6 else 0)
@@ -137,7 +231,7 @@ return React.memo(function(props)
 				Native = {
 					Position = UDim2.fromOffset(infoX, top + 1),
 					Size = UDim2.fromOffset(
-						math.min(labelWidth(string.upper(style.rarity), T.Type.Minimum, 24), infoWidth),
+						CollectibleLayout.tagWidth(string.upper(style.rarity), T.Type.Minimum, infoWidth),
 						ribbonHeight
 					),
 					ZIndex = 12,
@@ -145,8 +239,17 @@ return React.memo(function(props)
 			})
 			nameY = top + 1 + ribbonHeight + 6
 		end
-		local nameHeight = if short then 40 else math.ceil(nameSize * 2.4)
-		nameHeight = math.max(nameSize + 6, math.min(nameHeight, actionY - 6 - nameY))
+		local lineHeight = textHeight("A", nameSize, T.Type.Display, infoWidth)
+		local nameHeight = if short
+			then 40
+			else math.min(textHeight(style.name, nameSize, T.Type.Display, infoWidth), lineHeight * 2)
+		if style.currency and not short then
+			nameHeight = lineHeight
+			local stack = nameHeight + T.Layout.CompactGap + actionHeight
+			nameY = math.max(pad, math.floor((height - S.LipHeight - stack) / 2))
+			actionTop = nameY + nameHeight + T.Layout.CompactGap
+		end
+		nameHeight = math.max(nameSize + 6, math.min(nameHeight, actionTop - 6 - nameY))
 		copy.Name = c("TextLabel", {
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(infoX, nameY),
@@ -161,7 +264,7 @@ return React.memo(function(props)
 			TextYAlignment = Enum.TextYAlignment.Top,
 			ZIndex = 12,
 		})
-		local cursor = nameY + nameHeight + 4
+		local cursor = nameY + nameHeight + 6
 		if style.progress ~= nil then
 			copy.Progress = c(Progress, {
 				Progress = style.progress,
@@ -174,21 +277,35 @@ return React.memo(function(props)
 			})
 			cursor += 12 + 10
 		end
-		local secondaryHeight = actionY - 8 - cursor
-		if style.secondary and not short and secondaryHeight >= T.Type.Minimum then
-			copy.SupportingText = c("TextLabel", {
+		local limit = actionTop - T.Layout.CompactGap
+		local function copyLine(key: string, text: string, color: Color3)
+			local line = textHeight("A", T.Type.Minimum, T.Type.Label, infoWidth)
+			local lines = math.floor((limit - cursor) / line)
+			if lines < 1 then
+				return
+			end
+			local blockHeight = math.min(textHeight(text, T.Type.Minimum, T.Type.Label, infoWidth), lines * line)
+			copy[key] = c("TextLabel", {
 				BackgroundTransparency = 1,
 				Position = UDim2.fromOffset(infoX, cursor),
-				Size = UDim2.fromOffset(infoWidth, secondaryHeight),
+				Size = UDim2.fromOffset(infoWidth, blockHeight),
 				Font = T.Type.Label,
-				Text = style.secondary,
+				Text = text,
 				TextSize = T.Type.Minimum,
-				TextColor3 = C.InkSoft,
+				TextColor3 = color,
+				TextTruncate = Enum.TextTruncate.AtEnd,
 				TextWrapped = true,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Top,
 				ZIndex = 12,
 			})
+			cursor += blockHeight + 4
+		end
+		if style.secondary and not short then
+			copyLine("SupportingText", style.secondary, C.InkSoft)
+		end
+		if style.description and not short then
+			copyLine("Description", style.description, C.InkSoft)
 		end
 	end
 
@@ -214,7 +331,7 @@ return React.memo(function(props)
 			Text = "",
 			AutoButtonColor = false,
 			Selectable = false,
-			Size = UDim2.new(1, 0, 0, actionY - S.StrokeCard * 2),
+			Size = UDim2.new(1, 0, 0, actionTop - S.StrokeCard * 2),
 			ZIndex = 14,
 			[React.Event.Activated] = function()
 				UIFeedback.click()
@@ -226,13 +343,18 @@ return React.memo(function(props)
 			BonksAmount = style.action.BonksAmount,
 			TextSize = if infoWidth < 220 then T.Type.Minimum else T.Type.TileLabel,
 			Color = if style.primary then C.Pink else C.Surface,
+			Muted = style.actionState == "Muted",
 			AnchorPoint = Vector2.zero,
-			Position = UDim2.fromOffset(infoX, actionY),
+			Position = UDim2.fromOffset(infoX, actionTop),
 			Size = UDim2.fromOffset(infoWidth, actionHeight),
 			ZIndex = 12,
 			OnHoverChanged = setActionHovered,
 			OnActivated = function()
-				props.OnActivated(card)
+				if style.actionState == "Retry" and props.OnRetry then
+					props.OnRetry()
+				else
+					props.OnActivated(card)
+				end
 			end,
 		}),
 		Sticker = if style.sticker
@@ -272,6 +394,9 @@ return React.memo(function(props)
 			else nil,
 	}
 	for key, child in copy do
+		children[key] = child
+	end
+	for key, child in stacked do
 		children[key] = child
 	end
 

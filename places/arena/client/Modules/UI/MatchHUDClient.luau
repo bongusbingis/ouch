@@ -15,6 +15,9 @@ local ModeRegistry = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Modes"):WaitForChild("ModeRegistry")
 )
 
+-- Hold Tab / ButtonSelect (Input.Hints.Scores); the Scores button shows the same binding.
+local SCORES_BINDING =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints.Scores
 local MatchHUDClient = {}
 local snapshot: any = Model.build({}, 0)
 local listeners: { (any) -> () } = {}
@@ -107,7 +110,13 @@ local function hookMember(member: Player)
 		return
 	end
 	memberConnections[member] = member.AttributeChanged:Connect(function(name)
-		if name == "MatchScore" or name == "TeamId" or name == "ArenaRoundEligible" then
+		if
+			name == "MatchScore"
+			or name == "TeamId"
+			or name == "ArenaRoundEligible"
+			or name == "RewardsRecoveryPending"
+			or name == "MatchRespawnAt"
+		then
 			scheduleUpdate()
 		end
 	end)
@@ -176,7 +185,6 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 		end)
 
 		local player = Players.LocalPlayer
-		table.insert(eventConnections, player.AttributeChanged:Connect(scheduleUpdate))
 		table.insert(
 			eventConnections,
 			player.CharacterAdded:Connect(function(char)
@@ -238,7 +246,7 @@ function MatchHUDClient.subscribe(callback: (any) -> ()): () -> ()
 				setOpen(true)
 			end
 			return Enum.ContextActionResult.Sink
-		end, false, Enum.ContextActionPriority.High.Value + 2, Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect)
+		end, false, Enum.ContextActionPriority.High.Value + 2, SCORES_BINDING.Keyboard, SCORES_BINDING.Gamepad)
 
 		focusConnection = UserInputService.WindowFocusReleased:Connect(function()
 			setOpen(false)

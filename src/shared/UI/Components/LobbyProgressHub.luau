@@ -11,21 +11,79 @@ local Text = require(script.Parent.LobbyText)
 local Icon = require(script.Parent.Icon)
 local Bonks = require(script.Parent.BonksLabel)
 local Scroll = require(script.Parent.ScrollFrame)
-local c, C, S = React.createElement, T.Colors, T.Splash
+local Ribbon = require(script.Parent.RarityRibbon)
+local ResponsiveText = require(script.Parent.ResponsiveText)
+local SplashLayout = require(script.Parent.Parent.Models.SplashLayout)
+local Cosmetics = require(RS:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local c, C, S, K = React.createElement, T.Colors, T.Splash, T.Collectible
+local DAY_GAP = 6
 
 local function message(text)
-	return c(
-		Text,
-		{ Text = text, TextColor3 = C.InkSoft, Font = Enum.Font.BuilderSans, Size = UDim2.new(1, -8, 0, 76) }
-	)
+	return c(Text, {
+		Text = text,
+		TextColor3 = C.InkSoft,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.new(1, -8, 0, 76),
+	})
 end
 
+-- Title and reward share the top line; the bar and one right-hand status slot
+-- (count, CLAIM or CLAIMED) share the bottom line, so every row keeps the same
+-- baselines whatever its state.
 local function QuestRow(props)
 	local q = props.Quest
 	local dense = props.Compact == true
 	local rowHeight = if dense then T.LobbyLandscape.QuestHeight else S.QuestHeight
+	local inset = if dense then 6 else 12
+	local titleY = if dense then 6 else 10
+	local barHeight = if dense then 8 else 12
+	local bottomY = rowHeight - inset - T.Layout.MinTarget
+	local slotWidth = 104
+	local reserve = slotWidth + 34
 	local complete = q.progress >= q.goal
 	local ready = complete and not q.claimed
+	local slot
+	if ready then
+		slot = c(Button, {
+			Text = if props.Pending then "WAIT..." else "CLAIM",
+			TextSize = T.Type.Minimum,
+			Enabled = props.OnClaim ~= nil and not props.Pending,
+			Shadow = false,
+			Color = C.Pink,
+			LipColor = C.PinkLip,
+			StrokeColor = C.Ink,
+			Native = {
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -12, 0, bottomY),
+				Size = UDim2.fromOffset(slotWidth, T.Layout.MinTarget),
+			},
+			OnActivated = function()
+				if props.OnClaim then
+					props.OnClaim(q.questId)
+				end
+			end,
+		})
+	elseif q.claimed then
+		slot = c(Ribbon, {
+			Text = "CLAIMED",
+			Color = C.Lime,
+			Native = {
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -12, 0, bottomY + T.Layout.MinTarget / 2),
+				Size = UDim2.fromOffset(slotWidth, K.TagHeight),
+				ZIndex = 9,
+			},
+		})
+	else
+		slot = c(Text, {
+			Text = `{q.progress} / {q.goal}`,
+			TextColor3 = C.InkSoft,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -12, 0, bottomY),
+			Size = UDim2.fromOffset(slotWidth, T.Layout.MinTarget),
+		})
+	end
 	return c("Frame", {
 		BackgroundColor3 = if ready then C.Yellow:Lerp(C.Surface, 0.8) else C.Well,
 		BorderSizePixel = 0,
@@ -33,74 +91,42 @@ local function QuestRow(props)
 		Size = UDim2.new(1, -8, 0, rowHeight),
 	}, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
-		Outline = c("UIStroke", { Color = if ready then C.Yellow else C.WellLine, Thickness = 2 }),
+		Outline = c("UIStroke", { Color = if ready then C.Yellow else C.WellLine, Thickness = T.Shape.StrokeInner }),
 		Title = c(Text, {
-			Text = q.title,
-			Position = UDim2.fromOffset(14, if dense then 6 else 10),
-			Size = UDim2.new(1, -138, 0, if dense then 40 else 44),
+			Text = string.upper(q.title),
+			Position = UDim2.fromOffset(14, titleY),
+			Size = UDim2.new(1, -reserve, 0, bottomY - titleY),
 			TextYAlignment = Enum.TextYAlignment.Top,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 		}),
 		Meter = c(Progress, {
 			Progress = math.clamp(q.progress / math.max(q.goal, 1), 0, 1),
 			Color = if complete then C.Lime else C.Pink,
 			Native = {
-				Position = UDim2.fromOffset(14, if dense then 54 else 65),
-				Size = UDim2.new(1, -138, 0, if dense then 8 else 12),
+				Position = UDim2.fromOffset(14, bottomY + (T.Layout.MinTarget - barHeight) / 2),
+				Size = UDim2.new(1, -reserve, 0, barHeight),
 			},
-		}),
-		Count = c(Text, {
-			Text = `{q.progress} / {q.goal}`,
-			TextColor3 = C.InkSoft,
-			Position = UDim2.fromOffset(14, if dense then 68 else 83),
-			Size = UDim2.new(1, -138, 0, 22),
 		}),
 		Reward = if q.reward.kind == "Bonks"
 			then c(Bonks, {
 				Amount = q.reward.amount or 0,
 				TextColor = C.Ink,
 				TextStroke = 0,
-				MaxTextSize = 20,
+				MaxTextSize = T.Type.Body,
 				Native = {
 					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -12, 0, if dense then 4 else 12),
-					Size = UDim2.fromOffset(104, if dense then 24 else 26),
+					Position = UDim2.new(1, -12, 0, titleY),
+					Size = UDim2.fromOffset(slotWidth, 24),
 				},
 			})
 			else c(Text, {
 				Text = "REWARD",
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -12, 0, if dense then 4 else 12),
-				Size = UDim2.fromOffset(104, if dense then 24 else 26),
-			}),
-		Claim = if ready
-			then c(Button, {
-				Text = if props.Pending then "WAIT..." else "CLAIM",
-				TextSize = 18,
-				Enabled = props.OnClaim ~= nil and not props.Pending,
-				Shadow = false,
-				Color = C.Pink,
-				LipColor = C.PinkLip,
-				StrokeColor = C.Ink,
-				Native = {
-					AnchorPoint = Vector2.new(1, 1),
-					Position = UDim2.new(1, -12, 1, if dense then -6 else -12),
-					Size = UDim2.fromOffset(104, if dense then 44 else 48),
-				},
-				OnActivated = function()
-					if props.OnClaim then
-						props.OnClaim(q.questId)
-					end
-				end,
-			})
-			else c(Text, {
-				Text = if q.claimed then "CLAIMED" else "IN PROGRESS",
-				TextColor3 = C.InkSoft,
-				TextSize = 18,
 				TextXAlignment = Enum.TextXAlignment.Center,
-				AnchorPoint = Vector2.new(1, 1),
-				Position = UDim2.new(1, -10, 1, if dense then -6 else -12),
-				Size = UDim2.fromOffset(108, if dense then 44 else 48),
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -12, 0, titleY),
+				Size = UDim2.fromOffset(slotWidth, 24),
 			}),
+		Status = slot,
 	})
 end
 
@@ -108,25 +134,35 @@ local function seasonContent(props)
 	local landscape = props.Landscape == true
 	local state = props.SeasonState
 	if not state then
-		return message("Loading season progress...")
+		return message("LOADING SEASON...")
 	end
 	if state.active == false then
-		return message("No active season.")
+		return message("NO ACTIVE SEASON")
 	end
 	local maxed = (state.tier or 0) >= (state.tierCount or 0)
 	local ready = SeasonClaims.count(state)
+	local xp = state.xpIntoTier or 0
 	local actionHeight = if landscape then 44 else 48
 	local actionInset = 4
 	local actionY = if landscape then 76 else 86
 	return c(
 		"Frame",
-		{ BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, if landscape then 120 else S.SeasonContentHeight) },
+		{ BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, SplashLayout.seasonContentHeight(landscape)) },
 		{
-			Name = c(Text, {
-				Text = state.displayName or "SEASON",
-				Font = T.Type.Display,
-				TextSize = if landscape then 18 else 22,
-				Size = UDim2.new(1, if landscape then -74 else -110, 0, 32),
+			Name = c(ResponsiveText, {
+				MeasurementFont = T.Type.Display,
+				MinTextSize = T.Type.Minimum,
+				MaxTextSize = if landscape then T.Type.Minimum else T.Type.TileLabel,
+				Native = {
+					BackgroundTransparency = 1,
+					Size = UDim2.new(1, if landscape then -74 else -110, 0, 32),
+					Font = T.Type.Display,
+					Text = string.upper(state.displayName or "SEASON"),
+					TextColor3 = C.Ink,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					ZIndex = 8,
+				},
 			}),
 			Tier = c(Text, {
 				Text = `TIER {state.tier or 0}`,
@@ -137,15 +173,21 @@ local function seasonContent(props)
 				Size = UDim2.fromOffset(if landscape then 72 else 108, 32),
 			}),
 			Meter = c(Progress, {
-				Progress = if maxed then 1 else (state.xpIntoTier or 0) / math.max(state.xpForNextTier or 1, 1),
+				Progress = if maxed then 1 else xp / math.max(state.xpForNextTier or 1, 1),
 				Native = {
 					Position = UDim2.fromOffset(0, if landscape then 34 else 38),
 					Size = UDim2.new(1, 0, 0, if landscape then 8 else 12),
 				},
 			}),
+			-- An empty bar says what fills it rather than reading as a broken meter.
 			XP = c(Text, {
-				Text = if maxed then "MAX TIER" else `{state.xpIntoTier or 0} / {state.xpForNextTier or 1} XP`,
+				Text = if maxed
+					then "MAX TIER"
+					elseif xp <= 0 then "PLAY A MATCH TO EARN XP"
+					else `{xp} / {state.xpForNextTier or 1} XP`,
 				TextColor3 = C.InkSoft,
+				TextWrapped = false,
+				TextTruncate = Enum.TextTruncate.AtEnd,
 				Position = UDim2.fromOffset(0, if landscape then 46 else 58),
 				Size = UDim2.new(1, 0, 0, 24),
 			}),
@@ -156,7 +198,7 @@ local function seasonContent(props)
 			}, {
 				View = c(Button, {
 					Text = "VIEW REWARDS",
-					TextSize = 18,
+					TextSize = T.Type.Minimum,
 					TextColor = C.Ink,
 					Color = C.Surface,
 					LipColor = C.WellLine,
@@ -173,7 +215,7 @@ local function seasonContent(props)
 						Text = if props.PendingClaims and props.PendingClaims.Season
 							then "WAIT..."
 							else `CLAIM {ready}`,
-						TextSize = 18,
+						TextSize = T.Type.Minimum,
 						Color = C.Pink,
 						LipColor = C.PinkLip,
 						Shadow = false,
@@ -191,80 +233,113 @@ local function seasonContent(props)
 	)
 end
 
+-- Today is pink with a white outlined number, claimed days are lime with an ink
+-- check and days still to come stay pale: the same stamps as the Daily Rewards modal.
+local function DayStamp(props)
+	local day = props.Day
+	local claimed = day.claimed and not day.available
+	return c("Frame", {
+		BackgroundColor3 = if day.available then C.Pink elseif claimed then C.Lime else C.Surface,
+		BorderSizePixel = 0,
+		LayoutOrder = props.Order,
+		Size = UDim2.new(1 / 7, -DAY_GAP * 6 / 7, 1, 0),
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, K.WellRadius) }),
+		Stroke = c("UIStroke", {
+			Color = if day.available or claimed then C.Ink else C.WellLine,
+			Thickness = T.Shape.StrokeInner,
+		}),
+		Mark = if claimed
+			then c(Icon, {
+				Name = "Check",
+				Color = C.Ink,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromScale(0.6, 0.6),
+					ZIndex = 9,
+				},
+			}, { Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }) })
+			else c(Text, {
+				Text = tostring(day.day),
+				Font = T.Type.Display,
+				TextSize = T.Type.TileLabel,
+				TextColor3 = if day.available then C.Surface else C.InkSoft,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextWrapped = false,
+				Size = UDim2.fromScale(1, 1),
+			}, {
+				Outline = if day.available then c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }) else nil,
+			}),
+	})
+end
+
 local function dailyContent(props)
 	local state = props.DailyReward
 	if not state then
-		return message("Loading daily rewards...")
+		return message("LOADING DAILY REWARDS...")
 	end
 	local days = {
 		Layout = c("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
+			Padding = UDim.new(0, DAY_GAP),
 		}),
-		Padding = c("UIPadding", { PaddingTop = UDim.new(0, 3), PaddingLeft = UDim.new(0, 3) }),
 	}
+	local upcoming = nil
 	for index, day in state.days or {} do
-		local claimed = day.claimed and not day.available
-		days[`Day{index}`] = c("Frame", {
-			BackgroundColor3 = if day.available
-				then C.Pink:Lerp(C.Surface, 0.82)
-				else if claimed then C.WellLine else C.Well,
-			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(S.DayWidth, S.DayHeight),
-			LayoutOrder = index,
+		days[`Day{index}`] = c(DayStamp, { Day = day, Order = index })
+		if day.day == state.nextDay then
+			upcoming = day.reward
+		end
+	end
+	local item = if upcoming and upcoming.itemId then Cosmetics.Items[upcoming.itemId] else nil
+	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, S.DailyContentHeight) }, {
+		Week = c("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, 40),
+		}, days),
+		Next = c("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(4, 48),
+			Size = UDim2.new(1, -8, 0, 40),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
-			Stroke = c("UIStroke", { Color = if day.available then C.Pink else C.WellLine, Thickness = 2 }),
-			Day = c(Text, {
-				Text = if claimed then "DONE" else `DAY {day.day}`,
-				TextSize = 18,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				Size = UDim2.new(1, 0, 0, 28),
-				Position = UDim2.fromOffset(0, 5),
+			Caption = c(Text, {
+				Text = if state.canClaim then `TODAY • DAY {state.nextDay}` else `TOMORROW • DAY {state.nextDay}`,
+				TextColor3 = C.InkSoft,
+				TextWrapped = false,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				Size = UDim2.fromScale(0.58, 1),
 			}),
-			Reward = if day.reward.kind == "Bonks"
-				then c(Bonks, {
-					Amount = day.reward.amount or 0,
+			Reward = if upcoming == nil
+				then nil
+				elseif upcoming.kind == "Bonks" then c(Bonks, {
+					Amount = upcoming.amount or 0,
 					TextColor = C.Ink,
 					TextStroke = 0,
-					MaxTextSize = 18,
-					Native = { Position = UDim2.fromOffset(2, 34), Size = UDim2.new(1, -4, 0, 26) },
-				})
-				else c(Text, {
-					Text = "GIFT",
-					TextXAlignment = Enum.TextXAlignment.Center,
-					Position = UDim2.fromOffset(0, 34),
-					Size = UDim2.new(1, 0, 0, 26),
-				}),
-			Mark = if claimed or day.available
-				then c(Icon, {
-					Name = if claimed then "Check" else "Star",
-					Color = if day.available then C.PinkLip else C.InkSoft,
+					MaxTextSize = T.Type.TileLabel,
+					Alignment = Enum.HorizontalAlignment.Right,
 					Native = {
-						AnchorPoint = Vector2.new(0.5, 0),
-						Position = UDim2.new(0.5, 0, 0, 61),
-						Size = UDim2.fromOffset(18, 18),
+						AnchorPoint = Vector2.new(1, 0),
+						Position = UDim2.fromScale(1, 0),
+						Size = UDim2.fromScale(0.42, 1),
+						ZIndex = 8,
 					},
 				})
-				else nil,
-		})
-	end
-	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, S.DailyContentHeight) }, {
-		Week = c(Scroll, {
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, 0),
-			Size = UDim2.new(1, 0, 0, 92),
-			ScrollingDirection = Enum.ScrollingDirection.X,
-			AutomaticCanvasSize = Enum.AutomaticSize.X,
-			CanvasSize = UDim2.new(),
-			ScrollBarThickness = 4,
-			ScrollBarImageColor3 = C.Pink,
-		}, days),
+				else c(Text, {
+					Text = if item then string.upper(item.DisplayName) else "GIFT",
+					Font = T.Type.Display,
+					TextXAlignment = Enum.TextXAlignment.Right,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.fromScale(1, 0),
+					Size = UDim2.fromScale(0.42, 1),
+				}),
+		}),
 		View = c(Button, {
 			Text = if state.canClaim then "OPEN DAILY REWARD" else "VIEW DAILY REWARDS",
-			TextSize = 18,
+			TextSize = T.Type.Minimum,
 			Color = if state.canClaim then C.Pink else C.Surface,
 			TextColor = if state.canClaim then C.Surface else C.Ink,
 			LipColor = if state.canClaim then C.PinkLip else C.WellLine,
@@ -294,7 +369,7 @@ return function(props)
 				else SeasonClaims.count(props.SeasonState)
 		tabs[name] = c(Button, {
 			Text = name .. (if ready > 0 then ` ({ready})` else ""),
-			TextSize = 18,
+			TextSize = T.Type.Minimum,
 			Color = if active == name then C.Pink else C.Surface,
 			LipColor = if active == name then C.PinkLip else C.WellLine,
 			TextColor = if active == name then C.Surface else C.Ink,
@@ -309,11 +384,13 @@ return function(props)
 	end
 	local content = {
 		Layout = c("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) }),
+		-- Room for the rows' outside strokes at the clip edge; the left edge lines up
+		-- with the tab rail and the right keeps the scrollbar clear of the rows.
 		Padding = c("UIPadding", {
-			PaddingTop = UDim.new(0, if props.Compact then 0 else 2),
-			PaddingBottom = UDim.new(0, 6),
-			PaddingLeft = UDim.new(0, 15),
-			PaddingRight = UDim.new(0, 12),
+			PaddingTop = UDim.new(0, T.Shape.StrokeInner + 1),
+			PaddingBottom = UDim.new(0, T.Shape.StrokeInner + 3),
+			PaddingLeft = UDim.new(0, 12),
+			PaddingRight = UDim.new(0, 4),
 		}),
 	}
 	if active == "DAILY" then
@@ -321,9 +398,9 @@ return function(props)
 	elseif active == "SEASON" then
 		content.Season = seasonContent(props)
 	elseif props.QuestState == nil then
-		content.Loading = message("Loading your daily quests...")
+		content.Loading = message("LOADING QUESTS...")
 	elseif #props.QuestState.quests == 0 then
-		content.Empty = message("No quests available yet.")
+		content.Empty = message("NO QUESTS RIGHT NOW")
 	else
 		for index, q in props.QuestState.quests do
 			content[q.questId] = c(QuestRow, {
@@ -364,7 +441,7 @@ return function(props)
 			CanvasSize = UDim2.new(),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
-			ScrollBarThickness = 5,
+			ScrollBarThickness = T.Layout.ScrollBar,
 			ScrollBarImageColor3 = C.Pink,
 		}, content),
 	})

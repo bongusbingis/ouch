@@ -21,6 +21,8 @@ type BumperState = {
 	clear: () -> (),
 }
 
+local function noop() end
+
 local bumpers: { [BasePart]: BumperState } = {}
 local rootConnections: { [Instance]: { RBXScriptConnection } } = {}
 local folderConnections: { [Folder]: { RBXScriptConnection } } = {}
@@ -53,7 +55,7 @@ local function trackGroup(group: Instance)
 		if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
 			bumpers[descendant] = {
 				started = nil,
-				clear = HazardVisuals.setEffect(descendant, "bumper"),
+				clear = noop,
 			}
 		end
 	end
@@ -94,7 +96,7 @@ local function trackFolder(root: Instance, folder: Instance)
 			if descendant:IsA("BasePart") and isBumper(descendant) and bumpers[descendant] == nil then
 				bumpers[descendant] = {
 					started = nil,
-					clear = HazardVisuals.setEffect(descendant, "bumper"),
+					clear = noop,
 				}
 			end
 		end),
@@ -215,7 +217,8 @@ function BumperVisuals.start()
 					state.clear()
 				elseif t >= 0.26 then
 					state.started = nil
-					state.clear = HazardVisuals.setEffect(part, "bumper")
+					state.clear()
+					state.clear = noop
 				elseif part.Transparency >= 1 then
 					continue
 				else

@@ -21,10 +21,18 @@ export type Props = {
 	Compact: boolean?,
 	Stacked: boolean?,
 	CardHeight: number?,
+	-- The modal measures the copy and hands every card the same sizes, so siblings never differ.
+	ArtHeight: number?,
+	DescriptionSize: number?,
+	DescriptionHeight: number?,
 	SelectedButtonRef: any?,
 	FirstButtonRef: any?,
 	Native: { [any]: any }?,
 }
+
+local PILL_HEIGHT = 40
+local CARD_INSET = 16
+local DESCRIPTION_GAP = 8
 
 local function ModeCard(props)
 	local option, selected, compact, z = props.Option, props.Selected, props.Compact, props.ZIndex
@@ -46,9 +54,14 @@ local function ModeCard(props)
 	local line = styles.Selected:map(function(value)
 		return C.Ink:Lerp(C.Pink, math.clamp(value, 0, 1))
 	end)
-	local artHeight = math.floor(props.Height * 0.52)
+	local artHeight = props.ArtHeight or math.floor(props.Height * 0.46)
 	local textX = if compact then UDim.new(0.39, 0) else UDim.new(0, 18)
 	local textWidth = if compact then UDim.new(0.61, -16) else UDim.new(1, -36)
+	local titleTop = if compact then 12 else artHeight + 18
+	local descriptionTop = if compact then 52 else artHeight + 58
+	local descriptionHeight = props.DescriptionHeight
+		or math.max(props.Height - descriptionTop - CARD_INSET - PILL_HEIGHT - DESCRIPTION_GAP, T.Type.Minimum)
+	local pillTextSize = if compact then T.Type.Minimum else T.Type.TileLabel
 	return c(AnimatedButton, {
 		ButtonRef = props.ButtonRef,
 		Enabled = props.Enabled,
@@ -79,47 +92,62 @@ local function ModeCard(props)
 			Size = if compact then UDim2.new(0.36, 0, 1, -16) else UDim2.new(1, -16, 0, artHeight),
 			ClipsDescendants = true,
 			ZIndex = z + 5,
-		}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, 16) }) }),
+		}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }) }),
 		Title = c(Text, {
 			Text = option.title,
 			Font = T.Type.Display,
 			TextSize = if compact then 22 else 28,
-			Position = UDim2.new(textX, UDim.new(0, if compact then 12 else artHeight + 18)),
+			Position = UDim2.new(textX, UDim.new(0, titleTop)),
 			Size = UDim2.new(textWidth, UDim.new(0, 34)),
 			ZIndex = z + 6,
 		}),
 		Description = c(Text, {
 			Text = option.description or option.title,
-			Font = Enum.Font.BuilderSans,
+			Font = T.Type.Label,
+			TextSize = props.DescriptionSize or T.Type.Minimum,
 			TextColor3 = C.InkSoft,
 			TextYAlignment = Enum.TextYAlignment.Top,
-			Position = UDim2.new(textX, UDim.new(0, if compact then 52 else artHeight + 58)),
-			Size = UDim2.new(textWidth, UDim.new(0, if compact then 80 else 64)),
+			Position = UDim2.new(textX, UDim.new(0, descriptionTop)),
+			Size = UDim2.new(textWidth, UDim.new(0, descriptionHeight)),
 			ZIndex = z + 6,
 		}),
 		Choice = c("Frame", {
-			BackgroundColor3 = if selected then C.Pink else C.Well,
-			BorderSizePixel = 0,
+			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(textX, UDim.new(1, -16)),
-			Size = UDim2.new(textWidth, UDim.new(0, 34)),
+			Position = UDim2.new(textX, UDim.new(1, -CARD_INSET)),
+			Size = UDim2.new(textWidth, UDim.new(0, PILL_HEIGHT)),
 			ZIndex = z + 6,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Label = c(Text, {
+			-- The same candy pill as every button: pink once chosen, cream while it is still an offer.
+			Pill = c(Surface, {
+				Color = if selected then C.Pink else C.SurfaceWarm,
+				LipColor = if selected then C.PinkLip else C.WellLine,
+				Shadow = false,
+				ZIndex = z + 6,
+			}),
+			Label = c("TextLabel", {
+				BackgroundTransparency = 1,
+				Font = T.Type.Display,
 				Text = if selected then "SELECTED" else "SELECT MODE",
-				TextSize = 18,
+				TextSize = pillTextSize,
 				TextColor3 = if selected then C.Surface else C.Ink,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				Position = UDim2.fromOffset(if selected then 20 else 0, 0),
-				Size = UDim2.new(1, if selected then -20 else 0, 1, 0),
-				ZIndex = z + 7,
+				Size = UDim2.new(1, if selected then -20 else 0, 1, -T.Shape.LipHeight),
+				ZIndex = z + 10,
+			}, {
+				Outline = if selected then c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }) else nil,
 			}),
 			Check = if selected
 				then c(Icon, {
 					Name = "Check",
 					Color = C.Surface,
-					Native = { Position = UDim2.fromOffset(12, 8), Size = UDim2.fromOffset(18, 18), ZIndex = z + 7 },
+					Native = {
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 14, 0.5, -T.Shape.LipHeight / 2),
+						Size = UDim2.fromOffset(18, 18),
+						ZIndex = z + 10,
+					},
 				})
 				else nil,
 		}),
@@ -146,6 +174,9 @@ return function(props: Props)
 			Order = index,
 			Compact = props.Compact,
 			Height = props.CardHeight or S.CardMinHeight,
+			ArtHeight = props.ArtHeight,
+			DescriptionSize = props.DescriptionSize,
+			DescriptionHeight = props.DescriptionHeight,
 			ZIndex = native.ZIndex or 1,
 			ButtonRef = if option.id == props.SelectedId
 				then props.SelectedButtonRef

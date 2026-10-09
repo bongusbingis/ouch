@@ -1,5 +1,6 @@
 --!strict
 local RS = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 local React = require(RS.Packages.react)
 local T = require(script.Parent.Parent.Tokens)
 local c = React.createElement
@@ -29,7 +30,12 @@ return function(props)
 	local underlineGap = props.UnderlineGapPx
 	local titleHeightOffset = T.Shape.LipHeight + bottomGap + (underlineGap or 0)
 	local stripes = { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }
-	for index = 0, 8 do
+	-- The underline hugs the lettering (like SectionHeader) instead of a fixed ribbon length.
+	local textSize = props.TextSize or (if (props.HeightPx or 54) < 45 then T.Type.TileLabel else T.Type.Section)
+	local textWidth = TextService:GetTextSize(props.Text or "", textSize, T.Type.Display, Vector2.new(4096, 200)).X
+	local underlineWidth = math.max(math.ceil(textWidth) + T.Layout.CompactGap, T.Layout.MinTarget)
+	local stripeCount = math.ceil(underlineWidth / (T.Layout.StripeWidth * 2))
+	for index = 0, stripeCount - 1 do
 		stripes["Stripe" .. index] = c("Frame", {
 			BackgroundColor3 = T.Colors.Surface,
 			BackgroundTransparency = 0.5,
@@ -66,7 +72,7 @@ return function(props)
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
 			Position = UDim2.new(0, 0, 1, -T.Shape.LipHeight - bottomGap),
-			Size = UDim2.fromOffset(T.Layout.RibbonWidth, T.Shape.LipHeight),
+			Size = UDim2.fromOffset(underlineWidth, T.Shape.LipHeight),
 			ZIndex = z,
 		}, stripes),
 		Title = c("TextLabel", {
@@ -74,7 +80,7 @@ return function(props)
 			BackgroundTransparency = 1,
 			Font = T.Type.Display,
 			Text = props.Text,
-			TextSize = props.TextSize or (if (props.HeightPx or 54) < 45 then T.Type.TileLabel else T.Type.Section),
+			TextSize = textSize,
 			TextColor3 = T.Colors.Ink,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = if underlineGap then Enum.TextYAlignment.Bottom else Enum.TextYAlignment.Center,

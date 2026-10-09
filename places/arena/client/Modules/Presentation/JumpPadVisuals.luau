@@ -37,6 +37,8 @@ local renderConnection: RBXScriptConnection? = nil
 local remoteConnection: RBXScriptConnection? = nil
 local started = false
 
+local function noop() end
+
 local function trackPart(state: PadState, instance: Instance)
 	if not instance:IsA("BasePart") then
 		return
@@ -44,7 +46,7 @@ local function trackPart(state: PadState, instance: Instance)
 	state.parts[instance] = {
 		baseSize = instance.Size,
 		inner = instance.Name == INNER_PART_NAME,
-		clear = HazardVisuals.setEffect(instance, "jumpPad"),
+		clear = noop,
 	}
 end
 
@@ -223,17 +225,22 @@ local function step()
 				state.parts[part] = nil
 				continue
 			end
+			if finished then
+				partState.clear()
+				partState.clear = noop
+				continue
+			end
 			if part.Transparency >= 1 then
 				continue
 			end
 			local baseSize = partState.baseSize
-			local q = if finished or GuiService.ReducedMotionEnabled
+			local q = if GuiService.ReducedMotionEnabled
 				then 0
 				else math.min(0.08, 0.12 / baseSize.Y, 0.5 / baseSize.X, 0.5 / baseSize.Z)
 			if not partState.inner then
 				q *= 0.5
 			end
-			local amount = if finished then 0 else amountAt(t)
+			local amount = amountAt(t)
 			local heightChange = -baseSize.Y * q * amount
 			local lateral = math.min(0.02, q * 0.25) * amount
 			local scale = Vector3.new(1 + lateral, 1 + heightChange / baseSize.Y, 1 + lateral)

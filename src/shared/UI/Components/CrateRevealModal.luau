@@ -16,9 +16,14 @@ local CrateOpeningGlow = require(script.Parent.CrateOpeningGlow)
 local OuchPanel = require(script.Parent.CandyPanel)
 local PuffyButton = require(script.Parent.PuffyButton)
 local Ribbon = require(script.Parent.RarityRibbon)
+local CollectibleFace = require(script.Parent.CollectibleFace)
+local CollectibleLayout = require(script.Parent.Parent.Models.CollectibleLayout)
+local InventoryConfig =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
@@ -50,7 +55,7 @@ local function tierFor(rarity: string?)
 end
 
 local function rarityColor(rarity: string?): Color3
-	return (if rarity then (if T.Rarity[rarity] then T.Rarity[rarity].Color else nil) else nil) or Color3.new(1, 1, 1)
+	return (if rarity then (if T.Rarity[rarity] then T.Rarity[rarity].Color else nil) else nil) or T.Colors.Surface
 end
 
 -- Ranks a batch so the summary can lead with the best pull. Lower is better;
@@ -99,18 +104,33 @@ local function burstRays(tier, color: Color3, alpha: any, zIndex: number)
 	return rays
 end
 
-local function subtitleFor(entry: any): string
-	if entry.isDupe then
-		return if entry.bonksRefund > 0 then `DUPLICATE  •  +{formatNumber(entry.bonksRefund)} BONKS` else "DUPLICATE"
-	end
-	return string.upper(entry.rarity)
+-- What kind of item it is; the rarity is already on the card's tag.
+local function kindOf(entry: any): string
+	local category = if entry.preview then entry.preview.category else nil
+	return (if category then InventoryConfig.ItemLabels[category] else nil) or ""
 end
 
-local function gridCell(entry, index, revealedCount, z, selected, onSelect, onInspect)
+local function statusFor(entry: any): string
+	if entry.isDupe then
+		return if entry.bonksRefund > 0 then `DUPE · +{formatNumber(entry.bonksRefund)} BONKS` else "DUPE"
+	end
+	return "NEW ITEM"
+end
+
+-- The single reveal sizes its panel to its content (no dead band under the
+-- title); landscape keeps at least this width so the card and info stack sit
+-- side by side, and grows to the classic cap.
+local SINGLE_MIN_WIDTH = 640
+local SINGLE_MAX_WIDTH = 820
+-- Hero name: fitted down from Tokens.Collectible.RevealNameMax to this floor,
+-- wrapping to two lines before it truncates.
+local HERO_NAME_MIN = T.Type.TileLabel
+local INFO_GAP = 8
+
+local function gridCell(entry, index, revealedCount, z, selected, onSelect, onInspect, width, height)
 	local shown = index <= revealedCount
-	local tier = T.Rarity[entry.rarity]
 	return c(PuffyButton, {
-		Color = T.Colors.Surface,
+		Color = T.Colors.SurfaceWarm,
 		Radius = T.Shape.RadiusCard,
 		Shadow = false,
 		StrokeColor = if selected then T.Colors.Yellow else T.Colors.Ink,
@@ -127,49 +147,17 @@ local function gridCell(entry, index, revealedCount, z, selected, onSelect, onIn
 		end,
 		Native = { LayoutOrder = index, Size = UDim2.fromScale(1, 1), ZIndex = z },
 	}, {
-		Rarity = if shown
-			then c(Ribbon, {
+		Face = if shown
+			then c(CollectibleFace, {
+				Width = width,
+				Height = height - T.Shape.LipHeight,
 				Rarity = entry.rarity,
-				Color = if tier then tier.Color else nil,
-				Native = { Position = UDim2.fromOffset(8, 8), Size = UDim2.new(1, -16, 0, 26), ZIndex = z + 6 },
-			})
-			else nil,
-		Preview = if shown
-			then c("Frame", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(8, 42),
-				Size = UDim2.new(1, -16, 1, -162),
+				Name = entry.displayName,
+				Footer = statusFor(entry),
 				ZIndex = z + 6,
-			}, {
-				Content = c(ShopPreview, { Items = if entry.preview then { entry.preview } else {}, ZIndex = z + 6 }),
+				Art = c(ShopPreview, { Items = if entry.preview then { entry.preview } else {}, ZIndex = z + 7 }),
 			})
 			else nil,
-		Name = c("TextLabel", {
-			BackgroundColor3 = T.Colors.Ink,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0, 8, 1, -112),
-			Size = UDim2.new(1, -16, 0, 52),
-			Font = T.Type.Display,
-			Text = if shown then string.upper(entry.displayName) else "…",
-			TextSize = T.Type.Minimum,
-			TextColor3 = T.Colors.Surface,
-			TextWrapped = true,
-			ZIndex = z + 7,
-		}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }) }),
-		Status = c("TextLabel", {
-			BackgroundTransparency = 1,
-			Position = UDim2.new(0, 8, 1, -52),
-			Size = UDim2.new(1, -16, 0, 44),
-			Font = T.Type.Label,
-			Text = if not shown
-				then ""
-				elseif entry.isDupe then "+" .. formatNumber(entry.bonksRefund) .. " BONKS · DUPE"
-				else "NEW ITEM",
-			TextSize = T.Type.Minimum,
-			TextColor3 = T.Colors.Ink,
-			TextWrapped = true,
-			ZIndex = z + 7,
-		}),
 	})
 end
 
@@ -193,7 +181,11 @@ return function(props)
 	local count = if results then #results else 0
 	local isBulk = count > 1
 	if not isBulk and not portrait then
-		panelSize = Vector2.new(math.min(panelSize.X, 820), math.min(panelSize.Y, 440))
+		-- Height here is the most the single may use; the panel is cut to its content below.
+		panelSize = Vector2.new(
+			math.min(safeArea.size.X - T.Layout.Inset * 2, math.max(panelSize.X, SINGLE_MIN_WIDTH), SINGLE_MAX_WIDTH),
+			math.floor(safeArea.size.Y * 0.9)
+		)
 	end
 	local headline = if results
 		then (if selectedIndex then results[selectedIndex] else nil) or (if isBulk
@@ -292,9 +284,11 @@ return function(props)
 		end
 		if props.OnOpenAgain then
 			table.insert(actions, {
-				text = if props.OpenAgainCount
-					then `AGAIN {props.OpenAgainCount}x`
-					else props.OpenAgainText or "OPEN AGAIN",
+				-- CAPS, no lowercase multiplier; the price sits on the button's own Bonks line.
+				text = if props.OpenAgainCount and props.OpenAgainCount > 1
+					then `OPEN {props.OpenAgainCount} MORE`
+					elseif props.OpenAgainCount then "OPEN AGAIN"
+					else string.upper(props.OpenAgainText or "OPEN AGAIN"),
 				bonks = props.OpenAgainBonks,
 				color = EconomyPalette.Pink,
 				enabled = props.OpenAgainEnabled == true,
@@ -304,31 +298,112 @@ return function(props)
 	else
 		table.insert(actions, { text = "SKIP", enabled = true, focus = true, run = finish })
 	end
-	local columns = if portrait then math.min(2, #actions) else #actions
-	local footerHeight = math.ceil(#actions / columns) * (actionHeight + 12) - 12
+	-- The footer grid is laid out for the settled button set from the first frame,
+	-- so the panel never changes size when SKIP gives way to the result actions.
+	local settledCount = (if preview and props.OnEquipItem then 1 else 0) + 1 + (if props.OnOpenAgain then 1 else 0)
+	local slots = math.max(#actions, settledCount)
+	local columns = if portrait then math.min(2, slots) else slots
+	local footerHeight = math.ceil(slots / columns) * (actionHeight + 12) - 12
 	local title = if building then "OPENING..." else if isBulk then `YOU GOT {count} ITEMS` else "YOU GOT"
-	local titleSize = if portrait or short then 26 else 36
+	local titleSize = T.Type.ModalTitle
 	local titleWidth = panelSize.X - inset * 2 - 64
 	local titleHeight = math.max(
 		44,
 		TextService:GetTextSize(title, titleSize, T.Type.Display, Vector2.new(math.max(titleWidth - 36, 1), 10000)).Y
 			+ 12
 	)
-	local bodyTop = inset + titleHeight + 34
+	-- The hint line under the title is reserved only when it shows (pity, batches).
+	local hintLine = isBulk or reveal.pityTriggered ~= nil
+	local bodyTop = inset + titleHeight + (if hintLine then 34 else T.Layout.CompactGap)
 	local bodyHeight = math.max(44, panelSize.Y - bodyTop - footerHeight - inset * 2)
-	local singleArtSize =
-		math.min(240, panelSize.X * (if portrait then 0.68 else 0.44), bodyHeight * (if portrait then 0.6 else 1))
+	-- Single reveal: one collectible card beside (or above) a composed info stack
+	-- (status chip, fitted name, kind, inspect hint), centred together, with the
+	-- panel cut to that content so nothing floats in dead space.
+	local K = T.Collectible
+	local contentWidth = panelSize.X - inset * 2
+	local heroKind = kindOf(headline)
+	local heroName = string.upper(headline.displayName)
+	local heroHint = preview ~= nil and props.OnInspectItem ~= nil
+	local kindHeight = if heroKind ~= "" then T.Type.Body + 4 else 0
+	local hintHeight = if heroHint then T.Type.Minimum + 4 else 0
+	local infoRows = 2 + (if heroKind ~= "" then 1 else 0) + (if heroHint then 1 else 0)
+	local infoFixed = K.RevealChipHeight + kindHeight + hintHeight + INFO_GAP * (infoRows - 1)
+	local nameTwoLines = HERO_NAME_MIN * 2 + 8
+	local heroCard, heroCopyWidth, heroCopyHeight, heroLeft, heroTop, copyLeft, copyTop
+	local heroNameSize, heroNameHeight = HERO_NAME_MIN, nameTwoLines
+	local function fitName(width: number, maxHeight: number)
+		heroNameSize = TextMetrics.fittingSize(
+			heroName,
+			T.Type.Display,
+			Vector2.new(width, maxHeight),
+			HERO_NAME_MIN,
+			K.RevealNameMax,
+			true
+		)
+		local measured = TextService:GetTextSize(heroName, heroNameSize, T.Type.Display, Vector2.new(width, 1000)).Y
+		heroNameHeight = math.ceil(math.min(measured, maxHeight)) + 4
+	end
+	if not isBulk then
+		local footerBlock = T.Layout.Gap + footerHeight + inset
+		if portrait then
+			heroCopyWidth = contentWidth
+			heroCard = math.floor(math.min(K.RevealCardMax, contentWidth * 0.7))
+			fitName(heroCopyWidth, K.RevealNameMax * 2 + 8)
+			heroCopyHeight = infoFixed + heroNameHeight
+			local overflow = bodyTop + heroCard + K.Pad * 2 + heroCopyHeight + footerBlock - panelSize.Y
+			if overflow > 0 then
+				heroCard = math.max(math.floor(heroCard - overflow), 120)
+			end
+			heroLeft = math.floor((panelSize.X - heroCard) / 2)
+			heroTop = bodyTop
+			copyLeft, copyTop = inset, bodyTop + heroCard + K.Pad * 2
+			bodyHeight = heroCard + K.Pad * 2 + heroCopyHeight
+		else
+			local room = panelSize.Y - bodyTop - footerBlock
+			heroCard = math.floor(math.min(K.RevealCardMax, room, contentWidth - K.RevealCopyMin - K.RevealGap))
+			heroCard = math.max(heroCard, 96)
+			heroCopyWidth = math.min(360, contentWidth - heroCard - K.RevealGap)
+			fitName(heroCopyWidth, math.max(heroCard - infoFixed, nameTwoLines))
+			heroCopyHeight = math.max(heroCard, infoFixed + heroNameHeight)
+			local groupWidth = heroCard + K.RevealGap + heroCopyWidth
+			-- Narrow the panel to the group so the pair reads centred, not adrift.
+			panelSize = Vector2.new(
+				math.min(panelSize.X, math.max(groupWidth + (inset + T.Layout.Gap) * 2, SINGLE_MIN_WIDTH)),
+				panelSize.Y
+			)
+			heroLeft = math.floor((panelSize.X - groupWidth) / 2)
+			heroTop = bodyTop + math.floor((heroCopyHeight - heroCard) / 2)
+			copyLeft, copyTop = heroLeft + heroCard + K.RevealGap, bodyTop
+			bodyHeight = heroCopyHeight
+		end
+		panelSize = Vector2.new(panelSize.X, math.min(panelSize.Y, bodyTop + bodyHeight + footerBlock))
+	end
+	titleWidth = panelSize.X - inset * 2 - 64
+	-- Every footer button shares one label size, fitted to the narrowest label room.
+	local buttonRoom =
+		Vector2.new(panelSize.X * 0.9 / columns - UIConfig.Spacing.ControlGapPx - 20, actionHeight - T.Shape.LipHeight)
+	local actionTextSize = UIConfig.Text.LabelPx
+	for _, action in actions do
+		local room = if action.bonks then Vector2.new(buttonRoom.X, buttonRoom.Y / 2) else buttonRoom
+		actionTextSize = math.min(
+			actionTextSize,
+			TextMetrics.fittingSize(action.text, T.Type.Display, room, T.Type.Minimum, UIConfig.Text.LabelPx, false)
+		)
+	end
 	local buttons = {}
 	for index, action in actions do
+		local row = math.floor((index - 1) / columns) + 1
 		buttons[`Action{index}`] = c(ShopPriceButton, {
-			TextSize = UIConfig.Text.LabelPx,
+			TextSize = actionTextSize,
 			ButtonRef = if action.focus then buttonRef else nil,
 			Enabled = action.enabled,
+			-- Equal widths; a short last row is centred instead of hugging the left.
 			Position = UDim2.new(
-				((index - 1) % columns + 0.5) / columns,
+				((index - 1) % columns + (columns - math.min(columns, #actions - (row - 1) * columns)) / 2 + 0.5)
+					/ columns,
 				0,
 				0,
-				math.floor((index - 1) / columns) * (actionHeight + 12) + actionHeight
+				(row - 1) * (actionHeight + 12) + actionHeight
 			),
 			Size = UDim2.new(1 / columns, -UIConfig.Spacing.ControlGapPx, 0, actionHeight),
 			Text = action.text,
@@ -405,7 +480,7 @@ return function(props)
 				}, burstRays(tier, color, motion.burst, 116))
 				else nil,
 			Flash = c("Frame", {
-				BackgroundColor3 = Color3.new(1, 1, 1),
+				BackgroundColor3 = T.Colors.Surface,
 				BackgroundTransparency = motion.burst:map(function(alpha: number)
 					return math.clamp(1 - alpha * 0.15, 0, 1)
 				end),
@@ -414,7 +489,7 @@ return function(props)
 				Visible = phase == "Burst",
 				ZIndex = 117,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Panel.RadiusPx) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusPanel) }),
 			}),
 			Title = c(CandyTitle, {
 				Text = title,
@@ -425,26 +500,23 @@ return function(props)
 					ZIndex = 114,
 				},
 			}),
-			Pity = if not building
+			Pity = if not building and (isBulk or reveal.pityTriggered)
 				then c(ResponsiveText, {
 					MeasurementFont = T.Type.Label,
 					MaxTextSize = 20,
 					MinTextSize = T.Type.Minimum,
 					Wrapped = true,
+					Truncate = true,
 					Native = {
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						FontFace = Font.new(
-							"rbxasset://fonts/families/SourceSansPro.json",
-							Enum.FontWeight.Bold,
-							Enum.FontStyle.Normal
-						),
+						Font = T.Type.Label,
 						Position = UDim2.new(0.5, 0, 0, bodyTop - 30),
 						Size = UDim2.new(0.88, 0, 0, 28),
 						Text = if reveal.pityTriggered
-							then `PITY  •  GUARANTEED {string.upper(reveal.pityTriggered)}`
+							then `PITY · GUARANTEED {string.upper(reveal.pityTriggered)}`
 							else "SELECT TO INSPECT",
-						TextColor3 = T.Colors.Ink,
+						TextColor3 = T.Colors.InkSoft,
 						ZIndex = 115,
 					},
 				})
@@ -453,38 +525,108 @@ return function(props)
 				then c(PuffyButton, {
 					Radius = T.Shape.RadiusCard,
 					Shadow = false,
-					Color = T.Colors.Well,
+					Color = T.Colors.SurfaceWarm,
+					StrokeColor = T.Colors.Ink,
 					Enabled = settled and preview ~= nil and props.OnInspectItem ~= nil,
 					OnActivated = function()
 						props.OnInspectItem(preview)
 					end,
 					Native = {
 						BackgroundTransparency = 1,
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.new(
-							if portrait then 0.5 else 0.26,
-							0,
-							0,
-							bodyTop + bodyHeight * (if portrait then 0.32 else 0.5)
-						),
-						Size = UDim2.fromOffset(singleArtSize, singleArtSize),
+						Position = UDim2.fromOffset(heroLeft, heroTop),
+						Size = UDim2.fromOffset(heroCard, heroCard),
 						Visible = revealedCount >= 1,
 						ZIndex = 113,
 					},
 				}, {
-					Content = c(ShopPreview, {
-						Items = if headline.preview then { headline.preview } else {},
-						Thumbnail = "",
-						ZIndex = 120,
-					}),
-					Rarity = c(Ribbon, {
+					Face = c(CollectibleFace, {
+						Width = heroCard,
+						Height = heroCard - T.Shape.LipHeight,
 						Rarity = headline.rarity,
+						ZIndex = 119,
+						Art = c(ShopPreview, {
+							Items = if headline.preview then { headline.preview } else {},
+							Thumbnail = "",
+							Playing = settled,
+							ZIndex = 120,
+						}),
+					}),
+				})
+				else nil,
+			-- The info stack reads top-down as one block: status chip, name, kind, then the inspect hint.
+			Info = if not isBulk and settled
+				then c("Frame", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(copyLeft, copyTop),
+					Size = UDim2.fromOffset(heroCopyWidth, heroCopyHeight),
+					ZIndex = 114,
+				}, {
+					Layout = c("UIListLayout", {
+						FillDirection = Enum.FillDirection.Vertical,
+						HorizontalAlignment = if portrait
+							then Enum.HorizontalAlignment.Center
+							else Enum.HorizontalAlignment.Left,
+						VerticalAlignment = if portrait
+							then Enum.VerticalAlignment.Top
+							else Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, INFO_GAP),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+					Status = c(Ribbon, {
+						Text = statusFor(headline),
+						Color = if headline.isDupe then T.Colors.Surface else T.Colors.Lime,
 						Native = {
-							Position = UDim2.fromOffset(8, 8),
-							Size = UDim2.new(1, -16, 0, 44),
-							ZIndex = 121,
+							LayoutOrder = 1,
+							Size = UDim2.fromOffset(
+								CollectibleLayout.tagWidth(statusFor(headline), T.Type.Minimum, heroCopyWidth),
+								K.RevealChipHeight
+							),
+							ZIndex = 115,
 						},
 					}),
+					-- Fitted to the column (40 down to 22, two lines, then truncation), so a
+					-- long name stays inside the panel instead of overflowing it.
+					Name = c("TextLabel", {
+						BackgroundTransparency = 1,
+						Font = T.Type.Display,
+						LayoutOrder = 2,
+						Size = UDim2.fromOffset(heroCopyWidth, heroNameHeight),
+						Text = heroName,
+						TextColor3 = T.Colors.Ink,
+						TextSize = heroNameSize,
+						TextTruncate = Enum.TextTruncate.AtEnd,
+						TextWrapped = true,
+						TextXAlignment = if portrait then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
+						ZIndex = 115,
+					}),
+					Kind = if heroKind ~= ""
+						then c("TextLabel", {
+							BackgroundTransparency = 1,
+							Font = T.Type.Label,
+							LayoutOrder = 3,
+							Size = UDim2.fromOffset(heroCopyWidth, T.Type.Body + 4),
+							Text = heroKind,
+							TextColor3 = T.Colors.InkSoft,
+							TextSize = T.Type.Body,
+							TextTruncate = Enum.TextTruncate.AtEnd,
+							TextXAlignment = if portrait then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
+							ZIndex = 115,
+						})
+						else nil,
+					Hint = if heroHint
+						then c("TextLabel", {
+							BackgroundTransparency = 1,
+							Font = T.Type.Label,
+							LayoutOrder = 4,
+							Size = UDim2.fromOffset(heroCopyWidth, T.Type.Minimum + 4),
+							Text = "SELECT THE CARD TO INSPECT",
+							TextColor3 = T.Colors.InkSoft,
+							TextSize = T.Type.Minimum,
+							TextTruncate = Enum.TextTruncate.AtEnd,
+							TextXAlignment = if portrait then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
+							ZIndex = 115,
+						})
+						else nil,
 				})
 				else nil,
 			Grid = if isBulk
@@ -496,23 +638,25 @@ return function(props)
 						CanvasSize = UDim2.fromOffset(0, 0),
 						Position = UDim2.new(0.06, 0, 0, bodyTop),
 						ScrollBarImageTransparency = 0.2,
-						ScrollBarThickness = 8,
+						ScrollBarThickness = T.Layout.ScrollBar,
 						ScrollBarImageColor3 = T.Colors.Pink,
-						Size = UDim2.new(0.88, 0, 0, math.max(44, bodyHeight - 86)),
+						Size = UDim2.new(0.88, 0, 0, math.max(44, bodyHeight - (if refundLine then 40 else 0))),
 						VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 						ZIndex = 113,
 					},
 					(function()
+						local gridWidth = panelSize.X * 0.88 - T.Layout.ScrollBar - 4
+						local gridColumns = math.max(1, math.floor(gridWidth / 200))
+						local cellWidth = math.floor(gridWidth / gridColumns) - 10
 						local cells: { [string]: any } = {
 							Layout = c("UIGridLayout", {
 								CellPadding = UDim2.fromOffset(10, 10),
-								CellSize = UDim2.new(
-									1 / math.max(1, math.floor((panelSize.X * 0.88) / 200)),
-									-10,
-									0,
-									260
-								),
+								CellSize = UDim2.fromOffset(cellWidth, 260),
 								SortOrder = Enum.SortOrder.LayoutOrder,
+							}),
+							Padding = c("UIPadding", {
+								PaddingTop = UDim.new(0, T.Shape.StrokeCard),
+								PaddingLeft = UDim.new(0, T.Shape.StrokeCard),
 							}),
 						}
 						for index, entry in results :: { any } do
@@ -523,95 +667,35 @@ return function(props)
 								114,
 								entry == headline,
 								setSelectedIndex,
-								props.OnInspectItem
+								props.OnInspectItem,
+								cellWidth,
+								260
 							)
 						end
 						return cells
 					end)()
 				)
 				else nil,
-			Name = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.FredokaOne,
-				MaxTextSize = if isBulk then 22 else 32,
-				MinTextSize = T.Type.Minimum,
-				Wrapped = true,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json"),
-					Position = UDim2.new(
-						if isBulk or portrait then 0.5 else 0.73,
-						0,
-						0,
-						bodyTop
-							+ (
-								if isBulk
-									then bodyHeight - 80
-									elseif not short and not portrait then bodyHeight / 2 - 50
-									else bodyHeight * (if portrait then 0.64 else 0.18)
-							)
-					),
-					Size = UDim2.new(
-						if isBulk or portrait then 0.9 else 0.44,
-						0,
-						0,
-						if isBulk
-							then 30
-							elseif not short and not portrait then 76
-							else bodyHeight * (if portrait then 0.22 else 0.44)
-					),
-					Text = if settled then string.upper(headline.displayName) else "",
-					TextColor3 = T.Colors.Ink,
-					ZIndex = 114,
-				},
-			}, {
-				Outline = c("UIStroke", {
-					Color = EconomyPalette.Ink,
-					Thickness = 0,
-					StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
-				}),
-			}),
-			Subtitle = c(ResponsiveText, {
-				MeasurementFont = T.Type.Label,
-				MaxTextSize = 22,
-				MinTextSize = T.Type.Minimum,
-				Wrapped = true,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0),
-					BackgroundTransparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/SourceSansPro.json",
-						Enum.FontWeight.Bold,
-						Enum.FontStyle.Normal
-					),
-					Position = UDim2.new(
-						if isBulk or portrait then 0.5 else 0.73,
-						0,
-						0,
-						bodyTop
-							+ (
-								if isBulk
-									then bodyHeight - 46
-									elseif not short and not portrait then bodyHeight / 2 + 34
-									else bodyHeight * (if portrait then 0.86 else 0.66)
-							)
-					),
-					Size = UDim2.new(
-						if isBulk or portrait then 0.88 else 0.44,
-						0,
-						0,
-						if isBulk
-							then 44
-							elseif not short and not portrait then 28
-							else bodyHeight * (if portrait then 0.14 else 0.25)
-					),
-					Text = if not settled
-						then ""
-						else if isBulk and refundLine then refundLine else subtitleFor(headline),
-					TextColor3 = T.Colors.Ink,
-					ZIndex = 114,
-				},
-			}),
+			Refunds = if isBulk
+					and settled
+					and refundLine
+				then c(ResponsiveText, {
+					MeasurementFont = T.Type.Label,
+					MaxTextSize = T.Type.Body,
+					MinTextSize = T.Type.Minimum,
+					Truncate = true,
+					Native = {
+						AnchorPoint = Vector2.new(0.5, 1),
+						BackgroundTransparency = 1,
+						Font = T.Type.Label,
+						Position = UDim2.new(0.5, 0, 0, bodyTop + bodyHeight),
+						Size = UDim2.new(0.88, 0, 0, 30),
+						Text = refundLine,
+						TextColor3 = T.Colors.Ink,
+						ZIndex = 114,
+					},
+				})
+				else nil,
 			Actions = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,

@@ -3,6 +3,7 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
@@ -23,6 +24,7 @@ local ResponsiveText = require(script.Parent.ResponsiveText)
 local BackpackTitle = require(script.Parent.BackpackTitle)
 local SectionHeader = require(script.Parent.SectionHeader)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local CollectibleLayout = require(script.Parent.Parent.Models.CollectibleLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Selection = require(script.Parent.Parent.Services.Selection)
 local EmoteSlotRail = require(script.Parent.EmoteSlotRail)
@@ -60,6 +62,61 @@ local function ownershipKey(data: any?): string
 	return table.concat(ids, "\0")
 end
 
+-- The well spans this share of the panel width (the tab row matches it), and
+-- the scroller this share of the well height.
+local WELL_WIDTH = 0.930013
+local SCROLL_HEIGHT = 0.907841
+
+-- Breathing room inside a tab pill on each side of its label, past the label's
+-- own inset and outline, so a label never runs into the pill edge.
+local TAB_TEXT_PAD = 6
+
+-- The largest shared label size (maximum down to the menu floor) at which every
+-- tab label fits a pill `width` wide; nil when even the floor does not fit.
+local function tabTextSize(width: number, maximum: number): number?
+	local room = width - T.Layout.CompactGap - TAB_TEXT_PAD * 2 - T.Type.Outline * 2
+	for size = maximum, T.Type.Minimum, -1 do
+		local fits = true
+		for _, definition in InventoryConfig.Tabs do
+			local bounds = TextService:GetTextSize(definition.Id, size, T.Type.Display, Vector2.new(4096, 200))
+			if bounds.X > room then
+				fits = false
+				break
+			end
+		end
+		if fits then
+			return size
+		end
+	end
+	return nil
+end
+
+-- Narrowest pill that fits every tab label at `size`.
+local function tabWidthFor(size: number): number
+	local widest = 0
+	for _, definition in InventoryConfig.Tabs do
+		widest =
+			math.max(widest, TextService:GetTextSize(definition.Id, size, T.Type.Display, Vector2.new(4096, 200)).X)
+	end
+	return math.ceil(widest) + T.Layout.CompactGap + TAB_TEXT_PAD * 2 + T.Type.Outline * 2
+end
+
+-- Every card label the Backpack can show across all tabs, so one name size and
+-- block height serve every tab (cards never change shape when switching tabs).
+local function allLabels(owned): { string }
+	local labels = {}
+	for _, tab in InventoryConfig.Tabs do
+		for _, section in tab.Sections do
+			for _, entry in InventoryModel.entries(Cosmetics, owned, section.Category) do
+				if not (tab.Id == "EMOTES" and entry.isDefault) then
+					table.insert(labels, CollectibleLayout.label(entry))
+				end
+			end
+		end
+	end
+	return labels
+end
+
 local function Section(props)
 	local cardChildren = {
 		UIListLayout = c("UIListLayout", {
@@ -79,9 +136,12 @@ local function Section(props)
 		cardChildren[entry.id] = c(Card, {
 			Compact = props.Compact,
 			Entry = entry,
-			Selected = props.SelectedItemId == entry.itemId,
+			-- Default entries have no itemId: never let nil == nil seed a selection.
+			Selected = props.SelectedItemId ~= nil and props.SelectedItemId == entry.itemId,
 			CardSize = props.CardSize,
 			CardHeight = props.CardHeight,
+			NameSize = props.NameSize,
+			NameHeight = props.NameHeight,
 			LayoutOrder = index,
 			Equipped = if props.SlotOf
 				then props.SlotOf(entry.itemId) ~= nil
@@ -133,9 +193,28 @@ return function(props: Props)
 	local inventoryLayout = UIConfig.Layout.Inventory
 	local short = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
-	local contentTop = if short
-		then T.LobbyLandscape.PanelHeader
-		else if panelSize.X < T.Layout.WheelMinWidth then T.Layout.CompactWellTop else T.Layout.WellTop
+	-- Tabs: one row as wide as the well with every label fitted to its pill (26
+	-- down to the 18 floor, never edge to edge); a panel that cannot fit the floor
+	-- size in one row, or a narrow one, stacks them 2x2. The short-landscape rail
+	-- widens past its configured width when a label would not fit at the floor.
+	local tabCount = #InventoryConfig.Tabs
+	local tabGap = T.Layout.CompactGap
+	local rowTabText = if short
+		then nil
+		else tabTextSize((panelSize.X * WELL_WIDTH - tabGap * (tabCount - 1)) / tabCount, T.Type.Tab)
+	local narrowTabs = not short and (panelSize.X < T.Layout.WheelMinWidth or rowTabText == nil)
+	local tabText = if short
+		then T.Type.Minimum
+		elseif narrowTabs then tabTextSize((panelSize.X * WELL_WIDTH - tabGap) / 2, T.Type.Tab) or T.Type.Minimum
+		else rowTabText :: number
+	local railWidth = if short
+		then math.max(inventoryLayout.ShortRailWidthPx, tabWidthFor(T.Type.Minimum) + inventoryLayout.ShortRailGapPx)
+		else inventoryLayout.ShortRailWidthPx
+	local contentLeft = inventoryLayout.ShortContentLeftPx + railWidth - inventoryLayout.ShortRailWidthPx
+	local tabsTop = if narrowTabs then T.Layout.CompactTabsTop else T.Layout.TabsTop
+	local tabsHeight = if narrowTabs then T.Layout.MinTarget * 2 + T.Layout.CompactGap else T.Layout.TabHeight
+	-- The well starts one compact gap under the tabs: no dead band above it.
+	local contentTop = if short then T.LobbyLandscape.PanelHeader else tabsTop + tabsHeight + T.Layout.CompactGap
 	local contentBottom = if short then panelSize.Y - inventoryLayout.ShortContentBottomPx else panelSize.Y * 0.9684105
 	local railGap = inventoryLayout.ShortRailGapPx
 	local railPadding = railGap
@@ -147,21 +226,19 @@ return function(props: Props)
 		railPadding = math.min(railPadding, math.floor((railHeight - tabHeight - railGap * gaps) / 2))
 	end
 	local contentWidth = if short
-		then math.max(panelSize.X - inventoryLayout.ShortContentLeftPx - inventoryLayout.ShortContentBottomPx, 1)
-		else panelSize.X * 0.930013
+		then math.max(panelSize.X - contentLeft - inventoryLayout.ShortContentBottomPx, 1)
+		else panelSize.X * WELL_WIDTH
 	local cardWidth = if short
 		then math.max(contentWidth - UIConfig.Layout.InventoryContentGapPx * 2, 1) * 0.955
 		else contentWidth * 0.94076 * 0.94
-	local _, cardSize = ResponsiveLayout.gridCellSize(
-		cardWidth,
-		if short
-			then T.LobbyLandscape.InventoryCardMin
-			elseif panelSize.X < T.Layout.WheelMinWidth then 124
-			else T.Layout.CardMin,
-		if short then T.LobbyLandscape.InventoryCard else T.Layout.CardMax,
-		if short then T.LobbyLandscape.ScrollInset else T.Layout.Gap,
-		T.Layout.MaxColumns
-	)
+	local cardGap = if short then T.LobbyLandscape.ScrollInset else T.Layout.Gap
+	local cardMinimum = if short
+		then T.LobbyLandscape.InventoryCardMin
+		elseif panelSize.X < T.Layout.WheelMinWidth then 124
+		else T.Layout.CardMin
+	local cardMaximum = if short then T.LobbyLandscape.InventoryCard else T.Layout.CardMax
+	local _, baseCardSize =
+		ResponsiveLayout.gridCellSize(cardWidth, cardMinimum, cardMaximum, cardGap, T.Layout.MaxColumns)
 	local selectedTab = props.SelectedTab
 	local emoteTab = selectedTab == "EMOTES"
 	local wheel = EmoteWheelController.useSnapshot()
@@ -239,6 +316,38 @@ return function(props: Props)
 		end
 	end, { selectedTab })
 	local ownedKey = ownershipKey(props.Data)
+	-- One card geometry for every tab: the same width, one name size and block
+	-- height measured over every label the Backpack can show, then snapped so the
+	-- first screen never ends inside a row's names.
+	local K = T.Collectible
+	local names = React.useMemo(function()
+		if props.Data == nil then
+			return { size = T.Type.TileLabel, height = K.NameHeight, labels = {} }
+		end
+		local labels = allLabels(props.Data.Cosmetics.Owned)
+		local size, height = CollectibleLayout.nameStyle(labels, baseCardSize - K.Pad * 2)
+		return { size = size, height = height, labels = labels }
+	end, { ownedKey, baseCardSize } :: { any })
+	local wellHeight = math.max(contentBottom - contentTop, 0)
+	local grid = CollectibleLayout.grid({
+		width = cardWidth,
+		visible = if short then wellHeight - T.LobbyLandscape.ScrollInset * 2 else wellHeight * SCROLL_HEIGHT,
+		top = (if short then T.LobbyLandscape.ScrollPadding else UIConfig.Layout.InventoryContentGapPx) + (if short
+			then inventoryLayout.ShortHeaderHeightPx
+			else inventoryLayout.HeaderHeightPx) + (if short then T.LobbyLandscape.ScrollInset else T.Layout.CompactGap),
+		minimum = cardMinimum,
+		maximum = cardMaximum,
+		gap = cardGap,
+		maxColumns = T.Layout.MaxColumns,
+		nameHeight = names.height,
+		lip = T.Shape.LipHeight,
+	})
+	local cardSize = grid.size
+	local nameSize, nameHeight = names.size, names.height
+	if cardSize < baseCardSize and #names.labels > 0 then
+		nameSize, nameHeight = CollectibleLayout.nameStyle(names.labels, cardSize - K.Pad * 2)
+	end
+	local cardHeight = CollectibleLayout.cardHeight(cardSize, nameHeight)
 	local sections = React.useMemo(function()
 		local result = {}
 		if props.Data == nil then
@@ -303,14 +412,12 @@ return function(props: Props)
 			Compact = short,
 			Entries = section.Entries,
 			Equipped = equipped,
-			CardSize = if emoteTab
-				then math.min(cardSize, T.Layout.EmoteCardMax)
-				elseif selectedTab == "EFFECTS" then math.min(cardSize, T.Layout.EffectCardMax)
-				else cardSize,
-			CardHeight = if emoteTab
-				then math.min(cardSize, T.Layout.EmoteCardMax)
-				elseif selectedTab == "EFFECTS" then math.min(cardSize, T.Layout.EffectCardMax)
-				else cardSize,
+			-- Every tab shares one card size; cards are slightly taller than wide so
+			-- the seam rarity tag costs no art.
+			CardSize = cardSize,
+			CardHeight = cardHeight,
+			NameSize = nameSize,
+			NameHeight = nameHeight,
 			HeaderHeight = if short then inventoryLayout.ShortHeaderHeightPx else inventoryLayout.HeaderHeightPx,
 			LayoutOrder = (index - 1) * 3,
 			OnEquip = onEquip,
@@ -329,7 +436,7 @@ return function(props: Props)
 			FillDirection = if short then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			HorizontalFlex = if short then nil else Enum.UIFlexAlignment.Fill,
-			Padding = if short then UDim.new(0, railGap) else UDim.new(0.015, 0),
+			Padding = UDim.new(0, if short then railGap else tabGap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			VerticalAlignment = if short then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Center,
 		}),
@@ -340,7 +447,6 @@ return function(props: Props)
 			})
 			else nil,
 	}
-	local narrowTabs = not short and panelSize.X < T.Layout.WheelMinWidth
 	if narrowTabs then
 		tabs.UIListLayout = nil
 	end
@@ -350,20 +456,20 @@ return function(props: Props)
 			Enabled = props.Data ~= nil,
 			Active = selectedTab == definition.Id,
 			Text = definition.Id,
-			TextSize = if short or narrowTabs then T.Type.Minimum else T.Type.Tab,
+			TextSize = tabText,
 			Native = {
 				LayoutOrder = layoutOrder,
 				Position = if narrowTabs
 					then UDim2.new(
-						(layoutOrder - 1) % 2 * 0.51,
-						0,
+						(layoutOrder - 1) % 2 * 0.5,
+						(layoutOrder - 1) % 2 * tabGap / 2,
 						0,
 						math.floor((layoutOrder - 1) / 2) * (T.Layout.MinTarget + T.Layout.CompactGap)
 					)
 					else nil,
 				Size = if short
 					then UDim2.new(1, -inventoryLayout.ShortRailGapPx, 0, T.Layout.MinTarget)
-					elseif narrowTabs then UDim2.new(0.46, 0, 0, T.Layout.MinTarget)
+					elseif narrowTabs then UDim2.new(0.5, -tabGap / 2, 0, T.Layout.MinTarget)
 					else UDim2.fromScale(0.22, 1),
 			},
 			OnActivated = function()
@@ -409,11 +515,11 @@ return function(props: Props)
 				AnchorPoint = if short then Vector2.zero else Vector2.new(0.5, 0.5),
 				LayoutOrder = 3,
 				Position = if short
-					then UDim2.fromOffset(inventoryLayout.ShortContentLeftPx, contentTop)
+					then UDim2.fromOffset(contentLeft, contentTop)
 					else UDim2.new(0.498913, 0, 0, (contentTop + contentBottom) / 2),
 				Size = if short
-					then UDim2.fromOffset(contentWidth, math.max(contentBottom - contentTop, 0))
-					else UDim2.new(0.930013, 0, 0, math.max(contentBottom - contentTop, 0)),
+					then UDim2.fromOffset(contentWidth, wellHeight)
+					else UDim2.new(WELL_WIDTH, 0, 0, wellHeight),
 			},
 		}, {
 			CategoriesHolder = if props.Data and #sections > 0
@@ -429,34 +535,35 @@ return function(props: Props)
 						then UDim2.fromOffset(T.LobbyLandscape.ScrollInset, T.LobbyLandscape.ScrollInset)
 						else UDim2.fromScale(0.0341613, 0.0426996),
 					ScrollBarImageColor3 = T.Colors.Pink,
-					ScrollBarThickness = T.Layout.CompactGap,
+					ScrollBarThickness = T.Layout.ScrollBar,
 					Size = if short
 						then UDim2.new(1, -T.LobbyLandscape.ScrollInset * 2, 1, -T.LobbyLandscape.ScrollInset * 2)
-						else UDim2.fromScale(0.94076, 0.907841),
+						else UDim2.fromScale(0.94076, SCROLL_HEIGHT),
 				}, categoryChildren)
 				else c("Frame", {
 					BackgroundTransparency = 1,
 					Size = UDim2.fromScale(1, 1),
 				}, {
 					Status = c(ResponsiveText, {
-						MeasurementFont = Enum.Font.LuckiestGuy,
+						MeasurementFont = T.Type.Display,
+						MaxTextSize = T.Type.Section,
+						MinTextSize = T.Type.Minimum,
 						Native = {
 							AnchorPoint = Vector2.new(0.5, 0.5),
 							BackgroundTransparency = 1,
-							FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
+							Font = T.Type.Display,
 							Position = UDim2.fromScale(0.5, 0.44),
-							Size = UDim2.fromScale(0.75, 0.12),
+							Size = UDim2.new(0.75, 0, 0, T.Layout.NameHeight),
 							Text = if props.Data then "NOTHING HERE YET" else "LOADING BACKPACK…",
 							TextColor3 = T.Colors.Ink,
-							TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-							TextStrokeTransparency = 0.15,
 						},
 					}),
 					Activity = c(ActivityDots, {
 						Active = props.Data == nil,
+						Color = T.Colors.Pink,
 						Native = {
-							Position = UDim2.fromScale(0.5, 0.58),
-							Size = UDim2.fromScale(0.12, 0.055),
+							Position = UDim2.new(0.5, 0, 0.44, T.Layout.NameHeight),
+							Size = UDim2.fromOffset(T.Layout.RibbonWidth, T.Layout.SmallBadgeSize),
 						},
 					}),
 				}),
@@ -471,19 +578,12 @@ return function(props: Props)
 			AutomaticCanvasSize = if short then Enum.AutomaticSize.Y else nil,
 			CanvasSize = if short then UDim2.new() else nil,
 			ScrollingDirection = if short then Enum.ScrollingDirection.Y else nil,
-			ScrollBarThickness = if short then inventoryLayout.ShortRailGapPx else nil,
-			ScrollBarImageColor3 = if short then UIConfig.ProgressionStyle.White else nil,
+			ScrollBarThickness = if short then T.Layout.ScrollBar else nil,
+			ScrollBarImageColor3 = if short then T.Colors.Pink else nil,
 			Position = if short
 				then UDim2.fromOffset(UIConfig.Layout.InventoryContentGapPx, contentTop)
-				else UDim2.new(0.5, 0, 0, if narrowTabs then T.Layout.CompactTabsTop else T.Layout.TabsTop),
-			Size = if short
-				then UDim2.fromOffset(inventoryLayout.ShortRailWidthPx, railHeight)
-				else UDim2.new(
-					0.866389,
-					0,
-					0,
-					if narrowTabs then T.Layout.MinTarget * 2 + T.Layout.CompactGap else T.Layout.TabHeight
-				),
+				else UDim2.new(0.5, 0, 0, tabsTop),
+			Size = if short then UDim2.fromOffset(railWidth, railHeight) else UDim2.new(WELL_WIDTH, 0, 0, tabsHeight),
 		}, tabs),
 	})
 end

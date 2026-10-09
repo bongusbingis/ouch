@@ -15,6 +15,8 @@ export type Options = {
 	Headline: boolean?,
 	ShowProgress: boolean?,
 	RobuxSymbol: string?,
+	-- The block's own header; a sticker that only repeats it is dropped.
+	SectionTitle: string?,
 }
 
 export type Style = {
@@ -32,6 +34,10 @@ export type Style = {
 	secondary: string?,
 	progress: number?,
 	action: { Text: string?, BonksAmount: number? },
+	-- "Muted" is a status in the action slot (still opens inspection), never a CTA;
+	-- "Retry" re-requests a price that failed to load.
+	actionState: string,
+	description: string?,
 	primary: boolean,
 	previewItems: { any },
 }
@@ -54,23 +60,52 @@ local stickers: { [string]: { Color: Color3, TextColor: Color3 } } = {
 
 local ShopCardStyle = {}
 
-function ShopCardStyle.sticker(card: any): Sticker?
+function ShopCardStyle.sticker(card: any, sectionTitle: string?): Sticker?
 	local season = card.kind == "SeasonPass"
 	local text = if season then "SEASON PASS" else card.badge
 	if text == nil or text == "" or T.Rarity[text] then
 		return nil
 	end
 	local upper = string.upper(text)
+	if sectionTitle ~= nil and string.upper(sectionTitle) == upper then
+		return nil
+	end
 	local palette = stickers[upper] or { Color = C.Cyan, TextColor = C.Ink }
 	return { Text = upper, Color = palette.Color, TextColor = palette.TextColor }
 end
 
 function ShopCardStyle.accent(card: any): Color3
+	-- Any single item (shop offer, Backpack entry, crate reward) is tinted by its tier.
+	local tier = if card.badge then T.Rarity[card.badge] else nil
+	if tier then
+		return tier.Color
+	end
 	if card.kind == "Cosmetic" then
-		local tier = T.Rarity[card.badge]
-		return if tier then tier.Color else C.NeutralTile
+		return C.NeutralTile
 	end
 	return accents[card.kind] or C.NeutralTile
+end
+
+-- The art tile fill and its tonal recess edge for an accent; shared by cards and
+-- inspection wells. It uses the collectible window's tint, so an item's Shop card,
+-- odds tile, Backpack tile and inspection all sit in the same pale window (which
+-- also keeps dark skins readable against it).
+function ShopCardStyle.tile(accent: Color3): (Color3, Color3)
+	local fill = accent:Lerp(C.Surface, T.Collectible.WellTint)
+	return fill, fill:Lerp(C.Ink, T.Collectible.WellEdgeTint)
+end
+
+function ShopCardStyle.actionState(card: any): string
+	if card.kind == "SeasonPass" or card.owned or card.purchased then
+		return "Action"
+	elseif card.pending then
+		return "Muted"
+	elseif card.status == "Retry" then
+		return "Retry"
+	elseif card.status == "Loading" or card.status == "Preview" or card.status == "Unavailable" then
+		return "Muted"
+	end
+	return "Action"
 end
 
 function ShopCardStyle.actionText(card: any, robuxSymbol: string?): (string?, number?)
@@ -85,7 +120,9 @@ function ShopCardStyle.actionText(card: any, robuxSymbol: string?): (string?, nu
 	elseif card.status == "Preview" then
 		return "COMING SOON", nil
 	elseif card.status == "Loading" then
-		return "LOADING…", nil
+		return "LOADING PRICE…", nil
+	elseif card.status == "Retry" then
+		return "RETRY PRICE", nil
 	elseif card.status == "Unavailable" then
 		return "UNAVAILABLE", nil
 	elseif card.kind == "Crate" then
@@ -124,6 +161,7 @@ function ShopCardStyle.resolve(card: any, seasonState: any?, options: Options?):
 		then seasonState
 		else nil
 	local accent = ShopCardStyle.accent(card)
+	local tileColor, tileLine = ShopCardStyle.tile(accent)
 	local text, amount = ShopCardStyle.actionText(card, opts.RobuxSymbol)
 	local name = if season
 			and seasonState
@@ -150,18 +188,28 @@ function ShopCardStyle.resolve(card: any, seasonState: any?, options: Options?):
 	return {
 		season = season,
 		currency = currency,
-		sticker = ShopCardStyle.sticker(card),
+		sticker = ShopCardStyle.sticker(card, opts.SectionTitle),
 		rarity = if T.Rarity[card.badge] then card.badge else nil,
 		owned = (card.owned == true or card.purchased == true) and not season,
 		ownedText = if card.purchased then "✓ PURCHASED" else "✓ OWNED",
 		accent = accent,
-		tileColor = accent:Lerp(C.Surface, L.TileTint),
-		tileLine = accent:Lerp(C.Ink, L.TileLineTint),
+		tileColor = tileColor,
+		-- A tonal recess edge from the tile's own fill, never a saturated accent outline.
+		tileLine = tileLine,
 		bodyColor = if opts.Headline then accent:Lerp(C.SurfaceWarm, L.HeadlineTint) else C.SurfaceWarm,
 		name = name,
 		secondary = secondary,
 		progress = progress,
 		action = { Text = text, BonksAmount = amount },
+		actionState = ShopCardStyle.actionState(card),
+		-- The offer's own sentence for cards with a copy column; a currency pack's
+		-- blurb only restates its amount, so it is left to the name.
+		description = if not season
+				and not currency
+				and type(card.description) == "string"
+				and card.description ~= ""
+			then card.description
+			else nil,
 		primary = season,
 		previewItems = ShopCardStyle.previewItems(card),
 	}

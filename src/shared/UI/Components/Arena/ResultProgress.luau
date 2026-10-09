@@ -16,6 +16,7 @@ local CandyProgressBar = require(script.Parent.Parent.CandyProgressBar)
 local CandySurface = require(script.Parent.Parent.CandySurface)
 local c, C, R = React.createElement, T.Colors, T.Results
 
+-- The one Bonks glyph, identical to the coin BonksLabel draws beside every other amount.
 local COIN = "rbxassetid://106703644238993"
 local function text(props: { [string]: any })
 	local native = table.clone(props)
@@ -98,10 +99,11 @@ end
 
 local function boostLine(rewards, order: number, widthOffset: number)
 	local parts = {}
-	if rewards.xpMultiplier and rewards.xpMultiplier > 1 then
+	-- A boost line only makes sense under a reward it actually multiplied.
+	if rewards.xpMultiplier and rewards.xpMultiplier > 1 and rewards.matchXp > 0 then
 		table.insert(parts, `×{rewards.xpMultiplier} XP`)
 	end
-	if rewards.bonksMultiplier and rewards.bonksMultiplier > 1 then
+	if rewards.bonksMultiplier and rewards.bonksMultiplier > 1 and rewards.bonks > 0 then
 		table.insert(parts, `×{rewards.bonksMultiplier} BONKS`)
 	end
 	if #parts == 0 then
@@ -111,8 +113,8 @@ local function boostLine(rewards, order: number, widthOffset: number)
 		LayoutOrder = order,
 		Text = table.concat(parts, " · ") .. " BOOST APPLIED",
 		TextColor3 = C.InkSoft,
-		TextSize = 15,
-		Size = UDim2.new(1, -widthOffset, 0, 18),
+		TextSize = T.Type.HudMinimum,
+		Size = UDim2.new(1, -widthOffset, 0, 20),
 	})
 end
 
@@ -121,7 +123,7 @@ local function pendingChip(saving: boolean, height: number, order: number, width
 		Label = text({
 			Text = if saving then "SAVING YOUR REWARDS…" else "LOADING YOUR REWARDS…",
 			TextColor3 = C.InkSoft,
-			TextSize = 16,
+			TextSize = T.Type.HudMinimum,
 			Position = UDim2.fromOffset(0, 6),
 			Size = UDim2.new(1, 0, 0, 20),
 			ZIndex = 19,
@@ -146,7 +148,7 @@ local function statRow(stat, rowHeight: number, order: number)
 		Name = text({
 			Text = stat.label,
 			TextColor3 = C.InkSoft,
-			TextSize = if rowHeight < 36 then 15 else 17,
+			TextSize = if rowHeight < 36 then T.Type.HudMinimum else 17,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Position = UDim2.fromOffset(8, 0),
 			Size = UDim2.new(1, -valueWidth - 20, 1, 0),
@@ -230,15 +232,15 @@ local function SeasonBlock(props)
 	}, {
 		Title = text({
 			Font = T.Type.Display,
-			Text = `SEASON TIER {season.afterTier}`,
-			TextSize = if props.Compact then 17 else 20,
+			Text = if season.afterTier >= 1 then `SEASON TIER {season.afterTier}` else "SEASON PROGRESS",
+			TextSize = if props.Compact then 18 else 20,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Position = UDim2.fromOffset(2, 0),
 			Size = UDim2.new(1, if tierBadge then -badgeWidth - 10 else -4, 0, 26),
 		}),
 		TierUp = c(Badge, {
 			Text = "TIER UP!",
-			TextSize = if props.Compact then 13 else 15,
+			TextSize = T.Type.HudMinimum,
 			Visible = tierBadge,
 			Native = {
 				AnchorPoint = Vector2.new(1, 0),
@@ -258,10 +260,10 @@ local function SeasonBlock(props)
 		Caption = text({
 			Text = `{formatNumber(season.xpIntoTier)} / {formatNumber(season.xpForNextTier)} XP`,
 			TextColor3 = C.InkSoft,
-			TextSize = 15,
+			TextSize = T.Type.HudMinimum,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Position = UDim2.fromOffset(0, 30 + R.SeasonBarHeight + 4),
-			Size = UDim2.new(1, 0, 0, 18),
+			Size = UDim2.new(1, 0, 0, 20),
 		}),
 	})
 end
@@ -271,7 +273,7 @@ return function(props)
 	local inset = props.Inset
 	local rewards = result.rewards
 	local scrollInset = R.PersonalScrollInset
-	local widthOffset = scrollInset * 2 + R.PersonalScrollBar + R.PersonalScrollClearance
+	local widthOffset = scrollInset * 2 + T.Layout.ScrollBar + R.PersonalScrollClearance
 	local stats = {}
 	for _, stat in result.personalStats do
 		if stat.id ~= "Placement" then
@@ -337,11 +339,11 @@ return function(props)
 			{
 				Mark = c(Badge, {
 					Text = "NEW",
-					TextSize = 13,
+					TextSize = T.Type.HudMinimum,
 					Native = {
 						AnchorPoint = Vector2.new(0, 0.5),
 						Position = UDim2.new(0, 6, 0.5, 0),
-						Size = UDim2.fromOffset(52, 24),
+						Size = UDim2.fromOffset(56, 28),
 						ZIndex = 20,
 					},
 				}),
@@ -374,7 +376,7 @@ return function(props)
 			CanvasSize = UDim2.new(),
 			Position = UDim2.fromOffset(inset, top),
 			ScrollBarImageColor3 = C.Pink,
-			ScrollBarThickness = R.PersonalScrollBar,
+			ScrollBarThickness = T.Layout.ScrollBar,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			Selectable = false,
 			Size = UDim2.new(1, -inset * 2, 1, -top - inset),

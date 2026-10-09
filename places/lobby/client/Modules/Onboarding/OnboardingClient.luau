@@ -54,6 +54,9 @@ export type Snapshot = {
 -- nothing and the arrow would point at a stale destination forever.
 local CLEAR = table.freeze({})
 
+-- Server rate-limits OnboardingReady to 3 calls per second; stay well under it.
+local RESOLVE_RETRY_SECONDS = 1
+
 local started = false
 local listeners: Listeners.Collection<Snapshot> = Listeners.new("OnboardingClient", true, "listener failed")
 local connections: { any } = {}
@@ -300,15 +303,31 @@ function OnboardingClient.start()
 	end)
 
 	task.spawn(function()
-		local ok, result = pcall(Network.call, "OnboardingReady")
-		if not ok or typeof(result) ~= "table" then
-			-- Fail open: an unresolved eligibility check must never trap the
-			-- player behind a loading state instead of the normal lobby.
-			publish({ active = false, resolved = true })
-			return
-		end
-		if result.eligible ~= true then
-			publish({ active = false, resolved = true })
+		-- The server answers "unresolved" until the player's profile has loaded.
+		-- Ask again (bounded by ResolveTimeoutSeconds) instead of treating that as
+		-- "not eligible", so a slow DataStore does not skip training for a new
+		-- player. Past the deadline, fail open to the normal lobby.
+		local deadline = os.clock() + OnboardingConfig.Eligibility.ResolveTimeoutSeconds
+		while started do
+			local ok, result = pcall(Network.call, "OnboardingReady")
+			if not started or state.resolved then
+				-- Torn down, or the server already pushed training state for us.
+				return
+			end
+			if not ok or typeof(result) ~= "table" then
+				-- Fail open: an unresolved eligibility check must never trap the
+				-- player behind a loading state instead of the normal lobby.
+				publish({ active = false, resolved = true })
+				return
+			end
+			if result.eligible == true then
+				return
+			end
+			if result.status ~= "unresolved" or os.clock() >= deadline then
+				publish({ active = false, resolved = true })
+				return
+			end
+			task.wait(RESOLVE_RETRY_SECONDS)
 		end
 	end)
 end

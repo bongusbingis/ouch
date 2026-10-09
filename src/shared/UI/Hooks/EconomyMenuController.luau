@@ -38,6 +38,40 @@ local Shop = require(Config:WaitForChild("Economy"):WaitForChild("Shop"))
 
 local EconomyMenuController = {}
 
+-- The replicated economy table is mutated in place, so its reference never
+-- changes when Bonks, ownership, pity or entitlements do. Memos that read it
+-- are keyed on this value-derived string instead.
+local function sortedTrueKeys(map: { [string]: boolean }?): string
+	local ids = {}
+	if map then
+		for id, flag in map do
+			if flag == true then
+				table.insert(ids, id)
+			end
+		end
+	end
+	table.sort(ids)
+	return table.concat(ids, ",")
+end
+
+local function economyKey(data: any?): string
+	if data == nil then
+		return ""
+	end
+	local pityParts = {}
+	if data.Crates and data.Crates.Pity then
+		for crateId, counters in data.Crates.Pity do
+			for counterId, value in counters do
+				table.insert(pityParts, `{crateId}.{counterId}={value}`)
+			end
+		end
+	end
+	table.sort(pityParts)
+	local owned = sortedTrueKeys(if data.Cosmetics then data.Cosmetics.Owned else nil)
+	local premium = sortedTrueKeys(if data.Entitlements then data.Entitlements.PremiumSeasons else nil)
+	return `{data.Bonks}|{owned}|{table.concat(pityParts, ",")}|{premium}`
+end
+
 local EQUIP_ERRORS = {
 	rate_limited = "Please wait before changing another item.",
 	no_profile = "Your inventory is still loading.",
@@ -139,6 +173,7 @@ function EconomyMenuController.use(options: Options): Controller
 	local lifecycleGeneration = React.useRef(0)
 	local storeData = useExternalStore(EconomyStore.snapshot, EconomyStore.subscribe)
 	local economyData = options.EconomyData or storeData
+	local economyRevision = economyKey(economyData)
 	local shopSnapshot = useExternalStore(shopClient.snapshot, shopClient.subscribe)
 	local shopModel = React.useMemo(function()
 		return ShopViewModel.build({
@@ -160,7 +195,7 @@ function EconomyMenuController.use(options: Options): Controller
 			crateOdds = CrateOdds,
 			crateBatch = CrateBatch,
 		})
-	end, { economyData, shopSnapshot })
+	end, { economyRevision, shopSnapshot })
 	local selectedShopCard = if selectedRewardItemId
 		then ShopViewModel.reward(
 			selectedRewardItemId,
@@ -210,7 +245,7 @@ function EconomyMenuController.use(options: Options): Controller
 				then `AGAIN {crateReveal.count}x  {formatNumber(total)}`
 				else `AGAIN  {formatNumber(total)}`,
 		}
-	end, { crateReveal, economyData })
+	end, { crateReveal, economyRevision })
 	local previewBlocked = notifications.request ~= nil
 		or (crateReveal ~= nil and selectedRewardItemId == nil)
 		or shopSnapshot.grant ~= nil

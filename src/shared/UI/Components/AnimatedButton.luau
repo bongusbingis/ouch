@@ -14,6 +14,10 @@ local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
 local Selection = require(script.Parent.Parent.Services.Selection)
 local ScrollingClipping = require(script.Parent.Parent.Services.ScrollingClipping)
+local InputHint = require(script.Parent.InputHint)
+local Tokens = require(script.Parent.Parent.Tokens)
+local CONFIRM =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints.Confirm
 
 local c = React.createElement
 
@@ -37,6 +41,8 @@ export type Props = {
 	HoverRotation: boolean?,
 	OnActivated: (() -> ())?,
 	OnSelectionGained: ((GuiButton) -> ())?,
+	-- Shows the confirm glyph (A / Cross) on the corner while gamepad focus is here.
+	FocusHint: boolean?,
 	OnHoverChanged: ((boolean) -> ())?,
 	OnPointerDown: ((InputObject) -> ())?,
 	ButtonRef: any?,
@@ -53,6 +59,7 @@ return function(props: Props)
 	local entered, setEntered = React.useState(props.EntranceDelay == nil)
 	local entranceRevision = React.useRef(0)
 	local hovering, setHovering = React.useState(false)
+	local focused, setFocused = React.useState(false)
 	local pressing, setPressing = React.useState(false)
 	local rotationBlocked, setRotationBlocked = React.useState(false)
 	local reducedMotion = useReducedMotion()
@@ -88,6 +95,18 @@ return function(props: Props)
 		end
 	end
 	local children = merge(layoutChildren, {
+		FocusHint = if props.FocusHint
+				and focused
+				and enabled
+			then c(InputHint.Component, {
+				Binding = CONFIRM,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromOffset(Tokens.InputHint.CornerInset, Tokens.InputHint.CornerInset),
+					ZIndex = (props.Native.ZIndex or 1) + 20,
+				},
+			})
+			else nil,
 		-- Roblox draws SelectionImageObject itself. Keep that template empty and
 		-- draw one border in local hitbox coordinates to avoid a second offset ring.
 		SelectionImage = c(
@@ -301,6 +320,7 @@ return function(props: Props)
 				end
 				else nil,
 			[React.Event.SelectionGained] = function(button)
+				setFocused(true)
 				if GuiService.SelectedObject ~= nil then
 					beginHover()
 				end
@@ -311,6 +331,7 @@ return function(props: Props)
 				end
 			end,
 			[React.Event.SelectionLost] = function()
+				setFocused(false)
 				endHover()
 			end,
 		}),

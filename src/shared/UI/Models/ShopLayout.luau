@@ -64,6 +64,56 @@ function ShopLayout.grid(available: number, count: number, class: CardClass, gap
 	}
 end
 
+-- The column count the width supports can leave one or two cards alone on a
+-- last row. Trading a column for an evenly filled grid reads as intended
+-- rather than as a leftover, so the narrowest count that empties the last
+-- row less is used (never below half the supported columns).
+function ShopLayout.balancedGrid(
+	available: number,
+	count: number,
+	class: CardClass,
+	gap: number,
+	maxColumns: number
+): Grid
+	local natural = ShopLayout.grid(available, count, class, gap, maxColumns)
+	if natural.rows <= 1 or count % natural.columns == 0 then
+		return natural
+	end
+	local best = natural
+	local bestEmpty = natural.columns - count % natural.columns
+	for columns = natural.columns - 1, math.max(1, math.ceil(natural.columns / 2)), -1 do
+		local empty = (columns - count % columns) % columns
+		if empty < bestEmpty then
+			best, bestEmpty = ShopLayout.grid(available, count, class, gap, columns), empty
+		end
+	end
+	return best
+end
+
+-- Blocks that end up alone across every row they occupy, narrower than the
+-- content: the packer had nothing to put beside them, so the open tracks are
+-- dead space the block itself should take.
+function ShopLayout.loneBlocks(placements: { Placement }, tracks: number): { Block }
+	local lone = {}
+	for _, placement in placements do
+		if placement.span >= tracks then
+			continue
+		end
+		local top, bottom = placement.y, placement.y + placement.block.height
+		local shared = false
+		for _, other in placements do
+			if other ~= placement and other.y < bottom and top < other.y + other.block.height then
+				shared = true
+				break
+			end
+		end
+		if not shared then
+			table.insert(lone, placement.block)
+		end
+	end
+	return lone
+end
+
 -- An empty section collapses to its header plus a single placeholder strip
 -- instead of reserving a card row it has nothing to put in.
 function ShopLayout.sectionHeight(grid: Grid, headerHeight: number, emptyHeight: number): number

@@ -14,6 +14,7 @@ local UIConfig = require(RS.Config.Interface.UI)
 local Config = require(RS.Config.Interface.Onboarding)
 local CandySurface = require(script.Parent.Parent.CandySurface)
 local PuffyButton = require(script.Parent.Parent.PuffyButton)
+local SKIP = require(RS.Config.Interface.Input).Hints.Skip
 local c, C, L = React.createElement, T.Colors, T.Onboarding
 
 return function(props)
@@ -75,6 +76,7 @@ return function(props)
 				TextColor = C.Ink,
 				Text = view.skip,
 				TextSize = T.Type.Minimum,
+				Hint = SKIP,
 				OnActivated = props.OnSkip,
 				Shadow = false,
 				Native = {

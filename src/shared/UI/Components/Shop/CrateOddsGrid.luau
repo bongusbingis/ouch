@@ -9,27 +9,22 @@ local number = require(script.Parent.Parent.Parent.Models.NumberText)
 local Button = require(script.Parent.Parent.PuffyButton)
 local Preview = require(script.Parent.ShopPreview)
 local Ribbon = require(script.Parent.Parent.RarityRibbon)
+local Face = require(script.Parent.Parent.CollectibleFace)
+local CollectibleLayout = require(script.Parent.Parent.Parent.Models.CollectibleLayout)
 local c, C = React.createElement, T.Colors
-local function text(value, y, height, color, z)
-	return c("TextLabel", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(8, y),
-		Size = UDim2.new(1, -16, 0, height),
-		Font = T.Type.Label,
-		Text = value,
-		TextSize = T.Type.Minimum,
-		TextColor3 = color or C.Ink,
-		TextWrapped = true,
-		ZIndex = z,
-	})
-end
 local function Tile(props)
 	local entry = props.Entry
-	local tier = T.Rarity[entry.rarity]
 	local z = props.ZIndex
-	local base = if entry.basePercent and entry.basePercent ~= entry.percent
-		then " · BASE " .. tostring(entry.basePercent) .. "%"
-		else ""
+	-- The group header states whatever every outcome shares (chance, base chance,
+	-- duplicate refund), so a tile only adds what is particular to it.
+	local parts = {}
+	if not props.SharedBase and entry.basePercent and entry.basePercent ~= entry.percent then
+		table.insert(parts, "BASE " .. tostring(entry.basePercent) .. "%")
+	end
+	if not props.SharedRefund then
+		table.insert(parts, "DUPE +" .. number(entry.bonksRefund or 0))
+	end
+	local footer = if #parts > 0 then table.concat(parts, " · ") else nil
 	return c(Button, {
 		OnActivated = props.OnActivated,
 		OnSelectionGained = function(button)
@@ -51,62 +46,29 @@ local function Tile(props)
 			end
 		end,
 		Style = "Card",
-		Color = C.NeutralTile:Lerp(C.Surface, 0.4),
+		Color = C.SurfaceWarm,
 		Radius = T.Shape.RadiusCard,
 		Shadow = false,
 		StrokeColor = if props.Selected then C.Yellow else C.Ink,
 		Native = { LayoutOrder = props.Order, Size = UDim2.fromOffset(props.Width, props.Height), ZIndex = z },
 	}, {
-		Chance = c(Ribbon, {
-			Text = tostring(entry.percent) .. "%",
-			Color = if tier then tier.Color else C.WellLine,
-			Native = {
-				Position = UDim2.fromOffset(10, 10),
-				Size = UDim2.new(if entry.owned then 0.52 else 1, if entry.owned then -15 else -20, 0, 26),
-				ZIndex = z + 6,
-			},
-		}),
-		Owned = if entry.owned
-			then c(Ribbon, {
-				Text = "OWNED",
-				Color = C.Yellow,
-				Native = {
-					Position = UDim2.new(0.52, 0, 0, 10),
-					Size = UDim2.new(0.48, -10, 0, 26),
-					ZIndex = z + 6,
-				},
-			})
-			else nil,
-		Preview = c("Frame", {
-			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(8, 44),
-			Size = UDim2.new(1, -16, 0, props.Height - 144),
+		-- The group header names the tier; the seam tag carries this outcome's chance in the tier colour.
+		Face = c(Face, {
+			Width = props.Width,
+			Height = props.Height - T.Shape.LipHeight,
+			Rarity = entry.rarity,
+			TagText = tostring(entry.percent) .. "%",
+			CornerText = if entry.owned then "OWNED" else nil,
+			Name = entry.displayName,
+			Footer = footer,
 			ZIndex = z + 6,
-		}, {
-			Content = c(Preview, {
+			Art = c(Preview, {
 				Items = if entry.preview then { entry.preview } else {},
 				ColorId = props.ColorId,
 				CostumeId = props.CostumeId,
-				ZIndex = z + 6,
+				ZIndex = z + 7,
 			}),
 		}),
-		Name = c("TextLabel", {
-			BackgroundColor3 = C.Ink,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0, 8, 1, -96),
-			Size = UDim2.new(1, -16, 0, 52),
-			Font = T.Type.Display,
-			Text = string.upper(entry.displayName),
-			TextSize = T.Type.Minimum,
-			TextColor3 = C.Surface,
-			TextWrapped = true,
-			ZIndex = z + 7,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
-			Padding = c("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
-		}),
-		Refund = text("DUPE: +" .. number(entry.bonksRefund or 0) .. " BONKS", props.Height - 42, 30, C.Ink, z + 7),
-		Base = if base ~= "" then text("BASE " .. tostring(entry.basePercent) .. "%", 40, 24, C.Ink, z + 8) else nil,
 	})
 end
 return function(props)
@@ -130,7 +92,7 @@ return function(props)
 			summary ..= " · BASE " .. tostring(base) .. "%"
 		end
 		if refund then
-			summary ..= " · DUPLICATES: " .. number(refund) .. " BONKS"
+			summary ..= " · DUPE +" .. number(refund) .. " BONKS"
 		end
 		children["Header" .. group.rarity] = c("Frame", {
 			BackgroundTransparency = 1,
@@ -144,7 +106,10 @@ return function(props)
 				Rarity = group.rarity,
 				Native = {
 					LayoutOrder = 1,
-					Size = UDim2.fromOffset(160, 30),
+					Size = UDim2.fromOffset(
+						CollectibleLayout.tagWidth(string.upper(group.rarity), T.Type.Minimum),
+						T.Collectible.TagHeight
+					),
 					ZIndex = props.ZIndex + 1,
 				},
 			}),
@@ -183,6 +148,8 @@ return function(props)
 				Height = height,
 				Inset = layout.inset,
 				Selected = props.SelectedId == entry.itemId,
+				SharedBase = base ~= nil,
+				SharedRefund = refund ~= nil,
 				ColorId = props.ColorId,
 				CostumeId = props.CostumeId,
 				ZIndex = props.ZIndex,

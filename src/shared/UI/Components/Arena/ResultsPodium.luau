@@ -59,7 +59,7 @@ local function Nameplate(props)
 			Font = T.Type.Display,
 			Text = entry.displayName,
 			TextColor3 = C.Ink,
-			TextSize = if compact then 16 else 22,
+			TextSize = if compact then T.Type.HudMinimum else 22,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Position = UDim2.fromOffset(textLeft, 4),
@@ -71,7 +71,7 @@ local function Nameplate(props)
 			Font = T.Type.Label,
 			Text = `{entry.score} {props.ScoreLabel}`,
 			TextColor3 = C.InkSoft,
-			TextSize = if compact then 13 else 16,
+			TextSize = T.Type.HudMinimum,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Position = UDim2.new(0, textLeft, 0.5, -2),
@@ -84,8 +84,17 @@ end
 return function(props)
 	local region = React.useRef(nil)
 	local entries = props.Entries or {}
+	-- No placed finishers (a draw, a no-contest round): the viewer stands alone on a neutral
+	-- centre pedestal instead of leaving the stage as an empty deck.
+	local showcase = entries
+	if #entries == 0 and props.Fallback ~= nil then
+		local solo: any = table.clone(props.Fallback)
+		solo.placement = 1
+		solo.neutral = true
+		showcase = { solo }
+	end
 	local identity = {}
-	for _, entry in entries do
+	for _, entry in showcase do
 		table.insert(
 			identity,
 			table.concat({
@@ -98,7 +107,7 @@ return function(props)
 		)
 	end
 	React.useEffect(function()
-		return Scene.create(entries, region.current)
+		return Scene.create(showcase, region.current)
 	end, { props.ResultId, table.concat(identity, "|") })
 	local labels = {}
 	for index = 1, math.min(#entries, 3) do

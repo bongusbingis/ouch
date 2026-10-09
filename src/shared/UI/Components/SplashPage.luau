@@ -90,7 +90,7 @@ return function(props: Props)
 		return c(Button, {
 			ButtonRef = props.PlayButtonRef,
 			Text = playText,
-			TextSize = if compact then 20 else 26,
+			TextSize = if compact then T.Type.Body else T.Type.Tab,
 			TextColor = if props.PlayEnabled then C.Surface else C.Ink,
 			Color = C.Pink,
 			LipColor = if props.PlayEnabled then C.PinkLip else C.WellLine,
@@ -105,7 +105,7 @@ return function(props: Props)
 	local function party(native, invite)
 		return c(Button, {
 			Text = if invite then (if compact then "INVITE" else "INVITE FRIENDS") else "JOIN PARTY",
-			TextSize = 18,
+			TextSize = T.Type.Minimum,
 			TextColor = C.Ink,
 			Color = C.Surface,
 			LipColor = C.WellLine,
@@ -125,7 +125,7 @@ return function(props: Props)
 			{
 				ButtonRef = props.ModeButtonRef,
 				Text = if compact then (if hasMode then "MODE" else "SELECT MODE") else nil,
-				TextSize = 18,
+				TextSize = T.Type.Minimum,
 				Wrapped = compact,
 				TextColor = C.Ink,
 				Color = if hasMode then (if expandedMode then C.Surface else C.Well) else C.Pink,
@@ -164,7 +164,7 @@ return function(props: Props)
 					Name = c(Text, {
 						Text = title,
 						Font = T.Type.Display,
-						TextSize = 22,
+						TextSize = T.Type.TileLabel,
 						Position = geometry(function(a)
 							return UDim2.new(S.ModeTextFraction * a, (if hasMode then 54 else 18) * (1 - a), 0, 12 * a)
 						end),
@@ -195,7 +195,7 @@ return function(props: Props)
 					}),
 					Change = c(Text, {
 						Text = if hasMode then "CHANGE  >" else ">",
-						TextSize = 18,
+						TextSize = T.Type.Minimum,
 						TextXAlignment = Enum.TextXAlignment.Right,
 						Position = geometry(function(a)
 							return UDim2.new(1, -112, a, -36 * a)

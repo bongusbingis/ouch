@@ -23,6 +23,7 @@ local Selection = require(script.Parent.Parent.Services.Selection)
 local c = React.createElement
 local CandyPanel = require(script.Parent.CandyPanel)
 local CandyTitle = require(script.Parent.CandyTitle)
+local LoadingBackdrop = require(script.Parent.LoadingBackdrop)
 local colors = require(script.Parent.Parent.EconomyPalette)
 
 export type Props = {
@@ -139,11 +140,46 @@ return function(props: Props)
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		}, {
 			Root = c("Frame", {
-				BackgroundTransparency = if snapshot.ready then 1 else 0,
-				BackgroundColor3 = colors.Ink,
+				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 				Active = true,
 			}, {
+				-- While the stage builds (or if it fails) the player sees the lobby's
+				-- candy sky, never a dark void; once it is live, the same sky fades in
+				-- from the top and pink from the bottom to frame the audition.
+				Backdrop = if snapshot.ready
+					then nil
+					else c(LoadingBackdrop, { Static = true, Native = { ZIndex = 1 } }),
+				SkyBand = if snapshot.ready
+					then c("Frame", {
+						BackgroundColor3 = T.Colors.Surface,
+						BorderSizePixel = 0,
+						Size = UDim2.fromScale(1, 0.24),
+						ZIndex = 1,
+					}, {
+						Gradient = c("UIGradient", {
+							Rotation = 90,
+							Color = ColorSequence.new(T.Colors.BackdropTop, T.Colors.BackdropMid),
+							Transparency = NumberSequence.new(0.05, 1),
+						}),
+					})
+					else nil,
+				FloorBand = if snapshot.ready
+					then c("Frame", {
+						AnchorPoint = Vector2.new(0, 1),
+						BackgroundColor3 = T.Colors.Surface,
+						BorderSizePixel = 0,
+						Position = UDim2.fromScale(0, 1),
+						Size = UDim2.fromScale(1, 0.3),
+						ZIndex = 1,
+					}, {
+						Gradient = c("UIGradient", {
+							Rotation = 90,
+							Color = ColorSequence.new(T.Colors.BackdropMid, T.Colors.BackdropBottom),
+							Transparency = NumberSequence.new(1, 0.05),
+						}),
+					})
+					else nil,
 				Title = c(CandyTitle, {
 					Text = string.upper(title),
 					TextSize = T.Type.Section,
@@ -155,6 +191,7 @@ return function(props: Props)
 					Size = UDim2.new(0.9, 0, 0, controlsHeight),
 					BackgroundColor3 = colors.Panel,
 					BorderSizePixel = 0,
+					ZIndex = 3,
 					SelectionGroup = true,
 					SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
 					SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,

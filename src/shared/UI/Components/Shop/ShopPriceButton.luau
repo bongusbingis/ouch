@@ -9,8 +9,11 @@ return function(props)
 	local stacked = props.SubText ~= nil or props.SubBonks ~= nil
 	local z = props.ZIndex or 8
 	local enabled = props.Enabled ~= false
-	local color = props.Color or (if props.Red then C.Pink else C.Surface)
-	local textColor = if enabled
+	-- Muted reads as a status in the action slot (the disabled recipe) while
+	-- staying focusable, so the card it belongs to can still be inspected.
+	local muted = props.Muted == true
+	local color = if muted then C.WellLine else props.Color or (if props.Red then C.Pink else C.Surface)
+	local textColor = if enabled and not muted
 		then props.TextColor or (if color == C.Pink or color == C.Grape then C.Surface else C.Ink)
 		else C.InkSoft
 	local children =

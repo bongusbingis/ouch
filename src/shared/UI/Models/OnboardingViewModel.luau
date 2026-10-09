@@ -8,12 +8,12 @@ function Model.build(snapshot)
 	local device = snapshot.deviceClass
 	local jump = if device == "Touch" then "Tap Jump" elseif device == "Gamepad" then "Press A" else "Press Space"
 	local copy = {
-		Intro = { "Welcome to training!", "Follow the arrow. Let's practise avoiding obstacles." },
-		AvoidBumpers = { "Dodge the bumpers", "Move around them and follow the arrow." },
-		JumpSweepers = { "Jump over the bar", jump .. " as the spinning bar comes towards you." },
-		TimeHammer = { "Time your run", "Wait for the hammer to swing away, then pass." },
-		Practice = { "One more go!", "Head back across the bridge. Dodge, jump and time it!" },
-		Celebration = { "You're ready!", "Take those skills into Splashdown!" },
+		Intro = { "WELCOME TO TRAINING!", "Follow the arrow. Let's practise avoiding obstacles." },
+		AvoidBumpers = { "DODGE THE BUMPERS", "Move around them and follow the arrow." },
+		JumpSweepers = { "JUMP OVER THE BAR", jump .. " as the spinning bar comes towards you." },
+		TimeHammer = { "TIME YOUR RUN", "Wait for the hammer to swing away, then pass." },
+		Practice = { "ONE MORE GO!", "Head back across the bridge. Dodge, jump and time it!" },
+		Celebration = { "YOU'RE READY!", "Take those skills into Splashdown!" },
 	}
 	local hints = {
 		AvoidBumpers = "Give each bumper room as you pass on its open side.",
@@ -24,13 +24,14 @@ function Model.build(snapshot)
 	local entry = copy[step] or copy.Intro
 	local index = table.find(LESSONS, step) or 0
 	return {
-		title = if snapshot.retrying then "Try again!" elseif snapshot.succeeded then "Nice work!" else entry[1],
+		title = if snapshot.retrying then "TRY AGAIN!" elseif snapshot.succeeded then "NICE WORK!" else entry[1],
 		detail = if snapshot.retrying
 			then "Watch the obstacle and give it another go."
 			elseif snapshot.succeeded then "Keep going!"
 			elseif (snapshot.hintLevel or 0) > 0 then hints[step] or entry[2]
 			else entry[2],
-		skip = if device == "Gamepad" then "B  Skip" elseif device == "Touch" then "Skip" else "X  Skip",
+		-- The key/glyph is drawn by InputHint ("[X] SKIP"), so the copy stays one word.
+		skip = "SKIP",
 		celebrating = step == "Celebration",
 		done = if step == "Celebration" then 4 else math.max(0, index - 1) + (if snapshot.succeeded then 1 else 0),
 	}

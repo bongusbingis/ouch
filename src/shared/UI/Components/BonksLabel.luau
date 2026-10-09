@@ -4,10 +4,13 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
+local T = require(script.Parent.Parent.Tokens)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local formatAmount = require(script.Parent.Parent.Models.NumberText)
 local c = React.createElement
+
+local BONKS_COIN = "rbxassetid://106703644238993"
 
 export type Props = {
 	Amount: number,
@@ -16,8 +19,6 @@ export type Props = {
 	IconSize: UDim2?,
 	MaxTextSize: number?,
 	TextStroke: number?,
-	StackThreshold: number?,
-	StackIconAsset: string?,
 	Alignment: Enum.HorizontalAlignment?,
 	Framed: boolean?,
 	children: { [any]: any }?,
@@ -30,9 +31,8 @@ return function(props: Props)
 		math.round((props.MaxTextSize or UI.Text.DefaultMaxSize) * (UI.Text.PreferredScale[preferred.Name] or 1))
 	local textSize, setTextSize = React.useState(maximum)
 	local text = formatAmount(props.Amount)
-	local icon = if props.Amount >= (props.StackThreshold or 1000)
-		then props.StackIconAsset or "rbxassetid://128078334031314"
-		else "rbxassetid://106703644238993"
+	-- One Bonks glyph at every amount; the coin stack is pack art only.
+	local icon = BONKS_COIN
 	React.useEffect(function()
 		local object = reference.current
 		if object == nil then
@@ -47,13 +47,17 @@ return function(props: Props)
 			end
 			lastSize = size
 			local cap = math.min(maximum, math.floor(size.Y * 0.82))
+			-- Currency stays legible: fit to the box, but never below the menu floor.
 			setTextSize(
-				TextMetrics.fittingIconTextSize(
-					text,
-					Enum.Font.LuckiestGuy,
-					Vector2.new(math.max(1, size.X - 4), size.Y - 2),
-					math.max(1, cap),
-					UI.Button.GapPx
+				math.max(
+					T.Type.Minimum,
+					TextMetrics.fittingIconTextSize(
+						text,
+						T.Type.Display,
+						Vector2.new(math.max(1, size.X - 4), size.Y - 2),
+						math.max(1, cap),
+						UI.Button.GapPx
+					)
 				)
 			)
 		end
@@ -79,7 +83,7 @@ return function(props: Props)
 		"ImageLabel",
 		{
 			BackgroundTransparency = if props.Framed then 0.86 else 1,
-			BackgroundColor3 = UI.ProgressionStyle.White,
+			BackgroundColor3 = T.Colors.Surface,
 			BorderSizePixel = 0,
 			Image = icon,
 			ScaleType = Enum.ScaleType.Fit,
@@ -90,7 +94,7 @@ return function(props: Props)
 		if props.Framed
 			then {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Rim = c("UIStroke", { Color = UI.ProgressionStyle.Ink, Thickness = 1, Transparency = 0.65 }),
+				Rim = c("UIStroke", { Color = T.Colors.Ink, Thickness = 1, Transparency = 0.65 }),
 			}
 			else nil
 	)
@@ -99,16 +103,16 @@ return function(props: Props)
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromScale(0, 1),
 		LayoutOrder = 2,
-		Font = Enum.Font.LuckiestGuy,
+		Font = T.Type.Display,
 		TextSize = textSize,
 		Text = text,
-		TextColor3 = props.TextColor or UI.ProgressionStyle.Yellow,
+		TextColor3 = props.TextColor or T.Colors.Yellow,
 		TextYAlignment = Enum.TextYAlignment.Center,
 		ZIndex = native.ZIndex or 1,
 	}, {
 		Stroke = if props.TextStroke
 			then c("UIStroke", {
-				Color = UI.ProgressionStyle.Ink,
+				Color = T.Colors.Ink,
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 				Thickness = props.TextStroke,
 			})

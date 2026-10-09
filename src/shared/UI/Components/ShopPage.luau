@@ -20,37 +20,82 @@ local Icon = require(script.Parent.Icon)
 local TextService = game:GetService("TextService")
 local Section = require(script.Parent.Shop.ShopSection)
 local c, C, L = React.createElement, T.Colors, T.Shop
+local function measure(entry, width, unit, props, span: number?, maxColumns: number?)
+	entry.class = Config.CardClasses[entry.style.Class]
+	entry.priority = entry.style.Priority
+	if props.Short then
+		entry.class = Composition.shortClass(entry.class, L.PromoMin, T.LobbyLandscape.CardHeight)
+	end
+	entry.span = span
+		or Composition.span(width, entry.style.Span, entry.class.MinPx, Config.GapPx, L.WideMin, L.MediumMin)
+	entry.width = Layout.spanWidth(unit, entry.span, Config.GapPx)
+	if #entry.cards == 1 and (entry.class.Layout == "Split" or entry.cards[1].kind == "SeasonPass") then
+		entry.class = table.clone(entry.class)
+		entry.class.MaxPx = entry.width
+	end
+	local columns = maxColumns or entry.style.MaxColumns
+	entry.grid = Layout.balancedGrid(entry.width, #entry.cards, entry.class, Config.CardGapPx, columns)
+	local adapted = Composition.adaptiveClass(
+		entry.class,
+		entry.grid.cardWidth,
+		L.CatalogSplitMin,
+		L.CatalogSplitHeight,
+		L.PromoMin,
+		L.CardHeight
+	)
+	if adapted ~= entry.class then
+		entry.class = adapted
+		entry.grid = Layout.balancedGrid(entry.width, #entry.cards, adapted, Config.CardGapPx, columns)
+	end
+	-- Split cards in a full row, or in a grid that wraps, stretch to the block
+	-- width rather than stopping at the class maximum and leaving a gutter.
+	local grid = entry.grid
+	local fill = math.floor((entry.width - (grid.columns - 1) * Config.CardGapPx) / grid.columns)
+	if entry.class.Layout == "Split" and fill > grid.cardWidth and (grid.rows > 1 or #entry.cards == grid.columns) then
+		entry.class = table.clone(entry.class)
+		entry.class.MaxPx = fill
+		entry.grid = Layout.grid(entry.width, #entry.cards, entry.class, Config.CardGapPx, grid.columns)
+	end
+	entry.headerHeight = Config.HeaderHeight(entry.width, entry.countdownAt, props.Short)
+	entry.height = Layout.sectionHeight(entry.grid, entry.headerHeight, Config.EmptyHeightPx)
+end
+-- Offers Roblox reports as off sale are left out rather than shown as dead
+-- UNAVAILABLE cards; loading and retryable prices stay so the row never jumps.
+local function offered(model)
+	local function keep(cards)
+		local kept = {}
+		for _, card in cards do
+			if card.status ~= "Unavailable" or card.owned or card.purchased then
+				table.insert(kept, card)
+			end
+		end
+		return kept
+	end
+	local filtered = table.clone(model)
+	filtered.hero = keep(model.hero or {})
+	filtered.sections = {}
+	for _, section in model.sections or {} do
+		local copy = table.clone(section)
+		copy.cards = keep(section.cards)
+		table.insert(filtered.sections, copy)
+	end
+	return filtered
+end
 local function blocks(entries, width, offset, props)
 	local unit = Layout.trackUnit(width, Config.Tracks, Config.GapPx)
 	for _, entry in entries do
-		entry.class = Config.CardClasses[entry.style.Class]
-		entry.priority = entry.style.Priority
-		if props.Short then
-			entry.class = Composition.shortClass(entry.class, L.PromoMin, T.LobbyLandscape.CardHeight)
-		end
-		entry.span = Composition.span(width, entry.style.Span, entry.class.MinPx, Config.GapPx, L.WideMin, L.MediumMin)
-		entry.width = Layout.spanWidth(unit, entry.span, Config.GapPx)
-		if #entry.cards == 1 and (entry.class.Layout == "Split" or entry.cards[1].kind == "SeasonPass") then
-			entry.class = table.clone(entry.class)
-			entry.class.MaxPx = entry.width
-		end
-		entry.grid = Layout.grid(entry.width, #entry.cards, entry.class, Config.CardGapPx, entry.style.MaxColumns)
-		local adapted = Composition.adaptiveClass(
-			entry.class,
-			entry.grid.cardWidth,
-			L.CatalogSplitMin,
-			L.CatalogSplitHeight,
-			L.PromoMin,
-			L.CardHeight
-		)
-		if adapted ~= entry.class then
-			entry.class = adapted
-			entry.grid = Layout.grid(entry.width, #entry.cards, adapted, Config.CardGapPx, entry.style.MaxColumns)
-		end
-		entry.headerHeight = Config.HeaderHeight(entry.width, entry.countdownAt, props.Short)
-		entry.height = Layout.sectionHeight(entry.grid, entry.headerHeight, Config.EmptyHeightPx)
+		measure(entry, width, unit, props)
 	end
 	local placements, bottom = Layout.compact(entries, Config.Tracks, Config.GapPx)
+	-- A block the packer left alone in its rows takes the full width instead of
+	-- leaving the rest of the well empty beside it.
+	local lone = Layout.loneBlocks(placements, Config.Tracks)
+	if #lone > 0 then
+		for _, entry in lone do
+			measure(entry, width, unit, props, Config.Tracks, math.max(entry.style.MaxColumns or 1, #entry.cards))
+		end
+		placements, bottom = Layout.compact(entries, Config.Tracks, Config.GapPx)
+	end
 	local children, anchors = {}, {}
 	for index, p in placements do
 		local e = p.block
@@ -68,6 +113,7 @@ local function blocks(entries, width, offset, props)
 			VisibleBottom = props.VisibleBottom,
 			OnCardActivated = props.OnCardActivated,
 			OnExpired = props.OnRefresh,
+			OnRetry = props.OnRefresh,
 			SeasonState = props.SeasonState,
 		})
 	end
@@ -94,7 +140,7 @@ return function(props)
 	local reduced = useReducedMotion()
 	local scroller = React.useRef(nil)
 	local width, setWidth =
-		React.useState(math.max(1, size.X - inset * 2 - scrollInset * 2 - scrollPadding * 2 - Config.ScrollBarPx))
+		React.useState(math.max(1, size.X - inset * 2 - scrollInset * 2 - scrollPadding * 2 - T.Layout.ScrollBar))
 	local band, setBand = React.useState(0)
 	local renderProps = table.clone(props)
 	renderProps.Short = short
@@ -104,7 +150,7 @@ return function(props)
 	local viewHeight = math.max(size.Y - header - inset - scrollInset * 2, 1)
 	renderProps.VisibleTop = band * L.CullBand - L.CullMargin
 	renderProps.VisibleBottom = band * L.CullBand + viewHeight + L.CullBand + L.CullMargin
-	local featured, catalog = Composition.groups(props.Model, Config)
+	local featured, catalog = Composition.groups(offered(props.Model), Config)
 	local content, featureBottom = blocks(featured, width, 0, renderProps)
 	local rest, bottom, anchors =
 		blocks(catalog, width, if featureBottom > 0 then featureBottom + Config.GapPx else 0, renderProps)
@@ -139,6 +185,14 @@ return function(props)
 	end
 	local walletY = if portrait then 91 else header / 2
 	local getWidth = if short then T.Layout.MinTarget else 156
+	local getGap = 6
+	local function measured(text: string, textSize: number): number
+		return TextService:GetTextSize(text, textSize, T.Type.Display, Vector2.new(4096, 200)).X
+	end
+	local function getFits(textSize: number): boolean
+		return measured("+", textSize) + getGap + measured("GET BONKS", textSize) <= getWidth - T.Layout.CompactGap * 2
+	end
+	local getTextSize = if getFits(T.Type.TileLabel) then T.Type.TileLabel else T.Type.Minimum
 	local titleSize = if portrait then 38 elseif short then T.Type.Section else T.Type.Title
 	local titleHeight = if portrait then 60 elseif short then 48 else 76
 	local titleTop = if portrait then 0 elseif short then 2 else -18
@@ -197,8 +251,6 @@ return function(props)
 			ZIndex = 8,
 		}),
 		GetBonks = c(Button, {
-			Text = if short then "+" else "+ GET BONKS",
-			TextSize = T.Type.Minimum,
 			Color = C.Pink,
 			Shadow = false,
 			OnActivated = function()
@@ -221,6 +273,46 @@ return function(props)
 				Size = UDim2.fromOffset(getWidth, 44),
 				ZIndex = 8,
 			},
+		}, {
+			-- The plus is its own glyph with a real gap, not a character crowding the label.
+			Label = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(T.Layout.CompactGap / 2, 0),
+				Size = UDim2.new(1, -T.Layout.CompactGap, 1, -T.Shape.LipHeight),
+				ZIndex = 14,
+			}, {
+				Layout = c("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, getGap),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+				Plus = c("TextLabel", {
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundTransparency = 1,
+					LayoutOrder = 1,
+					Size = UDim2.fromScale(0, 1),
+					Font = T.Type.Display,
+					Text = "+",
+					TextSize = if short then T.Type.Tab else getTextSize,
+					TextColor3 = C.Surface,
+					ZIndex = 14,
+				}, { Outline = c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }) }),
+				Text = if short
+					then nil
+					else c("TextLabel", {
+						AutomaticSize = Enum.AutomaticSize.X,
+						BackgroundTransparency = 1,
+						LayoutOrder = 2,
+						Size = UDim2.fromScale(0, 1),
+						Font = T.Type.Display,
+						Text = "GET BONKS",
+						TextSize = getTextSize,
+						TextColor3 = C.Surface,
+						ZIndex = 14,
+					}, { Outline = c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }) }),
+			}),
 		}),
 		Main = c(Well, {
 			Candy = true,
@@ -240,13 +332,13 @@ return function(props)
 				Position = UDim2.fromOffset(scrollInset, scrollInset),
 				Size = UDim2.new(1, -scrollInset * 2, 1, -scrollInset * 2),
 				ScrollBarImageColor3 = C.Pink,
-				ScrollBarThickness = Config.ScrollBarPx,
+				ScrollBarThickness = T.Layout.ScrollBar,
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				Selectable = false,
 				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 				ZIndex = 4,
 				[React.Change.AbsoluteSize] = function(instance)
-					setWidth(math.max(1, instance.AbsoluteSize.X - Config.ScrollBarPx - scrollPadding * 2))
+					setWidth(math.max(1, instance.AbsoluteSize.X - T.Layout.ScrollBar - scrollPadding * 2))
 				end,
 				[React.Change.CanvasPosition] = function(instance)
 					local reached = math.max(math.floor(instance.CanvasPosition.Y / L.CullBand), 0)
