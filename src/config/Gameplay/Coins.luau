@@ -3,6 +3,8 @@
 -- Collectible match coins (DEC-036). Spawn points are authored map content:
 -- Scriptables.CoinSpawns, a Folder of BaseParts on each arena map.
 return {
+	-- Kill switch: false stops all coin spawning and pickups (no other change needed).
+	Enabled = true,
 	BonksPerCoin = 5,
 	MatchCapBonks = 50, -- per player per match; counted before boosts
 	MaxActive = 6,

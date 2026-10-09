@@ -208,7 +208,10 @@ function CoinService.start(match: any, progressionService: any)
 			return
 		end
 		elapsed = 0
-		local live = not ended and matchService.phase() == "Active" and GameModes.IsCombat(matchService.activeModeId())
+		local live = CoinConfig.Enabled ~= false
+			and not ended
+			and matchService.phase() == "Active"
+			and GameModes.IsCombat(matchService.activeModeId())
 		if live and not active then
 			begin()
 		elseif not live and active then
