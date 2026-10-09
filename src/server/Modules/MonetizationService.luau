@@ -253,6 +253,13 @@ end
 
 local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
 	local player = activePlayers:GetPlayerByUserId(receiptInfo.PlayerId)
+	-- Wait behind this player's in-flight receipt. Nothing may yield between the
+	-- final lock check below and `processing[...] = true`.
+	local deadline = os.clock() + DataConfig.Persistence.ReceiptSaveTimeoutSeconds
+	while player and processing[player.UserId] and os.clock() < deadline do
+		task.wait(DataConfig.Persistence.SavePollSeconds)
+		player = activePlayers:GetPlayerByUserId(receiptInfo.PlayerId)
+	end
 	if player == nil or processing[player.UserId] then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end

@@ -201,6 +201,7 @@ local function _loadPlayerData(player)
 
 		if not player:IsDescendantOf(PlayersService) then
 			profile:EndSession()
+			reject(`{player.Name} left before the profile loaded`)
 			return
 		end
 
@@ -210,6 +211,7 @@ local function _loadPlayerData(player)
 		})
 
 		local entry = {
+			Player = player,
 			Profile = profile,
 			Data = WriteThroughProxy.wrap(profile.Data, profileReplica),
 			Replica = profileReplica,
@@ -738,8 +740,20 @@ end
 
 -- PlayerAdded and the startup sweep of existing players both call this, so a
 -- player who joins during server start must not open two sessions on one key.
+-- A same-server rejoin waits until the previous Player's load and session have
+-- closed; nothing yields between that wait ending and the new load claiming the key.
 function Data.load(player)
 	local userId = player.UserId
+	local holder = Data._loading[userId] or Data._profiles[userId]
+	if holder and holder.Player ~= player then
+		return Promise.new(function(resolve)
+			while holder and holder.Player ~= player and player:IsDescendantOf(PlayersService) do
+				task.wait(DataConfig.Persistence.SavePollSeconds)
+				holder = Data._loading[userId] or Data._profiles[userId]
+			end
+			resolve(if player:IsDescendantOf(PlayersService) then Data.load(player) else nil)
+		end)
+	end
 	local inFlight = Data._loading[userId]
 	if inFlight then
 		return inFlight
@@ -781,6 +795,7 @@ function Data.load(player)
 			end
 		end)
 	Data._loading[userId] = promise
+	promise.Player = player
 	return promise
 end
 

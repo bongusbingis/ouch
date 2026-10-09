@@ -378,6 +378,10 @@ local function receive(player: Player)
 	end
 
 	local rawPayload = joinData.TeleportData
+	if not RunService:IsStudio() and game.PrivateServerId == "" then
+		reject(player, `[ArenaSessionService] Rejected arrival outside a reserved server for {player.Name}`)
+		return
+	end
 	if rawPayload == nil then
 		if partyByUserId[player.UserId] ~= nil and session ~= nil then
 			addArrival(player, "Matched")
@@ -524,7 +528,7 @@ function ArenaSessionService.start()
 
 	Network.handleProtected("ArenaClientReady", { rateLimit = 4 }, clientReady)
 	Network.handleProtected("ReportArenaLoadingEvent", {
-		rateLimit = 12,
+		rateLimit = 4,
 		validate = validLoadingTelemetry,
 	}, loadingTelemetry)
 	PlayerData.onLoaded(markReady)

@@ -362,7 +362,6 @@ local function step(dt: number)
 		elseif not MovementGuard.check(entry.root, excluded) then
 			pendingIntents.forget(id)
 			pendingEquips[id] = nil
-			entries[id] = nil
 		end
 	end
 
