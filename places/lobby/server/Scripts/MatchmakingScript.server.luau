@@ -97,6 +97,14 @@ Network.handleProtected("PartyRequest", {
 			limit = 2,
 			window = 5,
 		},
+		[Protocol.Actions.LeaveParty] = {
+			limit = 2,
+			window = 5,
+		},
+		[Protocol.Actions.CancelMatchmaking] = {
+			limit = 2,
+			window = 5,
+		},
 		[Protocol.Actions.DevSoloPlay] = {
 			limit = 1,
 			window = 10,

@@ -30,6 +30,7 @@ local definitions = QuestsConfig.Definitions :: { QuestDefinition }
 local definitionsById = QuestLogic.definitionsById(definitions)
 local seenEvents = EventDedup.new(4096)
 local started = false
+local resultSnapshot: (() -> any)? = nil
 local PROFILE_WAIT_SECONDS = 15
 
 local function activeEntries(data: any): { QuestEntry }
@@ -176,9 +177,17 @@ local function playerWon(player: Player, winnerId: string?): boolean
 end
 
 local function handleMatchEnded(event: { [string]: any })
+	local result = if resultSnapshot then resultSnapshot() else nil
+	if result == nil then
+		return
+	end
 	local currentModeId = modeId()
 	local winnerId = event.winnerId :: string?
-	for _, player in Players:GetPlayers() do
+	for _, contestant in result.contestants do
+		local player = Players:GetPlayerByUserId(contestant.userId)
+		if player == nil then
+			continue
+		end
 		local changed = applyEventToPlayer(player, event, {
 			playerId = PlayerIds.toId(player),
 			modeId = currentModeId,
@@ -350,6 +359,7 @@ function QuestService.start(matchService: any?)
 	end)
 
 	if matchService then
+		resultSnapshot = matchService.resultSnapshot
 		matchService.onEvent(QuestService.handleMatchEvent)
 	end
 	Players.PlayerAdded:Connect(function(player)

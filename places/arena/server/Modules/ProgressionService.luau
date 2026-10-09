@@ -16,7 +16,9 @@ local EventDedup = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Adapters"):WaitForChild("EventDedup")
 )
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
-local GoodSignal = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("goodsignal"))
+local Listeners = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util"):WaitForChild("Listeners")
+)
 local PlayerData = require(script.Parent.PlayerData)
 local MatchAwardService = require(script.Parent.MatchAwardService)
 local BattlePassService = require(script.Parent.BattlePassService)
@@ -46,7 +48,11 @@ local awardId: string? = nil
 local currentResultId: string? = nil
 local summaryByPlayerId: { [string]: MatchSummary } = {}
 local summaryListeners: { (Player, MatchSummary, string) -> () } = {}
-local awardCommittedSignal = GoodSignal.new()
+-- snapshotDispatch = true: awaitCommitted's handler disconnects itself mid-emit (see `check`
+-- below), so a live iteration would skip the next callback.
+local awardCommittedSignal =
+	Listeners.new("ProgressionService.awardCommitted", true) :: Listeners.Collection<Player, string>
+
 local seenEvents = EventDedup.new()
 local activeMatchService: any = nil
 local participation: { [Player]: any } = {}
@@ -166,7 +172,7 @@ local function committed(player: Player, record: any, before: any, after: any)
 		seasonBefore = before,
 		seasonAfter = after,
 	}, record.ResultId)
-	awardCommittedSignal:Fire(player, record.ResultId)
+	awardCommittedSignal.emit(player, record.ResultId)
 end
 
 local function commitMatch()
@@ -300,14 +306,14 @@ function ProgressionService.awaitCommitted(players: { Player }, resultId: string
 	end
 
 	local thread = coroutine.running()
-	local conn: any = nil
-	local removingConn: any = nil
+	local conn: (() -> ())? = nil
+	local removingConn: RBXScriptConnection? = nil
 	local timer: thread? = nil
 
 	local function check()
 		if not anyPending(players, resultId) then
 			if conn then
-				conn:Disconnect()
+				conn()
 				conn = nil
 			end
 			if removingConn then
@@ -324,7 +330,7 @@ function ProgressionService.awaitCommitted(players: { Player }, resultId: string
 
 	timer = task.delay(remaining, function()
 		if conn then
-			conn:Disconnect()
+			conn()
 			conn = nil
 		end
 		if removingConn then
@@ -334,7 +340,7 @@ function ProgressionService.awaitCommitted(players: { Player }, resultId: string
 		task.spawn(thread, not anyPending(players, resultId))
 	end)
 
-	conn = awardCommittedSignal:Connect(function(_player: Player, committedResultId: string)
+	conn = awardCommittedSignal.add(function(_player: Player, committedResultId: string)
 		if committedResultId == resultId then
 			check()
 		end

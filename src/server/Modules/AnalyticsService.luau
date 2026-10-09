@@ -45,6 +45,18 @@ type OnboardingProgress = {
 	matchEnded: boolean,
 }
 
+-- Kinds a shop card can report as `offerKind` (see ShopViewModel.luau card builders
+-- and Products.luau's ProductType). Anything else is client-forged and dropped.
+local KNOWN_OFFER_KINDS = {
+	Bonks = true,
+	Crate = true,
+	Bundle = true,
+	Cosmetic = true,
+	SeasonPass = true,
+	OfferUnlock = true,
+	GamePass = true,
+}
+
 local onboardingProgress: { [number]: OnboardingProgress } = {}
 local sessionStart: { [number]: number } = {}
 local funnelSessionIds: { [number]: { [string]: string } } = {}
@@ -419,10 +431,11 @@ local function handleReport(player: Player, payload: { [string]: any })
 	if route.funnel and route.step and route.stepName then
 		AnalyticsService.logFunnelStep(player, route.funnel, route.step, route.stepName)
 	elseif route.customEventName then
+		local offerKind = payload.offerKind
 		AnalyticsService.logCustomEvent(player, route.customEventName, 1, {
 			menuId = payload.menuId,
 			offerKey = payload.offerKey,
-			offerKind = payload.offerKind,
+			offerKind = if typeof(offerKind) == "string" and KNOWN_OFFER_KINDS[offerKind] then offerKind else nil,
 		})
 	end
 end
@@ -449,7 +462,7 @@ function AnalyticsService.start(matchService: any?)
 	started = true
 
 	Network.handleProtected("ReportAnalyticsEvent", {
-		rateLimit = 10,
+		rateLimit = 5,
 		validate = function(_player, payload)
 			if typeof(payload) ~= "table" or typeof(payload.kind) ~= "string" then
 				return false, "invalid_payload"
