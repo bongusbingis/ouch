@@ -139,10 +139,38 @@ local function productPresentation(definition: any, metadata: { [string]: any })
 	if info == nil or info.loading == true then
 		return "Loading", nil
 	end
-	if info.failed == true or info.isForSale == false or type(info.priceInRobux) ~= "number" then
+	-- A failed lookup is a transient network miss the player can retry; only an
+	-- offer Roblox reports as off sale (or priceless) is genuinely unavailable.
+	if info.failed == true then
+		return "Retry", nil
+	end
+	if info.isForSale == false or type(info.priceInRobux) ~= "number" then
 		return "Unavailable", nil
 	end
 	return "Active", info.priceInRobux
+end
+
+-- Items carry no authored blurb, so inspection says what the item does in play
+-- rather than a generic line that could sit on any product.
+local CATEGORY_DESCRIPTIONS: { [string]: string } = {
+	BallAssets = "Changes how your dodgeball looks in every match.",
+	HammerAssets = "Changes how your hammer looks in every match.",
+	CostumeAssets = "A complete outfit for your character.",
+	CharacterColor = "Changes your character's color everywhere you play.",
+	ImpactEffectAssets = "Bursts when your hammer lands a hit or your dodgeball knocks a player out.",
+	ElimEffectAssets = "Plays when you knock a player out.",
+	EmoteAssets = "An emote for your emote wheel.",
+	TrailAssets = "Follows you as you move.",
+}
+
+function ShopViewModel.itemDescription(definition: any): string
+	if definition == nil then
+		return ""
+	end
+	if type(definition.Description) == "string" and definition.Description ~= "" then
+		return definition.Description
+	end
+	return CATEGORY_DESCRIPTIONS[definition.Category] or ""
 end
 
 local function previewItem(itemId: string, cosmetics: any): PreviewItem?
@@ -335,14 +363,12 @@ local function cosmeticCard(args: any, offer: any): Card?
 		then "Purchased"
 		else if owned
 			then "Owned"
-			else if offer.bonksPrice ~= nil or productStatus == "Active"
-				then "Active"
-				else if productStatus == "Preview" then "Preview" else "Unavailable"
+			else if offer.bonksPrice ~= nil or productStatus == "Active" then "Active" else productStatus
 	return {
 		id = `Cosmetic:{offer.itemId}`,
 		kind = "Cosmetic",
 		displayName = definition.DisplayName,
-		description = definition.Description or `{definition.Rarity} style. Ready for your next brawl.`,
+		description = ShopViewModel.itemDescription(definition),
 		hintText = nil,
 		status = status,
 		badge = definition.Rarity,
@@ -426,7 +452,9 @@ local function passCard(args: any, key: string, definition: any): Card
 	if status == "Active" then
 		if info == nil or info.loading == true then
 			status = "Loading"
-		elseif info.failed == true or info.isForSale == false or type(info.priceInRobux) ~= "number" then
+		elseif info.failed == true then
+			status = "Retry"
+		elseif info.isForSale == false or type(info.priceInRobux) ~= "number" then
 			status = "Unavailable"
 		else
 			price = info.priceInRobux
@@ -604,7 +632,7 @@ function ShopViewModel.inventory(entry: any): Card
 		id = `Inventory:{entry.id}`,
 		kind = "Inventory",
 		displayName = entry.displayName,
-		description = entry.definition.Description or "Take it for a spin.",
+		description = ShopViewModel.itemDescription(entry.definition),
 		status = "Owned",
 		badge = entry.rarity,
 		itemId = entry.itemId,

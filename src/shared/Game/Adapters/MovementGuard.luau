@@ -160,6 +160,16 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 	return true
 end
 
+-- Read-only view of the last fully validated position: the history token (replaced on reset), when the
+-- last full check ran (any caller), and the position it accepted or recovered to.
+function Guard.validated(root: BasePart): (any?, number?, Vector3?)
+	local history = histories[root]
+	if history == nil then
+		return nil, nil, nil
+	end
+	return history, history.checkedAt, history.safe.Position
+end
+
 function Guard.takeCorrections(): number
 	local count = corrections
 	corrections = 0

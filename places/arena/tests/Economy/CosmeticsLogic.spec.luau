@@ -1,4 +1,4 @@
--- Description: In-place port of the cosmetics equip-validation spec, covering slot and ownership rules and the configured category defaults.
+-- Description: In-place port of the cosmetics equip-validation spec, covering slot and ownership rules, category defaults, crate pool rarity spread, and that every exclusive item is obtainable and backed by real audio.
 
 --!nonstrict
 
@@ -8,6 +8,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local CosmeticsLogic = require(Shared:WaitForChild("Game"):WaitForChild("Economy"):WaitForChild("CosmeticsLogic"))
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
+local Crates = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Crates"))
+local GamePasses = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("GamePasses"))
+local Audio = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Infra"):WaitForChild("Audio"))
 
 local ITEMS = {
 	BallRed = { Category = "BallAssets", Rarity = "Common" },
@@ -60,6 +63,135 @@ return function()
 				local ok, reason = CosmeticsLogic.canEquip(ITEMS, SLOTS, {}, case[1], case[2])
 				expect(ok).to.equal(false)
 				expect(reason).to.equal(case[3])
+			end
+		end)
+
+		it("provides six ordered character colors without ownership", function()
+			local entries = {
+				{
+					name = Cosmetics.Defaults.CharacterColor.DisplayName,
+					order = Cosmetics.Defaults.CharacterColor.SortOrder,
+				},
+			}
+			for _, item in Cosmetics.Items do
+				if item.Category == "CharacterColor" then
+					expect(item.AlwaysAvailable).to.equal(true)
+					table.insert(entries, { name = item.DisplayName, order = item.SortOrder })
+				end
+			end
+			table.sort(entries, function(left, right)
+				return left.order < right.order
+			end)
+			expect(#entries).to.equal(6)
+			expect(entries[1].name).to.equal("Red")
+			expect(entries[3].name).to.equal("Cyan")
+			expect(entries[6].name).to.equal("Purple")
+		end)
+
+		it("spreads every openable crate's pool across more than one rarity", function()
+			for _, crate in Crates do
+				if crate.CatalogStatus == "Active" then
+					local rarities = {}
+					for _, itemId in crate.ItemPool do
+						local item = Cosmetics.Items[itemId]
+						expect(item ~= nil).to.be.ok()
+						rarities[item.Rarity] = true
+					end
+					local distinct = 0
+					for _ in rarities do
+						distinct += 1
+					end
+					expect(distinct > 1).to.be.ok()
+				end
+			end
+		end)
+
+		it("gives every equip slot that has items a default or an always-available entry", function()
+			local populated = {}
+			for _, item in Cosmetics.Items do
+				if item.AlwaysAvailable ~= true then
+					populated[item.Category] = true
+				end
+			end
+			for slot in populated do
+				expect(Cosmetics.Defaults[slot] ~= nil).to.be.ok()
+			end
+		end)
+
+		it("gives the default elimination effect sounds that Config.Audio actually defines", function()
+			local default = Cosmetics.Defaults.ElimEffectAssets
+			expect(default ~= nil).to.be.ok()
+			local effect = default.ElimEffect
+			expect(effect ~= nil).to.be.ok()
+			expect(Audio.Gameplay[effect.DodgeballSound] ~= nil).to.be.ok()
+			expect(Audio.Gameplay[effect.HammerSound] ~= nil).to.be.ok()
+		end)
+
+		it("points every elimination effect cosmetic at real audio entries", function()
+			for _, item in Cosmetics.Items do
+				if item.Category == "ElimEffectAssets" then
+					expect(item.ElimEffect ~= nil).to.be.ok()
+					local dodgeball = Audio.Gameplay[item.ElimEffect.DodgeballSound]
+					local hammer = Audio.Gameplay[item.ElimEffect.HammerSound]
+					expect(dodgeball ~= nil).to.be.ok()
+					expect(hammer ~= nil).to.be.ok()
+					expect(dodgeball.Scope).to.equal("World")
+					expect(hammer.Scope).to.equal("World")
+					expect(#dodgeball.AssetIds > 0).to.be.ok()
+					expect(#hammer.AssetIds > 0).to.be.ok()
+				end
+			end
+		end)
+
+		it("plays one consolidated sound for both weapons, default included", function()
+			local default = Cosmetics.Defaults.ElimEffectAssets.ElimEffect
+			expect(default.DodgeballSound).to.equal(default.HammerSound)
+			for _, item in Cosmetics.Items do
+				if item.Category == "ElimEffectAssets" then
+					expect(item.ElimEffect.DodgeballSound).to.equal(item.ElimEffect.HammerSound)
+				end
+			end
+		end)
+
+		it("makes every Exclusive cosmetic obtainable from some game pass in covered categories", function()
+			local granted = {}
+			local coveredCategories = {}
+			for _, definition in GamePasses.Catalog do
+				for _, category in definition.Categories do
+					coveredCategories[category] = true
+				end
+				for _, itemId in definition.EntitlementItemIds do
+					granted[itemId] = true
+				end
+			end
+			for itemId, item in Cosmetics.Items do
+				if item.Rarity == "Exclusive" and coveredCategories[item.Category] then
+					expect(granted[itemId]).to.equal(true)
+				end
+			end
+		end)
+
+		it("only lists cosmetics that exist, in categories each pass declares", function()
+			for _, definition in GamePasses.Catalog do
+				local allowed = {}
+				for _, category in definition.Categories do
+					allowed[category] = true
+				end
+				for _, itemId in definition.EntitlementItemIds do
+					local item = Cosmetics.Items[itemId]
+					expect(item ~= nil).to.be.ok()
+					expect(allowed[item.Category]).to.equal(true)
+				end
+			end
+		end)
+
+		it("keeps every Exclusive cosmetic out of the crate pools", function()
+			for _, crate in Crates do
+				for _, itemId in crate.ItemPool do
+					local item = Cosmetics.Items[itemId]
+					expect(item ~= nil).to.be.ok()
+					expect(item.Rarity ~= "Exclusive").to.be.ok()
+				end
 			end
 		end)
 	end)

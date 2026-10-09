@@ -58,6 +58,7 @@ type Shove = { root: BasePart, contactPart: BasePart, attachment: Attachment, ex
 local contacts: { [BasePart]: Contact } = {}
 local activeParts: { [BasePart]: boolean } = {}
 local bumpersByAssembly: { [Instance]: { BasePart } } = {}
+local spinnersByAssembly: { [Instance]: { BasePart } } = {}
 local visits: { [Player]: Visit } = {}
 local shoves: { [Player]: Shove } = {}
 local cooldowns: { [Player]: number } = {}
@@ -76,7 +77,7 @@ end
 
 local function bumpersFor(group: Instance): { BasePart }
 	local cached = bumpersByAssembly[group]
-	if cached and #cached > 0 then
+	if cached then
 		return cached
 	end
 	local found: { BasePart } = {}
@@ -111,6 +112,24 @@ local function bumpersFor(group: Instance): { BasePart }
 		end
 	end
 	bumpersByAssembly[group] = found
+	return found
+end
+
+local function spinnersFor(group: Instance): { BasePart }
+	local cached = spinnersByAssembly[group]
+	if cached then
+		return cached
+	end
+	local found: { BasePart } = {}
+	if group:FindFirstAncestor("SplashdownCourse") == nil then
+		for name, enabled in MapFeatures.Spinner.EnabledNames do
+			local spinner = if enabled then group:FindFirstChild(name, true) else nil
+			if spinner and spinner:IsA("BasePart") then
+				table.insert(found, spinner)
+			end
+		end
+	end
+	spinnersByAssembly[group] = found
 	return found
 end
 
@@ -185,6 +204,11 @@ function ShoveFeature.tickWorld(context: MapFeatureKit.Context)
 			bumpersByAssembly[assembly] = nil
 		end
 	end
+	for assembly in spinnersByAssembly do
+		if not assembly:IsDescendantOf(Workspace) then
+			spinnersByAssembly[assembly] = nil
+		end
+	end
 	table.clear(contacts)
 	table.clear(activeParts)
 	table.clear(roots)
@@ -212,15 +236,9 @@ function ShoveFeature.tickWorld(context: MapFeatureKit.Context)
 			activeParts[bumper] = true
 			testBumper(bumper)
 		end
-		for name, enabled in MapFeatures.Spinner.EnabledNames do
-			if group:FindFirstAncestor("SplashdownCourse") ~= nil then
-				continue
-			end
-			local spinner = if enabled then group:FindFirstChild(name, true) else nil
-			if spinner and spinner:IsA("BasePart") then
-				activeParts[spinner] = true
-				testSpinner(spinner)
-			end
+		for _, spinner in spinnersFor(group) do
+			activeParts[spinner] = true
+			testSpinner(spinner)
 		end
 	end
 

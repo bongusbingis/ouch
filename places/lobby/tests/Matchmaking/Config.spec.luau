@@ -98,6 +98,10 @@ return function()
 			end
 		end)
 
+		it("keeps the party record alive longer than an arena session plus Play Again", function()
+			expect(Config.PartyRecordLifetime >= 3600).to.equal(true)
+		end)
+
 		it("separates Studio and live memory store namespaces", function()
 			expect(type(Config.MemoryStoreNamespace)).to.equal("string")
 			expect(#Config.MemoryStoreNamespace > 0).to.equal(true)

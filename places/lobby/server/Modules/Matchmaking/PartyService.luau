@@ -86,6 +86,7 @@ function PartyService.new(
 		_initializing = {},
 		_teleportDispatching = {},
 		_teleportPresentationReady = {},
+		_teleportMatchByUser = {},
 		_appearanceConnections = {},
 		_appearanceRevisions = {},
 		_joinCodeFailures = {},
@@ -223,6 +224,9 @@ function PartyService:_maybeTeleport(party)
 			return
 		end
 		self:_reportFunnel(party.partyId, "Teleporting", { matchId = party.matchId, queueId = party.queueId })
+		for _, player in currentPlayers do
+			self._teleportMatchByUser[player.UserId] = party.matchId
+		end
 		self._teleportCoordinator:TeleportParty(party.matchId, party.partyId, currentPlayers)
 		self._teleportDispatching[party.partyId] = nil
 	end)
@@ -1309,9 +1313,58 @@ function PartyService:HandleTeleportFailure(player)
 	self:_sendError(player, Protocol.Errors.TeleportFailed)
 	AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.MatchmakingTeleportFailed, 1)
 	local partyId = self._localPartyByUser[player.UserId]
-	if partyId then
-		task.spawn(self._moveMemberToSoloParty, self, player, partyId, "TeleportFailed")
+	if not partyId then
+		return
 	end
+
+	local cached = self._cache[partyId]
+	-- Act only on the match this player was actually sent to; a stale retry must not cancel a newer match.
+	local matchId = self._teleportMatchByUser[player.UserId] or (cached and cached.matchId)
+	self._teleportMatchByUser[player.UserId] = nil
+	if
+		cached
+		and cached.phase ~= "Claimed"
+		and cached.phase ~= "Assigned"
+		and cached.phase ~= "Teleporting"
+		and PartyModel.hasMember(cached, player.UserId)
+	then
+		-- An earlier failure already returned this party to the lobby; the player stays with it.
+		return
+	end
+	if not cached or not matchId or (cached.phase ~= "Assigned" and cached.phase ~= "Teleporting") then
+		task.spawn(self._moveMemberToSoloParty, self, player, partyId, "TeleportFailed")
+		return
+	end
+
+	-- Keep the party together: the first failing member returns the whole party to the lobby so it
+	-- can queue again. Later failures of the same match find it already returned and change nothing.
+	task.spawn(function()
+		local decided = false
+		local updated = self._partyRepository:UpdateParty(partyId, function(current)
+			if not current then
+				return nil
+			end
+			decided = true
+			if
+				(current.phase ~= "Assigned" and current.phase ~= "Teleporting")
+				or current.matchId ~= matchId
+				or not PartyModel.hasMember(current, player.UserId)
+			then
+				return nil
+			end
+
+			local nextParty = PartyModel.clone(current)
+			PartyModel.returnToLobby(nextParty)
+			return PartyModel.touch(nextParty, os.time())
+		end)
+
+		if updated then
+			self:NotifyCommitted(updated, "TeleportFailed", player.UserId)
+		elseif not decided then
+			-- The record could not be read or written; fall back to a solo party so the player keeps playing.
+			self:_moveMemberToSoloParty(player, partyId, "TeleportFailed")
+		end
+	end)
 end
 
 function PartyService:HasLocalQueuedParty(queueId)
@@ -1461,6 +1514,7 @@ function PartyService:Start()
 
 	self._players.PlayerRemoving:Connect(function(player)
 		self._teleportPresentationReady[player.UserId] = nil
+		self._teleportMatchByUser[player.UserId] = nil
 		self._joinCodeFailures[player.UserId] = nil
 		self._appearanceRevisions[player.UserId] = (self._appearanceRevisions[player.UserId] or 0) + 1
 		local appearanceConnection = self._appearanceConnections[player]

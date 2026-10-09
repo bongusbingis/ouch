@@ -312,6 +312,7 @@ local function syncPlayers()
 end
 
 local handleMatchEvents: ({ MatchSim.MatchEvent }) -> ()
+local recomputeTeamScores: () -> ()
 
 local function modeContext(): GameMode.ModeContext
 	return {
@@ -330,6 +331,9 @@ local function modeContext(): GameMode.ModeContext
 			if activeMode == nil then
 				return
 			end
+			-- A conversion or a departure that decided the match has not been
+			-- scored yet, and the result clones the scores the moment it ends.
+			recomputeTeamScores()
 			local events: { MatchSim.MatchEvent } = {}
 			if MatchSim.finish(state, activeMode.rules, reason, events, winnerId) then
 				handleMatchEvents(events)
@@ -341,7 +345,7 @@ end
 -- Modes that own their scoreboard (GameMode.teamScore) have it recomputed here
 -- rather than accumulated, so a player leaving, joining or changing side moves
 -- the number the same way an elimination does.
-local function refreshTeamScores()
+function recomputeTeamScores()
 	local activeMode = mode
 	if activeMode == nil or activeMode.teamScore == nil then
 		return
@@ -360,6 +364,20 @@ local function refreshTeamScores()
 	if #events > 0 then
 		handleMatchEvents(events)
 	end
+end
+
+-- The mode hook sits here rather than in recomputeTeamScores because a mode
+-- finishing the match recomputes the scores itself, and would otherwise recurse.
+local function refreshTeamScores()
+	recomputeTeamScores()
+	local activeMode = mode
+	local onRosterChanged = if activeMode then activeMode.onRosterChanged else nil
+	if onRosterChanged == nil or (state.phase ~= "Starting" and state.phase ~= "Active") then
+		return
+	end
+	onRosterChanged(modeContext())
+	-- The hook may have moved someone to another side.
+	recomputeTeamScores()
 end
 
 local function grantSpawnProtection(character: Model)
@@ -458,6 +476,9 @@ function handleMatchEvents(events: { MatchSim.MatchEvent })
 			end
 		elseif event.kind == "MatchStarted" then
 			refreshPopulation()
+			-- A side may have emptied during Starting, when a match cannot be
+			-- finished yet. Deferred so it does not end the match mid-dispatch.
+			task.defer(refreshTeamScores)
 			local activeMode = assert(mode, "[MatchService] MatchStarted without a selected mode")
 			print(`[Match] started — {activeMode.id}`)
 		elseif event.kind == "MatchEnded" then
@@ -649,6 +670,11 @@ local function eliminateVictim(targetId: string?, event: { [string]: any }): boo
 	if player == nil or not EliminationService.down(player, knockbackVelocity(event)) then
 		return false
 	end
+	-- Whatever the player owned would otherwise lie where they fell, and the
+	-- respawn grants a fresh ball: one permanent loose ball per elimination, which
+	-- the ground-spawn cap does not bound. The respawn path re-arms them. Thrown
+	-- balls keep flying so near-simultaneous hits still trade.
+	BallService.clearOwned(player, { keepInFlight = true })
 	local key = PlayerIds.toId(player)
 	local generation = (respawnGeneration[key] or 0) + 1
 	respawnGeneration[key] = generation

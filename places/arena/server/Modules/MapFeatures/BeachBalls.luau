@@ -27,7 +27,6 @@ type BallInfo = {
 local balls: { [BasePart]: BallInfo } = {}
 local initializedAssemblies: { [Instance]: boolean } = {}
 local nextCheckAt = 0
-local mapOrigin: Vector3? = nil
 local warnedNoMapOrigin = false
 local warnedOwnership: { [BasePart]: boolean } = {}
 local pendingOwnership: { [BasePart]: boolean } = {}
@@ -71,12 +70,15 @@ local function getRuntimeFolder(assembly: Model | BasePart): Folder
 	return folder
 end
 
+-- Read per call, never cached: the arena root's projected origin moves when the
+-- ballot swaps the live map.
 local function mapOriginPosition(): Vector3?
-	if mapOrigin then
-		return mapOrigin
-	end
 	local assets = Workspace:FindFirstChild("Assets")
 	local arena = assets and assets:FindFirstChild("Arena")
+	local projected = if arena then arena:GetAttribute("MapOriginPosition") else nil
+	if typeof(projected) == "Vector3" then
+		return projected
+	end
 	local origin = arena and arena:FindFirstChild("MapOrigin")
 	if origin == nil or not origin:IsA("BasePart") then
 		if not warnedNoMapOrigin then
@@ -85,8 +87,7 @@ local function mapOriginPosition(): Vector3?
 		end
 		return nil
 	end
-	mapOrigin = origin.Position
-	return mapOrigin
+	return origin.Position
 end
 
 local function initGroup(assembly: Model)

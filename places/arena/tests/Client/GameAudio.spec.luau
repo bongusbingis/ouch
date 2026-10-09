@@ -49,7 +49,9 @@ return function()
 			Audio.Gameplay.CB051TestCue = { Scope = "World", Volume = -1, AssetIds = { "rbxassetid://1" } }
 			local ok, err = pcall(GameAudio.play, "CB051TestCue", Vector3.zero)
 			expect(ok).to.equal(false)
-			expect(string.find(tostring(err), "Config.Infra.Audio.Gameplay.CB051TestCue.Volume", 1, true) ~= nil).to.equal(true)
+			expect(string.find(tostring(err), "Config.Infra.Audio.Gameplay.CB051TestCue.Volume", 1, true) ~= nil).to.equal(
+				true
+			)
 		end)
 
 		it("requires a World host after validating its cue", function()

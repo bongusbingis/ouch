@@ -80,13 +80,14 @@ local function ensureRecord(player: Player): any
 	return record
 end
 
-local function add(player: Player?, delta: any)
+local function add(player: Player?, delta: any): boolean
 	if player == nil or awardId == nil or not ArenaSessionService.isRoundEligible(player) then
-		return
+		return false
 	end
 	if ensureRecord(player) then
-		PlayerData.addMatchProgress(player, awardId, delta)
+		return PlayerData.addMatchProgress(player, awardId, delta)
 	end
+	return false
 end
 
 local function rewardAmount(category: string, key: string): (number?, string?)
@@ -368,6 +369,12 @@ function ProgressionService.onSummary(listener: (Player, MatchSummary, string) -
 			table.remove(summaryListeners, index)
 		end
 	end
+end
+
+-- Coin pickups: folds Bonks into the player's pending match award, so they are journaled, boosted
+-- like every other match Bonks, and paid once at match end. False when nothing was recorded.
+function ProgressionService.addBonks(player: Player, bonks: number): boolean
+	return add(player, { Bonks = bonks })
 end
 
 function ProgressionService.start(matchService: any)

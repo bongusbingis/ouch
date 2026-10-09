@@ -16,8 +16,11 @@ local ModeRegistry = require(Game:WaitForChild("Modes"):WaitForChild("ModeRegist
 local ScoreTarget = require(Game:WaitForChild("Modes"):WaitForChild("ScoreTarget"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 
+local ArenaMaps = require(Config:WaitForChild("Gameplay"):WaitForChild("ArenaMaps"))
 local AnalyticsConfig = require(Config:WaitForChild("Infra"):WaitForChild("Analytics"))
 local AnalyticsService = require(script.Parent.AnalyticsService)
+local ArenaMapService = require(script.Parent.ArenaMapService)
+local ArenaReturnService = require(script.Parent.ArenaReturnService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
 local MatchService = require(script.Parent.MatchService)
 
@@ -27,21 +30,25 @@ local STATE_FOLDER_NAME = "ModeVoteState"
 local SNAPSHOT_VALUE_NAME = "Snapshot"
 local SNAPSHOT_SCHEMA_VERSION = 1
 local SELECTION_ATTRIBUTE = "ModeVoteSelection"
+local MAP_SELECTION_ATTRIBUTE = "MapVoteSelection"
 local LATE_READY_MINIMUM_SECONDS = Loading.LateVoteMinimumSeconds
 local MAXIMUM_VOTE_EXTENSION_SECONDS = Loading.LateVoteMaximumExtensionSeconds
 
 local snapshotValue: StringValue? = nil
 local vote: ModeVote.State? = nil
+local mapVote: ModeVote.State? = nil
 local voteStartsAt = 0
 local voteEndsAt = 0
 local voteMaximumEndsAt = 0
 local pendingWinner: string? = nil
 local winnerModeId = ""
+local winnerMapId = ""
 local revision = 0
 local deadlineRevision = 0
 local started = false
 local random = Random.new()
 local beginVote: () -> ()
+local strandedReturnPending = false
 
 local function playablePlayers(): { Player }
 	local result = {}
@@ -110,6 +117,12 @@ local function publish()
 		counts[modeId] = counts[modeId] or 0
 	end
 
+	local mapOptions = if mapVote then table.clone(mapVote.options) else ArenaMapService.availableMaps()
+	local mapCounts = if mapVote then ModeVote.counts(mapVote) else {}
+	for _, mapId in mapOptions do
+		mapCounts[mapId] = mapCounts[mapId] or 0
+	end
+
 	revision += 1
 	ensureSnapshotValue().Value = HttpService:JSONEncode({
 		schemaVersion = SNAPSHOT_SCHEMA_VERSION,
@@ -121,6 +134,10 @@ local function publish()
 		voteCounts = counts,
 		scoreTargets = projectedScoreTargets(options),
 		winnerModeId = winnerModeId,
+		mapOptions = mapOptions,
+		mapVoteCounts = mapCounts,
+		winnerMapId = winnerMapId,
+		currentMapId = ArenaMapService.currentMapId(),
 		revision = revision,
 	})
 end
@@ -128,15 +145,43 @@ end
 local function cancelVote()
 	deadlineRevision += 1
 	vote = nil
+	mapVote = nil
 	voteStartsAt = 0
 	voteEndsAt = 0
 	voteMaximumEndsAt = 0
 	pendingWinner = nil
 	winnerModeId = ""
+	winnerMapId = ""
 	for _, player in admittedPlayers() do
 		player:SetAttribute(SELECTION_ATTRIBUTE, nil)
+		player:SetAttribute(MAP_SELECTION_ATTRIBUTE, nil)
 	end
 	publish()
+end
+
+-- When no mode can run for the players still here (everyone else failed to load
+-- or left), nothing will ever open a ballot and the loading overlay never
+-- clears. After a short grace for a late arrival, send them back to the lobby
+-- rather than leave them waiting on a match that cannot start.
+local function returnStrandedPlayers()
+	if strandedReturnPending then
+		return
+	end
+	strandedReturnPending = true
+	task.delay(GameModes.OpponentGraceSeconds, function()
+		strandedReturnPending = false
+		local phase = MatchService.phase()
+		if vote ~= nil or pendingWinner ~= nil or (phase ~= "Idle" and phase ~= "Intermission") then
+			return
+		end
+		if configuredOptions() ~= nil then
+			beginVote()
+			return
+		end
+		for _, player in playablePlayers() do
+			ArenaReturnService.returnPlayer(player)
+		end
+	end)
 end
 
 local function startWinner()
@@ -189,6 +234,7 @@ local function finishVote(expectedRevision: number)
 	local available = configuredOptions()
 	if available == nil then
 		cancelVote()
+		returnStrandedPlayers()
 		return
 	end
 	local eligibleOptions = {}
@@ -211,6 +257,40 @@ local function finishVote(expectedRevision: number)
 	end)
 	winnerModeId = winner
 
+	-- The map ballot resolves with the mode ballot. A failed or refused swap leaves
+	-- the live map in place and the match starts on schedule regardless.
+	local mapChanged = false
+	local activeMapVote = mapVote
+	if activeMapVote then
+		local mapsNow = ArenaMapService.availableMaps()
+		local eligibleMaps = {}
+		for _, option in activeMapVote.options do
+			if table.find(mapsNow, option) then
+				table.insert(eligibleMaps, option)
+			end
+		end
+		if #eligibleMaps > 0 then
+			local eligibleMapVote = ModeVote.new(eligibleMaps)
+			for userId, choice in activeMapVote.votesByUserId do
+				ModeVote.cast(eligibleMapVote, userId, choice)
+			end
+			local winningMap = ModeVote.choose(eligibleMapVote, function(count)
+				return random:NextInteger(1, count)
+			end)
+			local before = ArenaMapService.currentMapId()
+			local called, swapped, swapReason = pcall(ArenaMapService.activate, winningMap)
+			if not called or not swapped then
+				warn(
+					`[ModeVoteService] map "{winningMap}" not activated: {if called
+						then swapReason or "unknown"
+						else swapped}`
+				)
+			end
+			mapChanged = ArenaMapService.currentMapId() ~= before
+		end
+	end
+	winnerMapId = ArenaMapService.currentMapId()
+
 	local counts = ModeVote.counts(activeVote)
 	for _, player in voters do
 		AnalyticsService.logCustomEvent(player, AnalyticsConfig.CustomEvents.ModeVoteResolved, 1, {
@@ -221,13 +301,20 @@ local function finishVote(expectedRevision: number)
 		})
 	end
 	vote = nil
+	mapVote = nil
 	voteStartsAt = 0
 	voteEndsAt = 0
 	voteMaximumEndsAt = 0
 	pendingWinner = winner
 	publish()
 	if MatchService.phase() == "Idle" then
-		startWinner()
+		-- A fresh server resolves its first ballot in Idle and would start the
+		-- match this frame; give a newly swapped map a moment to stream in.
+		if mapChanged then
+			task.delay(ArenaMaps.SwapSettleSeconds, startWinner)
+		else
+			startWinner()
+		end
 	end
 end
 
@@ -244,6 +331,7 @@ beginVote = function()
 	end
 	local options = configuredOptions()
 	if options == nil then
+		returnStrandedPlayers()
 		return
 	end
 
@@ -270,8 +358,12 @@ beginVote = function()
 	voteEndsAt = now + GameModes.VoteDurationSeconds
 	voteMaximumEndsAt = voteEndsAt + MAXIMUM_VOTE_EXTENSION_SECONDS
 	winnerModeId = ""
+	winnerMapId = ""
+	local maps = ArenaMapService.availableMaps()
+	mapVote = if #maps >= 2 then ModeVote.new(maps) else nil
 	for _, player in admittedPlayers() do
 		player:SetAttribute(SELECTION_ATTRIBUTE, nil)
+		player:SetAttribute(MAP_SELECTION_ATTRIBUTE, nil)
 	end
 	publish()
 
@@ -308,7 +400,7 @@ local function finishIfEveryoneVoted()
 	for _, player in playablePlayers() do
 		table.insert(userIds, player.UserId)
 	end
-	if not ModeVote.allVoted(activeVote, userIds) then
+	if not ModeVote.allVoted(activeVote, userIds) or (mapVote and not ModeVote.allVoted(mapVote, userIds)) then
 		return
 	end
 	voteEndsAt = Workspace:GetServerTimeNow()
@@ -334,6 +426,23 @@ local function submitVote(player: Player, modeId: string)
 	finishIfEveryoneVoted()
 end
 
+local function submitMapVote(player: Player, mapId: string)
+	local activeVote = mapVote
+	if vote == nil or activeVote == nil or not ArenaSessionService.isRoundEligible(player) then
+		return
+	end
+	if Workspace:GetServerTimeNow() >= voteEndsAt then
+		finishVote(deadlineRevision)
+		return
+	end
+	if not ModeVote.cast(activeVote, player.UserId, mapId) then
+		return
+	end
+	player:SetAttribute(MAP_SELECTION_ATTRIBUTE, mapId)
+	publish()
+	finishIfEveryoneVoted()
+end
+
 function ModeVoteService.start()
 	if started then
 		return
@@ -349,6 +458,13 @@ function ModeVoteService.start()
 		end,
 	}, submitVote)
 
+	Network.handleProtected("SubmitMapVote", {
+		rateLimit = 6,
+		validate = function(_player, mapId)
+			return typeof(mapId) == "string" and #mapId > 0 and #mapId <= 32, "invalid_map_id"
+		end,
+	}, submitMapVote)
+
 	ArenaSessionService.onGateReleased(function()
 		task.defer(beginVote)
 	end)
@@ -363,9 +479,14 @@ function ModeVoteService.start()
 	end)
 	ArenaSessionService.onRoundEligibilityChanged(function(player, eligible)
 		local activeVote = vote
-		if activeVote and not eligible and ModeVote.remove(activeVote, player.UserId) then
-			player:SetAttribute(SELECTION_ATTRIBUTE, nil)
-			publish()
+		if activeVote and not eligible then
+			local removedMode = ModeVote.remove(activeVote, player.UserId)
+			local removedMap = mapVote ~= nil and ModeVote.remove(mapVote, player.UserId)
+			if removedMode or removedMap then
+				player:SetAttribute(SELECTION_ATTRIBUTE, nil)
+				player:SetAttribute(MAP_SELECTION_ATTRIBUTE, nil)
+				publish()
+			end
 		end
 		if eligible then
 			if activeVote then
@@ -393,8 +514,12 @@ function ModeVoteService.start()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		local activeVote = vote
-		if activeVote and ModeVote.remove(activeVote, player.UserId) then
-			publish()
+		if activeVote then
+			local removedMode = ModeVote.remove(activeVote, player.UserId)
+			local removedMap = mapVote ~= nil and ModeVote.remove(mapVote, player.UserId)
+			if removedMode or removedMap then
+				publish()
+			end
 		end
 		task.defer(function()
 			if #playablePlayers() == 0 and (vote == activeVote or pendingWinner ~= nil) then

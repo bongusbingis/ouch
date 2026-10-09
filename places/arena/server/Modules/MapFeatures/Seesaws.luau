@@ -163,15 +163,6 @@ function Seesaws.tickWorld(context: Kit.Context)
 		if state == nil then
 			state = setup(board)
 			states[board] = state
-		else
-			assert(
-				Parts.axis(board, "SeesawAxis", Config.Seesaw.Axis) == Vector3.xAxis,
-				`[Seesaws] {board:GetFullName()} axle must use local X`
-			)
-			assert(
-				state.hinge.LowerAngle == -85 and state.hinge.UpperAngle == 85,
-				`[Seesaws] {board:GetFullName()} hinge limits changed`
-			)
 		end
 	end
 	for board, state in states do

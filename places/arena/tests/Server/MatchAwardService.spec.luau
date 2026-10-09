@@ -7,7 +7,12 @@ local WriteThroughProxy = require(
 )
 
 local PLAYER_ID = -779005
-local player = { UserId = PLAYER_ID, FindFirstChild = function() return nil end }
+local player = {
+	UserId = PLAYER_ID,
+	FindFirstChild = function()
+		return nil
+	end,
+}
 
 local function fixture(seasonId: string, amount: number): (any, any)
 	local raw = {
@@ -114,7 +119,14 @@ return function()
 				end
 				local applied, reason = PlayerData.applyMatchAward(player :: any, "award")
 				expect(applied).to.equal(false)
-				expect(string.find(reason or "", if failure == "version" then "MatchAwards.Version" else "MatchAwards.Pending.award.SeasonId", 1, true)).to.be.ok()
+				expect(
+					string.find(
+						reason or "",
+						if failure == "version" then "MatchAwards.Version" else "MatchAwards.Pending.award.SeasonId",
+						1,
+						true
+					)
+				).to.be.ok()
 				expect(raw.Level.Points).to.equal(0)
 				expect(raw.Bonks).to.equal(0)
 				expect(record.ProgressionApplied).to.equal(false)
@@ -161,7 +173,11 @@ return function()
 			for _, storedId in { "", "other" } do
 				local raw, replica = fixture("S1", 40)
 				raw.SeasonHistory.S1 = {
-					Id = storedId, XP = 10, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {},
+					Id = storedId,
+					XP = 10,
+					ClaimedFree = {},
+					ClaimedPremium = {},
+					CosmeticClaims = {},
 				}
 				local credited, reason = PlayerData.creditMatchSeasonXp(player :: any, "award")
 				expect(credited).to.equal(false)
@@ -176,10 +192,20 @@ return function()
 			for _, badXp in { 0 / 0, math.huge, -math.huge, 1.5, "20" } do
 				for _, active in { true, false } do
 					local raw, replica = fixture("S1", 40)
-					local target = if active then raw.Season else {
-						Id = "S1", XP = 0, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {},
-					}
-					if active then raw.Season.Id = "S1" else raw.SeasonHistory.S1 = target end
+					local target = if active
+						then raw.Season
+						else {
+							Id = "S1",
+							XP = 0,
+							ClaimedFree = {},
+							ClaimedPremium = {},
+							CosmeticClaims = {},
+						}
+					if active then
+						raw.Season.Id = "S1"
+					else
+						raw.SeasonHistory.S1 = target
+					end
 					target.XP = badXp
 					local credited, reason = PlayerData.creditMatchSeasonXp(player :: any, "award")
 					expect(credited).to.equal(false)
@@ -212,7 +238,8 @@ return function()
 
 		it("accepts old archived numeric and false claim markers without a CosmeticClaims field", function()
 			local raw = fixture("S1", 40)
-			raw.SeasonHistory.S1 = { Id = "S1", XP = 10, ClaimedFree = { [1] = true, ["2"] = false }, ClaimedPremium = {} }
+			raw.SeasonHistory.S1 =
+				{ Id = "S1", XP = 10, ClaimedFree = { [1] = true, ["2"] = false }, ClaimedPremium = {} }
 			expect(PlayerData.creditMatchSeasonXp(player :: any, "award")).to.equal(true)
 			expect(raw.SeasonHistory.S1.XP).to.equal(50)
 			expect(raw.MatchAwards.Pending.award.SeasonApplied).to.equal(true)
@@ -222,7 +249,11 @@ return function()
 			local raw = fixture("S1", 40)
 			for index = 1, 64 do
 				raw.SeasonHistory[`old-{index}`] = {
-					Id = `old-{index}`, XP = 0, ClaimedFree = {}, ClaimedPremium = {}, CosmeticClaims = {},
+					Id = `old-{index}`,
+					XP = 0,
+					ClaimedFree = {},
+					ClaimedPremium = {},
+					CosmeticClaims = {},
 				}
 			end
 			local credited, reason = PlayerData.creditMatchSeasonXp(player :: any, "award")

@@ -462,13 +462,36 @@ local function inHazard(course: SplashdownCourses.LiveCourse, position: Vector3)
 	return false
 end
 
-local function inTrigger(trigger: BasePart, position: Vector3): boolean
-	local offset = trigger.CFrame:PointToObjectSpace(position)
-	local size = trigger.Size
-	return math.abs(offset.X) <= size.X / 2
-		and math.abs(offset.Z) <= size.Z / 2
-		and math.abs(offset.Y) <= size.Y / 2 + Splashdown.TriggerVerticalPadding
+-- Where the straight segment from -> to first enters the trigger box, as a 0..1 fraction of the segment, or
+-- nil if it never touches it (Y padded by TriggerVerticalPadding so a jump through an arch counts).
+local function crossesTrigger(trigger: BasePart, from: Vector3, to: Vector3): number?
+	local a = trigger.CFrame:PointToObjectSpace(from)
+	local d = trigger.CFrame:PointToObjectSpace(to) - a
+	local half = trigger.Size / 2 + Vector3.new(0, Splashdown.TriggerVerticalPadding, 0)
+	local t0, t1 = 0, 1
+	for _, axis in { "X", "Y", "Z" } do
+		local p, v, h = (a :: any)[axis], (d :: any)[axis], (half :: any)[axis]
+		if math.abs(v) < 1e-6 then
+			if math.abs(p) > h then
+				return nil
+			end
+		else
+			local e0, e1 = (-h - p) / v, (h - p) / v
+			t0 = math.max(t0, math.min(e0, e1))
+			t1 = math.min(t1, math.max(e0, e1))
+			if t0 > t1 then
+				return nil
+			end
+		end
+	end
+	return t0
 end
+
+-- Last fully validated Guard sample per root, so credit follows validated motion (weak: roots die).
+local trails: { [BasePart]: { history: any, checkedAt: number, position: Vector3 } } = setmetatable(
+	{},
+	{ __mode = "k" }
+) :: any
 
 local closeRound: () -> ()
 
@@ -517,18 +540,52 @@ local function stepRacing(now: number)
 			splash(player, root)
 			continue
 		end
-		-- Credit progress only from a Guard-accepted position; a teleported root is recovered here instead.
-		if racer.finishTime ~= nil or not MovementGuard.check(root, excluded) then
+		if racer.finishTime ~= nil then
 			continue
 		end
-		local nextCheckpoint = course.checkpoints[racer.checkpoint + 1]
-		if nextCheckpoint and inTrigger(nextCheckpoint.trigger, position) then
-			if RaceRound.reachCheckpoint(current, id, nextCheckpoint.index) then
-				player:SetAttribute(Attributes.Checkpoint, nextCheckpoint.index)
-				fire({ kind = "Checkpoint", playerId = id, index = nextCheckpoint.index })
+		-- Credit progress only from a Guard-accepted position; a teleported root is recovered here instead.
+		local accepted = MovementGuard.check(root, excluded)
+		-- Credit only along the segment between two consecutive fully validated Guard positions (whichever
+		-- caller ran the full check). A sub-0.1 s hop into a trigger and back never lies on it, and a fast
+		-- racer still crosses a 2-stud trigger between samples. A Guard reset (respawn) starts a new trail.
+		local history, checkedAt, safe = MovementGuard.validated(root)
+		if history == nil or checkedAt == nil or safe == nil then
+			continue
+		end
+		local trail = trails[root]
+		if trail == nil or trail.history ~= history then
+			trails[root] = { history = history, checkedAt = checkedAt, position = safe }
+			continue
+		end
+		if trail.checkedAt == checkedAt then
+			continue
+		end
+		local from, fromAt = trail.position, trail.checkedAt
+		trail.checkedAt = checkedAt
+		trail.position = safe
+		if not accepted then
+			continue -- a recovered sample moves the trail but never earns credit
+		end
+		-- One segment can cross several triggers (a checkpoint, then the finish); credit each in order.
+		while racer.finishTime == nil do
+			local nextCheckpoint = course.checkpoints[racer.checkpoint + 1]
+			if nextCheckpoint == nil then
+				local entry = crossesTrigger(course.finishTrigger, from, safe)
+				if entry ~= nil then
+					-- Time the finish at the crossing, not the Guard sample, so close finishes order correctly.
+					local crossedAt = fromAt + entry * (checkedAt - fromAt)
+					finishRacer(player, id, now - math.max(os.clock() - crossedAt, 0))
+				end
+				break
 			end
-		elseif racer.checkpoint >= #course.checkpoints and inTrigger(course.finishTrigger, position) then
-			finishRacer(player, id, now)
+			if
+				crossesTrigger(nextCheckpoint.trigger, from, safe) == nil
+				or not RaceRound.reachCheckpoint(current, id, nextCheckpoint.index)
+			then
+				break
+			end
+			player:SetAttribute(Attributes.Checkpoint, nextCheckpoint.index)
+			fire({ kind = "Checkpoint", playerId = id, index = nextCheckpoint.index })
 		end
 	end
 	if RaceRound.shouldClose(current, now) then
@@ -539,9 +596,21 @@ end
 local nextRound: () -> ()
 
 local function finishRounds()
-	local winner = RacePoints.winner(standings)
+	-- Standings keep every racer who ever scored; only someone still here can win the match.
+	local present: { [string]: boolean } = {}
+	for _, player in Players:GetPlayers() do
+		present[playerId(player)] = true
+	end
+	local contenders: { RacePoints.Standing } = {}
+	for _, standing in standings do
+		if present[standing.playerId] then
+			table.insert(contenders, standing)
+		end
+	end
+	local winner = RacePoints.winner(contenders)
 	updateStats()
-	if not MatchService.finishMatch(winner, "RoundsComplete") then
+	-- "" means nobody won; nil would let MatchSim fall back to its score leader, and a lone 0-point racer leads.
+	if not MatchService.finishMatch(winner or "", "RoundsComplete") then
 		warn("[SplashdownService] the match could not be finished after the last round")
 	end
 end
@@ -679,15 +748,18 @@ local function spawnHandler(character: Model, player: Player?, reason: ArenaServ
 	end
 	release(character)
 	local current = round
-	if current and current.phase == "Racing" then
+	-- A late arrival during Intro or Countdown must be a racer by GO, so register on any open round.
+	if current and current.phase ~= "Closed" then
 		local id = playerId(player)
 		if current.racers[id] == nil then
 			RaceRound.addRacer(current, id)
 			participants[id] = true
 			setRacerAttributes(player, id)
 		end
-		placeCharacter(character, root, respawnTarget(player))
-		return true
+		if current.phase == "Racing" then
+			placeCharacter(character, root, respawnTarget(player))
+			return true
+		end
 	end
 	placeCharacter(character, root, padFor(player))
 	if phase == Phases.Intro or phase == Phases.Countdown or phase == Phases.RoundOver then

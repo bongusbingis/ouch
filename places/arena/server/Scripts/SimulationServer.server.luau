@@ -16,6 +16,7 @@ local ConfigLiveService = require(Modules:WaitForChild("ConfigLiveService"))
 local BallService = require(Modules:WaitForChild("BallService"))
 local ArenaService = require(Modules:WaitForChild("ArenaService"))
 local VenueService = require(Modules:WaitForChild("VenueService"))
+local ArenaMapService = require(Modules:WaitForChild("ArenaMapService"))
 local MatchService = require(Modules:WaitForChild("MatchService"))
 local ModeVoteService = require(Modules:WaitForChild("ModeVoteService"))
 local SplashdownService = require(Modules:WaitForChild("Splashdown"):WaitForChild("SplashdownService"))
@@ -31,6 +32,7 @@ local EconomyService = require(Modules:WaitForChild("EconomyService"))
 local SettingsService = require(Modules:WaitForChild("SettingsService"))
 local CmdrService = require(Modules:WaitForChild("CmdrService"))
 local ThrowUXService = require(Modules:WaitForChild("ThrowUXService"))
+local CoinService = require(Modules:WaitForChild("CoinService"))
 
 local RotatingPlatforms = require(
 	ReplicatedStorage:WaitForChild("Shared")
@@ -43,7 +45,6 @@ local CombatSimServer = require(Adapters:WaitForChild("CombatSimServer"))
 local PlayerIds = require(Adapters:WaitForChild("PlayerIds"))
 local Network = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"))
 local ConfigRoot = ReplicatedStorage:WaitForChild("Config")
-local Combat = require(ConfigRoot:WaitForChild("Gameplay"):WaitForChild("Combat"))
 
 local function forwardDamageFeedback(event)
 	local recipients = {}
@@ -98,11 +99,11 @@ BallService.start()
 -- Without these a match only ever loses balls: every one thrown off the map is
 -- gone for the round, and nothing puts a new one into play.
 local arena = ArenaService.start()
-BallService.startGroundSpawns(arena.ballSpawns)
-BallService.configureRecovery(arena.ballSpawns, arena.origin.Position.Y + Combat.Dodgeball.RecoveryBelowOffset)
+ArenaMapService.bindBalls(arena)
 -- A Splashdown server parks the arena interior here, after the ball supply it
 -- stands down was configured and before the kits look for their folders.
 VenueService.start()
+ArenaMapService.start()
 RotatingPlatforms.startMover()
 MapFeatureService.start() -- inspect the anchored features after this frame's mover
 MatchService.start()
@@ -118,6 +119,7 @@ CharacterColorService.start()
 EconomyService.start()
 SettingsService.start()
 ProgressionService.start(MatchService)
+CoinService.start(MatchService, ProgressionService)
 QuestService.start(MatchService)
 PostMatchService.start()
 CmdrService.start()

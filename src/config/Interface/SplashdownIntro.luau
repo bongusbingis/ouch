@@ -27,12 +27,11 @@ return {
 			},
 		},
 		DoorDash = {
-			Description = "Five doors, three rows, and only two of each row give way. Pick a lane and dash!",
+			Description = "Ride the belts, bounce off the jump pads, and dodge the bumpers and moving platforms on the way to the finish!",
 			Shots = {
 				{ Eye = { -40, 300, 40 }, Look = { 0, 10, 0 }, FieldOfView = 74 },
-				-- Down the corridor's own axis and UNDER its roof: the door rows are the
-				-- shot, and an overhead angle would only show the roof that stops them
-				-- being climbed.
+				-- Down the corridor's own axis and UNDER its roof, so the hazards in the
+				-- corridor are the shot, not the roof above them.
 				{ Eye = { -238, 27, 56 }, Look = { -150, 22, 56 }, FieldOfView = 62 },
 				{ Eye = { -10, 55, -105 }, Look = { -60, 18, -42 }, FieldOfView = 60 },
 			},

@@ -1,4 +1,4 @@
--- Description: In-place port of the projectile spec: swept kinematics, homing clamps, bounce and roll transitions, release sockets, and hit rules.
+-- Description: In-place port of the projectile spec: swept kinematics, homing clamps, bounce and roll transitions, release sockets, charged release speeds, and hit rules.
 
 --!nonstrict
 
@@ -505,6 +505,56 @@ return function()
 				end
 				expect(magnitude).to.be.near(60, 1e-3)
 			end)
+		end)
+
+		local function release(fields)
+			local state = SimTypes.newState()
+			local owner = MockWorld.character(vector.create(0, 2.5, 0), {
+				handPosition = vector.create(0, 1.2, 0),
+				throwPosition = vector.create(0, 1.2, 0),
+			})
+			local world = MockWorld.snapshot({ owner = owner }, {})
+			local ball = makeBall(state, {
+				phase = "Windup",
+				heldBy = "owner",
+				ownerId = "owner",
+				position = owner.handPosition,
+				releaseAim = vector.create(0, 0, 1),
+				windupRemaining = 0,
+			})
+			ball.releaseCharge = fields.releaseCharge
+			local events = {}
+			Projectiles.step(state, world, DT, events)
+			return ball
+		end
+
+		it("releases an uncharged throw at the configured speed", function()
+			local ball = release({})
+			expect(vector.magnitude(ball.velocity)).to.be.near(Combat.Dodgeball.ThrowSpeed, 1e-3)
+		end)
+
+		it("throws a fully charged ball faster", function()
+			local ball = release({ releaseCharge = 1 })
+			local expected = Combat.Dodgeball.ThrowSpeed * Combat.Dodgeball.Charge.MaxSpeedScale
+			expect(vector.magnitude(ball.velocity)).to.be.near(expected, 1e-3)
+		end)
+
+		it("scales charge speed continuously rather than in steps", function()
+			local half = vector.magnitude(release({ releaseCharge = 0.5 }).velocity)
+			local none = vector.magnitude(release({}).velocity)
+			local full = vector.magnitude(release({ releaseCharge = 1 }).velocity)
+			expect(half > none and half < full).to.be.ok()
+		end)
+
+		it("does not let an out-of-range charge exceed the full-charge throw", function()
+			local full = vector.magnitude(release({ releaseCharge = 1 }).velocity)
+			expect(vector.magnitude(release({ releaseCharge = 5 }).velocity)).to.be.near(full, 1e-3)
+		end)
+
+		it("releases flat along the aim the player gave", function()
+			local flat = release({})
+			expect(flat.velocity.y).to.be.near(0, 1e-4)
+			expect(vector.normalize(flat.velocity).x).to.be.near(0, 1e-4)
 		end)
 	end)
 end

@@ -123,10 +123,7 @@ function BigBalls.tickPlayer(context: Kit.Context, player: Player, root: BasePar
 			force.Attachment0 = attachment
 			force.ApplyAtCenterOfMass = true
 			force.RelativeTo = Enum.ActuatorRelativeTo.World
-			force.Force = Vector3.yAxis
-				* root.AssemblyMass
-				* Workspace.Gravity
-				* floatFactor
+			force.Force = Vector3.yAxis * root.AssemblyMass * Workspace.Gravity * floatFactor
 			force.Parent = attachment
 		end
 		Guard.allow(root, "BigBall", settings.MaxFloatSeconds + 1, humanoid.WalkSpeed * 1.3, speed * 1.3, ball)
@@ -142,14 +139,7 @@ function BigBalls.tickPlayer(context: Kit.Context, player: Player, root: BasePar
 		velocity.VectorVelocity = target
 		velocity.Parent = attachment
 		visit.expires = context.now + hold
-		Guard.allow(
-			root,
-			"BigBall",
-			math.max(hold + 0.3, guardSeconds),
-			speed * 1.3,
-			math.max(target.Y, 0) * 1.3,
-			ball
-		)
+		Guard.allow(root, "BigBall", math.max(hold + 0.3, guardSeconds), speed * 1.3, math.max(target.Y, 0) * 1.3, ball)
 	end
 	Network.fire("HazardVisual", nil, ball, "impact", 0.3)
 end

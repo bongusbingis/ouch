@@ -35,10 +35,12 @@ local Quests = {
 		Position = { x = 0.555, y = 0.842 },
 		Size = { x = 0.259, y = 0.224 },
 	},
+	-- `title` is display copy only (CAPS per DEC-030, no mode jargon); ids, goals,
+	-- tracks and rewards are the quest's identity and economy.
 	Definitions = {
 		{
 			id = "elims_5",
-			title = "Get 5 eliminations",
+			title = "GET 5 ELIMINATIONS",
 			goal = 5,
 			steps = 5,
 			reward = { kind = "Bonks", amount = 150 },
@@ -47,7 +49,7 @@ local Quests = {
 		},
 		{
 			id = "catches_3",
-			title = "Catch 3 dodgeballs",
+			title = "CATCH 3 DODGEBALLS",
 			goal = 3,
 			steps = 3,
 			reward = { kind = "Bonks", amount = 125 },
@@ -56,7 +58,7 @@ local Quests = {
 		},
 		{
 			id = "matches_2",
-			title = "Play 2 matches",
+			title = "PLAY 2 MATCHES",
 			goal = 2,
 			steps = 2,
 			reward = { kind = "Bonks", amount = 100 },
@@ -65,7 +67,7 @@ local Quests = {
 		},
 		{
 			id = "wins_1",
-			title = "Win a match",
+			title = "WIN A MATCH",
 			goal = 1,
 			steps = 1,
 			reward = { kind = "Bonks", amount = 200 },
@@ -74,7 +76,7 @@ local Quests = {
 		},
 		{
 			id = "ffa_wins_1",
-			title = "Win a FFA match",
+			title = "WIN A FREE-FOR-ALL",
 			goal = 1,
 			steps = 1,
 			reward = { kind = "Bonks", amount = 225 },
@@ -83,7 +85,7 @@ local Quests = {
 		},
 		{
 			id = "tdm_wins_1",
-			title = "Win a TDM match",
+			title = "WIN A TEAM DEATHMATCH",
 			goal = 1,
 			steps = 1,
 			reward = { kind = "Bonks", amount = 225 },
@@ -92,7 +94,7 @@ local Quests = {
 		},
 		{
 			id = "dodgeball_elims_3",
-			title = "Get 3 dodgeball eliminations",
+			title = "GET 3 DODGEBALL ELIMINATIONS",
 			goal = 3,
 			steps = 3,
 			reward = { kind = "Bonks", amount = 175 },
@@ -101,7 +103,7 @@ local Quests = {
 		},
 		{
 			id = "hammer_elims_3",
-			title = "Get 3 hammer eliminations",
+			title = "GET 3 HAMMER ELIMINATIONS",
 			goal = 3,
 			steps = 3,
 			reward = { kind = "Bonks", amount = 175 },
@@ -110,7 +112,7 @@ local Quests = {
 		},
 		{
 			id = "hammer_hits_5",
-			title = "Hit 5 players with the hammer",
+			title = "HIT 5 PLAYERS WITH THE HAMMER",
 			goal = 5,
 			steps = 5,
 			reward = { kind = "Bonks", amount = 150 },
@@ -119,7 +121,7 @@ local Quests = {
 		},
 		{
 			id = "throws_10",
-			title = "Throw 10 dodgeballs",
+			title = "THROW 10 DODGEBALLS",
 			goal = 10,
 			steps = 10,
 			reward = { kind = "Bonks", amount = 125 },

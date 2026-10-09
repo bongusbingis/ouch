@@ -16,14 +16,14 @@ ray.RespectCanCollide = true
 function Conveyors.tickWorld(context: Kit.Context)
 	local active = {}
 	for _, part in Parts.collect(context.instances, Config.Attributes.Conveyor) do
-		local axis = Parts.axis(part, Config.Attributes.ConveyorAxis, Config.Conveyor.Axis)
-		local speed = Parts.number(part, "ConveyorSpeed", Config.Conveyor.Speed)
 		active[part] = true
 		if not original[part] then
 			original[part] = part.AssemblyLinearVelocity
 		end
 		if lastOrientation[part] ~= part.CFrame then
 			lastOrientation[part] = part.CFrame
+			local axis = Parts.axis(part, Config.Attributes.ConveyorAxis, Config.Conveyor.Axis)
+			local speed = Parts.number(part, "ConveyorSpeed", Config.Conveyor.Speed)
 			part.AssemblyLinearVelocity = part.CFrame:VectorToWorldSpace(axis) * speed
 		end
 	end

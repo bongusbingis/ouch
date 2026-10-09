@@ -47,5 +47,55 @@ T.describe("Season reward composition", function()
 		T.expect(browser.cardsX > browser.tabWidth):toBeTruthy()
 		T.expect(phone.bodyHeight >= browser.tabHeight * 2 + S.ShortGap):toBeTruthy()
 	end)
+	T.it("fits the short-landscape reward preview stack inside its well", function()
+		local measures = {
+			-- Realistic chips: "PREMIUM • TIER 12" / "PREMIUM PASS + TIER 12" / "HAT".
+			{ track = 190, requirement = 240, kind = 40 },
+			-- Longest requirement copy: shares the kind row when the track row is full.
+			{ track = 190, requirement = 340, kind = 90 },
+			-- Nothing shares a row: the requirement takes the kind caption's place.
+			{ track = 190, requirement = 560, kind = 90 },
+		}
+		local modes = {}
+		for _, size in { Vector2.new(750, 304), Vector2.new(667, 375), Vector2.new(844, 390), Vector2.new(960, 540) } do
+			for _, premium in { false, true } do
+				local layout = Layout.resolve(size, premium)
+				T.expect(layout.short):toBeTruthy()
+				for _, measure in measures do
+					local stack = Layout.shortPreview(layout.bodyHeight, layout.previewWidth, measure)
+					if size.X == 750 and size.Y == 304 then
+						modes[stack.mode] = true
+					end
+					local h = layout.bodyHeight
+					T.expect(stack.top >= 0 and stack.top + stack.total <= h):toBeTruthy()
+					T.expect(stack.back.size >= 44 and stack.back.y + stack.back.size <= h):toBeTruthy()
+					T.expect(stack.face.y >= 0 and stack.face.y + stack.face.side <= h):toBeTruthy()
+					T.expect(stack.name.y >= stack.back.y + stack.back.size):toBeTruthy()
+					local nameBottom = stack.name.y + stack.name.height
+					local kindBottom = nameBottom
+					if stack.kind then
+						T.expect(stack.kind.y >= nameBottom):toBeTruthy()
+						kindBottom = stack.kind.y + stack.kind.height
+						T.expect(kindBottom <= h):toBeTruthy()
+					end
+					local r = stack.requirement
+					T.expect(r.y >= 0 and r.y + r.height <= h):toBeTruthy()
+					T.expect(r.x >= stack.columnX and r.x + r.width <= stack.columnX + stack.columnWidth):toBeTruthy()
+					if stack.mode == "TrackRow" then
+						T.expect(r.x >= stack.track.x + math.min(measure.track, stack.track.maxWidth)):toBeTruthy()
+					elseif stack.mode == "KindRow" then
+						T.expect(r.y):toEqual(stack.kind.y)
+						T.expect(r.x >= stack.columnX + stack.kind.width):toBeTruthy()
+					else
+						T.expect(r.y >= kindBottom):toBeTruthy()
+					end
+				end
+			end
+		end
+		-- 750x304 leaves a 126 px well: the roomy two-line stack never applies there.
+		T.expect(Layout.resolve(Vector2.new(750, 304), false).bodyHeight):toEqual(126)
+		T.expect(modes.Stacked):toEqual(nil)
+		T.expect(modes.TrackRow and modes.KindRow and modes.NoKind):toBeTruthy()
+	end)
 end)
 return true

@@ -353,6 +353,32 @@ T.describe("ShopLayout", function()
 		T.expect(overlaps(placements)):toEqual(false)
 		T.expect(bottom > 0):toBeTruthy()
 	end)
+
+	T.it("trades a column rather than leaving an orphan on the last row", function()
+		local class = { MinPx = 184, MaxPx = 420, Aspect = 1, MinHeightPx = 270, MaxHeightPx = 270 }
+		-- Four cards that fit three across would leave one alone: two by two instead.
+		local four = ShopLayout.balancedGrid(650, 4, class, 18, 4)
+		T.expect(four.columns):toEqual(2)
+		T.expect(four.rows):toEqual(2)
+		-- Three cards in a two-wide block become one full column.
+		T.expect(ShopLayout.balancedGrid(415, 3, class, 18, 2).columns):toEqual(1)
+		-- Already-even grids and single rows are untouched.
+		T.expect(ShopLayout.balancedGrid(852, 4, class, 18, 4).columns):toEqual(4)
+		T.expect(ShopLayout.balancedGrid(852, 2, class, 18, 4).rows):toEqual(1)
+	end)
+
+	T.it("finds blocks the packer left alone across their rows", function()
+		local placements = ShopLayout.compact({
+			block("Crates", 6, 300),
+			block("ForYou", 6, 300),
+			block("Bonks", 6, 200),
+		}, TRACKS, GAP)
+		local lone = ShopLayout.loneBlocks(placements, TRACKS)
+		T.expect(#lone):toEqual(1)
+		T.expect(lone[1].id):toEqual("Bonks")
+		local full = ShopLayout.compact({ block("More", 12, 300) }, TRACKS, GAP)
+		T.expect(#ShopLayout.loneBlocks(full, TRACKS)):toEqual(0)
+	end)
 end)
 
 return true

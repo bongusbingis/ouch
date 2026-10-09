@@ -61,6 +61,11 @@ export type GameMode = {
 	onMatchStart: (ctx: ModeContext) -> (),
 	onPlayerSpawned: (ctx: ModeContext, player: Player, isFirstSpawn: boolean) -> (),
 	onElim: (ctx: ModeContext, sourceId: string?, targetId: string?) -> (),
+	-- Optional. MatchService calls this after it recomputes the scoreboard while
+	-- a match is starting or active, i.e. whenever the roster or anyone's side
+	-- changed, so a mode can end or repair a round that a player leaving left
+	-- unwinnable. It must not assume an elimination happened.
+	onRosterChanged: ((ctx: ModeContext) -> ())?,
 	onMatchEnd: (ctx: ModeContext) -> (),
 }
 

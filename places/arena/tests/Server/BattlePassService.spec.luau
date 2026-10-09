@@ -300,20 +300,86 @@ return function()
 
 		it("rejects positive XP and invalid journal preconditions when an archive is absent", function()
 			local cases = {
-				{ "positive XP", function(record) record.Awarded.XP = 1 end, "Awarded.XP" },
+				{
+					"positive XP",
+					function(record)
+						record.Awarded.XP = 1
+					end,
+					"Awarded.XP",
+				},
 				{ "wrong award ID", function() end, "record required" },
 				{ "empty award ID", function() end, "nonempty award ID" },
 				{ "unknown season", function() end, "known nonempty season ID" },
-				{ "missing journal", function(_record, f) f.profile.MatchAwards = nil end, "V1 Pending journal" },
-				{ "wrong journal version", function(_record, f) f.profile.MatchAwards.Version = 2 end, "V1 Pending journal" },
-				{ "missing pending", function(_record, f) f.profile.MatchAwards.Pending = nil end, "V1 Pending journal" },
-				{ "unready", function(record) record.Ready = false end, "ready, progression-applied" },
-				{ "unapplied progression", function(record) record.ProgressionApplied = false end, "ready, progression-applied" },
-				{ "unapplied season", function(record) record.SeasonApplied = false end, "ready, progression-applied" },
-				{ "wrong season", function(record) record.SeasonId = "S2" end, ".SeasonId" },
-				{ "nonnumeric zero", function(record) record.Awarded.XP = "0" end, ".Awarded.XP" },
-				{ "nonfinite zero", function(record) record.Awarded.XP = 0 / 0 end, ".Awarded.XP" },
-				{ "missing awarded", function(record) record.Awarded = nil end, ".Awarded.XP" },
+				{
+					"missing journal",
+					function(_record, f)
+						f.profile.MatchAwards = nil
+					end,
+					"V1 Pending journal",
+				},
+				{
+					"wrong journal version",
+					function(_record, f)
+						f.profile.MatchAwards.Version = 2
+					end,
+					"V1 Pending journal",
+				},
+				{
+					"missing pending",
+					function(_record, f)
+						f.profile.MatchAwards.Pending = nil
+					end,
+					"V1 Pending journal",
+				},
+				{
+					"unready",
+					function(record)
+						record.Ready = false
+					end,
+					"ready, progression-applied",
+				},
+				{
+					"unapplied progression",
+					function(record)
+						record.ProgressionApplied = false
+					end,
+					"ready, progression-applied",
+				},
+				{
+					"unapplied season",
+					function(record)
+						record.SeasonApplied = false
+					end,
+					"ready, progression-applied",
+				},
+				{
+					"wrong season",
+					function(record)
+						record.SeasonId = "S2"
+					end,
+					".SeasonId",
+				},
+				{
+					"nonnumeric zero",
+					function(record)
+						record.Awarded.XP = "0"
+					end,
+					".Awarded.XP",
+				},
+				{
+					"nonfinite zero",
+					function(record)
+						record.Awarded.XP = 0 / 0
+					end,
+					".Awarded.XP",
+				},
+				{
+					"missing awarded",
+					function(record)
+						record.Awarded = nil
+					end,
+					".Awarded.XP",
+				},
 			}
 			for _, case in cases do
 				BattlePassService._resetForTest()
@@ -321,7 +387,9 @@ return function()
 				local record = pendingAward(f, "S1", 0)
 				case[2](record, f)
 				BattlePassService.start(f.options)
-				local awardId = if case[1] == "wrong award ID" then "other" else if case[1] == "empty award ID" then "" else "award"
+				local awardId = if case[1] == "wrong award ID"
+					then "other"
+					else if case[1] == "empty award ID" then "" else "award"
 				local seasonId = if case[1] == "unknown season" then "Retired" else "S1"
 				local settled, reason = BattlePassService.settleArchivedSeason(f.player, seasonId, awardId)
 				expect(settled).to.equal(false)

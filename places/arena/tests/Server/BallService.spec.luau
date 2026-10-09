@@ -121,6 +121,22 @@ return function()
 			expect(#ballsIn(TestAssets.get(Workspace, "Balls"))).to.equal(0)
 		end)
 
+		it("clearOwned keepInFlight removes held balls but spares thrown ones", function()
+			local player = FakePlayer.new(100007)
+			rigFor(player)
+			BallService.grantHeldBall(player)
+			local folder = TestAssets.get(Workspace, "Balls")
+			local held = ballsIn(folder)[1]
+			local thrown = held:Clone()
+			thrown:SetAttribute("ph", 2)
+			thrown.Parent = folder
+
+			expect(BallService.clearOwned(player, { keepInFlight = true })).to.equal(1)
+			expect(held.Parent).never.to.be.ok()
+			expect(thrown.Parent).to.equal(folder)
+			expect(BallService.clearOwned(player)).to.equal(1)
+		end)
+
 		simulationIt("recycles an out-of-bounds ball without replacing its instance", function()
 			local player = FakePlayer.new(100006)
 			rigFor(player)
