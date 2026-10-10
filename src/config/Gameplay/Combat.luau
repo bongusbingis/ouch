@@ -124,9 +124,9 @@ return {
 		HitRecovery = 0.18,
 		MissStunDuration = 0.25,
 		MissStunWalkSpeedScale = 0.25,
-		Range = 7,
-		Width = 4,
-		Height = 5,
+		Range = 9, -- Jack 2026-10-10: +~30% hitbox sidework (was 7/4/5)
+		Width = 5,
+		Height = 6.5,
 		KnockbackSpeed = 85,
 		KnockbackUpSpeed = 25,
 		DashSpeed = 58,

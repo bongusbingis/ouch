@@ -229,6 +229,30 @@ return function()
 			expect(swingEvent(events).magnitude).to.be.near(Combat.Hammer.DashSpeed, 1e-6)
 		end)
 
+		it("hits at the lateral edge of the swing box but not past it", function()
+			local still = command({ assist = { AutoFace = 0, Lunge = 0 } })
+			local edge = Combat.Hammer.Width * 0.5 + 1
+			local function tryLateral(lateral: number): number
+				local arena = world({ e1 = MockWorld.character(vector.create(4, 2.5, lateral), { radius = 1 }) })
+				local state = SimCore.newState()
+				return countEvents(SimCore.step(state, { still }, arena, DT), "HammerHit")
+			end
+			expect(tryLateral(edge - 0.1)).to.equal(1)
+			expect(tryLateral(edge + 0.1)).to.equal(0)
+		end)
+
+		it("hits at the vertical edge of the swing box but not past it", function()
+			local still = command({ assist = { AutoFace = 0, Lunge = 0 } })
+			local edge = Combat.Hammer.Height * 0.5
+			local function tryHeight(dy: number): number
+				local arena = world({ e1 = MockWorld.character(vector.create(4, 2.5 + dy, 0), { radius = 1 }) })
+				local state = SimCore.newState()
+				return countEvents(SimCore.step(state, { still }, arena, DT), "HammerHit")
+			end
+			expect(tryHeight(edge - 0.1)).to.equal(1)
+			expect(tryHeight(edge + 0.1)).to.equal(0)
+		end)
+
 		it("ignores teammates when assisting a swing", function()
 			local state = SimCore.newState()
 			local allies = world({
