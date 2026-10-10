@@ -60,7 +60,8 @@ All systems serve the four highest product priorities: **monetization, engagemen
 - Server-authoritative pickup; the `CoinCollected` remote is server-to-client presentation only.
 - 5 Bonks per coin, capped at 50 Bonks per player per match (base, before boost). The tally resets per match.
 - Live only in the Active phase of combat modes (never Splashdown). Spawns come from each map's `Scriptables.CoinSpawns`; none means no coins and no warning.
-- Bonks are journaled through the existing match award (`ProgressionService.addBonks`), paid once at match end. No saved-data shape change.
+- Bonks are journaled through the existing match award (`ProgressionService.addBonks`), paid once at match end when the match completes and the player is eligible. No saved-data shape change.
+- Coin Bonks pass the match-award participation gate and no-result rules (DEC-038, DEC-041); idle players and matches without a result earn nothing. `Coins.Enabled` is the kill switch.
 **Depends on:** MatchService, ProgressionService, map `CoinSpawns`.
 **Consumers:** Post-match "Your Round" Bonks.
 
