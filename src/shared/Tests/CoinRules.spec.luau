@@ -27,6 +27,14 @@ T.describe("CoinRules", function()
 		T.expect(CoinRules.grant(tally, "b", 5, 50)):toEqual(5)
 	end)
 
+	T.it("pays pending coin Bonks only for a completed, eligible player", function()
+		T.expect(CoinRules.payable(15, true, true)):toEqual(15)
+		T.expect(CoinRules.payable(15, true, false)):toEqual(0)
+		T.expect(CoinRules.payable(15, false, true)):toEqual(0)
+		T.expect(CoinRules.payable(15, false, false)):toEqual(0)
+		T.expect(CoinRules.payable(nil, true, true)):toEqual(0)
+	end)
+
 	T.it("never picks an occupied spawn and returns nil when all are taken", function()
 		local occupied = { [1] = true, [3] = true }
 		for roll = 1, 2 do

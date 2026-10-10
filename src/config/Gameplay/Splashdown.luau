@@ -30,6 +30,10 @@ return {
 	-- Checkpoint and finish triggers are matched on the root, with this much
 	-- vertical slack so a jump through an arch still counts.
 	TriggerVerticalPadding = 4,
+	-- Checkpoint credit waits until the straight move from the last credited
+	-- sample fits the Guard's sustained horizontal speed plus this slack, so a
+	-- burst-tolerated hop into a trigger (and back) earns nothing.
+	CreditSlackStuds = 6,
 	-- Points for first place equal the queue capacity, so a full lobby's winner
 	-- always scores the same number; last place scores 1 and a DNF scores 0.
 	PointsForFirst = 30,

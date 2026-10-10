@@ -9,7 +9,7 @@ local function global(modeId: string, scope: "Player" | "Team", winnerId: string
 	return PostMatchResult.build({
 		resultId = "result-1",
 		modeId = modeId,
-		modeName = if modeId == "FFA" then "Free For All" else "Team Deathmatch",
+		modeName = if modeId == "FFA" then "Free-for-all" else "Team Deathmatch",
 		scoreScope = scope,
 		scoreLabel = scoreLabel or "ELIMS",
 		winnerId = winnerId,
@@ -39,7 +39,7 @@ T.describe("PostMatchResult", function()
 		local result = PostMatchResult.build({
 			resultId = "round",
 			modeId = "FFA",
-			modeName = "Free For All",
+			modeName = "Free-for-all",
 			scoreScope = "Player",
 			scoreLabel = "ELIMS",
 			reason = "TimeCap",
@@ -89,7 +89,7 @@ T.describe("PostMatchResult", function()
 		local result = PostMatchResult.build({
 			resultId = "costume",
 			modeId = "FFA",
-			modeName = "Free For All",
+			modeName = "Free-for-all",
 			scoreScope = "Player",
 			scoreLabel = "ELIMS",
 			winnerId = "10",

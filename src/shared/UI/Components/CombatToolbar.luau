@@ -237,32 +237,42 @@ return function(props: Props)
 				Shadow = false,
 				ZIndex = 54,
 			}),
-			Padding = c("UIPadding", {
-				PaddingLeft = UDim.new(0, T.InputHint.Gap * 2),
-				PaddingRight = UDim.new(0, T.InputHint.Gap * 2),
-				PaddingBottom = UDim.new(0, T.Shape.LipHeight),
-			}),
-			Row = c("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, T.InputHint.Gap),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-			Hint = c(InputHint.Component, {
-				Binding = Input.EmoteWheel,
-				Device = model.deviceClass,
-				Native = { LayoutOrder = 1, ZIndex = 60 },
-			}),
-			Text = c("TextLabel", {
+			-- The row lives in its own frame: a UIListLayout on EmoteHint itself would also
+			-- place the Surface sibling as the first item, a blank cream pill pushing the
+			-- key and label out past the chip.
+			Content = c("Frame", {
 				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 1,
-				LayoutOrder = 2,
 				Size = UDim2.fromScale(0, 1),
-				Font = T.Type.Display,
-				Text = "EMOTES",
-				TextSize = T.Type.HudMinimum,
-				TextColor3 = C.Ink,
-				ZIndex = 60,
+				ZIndex = 54,
+			}, {
+				Padding = c("UIPadding", {
+					PaddingLeft = UDim.new(0, T.InputHint.Gap * 2),
+					PaddingRight = UDim.new(0, T.InputHint.Gap * 2),
+					PaddingBottom = UDim.new(0, T.Shape.LipHeight),
+				}),
+				Row = c("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, T.InputHint.Gap),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+				Hint = c(InputHint.Component, {
+					Binding = Input.EmoteWheel,
+					Device = model.deviceClass,
+					Native = { LayoutOrder = 1, ZIndex = 60 },
+				}),
+				Text = c("TextLabel", {
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundTransparency = 1,
+					LayoutOrder = 2,
+					Size = UDim2.fromScale(0, 1),
+					Font = T.Type.Display,
+					Text = "EMOTES",
+					TextSize = T.Type.HudMinimum,
+					TextColor3 = C.Ink,
+					ZIndex = 60,
+				}),
 			}),
 		})
 	end

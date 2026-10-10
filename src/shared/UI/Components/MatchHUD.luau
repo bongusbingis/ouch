@@ -83,7 +83,7 @@ return function(props)
 				Text = view.clock,
 				Title = true,
 				Size = if short then 26 else 30,
-				Color = if view.remaining <= Config.HUD.UrgentSeconds then C.PinkLip else C.Ink,
+				Color = if view.active and view.remaining <= Config.HUD.UrgentSeconds then C.PinkLip else C.Ink,
 				Native = {
 					Position = UDim2.new(1, -78, 0, 4),
 					Size = UDim2.new(0, 68, 1, if view.teamMode then -28 else -14),
@@ -91,10 +91,13 @@ return function(props)
 			}),
 			Team = if view.teamMode and view.teamId
 				then c(Label, {
-					Text = `YOU: {string.upper(view.teamId)}`,
+					-- The slot under the clock is 72 px wide; longer names (SURVIVORS,
+					-- INFECTED) cannot carry the prefix at the 16 px floor.
+					Text = if #view.teamId <= 4 then `YOU: {string.upper(view.teamId)}` else string.upper(view.teamId),
 					Size = T.Type.HudMinimum,
 					Font = T.Type.CompactLabel,
 					Color = C.InkSoft,
+					Align = Enum.TextXAlignment.Right,
 					Native = { Position = UDim2.new(1, -80, 1, -23), Size = UDim2.fromOffset(72, 20) },
 				})
 				else nil,

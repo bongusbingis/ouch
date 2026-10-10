@@ -131,6 +131,8 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 	if not Budget.step(history.budget, root.Position, now, horizontal, upward, Config.BurstStuds) then
 		return recover(root, history, false)
 	end
+	-- Read-only record for callers that gate rewards on sustained speed (Splashdown credit); not used here.
+	history.limit = horizontal
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = wallExcluded or excluded
@@ -161,13 +163,14 @@ function Guard.check(root: BasePart, excluded: { Instance }): boolean
 end
 
 -- Read-only view of the last fully validated position: the history token (replaced on reset), when the
--- last full check ran (any caller), and the position it accepted or recovered to.
-function Guard.validated(root: BasePart): (any?, number?, Vector3?)
+-- last full check ran (any caller), the position it accepted or recovered to, and the horizontal
+-- studs/s that check allowed (walk tolerance, platforms and live allowances; 0 before the first check).
+function Guard.validated(root: BasePart): (any?, number?, Vector3?, number?)
 	local history = histories[root]
 	if history == nil then
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	end
-	return history, history.checkedAt, history.safe.Position
+	return history, history.checkedAt, history.safe.Position, history.limit or 0
 end
 
 function Guard.takeCorrections(): number

@@ -188,12 +188,21 @@ return function()
 			point.Position = Vector3.new(1000, 5, 1000)
 			point.Parent = Workspace
 
+			-- Pin the environment: a live match can hold WorldBallCap loose balls (replenishment then
+			-- returns early) and the shipped cadence outlasts a short wait. Restored in the finally below.
+			local dodgeball = Combat.Dodgeball
+			local originalCap, originalCadence = dodgeball.WorldBallCap, dodgeball.SpawnCadence
+			dodgeball.WorldBallCap = math.huge
+			dodgeball.SpawnCadence = 0.1
+
 			BallService.start()
 			BallService.startGroundSpawns({ point })
 
 			local folder = TestAssets.get(Workspace, "Balls")
 			local spawned = nil
-			for _ = 1, 120 do
+			-- The poll runs every 0.5s: one pass arms the cadence, a later one spawns.
+			local deadline = os.clock() + 5
+			while os.clock() < deadline do
 				task.wait()
 				-- Only count balls this test's spawn point produced, never a live match's supply.
 				for _, ball in ballsIn(folder) do
@@ -207,28 +216,34 @@ return function()
 				end
 			end
 
-			expect(spawned).to.be.ok()
-			expect(spawned:GetAttribute("ph")).to.equal(5)
-			local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
-			expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
+			local ok, err = pcall(function()
+				expect(spawned).to.be.ok()
+				expect(spawned:GetAttribute("ph")).to.equal(5)
+				local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
+				expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
 
-			local function nearbyCount()
-				local count = 0
-				for _, ball in ballsIn(folder) do
-					if (ball.Position - point.Position).Magnitude < 20 then
-						count += 1
+				local function nearbyCount()
+					local count = 0
+					for _, ball in ballsIn(folder) do
+						if (ball.Position - point.Position).Magnitude < 20 then
+							count += 1
+						end
 					end
+					return count
 				end
-				return count
-			end
-			local before = nearbyCount()
-			for _ = 1, 10 do
-				task.wait()
-			end
-			expect(nearbyCount()).to.equal(before)
+				local before = nearbyCount()
+				for _ = 1, 10 do
+					task.wait()
+				end
+				expect(nearbyCount()).to.equal(before)
+			end)
 
+			dodgeball.WorldBallCap, dodgeball.SpawnCadence = originalCap, originalCadence
 			BallService.stopGroundSpawns()
 			point:Destroy()
+			if not ok then
+				error(err, 0)
+			end
 		end)
 	end)
 end

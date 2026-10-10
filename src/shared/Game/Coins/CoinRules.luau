@@ -14,6 +14,14 @@ function CoinRules.grant(tally: Tally, playerId: string, perCoin: number, cap: n
 	return granted
 end
 
+-- Pending coin Bonks that pay out at match commit: only for a completed (not NoContest), eligible player.
+function CoinRules.payable(pending: number?, completed: boolean, eligible: boolean): number
+	if not completed or not eligible then
+		return 0
+	end
+	return math.max(0, pending or 0)
+end
+
 function CoinRules.atCap(tally: Tally, playerId: string, cap: number): boolean
 	return (tally[playerId] or 0) >= cap
 end

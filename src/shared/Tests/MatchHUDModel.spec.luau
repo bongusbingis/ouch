@@ -27,6 +27,8 @@ T.describe("MatchHUDModel", function()
 		T.expect(view.remaining):toEqual(3)
 		T.expect(view.objective):toEqual("FIRST TO 40 ELIMINATIONS")
 		T.expect(Model.build({ phase = "Active" }, 0).starting):toEqual(false)
+		T.expect(view.active):toEqual(false)
+		T.expect(Model.build({ phase = "Active" }, 0).active):toEqual(true)
 	end)
 	T.it("orders live standings without inventing tie breakers or mutating player facts", function()
 		local players = {
