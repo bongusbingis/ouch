@@ -14,6 +14,9 @@ local Config =
 local Surface = require(script.Parent.HUDSurface)
 local Label = require(script.Parent.HUDLabel)
 local ModalClose = require(script.Parent.Parent.ModalClose)
+local InputHint = require(script.Parent.Parent.InputHint)
+local SCORES =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints.Scores
 local WellScroll = require(script.Parent.Parent.WellScroll)
 local MatchHUDModel = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
 local useSafeArea = require(script.Parent.Parent.Parent.Hooks.useSafeArea)
@@ -24,7 +27,7 @@ local colors = T.ArenaHUD.Colors
 local DISPLAY_FONT = Font.fromEnum(T.Type.Display)
 
 local function row(entry, index: number, height: number, teamMode: boolean, z: number)
-	local textSize = if height < 28 then 14 else 17
+	local textSize = if height < 28 then T.Type.HudMinimum else 17
 	return c("Frame", {
 		BackgroundColor3 = if entry.isLocal then colors.Pink else colors.Claimed,
 		BackgroundTransparency = 0,
@@ -33,7 +36,7 @@ local function row(entry, index: number, height: number, teamMode: boolean, z: n
 		Size = UDim2.new(1, 0, 0, height),
 		ZIndex = z,
 	}, {
-		Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 		Rank = c("TextLabel", {
 			BackgroundTransparency = 1,
 			FontFace = DISPLAY_FONT,
@@ -63,10 +66,10 @@ local function row(entry, index: number, height: number, teamMode: boolean, z: n
 				BackgroundTransparency = 1,
 				Font = T.Type.Label,
 				Position = UDim2.new(1, -56, 0, 0),
-				Size = UDim2.fromOffset(100, height),
+				Size = UDim2.fromOffset(108, height),
 				Text = "RESPAWNING",
 				TextColor3 = colors.Muted,
-				TextSize = textSize - 3,
+				TextSize = T.Type.HudMinimum,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = z + 1,
 			})
@@ -148,7 +151,7 @@ return function(props)
 				Size = UDim2.new(1, 0, 0, rowHeight),
 				ZIndex = z + 2,
 			}, {
-				Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
+				Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 				Text = c(Label, {
 					Text = `{team.label}  {team.score}`,
 					Title = true,
@@ -214,7 +217,7 @@ return function(props)
 					then `  •  FIRST TO {view.target}`
 					else ""),
 				Color = colors.Ink,
-				Size = if short then 13 else 16,
+				Size = T.Type.HudMinimum,
 				Align = Enum.TextXAlignment.Left,
 				Native = {
 					Position = UDim2.fromOffset(inset, if short then 32 else 50),
@@ -224,19 +227,38 @@ return function(props)
 			}),
 			Close = if touch
 				then c(ModalClose, {
+					-- The board is held open by Tab / View, so Esc / B is not its close.
+					Hint = false,
 					Position = UDim2.new(1, -12, 0, 12),
 					SizePx = UI.Interaction.MinTargetPx,
 					OnActivated = props.OnClose,
 					ZIndex = z + 3,
 				})
-				else c(Label, {
-					Text = if string.find(UserInputService:GetLastInputType().Name, "Gamepad")
-						then "HOLD SELECT"
-						else "HOLD TAB",
-					Color = colors.Ink,
-					Size = UI.Text.CaptionMinPx,
-					Align = Enum.TextXAlignment.Right,
-					Native = { Position = UDim2.new(1, -116, 0, 12), Size = UDim2.fromOffset(100, 20), ZIndex = z + 2 },
+				else c("Frame", {
+					AnchorPoint = Vector2.new(1, 0),
+					BackgroundTransparency = 1,
+					Position = UDim2.new(1, -16, 0, 8),
+					Size = UDim2.fromOffset(160, T.InputHint.Size),
+					ZIndex = z + 2,
+				}, {
+					Row = c("UIListLayout", {
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Right,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, T.InputHint.Gap),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+					Hint = c(InputHint.Component, {
+						Binding = SCORES,
+						Native = { LayoutOrder = 1, ZIndex = z + 2 },
+					}),
+					Hold = c(Label, {
+						Text = "HOLD",
+						Color = colors.Ink,
+						Size = T.Type.HudMinimum,
+						Align = Enum.TextXAlignment.Left,
+						Native = { LayoutOrder = 2, Size = UDim2.fromOffset(52, 20), ZIndex = z + 2 },
+					}),
 				}),
 			Columns = c(WellScroll, {
 				Candy = true,
@@ -246,7 +268,7 @@ return function(props)
 					Size = UDim2.new(1, -inset * 2, 1, -headerHeight - footerHeight),
 					CanvasSize = UDim2.fromOffset(0, listHeight),
 					ScrollingDirection = Enum.ScrollingDirection.Y,
-					ScrollBarThickness = 4,
+					ScrollBarThickness = T.Layout.ScrollBar,
 					ScrollBarImageColor3 = colors.Pink,
 					Selectable = false,
 					ZIndex = z + 2,
@@ -255,7 +277,7 @@ return function(props)
 			Footer = c(Label, {
 				Text = view.footer,
 				Color = colors.Ink,
-				Size = UI.Text.CaptionMinPx,
+				Size = T.Type.HudMinimum,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 1),
 					Position = UDim2.new(0.5, 0, 1, if short then -8 else -16),

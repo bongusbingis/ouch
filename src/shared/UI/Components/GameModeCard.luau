@@ -43,7 +43,7 @@ return function(props: Props)
 	local accent = accents[mode.Id] or C.Yellow
 	local shortName = if mode.Id == "Infection" then "INFECT" else string.upper(mode.Id)
 	local cardHeight = props.CardHeight or 350
-	local wellTop = if portrait then 118 else if compact then 104 else 137
+	local wellTop = if portrait then 118 else if compact then 112 else 152
 	local wellBottom = if compact then 70 else 88
 	local actionHeight = if compact then 48 else 56
 	local inset = if compact then 14 else 20
@@ -71,22 +71,29 @@ return function(props: Props)
 			Size = UDim2.new(1, -inset * 2, 0, if compact then 34 else 40),
 			Text = mode.Title,
 			TextColor3 = C.Ink,
-			TextSize = if compact then 23 else 31,
-			TextScaled = false,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextSize = if compact then F.TileLabel else F.Section,
+			-- Long names (TEAM DEATHMATCH) shrink to fit the card down to the menu floor
+			-- instead of truncating.
+			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = 5,
+		}, {
+			Fit = c("UITextSizeConstraint", {
+				MaxTextSize = if compact then F.TileLabel else F.Section,
+				MinTextSize = F.Minimum,
+			}),
 		}),
 		Description = c("TextLabel", {
 			BackgroundTransparency = 1,
 			Font = F.Label,
-			Position = UDim2.fromOffset(inset, if compact then 62 else 84),
-			Size = UDim2.new(1, -inset * 2, 0, if portrait then 52 else if compact then 37 else 44),
+			Position = UDim2.fromOffset(inset, if compact then 62 else 80),
+			-- Room for three wrapped lines at the 18 px floor so no description clips mid-sentence.
+			Size = UDim2.new(1, -inset * 2, 0, if portrait then 52 else if compact then 44 else 66),
 			Text = if compact
 				then string.match(mode.Description, "^[^.]+[.]?") or mode.Description
 				else mode.Description,
 			TextColor3 = C.InkSoft,
-			TextSize = if compact then 18 else 20,
+			TextSize = F.Minimum,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
@@ -127,8 +134,13 @@ return function(props: Props)
 					Text = shortName,
 					TextColor3 = C.Ink,
 					TextSize = if compact then 48 else 70,
-					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextScaled = true,
 					ZIndex = 8,
+				}, {
+					Fit = c("UITextSizeConstraint", {
+						MaxTextSize = if compact then 48 else 70,
+						MinTextSize = F.Minimum,
+					}),
 				}),
 				Art = if art
 					then c("ImageLabel", {
@@ -154,19 +166,21 @@ return function(props: Props)
 						Size = UDim2.fromScale(1, 1),
 						Text = VoteModel.formatVoteCount(mode.VoteCount),
 						TextColor3 = C.Ink,
-						TextSize = 18,
+						TextSize = F.Minimum,
 						ZIndex = 11,
 					}),
 				}),
 			}),
 		}),
+		-- Top-right of the card, level with the accent bar, so it never shares the
+		-- artwork well with the vote-count pill.
 		Selection = if mode.Selected and not compact
 			then c("Frame", {
 				AnchorPoint = Vector2.new(1, 0),
 				BackgroundColor3 = C.Yellow,
 				BorderSizePixel = 0,
-				Position = UDim2.new(1, -inset - 10, 0, wellTop + 16),
-				Size = UDim2.fromOffset(118, 32),
+				Position = UDim2.new(1, -inset, 0, 8),
+				Size = UDim2.fromOffset(118, 30),
 				Rotation = -3,
 				ZIndex = 10,
 			}, {
@@ -178,7 +192,7 @@ return function(props: Props)
 					Size = UDim2.fromScale(1, 1),
 					Text = "YOUR PICK",
 					TextColor3 = C.Ink,
-					TextSize = 18,
+					TextSize = F.Minimum,
 					ZIndex = 11,
 				}),
 			})
@@ -187,11 +201,12 @@ return function(props: Props)
 			ButtonRef = props.ButtonRef,
 			Enabled = props.Enabled,
 			EntranceDelay = (mode.SortOrder - 1) * 0.025,
+			FocusHint = true,
 			Color = if mode.Selected then C.Yellow else C.Pink,
 			LipColor = if mode.Selected then C.YellowLip else C.PinkLip,
 			Text = if mode.Selected then "VOTED" else "VOTE",
 			TextColor = if mode.Selected then C.Ink else C.Surface,
-			TextSize = if compact then 23 else 27,
+			TextSize = if compact then F.TileLabel else F.Tab,
 			Native = {
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.new(0.5, 0, 1, if compact then -14 else -20),

@@ -82,6 +82,8 @@ return {
 			TargetOffset = Vector3.zero,
 			Scale = 0.8,
 			RotationDegrees = -20,
+			-- Fixed Z lean so the head reads; framing uses the tilted bounding box.
+			TiltDegrees = -35,
 			SpinDegreesPerSecond = 12,
 		},
 	},

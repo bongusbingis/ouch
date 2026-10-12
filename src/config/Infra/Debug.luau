@@ -69,7 +69,7 @@ return {
 	-- Studio-only: the matchmaking queue a direct (non-teleported) arena play
 	-- session pretends it came from, so a Splashdown server can be tested without
 	-- the lobby. "Arena" or "Splashdown"; live servers always read the teleport.
-	StudioQueue = "Splashdown",
+	StudioQueue = "Arena",
 
 	-- Adds a handful of non-persisted example settings (both toggle variants,
 	-- every slider mode, a disabled row, and a Lobby-only row) to the real

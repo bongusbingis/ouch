@@ -13,6 +13,9 @@ local CandySurface = require(script.Parent.CandySurface)
 local WeaponViewport = require(script.Parent.WeaponViewport)
 local Label = require(script.Parent.Arena.HUDLabel)
 local UIFeedback = require(script.Parent.Parent.Services.UIFeedback)
+local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
+local InputHint = require(script.Parent.InputHint)
+local Input = require(RS:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input"))
 local c, C = React.createElement, T.Colors
 
 local function ActionSlot(props)
@@ -64,7 +67,7 @@ local function ActionSlot(props)
 			Surface = c(CandySurface, {
 				Color = if muted then C.Well else if slot.selected then C.Pink else C.SurfaceWarm,
 				LipColor = if slot.selected and not muted then C.PinkLip else C.WellLine,
-				Radius = T.ArenaHUD.ControlRadius,
+				Radius = T.Shape.RadiusCard,
 				Shadow = false,
 				ZIndex = 0,
 			}),
@@ -85,16 +88,19 @@ local function ActionSlot(props)
 			}),
 			Title = c(Label, {
 				Text = if kind == "Locked" then "LOCKED" elseif kind == "Unavailable" then "NO BALL" else slot.title,
-				Size = if touch then 16 else 18,
-				Minimum = 14,
+				Size = if touch then T.Type.HudMinimum else T.Type.Minimum,
+				Minimum = T.Type.HudMinimum,
 				Color = if muted then C.InkSoft else C.Ink,
 				Native = { Position = UDim2.new(0, 4, 1, -24), Size = UDim2.new(1, -8, 0, 18), ZIndex = 7 },
 			}),
-			Key = if not touch and slot.inputLabel
-				then c(Label, {
-					Text = slot.inputLabel,
-					Size = 13,
-					Native = { Position = UDim2.fromOffset(6, 3), Size = UDim2.fromOffset(32, 18), ZIndex = 7 },
+			Key = if not touch
+				then c(InputHint.Component, {
+					Binding = Input.WeaponEquip[slot.weapon],
+					Device = props.Device,
+					Native = {
+						Position = UDim2.fromOffset(T.InputHint.CornerInset, T.InputHint.CornerInset),
+						ZIndex = 9,
+					},
 				})
 				else nil,
 			Selected = if slot.selected
@@ -203,9 +209,71 @@ return function(props: Props)
 			Slot = slot,
 			Order = index,
 			Touch = touch,
+			Device = model.deviceClass,
 			Width = size.X,
 			OnEquip = props.OnEquip,
 			ItemId = if slot.weapon == "Hammer" then props.HammerItemId else props.BallItemId,
+		})
+	end
+	-- Keyboard/gamepad: the emote wheel's hold key as a passive "[B] EMOTES" chip
+	-- left of the slots (touch keeps its tappable launcher beside the toolbar).
+	-- It sits outside the slot list so the UIListLayout never places it.
+	local emoteBlocked = EmoteWheelController.useBlocked()
+	local rootChildren: { [string]: any } = {
+		Slots = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 50 }, children),
+	}
+	if not touch and not emoteBlocked then
+		rootChildren.EmoteHint = c("Frame", {
+			AnchorPoint = Vector2.new(1, 0.5),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0, -T.ArenaHUD.Gap, 0.5, 0),
+			Size = UDim2.fromOffset(0, T.Layout.MinTarget),
+			ZIndex = 54,
+		}, {
+			Surface = c(CandySurface, {
+				Color = C.SurfaceWarm,
+				LipColor = C.WellLine,
+				Shadow = false,
+				ZIndex = 54,
+			}),
+			-- The row lives in its own frame: a UIListLayout on EmoteHint itself would also
+			-- place the Surface sibling as the first item, a blank cream pill pushing the
+			-- key and label out past the chip.
+			Content = c("Frame", {
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(0, 1),
+				ZIndex = 54,
+			}, {
+				Padding = c("UIPadding", {
+					PaddingLeft = UDim.new(0, T.InputHint.Gap * 2),
+					PaddingRight = UDim.new(0, T.InputHint.Gap * 2),
+					PaddingBottom = UDim.new(0, T.Shape.LipHeight),
+				}),
+				Row = c("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, T.InputHint.Gap),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+				Hint = c(InputHint.Component, {
+					Binding = Input.EmoteWheel,
+					Device = model.deviceClass,
+					Native = { LayoutOrder = 1, ZIndex = 60 },
+				}),
+				Text = c("TextLabel", {
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundTransparency = 1,
+					LayoutOrder = 2,
+					Size = UDim2.fromScale(0, 1),
+					Font = T.Type.Display,
+					Text = "EMOTES",
+					TextSize = T.Type.HudMinimum,
+					TextColor3 = C.Ink,
+					ZIndex = 60,
+				}),
+			}),
 		})
 	end
 	return c("Frame", {
@@ -216,5 +284,5 @@ return function(props: Props)
 		Position = UDim2.fromOffset(position.X, position.Y),
 		Size = UDim2.fromOffset(size.X, size.Y),
 		ZIndex = 50,
-	}, children)
+	}, rootChildren)
 end

@@ -93,6 +93,12 @@ return {
 				"rbxassetid://93903966058481",
 			},
 		},
+		-- Coin pickup ("Coin Collect", 0.87 s, Creator Store free audio).
+		CoinPickup = {
+			Scope = "Local",
+			Volume = 1,
+			AssetIds = { "rbxassetid://135483737426662" },
+		},
 		OnboardingStepStart = {
 			Scope = "Local",
 			Volume = 0.5,

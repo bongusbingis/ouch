@@ -22,6 +22,7 @@ local RacePoints = require(Race:WaitForChild("RacePoints"))
 local CourseSequence = require(Race:WaitForChild("CourseSequence"))
 local DoorPlan = require(Race:WaitForChild("DoorPlan"))
 local SplashdownState = require(Race:WaitForChild("SplashdownState"))
+local RaceTrail = require(Race:WaitForChild("RaceTrail"))
 
 local ArenaService = require(script.Parent.Parent.ArenaService)
 local ArenaSessionService = require(script.Parent.Parent.ArenaSessionService)
@@ -36,7 +37,7 @@ local MODE_ID = "Splashdown"
 local Phases = SplashdownState.Phases
 local Attributes = Splashdown.Attributes
 
-type Hold = { character: Model, root: BasePart }
+type Hold = { character: Model, root: BasePart, at: CFrame }
 type Pending = { generation: number }
 
 local active = false
@@ -148,7 +149,7 @@ end
 
 local function hold(character: Model, root: BasePart)
 	root.Anchored = true
-	holds[character] = { character = character, root = root }
+	holds[character] = { character = character, root = root, at = root.CFrame }
 end
 
 local function release(character: Model)
@@ -158,8 +159,10 @@ local function release(character: Model)
 	end
 	holds[character] = nil
 	if held.root.Parent ~= nil then
+		-- Re-seat on the server-known spot: a client may have moved its own anchored root while held,
+		-- and the Guard reset below must not adopt that displacement as the new baseline.
+		placeCharacter(held.character, held.root, held.at)
 		held.root.Anchored = false
-		MovementGuard.reset(held.root)
 	end
 end
 
@@ -462,13 +465,37 @@ local function inHazard(course: SplashdownCourses.LiveCourse, position: Vector3)
 	return false
 end
 
-local function inTrigger(trigger: BasePart, position: Vector3): boolean
-	local offset = trigger.CFrame:PointToObjectSpace(position)
-	local size = trigger.Size
-	return math.abs(offset.X) <= size.X / 2
-		and math.abs(offset.Z) <= size.Z / 2
-		and math.abs(offset.Y) <= size.Y / 2 + Splashdown.TriggerVerticalPadding
+-- Where the straight segment from -> to first enters the trigger box, as a 0..1 fraction of the segment, or
+-- nil if it never touches it (Y padded by TriggerVerticalPadding so a jump through an arch counts).
+local function crossesTrigger(trigger: BasePart, from: Vector3, to: Vector3): number?
+	local a = trigger.CFrame:PointToObjectSpace(from)
+	local d = trigger.CFrame:PointToObjectSpace(to) - a
+	local half = trigger.Size / 2 + Vector3.new(0, Splashdown.TriggerVerticalPadding, 0)
+	local t0, t1 = 0, 1
+	for _, axis in { "X", "Y", "Z" } do
+		local p, v, h = (a :: any)[axis], (d :: any)[axis], (half :: any)[axis]
+		if math.abs(v) < 1e-6 then
+			if math.abs(p) > h then
+				return nil
+			end
+		else
+			local e0, e1 = (-h - p) / v, (h - p) / v
+			t0 = math.max(t0, math.min(e0, e1))
+			t1 = math.min(t1, math.max(e0, e1))
+			if t0 > t1 then
+				return nil
+			end
+		end
+	end
+	return t0
 end
+
+-- Last fully validated Guard sample and credit anchor per root, so credit follows validated motion at a
+-- sustainable speed (weak: roots die).
+local trails: { [BasePart]: { history: any, checkedAt: number, credit: RaceTrail.Trail } } = setmetatable(
+	{},
+	{ __mode = "k" }
+) :: any
 
 local closeRound: () -> ()
 
@@ -490,6 +517,59 @@ local function finishRacer(player: Player, id: string, now: number)
 	setRacerAttributes(player, id)
 	fire({ kind = "Finish", playerId = id, placement = placement, time = time })
 	publish()
+end
+
+-- Credits a released path segment by segment, carrying the racer's checkpoint forward; one segment can
+-- cross several triggers (a checkpoint, then the finish).
+local function creditPath(player: Player, id: string, points: { Vector3 }, times: { number }, now: number)
+	local course = live
+	local current = round
+	local racer = if current then current.racers[id] else nil
+	if course == nil or current == nil or racer == nil then
+		return
+	end
+	for index = 1, #points - 1 do
+		local from, to = points[index], points[index + 1]
+		local fromAt, toAt = times[index], times[index + 1]
+		while racer.finishTime == nil do
+			local nextCheckpoint = course.checkpoints[racer.checkpoint + 1]
+			if nextCheckpoint == nil then
+				local entry = crossesTrigger(course.finishTrigger, from, to)
+				if entry ~= nil then
+					-- Time the finish at the crossing, not the Guard sample, so close finishes order correctly.
+					local crossedAt = fromAt + entry * (toAt - fromAt)
+					finishRacer(player, id, now - math.max(os.clock() - crossedAt, 0))
+				end
+				break
+			end
+			if
+				crossesTrigger(nextCheckpoint.trigger, from, to) == nil
+				or not RaceRound.reachCheckpoint(current, id, nextCheckpoint.index)
+			then
+				break
+			end
+			player:SetAttribute(Attributes.Checkpoint, nextCheckpoint.index)
+			fire({ kind = "Checkpoint", playerId = id, index = nextCheckpoint.index })
+		end
+		if racer.finishTime ~= nil then
+			return
+		end
+	end
+end
+
+-- Credits whatever a racer's trail still queues. With fit (a splash ends the trail) only when it fits the
+-- sustained-speed budget as of now, the same bound a later sample would apply; without fit (the round is
+-- closing) unconditionally, so a crossing in the last moments is not turned into a DNF.
+local function flushTrail(player: Player, root: BasePart, fit: boolean)
+	local trail = trails[root]
+	local history = MovementGuard.validated(root)
+	if trail == nil or trail.history ~= history then
+		return
+	end
+	local points, times = RaceTrail.flush(trail.credit, os.clock(), fit)
+	if points and times then
+		creditPath(player, playerId(player), points :: any, times, Workspace:GetServerTimeNow())
+	end
 end
 
 local function stepRacing(now: number)
@@ -514,6 +594,9 @@ local function stepRacing(now: number)
 		end
 		local position = root.Position
 		if inHazard(course, position) then
+			if racer.finishTime == nil then
+				flushTrail(player, root, true)
+			end
 			splash(player, root)
 			continue
 		end
@@ -521,14 +604,37 @@ local function stepRacing(now: number)
 		if racer.finishTime ~= nil or not MovementGuard.check(root, excluded) then
 			continue
 		end
-		local nextCheckpoint = course.checkpoints[racer.checkpoint + 1]
-		if nextCheckpoint and inTrigger(nextCheckpoint.trigger, position) then
-			if RaceRound.reachCheckpoint(current, id, nextCheckpoint.index) then
-				player:SetAttribute(Attributes.Checkpoint, nextCheckpoint.index)
-				fire({ kind = "Checkpoint", playerId = id, index = nextCheckpoint.index })
-			end
-		elseif racer.checkpoint >= #course.checkpoints and inTrigger(course.finishTrigger, position) then
-			finishRacer(player, id, now)
+		-- Credit progress only from a Guard-accepted position; a teleported root is recovered here instead.
+		local accepted = MovementGuard.check(root, excluded)
+		-- Credit only along validated Guard positions (whichever caller ran the full check), released by
+		-- RaceTrail once the path since the last credit fits the Guard's sustained horizontal speed plus a
+		-- banked CreditSlackStuds. The Guard's 32-stud burst can accept a hop into a trigger; that sample
+		-- waits until the racer could have run there. A fast racer still crosses a 2-stud trigger between
+		-- samples, and a held path is credited late, segment by segment, never dropped. A Guard reset
+		-- (respawn, release) starts a new trail.
+		local history, checkedAt, safe, limit = MovementGuard.validated(root)
+		if history == nil or checkedAt == nil or safe == nil then
+			continue
+		end
+		local trail = trails[root]
+		if trail == nil or trail.history ~= history then
+			trails[root] = {
+				history = history,
+				checkedAt = checkedAt,
+				credit = RaceTrail.new(checkedAt, safe, Splashdown.CreditSlackStuds),
+			}
+			continue
+		end
+		if trail.checkedAt == checkedAt then
+			continue
+		end
+		trail.checkedAt = checkedAt
+		if not accepted then
+			continue -- a recovered sample is neither queued nor credited
+		end
+		local points, times = RaceTrail.advance(trail.credit, checkedAt, safe, limit or 0)
+		if points and times then
+			creditPath(player, id, points :: any, times, now)
 		end
 	end
 	if RaceRound.shouldClose(current, now) then
@@ -539,9 +645,21 @@ end
 local nextRound: () -> ()
 
 local function finishRounds()
-	local winner = RacePoints.winner(standings)
+	-- Standings keep every racer who ever scored; only someone still here can win the match.
+	local present: { [string]: boolean } = {}
+	for _, player in Players:GetPlayers() do
+		present[playerId(player)] = true
+	end
+	local contenders: { RacePoints.Standing } = {}
+	for _, standing in standings do
+		if present[standing.playerId] then
+			table.insert(contenders, standing)
+		end
+	end
+	local winner = RacePoints.winner(contenders)
 	updateStats()
-	if not MatchService.finishMatch(winner, "RoundsComplete") then
+	-- "" means nobody won; nil would let MatchSim fall back to its score leader, and a lone 0-point racer leads.
+	if not MatchService.finishMatch(winner or "", "RoundsComplete") then
 		warn("[SplashdownService] the match could not be finished after the last round")
 	end
 end
@@ -551,6 +669,13 @@ closeRound = function()
 	local course = live
 	if current == nil or course == nil or current.phase ~= "Racing" then
 		return
+	end
+	for _, player in Players:GetPlayers() do
+		local racer = current.racers[playerId(player)]
+		local root = rootOf(player.Character)
+		if racer and racer.finishTime == nil and root and not pendingRespawns[player] then
+			flushTrail(player, root, false)
+		end
 	end
 	freezeLava(Workspace:GetServerTimeNow())
 	local outcome = RaceRound.close(current)
@@ -679,15 +804,18 @@ local function spawnHandler(character: Model, player: Player?, reason: ArenaServ
 	end
 	release(character)
 	local current = round
-	if current and current.phase == "Racing" then
+	-- A late arrival during Intro or Countdown must be a racer by GO, so register on any open round.
+	if current and current.phase ~= "Closed" then
 		local id = playerId(player)
 		if current.racers[id] == nil then
 			RaceRound.addRacer(current, id)
 			participants[id] = true
 			setRacerAttributes(player, id)
 		end
-		placeCharacter(character, root, respawnTarget(player))
-		return true
+		if current.phase == "Racing" then
+			placeCharacter(character, root, respawnTarget(player))
+			return true
+		end
 	end
 	placeCharacter(character, root, padFor(player))
 	if phase == Phases.Intro or phase == Phases.Countdown or phase == Phases.RoundOver then
@@ -763,7 +891,10 @@ end
 
 function SplashdownService.stateForAdmin(): { [string]: any }
 	local current = round
-	local total, finished = if current then RaceRound.counts(current) else 0, 0
+	local total, finished = 0, 0
+	if current then
+		total, finished = RaceRound.counts(current)
+	end
 	return {
 		active = active,
 		phase = phase,

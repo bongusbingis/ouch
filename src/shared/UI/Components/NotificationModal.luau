@@ -19,6 +19,7 @@ local Selection = require(script.Parent.Parent.Services.Selection)
 local modalSurface = require(script.Parent.ModalSurface)
 
 local CandyTitle = require(script.Parent.CandyTitle)
+local ModalClose = require(script.Parent.ModalClose)
 local c = React.createElement
 local CandyPanel = require(script.Parent.CandyPanel)
 
@@ -40,15 +41,24 @@ export type Props = {
 	FocusEnabled: boolean?,
 }
 
+local BUTTON_HEIGHT = 54
+local BUTTON_GAP = 12
+-- A lone action is the one thing to press, so it is the pink primary; a pair keeps its authored colours.
+local SINGLE_BUTTON_MAX_WIDTH = 420
+local BODY_GAP = 12
+local FOOTER_GAP = 16
+
 local function notificationButton(
 	definition: ButtonDefinition,
 	order: number,
 	onChoose: (any) -> (),
 	buttonRef: any?,
 	columns: number,
-	height: number
+	primary: boolean
 )
-	local red = definition.Color == "Red"
+	local red = primary or definition.Color == "Red"
+	local column = (order - 2) % columns
+	local row = math.floor((order - 2) / columns)
 	return c(ShopPriceButton, {
 		ButtonRef = buttonRef,
 		EntranceDelay = (order - 2) * 0.025,
@@ -57,13 +67,9 @@ local function notificationButton(
 		TextSize = 24,
 		LayoutOrder = order,
 		AnchorPoint = Vector2.zero,
-		Position = UDim2.new(
-			((order - 2) % columns) / columns,
-			0,
-			0,
-			math.floor((order - 2) / columns) * (height + 12)
-		),
-		Size = UDim2.new(1 / columns, -12, 0, height),
+		-- Columns share the row exactly: width = (W - gap * (columns - 1)) / columns.
+		Position = UDim2.new(column / columns, column * BUTTON_GAP / columns, 0, row * (BUTTON_HEIGHT + BUTTON_GAP)),
+		Size = UDim2.new(1 / columns, -BUTTON_GAP * (columns - 1) / columns, 0, BUTTON_HEIGHT),
 		ZIndex = 136,
 		OnActivated = function()
 			onChoose(definition.Value)
@@ -118,29 +124,30 @@ return function(props: Props)
 	end
 
 	local inset = T.Layout.Inset
-	local titleSize = if panelSize.X < 500 then 28 else 38
+	local closeSize = T.Layout.MinTarget
+	local titleSize = T.Type.ModalTitle
+	-- The title sticker stops short of the close button instead of running under it.
+	local titleWidth = panelSize.X - inset * 2 - closeSize - T.Layout.CompactGap
 	local titleHeight = math.max(
 		60,
-		TextService:GetTextSize(
-			request.Title,
-			titleSize,
-			T.Type.Display,
-			Vector2.new(panelSize.X - inset * 2 - 36, 10000)
-		).Y + 20
+		TextService:GetTextSize(request.Title, titleSize, T.Type.Display, Vector2.new(titleWidth - 36, 10000)).Y + 20
 	)
 	local descriptionHeight = TextService:GetTextSize(
 		request.Description,
 		T.Type.Body,
 		T.Type.Label,
 		Vector2.new(panelSize.X - inset * 2 - 16, 10000)
-	).Y + 16
-	local columns = math.max(1, math.min(#request.Buttons, math.floor((panelSize.X - inset * 2) / 150)))
-	local buttonHeight = 54
-	local footerHeight = math.ceil(math.max(#request.Buttons, 1) / columns) * (buttonHeight + 12) - 12
-	local desired = titleHeight + descriptionHeight + footerHeight + inset * 3
-	panelSize = Vector2.new(panelSize.X, math.min(safeArea.size.Y - 32, math.max(280, desired)))
-	local bodyTop = inset + titleHeight + 12
-	local bodyHeight = math.max(44, panelSize.Y - bodyTop - footerHeight - inset * 2)
+	).Y + 8
+	local single = #request.Buttons == 1
+	local contentWidth = panelSize.X - inset * 2
+	local columns = math.max(1, math.min(#request.Buttons, math.floor(contentWidth / 150)))
+	local footerWidth = if single then math.min(contentWidth, SINGLE_BUTTON_MAX_WIDTH) else contentWidth
+	local footerHeight = math.ceil(math.max(#request.Buttons, 1) / columns) * (BUTTON_HEIGHT + BUTTON_GAP) - BUTTON_GAP
+	-- The panel hugs its content (title, message, actions); only a very long message scrolls.
+	local bodyTop = inset + titleHeight + BODY_GAP
+	local desired = bodyTop + descriptionHeight + FOOTER_GAP + footerHeight + inset
+	panelSize = Vector2.new(panelSize.X, math.min(safeArea.size.Y - 32, desired))
+	local bodyHeight = math.max(44, panelSize.Y - bodyTop - FOOTER_GAP - footerHeight - inset)
 	local buttons = {}
 	for index, definition in request.Buttons do
 		buttons[`Button{index}`] = notificationButton(
@@ -149,7 +156,7 @@ return function(props: Props)
 			props.OnChoose,
 			if index == 1 then firstButtonRef else nil,
 			columns,
-			buttonHeight
+			single
 		)
 	end
 
@@ -163,6 +170,10 @@ return function(props: Props)
 		Text = "",
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 130,
+		-- A tap outside the card dismisses it; the panel below is Active so taps on it never reach here.
+		[React.Event.Activated] = function()
+			props.OnChoose(false)
+		end,
 	}, {
 		Panel = c(CandyPanel, {
 			Active = true,
@@ -189,9 +200,17 @@ return function(props: Props)
 				TextSize = titleSize,
 				Native = {
 					Position = UDim2.fromOffset(inset, inset),
-					Size = UDim2.new(1, -inset * 2, 0, titleHeight),
+					Size = UDim2.fromOffset(titleWidth, titleHeight),
 					ZIndex = 134,
 				},
+			}),
+			Close = c(ModalClose, {
+				Position = UDim2.new(1, -inset, 0, inset + (titleHeight - closeSize) / 2),
+				SizePx = closeSize,
+				OnActivated = function()
+					props.OnChoose(false)
+				end,
+				ZIndex = 138,
 			}),
 			Description = c("ScrollingFrame", {
 				BackgroundTransparency = 1,
@@ -199,7 +218,7 @@ return function(props: Props)
 				Position = UDim2.fromOffset(inset, bodyTop),
 				Size = UDim2.new(1, -inset * 2, 0, bodyHeight),
 				CanvasSize = UDim2.fromOffset(0, descriptionHeight),
-				ScrollBarThickness = 6,
+				ScrollBarThickness = T.Layout.ScrollBar,
 				ScrollBarImageColor3 = T.Colors.Pink,
 				ScrollingDirection = Enum.ScrollingDirection.Y,
 				Selectable = false,
@@ -222,8 +241,8 @@ return function(props: Props)
 			Buttons = c("Frame", {
 				AnchorPoint = Vector2.new(0.5, 1),
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0.5, 0, 1, -UIConfig.Spacing.PageInsetPx - 4),
-				Size = UDim2.new(1, -inset * 2 + 12, 0, footerHeight),
+				Position = UDim2.new(0.5, 0, 1, -inset),
+				Size = UDim2.fromOffset(footerWidth, footerHeight),
 				ZIndex = 135,
 			}, buttons),
 		}),

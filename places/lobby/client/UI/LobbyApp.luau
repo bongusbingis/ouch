@@ -5,6 +5,7 @@
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -35,6 +36,7 @@ local NotificationContext = require(UI:WaitForChild("Contexts"):WaitForChild("No
 local useExternalStore = require(UI:WaitForChild("Hooks"):WaitForChild("useExternalStore"))
 local DailyRewardModal = require(Components:WaitForChild("DailyRewardModal"))
 local EconomyMenuModals = require(Components:WaitForChild("EconomyMenuModals"))
+local ErrorBoundary = require(Components:WaitForChild("ErrorBoundary"))
 local InventoryPage = require(Components:WaitForChild("InventoryPage"))
 local JoinCodeModal = require(Components:WaitForChild("JoinCodeModal"))
 local LoadingScreen = require(Components:WaitForChild("LoadingScreen"))
@@ -83,14 +85,23 @@ local PAGE_POSITIONS = {
 
 local PAGE_BACKGROUND_COLORS = {
 	SplashScreen = Tokens.Splash.BackdropColor,
-	Inventory = Color3.fromRGB(232, 225, 7),
-	Shop = Color3.fromRGB(142, 31, 232),
+	-- Soft candy tints from the lobby's sky-to-lilac backdrop, not the saturated
+	-- Yellow/Grape accents, which read garish as a lit world backdrop.
+	Inventory = Tokens.Colors.BackdropTop,
+	Shop = Tokens.Colors.BackdropMid,
 }
 
 -- Settings has no establishing shot of its own authored in Studio yet, so it
 -- borrows Inventory's camera and background color rather than requiring a new
 -- Views.Party.SettingsCamera part before the page is navigable.
 local WORLD_CAMERA_PAGE = { Settings = "Inventory" }
+
+-- One crashing page, modal or header piece must never unmount the rest of the
+-- lobby UI: each independent layer sits in its own boundary and drops to
+-- nothing on error, leaving the player able to keep playing.
+local function guard(name: string, element: any, resetKey: any?, onError: ((err: any) -> ())?)
+	return c(ErrorBoundary, { Name = `LobbyApp.{name}`, OnError = onError, ResetKey = resetKey }, { [name] = element })
+end
 
 local QUEUE_OPTIONS = {}
 for _, queueId in Queues.Order do
@@ -119,7 +130,7 @@ local function useParty(client, notifications)
 	return client:getSnapshot(), client:isBusy()
 end
 
-local function useLoadingTip(visible: boolean): string?
+local function useLoadingTip(visible: boolean, tips: { string }): string?
 	local tip, setTip = React.useState(nil)
 	React.useEffect(function()
 		if not visible then
@@ -130,15 +141,15 @@ local function useLoadingTip(visible: boolean): string?
 			task.wait(Loading.TipDelaySeconds)
 			local index = 1
 			while true do
-				setTip(Loading.Tips[index])
-				index = index % #Loading.Tips + 1
+				setTip(tips[index])
+				index = index % #tips + 1
 				task.wait(Loading.TipIntervalSeconds)
 			end
 		end)
 		return function()
 			task.cancel(thread)
 		end
-	end, { visible })
+	end, { visible, tips })
 	return tip
 end
 
@@ -476,8 +487,12 @@ local function LobbyContent(props)
 			title = "YOU'RE READY",
 			description = `You have {NumberText(bonks)} Bonks to spend. Pick up a new look in the shop, then head back for a match.`,
 			buttonText = "OPEN SHOP",
-		}, function()
-			setCurrentPage("Shop")
+		}, function(chose)
+			-- Esc/B and a superseding notice also resolve this callback; only the
+			-- button itself should navigate.
+			if chose == true then
+				setCurrentPage("Shop")
+			end
 		end)
 	end, { onboardingActive, onboardingResolved, economyData, notifications })
 
@@ -554,7 +569,11 @@ local function LobbyContent(props)
 	elseif teleportPhase == "Teleporting" then
 		loadingDetail = "THE MATCH IS READY"
 	end
-	local loadingTip = useLoadingTip(loadingVisible)
+	-- Splashdown is a no-combat race, so it gets the same race tips the arena
+	-- loading screen shows rather than dodgeball and hammer advice.
+	local loadingQueue = if snapshot and snapshot.queueId then Queues.Queues[snapshot.queueId] else nil
+	local loadingRace = loadingQueue ~= nil and loadingQueue.ModeSelection.ModeId == "Splashdown"
+	local loadingTip = useLoadingTip(loadingVisible, if loadingRace then Loading.RaceTips else Loading.Tips)
 	React.useEffect(function()
 		if loadingVisible or not lobbyVisible then
 			CosmeticPreviewClient.close(nil, "unavailable")
@@ -632,6 +651,9 @@ local function LobbyContent(props)
 	React.useEffect(function()
 		if
 			lobbyVisible
+			and currentPage == "SplashScreen"
+			-- Never stack on a notification (e.g. YOU'RE READY); wait for it to close.
+			and notifications.request == nil
 			and snapshot ~= nil
 			and snapshot.phase == "Lobby"
 			and not snapshot.returnQueuePending
@@ -649,7 +671,7 @@ local function LobbyContent(props)
 				end
 			end
 		end
-	end, { lobbyVisible, dailyRewardState, snapshot })
+	end, { lobbyVisible, dailyRewardState, snapshot, currentPage, notifications.request })
 
 	React.useEffect(function()
 		if props.WorldPresentationEnabled == false or onboardingActive then
@@ -811,9 +833,14 @@ local function LobbyContent(props)
 	React.useEffect(function()
 		local connection = UserInputService.InputBegan:Connect(function(input, processed)
 			local isBack = input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB
+			-- Hidden developer solo-play gesture: Studio only, never on a shipped
+			-- client. The server still re-checks the developer group rank.
 			if
-				input.UserInputType == Enum.UserInputType.Touch
-				or input.UserInputType == Enum.UserInputType.MouseButton2
+				RunService:IsStudio()
+				and (
+					input.UserInputType == Enum.UserInputType.Touch
+					or input.UserInputType == Enum.UserInputType.MouseButton2
+				)
 			then
 				local now = os.clock()
 				local tapState = devTapState.current
@@ -824,7 +851,6 @@ local function LobbyContent(props)
 				tapState.tapCount += 1
 				if tapState.tapCount >= 10 then
 					tapState.tapCount = 0
-					print("spawning dev server for solo play")
 					task.spawn(partyClient.devSoloPlay, partyClient)
 				end
 			end
@@ -902,114 +928,120 @@ local function LobbyContent(props)
 			elseif pageName == "Shop" then shopComposition
 			elseif pageName == "Settings" then settingsComposition
 			else nil
-		views[pageName] = c(PageTransition, {
-			Active = currentPage == pageName,
-			Preset = if pageName == "Inventory" then nil else pageName,
-			Onscreen = if pageComposition and (not portrait or (pageName == "Shop" and shopHeader ~= nil))
-				then UDim2.fromOffset(
-					safeArea.position.X + pageComposition.panel.position.X + pageComposition.panel.size.X / 2,
-					safeArea.position.Y + pageComposition.panel.position.Y + pageComposition.panel.size.Y / 2
-				)
-				elseif shortPages and pageName ~= "SplashScreen" then UIConfig.Layout.ShortPagePosition
-				elseif portrait and (pageName == "Inventory" or pageName == "Shop") then UIConfig.Layout.PagePosition
-				else positions.onscreen,
-			Offscreen = if shortPages and pageName ~= "SplashScreen"
-				then UIConfig.Layout.ShortPageOffscreen
-				else positions.offscreen,
-			Render = function(position, scale, arrival)
-				if pageName == "SplashScreen" then
-					return c(SplashPage, {
-						HeaderHeight = mobileHeaderHeight,
-						Position = position,
-						PageArrival = arrival,
-						PlayButtonRef = playButtonRef,
-						ModeButtonRef = modeButtonRef,
-						WorldWindowRef = splashWorldRef,
-						PartyState = presentation.partyState,
-						ShowMatchmakingActivity = presentation.showMatchmakingActivity,
-						PlayText = presentation.playText,
-						PlayEnabled = presentation.playEnabled,
-						QueueOptions = QUEUE_OPTIONS,
-						SelectedQueueId = selectedQueueId,
-						QueueEnabled = presentation.canPickQueue,
-						OnOpenModes = function()
-							if presentation.canPickQueue then
-								setModeOpen(true)
-							end
-						end,
-						OnPlay = function()
-							-- Recheck the live party so stale input cannot start the default queue.
-							local current = partyClient:getSnapshot()
-							local selected =
-								LobbyViewModel.selectedQueueId(current, Players.LocalPlayer.UserId, queueChoice)
-							local action = LobbyViewModel.partyPresentation(
-								current,
-								Players.LocalPlayer.UserId,
-								partyClient:isBusy(),
-								if Queues.isEnabled(selected) then selected else nil
-							)
-							if action.playEnabled then
-								task.spawn(partyClient.toggleMatchmaking, partyClient)
-							end
-						end,
-						OnInvite = function()
-							task.spawn(partyClient.promptInvite, partyClient)
-						end,
-						OnJoinCode = function()
-							setJoinOpen(true)
-						end,
-						DailyReward = dailyRewardState,
-						OnViewDailyReward = function()
-							setShowDailyRewardModal(true)
-						end,
-						SeasonState = seasonState,
-						OnViewSeasonRewards = if economyMenu.canViewSeason then economyMenu.viewSeason else nil,
-						QuestState = questState,
-						PendingClaims = pendingClaims,
-						OnClaimSeason = function()
-							claimReward("Season", props.SeasonStore.claimAll)
-						end,
-						OnClaimQuest = function(questId)
-							claimReward(questId, function()
-								return props.QuestStore.claim(questId)
-							end)
-						end,
-					})
-				elseif pageName == "Inventory" then
-					return c(InventoryPage, {
-						HeaderHeight = mobileHeaderHeight,
-						OnLockedSlot = function()
-							setCurrentPage("Shop")
-						end,
-						Data = economyData,
-						Position = position,
-						SelectedTab = inventoryTab,
-						WorldWindowRef = if portrait then nil else inventoryWorldRef,
-						OnTabChanged = economyMenu.setInventoryTab,
-						OnEquip = economyMenu.equip,
-						OnInspect = economyMenu.inspectInventory,
-					})
-				elseif pageName == "Settings" then
-					return c(SettingsPage, {
-						Position = position,
-						Size = if settingsComposition then settingsComposition.panel.size else nil,
-						TransitionScale = scale,
-						Place = "Lobby",
-					})
-				elseif pageName == "Shop" then
-					return c(ShopPage, {
-						SeasonState = seasonState,
-						Model = economyMenu.shopModel,
-						Position = position,
-						Size = shopComposition.panel.size,
-						TransitionScale = scale,
-						OnCardActivated = economyMenu.activateShopCard,
-						OnRefresh = economyMenu.refreshShop,
-					})
-				end
-				return nil
-			end,
-		})
+		views[pageName] = guard(
+			pageName,
+			c(PageTransition, {
+				Active = currentPage == pageName,
+				Preset = if pageName == "Inventory" then nil else pageName,
+				Onscreen = if pageComposition and (not portrait or (pageName == "Shop" and shopHeader ~= nil))
+					then UDim2.fromOffset(
+						safeArea.position.X + pageComposition.panel.position.X + pageComposition.panel.size.X / 2,
+						safeArea.position.Y + pageComposition.panel.position.Y + pageComposition.panel.size.Y / 2
+					)
+					elseif shortPages and pageName ~= "SplashScreen" then UIConfig.Layout.ShortPagePosition
+					elseif
+						portrait and (pageName == "Inventory" or pageName == "Shop")
+					then UIConfig.Layout.PagePosition
+					else positions.onscreen,
+				Offscreen = if shortPages and pageName ~= "SplashScreen"
+					then UIConfig.Layout.ShortPageOffscreen
+					else positions.offscreen,
+				Render = function(position, scale, arrival)
+					if pageName == "SplashScreen" then
+						return c(SplashPage, {
+							HeaderHeight = mobileHeaderHeight,
+							Position = position,
+							PageArrival = arrival,
+							PlayButtonRef = playButtonRef,
+							ModeButtonRef = modeButtonRef,
+							WorldWindowRef = splashWorldRef,
+							PartyState = presentation.partyState,
+							ShowMatchmakingActivity = presentation.showMatchmakingActivity,
+							PlayText = presentation.playText,
+							PlayEnabled = presentation.playEnabled,
+							QueueOptions = QUEUE_OPTIONS,
+							SelectedQueueId = selectedQueueId,
+							QueueEnabled = presentation.canPickQueue,
+							OnOpenModes = function()
+								if presentation.canPickQueue then
+									setModeOpen(true)
+								end
+							end,
+							OnPlay = function()
+								-- Recheck the live party so stale input cannot start the default queue.
+								local current = partyClient:getSnapshot()
+								local selected =
+									LobbyViewModel.selectedQueueId(current, Players.LocalPlayer.UserId, queueChoice)
+								local action = LobbyViewModel.partyPresentation(
+									current,
+									Players.LocalPlayer.UserId,
+									partyClient:isBusy(),
+									if Queues.isEnabled(selected) then selected else nil
+								)
+								if action.playEnabled then
+									task.spawn(partyClient.toggleMatchmaking, partyClient)
+								end
+							end,
+							OnInvite = function()
+								task.spawn(partyClient.promptInvite, partyClient)
+							end,
+							OnJoinCode = function()
+								setJoinOpen(true)
+							end,
+							DailyReward = dailyRewardState,
+							OnViewDailyReward = function()
+								setShowDailyRewardModal(true)
+							end,
+							SeasonState = seasonState,
+							OnViewSeasonRewards = if economyMenu.canViewSeason then economyMenu.viewSeason else nil,
+							QuestState = questState,
+							PendingClaims = pendingClaims,
+							OnClaimSeason = function()
+								claimReward("Season", props.SeasonStore.claimAll)
+							end,
+							OnClaimQuest = function(questId)
+								claimReward(questId, function()
+									return props.QuestStore.claim(questId)
+								end)
+							end,
+						})
+					elseif pageName == "Inventory" then
+						return c(InventoryPage, {
+							HeaderHeight = mobileHeaderHeight,
+							OnLockedSlot = function()
+								setCurrentPage("Shop")
+							end,
+							Data = economyData,
+							Position = position,
+							SelectedTab = inventoryTab,
+							WorldWindowRef = if portrait then nil else inventoryWorldRef,
+							OnTabChanged = economyMenu.setInventoryTab,
+							OnEquip = economyMenu.equip,
+							OnInspect = economyMenu.inspectInventory,
+						})
+					elseif pageName == "Settings" then
+						return c(SettingsPage, {
+							Position = position,
+							Size = if settingsComposition then settingsComposition.panel.size else nil,
+							TransitionScale = scale,
+							Place = "Lobby",
+						})
+					elseif pageName == "Shop" then
+						return c(ShopPage, {
+							SeasonState = seasonState,
+							Model = economyMenu.shopModel,
+							Position = position,
+							Size = shopComposition.panel.size,
+							TransitionScale = scale,
+							OnCardActivated = economyMenu.activateShopCard,
+							OnRefresh = economyMenu.refreshShop,
+						})
+					end
+					return nil
+				end,
+			}),
+			currentPage == pageName
+		)
 	end
 
 	return c("Frame", {
@@ -1018,10 +1050,13 @@ local function LobbyContent(props)
 		Size = UDim2.fromScale(1, 1),
 	}, {
 		Onboarding = if onboardingClient
-			then c(OnboardingOverlay, {
-				Snapshot = onboarding,
-				OnSkip = onboardingClient.skip,
-			})
+			then guard(
+				"Onboarding",
+				c(OnboardingOverlay, {
+					Snapshot = onboarding,
+					OnSkip = onboardingClient.skip,
+				})
+			)
 			else nil,
 		BaseClip = c("Frame", {
 			BackgroundTransparency = 1,
@@ -1052,168 +1087,222 @@ local function LobbyContent(props)
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 			}, {
-				TopBar = c(TopBar, {
-					CurrentPage = currentPage,
-					OnNavigate = setCurrentPage,
-					LobbyHeader = true,
-					HeaderVisible = lobbyVisible and not effectPreview.active,
-				}),
-				PartyCode = c(PageTransition, {
-					Active = currentPage == "SplashScreen",
-					Onscreen = UDim2.fromOffset(
-						safeArea.position.X + partyRect.position.X + partyRect.size.X,
-						safeArea.position.Y + partyRect.position.Y
-					),
-					Offscreen = UDim2.new(1, -8, -1, 0),
-					Render = function(position)
-						return c(PartyCode, {
-							Compact = true,
-							Size = UDim2.fromOffset(partyRect.size.X, partyRect.size.Y),
-							Label = if splashComposition.landscape
-								then `PARTY ({partyCount})`
-								else headerLayout.partyLabel,
-							Position = position,
-							CodeText = LobbyViewModel.formatPartyCode(
-								if snapshot then snapshot.joinCode else nil,
-								codeVisible
-							),
-							CodeVisible = codeVisible,
-							OnOpen = function()
-								setPartyMembersOpen(true)
-							end,
-							OnToggle = function()
-								setCodeVisible(function(value)
-									return not value
-								end)
-							end,
-						})
-					end,
-				}),
+				TopBar = guard(
+					"TopBar",
+					c(TopBar, {
+						CurrentPage = currentPage,
+						OnNavigate = setCurrentPage,
+						LobbyHeader = true,
+						HeaderVisible = lobbyVisible and not effectPreview.active,
+						CycleEnabled = lobbyVisible
+							and not effectPreview.active
+							and notifications.request == nil
+							and not showDailyRewardModal
+							and not partyMembersOpen
+							and not joinOpen
+							and not modeOpen
+							and economyMenu.selectedShopCardId == nil
+							and economyMenu.crateReveal == nil
+							and not economyMenu.inspectingReward,
+					})
+				),
+				PartyCode = guard(
+					"PartyCode",
+					c(PageTransition, {
+						Active = currentPage == "SplashScreen",
+						Onscreen = UDim2.fromOffset(
+							safeArea.position.X + partyRect.position.X + partyRect.size.X,
+							safeArea.position.Y + partyRect.position.Y
+						),
+						Offscreen = UDim2.new(1, -8, -1, 0),
+						Render = function(position)
+							return c(PartyCode, {
+								Compact = true,
+								Size = UDim2.fromOffset(partyRect.size.X, partyRect.size.Y),
+								Label = if splashComposition.landscape
+									then `PARTY ({partyCount})`
+									else headerLayout.partyLabel,
+								Position = position,
+								CodeText = LobbyViewModel.formatPartyCode(
+									if snapshot then snapshot.joinCode else nil,
+									codeVisible
+								),
+								CodeVisible = codeVisible,
+								OnOpen = function()
+									setPartyMembersOpen(true)
+								end,
+								OnToggle = function()
+									setCodeVisible(function(value)
+										return not value
+									end)
+								end,
+							})
+						end,
+					})
+				),
 			}),
 			Modals = c("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 100,
 			}, {
-				GameModes = c(QueuePickerModal, {
-					Open = modeOpen
-						and currentPage == "SplashScreen"
-						and lobbyVisible
-						and not loadingVisible
-						and not showDailyRewardModal,
-					FocusEnabled = notifications.request == nil,
-					Options = QUEUE_OPTIONS,
-					SelectedId = selectedQueueId,
-					Enabled = presentation.canPickQueue,
-					OnClose = function()
-						setModeOpen(false)
-					end,
-					OnSelect = function(queueId)
-						if not presentation.canPickQueue or not snapshot or not Queues.isEnabled(queueId) then
-							return
-						end
-						task.spawn(function()
-							-- Even choosing the internal default is an explicit, accepted request.
-							local response = partyClient:setQueue(queueId)
-							if not response or not response.ok then
+				GameModes = guard(
+					"GameModes",
+					c(QueuePickerModal, {
+						Open = modeOpen
+							and currentPage == "SplashScreen"
+							and lobbyVisible
+							and not loadingVisible
+							and not showDailyRewardModal,
+						FocusEnabled = notifications.request == nil,
+						Options = QUEUE_OPTIONS,
+						SelectedId = selectedQueueId,
+						Enabled = presentation.canPickQueue,
+						OnClose = function()
+							setModeOpen(false)
+						end,
+						OnSelect = function(queueId)
+							if not presentation.canPickQueue or not snapshot or not Queues.isEnabled(queueId) then
 								return
 							end
-							local choice =
-								{ partyId = snapshot.partyId, leaderUserId = snapshot.leaderUserId, queueId = queueId }
-							local current = partyClient:getSnapshot()
-							if
-								current
-								and current.partyId == choice.partyId
-								and current.leaderUserId == choice.leaderUserId
-								and current.queueId == queueId
-							then
-								setQueueChoice(choice)
-								setModeOpen(false)
+							task.spawn(function()
+								-- Even choosing the internal default is an explicit, accepted request.
+								local response = partyClient:setQueue(queueId)
+								if not response or not response.ok then
+									return
+								end
+								local choice = {
+									partyId = snapshot.partyId,
+									leaderUserId = snapshot.leaderUserId,
+									queueId = queueId,
+								}
+								local current = partyClient:getSnapshot()
+								if
+									current
+									and current.partyId == choice.partyId
+									and current.leaderUserId == choice.leaderUserId
+									and current.queueId == queueId
+								then
+									setQueueChoice(choice)
+									setModeOpen(false)
+								end
+							end)
+						end,
+					}),
+					modeOpen
+				),
+				PartyMembers = guard(
+					"PartyMembers",
+					c(PartyMembersModal, {
+						Open = partyMembersOpen and currentPage == "SplashScreen",
+						FocusEnabled = notifications.request == nil,
+						Members = partyMembers,
+						LocalUserId = Players.LocalPlayer.UserId,
+						LeaderUserId = if snapshot then snapshot.leaderUserId else nil,
+						CodeText = LobbyViewModel.formatPartyCode(
+							if snapshot then snapshot.joinCode else nil,
+							codeVisible
+						),
+						CodeVisible = codeVisible,
+						CodeAvailable = snapshot ~= nil and snapshot.joinCode ~= nil,
+						CanRemove = snapshot ~= nil
+							and snapshot.leaderUserId == Players.LocalPlayer.UserId
+							and not requestBusy
+							and (snapshot.phase == "Lobby" or snapshot.phase == "Queued"),
+						CanLeave = snapshot ~= nil
+							and #snapshot.members > 1
+							and not requestBusy
+							and (snapshot.phase == "Lobby" or snapshot.phase == "Queued"),
+						OnToggleCode = function()
+							setCodeVisible(function(value)
+								return not value
+							end)
+						end,
+						OnRemove = removePartyMember,
+						OnLeave = leaveParty,
+						OnClose = function()
+							setPartyMembersOpen(false)
+						end,
+					}),
+					partyMembersOpen
+				),
+				JoinCode = guard(
+					"JoinCode",
+					c(JoinCodeModal, {
+						Open = joinOpen,
+						FocusEnabled = notifications.request == nil and not showDailyRewardModal,
+						OnClose = function()
+							setJoinOpen(false)
+						end,
+						OnSubmit = function(code)
+							local response, errorCode = partyClient:joinByCode(code)
+							if response and response.ok then
+								return true
 							end
-						end)
-					end,
-				}),
-				PartyMembers = c(PartyMembersModal, {
-					Open = partyMembersOpen and currentPage == "SplashScreen",
-					FocusEnabled = notifications.request == nil,
-					Members = partyMembers,
-					LocalUserId = Players.LocalPlayer.UserId,
-					LeaderUserId = if snapshot then snapshot.leaderUserId else nil,
-					CodeText = LobbyViewModel.formatPartyCode(if snapshot then snapshot.joinCode else nil, codeVisible),
-					CodeVisible = codeVisible,
-					CodeAvailable = snapshot ~= nil and snapshot.joinCode ~= nil,
-					CanRemove = snapshot ~= nil
-						and snapshot.leaderUserId == Players.LocalPlayer.UserId
-						and not requestBusy
-						and (snapshot.phase == "Lobby" or snapshot.phase == "Queued"),
-					CanLeave = snapshot ~= nil
-						and #snapshot.members > 1
-						and not requestBusy
-						and (snapshot.phase == "Lobby" or snapshot.phase == "Queued"),
-					OnToggleCode = function()
-						setCodeVisible(function(value)
-							return not value
-						end)
-					end,
-					OnRemove = removePartyMember,
-					OnLeave = leaveParty,
-					OnClose = function()
-						setPartyMembersOpen(false)
-					end,
-				}),
-				JoinCode = c(JoinCodeModal, {
-					Open = joinOpen,
-					FocusEnabled = notifications.request == nil and not showDailyRewardModal,
-					OnClose = function()
-						setJoinOpen(false)
-					end,
-					OnSubmit = function(code)
-						local response, errorCode = partyClient:joinByCode(code)
-						if response and response.ok then
-							return true
-						end
-						local message = partyClient.JoinCodeErrorMessages[errorCode]
-						if message == nil then
-							notifications.notify({
-								title = "PARTY NOTICE",
-								description = partyClient.ErrorMessages[errorCode] or "PARTY REQUEST FAILED",
-								buttonText = "CONFIRM",
-							})
-						end
-						return false, message
-					end,
-				}),
-				Notification = c(NotificationModal, {
-					Request = notifications.request,
-					OnChoose = notifications.close,
-					FocusEnabled = not effectPreview.active,
-				}),
-				Economy = c(EconomyMenuModals, {
-					FocusEnabled = notifications.request == nil,
-					Controller = economyMenu,
-				}),
-				DailyReward = c(DailyRewardModal, {
-					Visible = showDailyRewardModal,
-					State = dailyRewardState,
-					Pending = pendingClaims.Daily,
-					ErrorText = dailyClaimError,
-					FocusEnabled = notifications.request == nil,
-					OnClaim = function()
-						claimReward("Daily", props.DailyRewardStore.claim)
-					end,
-					OnClose = function()
-						setShowDailyRewardModal(false)
-					end,
-				}),
+							local message = partyClient.JoinCodeErrorMessages[errorCode]
+							if message == nil then
+								notifications.notify({
+									title = "PARTY NOTICE",
+									description = partyClient.ErrorMessages[errorCode] or "PARTY REQUEST FAILED",
+									buttonText = "CONFIRM",
+								})
+							end
+							return false, message
+						end,
+					}),
+					joinOpen
+				),
+				Notification = guard(
+					"Notification",
+					c(NotificationModal, {
+						Request = notifications.request,
+						OnChoose = notifications.close,
+						FocusEnabled = not effectPreview.active,
+					}),
+					notifications.request,
+					-- A crashed modal must not leave an undismissable request that blocks the
+					-- daily reward, tab cycling and the emote wheel.
+					function()
+						notifications.close(false)
+					end
+				),
+				Economy = guard(
+					"Economy",
+					c(EconomyMenuModals, {
+						FocusEnabled = notifications.request == nil,
+						Controller = economyMenu,
+					}),
+					economyMenu.selectedShopCardId
+				),
+				DailyReward = guard(
+					"DailyReward",
+					c(DailyRewardModal, {
+						Visible = showDailyRewardModal,
+						State = dailyRewardState,
+						Pending = pendingClaims.Daily,
+						ErrorText = dailyClaimError,
+						FocusEnabled = notifications.request == nil,
+						OnClaim = function()
+							claimReward("Daily", props.DailyRewardStore.claim)
+						end,
+						OnClose = function()
+							setShowDailyRewardModal(false)
+						end,
+					}),
+					showDailyRewardModal
+				),
 			}),
-			GameVersion = c(GameVersion),
+			GameVersion = guard("GameVersion", c(GameVersion)),
 		}),
-		Loading = c(LoadingScreen, {
-			Visible = loadingVisible,
-			Title = loadingTitle,
-			Detail = loadingDetail,
-			Tip = loadingTip,
-		}),
+		Loading = guard(
+			"Loading",
+			c(LoadingScreen, {
+				Visible = loadingVisible,
+				Title = loadingTitle,
+				Detail = loadingDetail,
+				Tip = loadingTip,
+			})
+		),
 	})
 end
 

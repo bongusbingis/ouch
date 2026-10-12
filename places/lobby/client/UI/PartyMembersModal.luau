@@ -56,7 +56,7 @@ local function label(text: string, position: UDim2, size: UDim2, maximum: number
 	local font = if muted then Enum.Font.BuilderSansBold else T.Type.Label
 	return c(ResponsiveText, {
 		MeasurementFont = font,
-		MinTextSize = if muted then 12 else 14,
+		MinTextSize = T.Type.Minimum,
 		MaxTextSize = maximum,
 		Wrapped = true,
 		Native = {
@@ -90,10 +90,10 @@ return function(props: Props)
 	local actionWidth = if short then S.CompactActionWidth else S.ActionWidth
 	local minimumHeight = if short then S.CompactMinHeight else S.MinHeight
 	local memberStrokeInset = S.MemberStrokeInset
-	-- Keep each card inside the padded canvas area. The scrolling frame reserves
-	-- the scrollbar inset on the right, but a full-width child would still span
-	-- the unpadded canvas and be clipped at that edge.
-	local rowWidth = UDim2.new(1, -(S.ScrollBar + memberStrokeInset * 2 + 2), 0, rowHeight)
+	-- The scroller's canvas is exactly its window wide (no horizontal canvas, and the scrollbar
+	-- inset already comes out of that window), so each card is the window minus the outline on
+	-- either side and the list layout centres it.
+	local rowWidth = UDim2.new(1, -T.Shape.StrokeCard * 2, 0, rowHeight)
 	local width = math.min(legacyLayout.MaxWidthPx, math.max(safeArea.size.X - edge * 2, 1))
 	local listTop = contentInset + codeHeight + gap + sectionHeight + sectionGap
 	local rowCount = math.max(#props.Members, 1)
@@ -169,8 +169,6 @@ return function(props: Props)
 		Padding = c("UIPadding", {
 			PaddingTop = UDim.new(0, memberStrokeInset),
 			PaddingBottom = UDim.new(0, memberStrokeInset),
-			PaddingLeft = UDim.new(0, memberStrokeInset),
-			PaddingRight = UDim.new(0, S.ScrollBar + memberStrokeInset + 2),
 		}),
 	}
 	for index, member in props.Members do
@@ -234,7 +232,7 @@ return function(props: Props)
 			Action = if removable
 				then c(PuffyButton, {
 					Text = "REMOVE",
-					TextSize = if short then 16 else 18,
+					TextSize = T.Type.Minimum,
 					TextColor = if removeEnabled then C.Surface else C.InkSoft,
 					Color = C.Orange,
 					LipColor = if removeEnabled then C.OrangeLip else C.WellLine,
@@ -254,7 +252,7 @@ return function(props: Props)
 				})
 				elseif leaveEnabled then c(PuffyButton, {
 					Text = "LEAVE",
-					TextSize = if short then 16 else 18,
+					TextSize = T.Type.Minimum,
 					TextColor = C.Surface,
 					Color = C.Orange,
 					LipColor = C.OrangeLip,
@@ -323,7 +321,7 @@ return function(props: Props)
 			Entrance = c("UIScale", { Scale = styles.Scale }),
 			Title = c(CandyTitle, {
 				Text = "YOUR PARTY",
-				TextSize = if short then 26 else 42,
+				TextSize = T.Type.ModalTitle,
 				Native = {
 					Position = UDim2.fromOffset(inset + (if short then 8 else 12), if short then 2 else -18),
 					Size = UDim2.fromOffset(
@@ -371,7 +369,7 @@ return function(props: Props)
 					),
 					ToggleCode = c(PuffyButton, {
 						Text = if props.CodeVisible then "HIDE CODE" else "SHOW CODE",
-						TextSize = if short then 16 else 18,
+						TextSize = T.Type.Minimum,
 						TextColor = if codeButtonEnabled then C.Ink else C.InkSoft,
 						Wrapped = true,
 						Color = C.Yellow,
@@ -391,7 +389,7 @@ return function(props: Props)
 					Text = "MEMBERS",
 					Candy = true,
 					HeightPx = sectionHeight,
-					TextSize = if short then 20 else T.Type.TileLabel,
+					TextSize = if short then T.Type.Body else T.Type.TileLabel,
 					Position = UDim2.fromOffset(contentInset, contentInset + codeHeight + gap),
 					Size = UDim2.new(1, -contentInset * 2, 0, sectionHeight),
 					ZIndex = 116,
@@ -401,7 +399,7 @@ return function(props: Props)
 					Selectable = not props.CanRemove,
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
-					CanvasSize = UDim2.new(1, 0, 0, listContentHeight),
+					CanvasSize = UDim2.fromOffset(0, listContentHeight),
 					ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
 					Position = UDim2.fromOffset(contentInset, listTop),
 					ScrollingDirection = Enum.ScrollingDirection.Y,

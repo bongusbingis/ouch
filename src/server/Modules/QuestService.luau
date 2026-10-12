@@ -40,37 +40,38 @@ local function activeEntries(data: any): { QuestEntry }
 	return QuestLogic.copyEntries(data.Quests.Active)
 end
 
-local function grantCompletedUnclaimed(data: any, player: Player)
-	for _, entry in ipairs(activeEntries(data)) do
-		if entry.claimed then
+local function grantRolloverRewards(data: any, player: Player, owed: { QuestEntry })
+	for _, entry in owed do
+		local definition = definitionsById[entry.id]
+		if definition == nil then
 			continue
 		end
-		local definition = definitionsById[entry.id]
-		if definition and entry.progress >= definition.goal then
-			local granted = RewardService.grant(player, definition.reward)
-			if granted and definition.reward.kind == "Bonks" then
-				pcall(
-					AnalyticsService.logEconomyEvent,
-					player,
-					"Source",
-					"Bonks",
-					definition.reward.amount,
-					data.Bonks,
-					AnalyticsConfig.EconomyTransactionTypes.Gameplay,
-					entry.id,
-					{ source = "QuestRollover" }
-				)
-			end
+		local granted = RewardService.grant(player, definition.reward)
+		if granted and definition.reward.kind == "Bonks" then
+			pcall(
+				AnalyticsService.logEconomyEvent,
+				player,
+				"Source",
+				"Bonks",
+				definition.reward.amount,
+				data.Bonks,
+				AnalyticsConfig.EconomyTransactionTypes.Gameplay,
+				entry.id,
+				{ source = "QuestRollover" }
+			)
 		end
 	end
 end
 
+-- Build and commit the new daily set before paying out the old one, so a
+-- failure can never leave the old completed entries in place to be paid again.
 local function assignDaily(data: any, player: Player, now: number)
-	grantCompletedUnclaimed(data, player)
+	local owed = QuestLogic.completedUnclaimed(activeEntries(data), definitionsById)
 	local state = QuestLogic.createDailyEntries(player.UserId, now, definitions, QuestsConfig.DailyCount)
 	data.Quests.DailyKey = state.dailyKey
 	data.Quests.ResetAt = state.resetAt
 	data.Quests.Active = state.active
+	grantRolloverRewards(data, player, owed)
 end
 
 local function waitForData(player: Player): any?
@@ -97,12 +98,7 @@ local function ensureData(player: Player, now: number?, shouldWait: boolean?): a
 		data.Quests = QuestLogic.blankState(currentTime)
 	end
 
-	local dailyKey = QuestLogic.dailyKey(currentTime)
-	if
-		data.Quests.DailyKey ~= dailyKey
-		or tonumber(data.Quests.ResetAt) == nil
-		or currentTime >= data.Quests.ResetAt
-	then
+	if QuestLogic.needsDailyReset(data.Quests.DailyKey, data.Quests.ResetAt, currentTime) then
 		assignDaily(data, player, currentTime)
 	end
 

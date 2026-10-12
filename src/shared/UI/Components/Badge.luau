@@ -3,7 +3,12 @@ local RS = game:GetService("ReplicatedStorage")
 local React = require(RS.Packages.react)
 local T = require(script.Parent.Parent.Tokens)
 local Motion = require(script.Parent.Parent.Motion)
+local Icon = require(script.Parent.Icon)
 local c = React.createElement
+
+-- The tick is drawn from the Check icon; the Unicode glyph falls back to a font that renders it as a root sign.
+local CHECK_TEXT = "\u{2713}"
+local CHECK_SIZE = 0.62
 return function(props)
 	local ref = React.useRef(nil)
 	React.useEffect(function()
@@ -20,14 +25,27 @@ return function(props)
 	native.Rotation = if props.Tilt ~= nil then props.Tilt else T.Shape.TiltBadge
 	native.Visible = props.Visible ~= false
 	native.ZIndex = native.ZIndex or 12
+	local isCheck = not props.Lock and (props.Text == nil or props.Text == CHECK_TEXT)
 	return c("Frame", native, {
 		Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
 		Outline = c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Shape.StrokeCard }),
-		Label = if not props.Lock
+		Check = if isCheck
+			then c(Icon, {
+				Name = "Check",
+				Color = props.TextColor or T.Colors.Ink,
+				Native = {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromScale(CHECK_SIZE, CHECK_SIZE),
+					ZIndex = native.ZIndex + 1,
+				},
+			})
+			else nil,
+		Label = if not props.Lock and not isCheck
 			then c("TextLabel", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
-				Text = props.Text or "✓",
+				Text = props.Text,
 				TextSize = props.TextSize or T.Type.Section,
 				Font = T.Type.Label,
 				TextColor3 = props.TextColor or T.Colors.Ink,

@@ -32,6 +32,12 @@ return function()
 		local simulationIt = if RunService:IsRunning() then it else itSKIP
 		local rigs = {}
 
+		local function resetBalls()
+			BallService.stopGroundSpawns()
+			BallService.clearRecovery()
+			BallService.clearAll()
+		end
+
 		local function rigFor(player)
 			local rig = CharacterFixture.create(player.Name)
 			table.insert(rigs, rig)
@@ -39,10 +45,11 @@ return function()
 			return rig
 		end
 
+		-- Start from an empty ball supply even when a live match already seeded the Balls folder.
+		beforeEach(resetBalls)
+
 		afterEach(function()
-			BallService.stopGroundSpawns()
-			BallService.clearRecovery()
-			BallService.clearAll()
+			resetBalls()
 			for _, rig in rigs do
 				CharacterFixture.destroy(rig)
 			end
@@ -121,6 +128,22 @@ return function()
 			expect(#ballsIn(TestAssets.get(Workspace, "Balls"))).to.equal(0)
 		end)
 
+		it("clearOwned keepInFlight removes held balls but spares thrown ones", function()
+			local player = FakePlayer.new(100007)
+			rigFor(player)
+			BallService.grantHeldBall(player)
+			local folder = TestAssets.get(Workspace, "Balls")
+			local held = ballsIn(folder)[1]
+			local thrown = held:Clone()
+			thrown:SetAttribute("ph", 2)
+			thrown.Parent = folder
+
+			expect(BallService.clearOwned(player, { keepInFlight = true })).to.equal(1)
+			expect(held.Parent).never.to.be.ok()
+			expect(thrown.Parent).to.equal(folder)
+			expect(BallService.clearOwned(player)).to.equal(1)
+		end)
+
 		simulationIt("recycles an out-of-bounds ball without replacing its instance", function()
 			local player = FakePlayer.new(100006)
 			rigFor(player)
@@ -165,33 +188,62 @@ return function()
 			point.Position = Vector3.new(1000, 5, 1000)
 			point.Parent = Workspace
 
+			-- Pin the environment: a live match can hold WorldBallCap loose balls (replenishment then
+			-- returns early) and the shipped cadence outlasts a short wait. Restored in the finally below.
+			local dodgeball = Combat.Dodgeball
+			local originalCap, originalCadence = dodgeball.WorldBallCap, dodgeball.SpawnCadence
+			dodgeball.WorldBallCap = math.huge
+			dodgeball.SpawnCadence = 0.1
+
 			BallService.start()
 			BallService.startGroundSpawns({ point })
 
 			local folder = TestAssets.get(Workspace, "Balls")
 			local spawned = nil
-			for _ = 1, 120 do
+			-- The poll runs every 0.5s: one pass arms the cadence, a later one spawns.
+			local deadline = os.clock() + 5
+			while os.clock() < deadline do
 				task.wait()
-				local balls = ballsIn(folder)
-				if #balls > 0 then
-					spawned = balls[1]
+				-- Only count balls this test's spawn point produced, never a live match's supply.
+				for _, ball in ballsIn(folder) do
+					if (ball.Position - point.Position).Magnitude < 20 then
+						spawned = ball
+						break
+					end
+				end
+				if spawned then
 					break
 				end
 			end
 
-			expect(spawned).to.be.ok()
-			expect(spawned:GetAttribute("ph")).to.equal(5)
-			local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
-			expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
+			local ok, err = pcall(function()
+				expect(spawned).to.be.ok()
+				expect(spawned:GetAttribute("ph")).to.equal(5)
+				local expected = point.Position + Vector3.new(0, Combat.Dodgeball.Radius, 0)
+				expect((spawned.CFrame.Position - expected).Magnitude).to.be.near(0, 1e-3)
 
-			local before = #ballsIn(folder)
-			for _ = 1, 10 do
-				task.wait()
-			end
-			expect(#ballsIn(folder)).to.equal(before)
+				local function nearbyCount()
+					local count = 0
+					for _, ball in ballsIn(folder) do
+						if (ball.Position - point.Position).Magnitude < 20 then
+							count += 1
+						end
+					end
+					return count
+				end
+				local before = nearbyCount()
+				for _ = 1, 10 do
+					task.wait()
+				end
+				expect(nearbyCount()).to.equal(before)
+			end)
 
+			dodgeball.WorldBallCap, dodgeball.SpawnCadence = originalCap, originalCadence
 			BallService.stopGroundSpawns()
 			point:Destroy()
+			if not ok then
+				error(err, 0)
+			end
 		end)
 	end)
 end

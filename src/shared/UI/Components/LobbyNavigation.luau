@@ -11,6 +11,12 @@ local AnimatedButton = require(script.Parent.AnimatedButton)
 local CandySurface = require(script.Parent.CandySurface)
 local LobbySelectionPillow = require(script.Parent.LobbySelectionPillow)
 local Icon = require(script.Parent.Icon)
+local InputHint = require(script.Parent.InputHint)
+local InputHintModel = require(script.Parent.Parent.Models.InputHintModel)
+local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
+local HINTS = require(RS:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints
+local CYCLE_ACTION = "CycleMenuTabs"
 local c, C, N = React.createElement, T.Colors, T.LobbyNavigation
 
 local function NavigationTab(props)
@@ -43,7 +49,10 @@ local function NavigationTab(props)
 	local icon = N.Icons[tab.Id]
 	local compact = props.Compact
 	local iconOnly = props.IconOnly == true
-	local tightLabel = props.Width < N.CompactLabelWidth
+	-- Decided once per rail so every tab shares one label face.
+	local tightLabel = props.Tight == true
+	-- The condensed face is only for rails that cannot fit the display face even at Minimum.
+	local condensed = props.Condensed == true
 	local iconSize = if compact then N.CompactIcon else N.Icon
 	local selectedIcon = if compact then N.CompactSelectedIcon else N.SelectedIcon
 	local iconTop = if compact then N.CompactIconTop else N.IconTop
@@ -133,7 +142,7 @@ local function NavigationTab(props)
 				)
 			end),
 			Size = UDim2.new(1, -T.Shape.StrokeTab * 2, 0, N.LabelHeight),
-			Font = if tightLabel then T.Type.CompactLabel else T.Type.Display,
+			Font = if condensed then T.Type.CompactLabel else T.Type.Display,
 			Text = if tab.Id == "SplashScreen" then "PLAY" else tab.Label,
 			TextSize = state(function(s)
 				return if tightLabel then T.Type.Minimum else T.Type.Body + (N.SelectedLabel - T.Type.Body) * s
@@ -211,7 +220,71 @@ return function(props)
 		required += width
 	end
 	local remaining = (props.Width - required) / math.max(count, 1)
+	local tight, condensed = false, false
+	for index, tab in tabs do
+		local room = widths[index] + remaining
+		if room < N.CompactLabelWidth then
+			tight = true
+			local label = if tab.Id == "SplashScreen" then "PLAY" else tab.Label
+			local need = TextService:GetTextSize(
+				label,
+				T.Type.Minimum,
+				T.Type.Display,
+				Vector2.new(10000, N.LabelHeight)
+			).X + N.CompactTextPadding
+			if props.Compact or room < need then
+				condensed = true
+			end
+		end
+	end
+
+	-- LB/RB step through the tabs while the owner says this rail has input (no
+	-- modal above it, never during combat); sunk so equip binds do not also fire.
+	local cycleEnabled = props.CycleEnabled == true
+	local ids, enabledIds = {}, {}
+	for _, tab in tabs do
+		table.insert(ids, tab.Id)
+		enabledIds[tab.Id] = tab.Enabled ~= false
+	end
+	local latest = React.useRef(nil :: any)
+	latest.current = { ids = ids, enabled = enabledIds, current = props.CurrentPage, navigate = props.OnNavigate }
+	React.useEffect(function()
+		if not cycleEnabled then
+			return
+		end
+		ContextActionService:BindActionAtPriority(CYCLE_ACTION, function(_, inputState, input)
+			if UserInputService:GetFocusedTextBox() ~= nil then
+				return Enum.ContextActionResult.Pass
+			end
+			if inputState == Enum.UserInputState.Begin then
+				local state = latest.current
+				local step = if input.KeyCode == HINTS.TabPrevious.Gamepad then -1 else 1
+				local nextId = InputHintModel.cycle(state.ids, state.enabled, state.current, step)
+				if nextId ~= state.current then
+					state.navigate(nextId)
+				end
+			end
+			return Enum.ContextActionResult.Sink
+		end, false, Enum.ContextActionPriority.High.Value + 1, HINTS.TabPrevious.Gamepad, HINTS.TabNext.Gamepad)
+		return function()
+			ContextActionService:UnbindAction(CYCLE_ACTION)
+		end
+	end, { cycleEnabled })
+	local hintNative = function(x: number)
+		return {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(x, 0.5),
+			ZIndex = 12,
+		}
+	end
 	local children = {
+		-- Gamepad only: the shoulder glyphs straddle the rail's rounded ends.
+		PreviousHint = if cycleEnabled
+			then c(InputHint.Component, { Binding = HINTS.TabPrevious, Native = hintNative(0) })
+			else nil,
+		NextHint = if cycleEnabled
+			then c(InputHint.Component, { Binding = HINTS.TabNext, Native = hintNative(1) })
+			else nil,
 		-- Star = if not props.Compact
 		-- 	then c(Icon, {
 		-- 		Name = "Star",
@@ -244,6 +317,8 @@ return function(props)
 			Tab = tab,
 			Left = left,
 			Width = width,
+			Tight = tight,
+			Condensed = condensed,
 			Compact = props.Compact,
 			IconOnly = props.IconOnly,
 			Selected = tab.Id == props.CurrentPage,

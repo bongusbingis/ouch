@@ -98,4 +98,18 @@ function ModeVote.extendForLateReady(
 	return math.max(currentEndsAt, math.min(now + minimumVisibleSeconds, maximumEndsAt))
 end
 
+-- Decides what the stranded-player timer does once its grace elapses: keep
+-- waiting while admitted players are still loading (bounded by maxWaitSeconds
+-- since the first arm), otherwise send the stranded players back.
+function ModeVote.strandedAction(
+	loadingCount: number,
+	waitedSeconds: number,
+	maxWaitSeconds: number
+): "rearm" | "return"
+	if loadingCount > 0 and waitedSeconds < maxWaitSeconds then
+		return "rearm"
+	end
+	return "return"
+end
+
 return table.freeze(ModeVote)

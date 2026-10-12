@@ -3,15 +3,16 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
-local ButtonSurface = require(script.Parent.ButtonSurface)
-local ResponsiveText = require(script.Parent.OuchText)
+local CandySurface = require(script.Parent.CandySurface)
+local PuffyButton = require(script.Parent.PuffyButton)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
+local T = require(script.Parent.Parent.Tokens)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
-local c = React.createElement
+local c, C, S = React.createElement, T.Colors, T.Shape
 
 export type Props = {
 	CodeText: string,
@@ -24,44 +25,54 @@ export type Props = {
 	Position: any?,
 }
 
+-- Largest candy size that keeps the whole string inside the face; never below the menu floor.
+local function fittedSize(text: string, font: Enum.Font, width: number, sizes: { number }): number
+	for _, size in sizes do
+		if TextService:GetTextSize(text, size, font, Vector2.new(100000, 1000)).X <= width then
+			return size
+		end
+	end
+	return T.Type.Minimum
+end
+
 return function(props: Props)
 	local safeArea = useSafeArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 	local short = props.Compact == true
 		or (not portrait and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx)
 	if short then
-		return c(AnimatedButton, {
+		local size = props.Size
+			or UDim2.fromOffset(UIConfig.Layout.PartyCode.LandscapeWidthPx * 0.7, T.Layout.MinTarget)
+		local label = props.Label
+			or if props.OnOpen
+				then "PARTY CODE"
+				elseif props.CodeVisible then (string.gsub(props.CodeText, "^PARTY CODE:%s*", ""))
+				else "PARTY CODE"
+		return c(PuffyButton, {
+			Color = C.Yellow,
+			LipColor = C.YellowLip,
+			StrokeColor = T.LobbyNavigation.Rim,
+			Text = label,
+			TextColor = C.Ink,
+			TextSize = fittedSize(
+				label,
+				T.Type.Display,
+				size.X.Offset - T.Layout.CompactGap - S.StrokeTab * 2,
+				{ T.Type.Body, T.Type.Minimum }
+			),
 			OnActivated = props.OnOpen or props.OnToggle,
-			SelectionRadius = UDim.new(0, 8),
-			Visual = c(ButtonSurface, { Color = UIConfig.ProgressionStyle.Yellow, Radius = UDim.new(0, 8) }),
+			Shadow = false,
 			Native = {
 				AnchorPoint = Vector2.new(1, 0),
-				BackgroundTransparency = 1,
-				Position = props.Position or UDim2.new(1, -8, 0, 14),
-				Size = props.Size or UDim2.fromOffset(
-					UIConfig.Layout.PartyCode.LandscapeWidthPx * 0.7,
-					UIConfig.Interaction.MinTargetPx
-				),
+				Position = props.Position or UDim2.new(1, -T.LobbyNavigation.MobileEdge, 0, T.Layout.CompactGap),
+				Size = size,
 			},
-		}, {
-			Label = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 20,
-				Native = {
-					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(10, 3),
-					Size = UDim2.new(1, -20, 1, -6),
-					Font = Enum.Font.LuckiestGuy,
-					Text = props.Label or if props.OnOpen
-						then "PARTY CODE"
-						elseif props.CodeVisible then string.gsub(props.CodeText, "^PARTY CODE:%s*", "")
-						else "PARTY CODE",
-					TextColor3 = UIConfig.ProgressionStyle.Ink,
-					ZIndex = 2,
-				},
-			}),
 		})
 	end
+	local codeHeight = if portrait
+		then UIConfig.Layout.PartyCode.CodeHeightPx
+		else UIConfig.Layout.PartyCode.LandscapeCodeHeightPx
+	local width = if portrait then nil else UIConfig.Layout.PartyCode.LandscapeWidthPx
 	return c("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundTransparency = 1,
@@ -70,68 +81,59 @@ return function(props: Props)
 			then UDim2.new(0.44, 0, 0, UIConfig.Layout.PartyCode.PortraitHeightPx)
 			else UDim2.fromOffset(
 				UIConfig.Layout.PartyCode.LandscapeWidthPx,
-				UIConfig.Layout.PartyCode.LandscapeCodeHeightPx + UIConfig.Interaction.MinTargetPx + 6
+				codeHeight + T.Layout.MinTarget + T.Layout.CompactGap / 2
 			),
 	}, {
 		UIListLayout = c("UIListLayout", {
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 6),
+			Padding = UDim.new(0, T.Layout.CompactGap / 2),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
-		Code = c("ImageLabel", {
+		Code = c("Frame", {
 			LayoutOrder = 1,
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://123095501298848",
-			Position = UDim2.fromScale(0.365216, 0.0467871),
-			Size = if portrait
-				then UDim2.new(1, 0, 0, UIConfig.Layout.PartyCode.CodeHeightPx)
-				else UDim2.new(1, 0, 0, UIConfig.Layout.PartyCode.LandscapeCodeHeightPx),
+			Size = UDim2.new(1, 0, 0, codeHeight),
 		}, {
-
-			TextLabel = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 40,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.541416),
-					Size = UDim2.fromScale(0.95, 0.728),
-					Text = props.CodeText,
-					TextColor3 = Color3.new(1, 1, 1),
-				},
+			Surface = c(CandySurface, {
+				Color = C.Surface,
+				LipColor = C.WellLine,
+				StrokeColor = T.LobbyNavigation.Rim,
+				Shadow = false,
+			}),
+			Text = c("TextLabel", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(T.Layout.CompactGap / 2, 0),
+				Size = UDim2.new(1, -T.Layout.CompactGap, 1, -S.LipHeight),
+				Font = T.Type.Display,
+				Text = props.CodeText,
+				TextColor3 = C.Ink,
+				TextSize = if width
+					then fittedSize(
+						props.CodeText,
+						T.Type.Display,
+						width - T.Layout.CompactGap - S.StrokeTab * 2,
+						{ T.Type.TileLabel, T.Type.Body, T.Type.Minimum }
+					)
+					else T.Type.Section,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				ZIndex = 5,
 			}),
 		}),
-
-		ShowCode = c(AnimatedButton, {
+		ShowCode = c(PuffyButton, {
+			Color = C.Pink,
+			LipColor = C.PinkLip,
+			StrokeColor = T.LobbyNavigation.Rim,
+			Text = if props.CodeVisible then "HIDE CODE" else "SHOW CODE",
+			TextSize = T.Type.Body,
+			OnActivated = props.OnToggle,
+			Shadow = false,
 			Native = {
 				LayoutOrder = 2,
-				BackgroundTransparency = 1,
-				Image = "rbxassetid://136731323162202",
-				Position = UDim2.fromScale(0.433867, 0.634355),
-				Size = if portrait
-					then UDim2.new(0.42, 0, 0, UIConfig.Interaction.MinTargetPx)
-					else UDim2.new(0.62, 0, 0, UIConfig.Interaction.MinTargetPx),
+				Size = UDim2.new(if portrait then 0.42 else 0.62, 0, 0, T.Layout.MinTarget),
 			},
-			OnActivated = props.OnToggle,
 		}, {
-			TextLabel = c(ResponsiveText, {
-				MeasurementFont = Enum.Font.LuckiestGuy,
-				MaxTextSize = 28,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json"),
-					Position = UDim2.fromScale(0.5, 0.541416),
-					Size = UDim2.fromScale(0.85, 0.728),
-					Text = if props.CodeVisible then "HIDE CODE" else "SHOW CODE",
-					TextColor3 = Color3.new(1, 1, 1),
-				},
-			}),
 			UIAspectRatioConstraint = if portrait then c("UIAspectRatioConstraint", { AspectRatio = 2.86 }) else nil,
-			UISizeConstraint = c("UISizeConstraint", {
-				MinSize = Vector2.new(0, UIConfig.Interaction.MinTargetPx),
-			}),
+			UISizeConstraint = c("UISizeConstraint", { MinSize = Vector2.new(0, T.Layout.MinTarget) }),
 		}),
 	})
 end

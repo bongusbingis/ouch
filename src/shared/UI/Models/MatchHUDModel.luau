@@ -167,6 +167,8 @@ function MatchHUDModel.build(snapshot: any, now: number): any
 	end
 	return {
 		starting = snapshot.phase == "Starting",
+		-- The clock only reads as urgent while the match itself is running, never during the Starting countdown.
+		active = snapshot.phase == "Active",
 		entries = entries,
 		placement = placement,
 		teamMode = teamMode,

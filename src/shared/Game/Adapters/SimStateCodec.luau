@@ -1,4 +1,4 @@
--- Description: Encodes and decodes simulation state to and from the attributes on ball and character instances, the between-tick source of truth that replicates to clients for presentation.
+-- Description: Encodes and decodes simulation state to and from the attributes on ball and character instances; only attributes the client reads or the spawn-time decode needs are replicated.
 
 --!strict
 
@@ -60,22 +60,15 @@ function SimStateCodec.decodeProjectile(ball: Instance): ProjectileState?
 		phase = NUMBER_TO_PHASE[(ball:GetAttribute("ph") :: number?) or 5] or "Free",
 		position = ball.CFrame.Position,
 		velocity = if hasVelocity then velocity else vector.zero,
-		targetId = ball:GetAttribute("tg") :: string?,
 		effectiveRadius = (ball:GetAttribute("er") :: number?) or DEFAULT_EFFECTIVE_RADIUS,
 		flightTime = (ball:GetAttribute("ft") :: number?) or 0,
-		windupRemaining = (ball:GetAttribute("wu") :: number?) or 0,
-		bounceCount = (ball:GetAttribute("bc") :: number?) or 0,
-		releaseAim = ball:GetAttribute("ra") :: Vector3?,
-		releaseTargetId = ball:GetAttribute("rt") :: string?,
-		releaseDeviceClass = ball:GetAttribute("rd") :: string?,
-		releaseCharge = ball:GetAttribute("rc") :: number?,
+		windupRemaining = 0,
+		bounceCount = 0,
 	}
 end
 
 function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]: Model }): SimState
 	local state = SimTypes.newState()
-	state.tick = (ballsFolder:GetAttribute("tk") :: number?) or 0
-	state.nextProjectileSeq = (ballsFolder:GetAttribute("sq") :: number?) or 1
 
 	for _, ball in ballsFolder:GetChildren() do
 		local decoded = SimStateCodec.decodeProjectile(ball)
@@ -88,22 +81,18 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 		state.players[playerId] = {
 			id = playerId,
 			equipped = (model:GetAttribute(SimStateCodec.EquippedAttribute) :: string?) or WeaponRegistry.defaultKind(),
-			heldBallLastTick = model:GetAttribute("hadB") == true,
+			heldBallLastTick = false,
 			weapons = {
 				Dodgeball = {
 					throwCooldown = (model:GetAttribute("dbTc") :: number?) or 0,
 					catchCooldown = (model:GetAttribute("dbCc") :: number?) or 0,
-					catchRemaining = (model:GetAttribute("dbCr") :: number?) or 0,
-					catchDirection = model:GetAttribute("dbCd") :: Vector3?,
-					chargeSeconds = model:GetAttribute("dbCh") :: number?,
+					catchRemaining = 0,
 				},
 				Hammer = {
 					cooldown = (model:GetAttribute("hmCd") :: number?) or 0,
-					activeRemaining = (model:GetAttribute("hmAc") :: number?) or 0,
-					recoveryRemaining = (model:GetAttribute("hmRc") :: number?) or 0,
-					stunRemaining = (model:GetAttribute("hmSt") :: number?) or 0,
-					direction = model:GetAttribute("hmDr") :: Vector3?,
-					hitTargetId = model:GetAttribute("hmHt") :: string?,
+					activeRemaining = 0,
+					recoveryRemaining = 0,
+					stunRemaining = 0,
 				},
 			},
 		}
@@ -113,8 +102,6 @@ function SimStateCodec.decode(ballsFolder: Instance, characterModels: { [string]
 end
 
 function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterModels: { [string]: Model })
-	setAttributeIfChanged(ballsFolder, "tk", state.tick)
-	setAttributeIfChanged(ballsFolder, "sq", state.nextProjectileSeq)
 	for _, ball in ballsFolder:GetChildren() do
 		if not ball:IsA("BasePart") then
 			continue
@@ -132,15 +119,8 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 		setAttributeIfChanged(ball, "ph", PHASE_TO_NUMBER[projectile.phase])
 		setAttributeIfChanged(ball, "ow", projectile.ownerId)
 		setAttributeIfChanged(ball, "hb", projectile.heldBy)
-		setAttributeIfChanged(ball, "tg", projectile.targetId)
 		setAttributeIfChanged(ball, "er", projectile.effectiveRadius)
 		setAttributeIfChanged(ball, "ft", projectile.flightTime)
-		setAttributeIfChanged(ball, "wu", projectile.windupRemaining)
-		setAttributeIfChanged(ball, "bc", projectile.bounceCount)
-		setAttributeIfChanged(ball, "ra", projectile.releaseAim)
-		setAttributeIfChanged(ball, "rt", projectile.releaseTargetId)
-		setAttributeIfChanged(ball, "rd", projectile.releaseDeviceClass)
-		setAttributeIfChanged(ball, "rc", projectile.releaseCharge)
 		local velocity = projectile.velocity
 		if projectile.phase ~= "InFlight" and projectile.phase ~= "Bouncing" and projectile.phase ~= "Rolling" then
 			velocity = vector.zero
@@ -154,20 +134,11 @@ function SimStateCodec.encode(state: SimState, ballsFolder: Instance, characterM
 			continue
 		end
 		setAttributeIfChanged(model, SimStateCodec.EquippedAttribute, player.equipped)
-		setAttributeIfChanged(model, "hadB", player.heldBallLastTick)
 		local kitState = player.weapons.Dodgeball
 		setAttributeIfChanged(model, "dbTc", kitState.throwCooldown)
 		setAttributeIfChanged(model, "dbCc", kitState.catchCooldown)
-		setAttributeIfChanged(model, "dbCr", kitState.catchRemaining)
-		setAttributeIfChanged(model, "dbCd", kitState.catchDirection)
-		setAttributeIfChanged(model, "dbCh", kitState.chargeSeconds)
 		local hammerState = player.weapons.Hammer
 		setAttributeIfChanged(model, "hmCd", hammerState.cooldown)
-		setAttributeIfChanged(model, "hmAc", hammerState.activeRemaining)
-		setAttributeIfChanged(model, "hmRc", hammerState.recoveryRemaining)
-		setAttributeIfChanged(model, "hmSt", hammerState.stunRemaining)
-		setAttributeIfChanged(model, "hmDr", hammerState.direction)
-		setAttributeIfChanged(model, "hmHt", hammerState.hitTargetId)
 	end
 end
 

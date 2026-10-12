@@ -10,6 +10,8 @@ local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("r
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 local Config = ReplicatedStorage:WaitForChild("Config")
 local GameModes = require(Config:WaitForChild("Gameplay"):WaitForChild("GameModes"))
+local ArenaMaps = require(Config:WaitForChild("Gameplay"):WaitForChild("ArenaMaps"))
+local T = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Tokens"))
 local Queues = require(Config:WaitForChild("Gameplay"):WaitForChild("Queues"))
 local Loading = require(Config:WaitForChild("Interface"):WaitForChild("Loading"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -20,6 +22,9 @@ local GameModeVoteViewModel = require(
 		:WaitForChild("Models")
 		:WaitForChild("GameModeVoteViewModel")
 )
+local ArenaLoadingViewModel =
+	require(Shared:WaitForChild("UI"):WaitForChild("Models"):WaitForChild("ArenaLoadingViewModel"))
+local ErrorBoundary = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("ErrorBoundary"))
 local GameModeSelect = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameModeSelect"))
 local GameVersion = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("GameVersion"))
 local LoadingBackdrop = require(Shared:WaitForChild("UI"):WaitForChild("Components"):WaitForChild("LoadingBackdrop"))
@@ -51,6 +56,13 @@ export type Props = {
 	OnPresented: (() -> ())?,
 }
 
+-- One crashing subtree must never unmount the rest of the arena UI: each major,
+-- independent layer sits in its own boundary and drops to nothing on error.
+-- resetKey grants a failed layer one fresh attempt when its round context changes.
+local function guard(name: string, element: any, onError: ((err: any) -> ())?, resetKey: any?)
+	return c(ErrorBoundary, { Name = `ArenaApp.{name}`, OnError = onError, ResetKey = resetKey }, { [name] = element })
+end
+
 local function imageId(value: any): string
 	if value == nil or value == "" then
 		return ""
@@ -80,44 +92,6 @@ local function useLoadingTip(visible: boolean, tips: { string }): string?
 		end
 	end, { visible })
 	return tip
-end
-
-local function loadingCopy(loading, vote, teleportStatus, hasResult: boolean)
-	local fixed = loading.fixedModeId ~= nil
-	if teleportStatus then
-		if teleportStatus.state == "Failed" then
-			if teleportStatus.reason == "rewards_pending" then
-				return "REWARDS ARE STILL SAVING", "TRY AGAIN TO CHECK YOUR REWARDS AND RETURN"
-			end
-			return "RETURN FAILED", "WE COULD NOT REACH THE LOBBY"
-		elseif teleportStatus.state == "Retrying" then
-			return "RECONNECTING", `ATTEMPT {teleportStatus.attempt} OF {teleportStatus.maxAttempts}`
-		elseif teleportStatus.state == "Attempting" then
-			return "RETURNING TO LOBBY", "TRAVELING FROM THE ARENA"
-		end
-	end
-	if loading.admission == "Rejected" then
-		return "UNABLE TO JOIN MATCH", "PLEASE RETURN TO THE LOBBY"
-	elseif not loading.localReady then
-		if loading.preloadReady and not loading.simulationReady then
-			return "LOADING ARENA", "STARTING GAMEPLAY SYSTEMS"
-		elseif loading.preloadReady then
-			return if fixed then "GETTING THE RACE READY" else "GETTING THE VOTE READY", nil
-		end
-		return "LOADING ARENA", "PREPARING THE ARENA"
-	elseif not loading.gateReleased then
-		if loading.arrivedPlayerCount < loading.expectedPlayerCount then
-			return "WAITING FOR PLAYERS", `{loading.arrivedPlayerCount} OF {loading.expectedPlayerCount} IN ARENA`
-		end
-		return "GETTING EVERYONE READY", `{loading.readyPlayerCount} OF {loading.expectedPlayerCount} READY`
-	elseif vote.open then
-		return "GETTING THE VOTE READY", nil
-	elseif loading.matchPhase == "Results" and not hasResult then
-		return "JOINING NEXT ROUND", "THIS ROUND IS WRAPPING UP"
-	elseif fixed then
-		return "GETTING THE RACE READY", "THE NEXT RACE STARTS SOON"
-	end
-	return "JOINING MATCH", nil
 end
 
 local function ConnectedTeammates(props: { Visible: boolean })
@@ -183,6 +157,10 @@ return function(props: Props)
 		end
 	end
 
+	local mapChips = GameModeVoteViewModel.mapChips(vote, ArenaMaps, function(key: string): Color3
+		return (T.Colors :: any)[key] or T.Colors.Yellow
+	end, imageId)
+
 	-- A fixed-mode session (Splashdown) never shows a ballot: the vote step of
 	-- the loading gate is satisfied outright so readiness reports as usual.
 	local fixedMode = loading.fixedModeId ~= nil
@@ -209,8 +187,28 @@ return function(props: Props)
 	local returning = teleportStatus ~= nil and teleportStatus.state ~= "Complete"
 	-- Once the bounded startup deadline releases a degraded client, keep the
 	-- healthy HUD/root visible instead of leaving a generic loading overlay up.
+	-- A rejected player never becomes ready, so the startup deadline degrades them;
+	-- the overlay still stays up because it carries their only way back to the lobby.
 	local loadingVisible = returning
+		or loading.admission == "Rejected"
 		or (not loading.initializationDegraded and (not hostPresented or (not votePresented and not matchVisible)))
+	-- Too few players for any mode leaves the server idle with no ballot; after a
+	-- short wait say so and offer RETURN instead of an endless JOINING MATCH.
+	local waitingForRoster = loadingVisible and ArenaLoadingViewModel.isWaitingForRoster(loading, vote, teleportStatus)
+	local rosterWaited, setRosterWaited = React.useState(false)
+	React.useEffect(function()
+		if not waitingForRoster then
+			setRosterWaited(false)
+			return
+		end
+		local thread = task.delay(ArenaLoadingViewModel.RosterWaitSeconds, function()
+			setRosterWaited(true)
+		end)
+		return function()
+			task.cancel(thread)
+		end
+	end, { waitingForRoster })
+	local rosterStalled = waitingForRoster and rosterWaited
 	local hudAvailable = not loadingVisible and loading.matchPhase == "Active" and not menu.open
 	local hudVisible = not loadingVisible
 		and (loading.matchPhase == "Active" or loading.matchPhase == "Starting")
@@ -229,7 +227,8 @@ return function(props: Props)
 		loadingVisible and not returning,
 		if loading.fixedModeId == "Splashdown" then Loading.RaceTips else Loading.Tips
 	)
-	local title, detail = loadingCopy(loading, vote, teleportStatus, postMatch.result ~= nil)
+	local title, detail =
+		ArenaLoadingViewModel.copy(loading, vote, teleportStatus, postMatch.result ~= nil, rosterStalled)
 	local queue = Queues.Queues[loading.queueId]
 	local kicker = if queue then queue.Title else nil
 	-- The bar counts assets while the client warms up, then the roster while
@@ -243,25 +242,25 @@ return function(props: Props)
 			else loading.readyPlayerCount
 		progress = count / math.max(loading.expectedPlayerCount, 1)
 	end
+	local primaryKind, secondaryKind = ArenaLoadingViewModel.actions(loading, teleportStatus, rosterStalled)
 	local primaryAction = nil
 	local secondaryAction = nil
-	if teleportStatus and teleportStatus.state == "Failed" then
-		primaryAction = {
-			Text = "TRY AGAIN",
-			Style = "Primary",
-			OnActivated = ArenaTeleportClient.retry,
-		}
-		secondaryAction = {
-			Text = "STAY",
-			Style = "Secondary",
-			OnActivated = ArenaTeleportClient.stay,
-		}
-	elseif loading.admission == "Rejected" then
-		primaryAction = {
-			Text = "RETURN",
-			Style = "Primary",
-			OnActivated = ArenaTeleportClient.returnToLobby,
-		}
+	if primaryKind == "Retry" then
+		primaryAction = { Text = "TRY AGAIN", Style = "Primary", OnActivated = ArenaTeleportClient.retry }
+	elseif primaryKind == "Return" then
+		primaryAction = { Text = "RETURN", Style = "Primary", OnActivated = ArenaTeleportClient.returnToLobby }
+	end
+	if secondaryKind == "Stay" then
+		secondaryAction = { Text = "STAY", Style = "Secondary", OnActivated = ArenaTeleportClient.stay }
+	end
+
+	local function presentHost()
+		if not hostPresented then
+			setHostPresented(true)
+			if props.OnPresented then
+				props.OnPresented()
+			end
+		end
 	end
 
 	local actionable = primaryAction ~= nil or secondaryAction ~= nil
@@ -283,50 +282,63 @@ return function(props: Props)
 		VoteBackdrop = if vote.admitted
 				and vote.open
 				and not loading.worldReady
-			then c(LoadingBackdrop, {
-				Native = {
-					Active = false,
-					ZIndex = 0,
-				},
-			})
+			then guard(
+				"VoteBackdrop",
+				c(LoadingBackdrop, {
+					Native = {
+						Active = false,
+						ZIndex = 0,
+					},
+				})
+			)
 			else nil,
 		GameModeSelect = if fixedMode
 			then nil
-			else c(GameModeSelect, {
-				Active = canPresentVote,
-				Prepared = vote.admitted and #modes > 0,
-				Modes = modes,
-				EndsAt = vote.endsAt,
-				DurationSeconds = vote.durationSeconds,
-				OnVote = ModeVoteClient.vote,
-				OnPrepared = ArenaLoadingClient.markVotePrepared,
-				OnPresented = function()
-					setPresentedVoteStartsAt(vote.startsAt)
-					ArenaLoadingClient.markBallotPresented(vote.startsAt)
-				end,
+			else guard(
+				"GameModeSelect",
+				c(GameModeSelect, {
+					Active = canPresentVote,
+					Prepared = vote.admitted and #modes > 0,
+					Modes = modes,
+					EndsAt = vote.endsAt,
+					DurationSeconds = vote.durationSeconds,
+					OnVote = ModeVoteClient.vote,
+					Maps = mapChips,
+					OnVoteMap = ModeVoteClient.voteMap,
+					OnPrepared = ArenaLoadingClient.markVotePrepared,
+					OnPresented = function()
+						setPresentedVoteStartsAt(vote.startsAt)
+						ArenaLoadingClient.markBallotPresented(vote.startsAt)
+					end,
+				}),
+				nil,
+				vote.startsAt
+			),
+		GameVersion = guard("GameVersion", c(GameVersion)),
+		Teammates = guard("Teammates", c(ConnectedTeammates, { Visible = hudAvailable })),
+		MatchHUD = if raceMode
+			then nil
+			else guard("MatchHUD", c(ConnectedMatchHUD, { Visible = hudVisible }), nil, phase),
+		SplashdownHUD = if raceMode
+			then guard("SplashdownHUD", c(ConnectedSplashdownHUD, { Visible = hudVisible }), nil, phase)
+			else nil,
+		-- If the loading screen itself crashes it can never report "presented";
+		-- release that handshake so the host and HUD are not held back for good.
+		LoadingScreen = guard(
+			"LoadingScreen",
+			c(LoadingScreen, {
+				Visible = loadingVisible,
+				ParentScreenInsets = Enum.ScreenInsets.None,
+				Title = title,
+				Detail = detail,
+				Kicker = kicker,
+				Tip = tip,
+				Progress = progress,
+				PrimaryAction = primaryAction,
+				SecondaryAction = secondaryAction,
+				OnPresented = presentHost,
 			}),
-		GameVersion = c(GameVersion),
-		Teammates = c(ConnectedTeammates, { Visible = hudAvailable }),
-		MatchHUD = if raceMode then nil else c(ConnectedMatchHUD, { Visible = hudVisible }),
-		SplashdownHUD = if raceMode then c(ConnectedSplashdownHUD, { Visible = hudVisible }) else nil,
-		LoadingScreen = c(LoadingScreen, {
-			Visible = loadingVisible,
-			ParentScreenInsets = Enum.ScreenInsets.None,
-			Title = title,
-			Detail = detail,
-			Kicker = kicker,
-			Tip = tip,
-			Progress = progress,
-			PrimaryAction = primaryAction,
-			SecondaryAction = secondaryAction,
-			OnPresented = function()
-				if not hostPresented then
-					setHostPresented(true)
-					if props.OnPresented then
-						props.OnPresented()
-					end
-				end
-			end,
-		}),
+			presentHost
+		),
 	})
 end

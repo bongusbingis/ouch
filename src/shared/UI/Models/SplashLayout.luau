@@ -9,11 +9,22 @@ local function rect(x, y, w, h)
 	return { position = Vector2.new(x, y), size = Vector2.new(math.max(1, w), math.max(1, h)) }
 end
 
-local function progressHeight(available: number, tab: string?, compact: boolean): number
+-- Landscape phones stack the season summary tighter: title, bar and XP line in
+-- 76 px, then the 44 px reward actions.
+local LANDSCAPE_SEASON_CONTENT = 76 + 44
+
+-- Height of the season summary the progression hub draws.
+function SplashLayout.seasonContentHeight(landscape: boolean?): number
+	return if landscape then LANDSCAPE_SEASON_CONTENT else S.SeasonContentHeight
+end
+
+-- Season and Daily fit their summary so the panel never sits mostly empty; Quests
+-- takes the space it is given and scrolls.
+local function progressHeight(available: number, tab: string?, compact: boolean, landscape: boolean?): number
 	local content = if tab == "QUESTS"
 		then nil
 		elseif tab == "DAILY" then S.DailyContentHeight
-		else S.SeasonContentHeight
+		else SplashLayout.seasonContentHeight(landscape)
 	local contentTop = if compact then S.CompactProgressContentTop else S.ProgressContentTop
 	return math.max(
 		1,
@@ -41,16 +52,17 @@ function SplashLayout.resolve(
 		local footerY = size.Y - edge - l.ActionHeight
 		local statusHeight = if showStatus then l.StatusHeight else 0
 		local height = math.max(1, footerY - l.Gap - landscapeTop - statusHeight)
+		local progress = progressHeight(height, tab, true, true)
 		return {
 			compact = true,
 			portrait = false,
 			landscape = true,
 			body = rect(x, landscapeTop, width, height),
-			progress = rect(x, landscapeTop, width, height),
+			progress = rect(x, landscapeTop, width, progress),
 			footer = rect(edge, footerY, size.X - edge * 2, l.ActionHeight),
 			world = rect(edge, landscapeTop, x - edge - l.Gap, footerY - l.Gap - landscapeTop),
 			party = rect(edge, landscapeTop, l.PartyButtonWidth, l.ActionHeight),
-			progressHeight = height,
+			progressHeight = progress,
 			modeExtra = 0,
 		}
 	end

@@ -103,6 +103,39 @@ function EmoteWheelModel.sectors(slots: { string? }, capacity: number): { Sector
 	return sectors
 end
 
+-- True when at least one sector holds an emote. A wheel with nothing equipped
+-- shows a designed empty state instead of "release to play".
+function EmoteWheelModel.anyFilled(sectors: { Sector }): boolean
+	for _, sector in sectors do
+		if sector.filled then
+			return true
+		end
+	end
+	return false
+end
+
+export type Caption = {
+	name: string,
+	kind: "none" | "empty" | "filled" | "idle",
+}
+
+-- Centre caption for the open wheel: the lit emote, an empty slot, the idle
+-- title, or "no emotes yet" when nothing is equipped (hints must not promise a
+-- play on release in the last two cases).
+function EmoteWheelModel.caption(sectors: { Sector }, selected: number?): Caption
+	if not EmoteWheelModel.anyFilled(sectors) then
+		return { name = "NO EMOTES YET", kind = "none" }
+	end
+	local sector = if selected then sectors[selected] else nil
+	if sector == nil then
+		return { name = "EMOTES", kind = "idle" }
+	end
+	if sector.filled then
+		return { name = sector.displayName, kind = "filled" }
+	end
+	return { name = "EMPTY SLOT", kind = "empty" }
+end
+
 -- Degrees from twelve o'clock, clockwise, for a screen-space offset (Y down).
 function EmoteWheelModel.angleOf(offset: Vector2): number
 	return (math.deg(math.atan2(offset.X, -offset.Y)) + 360) % 360

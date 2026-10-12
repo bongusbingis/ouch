@@ -8,9 +8,13 @@ local c, C = React.createElement, T.Colors
 return function(props)
 	local stacked = props.SubText ~= nil or props.SubBonks ~= nil
 	local z = props.ZIndex or 8
-	local enabled = props.Enabled ~= false
-	local color = props.Color or (if props.Red then C.Pink else C.Surface)
-	local textColor = if enabled
+	-- Muted is a status (loading / coming soon / processing) in the action slot:
+	-- disabled, so it is neither Active nor Selectable and never looks actionable.
+	-- The card around it still opens inspection.
+	local muted = props.Muted == true
+	local enabled = props.Enabled ~= false and not muted
+	local color = if muted then C.WellLine else props.Color or (if props.Red then C.Pink else C.Surface)
+	local textColor = if enabled and not muted
 		then props.TextColor or (if color == C.Pink or color == C.Grape then C.Surface else C.Ink)
 		else C.InkSoft
 	local children =

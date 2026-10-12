@@ -84,6 +84,26 @@ T.describe("Arena mobile HUD composition", function()
 		local layout = Layout.resolve(Vector2.zero, rect(0, 0, 0, 0), rect(0, 0, 0, 0), true)
 		T.expect(layout.hud.size.X > 0 and layout.toolbar.size.X > 0):toBeTruthy()
 	end)
+
+	T.it("widens Menu and Scores for their keyboard/gamepad hints without overlap", function()
+		local hints = { menu = 34, scores = 47 }
+		for _, sample in
+			{
+				{ 1920, 1080, rect(0, 0, 1920, 1080), rect(0, 0, 1920, 58) },
+				{ 1280, 720, rect(0, 0, 1280, 720), rect(0, 0, 1280, 58) },
+				{ 844, 390, rect(59, 0, 785, 369), rect(630, 0, 726, 58) },
+				{ 667, 375, rect(0, 0, 667, 354), rect(208, 0, 667, 58) },
+			}
+		do
+			local device = sample[3]
+			local plain = Layout.resolve(Vector2.new(sample[1], sample[2]), device, sample[4], false)
+			local hinted = Layout.resolve(Vector2.new(sample[1], sample[2]), device, sample[4], false, hints)
+			T.expect(hinted.menu.size.X):toEqual(plain.menu.size.X + hints.menu)
+			T.expect(hinted.scores.size.X):toEqual(plain.scores.size.X + hints.scores)
+			T.expect(hinted.menu.position.X + hinted.menu.size.X):toEqual(plain.menu.position.X + plain.menu.size.X)
+			checkControls(hinted, device)
+		end
+	end)
 end)
 
 return true

@@ -34,6 +34,7 @@ export type Arena = {
 }
 
 local arena: Arena? = nil
+local originConnection: RBXScriptConnection? = nil
 local warnedMissingTeamSpawns: { [string]: boolean } = {}
 
 local function spawnParts(folder: Folder, path: string, origin: Vector3): { BasePart }
@@ -50,6 +51,20 @@ local function spawnParts(folder: Folder, path: string, origin: Vector3): { Base
 		table.insert(parts, child)
 	end
 	assert(#parts > 0, `[ArenaService] {path} must contain at least one usable BasePart`)
+	return parts
+end
+
+-- Spawn parts of a folder within reach of the origin, without logging or asserting.
+local function usableSpawns(folder: Instance, origin: Vector3): { BasePart }
+	local parts = {}
+	for _, child in folder:GetChildren() do
+		if
+			child:IsA("BasePart")
+			and (child.Position - origin).Magnitude <= MapFeatures.Spawns.MaxOriginDistanceStuds
+		then
+			table.insert(parts, child)
+		end
+	end
 	return parts
 end
 
@@ -136,9 +151,70 @@ function ArenaService.start(): Arena
 	projectOrigin()
 	local tagged, reason = ScriptableRoots.tag(scriptables)
 	assert(tagged, `[ArenaService] rejected Workspace.Assets.Arena.Scriptables:\n{reason}`)
-	origin:GetPropertyChangedSignal("CFrame"):Connect(projectOrigin)
+	-- A refresh replaces the origin, so the previous origin must stop driving the
+	-- root's attributes.
+	if originConnection then
+		originConnection:Disconnect()
+	end
+	originConnection = origin:GetPropertyChangedSignal("CFrame"):Connect(projectOrigin)
 	arena = resolved
 	return resolved
+end
+
+-- Non-yielding, non-tagging check that a container satisfies the arena contract
+-- start() asserts on. Used to vet a staged map before anything is moved.
+function ArenaService.validate(container: Instance): (boolean, string?)
+	local origin = container:FindFirstChild("MapOrigin")
+	if origin == nil or not origin:IsA("BasePart") then
+		return false, "MapOrigin must be a BasePart"
+	end
+	for _, name in { "Map", "Scriptables", "PlayerSpawns", "TeamSpawns" } do
+		local child = container:FindFirstChild(name)
+		if child == nil or not child:IsA("Folder") then
+			return false, `{name} must be a Folder`
+		end
+	end
+	local playerSpawns = usableSpawns(container.PlayerSpawns, origin.Position)
+	if #playerSpawns < GameModes.MatchCapacity then
+		return false, "PlayerSpawns must cover MatchCapacity"
+	end
+	for _, teamId in { "Red", "Blue" } do
+		local folder = container.TeamSpawns:FindFirstChild(teamId)
+		if folder == nil or not folder:IsA("Folder") then
+			return false, `TeamSpawns.{teamId} must be a Folder`
+		end
+		if #usableSpawns(folder, origin.Position) < math.ceil(GameModes.MatchCapacity / 2) then
+			return false, `{teamId} requires half MatchCapacity spawns`
+		end
+	end
+	return true, nil
+end
+
+-- Re-resolves Workspace.Assets.Arena after its interior was replaced. The cache
+-- and origin listener change only on success; a failure leaves the previous
+-- arena (and its origin attributes) in place.
+function ArenaService.refresh(): (boolean, string?)
+	local previous = arena
+	local assets = Workspace:FindFirstChild("Assets")
+	local root = assets and assets:FindFirstChild("Arena")
+	if root == nil then
+		return false, "Workspace.Assets.Arena missing"
+	end
+	local valid, invalid = ArenaService.validate(root)
+	if not valid then
+		return false, invalid
+	end
+	arena = nil
+	local ok, result = pcall(ArenaService.start)
+	if ok then
+		return true, nil
+	end
+	arena = previous
+	if previous then
+		previous.root:SetAttribute("MapOriginPosition", previous.origin.Position)
+		previous.root:SetAttribute("MapOriginCFrame", previous.origin.CFrame)
+	end
+	return false, tostring(result)
 end
 
 function ArenaService.get(): Arena

@@ -9,7 +9,7 @@ local function global(modeId: string, scope: "Player" | "Team", winnerId: string
 	return PostMatchResult.build({
 		resultId = "result-1",
 		modeId = modeId,
-		modeName = if modeId == "FFA" then "Free For All" else "Team Deathmatch",
+		modeName = if modeId == "FFA" then "Free-for-all" else "Team Deathmatch",
 		scoreScope = scope,
 		scoreLabel = scoreLabel or "ELIMS",
 		winnerId = winnerId,
@@ -39,7 +39,7 @@ T.describe("PostMatchResult", function()
 		local result = PostMatchResult.build({
 			resultId = "round",
 			modeId = "FFA",
-			modeName = "Free For All",
+			modeName = "Free-for-all",
 			scoreScope = "Player",
 			scoreLabel = "ELIMS",
 			reason = "TimeCap",
@@ -83,6 +83,91 @@ T.describe("PostMatchResult", function()
 		T.expect(parsed.podium[2].costumeId):toEqual("PartyRoyal")
 		projected.podium[3] = projected.podium[2]
 		T.expect(PostMatchResult.parse(projected)):toBeNil()
+	end)
+
+	T.it("carries each contestant's costume from the server build into the podium and personal avatar", function()
+		local result = PostMatchResult.build({
+			resultId = "costume",
+			modeId = "FFA",
+			modeName = "Free-for-all",
+			scoreScope = "Player",
+			scoreLabel = "ELIMS",
+			winnerId = "10",
+			reason = "TargetReached",
+			interactiveAt = 10,
+			endsAt = 18,
+			contestants = {
+				{ playerId = "10", userId = 10, username = "One", displayName = "ONE", costumeId = "PartyRoyal" },
+				{ playerId = "20", userId = 20, username = "Two", displayName = "TWO", costumeId = "RainHopper" },
+			},
+			scores = { ["10"] = 5, ["20"] = 2 },
+		})
+		T.expect(result.contestants[1].costumeId):toEqual("PartyRoyal")
+		local projected = PostMatchResult.forPlayer(result, 20, nil, nil)
+		T.expect(projected.personalAppearance.costumeId):toEqual("RainHopper")
+		T.expect(projected.podium[1].costumeId):toEqual("PartyRoyal")
+		T.expect(projected.podium[2].costumeId):toEqual("RainHopper")
+	end)
+
+	T.it("breaks equal Splashdown points by the winner then cumulative time, matching the standings", function()
+		local function splashdown(winnerId: string?)
+			return PostMatchResult.build({
+				resultId = "splash",
+				modeId = "Splashdown",
+				modeName = "Splashdown",
+				scoreScope = "Player",
+				scoreLabel = "POINTS",
+				winnerId = winnerId,
+				reason = "RoundsComplete",
+				interactiveAt = 10,
+				endsAt = 18,
+				contestants = {
+					{ playerId = "10", userId = 10, username = "One", displayName = "ONE", stats = { TotalTime = 90 } },
+					{ playerId = "20", userId = 20, username = "Two", displayName = "TWO", stats = { TotalTime = 80 } },
+					{
+						playerId = "30",
+						userId = 30,
+						username = "Three",
+						displayName = "THREE",
+						stats = { TotalTime = 85 },
+					},
+				},
+				scores = { ["10"] = 87, ["20"] = 87, ["30"] = 87 },
+			})
+		end
+		local result = splashdown("20")
+		T.expect(result.scores[1].id):toEqual("20")
+		T.expect(result.scores[2].id):toEqual("30")
+		T.expect(result.scores[3].id):toEqual("10")
+		T.expect(result.scores[1].placement):toEqual(1)
+		T.expect(result.scores[2].placement):toEqual(2)
+		T.expect(result.scores[3].placement):toEqual(3)
+
+		local loser = PostMatchResult.forPlayer(result, 10, nil, nil)
+		T.expect(loser.placement):toEqual(3)
+		T.expect(loser.presentation.title):toEqual("3RD PLACE")
+		T.expect(loser.podium[1].userId):toEqual(20)
+		T.expect(loser.podium[2].placement):toEqual(2)
+		T.expect(loser.podium[3].placement):toEqual(3)
+
+		-- Fully tied points and time with no winner still share a placement.
+		local tied = PostMatchResult.build({
+			resultId = "tied",
+			modeId = "Splashdown",
+			modeName = "Splashdown",
+			scoreScope = "Player",
+			scoreLabel = "POINTS",
+			reason = "RoundsComplete",
+			interactiveAt = 10,
+			endsAt = 18,
+			contestants = {
+				{ playerId = "10", userId = 10, username = "One", displayName = "ONE", stats = { TotalTime = 80 } },
+				{ playerId = "20", userId = 20, username = "Two", displayName = "TWO", stats = { TotalTime = 80 } },
+			},
+			scores = { ["10"] = 50, ["20"] = 50 },
+		})
+		T.expect(tied.scores[1].placement):toEqual(1)
+		T.expect(tied.scores[2].placement):toEqual(1)
 	end)
 
 	T.it("keeps team contribution recognition separate from the winning team score", function()

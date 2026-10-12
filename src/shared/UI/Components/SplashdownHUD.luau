@@ -10,7 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local SplashdownIntro = require(script.Parent.SplashdownIntro)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local Surface = require(script.Parent.Arena.HUDSurface)
@@ -38,7 +37,7 @@ local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 	}
 	local circle = rowHeight - 8
 	for index, row in toast.rows do
-		local textSize = if short then 13 else 16
+		local textSize = T.Type.HudMinimum
 		children[`Row{index}`] = c("Frame", {
 			BackgroundColor3 = if row.isLocal then colors.Pink else T.Colors.Well,
 			BorderSizePixel = 0,
@@ -46,10 +45,10 @@ local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 			Size = UDim2.new(1, 0, 0, rowHeight),
 			ZIndex = z,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 12) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 			Outline = c("UIStroke", {
 				Color = if row.isLocal then T.Colors.PinkLip else T.Colors.WellLine,
-				Thickness = 2,
+				Thickness = T.Shape.StrokeInner,
 			}),
 			Rank = c("Frame", {
 				BackgroundColor3 = T.Results.PlacementColors[row.placement] or T.Colors.Surface,
@@ -59,7 +58,7 @@ local function toastRows(toast, rowHeight: number, short: boolean, z: number)
 				ZIndex = z + 1,
 			}, {
 				Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				Outline = c("UIStroke", { Color = colors.Ink, Thickness = 2 }),
+				Outline = c("UIStroke", { Color = colors.Ink, Thickness = T.Shape.StrokeInner }),
 				Text = c(Label, {
 					Text = tostring(row.placement),
 					Title = true,
@@ -109,7 +108,7 @@ return function(props: Props)
 	local centerX = geometry.hud.position.X + width / 2
 	local stripTop = geometry.menu.position.Y + 56
 	local toast = view.toast
-	local rowHeight = if short then 26 else 32
+	local rowHeight = if short then 28 else 32
 	local rows = if toast then toastRows(toast, rowHeight, short, 22) else nil
 	local toastWidth = math.min(520, safe.size.X - 32)
 	local toastHeight = (if short then 96 else 124) + (if toast then #toast.rows * (rowHeight + 4) else 0)
@@ -128,14 +127,15 @@ return function(props: Props)
 		}, {
 			Round = c(Label, {
 				Text = `{view.roundLabel} • {view.title}`,
-				Size = if short then 12 else 15,
+				Size = T.Type.HudMinimum,
+				Font = if short then T.Type.CompactLabel else nil,
 				Color = colors.Ink,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -104, 0, 22) },
 			}),
 			Clock = c(Surface, {
 				Color = if view.closing then colors.Pink else colors.PanelRaised,
-				Radius = UIConfig.Radius.Tile,
+				Radius = T.Shape.RadiusCard,
 				Shadow = false,
 				Native = { Position = UDim2.new(1, -88, 0, 8), Size = UDim2.fromOffset(76, if short then 30 else 34) },
 			}, { Text = c(Label, { Text = view.clock, Title = true, Size = 26 }) }),
@@ -168,7 +168,7 @@ return function(props: Props)
 			Closing = if view.closing
 				then c(Label, {
 					Text = view.closing,
-					Size = 13,
+					Size = T.Type.HudMinimum,
 					Color = colors.Pink,
 					Align = Enum.TextXAlignment.Right,
 					Native = {
@@ -199,7 +199,7 @@ return function(props: Props)
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0),
 					Position = UDim2.fromOffset(centerX, top + height + 12),
-					Size = UDim2.fromOffset(width * 0.84, if short then 58 else 72),
+					Size = UDim2.fromOffset(if short then width else width * 0.84, if short then 58 else 72),
 					ZIndex = 12,
 				},
 			}, {
@@ -212,7 +212,8 @@ return function(props: Props)
 				}),
 				Detail = c(Label, {
 					Text = "STAY ON THE DECK WHILE THE ROUND CLOSES",
-					Size = if short then 13 else 16,
+					Size = T.Type.HudMinimum,
+					Font = if short then T.Type.CompactLabel else nil,
 					Native = {
 						Position = UDim2.fromOffset(8, if short then 32 else 42),
 						Size = UDim2.new(1, -16, 0, 24),
@@ -251,7 +252,7 @@ return function(props: Props)
 				}),
 				Subtitle = c(Label, {
 					Text = toast.subtitle,
-					Size = if short then 13 else 16,
+					Size = T.Type.HudMinimum,
 					Color = colors.Muted,
 					Native = {
 						Position = UDim2.fromOffset(0, if short then 30 else 40),

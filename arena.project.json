@@ -5,8 +5,7 @@
   "servePlaceIds": [121997450145716],
   "blockedPlaceIds": [130584867985467],
   "globIgnorePaths": [
-    "src/shared/Tests/**",
-    "places/lobby/client/UI/Stories/**"
+    "src/shared/Tests/**"
   ],
   "tree": {
     "$className": "DataModel",
@@ -161,6 +160,10 @@
         "Helpers": {
           "$path": "src/tests/Helpers"
         }
+      },
+
+      "UIStories": {
+        "$path": "stories"
       }
     },
 

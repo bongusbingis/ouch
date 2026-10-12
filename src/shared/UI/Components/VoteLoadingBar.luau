@@ -44,7 +44,7 @@ return function(props: Props)
 		AnchorPoint = Vector2.new(0.5, 1),
 		BackgroundTransparency = 1,
 		Position = props.Position or UDim2.fromScale(0.5, 0.975),
-		Size = props.Size or UDim2.fromOffset(540, 56),
+		Size = props.Size or UDim2.fromOffset(T.MapVote.BarMaxWidth, T.MapVote.BarHeight),
 	}, {
 		Surface = c(CandySurface, {
 			Color = T.Colors.SurfaceWarm,
@@ -59,7 +59,7 @@ return function(props: Props)
 			Size = UDim2.new(1, -104, 0, 20),
 			Text = "VOTING ENDS",
 			TextColor3 = T.Colors.Ink,
-			TextSize = 18,
+			TextSize = T.Type.Minimum,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = 6,
 		}),
@@ -72,7 +72,7 @@ return function(props: Props)
 				return `{value}s`
 			end),
 			TextColor3 = T.Colors.Pink,
-			TextSize = 21,
+			TextSize = T.Type.TileLabel,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			ZIndex = 6,
 		}),

@@ -43,20 +43,19 @@ local function thresholds(count: number): { number }
 	return list
 end
 
--- 1788307200 is 2026-09-02T00:00:00Z, so the six-week window ends
--- 2026-10-14T00:00:00Z. The comment here previously said September 1, which the
--- value never matched; dates are the release owner's to set, so the description
--- was corrected to the value rather than the value to the description. Confirm
--- both against the intended commercial window before advertising it.
+-- 1788307200 is 2026-09-02T00:00:00Z. QA window: 26 weeks, ending
+-- 2027-03-03T00:00:00Z, because there is no release date yet. Dates are the
+-- release owner's to set: replace both with the real commercial window before
+-- launch (RELEASE-001 release checklist).
 local S1_START = 1788307200
-local SIX_WEEKS = 42 * 24 * 60 * 60
+local S1_LENGTH = 26 * 7 * 24 * 60 * 60
 
 local Definitions: { [string]: SeasonDef } = {
 	S1 = {
 		Id = "S1",
 		DisplayName = "Season 1: First Splat",
 		StartsAt = S1_START,
-		EndsAt = S1_START + SIX_WEEKS,
+		EndsAt = S1_START + S1_LENGTH,
 		TierCount = TIER_COUNT,
 		XpThresholds = thresholds(TIER_COUNT),
 		-- Existing currency rewards remain payable; cosmetic additions have independent grant identities.

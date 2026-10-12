@@ -114,11 +114,18 @@ end
 -- Removes every ball a player owns. Ball lifetime belongs to this service, so
 -- callers that need a player emptyhanded ask here rather than destroying
 -- instances they did not create.
-function BallService.clearOwned(player: Player): number
+-- With keepInFlight, only balls still in the player's hand (Held, Windup) go;
+-- thrown balls (InFlight, Bouncing, Rolling) keep flying and resolve normally.
+function BallService.clearOwned(player: Player, options: { keepInFlight: boolean? }?): number
 	local playerId = PlayerIds.toId(player)
+	local keepInFlight = options ~= nil and options.keepInFlight == true
 	local removed = 0
 	for _, ball in ballsFolder():GetChildren() do
 		if ball:IsA("BasePart") and ball:GetAttribute("ow") == playerId then
+			local phase = ball:GetAttribute("ph")
+			if keepInFlight and type(phase) == "number" and phase >= 2 and phase <= 4 then
+				continue
+			end
 			ball:Destroy()
 			removed += 1
 		end

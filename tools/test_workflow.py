@@ -88,6 +88,39 @@ class WorkflowTests(WorkflowFixture):
         status = reviewer.stream_status("\n".join(json.dumps(event) for event in events))
         self.assertEqual(status, {'model':'test-model','phase':'generating','rate_limit_status':'allowed'})
 
+    def test_muse_invocation_is_confined_and_uses_prompt_file(self):
+        help_response = MagicMock(returncode=0, stdout=" ".join(reviewer.MUSE_REQUIRED_FLAGS))
+        review_response = MagicMock(returncode=0, stdout="VERDICT: APPROVED")
+        with patch("reviewer.shutil.which", return_value="muse"), patch("reviewer.subprocess.run", return_value=help_response), patch("reviewer.run_muse", return_value=review_response) as run:
+            self.assertEqual(reviewer.muse("bounded packet", 10), "VERDICT: APPROVED")
+        args, kwargs = run.call_args
+        self.assertEqual(args[0][:2], ["muse", "exec"])
+        for flag in ("--disable-write", "--disable-shell", "--disable-web-tools", "--no-session-log"):
+            self.assertIn(flag, args[0])
+        for forbidden in ("--yolo", "--disable-approval", "--disable-sandbox", "--trust-workspace"):
+            self.assertNotIn(forbidden, args[0])
+        self.assertEqual(args[0][args[0].index("--workspace") + 1], kwargs["cwd"])
+        self.assertTrue(args[0][args[0].index("--prompt-file") + 1].startswith(kwargs["cwd"]))
+        self.assertNotEqual(Path(kwargs["cwd"]), ROOT)
+
+    def test_muse_help_gate_rejects_missing_flags(self):
+        help_response = MagicMock(returncode=0, stdout="--json --prompt-file")
+        with patch("reviewer.shutil.which", return_value="muse"), patch("reviewer.subprocess.run", return_value=help_response):
+            with self.assertRaisesRegex(RuntimeError, "confinement flags"):
+                reviewer.muse("bounded packet", 10)
+
+    def test_muse_empty_stdout_raises(self):
+        help_response = MagicMock(returncode=0, stdout=" ".join(reviewer.MUSE_REQUIRED_FLAGS))
+        review_response = MagicMock(returncode=0, stdout="  \n")
+        with patch("reviewer.shutil.which", return_value="muse"), patch("reviewer.subprocess.run", return_value=help_response), patch("reviewer.run_muse", return_value=review_response):
+            with self.assertRaisesRegex(RuntimeError, "no text"):
+                reviewer.muse("bounded packet", 10)
+
+    def test_muse_provider_rejects_visual_inputs(self):
+        with patch("sys.argv", ["reviewer.py", "muse", "--task", "Review this", "--image", "docs/ARCHITECTURE.md"]):
+            with self.assertRaises(SystemExit):
+                reviewer.main()
+
     def test_invalid_bytes_and_update_fail(self):
         with self.assertRaises(ValueError):
             validate_bytes(b"not png", "asset.png", "Unknown")

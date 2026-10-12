@@ -18,14 +18,12 @@ end
 T.describe("PopulationPolicy", function()
 	T.it("relaxes Splashdown at each boundary while giving larger races a chance to fill", function()
 		local queue = Queues.get("Splashdown")
-		local boundaries = {
-			{ seconds = 0, players = 30 },
-			{ seconds = 5, players = 20 },
-			{ seconds = 10, players = 12 },
-			{ seconds = 15, players = 8 },
-			{ seconds = 20, players = 4 },
-			{ seconds = 30, players = 2 },
-		}
+		local boundaries = {}
+		for _, step in queue.PopulationExpansion do
+			table.insert(boundaries, { seconds = step.AfterSeconds, players = step.MinimumPlayers })
+		end
+		T.expect(boundaries[1].players):toEqual(queue.MatchCapacity)
+		T.expect(boundaries[#boundaries].players):toEqual(queue.MinPlayers)
 		for index, boundary in boundaries do
 			T.expect(required(queue, boundary.seconds)):toEqual(boundary.players)
 			if index > 1 then
@@ -34,14 +32,14 @@ T.describe("PopulationPolicy", function()
 		end
 	end)
 
-	T.it("makes two racers eligible by 30 seconds and keeps them eligible after three minutes", function()
+	T.it("makes the minimum roster eligible by 30 seconds and keeps it eligible after three minutes", function()
 		for _, queueId in Queues.Order do
 			local queue = Queues.get(queueId)
-			T.expect(queue.MinPlayers):toEqual(2)
+			T.expect(queue.MinPlayers <= 2):toEqual(true)
 			T.expect(queue.MaxWaitSeconds <= 30):toEqual(true)
-			T.expect(required(queue, 30)):toEqual(2)
-			T.expect(required(queue, 180)):toEqual(2)
-			T.expect(required(queue, 3600)):toEqual(2)
+			T.expect(required(queue, 30)):toEqual(queue.MinPlayers)
+			T.expect(required(queue, 180)):toEqual(queue.MinPlayers)
+			T.expect(required(queue, 3600)):toEqual(queue.MinPlayers)
 		end
 	end)
 

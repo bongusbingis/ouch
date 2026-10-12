@@ -235,7 +235,8 @@ T.describe("ShopViewModel", function()
 			local card = model.byId["Product:Bonks500"]
 			T.expect(card.robuxPrice):toBeNil()
 			T.expect(card.productId):toBeNil()
-			T.expect(card.status):toEqual(if info.loading then "Loading" else "Unavailable")
+			T.expect(card.status)
+				:toEqual(if info.loading then "Loading" elseif info.failed then "Retry" else "Unavailable")
 		end
 	end)
 

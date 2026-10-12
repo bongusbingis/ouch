@@ -90,7 +90,9 @@ local function requiredCapacity(): number
 	local fixedModeId = if typeof(selection) == "table" then selection.ModeId else nil
 	assert(
 		strategy == "Fixed" and fixedModeId == "Splashdown",
-		`[SplashdownCourses] {queuePath}.ModeSelection received Strategy={tostring(strategy)}, ModeId={tostring(fixedModeId)}; expected Fixed mode Splashdown; correct the selected queue's ModeSelection`
+		`[SplashdownCourses] {queuePath}.ModeSelection received Strategy={tostring(strategy)}, ModeId={tostring(
+			fixedModeId
+		)}; expected Fixed mode Splashdown; correct the selected queue's ModeSelection`
 	)
 	local capacity = queue.MatchCapacity
 	assert(
@@ -190,15 +192,13 @@ local function resolve(courseId: string, model: Model, path: string, capacity: n
 		)
 		lava = configuredLiquid[1]
 		local authored = assert(RisingLiquid.resolve(lava:GetAttributes()))
-		local configured = assert(
-			RisingLiquid.resolve({
-				RisingLiquid = true,
-				MaxHeight = lavaDefinition.MaxHeight,
-				RiseStudsPerSecond = lavaDefinition.RiseStudsPerSecond,
-				StartDelaySeconds = lavaDefinition.StartDelaySeconds,
-				PauseWaypoints = lavaDefinition.PauseWaypoints or "",
-			})
-		)
+		local configured = assert(RisingLiquid.resolve({
+			RisingLiquid = true,
+			MaxHeight = lavaDefinition.MaxHeight,
+			RiseStudsPerSecond = lavaDefinition.RiseStudsPerSecond,
+			StartDelaySeconds = lavaDefinition.StartDelaySeconds,
+			PauseWaypoints = lavaDefinition.PauseWaypoints or "",
+		}))
 		assert(
 			math.abs(authored.studs - configured.studs) < 1e-6
 				and math.abs(authored.seconds - configured.seconds) < 1e-6
@@ -207,10 +207,7 @@ local function resolve(courseId: string, model: Model, path: string, capacity: n
 		)
 		lavaRise = configured
 	else
-		assert(
-			#configuredLiquid == 0,
-			`[SplashdownCourses] {path} has RisingLiquid=true but no LavaRise configuration`
-		)
+		assert(#configuredLiquid == 0, `[SplashdownCourses] {path} has RisingLiquid=true but no LavaRise configuration`)
 	end
 
 	local doorsFolder = scriptables:FindFirstChild("Doors")
@@ -310,12 +307,7 @@ function SplashdownCourses.instantiate(courseId: string, parent: Instance, origi
 	-- Resolve and tag while staged; cleanup always rethrows the original failure.
 	local ok, result = pcall(function(): LiveCourse
 		clone:PivotTo(origin)
-		local live = resolve(
-			courseId,
-			clone,
-			`{parent:GetFullName()}.{Splashdown.ActiveCourseName}`,
-			capacity
-		)
+		local live = resolve(courseId, clone, `{parent:GetFullName()}.{Splashdown.ActiveCourseName}`, capacity)
 		local tagged, reason = ScriptableRoots.tag(live.scriptables)
 		assert(
 			tagged,

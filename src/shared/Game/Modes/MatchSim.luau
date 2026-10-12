@@ -66,12 +66,18 @@ function MatchSim.start(state: MatchState, rules: MatchRules, events: { MatchEve
 	table.insert(events, { kind = "MatchPreparing" })
 end
 
+-- Nobody at zero can lead: a player who never scored (or, in Splashdown, never
+-- finished a round) must not be handed a win just because they are the only
+-- entry left in the table.
 local function leader(state: MatchState): string?
 	local bestId: string? = nil
-	local bestScore = -1
+	local bestScore = 0
 	local tied = false
 	for _, playerId in SimUtil.sortedKeys(state.scores) do
 		local score = state.scores[playerId]
+		if score <= 0 then
+			continue
+		end
 		if score > bestScore then
 			bestId = playerId
 			bestScore = score

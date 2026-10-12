@@ -4,6 +4,7 @@
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -30,6 +31,12 @@ local c = React.createElement
 local C, J = T.Colors, T.JoinCode
 local CODE_LENGTH = 6
 local HELP_TEXT = ""
+local INSTRUCTION_TEXT = "Enter your friend's 6-digit party code."
+-- The heading block (title sticker + instruction) is stacked from measured heights so the sticker can
+-- never cover the line beneath it, then centred in the space above the entry well.
+local BLOCK_GAP = 8
+local BLOCK_TOP_MIN = 8
+local MIN_TITLE_HEIGHT = 44
 
 local function keyboardSnapshot()
 	return {
@@ -388,6 +395,20 @@ return function(props: Props)
 
 	local canSubmit = #code == CODE_LENGTH and not submitting and props.FocusEnabled ~= false
 	local compact = panelSize.X < J.CompactWidth
+	local instructionHeight = math.ceil(
+		TextService:GetTextSize(
+			INSTRUCTION_TEXT,
+			T.Type.Minimum,
+			T.Type.Label,
+			Vector2.new(math.max(panelSize.X * 0.9 - 4, 1), 10000)
+		).Y
+	) + 4
+	local entryTop = layout.contentHeight * JoinCodeLayout.EntryTop
+	local titleHeight =
+		math.clamp(entryTop - BLOCK_GAP * 2 - instructionHeight - BLOCK_TOP_MIN, MIN_TITLE_HEIGHT, J.TitleHeight)
+	local blockHeight = titleHeight + BLOCK_GAP + instructionHeight
+	local titleTop = math.max(BLOCK_TOP_MIN, math.floor((entryTop - blockHeight) / 2))
+	local instructionTop = titleTop + titleHeight + BLOCK_GAP
 	return modalSurface({
 		Active = true,
 		AutoButtonColor = false,
@@ -442,32 +463,28 @@ return function(props: Props)
 					-- or actions when the native keyboard leaves only a short viewport.
 					Title = c(CandyTitle, {
 						Text = "JOIN PARTY",
-						TextSize = if compact then J.CompactTitleSize else J.TitleSize,
+						TextSize = T.Type.ModalTitle,
 						Native = {
-							AnchorPoint = Vector2.new(0, 0.5),
-							Position = UDim2.fromScale(0.05, J.TitleCenter),
-							Size = UDim2.new(
-								0.9,
-								0,
-								0,
-								math.min(J.TitleHeight, layout.contentHeight * J.TitleHeightScale)
-							),
+							Position = UDim2.new(0.05, 0, 0, titleTop),
+							Size = UDim2.new(0.9, 0, 0, titleHeight),
 							ZIndex = 106,
 						},
 					}),
 					Instruction = c(ResponsiveText, {
 						MeasurementFont = T.Type.Label,
 						MaxTextSize = T.Type.Minimum,
-						MinTextSize = 14,
+						MinTextSize = T.Type.Minimum,
+						Wrapped = true,
 						Native = {
-							AnchorPoint = Vector2.new(0, 0.5),
 							BackgroundTransparency = 1,
 							Font = T.Type.Label,
-							Position = UDim2.fromScale(0.05, J.InstructionCenter),
-							Size = UDim2.fromScale(0.9, 0.08),
-							Text = "Enter your friend's 6-digit party code.",
+							Position = UDim2.new(0.05, 0, 0, instructionTop),
+							Size = UDim2.new(0.9, 0, 0, instructionHeight),
+							Text = INSTRUCTION_TEXT,
 							TextColor3 = C.InkSoft,
+							TextWrapped = true,
 							TextXAlignment = Enum.TextXAlignment.Left,
+							TextYAlignment = Enum.TextYAlignment.Center,
 							ZIndex = 105,
 						},
 					}),
@@ -590,7 +607,7 @@ return function(props: Props)
 						HostName = "ErrorText",
 						MeasurementFont = T.Type.Label,
 						MaxTextSize = T.Type.Minimum,
-						MinTextSize = 14,
+						MinTextSize = T.Type.Minimum,
 						Wrapped = true,
 						Native = {
 							AnchorPoint = Vector2.new(0.5, 0.5),

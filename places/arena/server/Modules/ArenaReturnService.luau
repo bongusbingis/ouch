@@ -468,6 +468,23 @@ function ArenaReturnService.start()
 		end,
 	}, handleRequest)
 
+	-- MatchEnded retains only players who were round-eligible then. A slow loader
+	-- or rejoiner who becomes ready during Results would otherwise be sent to the
+	-- lobby at MatchReset, so they keep their party's place in the next round.
+	-- A party that chose the lobby left its members ineligible, which this respects.
+	ArenaSessionService.onReady(function(player)
+		local partyId = ArenaSessionService.partyIdFor(player)
+		if
+			partyId
+			and MatchService.phase() == "Results"
+			and ArenaSessionService.isRoundEligible(player)
+			and not pendingReturn[player]
+			and not coordinator:IsTracked(player)
+		then
+			retainedPartyIds[partyId] = true
+		end
+	end)
+
 	MatchService.onEvent(function(event)
 		if event.kind == "MatchEnded" then
 			table.clear(retainedPartyIds)

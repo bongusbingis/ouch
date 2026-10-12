@@ -7,7 +7,7 @@ local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 return function(props)
 	local native = table.clone(props.Native or {})
 	native.BackgroundTransparency = 1
-	native.Font = if props.Title then T.Type.Display else T.Type.Label
+	native.Font = props.Font or (if props.Title then T.Type.Display else T.Type.Label)
 	native.Text = props.Text or ""
 	native.TextColor3 = props.Color or T.Colors.Ink
 	native.TextXAlignment = props.Align or Enum.TextXAlignment.Center
@@ -16,7 +16,7 @@ return function(props)
 	return React.createElement(ResponsiveText, {
 		HostName = props.Name,
 		MeasurementFont = native.Font,
-		MinTextSize = props.Minimum or 12,
+		MinTextSize = props.Minimum or T.Type.HudMinimum,
 		MaxTextSize = props.Size or 20,
 		Wrapped = native.TextWrapped == true,
 		Native = native,

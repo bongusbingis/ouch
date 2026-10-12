@@ -188,6 +188,7 @@ local function copyContestants(contestants: { Contestant }): { Contestant }
 			displayName = contestant.displayName,
 			teamId = contestant.teamId,
 			colorId = contestant.colorId,
+			costumeId = contestant.costumeId,
 			emoteId = contestant.emoteId,
 			ballId = contestant.ballId,
 			hammerId = contestant.hammerId,
@@ -213,6 +214,8 @@ end
 local function orderedScores(input: BuildInput, contestants: { Contestant }): { ScoreEntry }
 	local ids = {}
 	local scores = table.clone(input.scores)
+	-- Cumulative race time is the Splashdown tiebreak (RacePoints.standings): lower wins when points tie.
+	local times: { [string]: number } = {}
 	if input.scoreScope == "Team" then
 		for _, teamId in input.teamIds or {} do
 			table.insert(ids, teamId)
@@ -223,27 +226,53 @@ local function orderedScores(input: BuildInput, contestants: { Contestant }): { 
 			if scores[contestant.playerId] == nil then
 				scores[contestant.playerId] = contestant.contribution or 0
 			end
+			local time = if contestant.stats then contestant.stats.TotalTime else nil
+			if time ~= nil then
+				times[contestant.playerId] = time
+			end
 		end
+	end
+
+	-- Equal scores fall to the authoritative winner first, then lower cumulative time (no report
+	-- sorts last), then id, so the list agrees with the standings the winner came from.
+	local winnerId = input.winnerId
+	local function tiebreak(a: string, b: string): number
+		if winnerId ~= nil and winnerId ~= "" and a ~= b then
+			if a == winnerId then
+				return -1
+			elseif b == winnerId then
+				return 1
+			end
+		end
+		local aTime, bTime = times[a] or math.huge, times[b] or math.huge
+		if aTime ~= bTime then
+			return if aTime < bTime then -1 else 1
+		end
+		return 0
 	end
 
 	table.sort(ids, function(a, b)
 		local aScore = scores[a] or 0
 		local bScore = scores[b] or 0
-		if aScore == bScore then
-			return a < b
+		if aScore ~= bScore then
+			return aScore > bScore
 		end
-		return aScore > bScore
+		local decided = tiebreak(a, b)
+		if decided ~= 0 then
+			return decided < 0
+		end
+		return a < b
 	end)
 
 	local result = {}
-	local previousScore: number? = nil
+	local previousId: string? = nil
 	local placement = 0
 	for index, id in ids do
 		local score = scores[id] or 0
-		if previousScore == nil or score ~= previousScore then
+		if previousId == nil or score ~= (scores[previousId] or 0) or tiebreak(previousId, id) ~= 0 then
 			placement = index
 		end
-		previousScore = score
+		previousId = id
 		table.insert(result, {
 			id = id,
 			label = if input.scoreScope == "Team" then string.upper(id) else contestantLabel(contestants, id),
@@ -445,8 +474,12 @@ function PostMatchResult.podium(result: GlobalResult): { ShowcaseEntry }
 	end
 	local candidates = {}
 	local scores = {}
-	for _, entry in result.scores do
+	local order = {}
+	local placements = {}
+	for index, entry in result.scores do
 		scores[entry.id] = entry.score
+		order[entry.id] = index
+		placements[entry.id] = entry.placement or index
 	end
 	for _, contestant in result.contestants do
 		local score = if result.scoreScope == "Player" then scores[contestant.playerId] else contestant.contribution
@@ -456,14 +489,21 @@ function PostMatchResult.podium(result: GlobalResult): { ShowcaseEntry }
 			table.insert(candidates, entry)
 		end
 	end
+	-- Player scope follows the ordered score list so podium ranks match the standings, tiebreak included.
+	local player = result.scoreScope == "Player"
 	table.sort(candidates, function(a, b)
+		if player then
+			return (order[a.playerId] or math.huge) < (order[b.playerId] or math.huge)
+		end
 		return if a.score == b.score then a.userId < b.userId else a.score > b.score
 	end)
 	local podium = {}
 	local previous, rank = nil, 0
 	for index = 1, math.min(#candidates, 3) do
 		local entry = candidates[index]
-		if entry.score ~= previous then
+		if player then
+			rank = placements[entry.playerId] or index
+		elseif entry.score ~= previous then
 			rank = index
 		end
 		previous = entry.score

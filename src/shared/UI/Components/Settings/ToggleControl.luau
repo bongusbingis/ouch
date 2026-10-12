@@ -17,6 +17,9 @@ local Tokens = require(script.Parent.Parent.Parent.Tokens)
 local c = React.createElement
 local C = Tokens.Colors
 local SETTINGS = Tokens.Settings
+-- Each option keeps room to breathe beside the pink segment: a cell never gets narrower than this,
+-- however small the row it sits in.
+local MIN_CELL_WIDTH = 76
 
 export type Props = {
 	Value: any,
@@ -68,20 +71,20 @@ return function(props: Props)
 		}, {
 			Label = c(ResponsiveText, {
 				MeasurementFont = Tokens.Type.Display,
-				MaxTextSize = 22,
-				MinTextSize = 16,
+				MaxTextSize = Tokens.Type.Body,
+				MinTextSize = Tokens.Type.Body,
 				Native = {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					Font = Tokens.Type.Display,
-					Position = UDim2.new(0.5, 0, 0.5, 2),
-					Size = UDim2.fromScale(0.86, 0.7),
+					Position = UDim2.new(0.5, 0, 0.5, -Tokens.Shape.LipHeight / 2),
+					Size = UDim2.new(1, -Tokens.Shape.StrokeTab * 4, 0.7, 0),
 					Text = props.Labels[index],
 					TextColor3 = if selected then C.Surface else C.InkSoft,
 					ZIndex = 5,
 				},
 			}, {
-				Stroke = if selected then c("UIStroke", { Color = C.Ink, Thickness = 2 }) else nil,
+				Stroke = if selected then c("UIStroke", { Color = C.Ink, Thickness = Tokens.Type.Outline }) else nil,
 			}),
 		})
 	end
@@ -95,6 +98,7 @@ return function(props: Props)
 		Size = props.Size or UDim2.fromScale(1, 1),
 		ZIndex = 6,
 	}, {
+		MinimumWidth = c("UISizeConstraint", { MinSize = Vector2.new(MIN_CELL_WIDTH * 2, 0) }),
 		Surface = c(CandySurface, {
 			Color = if enabled then C.Surface else C.WellLine,
 			LipColor = C.WellLine,
@@ -106,15 +110,15 @@ return function(props: Props)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = styles.Alpha:map(function(alpha: number)
-				return UDim2.new(alpha * 0.5, 4, 0, 4)
+				return UDim2.new(alpha * 0.5, Tokens.Shape.StrokeTab, 0, Tokens.Shape.StrokeTab)
 			end),
-			Size = UDim2.new(0.5, -8, 1, -8),
+			Size = UDim2.new(0.5, -Tokens.Shape.StrokeTab * 2, 1, -Tokens.Shape.StrokeTab * 2),
 			ZIndex = 3,
 		}, {
 			Surface = c(CandySurface, {
 				Color = if enabled then C.Pink else C.WellLine,
 				LipColor = if enabled then C.PinkLip else C.WellLine,
-				Radius = math.max(SETTINGS.ToggleRadius - 4, 1),
+				Radius = math.max(SETTINGS.ToggleRadius - Tokens.Shape.StrokeTab, 1),
 				Shadow = false,
 				Stroke = false,
 				ZIndex = 3,

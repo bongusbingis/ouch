@@ -589,6 +589,20 @@ local function optionalMediaInstances(): ({ Instance }, { Instance })
 				addImage(definition.ThumbnailId, `Config.Gameplay.GameModes.Modes.{modeId}.ThumbnailId`, true)
 			end
 		end
+		-- Map thumbnails are optional art: a missing or broken config never gates readiness.
+		local mapsModule = Config:WaitForChild("Gameplay"):FindFirstChild("ArenaMaps")
+		local mapsLoaded, ArenaMaps = false, nil
+		if mapsModule ~= nil and mapsModule:IsA("ModuleScript") then
+			mapsLoaded, ArenaMaps = pcall(require, mapsModule)
+		end
+		if mapsLoaded and typeof(ArenaMaps) == "table" and typeof(ArenaMaps.Order) == "table" then
+			for _, mapId in ArenaMaps.Order do
+				local definition = ArenaMaps.Maps[mapId]
+				if definition ~= nil and definition.ThumbnailId ~= "" then
+					addImage(definition.ThumbnailId, `Config.Gameplay.ArenaMaps.Maps.{mapId}.ThumbnailId`, true)
+				end
+			end
+		end
 		local assets = ReplicatedStorage:FindFirstChild("Assets")
 		if assets == nil then
 			return

@@ -59,6 +59,13 @@ T.describe("ModeVote", function()
 		T.expect(ModeVote.extendForLateReady(110, 120, 104, 5)):toEqual(110)
 		T.expect(ModeVote.extendForLateReady(110, 120, 110, 5)):toEqual(110)
 	end)
+
+	T.it("waits for loading players within the cap but still returns a lone stranded player", function()
+		T.expect(ModeVote.strandedAction(1, 8, 20)):toEqual("rearm")
+		T.expect(ModeVote.strandedAction(1, 19.9, 20)):toEqual("rearm")
+		T.expect(ModeVote.strandedAction(1, 20, 20)):toEqual("return")
+		T.expect(ModeVote.strandedAction(0, 0, 20)):toEqual("return")
+	end)
 end)
 
 return true

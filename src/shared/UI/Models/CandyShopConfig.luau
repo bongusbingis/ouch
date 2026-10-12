@@ -48,7 +48,7 @@ return table.freeze({
 		More = { Class = "Pass", MaxColumns = 4, Span = 12, Title = "PASSES", Priority = 1 },
 		Crates = { Class = "Feature", MaxColumns = 2, Span = 4, Priority = 2 },
 		ForYou = { Class = "Feature", MaxColumns = 2, Span = 4, Priority = 2 },
-		Bonks = { Class = "Tile", MaxColumns = 3, Span = 8, Priority = 2 },
+		Bonks = { Class = "Tile", MaxColumns = 3, Span = 4, Priority = 2 },
 	},
 	Order = { "More", "Crates", "ForYou", "Bonks" },
 })

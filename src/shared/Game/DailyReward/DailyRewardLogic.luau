@@ -108,6 +108,8 @@ end
 function DailyRewardLogic.publicState(state: DailyRewardState, config: Config, now: number): PublicState
 	local claimable = DailyRewardLogic.canClaim(state, now)
 	local next = DailyRewardLogic.nextDay(state, config)
+	-- Once a finished cycle can wrap back to day 1, none of the new cycle is claimed yet.
+	local claimedThrough = if claimable and next == 1 then 0 else state.Day
 
 	local days: { PublicDay } = {}
 	for day = 1, config.CycleLength do
@@ -116,7 +118,7 @@ function DailyRewardLogic.publicState(state: DailyRewardState, config: Config, n
 			continue
 		end
 
-		local claimed = day <= state.Day
+		local claimed = day <= claimedThrough
 		local available = day == next and claimable
 		local current = day == next
 

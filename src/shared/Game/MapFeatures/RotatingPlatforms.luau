@@ -103,6 +103,8 @@ export type Platform = {
 	pivotToBounds: CFrame,
 	reach: number,
 	appliedAngle: number?,
+	-- Computed once at build; hydrated client platforms are never seesaws (register refuses them).
+	hasSeesaw: boolean?,
 	localRotors: { LocalRotor },
 	restParts: { RestPart }?,
 	descriptor: string?,
@@ -303,7 +305,7 @@ end
 -- Applies a compiled assembly without depending on a running heartbeat.
 function RotatingPlatforms.applyAt(platform: Platform, now: number)
 	-- A physical board must never be reset by a kinematic group pivot.
-	if containsSeesaw(platform.assembly) then
+	if platform.hasSeesaw then
 		return
 	end
 	local angle = Rotation.angleAt(now, platform.degreesPerSecond)
@@ -664,6 +666,7 @@ local function build(first: Model | BasePart, second: (Model | BasePart)?): Plat
 		boundsSize = boundsSize,
 		pivotToBounds = pivot:Inverse() * boundsCFrame,
 		reach = (boundsCFrame.Position - motionPivot.Position).Magnitude + boundsSize.Magnitude / 2,
+		hasSeesaw = containsSeesaw(assembly),
 		localRotors = localRotors,
 	}
 end
@@ -1299,9 +1302,6 @@ function RotatingPlatforms.startMover()
 end
 
 local function applyClientBatch(platform: Platform, now: number): (string, string?)
-	if containsSeesaw(platform.assembly) then
-		return "ok", nil
-	end
 	local batch = platform.clientBatch :: ClientBatch
 	local restParts = platform.restParts :: { RestPart }
 	local pose = RotatingPlatforms.poseAt(platform, now)

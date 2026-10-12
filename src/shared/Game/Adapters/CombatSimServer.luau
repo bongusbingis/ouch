@@ -20,6 +20,7 @@ local MovementSpeedService = require(script.Parent.MovementSpeedService)
 local WeaponRegistry = require(script.Parent.Parent.Sim.WeaponRegistry)
 local ModeRegistry = require(script.Parent.Parent.Modes.ModeRegistry)
 local Combat = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.Combat)
+local GameModes = require(script.Parent.Parent.Parent.Parent.Config.Gameplay.GameModes)
 local InputConfig = require(script.Parent.Parent.Parent.Parent.Config.Interface.Input)
 local Debug = require(script.Parent.Parent.Parent.Parent.Config.Infra.Debug)
 local Network = require(script.Parent.Parent.Parent.Network)
@@ -244,7 +245,11 @@ end
 
 local function buildCommands(entries: { [string]: CharacterEntry }): { InputCommand }
 	local commands: { InputCommand } = {}
-	local active = matchState ~= nil and matchState:GetAttribute("phase") == "Active"
+	-- Weapon input is combat-only: non-combat modes (Splashdown) must not reach the
+	-- hammer/dodgeball sim, whose swing dash and knockback apply regardless of Elim filtering.
+	local active = matchState ~= nil
+		and matchState:GetAttribute("phase") == "Active"
+		and GameModes.IsCombat(matchState:GetAttribute("modeId"))
 	local intents = pendingIntents.drain()
 
 	for playerId, weapon in pendingEquips do

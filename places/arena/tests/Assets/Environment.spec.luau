@@ -5,16 +5,21 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
+local LiveSession = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("LiveSession"))
 
 return function()
 	describe("Cloud execution environment", function()
+		-- These two pin the headless cloud environment itself; a Studio Play session legitimately
+		-- has a player and a running simulation, so they skip there and run in the cloud.
+		local cloudOnlyIt = LiveSession.guardedIt(it, itSKIP)
 		it("runs in a server context", function()
 			expect(RunService:IsServer()).to.equal(true)
 			expect(RunService:IsClient()).to.equal(false)
 		end)
 
-		it("has no players (player emulation is impossible here)", function()
+		cloudOnlyIt("has no players (player emulation is impossible here)", function()
 			expect(#Players:GetPlayers()).to.equal(0)
 		end)
 
@@ -22,7 +27,7 @@ return function()
 			expect(Workspace.Gravity > 0).to.equal(true)
 		end)
 
-		it("does not run the place simulation", function()
+		cloudOnlyIt("does not run the place simulation", function()
 			expect(RunService:IsRunning()).to.equal(false)
 		end)
 

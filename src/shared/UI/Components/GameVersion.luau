@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local ResponsiveText = require(script.Parent.ResponsiveText)
+local T = require(script.Parent.Parent.Tokens)
 
 local c = React.createElement
 
@@ -52,22 +53,18 @@ return function()
 	end
 
 	return c(ResponsiveText, {
-		MeasurementFont = Enum.Font.SourceSansBold,
-		MinTextSize = 10,
-		MaxTextSize = 14,
+		MeasurementFont = T.Type.Label,
+		MinTextSize = T.Type.HudMinimum,
+		MaxTextSize = T.Type.HudMinimum,
 		Native = {
 			AnchorPoint = Vector2.new(0, 1),
 			BackgroundTransparency = 1,
-			FontFace = Font.new(
-				"rbxasset://fonts/families/SourceSansPro.json",
-				Enum.FontWeight.Bold,
-				Enum.FontStyle.Normal
-			),
-			Position = UDim2.fromScale(0.01, 0.99),
-			Size = UDim2.fromScale(0.2, 0.025),
+			Font = T.Type.Label,
+			Position = UDim2.new(0.01, 0, 1, -6),
+			Size = UDim2.new(0.3, 0, 0, T.Type.HudMinimum + 6),
 			Text = versionText,
-			TextColor3 = Color3.new(1, 1, 1),
-			TextTransparency = 0.55,
+			TextColor3 = T.Colors.Ink,
+			TextTransparency = 0.3,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = 5,
 		},

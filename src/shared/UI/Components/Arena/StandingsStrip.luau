@@ -7,7 +7,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local Config =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("ArenaPresentation"))
 local MatchHUDModel = require(script.Parent.Parent.Parent.Models.MatchHUDModel)
@@ -71,7 +70,7 @@ return function(props: Props)
 	}
 	for index, entry in rows do
 		local leader = entry.placement == 1
-		local textSize = if short then 14 else UI.Text.CaptionMinPx
+		local textSize = T.Type.HudMinimum
 		children[`Row{index}`] = c("Frame", {
 			BackgroundColor3 = if entry.isLocal then colors.Pink else colors.Panel,
 			BackgroundTransparency = 0,
@@ -80,7 +79,7 @@ return function(props: Props)
 			Size = UDim2.new(1, 0, 0, rowHeight),
 			ZIndex = z + 1,
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 			Team = if view.teamMode and entry.teamId
 				then c("Frame", {
 					BackgroundColor3 = colors[accentByTeam[entry.teamId] or "Cyan"],
@@ -88,7 +87,7 @@ return function(props: Props)
 					Position = UDim2.fromOffset(0, 0),
 					Size = UDim2.new(0, 4, 1, 0),
 					ZIndex = z + 2,
-				}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, UI.Radius.Tile) }) })
+				}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }) })
 				else nil,
 			Rank = c("TextLabel", {
 				Visible = not leader,

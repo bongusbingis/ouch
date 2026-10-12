@@ -22,6 +22,10 @@ local c = React.createElement
 local C = Tokens.Colors
 local S = Tokens.Shape
 local SETTINGS = Tokens.Settings
+-- Faces shorter than this tighten their padding so a wrapped description still fits.
+local ROOMY_FACE = 88
+-- Title line above a description: one label line plus its leading.
+local LABEL_HEIGHT = Tokens.Type.Body + Tokens.Shape.LipHeight
 
 export type Props = {
 	Definition: SettingsRegistry.Definition,
@@ -43,12 +47,13 @@ return React.memo(function(props: Props)
 	local enabled = props.Enabled ~= false
 	local hasDescription = definition.Description ~= nil and definition.Description ~= ""
 	local faceHeight = props.Height - S.LipHeight
-	local verticalInset = if faceHeight < 88 then 8 else 12
+	local verticalInset = if faceHeight < ROOMY_FACE then Tokens.Shape.StrokeCard * 2 else Tokens.Layout.CompactGap
 	local innerHeight = faceHeight - verticalInset * 2
 
-	local textWidth = if props.Compact then 1 else 0.54
+	local slider = definition.Type == "Slider"
+	-- Wide rows split label and control; a slider (track + readout on one line) gets the larger share.
+	local textWidth = if props.Compact then 1 elseif slider then 0.44 else 0.5
 	local controlHeight = UIConfig.Interaction.MinTargetPx
-		+ (if definition.Type == "Slider" then UIConfig.Layout.SettingsControls.SliderLabelHeightPx else 0)
 	local textHeight = if props.Compact
 		then math.max(innerHeight - controlHeight - UIConfig.Layout.SettingsControls.LabelControlGapPx, 0)
 		else innerHeight
@@ -68,7 +73,7 @@ return React.memo(function(props: Props)
 				then UDim2.new(0, SETTINGS.CardInset, 1, -SETTINGS.CardInset - S.LipHeight)
 				else UDim2.new(1, -SETTINGS.CardInset, 0, faceHeight / 2),
 			Size = UDim2.new(
-				if props.Compact then 0.66 else 0.36,
+				if props.Compact then 0.66 else 0.42,
 				if props.Compact then -SETTINGS.CardInset else 0,
 				0,
 				controlHeight
@@ -88,7 +93,7 @@ return React.memo(function(props: Props)
 				then UDim2.new(0, SETTINGS.CardInset, 1, -SETTINGS.CardInset - S.LipHeight)
 				else UDim2.new(1, -SETTINGS.CardInset, 0, faceHeight / 2),
 			Size = UDim2.new(
-				if props.Compact then 1 else 0.42,
+				if props.Compact then 1 else 0.5,
 				if props.Compact then -SETTINGS.CardInset * 2 else 0,
 				0,
 				controlHeight
@@ -115,17 +120,20 @@ return React.memo(function(props: Props)
 			Size = UDim2.new(textWidth, -SETTINGS.CardInset * 2, 0, textHeight),
 			ZIndex = 5,
 		}, {
+			-- One fixed size for every row label (never fitted per row), so siblings always match.
 			Label = c(ResponsiveText, {
 				MeasurementFont = Tokens.Type.Label,
-				MaxTextSize = 22,
-				MinTextSize = 16,
+				MaxTextSize = Tokens.Type.Body,
+				MinTextSize = Tokens.Type.Body,
+				Wrapped = not hasDescription,
 				Native = {
 					BackgroundTransparency = 1,
 					Font = Tokens.Type.Label,
 					Position = UDim2.fromScale(0, 0),
-					Size = if hasDescription then UDim2.new(1, 0, 0, 28) else UDim2.fromScale(1, 1),
+					Size = if hasDescription then UDim2.new(1, 0, 0, LABEL_HEIGHT) else UDim2.fromScale(1, 1),
 					Text = definition.Label,
 					TextColor3 = if enabled then C.Ink else C.InkSoft,
+					TextWrapped = not hasDescription,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextYAlignment = Enum.TextYAlignment.Center,
 					ZIndex = 5,
@@ -133,15 +141,15 @@ return React.memo(function(props: Props)
 			}),
 			Description = if hasDescription
 				then c(ResponsiveText, {
-					MeasurementFont = Enum.Font.BuilderSansBold,
-					MaxTextSize = 18,
-					MinTextSize = 14,
+					MeasurementFont = Tokens.Type.Label,
+					MaxTextSize = Tokens.Type.Minimum,
+					MinTextSize = Tokens.Type.Minimum,
 					Wrapped = true,
 					Native = {
 						BackgroundTransparency = 1,
-						Font = Enum.Font.BuilderSansBold,
-						Position = UDim2.fromOffset(0, 28),
-						Size = UDim2.new(1, 0, 1, -28),
+						Font = Tokens.Type.Label,
+						Position = UDim2.fromOffset(0, LABEL_HEIGHT),
+						Size = UDim2.new(1, 0, 1, -LABEL_HEIGHT),
 						Text = if not enabled and props.DisabledReason
 							then props.DisabledReason
 							else definition.Description,

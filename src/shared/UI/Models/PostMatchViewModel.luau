@@ -18,6 +18,7 @@ export type ActionModel = {
 	leaderName: string,
 	primaryText: string,
 	primaryStyle: PrimaryStyle,
+	primaryIcon: string?,
 	returnText: string,
 	returnAction: "ReturnToLobby" | "LeaveParty",
 	statusText: string,
@@ -64,6 +65,7 @@ function PostMatchViewModel.actions(
 	local canReplay = status == nil or status.canReplay ~= false
 
 	local primaryText, primaryStyle: PrimaryStyle
+	local primaryIcon: string? = nil
 	if busy then
 		primaryText, primaryStyle = "PLEASE WAIT…", "Waiting"
 	elseif not isLeader then
@@ -71,7 +73,8 @@ function PostMatchViewModel.actions(
 	elseif not canReplay then
 		primaryText, primaryStyle = "FIND PLAYERS", "Primary"
 	elseif replaySelected then
-		primaryText, primaryStyle = "NEXT ROUND ✓", "Done"
+		-- The confirmation tick is drawn from the Check icon, not a Unicode glyph (fallback fonts render it as a root sign).
+		primaryText, primaryStyle, primaryIcon = "NEXT ROUND", "Done", "Check"
 	else
 		primaryText, primaryStyle = "PLAY AGAIN", "Primary"
 	end
@@ -111,6 +114,7 @@ function PostMatchViewModel.actions(
 		leaderName = leaderName,
 		primaryText = primaryText,
 		primaryStyle = primaryStyle,
+		primaryIcon = primaryIcon,
 		returnText = returnText,
 		returnAction = if isLeader then "ReturnToLobby" else "LeaveParty",
 		statusText = statusText,
@@ -148,6 +152,22 @@ function PostMatchViewModel.kicker(modeName: string, eyebrow: string): string
 	return string.upper(modeName) .. " · " .. eyebrow
 end
 
+-- The detail pill only earns its place when it adds something the kicker and title do not;
+-- generic "round complete" restatements are dropped.
+local GENERIC_DETAILS = {
+	["ROUND COMPLETE"] = true,
+	["MATCH COMPLETE"] = true,
+	["ROUND OVER"] = true,
+	["ROUND ENDED"] = true,
+}
+
+function PostMatchViewModel.detail(detail: string?, eyebrow: string): string?
+	if detail == nil or detail == "" or detail == eyebrow or GENERIC_DETAILS[detail] then
+		return nil
+	end
+	return detail
+end
+
 function PostMatchViewModel.stageHeading(
 	teamMode: boolean,
 	podiumCount: number,
@@ -161,6 +181,13 @@ function PostMatchViewModel.stageHeading(
 		return if tied then "DEAD HEAT" else "READY FOR THE NEXT ONE"
 	end
 	return if teamMode then "WINNING TEAM STANDOUTS" else "TOP FINISHERS"
+end
+
+-- Team-scope podium plates show each player's own eliminations (contribution),
+-- not the team score, so they keep the elimination unit even when the mode's
+-- score label counts something else (Infection scores headcount as PLAYERS).
+function PostMatchViewModel.podiumScoreLabel(teamMode: boolean, scoreLabel: string): string
+	return if teamMode then "ELIMS" else scoreLabel
 end
 
 function PostMatchViewModel.statText(stat: { id: string, value: number }): string

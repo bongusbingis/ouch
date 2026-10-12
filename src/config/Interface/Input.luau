@@ -45,6 +45,24 @@ return {
 		Gamepad = Enum.KeyCode.DPadDown,
 		GamepadLabel = "DPad Down",
 	},
+	-- HUD and menu actions with one keyboard key and one gamepad button each; the
+	-- binders (CombatMenuClient, MatchHUDClient, LobbyNavigation) and InputHint read
+	-- these so a shown hint can never drift from the real bind. ButtonStart is
+	-- Roblox's own menu and is never used. Gamepad combat owns R2 (throw), X
+	-- (hammer), B (cancel throw), A (jump), L1/R1 (equip) and DPadDown (emotes).
+	Hints = {
+		Menu = { Keyboard = Enum.KeyCode.M, Gamepad = Enum.KeyCode.ButtonY },
+		-- Hold to view; ArenaCoreUI hides the PlayerList so Tab is free.
+		Scores = { Keyboard = Enum.KeyCode.Tab, Gamepad = Enum.KeyCode.ButtonSelect },
+		Back = { Keyboard = Enum.KeyCode.Escape, Gamepad = Enum.KeyCode.ButtonB },
+		-- Gamepad-only: shown on the focused control (Roblox activates it with A).
+		Confirm = { Gamepad = Enum.KeyCode.ButtonA },
+		-- Menu tab cycling only while a tab rail owns input (never during combat).
+		TabPrevious = { Gamepad = Enum.KeyCode.ButtonL1 },
+		TabNext = { Gamepad = Enum.KeyCode.ButtonR1 },
+		-- Mirrors the OnboardingSkip InputAction bindings below (spec-checked).
+		Skip = { Keyboard = Enum.KeyCode.X, Gamepad = Enum.KeyCode.ButtonB },
+	},
 	Actions = {
 		{
 			Name = "OnboardingSkip",

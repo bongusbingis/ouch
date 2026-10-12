@@ -20,6 +20,10 @@ local DeviceClass = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Input"):WaitForChild("DeviceClass")
 )
 
+-- M / ButtonY (Input.Hints.Menu): MenuToggle shows the same binding as its hint.
+local MENU_BINDING =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints.Menu
+
 local CombatMenuClient = {}
 
 export type Page = "Inventory" | "Shop" | "Settings"
@@ -128,8 +132,8 @@ function CombatMenuClient.start()
 		handleToggle,
 		false,
 		ACTION_PRIORITY,
-		Enum.KeyCode.M,
-		Enum.KeyCode.ButtonY
+		MENU_BINDING.Keyboard,
+		MENU_BINDING.Gamepad
 	)
 end
 
