@@ -2,6 +2,7 @@
 
 --!strict
 
+local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -45,6 +46,14 @@ function InputRouter.start()
 			Network.fireServer("ReportDeviceClass", deviceClass)
 		end)
 	)
+
+	local function reassertDeviceClass()
+		local honest = DeviceClass.current()
+		if Players.LocalPlayer:GetAttribute("DeviceClass") ~= honest then
+			Network.fireServer("ReportDeviceClass", honest)
+		end
+	end
+	table.insert(connections, Players.LocalPlayer:GetAttributeChangedSignal("DeviceClass"):Connect(reassertDeviceClass))
 
 	if ModeVoteClient then
 		table.insert(

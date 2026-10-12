@@ -20,7 +20,9 @@ local MatchService = require(script.Parent.MatchService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local AnalyticsService = require(script.Parent.AnalyticsService)
 local Env = require(script.Parent.Parent.Env)
-local GoodSignal = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("goodsignal"))
+local Listeners = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Util"):WaitForChild("Listeners")
+)
 
 local ArenaReturnService = {}
 
@@ -29,7 +31,10 @@ local staying: { [Player]: boolean } = {}
 local pendingReturn: { [Player]: boolean } = {}
 local separatingReturn: { [Player]: boolean } = {}
 local presentationReady: { [number]: boolean } = {}
-local presentationReadySignal = GoodSignal.new()
+-- snapshotDispatch = true: handlers disconnect themselves mid-emit (see awaitPlayerPresentation/
+-- awaitPreparedPresentation below), so a live iteration would skip the next callback.
+local presentationReadySignal = Listeners.new("ArenaReturn.presentationReady", true) :: Listeners.Collection<Player?>
+
 local preparing: { [Player]: number | "Manual" } = {}
 local retainedPartyIds: { [string]: boolean } = {}
 local interruptedListeners: { (Player, string) -> () } = {}
@@ -42,19 +47,19 @@ local function awaitPlayerPresentation(player: Player, timeout: number)
 		return
 	end
 	local thread = coroutine.running()
-	local conn: any = nil
+	local conn: (() -> ())? = nil
 	local timer: thread? = nil
 	timer = task.delay(remaining, function()
 		if conn then
-			conn:Disconnect()
+			conn()
 			conn = nil
 		end
 		task.spawn(thread)
 	end)
-	conn = presentationReadySignal:Connect(function(readyPlayer: Player?)
+	conn = presentationReadySignal.add(function(readyPlayer: Player?)
 		if readyPlayer == player or player.Parent ~= Players then
 			if conn then
-				conn:Disconnect()
+				conn()
 				conn = nil
 			end
 			if timer then
@@ -83,19 +88,19 @@ local function awaitPreparedPresentation(prepared: { Player }, generation: numbe
 	end
 
 	local thread = coroutine.running()
-	local conn: any = nil
+	local conn: (() -> ())? = nil
 	local timer: thread? = nil
 	timer = task.delay(remaining, function()
 		if conn then
-			conn:Disconnect()
+			conn()
 			conn = nil
 		end
 		task.spawn(thread)
 	end)
-	conn = presentationReadySignal:Connect(function()
+	conn = presentationReadySignal.add(function()
 		if allPresented() or (generation ~= nil and generation ~= returnGeneration) then
 			if conn then
-				conn:Disconnect()
+				conn()
 				conn = nil
 			end
 			if timer then
@@ -217,7 +222,7 @@ local function returnParties()
 		table.clear(retainedPartyIds)
 	end
 	returnGeneration += 1
-	presentationReadySignal:Fire(nil)
+	presentationReadySignal.emit(nil)
 	local generation = returnGeneration
 	for player, preparation in preparing do
 		if preparation ~= "Manual" then
@@ -447,13 +452,13 @@ function ArenaReturnService.start()
 		separatingReturn[player] = nil
 		preparing[player] = nil
 		presentationReady[player.UserId] = nil
-		presentationReadySignal:Fire(player)
+		presentationReadySignal.emit(player)
 	end)
 
 	Network.handleProtected("TeleportPresentationReady", { rateLimit = 4 }, function(player)
 		presentationReady[player.UserId] = true
 		player:SetAttribute("TeleportPresentationReady", true)
-		presentationReadySignal:Fire(player)
+		presentationReadySignal.emit(player)
 	end)
 
 	Network.handleProtected("RequestLobbyReturn", {

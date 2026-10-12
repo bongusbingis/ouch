@@ -499,6 +499,12 @@ local function stepRacing(now: number)
 		return
 	end
 	stepLava(now)
+	local excluded: { Instance } = {}
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(excluded, player.Character)
+		end
+	end
 	for _, player in Players:GetPlayers() do
 		local id = playerId(player)
 		local racer = current.racers[id]
@@ -511,7 +517,8 @@ local function stepRacing(now: number)
 			splash(player, root)
 			continue
 		end
-		if racer.finishTime ~= nil then
+		-- Credit progress only from a Guard-accepted position; a teleported root is recovered here instead.
+		if racer.finishTime ~= nil or not MovementGuard.check(root, excluded) then
 			continue
 		end
 		local nextCheckpoint = course.checkpoints[racer.checkpoint + 1]
