@@ -4,8 +4,13 @@ local T = require(script.Parent.Parent.Tokens)
 
 local Layout = {}
 
+-- Shortest odds tile that still leaves a >=56 px art window above the seam tag,
+-- the 2-line name and the footer (so ~2 rows fit the odds window), rather than
+-- the 270 px shop card.
+Layout.TileHeight = 186
+
 function Layout.resolve(viewportWidth: number)
-	local height = if viewportWidth < 400 then T.Shop.OddsCompactHeight else T.Shop.CardHeight
+	local height = Layout.TileHeight
 	local growth = (T.Motion.HoverScale - 1) / 2
 	local stroke = T.Shape.StrokeTab * T.Motion.HoverScale
 	local minimumInset = math.ceil(height * growth + stroke)

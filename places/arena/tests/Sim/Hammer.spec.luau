@@ -1,4 +1,4 @@
--- Description: In-place port of the hammer weapon spec: input routing against held balls, closest-target-in-front hits, team rules, and the cooldown, active, and recovery phases.
+-- Description: In-place port of the hammer weapon spec: input routing against held balls, closest-target-in-front hits, team rules, the cooldown, active, and recovery phases, and assisted swing turning and lunging.
 
 --!nonstrict
 
@@ -13,6 +13,8 @@ local MockWorld =
 local SimCore = require(Sim:WaitForChild("SimCore"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))
+local MobileInput =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("MobileInput"))
 
 local DT = 1 / 60
 
@@ -157,6 +159,122 @@ return function()
 				end
 			end
 			expect(swung).to.equal(true)
+		end)
+
+		local function swingEvent(events): any
+			for _, event in events do
+				if event.kind == "HammerSwing" then
+					return event
+				end
+			end
+			return nil
+		end
+
+		local function offAxisWorld(distance: number)
+			local offset = distance / math.sqrt(2)
+			return world({ e1 = MockWorld.character(vector.create(offset, 2.5, offset)) })
+		end
+
+		it("leaves the swing exactly where it was aimed with no assists", function()
+			local state = SimCore.newState()
+			local events =
+				SimCore.step(state, { command({ assist = { AutoFace = 0, Lunge = 0 } }) }, offAxisWorld(6), DT)
+			local swing = swingEvent(events)
+			expect(swing ~= nil).to.equal(true)
+			expect(swing.direction.x).to.be.near(1, 1e-6)
+			expect(swing.direction.z).to.be.near(0, 1e-6)
+		end)
+
+		it("dashes at the baseline speed with no assists", function()
+			local state = SimCore.newState()
+			local events =
+				SimCore.step(state, { command({ assist = { AutoFace = 0, Lunge = 0 } }) }, offAxisWorld(6), DT)
+			expect(swingEvent(events).magnitude).to.be.near(Combat.Hammer.DashSpeed, 1e-6)
+		end)
+
+		it("turns the swing toward a target that is off axis", function()
+			local state = SimCore.newState()
+			local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, offAxisWorld(6), DT)
+			local direction = swingEvent(events).direction
+			expect(direction.z > 0).to.equal(true)
+			expect(vector.magnitude(direction)).to.be.near(1, 1e-5)
+		end)
+
+		it("never turns the swing further than the clamp allows", function()
+			local state = SimCore.newState()
+			local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, offAxisWorld(6), DT)
+			local direction = swingEvent(events).direction
+			local turned = math.deg(math.acos(math.clamp(vector.dot(direction, vector.create(1, 0, 0)), -1, 1)))
+			expect(turned <= MobileInput.Assist.AutoFaceMaxAngleDeg + 0.5).to.equal(true)
+		end)
+
+		it("keeps the swing flat when the target is above the player", function()
+			local state = SimCore.newState()
+			local high = world({ e1 = MockWorld.character(vector.create(4, 12, 2)) })
+			local events = SimCore.step(state, { command({ assist = { AutoFace = 1 } }) }, high, DT)
+			expect(swingEvent(events).direction.y).to.be.near(0, 1e-6)
+		end)
+
+		it("lunges harder at a target beyond the swing box", function()
+			local state = SimCore.newState()
+			local far = world({ e1 = MockWorld.character(vector.create(Combat.Hammer.Range + 2, 2.5, 0)) })
+			local events = SimCore.step(state, { command({ assist = { Lunge = 1 } }) }, far, DT)
+			expect(swingEvent(events).magnitude > Combat.Hammer.DashSpeed).to.equal(true)
+		end)
+
+		it("does not lunge at a target already inside the swing box", function()
+			local state = SimCore.newState()
+			local near = world({ e1 = MockWorld.character(vector.create(Combat.Hammer.Range * 0.5, 2.5, 0)) })
+			local events = SimCore.step(state, { command({ assist = { Lunge = 1 } }) }, near, DT)
+			expect(swingEvent(events).magnitude).to.be.near(Combat.Hammer.DashSpeed, 1e-6)
+		end)
+
+		it("hits at the lateral edge of the swing box but not past it", function()
+			local still = command({ assist = { AutoFace = 0, Lunge = 0 } })
+			local edge = Combat.Hammer.Width * 0.5 + 1
+			local function tryLateral(lateral: number): number
+				local arena = world({ e1 = MockWorld.character(vector.create(4, 2.5, lateral), { radius = 1 }) })
+				local state = SimCore.newState()
+				return countEvents(SimCore.step(state, { still }, arena, DT), "HammerHit")
+			end
+			expect(tryLateral(edge - 0.1)).to.equal(1)
+			expect(tryLateral(edge + 0.1)).to.equal(0)
+		end)
+
+		it("hits at the vertical edge of the swing box but not past it", function()
+			local still = command({ assist = { AutoFace = 0, Lunge = 0 } })
+			local edge = Combat.Hammer.Height * 0.5
+			local function tryHeight(dy: number): number
+				local arena = world({ e1 = MockWorld.character(vector.create(4, 2.5 + dy, 0), { radius = 1 }) })
+				local state = SimCore.newState()
+				return countEvents(SimCore.step(state, { still }, arena, DT), "HammerHit")
+			end
+			expect(tryHeight(edge - 0.1)).to.equal(1)
+			expect(tryHeight(edge + 0.1)).to.equal(0)
+		end)
+
+		it("ignores teammates when assisting a swing", function()
+			local state = SimCore.newState()
+			local allies = world({
+				e1 = MockWorld.character(vector.create(4, 2.5, 4), { teamId = "Red" }),
+			})
+			allies.characters.p1.teamId = "Red"
+			local events = SimCore.step(state, { command({ assist = { AutoFace = 1, Lunge = 1 } }) }, allies, DT)
+			local swing = swingEvent(events)
+			expect(swing.direction.z).to.be.near(0, 1e-6)
+			expect(swing.magnitude).to.be.near(Combat.Hammer.DashSpeed, 1e-6)
+		end)
+
+		it("scales the turn by strength so a half-strength assist turns less", function()
+			local function turnFor(strength: number): number
+				local state = SimCore.newState()
+				local events =
+					SimCore.step(state, { command({ assist = { AutoFace = strength } }) }, offAxisWorld(6), DT)
+				local direction = swingEvent(events).direction
+				return math.acos(math.clamp(vector.dot(direction, vector.create(1, 0, 0)), -1, 1))
+			end
+			expect(turnFor(0.5) < turnFor(1)).to.equal(true)
+			expect(turnFor(0.5) > 0).to.equal(true)
 		end)
 	end)
 end

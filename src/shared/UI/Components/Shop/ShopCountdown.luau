@@ -5,7 +5,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local useExternalStore = require(script.Parent.Parent.Parent.Hooks.useExternalStore)
 local ShopClock = require(script.Parent.Parent.Parent.Services.ShopClock)
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
@@ -46,22 +45,22 @@ return function(props)
 		HostName = props.HostName or "Countdown",
 		MeasurementFont = T.Type.Label,
 		MinTextSize = T.Type.Minimum,
-		MaxTextSize = props.MaxTextSize or 18,
+		MaxTextSize = props.MaxTextSize or T.Type.Minimum,
 		Native = {
 			AnchorPoint = props.AnchorPoint,
 			BackgroundColor3 = T.Colors.Ink,
-			BackgroundTransparency = 0.12,
+			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
 			Font = T.Type.Label,
 			Position = props.Position,
 			Size = props.Size or UDim2.fromScale(0.3, 1),
 			Text = if expired then "UPDATING" else formatRemaining(props.ExpiresAt - now),
-			TextColor3 = props.TextColor3 or Color3.new(1, 1, 1),
+			TextColor3 = props.TextColor3 or T.Colors.Surface,
 			TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Center,
 			ZIndex = props.ZIndex or 6,
 		},
 	}, {
-		UICorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Tile) }),
+		UICorner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusPill) }),
 		UIPadding = c("UIPadding", {
 			PaddingLeft = UDim.new(0, 6),
 			PaddingRight = UDim.new(0, 6),

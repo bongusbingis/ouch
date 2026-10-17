@@ -17,7 +17,7 @@ local Config = {
 	ReturnQueuePollSeconds = 1,
 	PartyMaxPlayers = 4,
 
-	PartyRecordLifetime = 600,
+	PartyRecordLifetime = 3600,
 	PresenceLifetime = 90,
 	PresenceHeartbeatInterval = 30,
 	PartyRefreshInterval = 60,

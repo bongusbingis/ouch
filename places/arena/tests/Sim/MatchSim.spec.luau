@@ -1,4 +1,4 @@
--- Description: In-place port of the match phase machine spec, covering phase transitions, scoring, win conditions, and the mode registry surface.
+-- Description: In-place port of the match phase machine spec, covering the starting countdown, phase transitions, scoring, win conditions, and the mode registry surface.
 
 --!nonstrict
 
@@ -163,6 +163,45 @@ return function()
 			expect(ModeRegistry.get(default.id).id).to.equal(default.id)
 			expect(ModeRegistry.get("TDM").id).to.equal("TDM")
 			expect(ModeRegistry.get("Nope")).never.to.be.ok()
+		end)
+
+		it("ends an empty contest without inventing a win for the score leader", function()
+			local state = activeMatch({ "p1", "p2" })
+			state.scores.p1 = 10
+			local events = {}
+			expect(MatchSim.noContest(state, RULES, events)).to.equal(true)
+			expect(state.phase).to.equal("Results")
+			expect(state.winnerId).to.equal(nil)
+			expect(events[1].reason).to.equal("NoContest")
+			expect(MatchSim.noContest(state, RULES, events)).to.equal(false)
+			expect(#events).to.equal(1)
+		end)
+
+		it("counts down Starting before activating with reset scores", function()
+			local state = MatchSim.newState()
+			MatchSim.setPlayers(state, { p1 = true, p2 = true })
+			local events = {}
+			MatchSim.start(state, RULES, events)
+			expect(state.phase).to.equal("Starting")
+			expect(state.startingRemaining).to.equal(RULES.StartingSeconds)
+			expect(lastEvent(events, "MatchPreparing") ~= nil).to.equal(true)
+
+			MatchSim.tick(state, RULES, RULES.StartingSeconds, events)
+			expect(state.phase).to.equal("Active")
+			expect(state.timeRemaining).to.equal(RULES.TimeCapSeconds)
+			expect(state.scores.p1).to.equal(0)
+			expect(lastEvent(events, "MatchStarted") ~= nil).to.equal(true)
+		end)
+
+		it("can finish an active match through the orchestration hook", function()
+			local state, _ = activeMatch({ "p1", "p2" })
+			local events = {}
+			MatchSim.applyElim(state, RULES, "p1", "p2", events)
+			expect(MatchSim.finish(state, RULES, "Developer", events)).to.be.ok()
+			expect(MatchSim.finish(state, RULES, "Developer", events)).to.equal(false)
+			local ended = lastEvent(events, "MatchEnded")
+			expect(ended.winnerId).to.equal("p1")
+			expect(ended.reason).to.equal("Developer")
 		end)
 	end)
 end

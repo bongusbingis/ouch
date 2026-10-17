@@ -11,6 +11,8 @@ local HazardVisuals = {}
 
 type Modifier = { offset: CFrame, scale: Vector3, hidden: boolean }
 type State = { ghost: BasePart, transparency: number, modifiers: { [string]: Modifier } }
+local MODIFIER_KEYS = { "bumper", "jumpPad", "event", "tile", "door" }
+
 local active: { [BasePart]: State } = {}
 type TileState = { revision: number, state: string, dropAt: number? }
 local tileStates: { [BasePart]: TileState } = {}
@@ -420,7 +422,7 @@ function HazardVisuals.start()
 				continue
 			end
 			local offset, scale, hidden = CFrame.identity, Vector3.one, false
-			for _, key in { "bumper", "jumpPad", "event", "tile", "door" } do
+			for _, key in MODIFIER_KEYS do
 				local modifier = state.modifiers[key]
 				if modifier and not (reducedMotion and (key == "bumper" or key == "jumpPad" or key == "event")) then
 					offset *= modifier.offset

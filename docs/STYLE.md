@@ -21,7 +21,7 @@ The Backpack uses cream sticker surfaces, bright candy controls, plum outlines, 
 
 `PuffyButton` keeps a stable input hitbox around an animated visual. Draw the hard offset shadow, darker lip, inset fill, and a white fading top highlight; finish with a rounded ink or white outline. Shadows are disabled inside the scroll well. `PanelFrame` tilts only its decorative face so the unrotated scrolling content can clip correctly.
 
-Reusable components: `PuffyButton`, `TabPill`, `ItemTile`, `PanelFrame`, `SectionHeader`, `Badge`, and `BackpackEmoteWheel`. The existing `EmoteSlotRail` module remains as its compatibility entry point. The separate gameplay wheel is unchanged.
+Reusable components: `PuffyButton`, `TabPill`, `ItemTile`, `PanelFrame`, `SectionHeader`, `Badge`, and `BackpackEmoteWheel`. The existing `EmoteSlotRail` module remains as its compatibility entry point. The gameplay `EmoteWheel` is on the same candy system.
 
 Button hover, press, and release share one cancellable Cubic Out tween for scale, rotation, and lip compression. Inside a `ScrollingFrame` with `ClipsDescendants` enabled, hold button faces and other animated UI at their authored rotation while preserving scale, position, transparency, and lip motion; Roblox does not reliably clip descendants whose rotation changes. Retarget from the current visual and finish exactly at rest; do not use elastic or repeated bounce easing on text-bearing controls. `Motion.Control` and `Motion.Navigation` use near-critical damping with overshoot clamped, including toolbar buttons and sliding selections. Reduced motion still applies immediately.
 
@@ -31,7 +31,7 @@ Button hover, press, and release share one cancellable Cubic Out tween for scale
 
 The selected tab rises into a pink pillow with narrower shoulders, a wider rounded base, curved white highlights, violet depth, enlarged icon, white outlined label, and two yellow emphasis marks. `LobbySelectionPillow` uses the editable mask atlas in `assets/source/ui/lobby-navigation-selection.svg`. Selection blends with `Motion.Navigation`; `AnimatedButton` supplies the established hover, press, focus, sound, and cancellation behavior. Selection and interaction never move the input hitboxes. Reduced motion applies the selection immediately. Decorative stars/marks are not notification badges.
 
-Desktop expands the rail only inside the existing logo/party clearance and header reservation. Compact layouts retain the existing reflow and use condensed 18-pixel labels, fixed touch targets of at least 44 pixels, and smaller icons. The other pages, logo, background band, party/emote actions, and Arena navigation retain their existing presentation and behavior.
+Desktop expands the rail only inside the existing logo/party clearance and header reservation. Compact layouts retain the existing reflow and use condensed 18-pixel labels, fixed touch targets of at least 44 pixels, and smaller icons. Every mounted surface, including the arena menu `TopBar` and the lobby party/emote actions, uses Tokens and `CandySurface` (DEC-027).
 
 On mobile, `LobbyHeaderLayout.resolveMobile` docks navigation in the free portion of `GuiService.TopbarInset`, vertically centered with Roblox's controls. Wide phones retain labeled tabs; narrow portrait phones use four 44-pixel icon-only targets, as explicitly approved. If even four targets cannot fit beside CoreGui, use one labeled row below it rather than shrinking the targets or covering Roblox controls. Omit the extra mobile logo row and size the patterned band to the selected pillow's actual clearance. The existing overflow-enabled lobby root preserves modal input ownership; do not introduce a navigation portal above modal layers. Desktop and Arena navigation are unchanged. Shop uses the same mobile header reservation to grow upward into the recovered space while retaining its existing width and character-preview window.
 
@@ -57,13 +57,23 @@ The [Season-first layout review](.review/season-primary/VALIDATION.md) supersede
 
 ## Existing rarity, clearer indication
 
-The existing inventory already defines **Common, Rare, Legendary, and Exclusive**. Each cosmetic tile shows its tier as a named ribbon: mint, yellow, coral, or grape respectively. These colors follow the existing tier cues in a softer palette. The label communicates rarity without relying on color alone. The tile stays pale, preserving contrast with the yellow selection ring and pink equipped ring. Outfit colors remain actual color swatches. No tiers, drop rates, prices, or ownership data were added.
+The existing inventory already defines **Common, Rare, Legendary, and Exclusive**. Every cosmetic appears as one collectible card (Backpack, crate results and odds, stacked Shop cards, crate reveal; geometry in `T.Collectible` and `CollectibleLayout`, drawn by `CollectibleFace`). The rarity is a puffy `RarityRibbon` tag (mint, yellow, coral, or grape) centred on the art window's lower seam and stated once per card, so the label communicates rarity without relying on color alone. The art window is the rarity colour lerped toward white; the CAPS plum Fredoka name sits directly on the cream body (no capsule). The card outline is ink at rest, yellow on hover/focus/selection, and pink when equipped (equipped wins); the tier colour never reaches the outline. Outfit colors remain actual color swatches. No tiers, drop rates, prices, or ownership data were added.
+
+## Text, copy and scrollbars
+
+- **Floors (DEC-029):** menus, pages and modals use `T.Type.Minimum` (18); in-match HUD, scoreboard, race HUD and post-match captions use `T.Type.HudMinimum` (16). Nothing is smaller than 16.
+- Modal and panel title stickers use `T.Type.ModalTitle` (30). Scrollbars use `T.Layout.ScrollBar` (6).
+- **Case (DEC-030):** ALL CAPS for titles, buttons, tabs, pills, chips, labels and short status/feedback headlines (`SAVED`, `NICE WORK!`). Sentence case only for multi-word descriptions, instructions and body copy.
+
+## Input hints
+
+`InputHint` shows the control for the active device: a keycap on keyboard/mouse, the gamepad glyph on controller, nothing on touch. A hint on a button reads `[hint] LABEL` (`PuffyButton` `Hint` prop). `Config.Interface.Input.Hints` is the single source for both binds and hints, so do not hard-code key names in copy. Touch layout and 44 px targets are unchanged.
 
 ## Tile state matrix
 
 | State | Presentation and behavior |
 | --- | --- |
-| Default | Pale tile or outfit swatch, top highlight and lip, large preview, plum name pill |
+| Default | Cream card, ink outline, rarity-tinted art window with seam tag, CAPS name on the body |
 | Hover / keyboard focus | Yellow outline and smooth lift; emote loops and effect accents play on hover |
 | Pressed | Visual squashes to .94; input hitbox stays fixed |
 | Selected emote | Pulsing yellow outline; wheel asks for a slot |
@@ -168,8 +178,8 @@ Every card has one hero and one layer order, resolved by `ShopCardStyle` and dra
 
 - **Body:** cream `CandySurface` with the ink outline and lip; hover turns the outline yellow. Only the headline blocks (the season card and the featured promo) tint the body with their accent through `Tokens.Shop.HeadlineTint`; catalog cards stay cream like Settings rows.
 - **Art tile:** `ShopArtTile`, a recessed well filled with the card's accent lerped toward white (`TileTint`), a matching accent line, and the faint Backpack swirl. Cosmetics use their rarity colour as the accent, the plan's "matching accent behind a large preview"; passes are grape, crates cyan, bundles pink, currency yellow, the season gold. In split cards the tile takes `SplitArtScale` (42 %) of the width for the full card height beside the copy column; stacked cards put it above the action.
-- **Name:** stacked cards keep the Backpack's plum Builder Sans band hanging `StrokeCard` off the tile's bottom edge (`BandHeight`); split cards write the name upright in plum Fredoka with the supporting line (previous price, cost per open, tier and premium state) in Builder Sans `InkSoft` beneath it, and the season card's striped progress bar between the two.
-- **Rarity:** the named `RarityRibbon`, inside the tile's top on stacked cards and as a content-width kicker above the name on split cards. It is never a sticker.
+- **Name:** stacked cards write the CAPS name in plum Fredoka directly on the cream body under the tile's seam tag (no band); split cards write the name upright in plum Fredoka with the supporting line (previous price, cost per open, tier and premium state) in Builder Sans `InkSoft` beneath it, and the season card's striped progress bar between the two.
+- **Rarity:** the `RarityRibbon` tag centred on the art tile's lower seam on stacked cards and as a content-width kicker above the name on split cards.
 - **Product sticker:** every explicit badge the view model supplies (`FEATURED`, `SEASON PASS`, `PERMANENT`, `WEEKLY BUNDLE`, `STARTER OFFER`) renders as a `Badge` sticker overlapping the card's top-left corner by `StickerOverhang`, tilted `StickerTilt` (−6°, shallower than the −10° badge tilt so a wide sticker stays clear of the section underline). Kind-derived fallbacks that only repeat the section title (a plain crate under CRATES, a pack under BONKS) are not shown. Pink and grape stickers use white outlined text; gold, yellow and cyan use ink.
 - **Ownership:** `✓ OWNED` is a yellow `Badge` stamp at the standard tilt overlapping the top-right corner. The season card never shows it; its premium state is written in the supporting line.
 - **Action:** the `ShopPriceButton` is the only outlined pill on the card. Pink for the season entry, cream elsewhere.
@@ -197,9 +207,10 @@ The [Shop review gallery](.review/candy-shop/index.html) contains real Studio ca
 Fixture rendering was blocked by the Studio tool's React capability restriction. Single/batch reveals, transaction notifications, and pending/claim failure variants are implemented and source-reviewed but were not visually validated in this session. Physical touch/gamepad and expanded preferred-text-size coverage also remain unverified. Do not treat those states as visually approved merely because this style guide exists.
 
 
-## Splashdown onboarding
+## Onboarding
 
+- Onboarding is combat-first: throw, cross, bonk, charge, brawl. The three mandatory mechanics are the combat ones, and the crossing is one extra lesson in avoiding an obstacle. Do not rebuild it as an obstacle course.
 - Retain the authored TutorialArena, approach bridge, waypoint arrow and short lesson flow.
-- Use the exact Splashdown/arena mesh assets in `assets/SplashdownTraining.rbxm`; the server clones them at the Splashdown authoring scale and uses the shared rotating-platform and shove kits. Do not replace them with generated primitive obstacles or add a new training map.
+- The obstacle lesson uses one authored sweeper from `assets/SplashdownTraining.rbxm`, cloned at the Splashdown authoring scale and driven by the shared rotating-platform and shove kits, and it exists only while that step is live. Do not replace it with a generated primitive, add more hazards, or add a new training map.
 - The instruction surface is a compact cream candy prompt with upright Fredoka/BuilderSans text. Skip remains a separate yellow 44 px target. Use `Tokens.Onboarding`, `CandySurface` and `PuffyButton`.
 - Validation is recorded in `.review/candy-onboarding/VALIDATION.md`. Visual review must use the actual Lobby Studio window.

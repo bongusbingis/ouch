@@ -43,6 +43,7 @@ export type EventContext = {
 local QuestLogic = {}
 
 local UINT32 = 4294967296
+local SECONDS_PER_DAY = 86400
 
 local function cloneReward(reward: Reward): Reward
 	return {
@@ -74,19 +75,16 @@ function QuestLogic.isNewDailyCycle(previousKey: string?, currentKey: string?): 
 	return previousKey ~= nil and currentKey ~= nil and currentKey ~= "" and previousKey ~= currentKey
 end
 
+-- Plain timestamp arithmetic: building a calendar date from day + 1 throws on
+-- the last UTC day of every month in Roblox DateTime.
 function QuestLogic.nextResetAt(now: number): number
-	local utc = os.date("!*t", now)
-	if DateTime ~= nil then
-		return DateTime.fromUniversalTime(utc.year, utc.month, utc.day + 1, 0, 0, 0).UnixTimestamp
-	end
-	return os.time({
-		year = utc.year,
-		month = utc.month,
-		day = utc.day + 1,
-		hour = 0,
-		min = 0,
-		sec = 0,
-	})
+	return now - (now % SECONDS_PER_DAY) + SECONDS_PER_DAY
+end
+
+-- True when the stored daily key or reset time no longer covers `now`.
+function QuestLogic.needsDailyReset(dailyKey: any, resetAt: any, now: number): boolean
+	local resetTime = tonumber(resetAt)
+	return dailyKey ~= QuestLogic.dailyKey(now) or resetTime == nil or now >= resetTime
 end
 
 function QuestLogic.blankState(now: number): QuestState
@@ -164,6 +162,18 @@ function QuestLogic.copyEntries(entries: { any }): { QuestEntry }
 		})
 	end
 	return copied
+end
+
+-- Entries whose reward is still owed when the daily set is replaced.
+function QuestLogic.completedUnclaimed(entries: { QuestEntry }, byId: { [string]: QuestDefinition }): { QuestEntry }
+	local owed = {}
+	for _, entry in entries do
+		local definition = byId[entry.id]
+		if not entry.claimed and definition ~= nil and entry.progress >= definition.goal then
+			table.insert(owed, entry)
+		end
+	end
+	return owed
 end
 
 local function sourceMatches(event: { [string]: any }, playerId: string): boolean

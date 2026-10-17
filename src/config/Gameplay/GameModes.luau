@@ -13,9 +13,10 @@ local Queues = require(script.Parent.Queues)
 --
 -- Queue names the matchmaking queue a mode is played from; only Arena modes
 -- appear on the arena ballot. Combat = false switches off weapons, combat input
--- and the combat HUD for the mode. ScoreLabel is the unit every score surface
--- prints. Spawn says where characters are placed: the authored arena spawns, or
--- the active Splashdown course.
+-- and the combat HUD for the mode. ScoreLabel is the unit of the mode's score
+-- (team rows and per-player standings); team-scope podium plates show each
+-- player's eliminations and so always print ELIMS. Spawn says where characters
+-- are placed: the authored arena spawns, or the active Splashdown course.
 local modes = {
 	FFA = {
 		Enabled = true,
@@ -40,14 +41,14 @@ local modes = {
 		Spawn = "Arena",
 	},
 	Infection = {
-		Enabled = false,
+		Enabled = true,
 		Title = "INFECTION",
 		Description = "One player starts infected. Survive to the clock, or join them.",
 		ThumbnailId = "",
 		SortOrder = 3,
 		Queue = "Arena",
 		Combat = true,
-		ScoreLabel = "ELIMS",
+		ScoreLabel = "PLAYERS",
 		Spawn = "Arena",
 	},
 	Splashdown = {

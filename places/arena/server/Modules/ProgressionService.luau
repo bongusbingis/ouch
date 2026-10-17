@@ -23,6 +23,9 @@ local PlayerData = require(script.Parent.PlayerData)
 local MatchAwardService = require(script.Parent.MatchAwardService)
 local BattlePassService = require(script.Parent.BattlePassService)
 local ArenaSessionService = require(script.Parent.ArenaSessionService)
+local CoinRules = require(
+	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Coins"):WaitForChild("CoinRules")
+)
 
 export type MatchSummary = {
 	firstMatch: boolean?,
@@ -56,6 +59,9 @@ local awardCommittedSignal =
 local seenEvents = EventDedup.new()
 local activeMatchService: any = nil
 local participation: { [Player]: any } = {}
+-- Coin Bonks collected this match, held in memory (not in the journaled record) until commitMatch
+-- decides whether the player earned them. Cleared on MatchStarted and PlayerRemoving.
+local pendingCoinBonks: { [Player]: number } = {}
 local function activity(player: Player): any
 	if not participation[player] then
 		participation[player] = Participation.new()
@@ -80,13 +86,14 @@ local function ensureRecord(player: Player): any
 	return record
 end
 
-local function add(player: Player?, delta: any)
+local function add(player: Player?, delta: any): boolean
 	if player == nil or awardId == nil or not ArenaSessionService.isRoundEligible(player) then
-		return
+		return false
 	end
 	if ensureRecord(player) then
-		PlayerData.addMatchProgress(player, awardId, delta)
+		return PlayerData.addMatchProgress(player, awardId, delta)
 	end
+	return false
 end
 
 local function rewardAmount(category: string, key: string): (number?, string?)
@@ -195,6 +202,10 @@ local function commitMatch()
 		local completed = result.reason ~= "NoContest"
 		local eligible = Participation.eligible(activity(player), record.Progress, DataConfig.Participation)
 		local delta = if completed and eligible then rewards("MatchComplete") else { XP = 0, Bonks = 0 }
+		-- Coin Bonks pass the same gate as MatchComplete/Win; folded here so they are journaled,
+		-- boosted and summarised like other match Bonks. Always dropped after this commit.
+		delta.Bonks += CoinRules.payable(pendingCoinBonks[player], completed, eligible)
+		pendingCoinBonks[player] = nil
 		delta.MatchesPlayed = if completed then 1 else 0
 		if winner ~= nil and winner ~= "" then
 			if won then
@@ -229,6 +240,7 @@ local function handleEvent(event: any)
 		table.clear(summaryByPlayerId)
 		seenEvents.clear()
 		table.clear(participation)
+		table.clear(pendingCoinBonks)
 		for _, player in Players:GetPlayers() do
 			if ArenaSessionService.isRoundEligible(player) then
 				ensureRecord(player)
@@ -370,6 +382,23 @@ function ProgressionService.onSummary(listener: (Player, MatchSummary, string) -
 	end
 end
 
+-- Coin pickups: held in memory for the match and paid at commit only if the player completed it
+-- and passed the participation gate (same rules as MatchComplete/Win); a match with no result for
+-- them pays nothing. Paid coins go through the journal and boosts like other match Bonks. False
+-- when nothing was recorded (no active award, not round-eligible, or no journal record).
+function ProgressionService.addBonks(player: Player, bonks: number): boolean
+	if awardId == nil or not ArenaSessionService.isRoundEligible(player) then
+		return false
+	end
+	-- A Ready record (rejoin after save/load) is never committed, so refuse and let CoinService roll back.
+	local record = ensureRecord(player)
+	if record == nil or record.Ready then
+		return false
+	end
+	pendingCoinBonks[player] = (pendingCoinBonks[player] or 0) + bonks
+	return true
+end
+
 function ProgressionService.start(matchService: any)
 	if started then
 		return
@@ -407,6 +436,7 @@ function ProgressionService.start(matchService: any)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		participation[player] = nil
+		pendingCoinBonks[player] = nil
 	end)
 end
 

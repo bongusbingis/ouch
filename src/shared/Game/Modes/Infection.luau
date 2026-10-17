@@ -142,6 +142,38 @@ function Infection.onElim(ctx: GameMode.ModeContext, sourceId: string?, targetId
 	end
 end
 
+-- A side can empty without a single conversion: the last survivor quits, or
+-- patient zero does. Nothing else would notice -- the win check above only runs
+-- on a conversion, and the clock hands the round to a survivor side that may no
+-- longer exist. Chooser passed in for the same reason as assignSides.
+function Infection.repairRoster(ctx: GameMode.ModeContext, chooseIndex: (number) -> number)
+	local players = ctx.getPlayers()
+	local survivors: { Player } = {}
+	local infected = 0
+	for _, player in players do
+		local teamId = ctx.getPlayerTeam(player)
+		if teamId == Infection.SurvivorTeam then
+			table.insert(survivors, player)
+		elseif teamId == Infection.InfectedTeam then
+			infected += 1
+		end
+	end
+
+	if infected == 0 and #survivors >= 2 then
+		-- Nobody left to convert anyone: a survivor takes patient zero's place.
+		local index = Infection.pickPatientZero(#survivors, chooseIndex)
+		if index ~= nil then
+			ctx.setPlayerTeam(survivors[index], Infection.InfectedTeam)
+		end
+	elseif #survivors == 0 and infected >= 1 and #players >= 2 then
+		ctx.finishMatch(Infection.InfectedTeam, "Infected")
+	end
+end
+
+function Infection.onRosterChanged(ctx: GameMode.ModeContext)
+	Infection.repairRoster(ctx, randomIndex)
+end
+
 function Infection.onMatchEnd(_ctx: GameMode.ModeContext) end
 
 return (Infection :: any) :: GameMode.GameMode

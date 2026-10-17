@@ -17,6 +17,7 @@ local useReducedMotion = require(script.Parent.Parent.Hooks.useReducedMotion)
 local useViewportSize = require(script.Parent.Parent.Hooks.useViewportSize)
 local T = require(script.Parent.Parent.Tokens)
 local PuffyButton = require(script.Parent.PuffyButton)
+local Badge = require(script.Parent.Badge)
 local useArenaHUDLayout = require(script.Parent.Parent.Hooks.useArenaHUDLayout)
 local usePreferredTextSize = require(script.Parent.Parent.Hooks.usePreferredTextSize)
 local Config = ReplicatedStorage:WaitForChild("Config")
@@ -26,9 +27,7 @@ local WheelConfig = require(Config:WaitForChild("Interface"):WaitForChild("Emote
 local Cosmetics = require(Config:WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 
 local c = React.createElement
-local Palette = UI.ProgressionStyle
-local WHITE = Color3.new(1, 1, 1)
-local DISPLAY_FONT = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+local C, S = T.Colors, T.Shape
 
 export type TouchRect = { minX: number, minY: number, maxX: number, maxY: number }
 type RegisterTouchExclusion = (TouchRect?) -> (boolean, string?)
@@ -93,15 +92,26 @@ local function ringSegments(
 		local isSelected = sectorIndex ~= nil and sectorIndex == selected
 		local filled = sector ~= nil and sector.filled
 		local mx, my = polar(angle, geo.mid)
-		children["Seg" .. index] = c("Frame", {
+		local fill = if isSelected then C.Pink elseif filled then C.Cyan else C.Surface
+		local size = UDim2.fromOffset(math.round(geo.chord), math.round(geo.thickness))
+		-- Ink (or yellow when lit) rim under the candy fill, as on the Backpack wheel.
+		children["Rim" .. index] = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = if isSelected then Palette.Cyan elseif filled then Palette.Surface else Palette.Ink,
-			BackgroundTransparency = 0,
+			BackgroundColor3 = if isSelected then C.Yellow else C.Ink,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, mx, 0.5, my),
 			Rotation = angle,
-			Size = UDim2.fromOffset(math.round(geo.chord), math.round(geo.thickness)),
+			Size = UDim2.fromOffset(math.round(geo.chord), math.round(geo.thickness) + S.StrokeCard * 2),
 			ZIndex = z,
+		})
+		children["Seg" .. index] = c("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = fill,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, mx, 0.5, my),
+			Rotation = angle,
+			Size = size,
+			ZIndex = z + 1,
 		})
 	end
 	return children
@@ -114,12 +124,11 @@ local function dividers(geo: Geometry, sectors: { EmoteWheelModel.Sector }, z: n
 		local x, y = polar(angle, geo.mid)
 		children["Divider" .. sector.index] = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = Palette.Raised,
-			BackgroundTransparency = 0.15,
+			BackgroundColor3 = C.Ink,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, x, 0.5, y),
 			Rotation = angle,
-			Size = UDim2.fromOffset(2, math.round(geo.thickness) + 2),
+			Size = UDim2.fromOffset(S.StrokeInner, math.round(geo.thickness) + S.StrokeCard * 2),
 			ZIndex = z + 1,
 		})
 	end
@@ -143,7 +152,6 @@ local function Wedge(props: {
 	local boxWidth = math.round(math.min(2 * geo.mid * math.sin(math.rad(arc / 2)) * 0.82, geo.thickness * 1.9))
 	local boxHeight = math.round(geo.thickness * 0.86)
 	local thumbnail = if sector.filled then thumbnailFor(sector.emoteId) else nil
-	local ink = if props.Selected then Palette.Ink elseif sector.filled then WHITE else Palette.Muted
 	return c(React.Fragment, nil, {
 		Content = c("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -157,7 +165,7 @@ local function Wedge(props: {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
 					Image = thumbnail,
-					ImageColor3 = if props.Selected then WHITE else Color3.fromRGB(235, 238, 242),
+					ImageColor3 = C.Surface,
 					Position = UDim2.fromScale(0.5, 0.5),
 					ScaleType = Enum.ScaleType.Fit,
 					Size = UDim2.fromScale(0.9, 0.9),
@@ -166,68 +174,58 @@ local function Wedge(props: {
 				else c("TextLabel", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					BackgroundTransparency = 1,
-					FontFace = DISPLAY_FONT,
+					Font = T.Type.Display,
 					Position = UDim2.fromScale(0.5, 0.5),
 					Size = UDim2.fromScale(1, 1),
 					Text = if sector.filled then sector.displayName else "",
-					TextColor3 = ink,
+					TextColor3 = C.Ink,
 					TextSize = props.TextPx,
 					TextWrapped = true,
 					ZIndex = props.ZIndex,
-				}, {
-					Stroke = if sector.filled and not props.Selected
-						then c("UIStroke", { Color = Palette.Ink, Thickness = 1.5, Transparency = 0.3 })
-						else nil,
 				}),
 			EmptyMark = if sector.filled
 				then nil
 				else c("Frame", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundColor3 = WHITE,
-					BackgroundTransparency = 0.72,
+					-- Assignable wheels show a "+" well; read-only (arena) wheels show a
+					-- hollow ring so a vacant slot never reads as a stray dot.
+					BackgroundColor3 = if props.Selected then C.Surface else C.Well,
+					BackgroundTransparency = if props.ShowPlus then 0 else 1,
 					BorderSizePixel = 0,
 					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromOffset(math.round(geo.thickness * 0.34), math.round(geo.thickness * 0.34)),
+					Size = UDim2.fromOffset(math.round(geo.thickness * 0.5), math.round(geo.thickness * 0.5)),
 					ZIndex = props.ZIndex,
 				}, {
 					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+					Ring = if props.ShowPlus
+						then nil
+						else c("UIStroke", {
+							Color = if props.Selected then C.Surface else C.WellLine,
+							Thickness = S.StrokeCard,
+						}),
 					Plus = if not props.ShowPlus
 						then nil
 						else c("TextLabel", {
 							BackgroundTransparency = 1,
-							FontFace = DISPLAY_FONT,
+							Font = T.Type.Display,
 							Size = UDim2.fromScale(1, 1),
 							Text = "+",
-							TextColor3 = WHITE,
-							TextScaled = true,
-							TextTransparency = 0.25,
+							TextColor3 = C.Ink,
+							TextSize = T.Type.Body,
 							ZIndex = props.ZIndex + 1,
 						}),
 				}),
 		}),
-		Badge = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = if props.Selected then Palette.Yellow else Palette.Ink,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0.5, bx, 0.5, by),
-			Size = UDim2.fromOffset(22, 22),
-			ZIndex = props.ZIndex + 1,
-		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			Outline = c(
-				"UIStroke",
-				{ Color = WHITE, Thickness = 1.5, Transparency = if props.Selected then 0 else 0.5 }
-			),
-			Text = c("TextLabel", {
-				BackgroundTransparency = 1,
-				FontFace = DISPLAY_FONT,
-				Size = UDim2.fromScale(1, 1),
-				Text = tostring(sector.index),
-				TextColor3 = if props.Selected then Palette.Ink else WHITE,
-				TextSize = 13,
-				TextTransparency = if props.Selected or sector.filled then 0 else 0.35,
-				ZIndex = props.ZIndex + 2,
-			}),
+		Number = c(Badge, {
+			Text = tostring(sector.index),
+			TextSize = T.Type.HudMinimum,
+			Color = if props.Selected then C.Yellow else C.Surface,
+			Native = {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, bx, 0.5, by),
+				Size = UDim2.fromOffset(T.Layout.SmallBadgeSize, T.Layout.SmallBadgeSize),
+				ZIndex = props.ZIndex + 1,
+			},
 		}),
 	})
 end
@@ -408,17 +406,19 @@ return function(props: Props)
 		config = Motion.Modal,
 		immediate = reducedMotion,
 	})
-	local selectedSector = if snapshot.selected then sectors[snapshot.selected] else nil
-	local nameText = if selectedSector and selectedSector.filled
-		then selectedSector.displayName
-		elseif selectedSector then "EMPTY SLOT"
-		else "EMOTES"
-	local nameColor = if selectedSector and selectedSector.filled
-		then Palette.Yellow
-		elseif selectedSector then Palette.Muted
-		else WHITE
-	local hint = if snapshot.deviceClass == "Gamepad"
-		then "RELEASE " .. string.upper(Input.EmoteWheel.GamepadLabel) .. " TO PLAY"
+	local caption = EmoteWheelModel.caption(sectors, snapshot.selected)
+	local nameText = caption.name
+	local nameColor = if caption.kind == "filled"
+		then C.Yellow
+		elseif caption.kind == "empty" or caption.kind == "none" then C.Well
+		else C.Surface
+	-- Only promise "play" when releasing would actually play an emote.
+	local hint = if caption.kind == "none"
+		then "EQUIP EMOTES IN BACKPACK"
+		elseif caption.kind == "empty" then "EQUIP ONE IN BACKPACK"
+		elseif snapshot.deviceClass == "Gamepad" then "RELEASE "
+			.. string.upper(Input.EmoteWheel.GamepadLabel)
+			.. " TO PLAY"
 		elseif snapshot.deviceClass == "Keyboard" then "RELEASE " .. Input.EmoteWheel.KeyboardLabel .. " TO PLAY"
 		else "DRAG AND RELEASE TO PLAY"
 	local wedges = {}
@@ -427,7 +427,7 @@ return function(props: Props)
 			Sector = sector,
 			Geometry = geo,
 			Capacity = snapshot.capacity,
-			TextPx = math.round(layout.labelTextPx * textScale),
+			TextPx = math.max(math.round(layout.labelTextPx * textScale), T.Type.HudMinimum),
 			Selected = snapshot.selected == sector.index,
 			ShowPlus = props.EmptySlotsAssignable ~= false,
 			ZIndex = z + 5,
@@ -458,7 +458,7 @@ return function(props: Props)
 			then ModalSurface({
 				ClassName = "TextButton",
 				AutoButtonColor = false,
-				BackgroundColor3 = Palette.Ink,
+				BackgroundColor3 = C.Ink,
 				BackgroundTransparency = styles.Alpha:map(function(alpha: number)
 					return 1 - alpha * 0.38
 				end),
@@ -483,7 +483,7 @@ return function(props: Props)
 				}, {
 					Shadow = c("Frame", {
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundColor3 = Palette.Ink,
+						BackgroundColor3 = C.Ink,
 						BackgroundTransparency = 0.55,
 						BorderSizePixel = 0,
 						Position = UDim2.new(0.5, 0, 0.5, 6),
@@ -517,7 +517,7 @@ return function(props: Props)
 					Name = c("TextLabel", {
 						AnchorPoint = if short then Vector2.new(0.5, 1) else Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						FontFace = DISPLAY_FONT,
+						Font = T.Type.Display,
 						Position = if short then UDim2.new(0.5, 0, 0.5, 4) else UDim2.new(0.5, 0, 1, 14),
 						Size = if short
 							then UDim2.fromOffset(math.round(geo.inner * 2) - 16, 52)
@@ -528,24 +528,23 @@ return function(props: Props)
 						TextWrapped = short,
 						ZIndex = z + 6,
 					}, {
-						Stroke = c("UIStroke", { Color = Palette.Ink, Thickness = 3, Transparency = 0.1 }),
+						Stroke = c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }),
 					}),
 					Hint = c("TextLabel", {
 						AnchorPoint = Vector2.new(0.5, 0),
 						BackgroundTransparency = 1,
-						FontFace = UI.Text.DefaultFont,
+						Font = T.Type.Label,
 						Position = if short then UDim2.new(0.5, 0, 0.5, 8) else UDim2.new(0.5, 0, 1, 60),
 						Size = if short
 							then UDim2.fromOffset(math.round(geo.inner * 2) - 24, 40)
 							else UDim2.new(1.8, 0, 0, 22),
 						Text = hint,
-						TextColor3 = WHITE,
-						TextSize = math.max(math.round((layout.labelTextPx - 3) * textScale), UI.Text.CaptionMinPx),
+						TextColor3 = C.Surface,
+						TextSize = math.max(math.round((layout.labelTextPx - 3) * textScale), T.Type.HudMinimum),
 						TextWrapped = short,
-						TextTransparency = 0.2,
 						ZIndex = z + 6,
 					}, {
-						Stroke = c("UIStroke", { Color = Palette.Ink, Thickness = 1.5, Transparency = 0.25 }),
+						Stroke = c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }),
 					}),
 				}),
 			})

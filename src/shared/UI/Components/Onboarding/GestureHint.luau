@@ -10,6 +10,7 @@ local Config = ReplicatedStorage:WaitForChild("Config")
 local OnboardingConfig = require(Config:WaitForChild("Interface"):WaitForChild("Onboarding"))
 local ThrowUX = require(Config:WaitForChild("Interface"):WaitForChild("ThrowUX"))
 local GestureGlyph = require(script.Parent.GestureGlyph)
+local T = require(script.Parent.Parent.Parent.Tokens)
 local useViewportSize = require(script.Parent.Parent.Parent.Hooks.useViewportSize)
 local GestureViewModel = require(script.Parent.Parent.Parent.Models.OnboardingGestureViewModel)
 local Combat = require(StarterPlayer:WaitForChild("PlayerModule")).Combat
@@ -38,7 +39,7 @@ return function(props: Props)
 	local geometry = Combat.inputGeometry()
 	local sizing = OnboardingConfig.Gesture
 	local size = math.clamp(math.min(viewport.X, viewport.Y) * sizing.SizeScale, sizing.MinPixels, sizing.MaxPixels)
-	local labelHeight = size * sizing.LabelScale
+	local labelHeight = math.max(size * sizing.LabelScale, T.Layout.SmallBadgeSize)
 	local anchor = Vector2.new(0.5, 0.5)
 	local position: Vector2
 

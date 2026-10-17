@@ -1,6 +1,7 @@
 --!strict
 local Test = require(script.Parent.TestKit)
 local Layout = require(script.Parent.Parent.UI.Models.CrateOddsLayout)
+local CollectibleLayout = require(script.Parent.Parent.UI.Models.CollectibleLayout)
 local T = require(script.Parent.Parent.UI.Tokens)
 
 Test.describe("Crate reward viewport clearance", function()
@@ -17,6 +18,20 @@ Test.describe("Crate reward viewport clearance", function()
 			Test.expect(layout.tileHeight >= T.Layout.MinTarget):toBeTruthy()
 			-- One hovered card must also clear its resting neighbour.
 			Test.expect(layout.gap >= overflowX + T.Shape.StrokeTab):toBeTruthy()
+		end
+	end)
+	Test.it("is short enough to show two rows yet keeps a usable collectible art window", function()
+		local K = T.Collectible
+		for _, width in { 200, 300, 500, 660 } do
+			local layout = Layout.resolve(width)
+			Test.expect(layout.tileHeight <= 190):toBeTruthy()
+			local face = CollectibleLayout.card(
+				layout.tileWidth,
+				layout.tileHeight - T.Shape.LipHeight,
+				{ tag = true, name = true, footer = true }
+			)
+			Test.expect(face.art.h >= 56):toBeTruthy()
+			Test.expect(K.NameHeight >= 2 * 18):toBeTruthy()
 		end
 	end)
 	Test.it("keeps multiple columns where full-size cards and their clearance fit", function()

@@ -125,7 +125,7 @@ function DebugPostMatchData.scenarios(): { Scenario }
 	local ffaFirst = base({
 		resultId = "ffa-first",
 		modeId = "FFA",
-		modeName = "Free For All",
+		modeName = "Free-for-all",
 		winnerId = "1",
 		placement = 1,
 		presentation = { eyebrow = "VICTORY", title = "1ST PLACE", detail = "YOU TAKE THE WIN", accent = "Yellow" },
@@ -138,7 +138,7 @@ function DebugPostMatchData.scenarios(): { Scenario }
 	local ffaSixth = base({
 		resultId = "ffa-sixth",
 		modeId = "FFA",
-		modeName = "Free For All",
+		modeName = "Free-for-all",
 		outcome = "Defeat",
 		winnerId = "2",
 		placement = 6,

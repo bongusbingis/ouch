@@ -7,17 +7,29 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local React = require(Packages:WaitForChild("react"))
 local ReactRoblox = require(Packages:WaitForChild("react-roblox"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local PuffyButton = require(script.Parent.PuffyButton)
 local T = require(script.Parent.Parent.Tokens)
 local LobbyNavigation = require(script.Parent.LobbyNavigation)
 local EmoteWheelController = require(script.Parent.Parent.Services.EmoteWheelController)
-local ButtonSurface = require(script.Parent.ButtonSurface)
 local Layout = require(script.Parent.Parent.Models.LobbyHeaderLayout)
 local TextMetrics = require(script.Parent.Parent.TextMetrics)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 local useHeaderInsets = require(script.Parent.Parent.Hooks.useHeaderInsets)
 
 local c = React.createElement
+
+-- Four white candy dots, each with the shared ink outline.
+local function emoteDot(order: number)
+	return c("Frame", {
+		BackgroundColor3 = T.Colors.Surface,
+		BorderSizePixel = 0,
+		LayoutOrder = order,
+		ZIndex = 8,
+	}, {
+		Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusPill) }),
+		Outline = c("UIStroke", { Color = T.Colors.Ink, Thickness = T.Type.Outline }),
+	})
+end
 
 return function(props)
 	local insets = useHeaderInsets()
@@ -49,6 +61,9 @@ return function(props)
 		navHeight = n.Height
 		navTop = (layout.height - navHeight) / 2
 	end
+	local dot = if emote then math.round(math.min(emote.size.X, emote.size.Y) * 0.2) else 0
+	local dotGap = math.round(dot * 0.9)
+	local dotCluster = dot * 2 + dotGap
 	local decorationTarget = props.DecorationTarget
 	if decorationTarget == nil then
 		local player = Players.LocalPlayer
@@ -125,60 +140,43 @@ return function(props)
 					Width = navWidth,
 					Compact = mobile ~= nil or layout.compact,
 					IconOnly = mobile ~= nil and mobile.iconOnly,
+					CycleEnabled = props.CycleEnabled == true and props.Visible ~= false,
 				}),
 			}),
 			Emote = if emote and not wheelBlocked
-				then c(AnimatedButton, {
-					Enabled = true,
-					Visual = c(ButtonSurface, {
-						Enabled = true,
-						Color = UIConfig.ProgressionStyle.Cyan,
-						Radius = UDim.new(0, 12),
-					}),
-					SelectionRadius = UDim.new(0, 12),
+				then c(PuffyButton, {
+					Color = T.Colors.Cyan,
+					LipColor = T.Colors.CyanLip,
+					StrokeColor = T.LobbyNavigation.Rim,
+					Shadow = false,
 					OnActivated = function()
 						EmoteWheelController.openTouch()
 					end,
 					Native = {
-						BackgroundTransparency = 1,
-						Image = "",
 						Position = UDim2.fromOffset(emote.position.X, emote.position.Y),
 						Size = UDim2.fromOffset(emote.size.X, emote.size.Y),
 					},
 				}, {
-					Dots = c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 2 }, {
-						TopLeft = c("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundColor3 = UIConfig.ProgressionStyle.White,
-							BorderSizePixel = 0,
-							Position = UDim2.fromScale(0.36, 0.36),
-							Size = UDim2.fromOffset(9, 9),
-							ZIndex = 3,
-						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
-						TopRight = c("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundColor3 = UIConfig.ProgressionStyle.White,
-							BorderSizePixel = 0,
-							Position = UDim2.fromScale(0.64, 0.36),
-							Size = UDim2.fromOffset(9, 9),
-							ZIndex = 3,
-						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
-						BottomLeft = c("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundColor3 = UIConfig.ProgressionStyle.White,
-							BorderSizePixel = 0,
-							Position = UDim2.fromScale(0.36, 0.64),
-							Size = UDim2.fromOffset(9, 9),
-							ZIndex = 3,
-						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
-						BottomRight = c("Frame", {
-							AnchorPoint = Vector2.new(0.5, 0.5),
-							BackgroundColor3 = UIConfig.ProgressionStyle.White,
-							BorderSizePixel = 0,
-							Position = UDim2.fromScale(0.64, 0.64),
-							Size = UDim2.fromOffset(9, 9),
-							ZIndex = 3,
-						}, { Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+					-- A centred 2x2 cluster, sized from the control so it holds at every scale.
+					Dots = c("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundTransparency = 1,
+						Position = UDim2.new(0.5, 0, 0.5, -T.Shape.LipHeight / 2),
+						Size = UDim2.fromOffset(dotCluster, dotCluster),
+						ZIndex = 8,
+					}, {
+						Grid = c("UIGridLayout", {
+							CellPadding = UDim2.fromOffset(dotGap, dotGap),
+							CellSize = UDim2.fromOffset(dot, dot),
+							FillDirectionMaxCells = 2,
+							HorizontalAlignment = Enum.HorizontalAlignment.Center,
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+						}),
+						Dot1 = emoteDot(1),
+						Dot2 = emoteDot(2),
+						Dot3 = emoteDot(3),
+						Dot4 = emoteDot(4),
 					}),
 				})
 				else nil,

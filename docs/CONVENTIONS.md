@@ -19,12 +19,13 @@
 - **Naming Conventions**: 
   - `PascalCase` for files, modules, and types.
   - `camelCase` for variables and functions.
+- **In-process signals**: Use `src/shared/Game/Util/Listeners.luau` for in-process signals and their cleanup; do not add another signal library or hand-rolled listener lists.
 - **Error Handling**: Functions that can fail should return `(boolean, string?)` for `(success, reason)` rather than throwing errors.
 
 ## 3. React & UI Patterns
 - **Functional Components**: UI components are simple functional components returning React elements. Use the `local c = React.createElement` alias pattern to reduce verbosity.
 - **Hooks**: Custom hooks live in `src/shared/UI/Hooks/`, use the `use` prefix, and return tables of mapped bindings (e.g., `useButtonMotion.luau`).
-- **Stories**: UI components are accompanied by `*.story.luau` files for isolated testing in tools like Hoarcekat or Storybook.
+- **Stories**: UI components have `*.story.luau` files in the UI Labs storybook at repo-level `stories/` (`Ouch.storybook.luau`; shared `StoryRoot` stage and `Fixtures` stubs). It maps to `ServerStorage.UIStories` and is not shipped to clients.
 - **Visuals**: See `docs/STYLE.md` for visual rules. Never invent colors/metrics; always import and use `src/shared/UI/Tokens.luau` (`T.Colors`, `T.Shape`, `T.Layout`).
 
 ## 4. Testing

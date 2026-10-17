@@ -251,6 +251,7 @@ local systems: { any } = {
 	{ name = "SplashdownAudio", parent = presentation, method = "start" },
 	{ name = "JumpPadVisuals", parent = presentation, method = "start" },
 	{ name = "BumperVisuals", parent = presentation, method = "start" },
+	{ name = "CoinVisuals", parent = presentation, method = "start" },
 	{ name = "HazardCarriers", parent = presentation, method = "start" },
 	{ name = "EmotePlayback", parent = presentation, method = "start" },
 	{ name = "FanAirflow", parent = presentation, method = "start" },

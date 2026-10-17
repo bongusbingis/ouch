@@ -205,7 +205,7 @@ end
 
 function GameAudio.onEvent(event: { [string]: any })
 	local kind = event.kind
-	if kind ~= "Elim" and kind ~= "HammerSwing" and kind ~= "BallThrown" and kind ~= "BallBounced" then
+	if kind ~= "Elim" and kind ~= "HammerSwing" and kind ~= "BallReleased" and kind ~= "BallBounced" then
 		return
 	end
 	if not seenEvents.markSeen(event) then
@@ -244,7 +244,7 @@ function GameAudio.onEvent(event: { [string]: any })
 	local balls = Workspace:FindFirstChild("Balls")
 	local ball = balls and event.projectileId and balls:FindFirstChild(event.projectileId)
 	if ball then
-		GameAudio.play(if kind == "BallThrown" then "DodgeballThrow" else "DodgeballBounce", ball)
+		GameAudio.play(if kind == "BallReleased" then "DodgeballThrow" else "DodgeballBounce", ball)
 	end
 end
 

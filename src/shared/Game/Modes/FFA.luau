@@ -10,7 +10,7 @@ local GameMode = require(script.Parent.GameMode)
 
 local FFA = {}
 FFA.id = "FFA"
-FFA.displayName = "Free For All"
+FFA.displayName = "Free-for-all"
 
 function FFA.resolveRules(): GameMode.MatchRules
 	local m = Modes.FFA

@@ -39,6 +39,8 @@ local modalSurface = require(script.Parent.ModalSurface)
 
 local c = React.createElement
 
+local INPUT_HINTS =
+	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints
 local BACK_ACTION = "CloseCombatMenuLayer"
 local BACK_PRIORITY = Enum.ContextActionPriority.High.Value + 2
 
@@ -56,6 +58,28 @@ local PAGE_POSITIONS = {
 		offscreen = UIConfig.Layout.PageOffscreen,
 	},
 }
+
+local CLOSE_GAP = 8
+local CLOSE_EDGE = Vector2.new(16, 10)
+
+-- The open-state CLOSE pill is pinned to the bottom-right corner. A centred page panel is
+-- fitted above that footprint (scaled down and nudged up, never below the top band) so the
+-- pill never overlaps a panel corner. Returns the fitted size and the upward shift in pixels.
+local function clearOfClose(size: Vector2, container: Vector2, anchor: UDim2, pill: Vector2, topLimit: number)
+	local centerX = container.X * anchor.X.Scale + anchor.X.Offset
+	local centerY = container.Y * anchor.Y.Scale + anchor.Y.Offset
+	local pillLeft = container.X - CLOSE_EDGE.X - pill.X
+	local bottom = container.Y - CLOSE_EDGE.Y - pill.Y - CLOSE_GAP
+	if centerX + size.X / 2 <= pillLeft - CLOSE_GAP or centerY + size.Y / 2 <= bottom then
+		return size, 0
+	end
+	local room = math.max(bottom - topLimit, 1)
+	local scale = math.clamp(room / size.Y, 0.7, 1)
+	local fitted = Vector2.new(math.floor(size.X * scale), math.floor(size.Y * scale))
+	local shift = math.max(centerY + fitted.Y / 2 - bottom, 0)
+	shift = math.min(shift, math.max(centerY - fitted.Y / 2 - topLimit, 0))
+	return fitted, math.ceil(shift)
+end
 
 local function validSelection(selection: Instance?): boolean
 	return selection ~= nil
@@ -119,17 +143,20 @@ local function MenuToggle(props)
 		ButtonRef = buttonRef,
 		Enabled = props.Available,
 		Text = if props.Open then "CLOSE" else "MENU",
-		TextSize = 17,
+		TextSize = T.Type.Minimum,
 		TextColor = T.Colors.Ink,
 		Color = if props.Open then T.Colors.Yellow else T.Colors.SurfaceWarm,
 		LipColor = if props.Open then T.Colors.YellowLip else T.Colors.WellLine,
 		Shadow = false,
 		Native = {
-			Position = if props.Open then UDim2.new(1, -88, 1, -54) else UDim2.fromOffset(position.X, position.Y),
+			-- Open: pinned bottom-right by its right edge so the hinted width cannot overflow.
+			AnchorPoint = if props.Open then Vector2.new(1, 1) else Vector2.zero,
+			Position = if props.Open then UDim2.new(1, -16, 1, -10) else UDim2.fromOffset(position.X, position.Y),
 			Size = UDim2.fromOffset(geometry.menu.size.X, geometry.menu.size.Y),
 			Visible = props.Available or props.Open,
 			ZIndex = 80,
 		},
+		Hint = INPUT_HINTS.Menu,
 		OnActivated = CombatMenuClient.toggle,
 	})
 end
@@ -139,6 +166,7 @@ local function CombatMenuContent(props)
 	local shortPages = not ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
 		and safeArea.size.Y <= UIConfig.Layout.ShortLandscapeMaxHeightPx
 	local available = props.Available == true
+	local hud = useArenaHUDLayout(Enum.ScreenInsets.CoreUISafeInsets)
 	local menu = useExternalStore(CombatMenuClient.getSnapshot, CombatMenuClient.subscribe)
 	local preview = useExternalStore(CosmeticPreviewClient.getSnapshot, CosmeticPreviewClient.subscribe)
 	React.useEffect(function()
@@ -213,7 +241,7 @@ local function CombatMenuContent(props)
 			end
 			CombatMenuClient.close()
 			return Enum.ContextActionResult.Sink
-		end, false, BACK_PRIORITY, Enum.KeyCode.Escape, Enum.KeyCode.ButtonB)
+		end, false, BACK_PRIORITY, INPUT_HINTS.Back.Keyboard, INPUT_HINTS.Back.Gamepad)
 		return function()
 			ContextActionService:UnbindAction(BACK_ACTION)
 		end
@@ -340,10 +368,28 @@ local function CombatMenuContent(props)
 		},
 	}
 	local views = {}
+	local portrait = ResponsiveLayout.isPortrait(safeArea.size, UIConfig.Layout.PortraitMaxAspect)
+	local bandHeight = if shortPages then UIConfig.Layout.TopBar.ShortHeightPx else safeArea.size.Y * 0.113754
 	for pageName, positions in PAGE_POSITIONS do
+		local onscreen = if shortPages then UIConfig.Layout.ShortPagePosition else positions.onscreen
+		-- Shop and Settings take an explicit size, so they can be fitted clear of the CLOSE pill.
+		local fitted: Vector2? = nil
+		local panel = UIConfig.Layout.Panels[pageName]
+		if panel ~= nil and pageName ~= "Inventory" then
+			local base = ResponsiveLayout.panelSize(
+				safeArea.size,
+				panel,
+				UIConfig.Layout.PortraitMaxAspect,
+				UIConfig.Layout.ShortLandscapeMaxHeightPx
+			)
+			local size, shift =
+				clearOfClose(base, safeArea.size, onscreen, hud.menu.size, bandHeight + (if portrait then 8 else 14))
+			fitted = size
+			onscreen += UDim2.fromOffset(0, -shift)
+		end
 		views[pageName] = c(PageTransition, {
 			Active = menu.open and menu.page == pageName,
-			Onscreen = if shortPages then UIConfig.Layout.ShortPagePosition else positions.onscreen,
+			Onscreen = onscreen,
 			Offscreen = if shortPages then UIConfig.Layout.ShortPageOffscreen else positions.offscreen,
 			Render = function(position)
 				if pageName == "Inventory" then
@@ -362,11 +408,12 @@ local function CombatMenuContent(props)
 					return c(ShopPage, {
 						Model = controller.shopModel,
 						Position = position,
+						Size = fitted,
 						OnCardActivated = controller.activateShopCard,
 						OnRefresh = controller.refreshShop,
 					})
 				end
-				return c(SettingsPage, { Position = position, Place = props.Place })
+				return c(SettingsPage, { Position = position, Place = props.Place, Size = fitted })
 			end,
 		})
 	end
@@ -381,7 +428,7 @@ local function CombatMenuContent(props)
 			then modalSurface({
 				ClassName = "Frame",
 				Active = true,
-				BackgroundColor3 = Color3.fromRGB(17, 24, 28),
+				BackgroundColor3 = T.Colors.Ink,
 				BackgroundTransparency = styles.BackdropTransparency,
 				SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
 				SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
@@ -407,6 +454,12 @@ local function CombatMenuContent(props)
 						CurrentPage = menu.page,
 						OnNavigate = CombatMenuClient.navigate,
 						Tabs = tabs,
+						CycleEnabled = menu.open
+							and not preview.active
+							and notifications.request == nil
+							and controller.selectedShopCardId == nil
+							and controller.crateReveal == nil
+							and not controller.inspectingReward,
 					}),
 				}),
 				Modals = c("Frame", {

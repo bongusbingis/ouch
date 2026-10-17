@@ -81,6 +81,14 @@ return function()
 			expect(QuestLogic.nextResetAt(midnight)).to.equal(midnight + 86400)
 		end)
 
+		it("resets at the next UTC midnight on month, year, and leap-day ends", function()
+			-- 2026-10-31, 2026-12-31, 2028-02-29 at 12:00 UTC
+			expect(QuestLogic.nextResetAt(1793448000)).to.equal(1793491200)
+			expect(QuestLogic.nextResetAt(1798718400)).to.equal(1798761600)
+			expect(QuestLogic.nextResetAt(1835438400)).to.equal(1835481600)
+			expect(QuestLogic.blankState(1793448000).resetAt).to.equal(1793491200)
+		end)
+
 		it("maps event progress to the intended player and mode", function()
 			local byId = QuestLogic.definitionsById(definitions)
 			local elim = { kind = "Elim", sourceId = "1", targetId = "2" }
@@ -113,6 +121,22 @@ return function()
 			expect(payload.progress).to.equal(5)
 			expect(payload.completed).to.equal(true)
 			expect(payload.reward.amount).to.equal(100)
+		end)
+
+		it("does not award a completed-match quest for an abandoned contest", function()
+			expect(
+				QuestLogic.progressForEvent(
+					definitions[3],
+					{ kind = "MatchEnded", reason = "NoContest" },
+					{ playerId = "1" }
+				)
+			).to.equal(0)
+		end)
+
+		it("recognizes a new quest cycle only after the initial daily snapshot", function()
+			expect(QuestLogic.isNewDailyCycle(nil, "2026-07-13")).to.equal(false)
+			expect(QuestLogic.isNewDailyCycle("2026-07-13", "2026-07-13")).to.equal(false)
+			expect(QuestLogic.isNewDailyCycle("2026-07-13", "2026-07-14")).to.equal(true)
 		end)
 	end)
 end

@@ -5,7 +5,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local ResponsiveText = require(script.Parent.Parent.ResponsiveText)
 local SectionHeader = require(script.Parent.Parent.SectionHeader)
 local ShopCard = require(script.Parent.ShopCard)
@@ -30,6 +29,8 @@ export type Props = {
 	VisibleBottom: number?,
 	OnCardActivated: (any) -> (),
 	OnExpired: (() -> ())?,
+	-- Re-requests marketplace prices that failed to load.
+	OnRetry: (() -> ())?,
 }
 
 return function(props: Props)
@@ -44,21 +45,20 @@ return function(props: Props)
 	if #section.cards == 0 then
 		children.Empty = c(ResponsiveText, {
 			HostName = "Empty",
-			MeasurementFont = UIConfig.Text.BodyFont,
+			MeasurementFont = T.Type.Label,
+			MinTextSize = T.Type.Minimum,
 			MaxTextSize = 20,
 			Native = {
 				BackgroundColor3 = T.Colors.WellLine,
 				BackgroundTransparency = 0,
-				Font = UIConfig.Text.BodyFont,
+				Font = T.Type.Label,
 				Size = UDim2.fromScale(1, 1),
 				Text = "NO OFFERS AVAILABLE",
 				TextColor3 = T.Colors.Ink,
-				TextStrokeColor3 = UIConfig.ProgressionStyle.Ink,
-				TextStrokeTransparency = 0.35,
 				ZIndex = 5,
 			},
 		}, {
-			UICorner = c("UICorner", { CornerRadius = UDim.new(0, UIConfig.Radius.Control) }),
+			UICorner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 		})
 	else
 		-- Cards carry the position the grid layout used to give them, so a card
@@ -89,6 +89,8 @@ return function(props: Props)
 					Position = UDim2.fromOffset(((index - 1) % columns) * (grid.cardWidth + gap), y),
 					Size = UDim2.fromOffset(grid.cardWidth, grid.cardHeight),
 					OnActivated = props.OnCardActivated,
+					OnRetry = props.OnRetry,
+					SectionTitle = section.title,
 					SeasonState = props.SeasonState,
 				})
 			end

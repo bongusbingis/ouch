@@ -6,6 +6,7 @@
   "visual_release_review": ".review/visual-release/final-review",
   "visual_release_acceptance": ".review/visual-release/owner-acceptance.json",
   "claude_effort": "max",
+  "muse_effort": "medium",
   "review_packet_max_bytes": 250000,
   "preferred_icon_prefixes": [
     "material-symbols",

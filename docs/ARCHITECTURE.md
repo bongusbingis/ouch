@@ -39,7 +39,9 @@ The DataModel is composed dynamically from scattered source paths via Rojo proje
 * **Place-Specific Code:** Specific implementations live under `places/{arena,lobby}/`.
 * **Matchmaking:** The lobby has its own `places/lobby/shared/Matchmaking/` mapped directly into `ReplicatedStorage.Shared.Matchmaking`.
 * **Tests:** `tests.project.json` reuses the arena layout for running the test suite.
-* **Exclusions:** `globIgnorePaths` excludes test specs and UI stories from being served into the game.
+* **Exclusions:** `globIgnorePaths` excludes test specs from being served into the game.
+* **UI Stories:** The UI Labs storybook lives at repo-level `stories/` and is mapped to `ServerStorage.UIStories` in both place projects (never replicated to clients, so it needs no `globIgnorePaths` entry).
+* **Arena Maps:** Map templates are staged under `ServerStorage.ArenaMaps.<id>`; the live map is the interior of `Workspace.Assets.Arena`. `ArenaMapService` parks the live interior and moves the vote winner's in when the ballot resolves (Idle/Intermission only). The authored bowl is the default and the fallback when a staged map is missing or invalid. See SYSTEMS.md, Arena Maps & Map Vote.
 
 ## 5. Server/Client Boundary
 The remote event/function setup is centralized in [`src/shared/Network.luau`](file:///src/shared/Network.luau).

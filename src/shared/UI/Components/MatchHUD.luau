@@ -24,10 +24,10 @@ local function teamPanels(view)
 			Position = UDim2.fromScale((index - 1) / count, 0),
 			Size = UDim2.new(1 / count, -8, 1, 0),
 		}, {
-			Corner = c("UICorner", { CornerRadius = UDim.new(0, 10) }),
+			Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 			Name = c(Label, {
 				Text = team.label,
-				Size = 12,
+				Size = T.Type.HudMinimum,
 				Align = Enum.TextXAlignment.Left,
 				Native = { Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -46, 1, -5) },
 			}),
@@ -73,16 +73,17 @@ return function(props)
 		}, {
 			Objective = c(Label, {
 				Text = view.title .. (if view.target > 0 then ` · FIRST TO {view.target}` else " · SURVIVE"),
-				Size = if short then 13 else 16,
+				Size = T.Type.HudMinimum,
+				Font = if short then T.Type.CompactLabel else nil,
 				Color = C.InkSoft,
 				Align = Enum.TextXAlignment.Left,
-				Native = { Position = UDim2.fromOffset(10, 3), Size = UDim2.new(1, -88, 0, 18) },
+				Native = { Position = UDim2.fromOffset(10, 2), Size = UDim2.new(1, -88, 0, 20) },
 			}),
 			Clock = c(Label, {
 				Text = view.clock,
 				Title = true,
 				Size = if short then 26 else 30,
-				Color = if view.remaining <= Config.HUD.UrgentSeconds then C.PinkLip else C.Ink,
+				Color = if view.active and view.remaining <= Config.HUD.UrgentSeconds then C.PinkLip else C.Ink,
 				Native = {
 					Position = UDim2.new(1, -78, 0, 4),
 					Size = UDim2.new(0, 68, 1, if view.teamMode then -28 else -14),
@@ -90,10 +91,14 @@ return function(props)
 			}),
 			Team = if view.teamMode and view.teamId
 				then c(Label, {
-					Text = `YOU: {string.upper(view.teamId)}`,
-					Size = 11,
+					-- The slot under the clock is 72 px wide; longer names (SURVIVORS,
+					-- INFECTED) cannot carry the prefix at the 16 px floor.
+					Text = if #view.teamId <= 4 then `YOU: {string.upper(view.teamId)}` else string.upper(view.teamId),
+					Size = T.Type.HudMinimum,
+					Font = T.Type.CompactLabel,
 					Color = C.InkSoft,
-					Native = { Position = UDim2.new(1, -78, 1, -23), Size = UDim2.fromOffset(68, 16) },
+					Align = Enum.TextXAlignment.Right,
+					Native = { Position = UDim2.new(1, -80, 1, -23), Size = UDim2.fromOffset(72, 20) },
 				})
 				else nil,
 			Scores = if view.teamMode
@@ -144,7 +149,7 @@ return function(props)
 				}),
 				Objective = c(Label, {
 					Text = view.objective,
-					Size = 15,
+					Size = T.Type.HudMinimum,
 					Native = { Position = UDim2.fromOffset(8, 36), Size = UDim2.new(1, -16, 0, 24) },
 				}),
 			})

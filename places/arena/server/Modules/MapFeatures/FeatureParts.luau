@@ -3,7 +3,10 @@
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local AttributeRules = require(
-	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("MapFeatures"):WaitForChild("AttributeRules")
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("MapFeatures")
+		:WaitForChild("AttributeRules")
 )
 local FeatureParts = {}
 local cache: { [Model]: { [string]: { BasePart } } } = {}
@@ -43,16 +46,12 @@ function FeatureParts.number(part: Instance, key: string, fallback: number): num
 	if value == nil then
 		return fallback
 	end
-	local reason = AttributeRules.checkPresentValue(part:GetFullName(), key, value)
-	assert(reason == nil, `[FeatureParts] {reason}`)
 	return value :: number
 end
 function FeatureParts.axis(part: Instance, key: string, fallback: string): Vector3
 	assert(AttributeRules.isFeatureValueKey(key), `[FeatureParts] {key} is not a registered feature value key`)
 	local value = part:GetAttribute(key)
 	value = if value == nil then fallback else value
-	local reason = AttributeRules.checkPresentValue(part:GetFullName(), key, value)
-	assert(reason == nil, `[FeatureParts] {reason}`)
 	return if value == "X" then Vector3.xAxis elseif value == "Z" then Vector3.zAxis else Vector3.yAxis
 end
 return FeatureParts

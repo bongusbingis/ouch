@@ -33,6 +33,57 @@ All systems serve the four highest product priorities: **monetization, engagemen
 **Depends on:** Configuration values for constraints, Combat & Simulation to track eliminations.
 **Consumers:** MatchService (for match lifecycle and scoring), MatchmakerService (for queues), UI layer (for scoring and match flow).
 
+### Arena Maps & Map Vote
+**Purpose:** Lets players vote a map alongside the mode in the arena ballot, and swaps the winner in between matches.
+**Owner modules:**
+- `places/arena/server/Modules/ArenaMapService.luau`
+- `places/arena/server/Modules/ModeVoteService.luau`
+- `src/config/Gameplay/ArenaMaps.luau`
+- `src/shared/UI/Components/GameModeSelect.luau` and `MapVoteChip.luau` (map dock)
+**Key invariants:**
+- Templates wait in `ServerStorage.ArenaMaps.<id>`; the live map is the interior of `Workspace.Assets.Arena`. A swap parks the live interior and moves the winner's in.
+- Swap only in Idle or Intermission; `activate` refuses Starting/Active/Results.
+- Pre-validate (Scriptables audit) and tag a template before moving anything; a failed swap reverts. A missing or invalid map is never offered and falls back to the bowl.
+- Never block match start or show a failure screen because of a map problem.
+- The map tally is a second `ModeVote.State` in the same snapshot (one extra remote, `SubmitMapVote`); with fewer than two offered maps the ballot is mode-only.
+**Depends on:** ArenaService, BallService, MatchService, VenueService, Game Modes.
+**Consumers:** Arena ballot UI, CoinService, Map Features.
+
+### Coins
+**Purpose:** Collectible arena coins that pay Bonks during combat matches.
+**Owner modules:**
+- `places/arena/server/Modules/CoinService.luau`
+- `src/shared/Game/Coins/CoinRules.luau`
+- `src/config/Gameplay/Coins.luau`
+- `places/arena/client/Modules/Presentation/CoinVisuals.luau`
+**Key invariants:**
+- Server-authoritative pickup; the `CoinCollected` remote is server-to-client presentation only.
+- 5 Bonks per coin, capped at 50 Bonks per player per match (base, before boost). The tally resets per match.
+- Live only in the Active phase of combat modes (never Splashdown). Spawns come from each map's `Scriptables.CoinSpawns`; none means no coins and no warning.
+- Bonks are journaled through the existing match award (`ProgressionService.addBonks`), paid once at match end when the match completes and the player is eligible. No saved-data shape change.
+- Coin Bonks pass the match-award participation gate and no-result rules (DEC-038, DEC-041); idle players and matches without a result earn nothing. `Coins.Enabled` is the kill switch.
+**Depends on:** MatchService, ProgressionService, map `CoinSpawns`.
+**Consumers:** Post-match "Your Round" Bonks.
+
+### Input Hints
+**Purpose:** Shows the right control hint per device and keeps hints and binds in sync.
+**Owner modules:** `src/config/Interface/Input.luau` (`Hints`), `src/shared/UI/Components/InputHint.luau`, `src/shared/UI/Models/InputHintModel.luau`, `src/shared/UI/Hooks/useDeviceClass.luau`.
+**Key invariants:**
+- `Config.Interface.Input.Hints` is the single table that drives both the binds and the displayed hint.
+- Keyboard/mouse shows a keycap, gamepad shows the `GetImageForKeyCode` glyph (text keycap fallback), touch shows nothing.
+- LB/RB tab cycling is bound only while no modal is up and combat is not running.
+**Depends on:** UserInputService, Config.
+**Consumers:** Arena HUD/menu, lobby navigation, ballot, post-match, onboarding.
+
+### UI Resilience
+**Purpose:** Keeps one broken component from taking down the screen.
+**Owner modules:** `src/shared/UI/Components/ErrorBoundary.luau`, `places/arena/client/UI/ArenaApp.luau`, `places/lobby/client/UI/LobbyApp.luau`.
+**Key invariants:**
+- App subtrees (pages, modal layers, HUDs, loading) are wrapped in `ErrorBoundary`, which warns once with the error and component stack and renders nothing.
+- If the arena `LoadingScreen` crashes, `OnError` releases the `hostPresented` handshake so the screen cannot cover the game.
+- Post-match, combat menu and toolbar are separate React roots and are not under the `ArenaApp` boundary.
+**Consumers:** Every mounted lobby and arena UI surface.
+
 ### Arena Startup & Asset Loading
 **Purpose:** Starts as much of the arena client as possible while isolating initialization and media failures.
 **Owner modules:** `places/arena/client/Modules/UI/ArenaLoadingClient.luau`, `places/arena/client/Scripts/SimulationClient.client.luau`, `places/arena/client/Scripts/ArenaUI.client.luau`
@@ -168,6 +219,8 @@ All systems serve the four highest product priorities: **monetization, engagemen
 **Key invariants:**
 - Onboarding state is append-only; a player can never un-learn a completed tutorial step.
 - The service must safely handle players who join mid-flow or have legacy data shapes.
+- The flow is combat-first (throw, hammer, charged throw) with one obstacle lesson between the first two; `CoreComplete` means the three combat mechanics and never the obstacle. A step completes only when the server observes the player perform it.
+- Being hit by the obstacle is feedback, not failure: the shared shove applies, recovery returns the player to the spawn side, and the lesson stays open. Nothing in onboarding blocks play or match entry.
 **Depends on:** PlayerData, Network.
 **Consumers:** Client UI overlays, Matchmaker (to gate modes behind tutorials).
 

@@ -5,15 +5,13 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
-local AnimatedButton = require(script.Parent.AnimatedButton)
+local T = require(script.Parent.Parent.Tokens)
+local LobbyNavigation = require(script.Parent.LobbyNavigation)
 local LobbyHeader = require(script.Parent.LobbyHeader)
-local ResponsiveText = require(script.Parent.ResponsiveText)
 local ResponsiveLayout = require(script.Parent.Parent.Models.ResponsiveLayout)
 local useSafeArea = require(script.Parent.Parent.Hooks.useSafeArea)
 
 local c = React.createElement
-local SELECTED = "rbxassetid://94748581468730"
-local UNSELECTED = "rbxassetid://136021539696619"
 
 export type TabDefinition = {
 	Id: string,
@@ -88,6 +86,8 @@ export type Props = {
 	Tabs: { TabDefinition }?,
 	LobbyHeader: boolean?,
 	HeaderVisible: boolean?,
+	-- LB/RB tab cycling (and its glyphs) while nothing modal sits above the rail.
+	CycleEnabled: boolean?,
 }
 
 return function(props: Props)
@@ -101,99 +101,61 @@ return function(props: Props)
 			OnNavigate = props.OnNavigate,
 			Tabs = definitions,
 			Visible = props.HeaderVisible,
+			CycleEnabled = props.CycleEnabled,
 		})
 	end
-	local gap = if portrait then UIConfig.Layout.TopBar.PortraitGapScale else UIConfig.Layout.TopBar.LandscapeGapScale
-	local buttonWidth = math.max((1 - gap * math.max(#definitions - 1, 0)) / math.max(#definitions, 1), 0)
-	local buttons = {
-		UIListLayout = c("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(gap, 0),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-		}),
-	}
-
-	for _, definition in definitions do
-		local selected = definition.Id == props.CurrentPage
-		local enabled = definition.Enabled ~= false
-		buttons[definition.Id] = c(AnimatedButton, {
-			ButtonRef = definition.ButtonRef,
-			Enabled = enabled,
-			Native = {
-				BackgroundTransparency = 1,
-				Image = if selected then SELECTED else UNSELECTED,
-				ImageColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(145, 145, 145),
-				LayoutOrder = definition.LayoutOrder,
-				Position = definition.ButtonPosition or UDim2.fromScale(0.418851, 0.25),
-				ScaleType = Enum.ScaleType.Slice,
-				Size = UDim2.fromScale(
-					buttonWidth,
-					if definition.ButtonSize then definition.ButtonSize.Y.Scale else 0.75
-				),
-				SliceCenter = UIConfig.LobbyArtwork.Action.CyanSlice,
-				SliceScale = UIConfig.LobbyArtwork.Action.SliceScale,
-				ZIndex = definition.ZIndex,
-			},
-			OnActivated = function()
-				props.OnNavigate(definition.Id)
-			end,
-			OnSelectionGained = definition.OnSelectionGained,
-		}, {
-			UIAspectRatioConstraint = c("UIAspectRatioConstraint", { AspectRatio = 1.3 }),
-			TargetSize = c(
-				"UISizeConstraint",
-				{ MinSize = Vector2.new(UIConfig.Interaction.MinTargetPx, UIConfig.Interaction.MinTargetPx) }
-			),
-			ImageLabel = c("ImageLabel", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				Image = definition.Icon,
-				ImageColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(190, 190, 190),
-				ImageTransparency = if enabled then 0 else 0.18,
-				LayoutOrder = 2,
-				Position = definition.IconPosition or UDim2.fromScale(0.5, 0.5),
-				Size = definition.IconSize or UDim2.fromScale(0.5, 0.65),
-			}),
-			Label = c(ResponsiveText, {
-				HostName = "Label",
-				MeasurementFont = UIConfig.Text.BodyFont,
-				Native = {
-					Active = true,
-					AnchorPoint = Vector2.new(0.5, 1),
-					BackgroundTransparency = 1,
-					Font = UIConfig.Text.BodyFont,
-					Position = definition.LabelPosition or UDim2.fromScale(0.5, 0),
-					Size = definition.LabelSize
-						or UDim2.fromScale(1.4, if definition.Id == "Inventory" then 0.420305 else 0.42),
-					Text = definition.Label,
-					TextColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(185, 185, 185),
-					TextTransparency = if enabled then 0 else 0.12,
-				},
-			}),
-		})
+	local count = math.max(#definitions, 1)
+	local bandHeight = if short then UIConfig.Layout.TopBar.ShortHeightPx else safeArea.size.Y * 0.113754
+	local nav = T.LobbyNavigation
+	local navHeight = math.clamp(bandHeight - nav.MobileBandPadding * 6, nav.MobileHeight, nav.Height)
+	local compact = navHeight < nav.Height - 8 or safeArea.size.X < 860
+	local iconOnly = safeArea.size.X < count * 112 / 2 + nav.MobileEdge * 2 + 120
+	local navWidth = if compact
+		then math.min(safeArea.size.X - nav.MobileEdge * 2, count * 112)
+		else math.min(safeArea.size.X * nav.WidthFraction, nav.MaxWidth, safeArea.size.X - nav.MobileEdge * 2)
+	if iconOnly then
+		navWidth = count * T.Layout.MinTarget + (count - 1) * nav.MobileEdge
 	end
+	navWidth = math.max(navWidth, count * T.Layout.MinTarget)
 
 	return c("Frame", {
-		BackgroundColor3 = UIConfig.ProgressionStyle.Ink,
-		BorderColor3 = Color3.new(),
+		BackgroundColor3 = T.Colors.Ink,
 		BorderSizePixel = 0,
-		Size = if short then UDim2.new(1, 0, 0, UIConfig.Layout.TopBar.ShortHeightPx) else UDim2.fromScale(1, 0.113754),
+		Size = UDim2.new(1, 0, 0, bandHeight),
 	}, {
-		PageTabs = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
+		Pattern = c("ImageLabel", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromScale(0.5, 0.62),
-			SelectionGroup = true,
-			Size = UDim2.fromScale(
-				if short
-					then UIConfig.Layout.TopBar.ShortWidthScale
-					else if portrait
-						then UIConfig.Layout.TopBar.PortraitWidthScale
-						else UIConfig.Layout.TopBar.LandscapeWidthScale,
-				0.877073
+			Image = T.Texture.Swirl,
+			ImageColor3 = T.Colors.Surface,
+			ImageTransparency = 0.94,
+			ScaleType = Enum.ScaleType.Tile,
+			TileSize = UDim2.fromOffset(240, 240),
+			Size = UDim2.fromScale(1, 1),
+		}),
+		Scallop = c("Frame", {
+			BackgroundColor3 = T.Colors.Ink,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 0, 1, -12),
+			Size = UDim2.new(1, 0, 0, 24),
+		}, { Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusPanel) }) }),
+		PageTabs = c("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(
+				safeArea.position.X + (safeArea.size.X - navWidth) / 2,
+				(bandHeight - navHeight) / 2
 			),
-		}, buttons),
+			SelectionGroup = true,
+			Size = UDim2.fromOffset(navWidth, navHeight),
+		}, {
+			Navigation = c(LobbyNavigation, {
+				Tabs = definitions,
+				CurrentPage = props.CurrentPage,
+				OnNavigate = props.OnNavigate,
+				Width = navWidth,
+				Compact = compact,
+				IconOnly = iconOnly,
+				CycleEnabled = props.CycleEnabled,
+			}),
+		}),
 	})
 end

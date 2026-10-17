@@ -83,7 +83,8 @@ local function nameFor(input: Input, playerId: string): string
 		return "YOU"
 	end
 	local names = input.names
-	return if names and names[playerId] then names[playerId] else playerId
+	-- Racers who left are not in the roster; never show their raw user id.
+	return if names and names[playerId] then names[playerId] else "PLAYER LEFT"
 end
 
 local function toastFor(input: Input, snapshot: any): Toast?

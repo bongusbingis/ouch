@@ -138,4 +138,35 @@ return function()
 			expect(PlayerData.beginMatchAward(player, "match-one", "S1")).to.equal(nil)
 		end)
 	end)
+
+	describe("MatchAwards", function()
+		it("migrates old profiles without replacing existing rewards", function()
+			local data: any = { Bonks = 125 }
+			local journal = MatchAwards.ensure(data)
+			expect(journal.Version).to.equal(1)
+			expect(data.Bonks).to.equal(125)
+			MatchAwards.enqueue(journal, "one", { Ready = false }, 2)
+			expect(MatchAwards.ensure(data).Pending.one.Ready).to.equal(false)
+		end)
+
+		it("rejects capacity overflow without evicting pending entries", function()
+			local journal = MatchAwards.ensure({})
+			MatchAwards.enqueue(journal, "one", { XP = 100 }, 1)
+			expect(MatchAwards.enqueue(journal, "two", { XP = 200 }, 1)).to.equal(nil)
+			expect(journal.Pending.one.XP).to.equal(100)
+		end)
+
+		it("deduplicates completed awards and bounds completion history", function()
+			local journal = MatchAwards.ensure({})
+			for index = 1, 5 do
+				local id = tostring(index)
+				MatchAwards.enqueue(journal, id, {}, 2)
+				MatchAwards.complete(journal, id, index, 2)
+			end
+			expect(journal.Completed["3"]).to.equal(nil)
+			expect(journal.Completed["4"]).to.equal(4)
+			expect(MatchAwards.enqueue(journal, "5", {}, 2)).to.equal(nil)
+			expect(next(journal.Pending)).to.equal(nil)
+		end)
+	end)
 end

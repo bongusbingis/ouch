@@ -4,6 +4,7 @@ local T = require(script.Parent.Parent.Tokens)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
+local TextService = game:GetService("TextService")
 local Players = game:GetService("Players")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local Shop = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Economy"):WaitForChild("Shop"))
@@ -26,8 +27,14 @@ local modalSurface = require(script.Parent.ModalSurface)
 
 local Well = require(script.Parent.Well)
 local Ribbon = require(script.Parent.RarityRibbon)
+local CollectibleFace = require(script.Parent.CollectibleFace)
+local ModalClose = require(script.Parent.ModalClose)
+local Button = require(script.Parent.PuffyButton)
 local Layout = require(script.Parent.Parent.Models.SeasonLayout)
-local S = T.SeasonRewards
+local FaceLayout = require(script.Parent.Parent.Models.CollectibleLayout)
+local S, K = T.SeasonRewards, T.Collectible
+-- The Bonks coin on its own, as on the reward tiles: the amount is named once, on the card.
+local BONKS_GLYPH = "rbxassetid://106703644238993"
 
 local c = React.createElement
 local CandyPanel = require(script.Parent.CandyPanel)
@@ -62,6 +69,50 @@ local function label(text, position, size, maximum, color, heading, alignment)
 				StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize,
 			})
 			else nil,
+	})
+end
+
+local function requirementColor(entry, active: boolean): Color3
+	if entry.claimed then
+		return T.Colors.Lime
+	elseif not active then
+		return T.Colors.Well
+	elseif entry.claimable then
+		return T.Colors.Yellow
+	elseif entry.needsPremium then
+		return T.Colors.Gold
+	end
+	return T.Colors.Well
+end
+
+-- The requirement reads as the same candy state chip as the tiles when it fits;
+-- longer wording wraps as one centred line group instead of truncating.
+local function requirementView(text: string, color: Color3, x: number, y: number, width: number, center: boolean)
+	local chipWidth = FaceLayout.tagWidth(text, T.Type.Minimum)
+	if chipWidth <= width then
+		return c(Ribbon, {
+			Text = text,
+			Color = color,
+			Native = {
+				AnchorPoint = Vector2.new(if center then 0.5 else 0, 0),
+				Position = UDim2.fromOffset(if center then x + width / 2 else x, y),
+				Size = UDim2.fromOffset(chipWidth, K.TagHeight),
+				ZIndex = 112,
+			},
+		})
+	end
+	return c("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(width, T.Layout.MinTarget),
+		Font = T.Type.Label,
+		Text = text,
+		TextSize = T.Type.Minimum,
+		TextColor3 = T.Colors.Ink,
+		TextWrapped = true,
+		TextXAlignment = if center then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ZIndex = 112,
 	})
 end
 
@@ -185,8 +236,192 @@ return function(props)
 	local requirement = if selected
 		then (if not seasonActive and not selected.claimed then unavailableText else Model.requirement(selected))
 		else ""
-	local previewDetails = S.PreviewDetailsHeight
-	local previewArtHeight = math.min(S.PreviewArtMaxHeight, math.max(40, bodyHeight - previewDetails - 88))
+	-- The preview is one composed stack (track chip, the collectible card with its
+	-- seam rarity tag and CAPS name, the item kind and the requirement chip), centred
+	-- in its well so nothing floats in leftover space. The amount of a currency reward
+	-- is named once, on the card.
+	local preview = nil
+	if previewVisible and selected then
+		local edge = S.BrowserInset
+		local previewWidth = layout.previewWidth
+		local caption = if definition then ItemLabels[definition.Category] or "COSMETIC" else "CURRENCY"
+		local trackText = `{string.upper(selected.track)} • TIER {selected.tier}`
+		local trackColor = if selected.track == "Premium" then T.Colors.Gold else T.Colors.Surface
+		local requirementTint = requirementColor(selected, seasonActive)
+		local artContent = if selected.kind == "Bonks"
+			then c("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 1,
+				Image = BONKS_GLYPH,
+				Position = UDim2.fromScale(0.5, 0.5),
+				ScaleType = Enum.ScaleType.Fit,
+				Size = UDim2.fromScale(0.8, 0.8),
+				ZIndex = 108,
+			})
+			else c(ShopPreview, {
+				Items = previewItems,
+				ColorId = (props.Equipped or {}).CharacterColor,
+				CostumeId = (props.Equipped or {}).CostumeAssets,
+				TextColor = T.Colors.Ink,
+				TextStroke = 0,
+				ZIndex = 108,
+			})
+		local function back(x: number, y: number)
+			return c(Button, {
+				Text = "<",
+				TextSize = T.Type.Tab,
+				TextColor = T.Colors.Ink,
+				Color = T.Colors.Surface,
+				LipColor = T.Colors.WellLine,
+				Shadow = false,
+				OnActivated = function()
+					setPreviewOpen(false)
+				end,
+				Native = {
+					Position = UDim2.fromOffset(x, y),
+					Size = UDim2.fromOffset(T.Layout.MinTarget, T.Layout.MinTarget),
+					ZIndex = 110,
+				},
+			})
+		end
+		local function trackChip(x: number, y: number, maxWidth: number, center: boolean)
+			return c(Ribbon, {
+				Text = trackText,
+				Color = trackColor,
+				Native = {
+					AnchorPoint = Vector2.new(if center then 0.5 else 0, 0),
+					Position = UDim2.fromOffset(x, y),
+					Size = UDim2.fromOffset(FaceLayout.tagWidth(trackText, T.Type.Minimum, maxWidth), K.TagHeight),
+					ZIndex = 112,
+				},
+			})
+		end
+		local children: { [string]: any } = {}
+		if short then
+			-- Landscape phone: square card on the left, the copy stacked beside it.
+			-- Layout.shortPreview keeps the whole stack inside the well (one-line
+			-- name and the requirement chip sharing a row on the shortest phones).
+			local kindBounds =
+				TextService:GetTextSize(caption, T.Type.Minimum, T.Type.Label, Vector2.new(4096, T.Layout.MinTarget))
+			local stack = Layout.shortPreview(bodyHeight, previewWidth, {
+				track = FaceLayout.tagWidth(trackText, T.Type.Minimum),
+				requirement = FaceLayout.tagWidth(requirement, T.Type.Minimum),
+				kind = math.ceil(kindBounds.X) + 2,
+			})
+			local columnX, columnWidth = stack.columnX, stack.columnWidth
+			children.Back = back(stack.back.x, stack.back.y)
+			children.Track = trackChip(stack.track.x, stack.track.y, stack.track.maxWidth, false)
+			children.Name = c(ResponsiveText, {
+				MeasurementFont = T.Type.Display,
+				MinTextSize = T.Type.Minimum,
+				MaxTextSize = T.Type.TileLabel,
+				Wrapped = stack.mode == "Stacked",
+				Native = {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(columnX, stack.name.y),
+					Size = UDim2.fromOffset(columnWidth, stack.name.height),
+					Font = T.Type.Display,
+					Text = string.upper(name),
+					TextColor3 = T.Colors.Ink,
+					TextWrapped = stack.mode == "Stacked",
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					ZIndex = 110,
+				},
+			})
+			children.Kind = if stack.kind
+				then label(
+					caption,
+					UDim2.fromOffset(columnX, stack.kind.y),
+					UDim2.fromOffset(stack.kind.width, stack.kind.height),
+					T.Type.Minimum,
+					T.Colors.InkSoft,
+					false
+				)
+				else nil
+			children.Requirement = requirementView(
+				requirement,
+				requirementTint,
+				stack.requirement.x,
+				stack.requirement.y,
+				stack.requirement.width,
+				false
+			)
+			children.Face = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(stack.face.x, stack.face.y),
+				Size = UDim2.fromOffset(stack.face.side, stack.face.side),
+				ZIndex = 106,
+			}, {
+				Card = c(CollectibleFace, {
+					Width = stack.face.side,
+					Height = stack.face.side,
+					Rarity = if definition then definition.Rarity else nil,
+					Art = artContent,
+					ZIndex = 106,
+				}),
+			})
+		else
+			local topRow = if compact then T.Layout.MinTarget else K.TagHeight
+			local faceWidth = math.min(previewWidth - (edge - K.Pad) * 2, S.PreviewMaxWidth)
+			local details = K.FooterHeight + K.NameGap + T.Layout.MinTarget
+			local available = bodyHeight - edge * 2 - topRow - details
+			local faceHeight = math.max(
+				T.Layout.MinTarget,
+				math.min(available, S.PreviewArtMaxHeight + K.NameHeight + K.TagHeight + K.Pad * 2)
+			)
+			local total = topRow + faceHeight + details
+			local top = math.max(edge, math.floor((bodyHeight - total) / 2))
+			local faceX = math.floor((previewWidth - faceWidth) / 2)
+			local copyX = faceX + K.Pad
+			local copyWidth = faceWidth - K.Pad * 2
+			children.Back = if compact then back(edge, top) else nil
+			children.Track = trackChip(
+				previewWidth / 2,
+				top + (topRow - K.TagHeight) / 2,
+				previewWidth - (T.Layout.MinTarget + edge * 2) * 2,
+				true
+			)
+			children.Face = c("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(faceX, top + topRow),
+				Size = UDim2.fromOffset(faceWidth, faceHeight),
+				ZIndex = 106,
+			}, {
+				Card = c(CollectibleFace, {
+					Width = faceWidth,
+					Height = faceHeight,
+					Rarity = if definition then definition.Rarity else nil,
+					Name = name,
+					Art = artContent,
+					ZIndex = 106,
+				}),
+			})
+			local detailsTop = top + topRow + faceHeight
+			children.Kind = label(
+				caption,
+				UDim2.fromOffset(copyX, detailsTop),
+				UDim2.fromOffset(copyWidth, K.FooterHeight),
+				T.Type.Minimum,
+				T.Colors.InkSoft,
+				false,
+				Enum.TextXAlignment.Center
+			)
+			children.Requirement = requirementView(
+				requirement,
+				requirementTint,
+				copyX,
+				detailsTop + K.FooterHeight + K.NameGap,
+				copyWidth,
+				true
+			)
+		end
+		preview = c(Well, {
+			Candy = true,
+			Native = { Size = UDim2.fromOffset(previewWidth, bodyHeight), ZIndex = 103 },
+		}, children)
+	end
 	local claimText = if props.ClaimPending
 		then "CLAIMING..."
 		else if loading
@@ -226,29 +461,18 @@ return function(props)
 			Title = c(PageTitle, {
 				Tilt = if short then 0 else nil,
 				Text = if ready then string.upper(state.displayName) else "SEASON REWARDS",
-				TextSize = if short then 24 else if layout.portrait then 26 else 34,
+				TextSize = T.Type.ModalTitle,
 				Native = {
 					Position = UDim2.fromOffset(inset, inset),
-					Size = UDim2.new(1, -inset * 2 - 120, 0, layout.titleHeight),
+					Size = UDim2.new(1, -inset * 2 - T.Layout.MinTarget - layout.gap, 0, layout.titleHeight),
 					ZIndex = 105,
 				},
 			}),
-			Back = c(PriceButton, {
-				Color = T.Colors.Surface,
+			Close = c(ModalClose, {
 				ButtonRef = closeRef,
-				Text = if compact and previewOpen then "REWARDS" else "BACK",
-				TextSize = 18,
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -inset, 0, inset + (if short then 0 else 4)),
-				Size = UDim2.fromOffset(104, 44),
+				Position = UDim2.new(1, -inset, 0, inset),
+				OnActivated = props.OnClose,
 				ZIndex = 106,
-				OnActivated = function()
-					if compact and previewOpen then
-						setPreviewOpen(false)
-					else
-						props.OnClose()
-					end
-				end,
 			}),
 			Status = c(Well, {
 				Candy = true,
@@ -266,7 +490,7 @@ return function(props)
 						Size = UDim2.fromOffset(56, 52),
 						ZIndex = 104,
 					}, {
-						Corner = c("UICorner", { CornerRadius = UDim.new(0, 14) }),
+						Corner = c("UICorner", { CornerRadius = UDim.new(0, T.Shape.RadiusCard) }),
 						Label = label(
 							"TIER",
 							UDim2.fromOffset(0, 2),
@@ -322,98 +546,7 @@ return function(props)
 						Enum.TextXAlignment.Center
 					)
 					else nil,
-				Preview = if previewVisible
-					then c(Well, {
-						Candy = true,
-						Native = { Size = UDim2.fromOffset(layout.previewWidth, bodyHeight), ZIndex = 103 },
-					}, {
-						Track = if not short
-							then c(Ribbon, {
-								Text = `{string.upper(selected.track)} • TIER {selected.tier}`,
-								Color = if selected.track == "Premium" then T.Colors.Gold else T.Colors.Surface,
-								Native = {
-									Position = UDim2.fromOffset(16, 14),
-									Size = UDim2.new(1, -32, 0, 28),
-									ZIndex = 106,
-								},
-							})
-							else nil,
-						Art = c("Frame", {
-							BackgroundTransparency = 1,
-							Position = if short
-								then UDim2.fromOffset(8, 8)
-								else UDim2.new(0, 16, 0.5, -(previewDetails + previewArtHeight) / 2 + 20),
-							Size = if short
-								then UDim2.new(0.35, -16, 1, -16)
-								else UDim2.new(1, -32, 0, previewArtHeight),
-							ZIndex = 104,
-						}, {
-							Content = c(ShopPreview, {
-								Items = previewItems,
-								BonksTextSize = if compact then 36 else 56,
-								PlaceholderBonks = if selected.kind == "Bonks" then selected.amount else nil,
-								ColorId = (props.Equipped or {}).CharacterColor,
-								CostumeId = (props.Equipped or {}).CostumeAssets,
-								TextColor = T.Colors.Ink,
-								TextStroke = 0,
-								ZIndex = 104,
-							}),
-						}),
-						Details = c("ScrollingFrame", {
-							BackgroundTransparency = 1,
-							BorderSizePixel = 0,
-							Selectable = false,
-							Position = if short then UDim2.new(0.35, 4, 0, 8) else UDim2.new(0, 16, 1, -previewDetails),
-							Size = if short
-								then UDim2.new(0.65, -16, 1, -16)
-								else UDim2.new(1, -32, 0, previewDetails - 12),
-							AutomaticCanvasSize = Enum.AutomaticSize.Y,
-							CanvasSize = UDim2.new(),
-							ScrollBarThickness = 3,
-							ScrollBarImageColor3 = T.Colors.Pink,
-							ZIndex = 105,
-						}, {
-							Kind = label(
-								if short
-									then `{string.upper(selected.track)} • TIER {selected.tier}`
-									else if definition
-										then ItemLabels[definition.Category] or "COSMETIC"
-										else "CURRENCY",
-								UDim2.fromOffset(0, 0),
-								UDim2.new(1, 0, 0, 22),
-								18,
-								T.Colors.InkSoft,
-								false
-							),
-							Name = label(
-								name,
-								UDim2.fromOffset(0, if short then 22 else 24),
-								UDim2.new(1, 0, 0, if short then 26 else 44),
-								if short then 24 else 28,
-								T.Colors.Ink,
-								true
-							),
-							Rarity = if definition
-								then c(Ribbon, {
-									Rarity = definition.Rarity,
-									Native = {
-										Position = UDim2.fromOffset(2, if short then 52 else 72),
-										Size = UDim2.new(1, -6, 0, 24),
-										ZIndex = 107,
-									},
-								})
-								else nil,
-							Requirement = label(
-								requirement,
-								UDim2.fromOffset(0, if short then 78 else 106),
-								UDim2.new(1, -4, 0, if short then 24 else 44),
-								18,
-								T.Colors.InkSoft,
-								false
-							),
-						}),
-					})
-					else nil,
+				Preview = if previewVisible then preview else nil,
 				Tracks = if ready and (not compact or not previewOpen)
 					then c("Frame", {
 						BackgroundTransparency = 1,
@@ -424,6 +557,7 @@ return function(props)
 						Rewards = c(Rewards, {
 							Compact = short,
 							Width = layout.tracksWidth,
+							Height = bodyHeight,
 							State = if ready then state else nil,
 							SeasonId = card.definition.SeasonId,
 							ShowProgress = false,
@@ -462,7 +596,7 @@ return function(props)
 				Premium = if showPremium
 					then c(PriceButton, {
 						Text = if card.pending then "PROCESSING..." else "GET PREMIUM",
-						TextSize = 18,
+						TextSize = T.Type.Minimum,
 						SubText = if card.robuxPrice
 							then Shop.RobuxSymbol .. formatNumber(card.robuxPrice)
 							else if card.status == "Loading" then "LOADING PRICE..." else "UNAVAILABLE",

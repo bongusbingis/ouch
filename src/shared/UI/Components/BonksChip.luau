@@ -1,6 +1,6 @@
 -- Name: BonksChip.luau
 -- Author: Jack C.
--- Description: The one Bonks balance readout: a Claimed pill holding the coin and amount in white display lettering, so the Shop header and crate footer show the wallet the same way the Daily Rewards modal shows a reward.
+-- Description: The one Bonks balance readout: a cream candy pill holding the coin and amount in ink display lettering, so the Shop header and crate footer show the wallet the same way the Daily Rewards modal shows a reward.
 -- Created: 2026-09-10
 --!strict
 
@@ -10,18 +10,13 @@ local TextService = game:GetService("TextService")
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
 local UIConfig = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local BonksLabel = require(script.Parent.BonksLabel)
+local CandyPanel = require(script.Parent.CandyPanel)
 local formatNumber = require(script.Parent.Parent.Models.NumberText)
-local Surface = require(script.Parent.Arena.Surface)
-local OuchPanel = require(script.Parent.OuchPanel)
+local T = require(script.Parent.Parent.Tokens)
 
 local c = React.createElement
-local Palette = UIConfig.ProgressionStyle
-local T = require(script.Parent.Parent.Tokens)
-local CandyPanel = require(script.Parent.CandyPanel)
 
 export type Props = {
-	Ouch: boolean?,
-	Candy: boolean?,
 	Amount: number,
 	HeightPx: number?,
 	TextSize: number?,
@@ -32,23 +27,21 @@ export type Props = {
 }
 
 return function(props: Props)
-	local height = props.HeightPx or 40
-	local textSize = props.TextSize or 22
+	local height = props.HeightPx or T.Layout.MinTarget
+	local textSize = math.max(props.TextSize or T.Type.TileLabel, T.Type.Minimum)
 	local amount = props.Amount or 0
 	local z = props.ZIndex or 5
-	-- Surface faces are scale-sized, so the chip measures its own width instead of
-	-- relying on AutomaticSize: icon (square, text-sized) + gap + amount + padding.
-	local textWidth =
-		TextService:GetTextSize(formatNumber(amount), textSize, Enum.Font.LuckiestGuy, Vector2.new(10000, 100)).X
-	local width = 12 + textSize + UIConfig.Button.GapPx + math.ceil(textWidth) + 14
-	return c(if props.Candy then CandyPanel elseif props.Ouch then OuchPanel else Surface, {
-		Color = if props.Candy then T.Colors.Surface elseif props.Ouch then Palette.Cyan else Palette.Claimed,
+	local inset = T.Layout.CompactGap
+	-- The pill is scale-sized, so the chip measures its own width instead of
+	-- relying on AutomaticSize: padding + icon (square, text-sized) + gap + amount + padding.
+	local textWidth = TextService:GetTextSize(formatNumber(amount), textSize, T.Type.Display, Vector2.new(10000, 100)).X
+	local width = inset * 2 + textSize + UIConfig.Button.GapPx + math.ceil(textWidth)
+	return c(CandyPanel, {
+		Color = T.Colors.Surface,
 		Padding = 0,
 		Tilt = 0,
-		Gloss = true,
-		Radius = UIConfig.Radius.Control,
+		Radius = T.Shape.RadiusPill,
 		Shadow = false,
-		StrokeTransparency = 0.55,
 		Native = {
 			AnchorPoint = props.AnchorPoint or Vector2.new(1, 0.5),
 			LayoutOrder = props.LayoutOrder,
@@ -58,14 +51,14 @@ return function(props: Props)
 		},
 	}, {
 		Padding = c("UIPadding", {
-			PaddingLeft = UDim.new(0, 12),
-			PaddingRight = UDim.new(0, 14),
+			PaddingLeft = UDim.new(0, inset),
+			PaddingRight = UDim.new(0, inset),
 		}),
 		Amount = c(BonksLabel, {
 			Amount = amount,
 			MaxTextSize = textSize,
-			TextColor = if props.Candy then T.Colors.Ink else Palette.White,
-			TextStroke = if props.Candy then 0 else 0.045,
+			TextColor = T.Colors.Ink,
+			TextStroke = 0,
 			Alignment = Enum.HorizontalAlignment.Center,
 			Native = {
 				BackgroundTransparency = 1,

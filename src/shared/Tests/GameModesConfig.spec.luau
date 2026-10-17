@@ -1,16 +1,24 @@
--- Description: Spec that the shipped game mode configuration offers the launch modes and keeps the disabled entries as explicit stubs.
+-- Description: Spec that the shipped game mode configuration offers the launch modes (FFA, TDM, Infection) in ballot order.
 
 --!strict
 
 local T = require(script.Parent.TestKit)
 local GameModes = require(script.Parent.Parent.Parent.Config.Gameplay.GameModes)
+local ModeRegistry = require(script.Parent.Parent.Game.Modes.ModeRegistry)
 
 T.describe("GameModes config", function()
-	T.it("offers launch modes while retaining the disabled Infection stub", function()
-		T.expect(table.concat(GameModes.VoteOptions, ",")):toEqual("FFA,TDM")
+	T.it("spells each mode the same on the ballot title and the post-match kicker", function()
+		for _, modeId in GameModes.VoteOptions do
+			local mode = ModeRegistry.get(modeId)
+			T.expect(mode ~= nil):toBeTruthy()
+			T.expect(string.upper((mode :: any).displayName)):toEqual(GameModes.Modes[modeId].Title)
+		end
+	end)
+	T.it("offers every launch mode on the arena ballot in sort order", function()
+		T.expect(table.concat(GameModes.VoteOptions, ",")):toEqual("FFA,TDM,Infection")
 		T.expect(GameModes.Modes.FFA.Enabled):toBeTruthy()
 		T.expect(GameModes.Modes.TDM.Enabled):toBeTruthy()
-		T.expect(not GameModes.Modes.Infection.Enabled):toBeTruthy()
+		T.expect(GameModes.Modes.Infection.Enabled):toBeTruthy()
 	end)
 
 	-- Empty, not a stand-in asset id: both read paths treat empty as "no art yet"

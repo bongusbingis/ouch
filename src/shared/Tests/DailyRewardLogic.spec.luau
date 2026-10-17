@@ -146,6 +146,27 @@ T.describe("DailyRewardLogic", function()
 		T.expect(pub.days[4].current):toEqual(true)
 	end)
 
+	T.it("publicState shows a fresh cycle after day 7 once day 1 is claimable", function()
+		local state = { Day = 7, LastClaimAt = NOON, TotalClaimed = 7 }
+		local pub = DailyRewardLogic.publicState(state, CONFIG, NEXT_NOON)
+		T.expect(pub.canClaim):toEqual(true)
+		T.expect(pub.nextDay):toEqual(1)
+		T.expect(pub.days[1].available):toEqual(true)
+		for day = 1, 7 do
+			T.expect(pub.days[day].claimed):toEqual(false)
+		end
+	end)
+
+	T.it("publicState keeps the full week claimed on the day 7 claim day", function()
+		local state = { Day = 7, LastClaimAt = NOON, TotalClaimed = 7 }
+		local pub = DailyRewardLogic.publicState(state, CONFIG, NOON + 3600)
+		T.expect(pub.canClaim):toEqual(false)
+		for day = 1, 7 do
+			T.expect(pub.days[day].claimed):toEqual(true)
+			T.expect(pub.days[day].available):toEqual(false)
+		end
+	end)
+
 	T.it("secondsUntilReset returns correct remaining time", function()
 		-- NOON is 12:00:00 UTC, so 12 hours remain
 		local seconds = DailyRewardLogic.secondsUntilReset(NOON)

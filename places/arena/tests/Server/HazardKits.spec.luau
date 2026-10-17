@@ -18,6 +18,9 @@ local Attributes = require(game.ReplicatedStorage.Config.Gameplay.MapFeatures).A
 local Rules = require(game.ReplicatedStorage.Shared.Game.MapFeatures.AttributeRules)
 local JumpPads = require(Kits.JumpPads)
 local Audit = require(game.ReplicatedStorage.Shared.Game.MapFeatures.AttributeAudit)
+local ScriptableRoots = require(game.ReplicatedStorage.Shared.Game.MapFeatures.ScriptableRoots)
+local CollectionService = game:GetService("CollectionService")
+local ScriptableRootTag = Attributes.ScriptableRoot
 return function()
 	describe("Attribute hazard kits", function()
 		local folder, group, group, context, character, root, humanoid, player
@@ -32,6 +35,17 @@ return function()
 				p:SetAttribute(key, value)
 			end
 			return p
+		end
+		-- Override validation runs once, when a root is tagged scriptable (ScriptableRoots.tag ->
+		-- AttributeAudit.checkFeatureValues); per-frame reads no longer re-validate. A refused
+		-- root must stay untagged so no kit ever drives it.
+		local function expectTagRefused(root_, fragments)
+			local ok, message = ScriptableRoots.tag(root_)
+			expect(ok).to.equal(false)
+			expect(CollectionService:HasTag(root_, ScriptableRootTag)).to.equal(false)
+			for _, fragment in fragments do
+				expect(string.find(message, fragment, 1, true) ~= nil).to.equal(true)
+			end
 		end
 		beforeEach(function()
 			folder = Instance.new("Folder")
@@ -75,7 +89,7 @@ return function()
 			Conveyor.forget(nil)
 			expect(belt.AssemblyLinearVelocity.Magnitude).to.equal(0)
 		end)
-		it("rejects a malformed conveyor override mutated after activation", function()
+		it("refuses to tag a root with a malformed conveyor override", function()
 			local belt = part(
 				"LiveBelt",
 				Vector3.new(20, 1, 20),
@@ -83,11 +97,9 @@ return function()
 				group,
 				{ Conveyor = true, ConveyorAxis = "X", ConveyorSpeed = 15 }
 			)
-			Conveyor.tickWorld(context)
+			expect(#Audit.checkFeatureValues(group)).to.equal(0)
 			belt:SetAttribute("ConveyorSpeed", "fast")
-			local ok, message = pcall(Conveyor.tickWorld, context)
-			expect(ok).to.equal(false)
-			expect(string.find(message, belt:GetFullName() .. ".ConveyorSpeed", 1, true) ~= nil).to.equal(true)
+			expectTagRefused(group, { belt:GetFullName() .. ".ConveyorSpeed" })
 		end)
 		it("keeps optional defaults and accepts exact feature limits", function()
 			local feature = part("Bounds", Vector3.one, Vector3.zero, group)
@@ -100,20 +112,20 @@ return function()
 			feature:SetAttribute("FanAxis", "Z")
 			expect(Parts.axis(feature, "FanAxis", "Y")).to.equal(Vector3.zAxis)
 		end)
-		it("rejects malformed live feature overrides with exact paths and ranges", function()
+		it("rejects malformed feature overrides at tag time with exact paths and ranges", function()
 			local feature = part("BrokenOverride", Vector3.one, Vector3.zero, group)
 			feature:SetAttribute("LaunchSpeed", "51")
-			local ok, message = pcall(Parts.number, feature, "LaunchSpeed", 51)
-			expect(ok).to.equal(false)
-			expect(string.find(message, feature:GetFullName() .. ".LaunchSpeed", 1, true) ~= nil).to.equal(true)
-			expect(string.find(message, "1..160", 1, true) ~= nil).to.equal(true)
+			expectTagRefused(group, { feature:GetFullName() .. ".LaunchSpeed", "1..160" })
 			feature:SetAttribute("LaunchSpeed", 161)
-			expect(pcall(Parts.number, feature, "LaunchSpeed", 51)).to.equal(false)
+			expect(#Audit.checkFeatureValues(group)).to.equal(1)
+			feature:SetAttribute("LaunchSpeed", 160)
 			feature:SetAttribute("SeesawAxis", "Y")
-			ok, message = pcall(Parts.axis, feature, "SeesawAxis", "Z")
-			expect(ok).to.equal(false)
-			expect(string.find(message, feature:GetFullName() .. ".SeesawAxis", 1, true) ~= nil).to.equal(true)
-			expect(string.find(message, "X or Z", 1, true) ~= nil).to.equal(true)
+			local errors = Audit.checkFeatureValues(group)
+			expect(#errors).to.equal(1)
+			expect(string.find(errors[1], feature:GetFullName() .. ".SeesawAxis", 1, true) ~= nil).to.equal(true)
+			expect(string.find(errors[1], "X or Z", 1, true) ~= nil).to.equal(true)
+			feature:SetAttribute("SeesawAxis", "Z")
+			expect(#Audit.checkFeatureValues(group)).to.equal(0)
 		end)
 		it("bounces a top-cap landing once and cleans its float", function()
 			local ball = part(
@@ -329,7 +341,7 @@ return function()
 			expect(force ~= nil).to.equal(true)
 			expect(math.abs(force.Force.Y / root.AssemblyMass / workspace.Gravity - 0.2) < 1e-5).to.equal(true)
 		end)
-		it("rejects a malformed ball override before allocating a visit", function()
+		it("refuses to tag a malformed ball override and accepts the corrected value", function()
 			local ball = part(
 				"MalformedSphere",
 				Vector3.one * 10,
@@ -337,14 +349,11 @@ return function()
 				group,
 				{ BigBall = true, BounceSpeed = "fast" }
 			)
+			expectTagRefused(group, { ball:GetFullName() .. ".BounceSpeed" })
+			ball:SetAttribute("BounceSpeed", 57)
+			expect(#Audit.checkFeatureValues(group)).to.equal(0)
 			root.AssemblyLinearVelocity = Vector3.new(0, -10, 0)
 			Balls.tickWorld(context)
-			local ok, message = pcall(Balls.tickPlayer, context, player, root)
-			expect(ok).to.equal(false)
-			expect(string.find(message, ball:GetFullName() .. ".BounceSpeed", 1, true) ~= nil).to.equal(true)
-			expect(root:FindFirstChild("BigBallFloatAttachment")).to.equal(nil)
-			expect(root.AssemblyLinearVelocity.Y).to.equal(-10)
-			ball:SetAttribute("BounceSpeed", 57)
 			Balls.tickPlayer(context, player, root)
 			expect(root.AssemblyLinearVelocity.Y).to.equal(57)
 		end)
@@ -394,7 +403,7 @@ return function()
 			Fans.tickPlayer(context, player, root)
 			expect(root:FindFirstChild("FanFloatForce") ~= nil).to.equal(true)
 		end)
-		it("rejects a seesaw axis changed after activation", function()
+		it("refuses to tag a seesaw whose axis is not X or Z", function()
 			local pedestal = part("Pedestal", Vector3.new(3, 5, 3), Vector3.new(0, 1497, 0), group)
 			local board = part(
 				"ChangedAxis",
@@ -403,32 +412,25 @@ return function()
 				pedestal,
 				{ Seesaw = true, SeesawAxis = "X" }
 			)
-			Seesaws.tickWorld(context)
+			expect(#Audit.checkFeatureValues(group)).to.equal(0)
 			board:SetAttribute("SeesawAxis", "Y")
-			local ok, message = pcall(Seesaws.tickWorld, context)
-			expect(ok).to.equal(false)
-			expect(string.find(message, board:GetFullName() .. ".SeesawAxis", 1, true) ~= nil).to.equal(true)
+			expectTagRefused(group, { board:GetFullName() .. ".SeesawAxis", "X or Z" })
 			board:SetAttribute("SeesawAxis", "Z")
+			expect(#Audit.checkFeatureValues(group)).to.equal(0)
 		end)
-		it("rejects malformed jump pad overrides before changing velocity", function()
+		it("refuses to tag malformed jump pad overrides", function()
 			local pad = Instance.new("Model")
 			pad.Name = "BrokenCoursePad"
 			pad:SetAttribute("JumpPad", true)
 			pad:SetAttribute("LaunchSpeed", "51")
 			pad.Parent = folder
 			part("Contact", Vector3.new(12, 1, 12), Vector3.new(0, 1500, 0), pad)
-			context.instances = { pad }
-			root.AssemblyLinearVelocity = -Vector3.yAxis * 10
-			local ok, message = pcall(JumpPads.tickPlayer, context, player, root)
-			expect(ok).to.equal(false)
-			expect(string.find(message, pad:GetFullName() .. ".LaunchSpeed", 1, true) ~= nil).to.equal(true)
-			expect(root.AssemblyLinearVelocity.Y).to.equal(-10)
+			expectTagRefused(pad, { pad:GetFullName() .. ".LaunchSpeed" })
 			pad:SetAttribute("LaunchSpeed", 51)
 			pad:SetAttribute("FloatFactor", 1)
-			ok, message = pcall(JumpPads.tickPlayer, context, player, root)
-			expect(ok).to.equal(false)
-			expect(string.find(message, pad:GetFullName() .. ".FloatFactor", 1, true) ~= nil).to.equal(true)
-			expect(root.AssemblyLinearVelocity.Y).to.equal(-10)
+			expectTagRefused(pad, { pad:GetFullName() .. ".FloatFactor" })
+			pad:SetAttribute("FloatFactor", 0)
+			expect(#Audit.checkFeatureValues(pad)).to.equal(0)
 		end)
 		it("supports 3, 4 and 5 doors with every valid breakable quota", function()
 			local f = Instance.new("Folder")

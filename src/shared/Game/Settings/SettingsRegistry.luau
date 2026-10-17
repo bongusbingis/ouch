@@ -51,7 +51,7 @@ local Definitions: { Definition } = {
 	{
 		Id = "CameraShake",
 		Type = "Toggle",
-		Label = "Camera Shake",
+		Label = "CAMERA SHAKE",
 		Description = "Adds impact movement to the camera during combat.",
 		Category = "GAMEPLAY",
 		Scope = "Both",
@@ -62,7 +62,7 @@ local Definitions: { Definition } = {
 	{
 		Id = "MasterVolume",
 		Type = "Slider",
-		Label = "Master Volume",
+		Label = "MASTER VOLUME",
 		Category = "AUDIO",
 		Scope = "Both",
 		Min = 0,
@@ -74,7 +74,7 @@ local Definitions: { Definition } = {
 	{
 		Id = "MusicVolume",
 		Type = "Slider",
-		Label = "Music Volume",
+		Label = "MUSIC VOLUME",
 		Category = "AUDIO",
 		Scope = "Both",
 		Min = 0,
@@ -86,7 +86,7 @@ local Definitions: { Definition } = {
 	{
 		Id = "EffectsVolume",
 		Type = "Slider",
-		Label = "Effects Volume",
+		Label = "EFFECTS VOLUME",
 		Category = "AUDIO",
 		Scope = "Both",
 		Min = 0,
@@ -102,7 +102,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugThrowInput",
 			Type = "Toggle",
-			Label = "Throw Input (example)",
+			Label = "THROW INPUT (EXAMPLE)",
 			Description = "Demonstrates a This/That toggle whose options are not ON/OFF.",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Both",
@@ -114,7 +114,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugContinuousSlider",
 			Type = "Slider",
-			Label = "Continuous Slider (example)",
+			Label = "CONTINUOUS SLIDER (EXAMPLE)",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Both",
 			Persist = false,
@@ -125,7 +125,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugIntegerSlider",
 			Type = "Slider",
-			Label = "Integer Slider (example)",
+			Label = "INTEGER SLIDER (EXAMPLE)",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Both",
 			Persist = false,
@@ -137,7 +137,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugSteppedDecimalSlider",
 			Type = "Slider",
-			Label = "Stepped Decimal Slider (example)",
+			Label = "STEPPED DECIMAL SLIDER (EXAMPLE)",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Both",
 			Persist = false,
@@ -152,7 +152,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugAllowedValuesSlider",
 			Type = "Slider",
-			Label = "Max FPS (example)",
+			Label = "MAX FPS (EXAMPLE)",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Both",
 			Persist = false,
@@ -165,7 +165,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugLobbyOnly",
 			Type = "Toggle",
-			Label = "Lobby-Only Setting (example)",
+			Label = "LOBBY-ONLY SETTING (EXAMPLE)",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Lobby",
 			Persist = false,
@@ -176,7 +176,7 @@ if Debug.SettingsShowExamples then
 		{
 			Id = "DebugArenaOnly",
 			Type = "Toggle",
-			Label = "Arena-Only Setting (example)",
+			Label = "ARENA-ONLY SETTING (EXAMPLE)",
 			Category = "DEBUG EXAMPLES",
 			Scope = "Arena",
 			Persist = false,

@@ -5,6 +5,7 @@ local React = require(RS.Packages.react)
 local T = require(script.Parent.Parent.Parent.Tokens)
 local PuffyButton = require(script.Parent.Parent.PuffyButton)
 local c = React.createElement
+local SCORES = require(RS:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("Input")).Hints.Scores
 
 return function(props)
 	local ref = React.useRef(nil)
@@ -31,7 +32,9 @@ return function(props)
 	return c(PuffyButton, {
 		ButtonRef = ref,
 		Text = "SCORES",
-		TextSize = 16,
+		-- "[TAB] SCORES" / "[View] SCORES": held, like the bind in MatchHUDClient.
+		Hint = SCORES,
+		TextSize = T.Type.HudMinimum,
 		TextColor = T.Colors.Ink,
 		Color = T.Colors.SurfaceWarm,
 		LipColor = T.Colors.WellLine,

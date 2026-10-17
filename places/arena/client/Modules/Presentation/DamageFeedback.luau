@@ -2,6 +2,7 @@
 
 --!strict
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -57,7 +58,7 @@ end
 
 function DamageFeedback.onEvent(event: any)
 	if event.kind == "Elim" and event.targetId == PlayerIds.toId(localPlayer) and seen.markSeen(event) then
-		if SettingsStore.get("CameraShake") ~= false then
+		if SettingsStore.get("CameraShake") ~= false and not GuiService.ReducedMotionEnabled then
 			shake()
 		end
 	end

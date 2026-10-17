@@ -4,13 +4,19 @@ local T = require(script.Parent.Parent.Tokens)
 local S = T.ArenaHUD
 local Layout = {}
 
-function Layout.resolve(viewport: Vector2, device: Rect, topbar: Rect, touch: boolean?)
+-- hints: extra width the Menu/Scores buttons need for their "[key] LABEL" hint
+-- (InputHint.reserve; zero on touch, where no hint renders).
+export type HintWidths = { menu: number, scores: number }
+
+function Layout.resolve(viewport: Vector2, device: Rect, topbar: Rect, touch: boolean?, hints: HintWidths?)
 	local compact = touch == true or viewport.Y <= S.ShortHeight or viewport.X < S.NarrowWidth
 	local edge, gap, target = S.Edge, S.Gap, T.Layout.MinTarget
 	local left, right = device.Min.X + edge, device.Max.X - edge
 	local width = math.min(if compact then S.CompactWidth else S.Width, math.max(right - left, 1))
 	local height = if compact then S.CompactHeight else S.Height
-	local actionsWidth = S.MenuWidth + gap + S.ScoresWidth
+	local menuWidth = S.MenuWidth + (if hints then hints.menu else 0)
+	local scoresWidth = S.ScoresWidth + (if hints then hints.scores else 0)
+	local actionsWidth = menuWidth + gap + scoresWidth
 	-- TopbarInset is relative to the device-safe origin, not the CoreUI origin.
 	local freeLeft = math.max(left, device.Min.X + topbar.Min.X + gap)
 	local freeRight = math.min(right, device.Min.X + topbar.Max.X - gap)
@@ -36,12 +42,12 @@ function Layout.resolve(viewport: Vector2, device: Rect, topbar: Rect, touch: bo
 		docked = docked,
 		hud = { position = Vector2.new(hudLeft, top), size = Vector2.new(width, height) },
 		menu = {
-			position = Vector2.new(actionsRight - S.MenuWidth, actionTop),
-			size = Vector2.new(S.MenuWidth, target),
+			position = Vector2.new(actionsRight - menuWidth, actionTop),
+			size = Vector2.new(menuWidth, target),
 		},
 		scores = {
 			position = Vector2.new(actionsRight - actionsWidth, actionTop),
-			size = Vector2.new(S.ScoresWidth, target),
+			size = Vector2.new(scoresWidth, target),
 		},
 		toolbar = {
 			position = Vector2.new(toolbarLeft, viewport.Y - bottom - S.ToolbarHeight),

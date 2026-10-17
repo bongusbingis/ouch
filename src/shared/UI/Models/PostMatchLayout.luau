@@ -60,7 +60,7 @@ local function personalHeight(result: any, rowHeight: number, chipHeight: number
 	local rewards = result.rewards
 	if rewards and ((rewards.xpMultiplier or 1) > 1 or (rewards.bonksMultiplier or 1) > 1) then
 		sections += 1
-		contentHeight += 18
+		contentHeight += 20
 	end
 	local statCount = 0
 	for _, stat in result.personalStats or {} do

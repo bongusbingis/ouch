@@ -6,24 +6,24 @@ local LobbyViewModel = {}
 
 export type QueueChoice = { partyId: string, leaderUserId: number, queueId: string }
 
--- An idle leader must explicitly choose this session. A server default alone is
--- not a choice. Members and in-flight parties display their authoritative queue.
+-- An idle leader defaults to Arena PVP. Members and in-flight parties display their authoritative queue.
 function LobbyViewModel.selectedQueueId(snapshot: any?, userId: number, choice: QueueChoice?): string?
 	if snapshot == nil then
 		return nil
 	end
 	if snapshot.leaderUserId ~= userId or snapshot.phase ~= "Lobby" or snapshot.returnQueuePending then
-		return snapshot.queueId
+		return if snapshot.queueId == "Splashdown" then "Arena" else snapshot.queueId
 	end
 	if
 		choice
 		and choice.partyId == snapshot.partyId
 		and choice.leaderUserId == snapshot.leaderUserId
 		and choice.queueId == snapshot.queueId
+		and choice.queueId ~= "Splashdown"
 	then
 		return choice.queueId
 	end
-	return nil
+	return if snapshot.queueId == "Splashdown" then "Arena" else (snapshot.queueId or "Arena")
 end
 
 export type PartyPresentation = {

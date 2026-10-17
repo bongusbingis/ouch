@@ -6,7 +6,6 @@
   "blockedPlaceIds": [121997450145716],
   "globIgnorePaths": [
     "src/shared/Tests/**",
-    "places/lobby/client/UI/Stories/**",
     "**/_Index/**/*.server.lua",
     "**/_Index/**/*.server.luau",
     "**/_Index/**/*.client.lua",
@@ -23,6 +22,8 @@
     },
 
     "ReplicatedStorage": {
+      "SplashdownTraining": { "$path": "assets/SplashdownTraining.rbxm" },
+
       "Shared": {
         "$path": "src/shared",
 
@@ -61,6 +62,10 @@
         "Helpers": {
           "$path": "src/tests/Helpers"
         }
+      },
+
+      "UIStories": {
+        "$path": "stories"
       }
     },
 
@@ -88,6 +93,10 @@
             "MapFeatureKit": { "$path": "places/arena/server/Modules/MapFeatures/MapFeatureKit.luau" },
             "FeatureParts": { "$path": "places/arena/server/Modules/MapFeatures/FeatureParts.luau" },
             "ShoveFeature": { "$path": "places/arena/server/Modules/MapFeatures/ShoveFeature.luau" }
+          },
+
+          "EliminationService": {
+            "$path": "places/arena/server/Modules/EliminationService.luau"
           },
 
           "CombatPoseService": {

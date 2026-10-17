@@ -6,7 +6,6 @@ local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local React = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("react"))
-local UI = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Interface"):WaitForChild("UI"))
 local InventoryConfig =
 	require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Inventory"))
 local CosmeticsModules = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Game"):WaitForChild("Cosmetics")
@@ -14,12 +13,19 @@ local CosmeticVisualFactory = require(CosmeticsModules:WaitForChild("CosmeticVis
 local CharacterAppearance = require(CosmeticsModules:WaitForChild("CharacterAppearance"))
 local CelebrationAvatar = require(script.Parent.Arena.CelebrationAvatar)
 local PreviewScheduler = require(script.Parent.Parent.Services.PreviewScheduler)
-local T = require(script.Parent.Parent.Tokens)
 
-local Icon = require(script.Parent.Icon)
 local CandyEffectPreview = require(script.Parent.CandyEffectPreview)
 
 local c = React.createElement
+
+-- Characters (outfit colours and costumes) use the emote avatar's light rig so a
+-- body colour renders true (RED and PINK stay distinct instead of both reading
+-- maroon under the viewport's dim defaults) and every Backpack figure matches.
+local CHARACTER_LIGHT = {
+	Ambient = Color3.fromRGB(205, 205, 225),
+	LightColor = Color3.fromRGB(255, 246, 230),
+	LightDirection = Vector3.new(-1, -1, -1),
+}
 local function setPivot(object: Model | BasePart, pivot: CFrame)
 	if object:IsA("Model") then
 		object:PivotTo(pivot)
@@ -99,15 +105,27 @@ local function setScale(object: Model | BasePart, scale: number)
 	end
 end
 
-local function centerObject(object: Model | BasePart): CFrame
+-- Poses the object (optional fixed Z tilt) then centres its posed bounding box on
+-- the origin. Returns the base pivot and the AABB extent of that posed shape.
+local function centerObject(object: Model | BasePart, tiltDegrees: number?): (CFrame, Vector3)
+	local tilt = CFrame.Angles(0, 0, math.rad(tiltDegrees or 0))
 	if object:IsA("Model") then
-		object:PivotTo(CFrame.identity)
-		local bounds = object:GetBoundingBox()
+		object:PivotTo(tilt)
+		local bounds, extent = object:GetBoundingBox()
 		object:PivotTo(CFrame.new(-bounds.Position) * object:GetPivot())
-		return object:GetPivot()
+		return object:GetPivot(), extent
 	end
-	object.CFrame = CFrame.identity
-	return object.CFrame
+	object.CFrame = tilt
+	local half = object.Size / 2
+	local r = tilt.RightVector
+	local u = tilt.UpVector
+	local l = tilt.LookVector
+	local extent = Vector3.new(
+		2 * (math.abs(r.X) * half.X + math.abs(u.X) * half.Y + math.abs(l.X) * half.Z),
+		2 * (math.abs(r.Y) * half.X + math.abs(u.Y) * half.Y + math.abs(l.Y) * half.Z),
+		2 * (math.abs(r.Z) * half.X + math.abs(u.Z) * half.Y + math.abs(l.Z) * half.Z)
+	)
+	return object.CFrame, extent
 end
 
 export type Props = {
@@ -122,45 +140,6 @@ export type Props = {
 	TextColor: Color3?,
 	TextStroke: number?,
 }
-
-local function effectPreview(props: Props)
-	local palette = UI.ProgressionStyle
-	local definition = props.Definition or {}
-	local accent = definition.PreviewColor or InventoryConfig.RarityColors[definition.Rarity] or palette.Yellow
-	local icon = definition.Icon or (if props.Category == "ElimEffectAssets" then "Speaker" else "Explosion")
-	return c("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = props.ZIndex }, {
-		Tile = c("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = if props.Candy
-				then (if props.Category == "ElimEffectAssets" then T.Colors.Cyan else T.Colors.Grape)
-				else palette.Ink,
-			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.72, 0.84),
-			ZIndex = props.ZIndex,
-		}, {
-			Aspect = c("UIAspectRatioConstraint", { AspectRatio = 1 }),
-			Corner = c(
-				"UICorner",
-				{ CornerRadius = if props.Candy then UDim.new(0.4, 0) else UDim.new(0, UI.Radius.Tile) }
-			),
-			Outline = c("UIStroke", {
-				Color = if props.Candy then T.Colors.Ink else accent,
-				Thickness = if props.Candy then T.Shape.StrokeCard else 2,
-				Transparency = 0,
-			}),
-			Glyph = c(Icon, {
-				Name = icon,
-				Native = {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromScale(0.82, 0.82),
-					ZIndex = props.ZIndex + 1,
-				},
-			}),
-		}),
-	})
-end
 
 local ViewportPreview = React.memo(function(props: Props)
 	local viewportRef = React.useRef(nil)
@@ -198,8 +177,7 @@ local ViewportPreview = React.memo(function(props: Props)
 			object = prepared
 			setScale(prepared, config.Scale)
 			prepared.Parent = world
-			local basePivot = centerObject(prepared)
-			local extent = if prepared:IsA("Model") then select(2, prepared:GetBoundingBox()) else prepared.Size
+			local basePivot, extent = centerObject(prepared, config.TiltDegrees)
 			local function frameCamera()
 				local size = viewport.AbsoluteSize
 				local aspect = math.max(size.X, 1) / math.max(size.Y, 1)
@@ -209,7 +187,10 @@ local ViewportPreview = React.memo(function(props: Props)
 				local distance = math.max((extent.Y / 2 + math.abs(target.Y)) / tangent, radius / (tangent * aspect))
 					+ radius
 				camera.CFrame = CFrame.lookAt(
-					target + config.CameraOffset.Unit * distance * (if props.Candy then 0.76 else 1),
+					target
+						+ config.CameraOffset.Unit
+							* distance
+							* (if props.Candy and config.TiltDegrees == nil then 0.76 else 1),
 					target
 				)
 			end
@@ -247,12 +228,16 @@ local ViewportPreview = React.memo(function(props: Props)
 		end
 	end, { props.Category, props.ItemId, props.Definition, props.ColorId, props.CostumeId })
 
+	local character = props.Category == "CharacterColor" or props.Category == "CostumeAssets"
 	return c("ViewportFrame", {
 		ref = viewportRef,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		Position = UDim2.fromScale(0.5, 0.475),
 		Size = UDim2.fromScale(1, 1),
+		Ambient = if character then CHARACTER_LIGHT.Ambient else nil,
+		LightColor = if character then CHARACTER_LIGHT.LightColor else nil,
+		LightDirection = if character then CHARACTER_LIGHT.LightDirection else nil,
 		ZIndex = props.ZIndex,
 	}, {
 		PreviewCamera = c("Camera", { ref = cameraRef, FieldOfView = InventoryConfig.ViewportFieldOfView }),
@@ -271,10 +256,8 @@ return React.memo(function(props: Props)
 		})
 	end
 	if props.Category == "ImpactEffectAssets" or props.Category == "ElimEffectAssets" then
-		if props.Candy then
-			return c(CandyEffectPreview, props)
-		end
-		return effectPreview(props)
+		-- Every surface shows the same designed effect seal, never a bare glyph.
+		return c(CandyEffectPreview, props)
 	end
 	return c(ViewportPreview, props)
 end)

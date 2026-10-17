@@ -47,6 +47,7 @@ local PartyVisibilityPolicy = require(
 
 local USERNAME_LOOKUP_ATTEMPTS = 3
 local USERNAME_RETRY_DELAY = 1
+local USERNAME_RECOVERY_DELAY = 10
 local IDLE_PLAYBACK_SPEED = 0.85
 local IDLE_BOUNDS_PADDING = Vector3.new(1, 0.5, 1)
 local BUBBLE_ANCHOR_OFFSET = Vector3.new(0, 1.25, 0)
@@ -396,19 +397,16 @@ local function nametagBounds(children, positions, origin, size)
 				- child.AbsoluteSize * child.AnchorPoint
 			local bottomRight = topLeft + child.AbsoluteSize
 			if child.Name == "Username" then
-				local alignment = Vector2.new(
-					if child.TextXAlignment == Enum.TextXAlignment.Center
-						then 0.5
-						elseif child.TextXAlignment == Enum.TextXAlignment.Right then 1
-						else 0,
-					if child.TextYAlignment == Enum.TextYAlignment.Center
-						then 0.5
-						elseif child.TextYAlignment == Enum.TextYAlignment.Bottom then 1
-						else 0
+				-- The sticker is the label's whole box plus its outline and tilt, not just the glyphs:
+				-- measuring only the text let the sticker poke past the stage window edge and be cropped.
+				local tilt = math.abs(math.sin(math.rad(child.Rotation)))
+				local labelSize = child.AbsoluteSize
+				local grow = Vector2.new(
+					T.Shape.StrokeCard + tilt * labelSize.Y / 2,
+					T.Shape.StrokeCard + tilt * labelSize.X / 2
 				)
-				topLeft += (child.AbsoluteSize - child.TextBounds) * alignment
-				bottomRight = topLeft + child.TextBounds + Vector2.one
-				topLeft -= Vector2.one
+				topLeft -= grow
+				bottomRight += grow
 			end
 			minimum = Vector2.new(math.min(minimum.X, topLeft.X), math.min(minimum.Y, topLeft.Y))
 			maximum = Vector2.new(math.max(maximum.X, bottomRight.X), math.max(maximum.Y, bottomRight.Y))
@@ -513,6 +511,8 @@ function PartyCharacterRenderer:_layoutNametags()
 	local characters, occupied, bodies = {}, {}, {}
 	for _, character in self._characters do
 		table.insert(characters, character)
+		-- No stage window (e.g. Settings) means nothing is framed for these names to sit over.
+		self:_applyNametagVisibility(character, world ~= nil or not self._getWorldBounds)
 	end
 	table.sort(characters, function(a, b)
 		return a.slot < b.slot
@@ -619,7 +619,15 @@ function PartyCharacterRenderer:SubscribeUsernames(listener)
 	end
 end
 
+function PartyCharacterRenderer:_applyNametagVisibility(character, stageAvailable)
+	local show = character.nametagWanted == true and stageAvailable
+	if character.nametag.Enabled ~= show then
+		character.nametag.Enabled = show
+	end
+end
+
 function PartyCharacterRenderer:_updateNametagPresentation()
+	local stageAvailable = not self._getWorldBounds or self._getWorldBounds() ~= nil
 	local localCharacter = self._characters[self._localUserId]
 	local localLeader = localCharacter and localCharacter.crownLabel.Visible
 	for _, character in self._characters do
@@ -634,7 +642,8 @@ function PartyCharacterRenderer:_updateNametagPresentation()
 		end
 		local canKick = not self._compactParty and localLeader and not character.crownLabel.Visible
 		-- Compact layouts show names and leadership in the party modal at readable sizes.
-		character.nametag.Enabled = not self._compactParty and visible
+		character.nametagWanted = not self._compactParty and visible
+		self:_applyNametagVisibility(character, stageAvailable)
 		character.usernameLabel.Visible = not self._compactParty
 		character.kickButton.Visible = canKick == true
 		character.kickButton.Active = canKick == true
@@ -817,6 +826,14 @@ function PartyCharacterRenderer:_requestUsername(userId)
 		self._usernameRequests[userId] = nil
 		if not username then
 			warn(("[PartyCharacterRenderer] Could not load username for %d"):format(userId))
+			-- Keep trying while the member is still in the party: a throttled
+			-- lookup must not leave the nametag on "..." and the party modal's
+			-- REMOVE disabled for the rest of their stay.
+			task.delay(USERNAME_RECOVERY_DELAY, function()
+				if not self._destroyed and generation == self._generation and self._characters[userId] then
+					self:_requestUsername(userId)
+				end
+			end)
 			return
 		end
 
@@ -901,6 +918,8 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 	rootPart.Anchored = true
 	nametag.Active = false
 	nametag.ResetOnSpawn = false
+	-- A held hammer or an animated limb must never hide the name behind it.
+	nametag.AlwaysOnTop = true
 	nametag.Adornee = spawn
 	nametag.Parent = self._playerGui
 	usernameLabel.Active = false
@@ -957,6 +976,7 @@ function PartyCharacterRenderer:_spawn(userId, slot, characterColorId, costumeId
 		idleTrack = idleTrack,
 		emoteTrack = nil :: AnimationTrack?,
 		nametag = nametag,
+		nametagWanted = false,
 		bubbleAnchor = bubbleAnchor,
 		usernameLabel = usernameLabel,
 		crownLabel = crownLabel,

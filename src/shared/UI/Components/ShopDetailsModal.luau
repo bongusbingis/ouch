@@ -25,14 +25,16 @@ local CrateOddsLayout = require(script.Parent.Parent.Models.CrateOddsLayout)
 local ResponsiveText = require(script.Parent.ResponsiveText)
 local OuchPanel = require(script.Parent.CandyPanel)
 local PageTitle = require(script.Parent.CandyTitle)
-local CandySurface = require(script.Parent.CandySurface)
 local Ribbon = require(script.Parent.RarityRibbon)
+local CollectibleLayout = require(script.Parent.Parent.Models.CollectibleLayout)
 local ModalClose = require(script.Parent.ModalClose)
 local BonksChip = require(script.Parent.BonksChip)
 local PuffyButton = require(script.Parent.PuffyButton)
 local BonksLabel = require(script.Parent.BonksLabel)
 local ShopPriceButton = require(script.Parent.Shop.ShopPriceButton)
 local ShopPreview = require(script.Parent.Shop.ShopPreview)
+local ShopArtTile = require(script.Parent.Shop.ShopArtTile)
+local ShopCardStyle = require(script.Parent.Parent.Models.ShopCardStyle)
 local CrateOddsGrid = require(script.Parent.Shop.CrateOddsGrid)
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CosmeticsLogic = require(
@@ -115,10 +117,10 @@ local function guaranteeText(card)
 	for _, rarity in { "Rare", "Legendary" } do
 		local count = remaining[rarity]
 		if count then
-			local name = if rarity == "Rare" then "Rare+" else "Legendary"
+			local name = if rarity == "Rare" then "RARE+" else "LEGENDARY"
 			table.insert(
 				entries,
-				if count == 1 then name .. " NEXT OPEN" else string.format("%s within %d opens", name, count)
+				if count == 1 then name .. " NEXT OPEN" else string.format("%s WITHIN %d OPENS", name, count)
 			)
 		end
 	end
@@ -242,11 +244,13 @@ local function statusFor(card, isCrate, shortfall)
 				then (if isCrate then "OWNED" else "")
 				else if card.status == "Loading"
 					then "LOADING PRICE…"
-					else if card.status == "Preview"
-						then "COMING SOON"
-						else if card.status == "Unavailable"
-							then "UNAVAILABLE"
-							else if shortfall > 0 then `NEED {formatNumber(shortfall)} MORE BONKS` else ""
+					else if card.status == "Retry"
+						then "PRICE DIDN’T LOAD"
+						else if card.status == "Preview"
+							then "COMING SOON"
+							else if card.status == "Unavailable"
+								then "UNAVAILABLE"
+								else if shortfall > 0 then `NEED {formatNumber(shortfall)} MORE BONKS` else ""
 end
 
 local function ItemDetails(props)
@@ -298,7 +302,8 @@ local function ItemDetails(props)
 		and (preview.itemId == nil or CosmeticsLogic.isOwned(Cosmetics.Items, props.Owned or {}, preview.itemId))
 	local equipped = preview ~= nil and ((props.Equipped or {})[preview.category] or "") == (preview.itemId or "")
 	local hasEquip = previewOwned and props.OnEquipItem ~= nil
-	local hasInventory = previewOwned and props.OnViewInventory ~= nil
+	-- Opened from the Backpack already: a BACKPACK button would only lead back.
+	local hasInventory = previewOwned and props.OnViewInventory ~= nil and card.kind ~= "Inventory"
 	local hasBonks = card.bonksPrice ~= nil and not card.owned and not card.purchased
 	local hasRobux = not card.owned
 		and not card.purchased
@@ -346,11 +351,14 @@ local function ItemDetails(props)
 	local details = {}
 	local badgeX = 0
 	local badgeText = if rarity then nil elseif card.badge then card.badge else nil
+	-- A product label wears the same colour as the sticker on its Shop card.
+	local sticker = if badgeText then ShopCardStyle.sticker(card) else nil
 	if rarity or badgeText then
 		local width = ribbonWidth(rarity or badgeText)
 		details.Badge = c(Ribbon, {
 			Rarity = rarity,
 			Text = badgeText,
+			Color = if sticker then sticker.Color else nil,
 			Native = {
 				Position = UDim2.fromOffset(badgeX, 0),
 				Size = UDim2.fromOffset(width, I.BadgeHeight),
@@ -378,8 +386,8 @@ local function ItemDetails(props)
 			caption,
 			UDim2.fromOffset(badgeX + 2, 0),
 			UDim2.fromOffset(frame.detailsWidth - badgeX - 2, I.BadgeHeight),
-			16,
-			{ color = C.InkSoft, minimum = 14, truncate = true, vertical = Enum.TextYAlignment.Center }
+			T.Type.Minimum,
+			{ color = C.InkSoft, minimum = T.Type.Minimum, truncate = true, vertical = Enum.TextYAlignment.Center }
 		)
 	end
 	details.Description = text(
@@ -394,8 +402,8 @@ local function ItemDetails(props)
 			hintText,
 			UDim2.fromOffset(0, hintTop),
 			UDim2.fromOffset(frame.detailsWidth, I.ListCaptionHeight),
-			16,
-			{ color = C.InkSoft, minimum = 14, truncate = true, vertical = Enum.TextYAlignment.Center }
+			T.Type.Minimum,
+			{ color = C.InkSoft, minimum = T.Type.Minimum, truncate = true, vertical = Enum.TextYAlignment.Center }
 		)
 	end
 	if hasAudition then
@@ -403,7 +411,7 @@ local function ItemDetails(props)
 			ButtonRef = playRef,
 			Color = C.Cyan,
 			Text = if preview.category == "ElimEffectAssets" then "PLAY SOUND" else "PLAY EFFECT",
-			TextSize = 20,
+			TextSize = T.Type.Body,
 			Enabled = true,
 			AnchorPoint = Vector2.zero,
 			Position = UDim2.fromOffset(0, auditionTop),
@@ -424,14 +432,11 @@ local function ItemDetails(props)
 			}),
 		}
 		for index, item in listedItems do
-			local name = item.definition.DisplayName
-				.. (
-					if item.owned
-						then (if card.kind == "Bundle"
-							then ` · +{Cosmetics.Rarities[item.definition.Rarity].DupeBonks or 0} Bonks (owned)`
-							else " · OWNED")
-						else ""
-				)
+			-- Row buttons follow the CAPS label rule like every other button.
+			local tier = Cosmetics.Rarities[item.definition.Rarity or ""]
+			local refund = formatNumber(if tier then tier.DupeBonks or 0 else 0)
+			local ownedText = if card.kind == "Bundle" then ` · OWNED · DUPE +{refund} BONKS` else " · OWNED"
+			local name = string.upper(item.definition.DisplayName) .. (if item.owned then ownedText else "")
 			rows[item.itemId or `{index}`] = c(PuffyButton, {
 				Enabled = item.definition.CostumePiece == nil,
 				Color = C.Surface,
@@ -440,7 +445,7 @@ local function ItemDetails(props)
 				Shadow = false,
 				Text = name,
 				TextColor = C.Ink,
-				TextSize = if frame.compact then 18 else 20,
+				TextSize = if frame.compact then T.Type.Minimum else T.Type.Body,
 				Wrapped = true,
 				OnActivated = function()
 					setSelectedId(item.itemId)
@@ -461,8 +466,8 @@ local function ItemDetails(props)
 					else "WHAT’S INSIDE",
 				UDim2.fromOffset(2, 0),
 				UDim2.fromOffset(width - 4, I.ListCaptionHeight),
-				16,
-				{ color = C.InkSoft, minimum = 14, truncate = true, vertical = Enum.TextYAlignment.Center }
+				T.Type.Minimum,
+				{ color = C.InkSoft, minimum = T.Type.Minimum, truncate = true, vertical = Enum.TextYAlignment.Center }
 			),
 			Rows = c(ScrollFrame, {
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -472,7 +477,7 @@ local function ItemDetails(props)
 				Position = UDim2.fromOffset(0, I.ListCaptionHeight + I.ListGap),
 				Size = UDim2.fromOffset(width, layout.listHeight),
 				ScrollingEnabled = layout.listScrolls,
-				ScrollBarThickness = if layout.listScrolls then 4 else 0,
+				ScrollBarThickness = if layout.listScrolls then T.Layout.ScrollBar else 0,
 				ScrollBarImageColor3 = C.Pink,
 				ZIndex = 105,
 			}, rows),
@@ -533,7 +538,9 @@ local function ItemDetails(props)
 				then "GET PASS"
 				else if card.kind == "Bundle"
 					then "GET BUNDLE"
-					else if card.kind == "Bonks" then "GET BONKS" else "BUY OUTFIT",
+					else if card.kind == "Bonks"
+						then "GET BONKS"
+						else if card.definition.Contents then "BUY OUTFIT" else "BUY ITEM",
 			subText = ShopConfig.RobuxSymbol .. formatNumber(card.robuxPrice),
 			onActivated = props.OnPurchaseRobux,
 		})
@@ -569,18 +576,22 @@ local function ItemDetails(props)
 		then frame.footerWidth - statusX
 		else frame.footerWidth - statusX - buttonsWidth - frame.footerGap
 
+	-- The art sits in the same tier-tinted recessed window as its Shop card and
+	-- Backpack tile, so inspection reads as the card opened up.
+	local wellColor, wellLine =
+		ShopCardStyle.tile(if rarity and T.Rarity[rarity] then T.Rarity[rarity].Color else ShopCardStyle.accent(card))
 	local previewFrame = {
-		Surface = c(CandySurface, {
-			Color = C.Surface,
-			LipColor = C.WellLine,
-			Radius = T.Shape.RadiusCard,
-			Shadow = false,
+		Window = c(ShopArtTile, {
+			Color = wellColor,
+			LineColor = wellLine,
+			Position = UDim2.fromScale(0, 0),
+			Size = UDim2.fromScale(1, 1),
 			ZIndex = 104,
 		}),
 		Preview = c("Frame", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(10, 8),
-			Size = UDim2.new(1, -20, 1, -16 - T.Shape.LipHeight),
+			Position = UDim2.fromOffset(10, 10),
+			Size = UDim2.new(1, -20, 1, -20),
 			ZIndex = 106,
 		}, {
 			Content = c(ShopPreview, {
@@ -606,7 +617,7 @@ local function ItemDetails(props)
 			Scale = c("UIScale", { Scale = styles.Scale }),
 			Title = c(PageTitle, {
 				Text = string.upper(card.displayName),
-				TextSize = frame.titleSize,
+				TextSize = T.Type.ModalTitle,
 				Tilt = if frame.short then 0 else nil,
 				Native = {
 					Position = UDim2.fromOffset(frame.inset + (if frame.compact then 2 else 6), frame.titleTop),
@@ -628,7 +639,7 @@ local function ItemDetails(props)
 					Size = UDim2.new(1, -frame.inset * 2, 0, layout.wellHeight),
 					CanvasSize = if layout.scroll then UDim2.fromOffset(0, layout.wellCanvas) else nil,
 					ScrollingDirection = if layout.scroll then Enum.ScrollingDirection.Y else nil,
-					ScrollBarThickness = if layout.scroll then 4 else nil,
+					ScrollBarThickness = if layout.scroll then T.Layout.ScrollBar else nil,
 					ScrollBarImageColor3 = if layout.scroll then C.Pink else nil,
 					ZIndex = 103,
 				},
@@ -641,7 +652,12 @@ local function ItemDetails(props)
 				}, previewFrame),
 				Details = c("Frame", {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(frame.contentInset + layout.art + frame.gap, frame.contentInset),
+					-- Beside the art, a short copy block is centred on it rather than
+					-- hanging from the top over an empty well.
+					Position = UDim2.fromOffset(
+						frame.contentInset + layout.art + frame.gap,
+						frame.contentInset + math.max(0, math.floor((layout.rowHeight - layout.detailsBlock) / 2))
+					),
 					Size = UDim2.fromOffset(frame.detailsWidth, layout.detailsBlock),
 					ZIndex = 104,
 				}, details),
@@ -661,7 +677,7 @@ local function ItemDetails(props)
 							Candy = true,
 							Amount = balance,
 							HeightPx = frame.chipHeight,
-							TextSize = 20,
+							TextSize = T.Type.Body,
 							AnchorPoint = Vector2.new(0, 0.5),
 							Position = UDim2.fromOffset(0, walletRowHeight / 2),
 							ZIndex = 104,
@@ -705,6 +721,11 @@ local function CrateDetails(props)
 	)
 	if portrait then
 		size = Vector2.new(size.X, math.max(size.Y, safe.size.Y - 32))
+	elseif safe.size.Y > UIConfig.Layout.ShortLandscapeMaxHeightPx then
+		-- The odds browser is the content here: take the screen height the shell
+		-- allows (as portrait does) so more than one row of outcomes is visible.
+		local cap = UIConfig.Layout.Panels.ShopDetails.Landscape.MaxSize.Y
+		size = Vector2.new(size.X, math.max(size.Y, math.min(cap, safe.size.Y - T.Inspection.Edge * 2)))
 	end
 	local card = props.Card
 	local selectedId, setSelectedId = React.useState(nil)
@@ -762,7 +783,7 @@ local function CrateDetails(props)
 	local statusWidth, sharedFooterHeight = 0, 26
 	local shareFooter = false
 	if veryShort and footerGuarantee and statusText ~= "" then
-		local textSize = math.round(14 * (UIConfig.Text.PreferredScale[preferredTextSize.Name] or 1))
+		local textSize = math.round(T.Type.Minimum * (UIConfig.Text.PreferredScale[preferredTextSize.Name] or 1))
 		local statusBounds = TextService:GetTextSize(statusText, textSize, T.Type.Label, Vector2.new(100000, 100000))
 		local guaranteeBounds = TextService:GetTextSize(guarantee, textSize, T.Type.Label, Vector2.new(100000, 100000))
 		statusWidth = math.ceil(statusBounds.X) + 8
@@ -792,7 +813,7 @@ local function CrateDetails(props)
 	local balanceWidth = if size.X < 620 then 120 else 252
 	local actionWidth = math.min(size.X - inset * 2, columns * (UIConfig.Layout.ShopDetailsActionMaxWidthPx + 8))
 	local titleWidth = size.X - inset * 2 - 100 - (if short and hasBonks then 112 else 0)
-	local titleSize = if short then 26 else 36
+	local titleSize = T.Type.ModalTitle
 	local titleText = string.upper(card.displayName) .. " CRATE"
 	local titleHeight = math.max(
 		48,
@@ -801,8 +822,13 @@ local function CrateDetails(props)
 	)
 	local bodyTop = inset + titleHeight + (if short then 6 else 12)
 	local bodyHeight = size.Y - bodyTop - footerHeight - inset - (if short then 0 else 8)
+	local tagRarity = if selected ~= nil and preview and preview.definition then preview.definition.Rarity else nil
+	-- The short-landscape effect window is too narrow for a rarity tag, so the tag
+	-- takes its own row across the top of the preview well and the window and
+	-- name start below it.
+	local tagRow = if compactEffect and tagRarity then T.Collectible.TagHeight + 4 else 0
 	local previewContentHeight = if veryShort
-		then math.max(bodyHeight, if compactEffect then 96 else 88)
+		then math.max(bodyHeight, if compactEffect then 112 + tagRow else 88)
 		else bodyHeight
 	local scrollPreview = previewContentHeight > bodyHeight
 	local previewHeight = if portrait then math.min(132, math.max(104, bodyHeight * 0.31)) else bodyHeight
@@ -821,7 +847,31 @@ local function CrateDetails(props)
 	local previewStackTop = if portrait or short
 		then 0
 		else math.max(0, math.floor((previewContentHeight - artHeight - nameHeight - previewFooter - 16) / 2))
-	local scrollInset, scrollBarWidth = 8, 4
+	-- The preview sits in a recessed art window tinted by the chosen tier (the
+	-- crate's own accent before a choice), the same window its odds tile shows.
+	local windowTop = previewStackTop + 8 + tagRow
+	-- Portrait gives the window enough width for the longest rarity tag; the
+	-- name column and the play button share the remaining right-hand column.
+	local windowWidth = if portrait
+		then UDim.new(0.45, -8)
+		elseif compactEffect then UDim.new(0.36, -8)
+		else UDim.new(1, -16)
+	-- The compact effect window ends with the name column, clear of the play button.
+	local windowHeight = if portrait
+		then previewHeight - 16
+		elseif compactEffect then previewContentHeight - 72 - windowTop
+		else math.max(32, artHeight) - 8
+	local tagInWindow = tagRarity ~= nil and not compactEffect
+	local artInset = if tagInWindow then 6 + T.Collectible.TagHeight + 4 else 6
+	-- Tags are sized to their label but never wider than the space they sit in.
+	local previewWellPx = (size.X - inset * 2) * (if portrait then 1 else 0.32)
+	local windowPx = windowWidth.Scale * previewWellPx + windowWidth.Offset
+	local tagInset = T.Collectible.TagInset
+	local tagMaxWidth = if tagInWindow then windowPx - tagInset * 2 else previewWellPx - 16
+	local windowFill, windowLine = ShopCardStyle.tile(
+		if tagRarity and T.Rarity[tagRarity] then T.Rarity[tagRarity].Color else ShopCardStyle.accent(card)
+	)
+	local scrollInset, scrollBarWidth = 8, T.Layout.ScrollBar
 	local gridViewport = (size.X - inset * 2) * listWidth - scrollInset * 2 - scrollBarWidth
 	-- Preserve the existing card-density budget while fitting motion inside that budget.
 	local gridGap = if short then 8 else UIConfig.Spacing.ControlGapPx
@@ -946,40 +996,55 @@ local function CrateDetails(props)
 						Visible = showPreview,
 						CanvasSize = if scrollPreview then UDim2.fromOffset(0, previewContentHeight) else nil,
 						ScrollingDirection = if scrollPreview then Enum.ScrollingDirection.Y else nil,
-						ScrollBarThickness = if scrollPreview then 3 else nil,
+						ScrollBarThickness = if scrollPreview then T.Layout.ScrollBar else nil,
 						ScrollBarImageColor3 = if scrollPreview then T.Colors.Pink else nil,
 						Size = if portrait then UDim2.new(1, 0, 0, previewHeight) else UDim2.fromScale(0.32, 1),
 						ZIndex = 103,
 					},
 				}, {
-					Rarity = if selected ~= nil
-							and preview
-							and preview.definition
-							and preview.definition.Rarity
+					-- The tag owns its own row; the art starts below it so a 3D preview never covers it.
+					Window = c(ShopArtTile, {
+						Color = windowFill,
+						LineColor = windowLine,
+						Position = UDim2.fromOffset(8, windowTop),
+						Size = UDim2.new(windowWidth.Scale, windowWidth.Offset, 0, math.max(windowHeight, 1)),
+						ZIndex = 103,
+					}),
+					Rarity = if tagRarity
 						then c(Ribbon, {
-							Rarity = preview.definition.Rarity,
+							Rarity = tagRarity,
 							Native = {
-								Position = UDim2.fromOffset(12, 12),
-								Size = UDim2.fromOffset(150, 28),
+								Position = if tagInWindow
+									then UDim2.fromOffset(8 + tagInset, windowTop + tagInset)
+									else UDim2.fromOffset(8, previewStackTop + 8),
+								Size = UDim2.fromOffset(
+									CollectibleLayout.tagWidth(
+										string.upper(tagRarity),
+										T.Type.Minimum,
+										math.max(tagMaxWidth, 1)
+									),
+									T.Collectible.TagHeight
+								),
 								ZIndex = 111,
 							},
 						})
 						else nil,
 					Art = c("Frame", {
 						BackgroundTransparency = 1,
-						Position = UDim2.fromOffset(0, previewStackTop),
-						Size = if portrait
-							then UDim2.fromScale(0.4, 1)
-							else if compactEffect
-								then UDim2.new(0.36, 0, 0, previewContentHeight - 56)
-								else UDim2.new(1, 0, 0, artHeight),
-						ZIndex = 103,
+						Position = UDim2.fromOffset(14, windowTop + artInset),
+						Size = UDim2.new(
+							windowWidth.Scale,
+							windowWidth.Offset - 12,
+							0,
+							math.max(28, windowHeight - artInset - 6)
+						),
+						ZIndex = 105,
 					}, {
 						Content = c(ShopPreview, {
 							Items = previews,
 							Playing = props.FocusEnabled ~= false and props.Visible ~= false,
 							Thumbnail = if selected then nil else card.thumbnail,
-							ZIndex = 103,
+							ZIndex = 105,
 							ColorId = (props.Equipped or {}).CharacterColor,
 							CostumeId = (props.Equipped or {}).CostumeAssets,
 							TextColor = T.Colors.Ink,
@@ -989,16 +1054,16 @@ local function CrateDetails(props)
 					Name = label(
 						if short and not selected
 							then "NEXT OPEN ODDS"
-							else if selected then selected.displayName else card.displayName,
+							else string.upper(if selected then selected.displayName else card.displayName),
 						if portrait
-							then UDim2.new(0.43, 0, 0, 8)
+							then UDim2.new(0.48, 0, 0, 8)
 							else if compactEffect
-								then UDim2.new(0.36, 8, 0, 4)
+								then UDim2.new(0.36, 8, 0, 4 + tagRow)
 								else UDim2.fromOffset(10, previewStackTop + artHeight + 8),
 						if portrait
-							then UDim2.new(0.53, 0, 0, previewHeight - previewFooter - 16)
+							then UDim2.new(0.48, 0, 0, previewHeight - previewFooter - 16)
 							else if compactEffect
-								then UDim2.new(0.64, -24, 0, previewContentHeight - 76)
+								then UDim2.new(0.64, -24, 0, previewContentHeight - 76 - tagRow)
 								else UDim2.new(1, -20, 0, nameHeight),
 						if short then 18 else 22,
 						nil,
@@ -1026,7 +1091,7 @@ local function CrateDetails(props)
 							Text = if preview.category == "ElimEffectAssets" then "PLAY SOUND" else "PLAY EFFECT",
 							Enabled = true,
 							Position = if portrait
-								then UDim2.new(0.7, 0, 1, -12)
+								then UDim2.new(0.72, 0, 1, -12)
 								else UDim2.new(
 									0.5,
 									0,
@@ -1047,14 +1112,16 @@ local function CrateDetails(props)
 							ZIndex = 105,
 						})
 						else nil,
-					Hint = if short or isEffect
+					Hint = if short
+							or isEffect
+							or selected ~= nil
 						then nil
 						else label(
 							"CHOOSE A REWARD",
 							if portrait
-								then UDim2.new(0.43, 0, 1, -27)
+								then UDim2.new(0.48, 0, 1, -27)
 								else UDim2.fromOffset(10, previewStackTop + artHeight + 8 + nameHeight + 8),
-							if portrait then UDim2.new(0.53, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
+							if portrait then UDim2.new(0.48, 0, 0, 22) else UDim2.new(1, -20, 0, 22),
 							UIConfig.Text.CaptionMinPx,
 							colors.White,
 							false
@@ -1088,7 +1155,7 @@ local function CrateDetails(props)
 						ScrollingDirection = Enum.ScrollingDirection.Y,
 						VerticalScrollBarInset = Enum.ScrollBarInset.Always,
 						ScrollBarThickness = scrollBarWidth,
-						ScrollBarImageColor3 = colors.White,
+						ScrollBarImageColor3 = C.Pink,
 						ZIndex = 103,
 					}, contents),
 				}),
@@ -1149,7 +1216,7 @@ local function CrateDetails(props)
 						Candy = true,
 						Amount = balance,
 						HeightPx = balanceHeight,
-						TextSize = 20,
+						TextSize = T.Type.Body,
 						AnchorPoint = Vector2.new(1, 0),
 						Position = UDim2.new(1, 0, 0, (balanceRowHeight - balanceHeight) / 2),
 						ZIndex = 104,

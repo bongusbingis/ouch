@@ -17,5 +17,5 @@ return function(props)
 	native.ImageColor3 = props.Color or Color3.new(1, 1, 1)
 	native.ScaleType = Enum.ScaleType.Fit
 	native.Size = native.Size or UDim2.fromScale(1, 1)
-	return React.createElement("ImageLabel", native)
+	return React.createElement("ImageLabel", native, props.children)
 end

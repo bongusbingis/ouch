@@ -21,6 +21,9 @@ local c = React.createElement
 local C = Tokens.Colors
 local SETTINGS = Tokens.Settings
 local DRAG_CLAIM_PIXELS = 10
+-- The readout sits on the track's own line, right of it, at the same size as the row labels.
+local VALUE_WIDTH = 64
+local VALUE_GAP = 12
 
 export type Props = {
 	Value: number,
@@ -47,6 +50,9 @@ return function(props: Props)
 	local enabled = props.Enabled ~= false
 	local definition = props.Definition
 	local trackRef = React.useRef(nil)
+	-- The knob travels along an inset rail so its centre stops half a knob short of each end of the
+	-- track: at 0% and 100% it sits inside the control instead of overhanging the card.
+	local railRef = React.useRef(nil)
 	local selectionImageRef = React.useRef(nil)
 	local focused, setFocused = React.useState(false)
 	local drag = React.useRef(nil :: DragState?)
@@ -73,7 +79,7 @@ return function(props: Props)
 	local displayText = if props.Format then props.Format(props.Value) else tostring(props.Value)
 
 	local function alphaFromX(x: number): number
-		local track = trackRef.current
+		local track = railRef.current
 		if track == nil then
 			local latest = latestProps.current
 			return SettingsValues.valueToAlpha(latest.Definition, latest.Value)
@@ -213,18 +219,18 @@ return function(props: Props)
 	}, {
 		Value = c(ResponsiveText, {
 			MeasurementFont = Tokens.Type.Label,
-			MaxTextSize = 20,
-			MinTextSize = 16,
+			MaxTextSize = Tokens.Type.Body,
+			MinTextSize = Tokens.Type.Body,
 			Native = {
-				AnchorPoint = Vector2.new(1, 0),
+				AnchorPoint = Vector2.new(1, 0.5),
 				BackgroundTransparency = 1,
 				Font = Tokens.Type.Label,
-				Position = UDim2.fromScale(1, 0),
-				Size = UDim2.new(1, 0, 0, UIConfig.Layout.SettingsControls.SliderLabelHeightPx),
+				Position = UDim2.fromScale(1, 0.5),
+				Size = UDim2.new(0, VALUE_WIDTH, 1, 0),
 				Text = displayText,
-				TextColor3 = C.Ink,
-				TextTransparency = if enabled then 0 else 0.3,
+				TextColor3 = if enabled then C.Ink else C.InkSoft,
 				TextXAlignment = Enum.TextXAlignment.Right,
+				TextYAlignment = Enum.TextYAlignment.Center,
 				ZIndex = 5,
 			},
 		}),
@@ -232,9 +238,8 @@ return function(props: Props)
 			ref = trackRef,
 			Active = true,
 			BackgroundTransparency = 1,
-			Position = UDim2.new(0, 0, 1, -UIConfig.Interaction.MinTargetPx),
 			Selectable = enabled,
-			Size = UDim2.new(1, 0, 0, UIConfig.Interaction.MinTargetPx),
+			Size = UDim2.new(1, -(VALUE_WIDTH + VALUE_GAP), 1, 0),
 			ZIndex = 4,
 			[React.Event.SelectionGained] = function(target)
 				setFocused(true)
@@ -287,12 +292,13 @@ return function(props: Props)
 					Shadow = false,
 					ZIndex = 4,
 				}),
+				-- Ends under the knob's centre: half a knob plus alpha of the rail.
 				Fill = c("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
 					BackgroundColor3 = if enabled then C.Pink else C.WellLine,
 					BorderSizePixel = 0,
 					Position = UDim2.new(0, 0, 0.5, -Tokens.Shape.LipHeight / 2),
-					Size = UDim2.new(alpha, 0, 1, -Tokens.Shape.LipHeight),
+					Size = UDim2.new(alpha, SETTINGS.SliderThumbSize * (0.5 - alpha), 1, -Tokens.Shape.LipHeight),
 					ZIndex = 7,
 				}, {
 					Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -300,12 +306,22 @@ return function(props: Props)
 						BackgroundColor3 = C.Surface,
 						BackgroundTransparency = Tokens.Shape.HighlightTransparency,
 						BorderSizePixel = 0,
-						Size = UDim2.fromScale(1, 0.45),
+						Size = UDim2.fromScale(1, Tokens.Shape.HighlightHeight),
 						ZIndex = 8,
 					}, {
 						Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
+						Fade = c("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0, 1) }),
 					}),
 				}),
+			}),
+			Rail = c("Frame", {
+				ref = railRef,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(SETTINGS.SliderThumbSize / 2, 0),
+				Size = UDim2.new(1, -SETTINGS.SliderThumbSize, 1, 0),
+				ZIndex = 9,
+			}, {
 				Ticks = if #stops > 1
 					then c(
 						React.Fragment,
@@ -319,7 +335,7 @@ return function(props: Props)
 									BackgroundTransparency = 0.7,
 									BorderSizePixel = 0,
 									Position = UDim2.fromScale(SettingsValues.valueToAlpha(definition, stop), 0.5),
-									Size = UDim2.fromOffset(6, 6),
+									Size = UDim2.fromOffset(Tokens.Shape.LipHeight, Tokens.Shape.LipHeight),
 									ZIndex = 9,
 								}, {
 									Corner = c("UICorner", { CornerRadius = UDim.new(1, 0) }),
@@ -329,21 +345,21 @@ return function(props: Props)
 						end)()
 					)
 					else nil,
-			}),
-			Thumb = c("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Position = UDim2.fromScale(alpha, 0.5),
-				Size = UDim2.fromOffset(SETTINGS.SliderThumbSize, SETTINGS.SliderThumbSize),
-				ZIndex = 10,
-			}, {
-				Surface = c(CandySurface, {
-					Color = if enabled then C.Yellow else C.WellLine,
-					LipColor = if enabled then C.YellowLip else C.WellLine,
-					Radius = Tokens.Shape.RadiusPill,
-					Shadow = false,
+				Thumb = c("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					Position = UDim2.fromScale(alpha, 0.5),
+					Size = UDim2.fromOffset(SETTINGS.SliderThumbSize, SETTINGS.SliderThumbSize),
 					ZIndex = 10,
+				}, {
+					Surface = c(CandySurface, {
+						Color = if enabled then C.Yellow else C.WellLine,
+						LipColor = if enabled then C.YellowLip else C.WellLine,
+						Radius = Tokens.Shape.RadiusPill,
+						Shadow = false,
+						ZIndex = 10,
+					}),
 				}),
 			}),
 		}),

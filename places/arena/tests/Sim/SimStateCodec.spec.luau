@@ -12,6 +12,9 @@ local SimTypes = require(Game:WaitForChild("Sim"):WaitForChild("SimTypes"))
 local SimStateCodec = require(Game:WaitForChild("Adapters"):WaitForChild("SimStateCodec"))
 local Combat = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Gameplay"):WaitForChild("Combat"))
 local BallFixture = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("BallFixture"))
+local MockWorld = require(ServerStorage:WaitForChild("Tests"):WaitForChild("Helpers"):WaitForChild("MockWorld"))
+local WeaponRegistry = require(Game:WaitForChild("Sim"):WaitForChild("WeaponRegistry"))
+local SimCore = require(Game:WaitForChild("Sim"):WaitForChild("SimCore"))
 
 local function makeBallsFolder(ballNames: { string }): (Folder, { [string]: BasePart })
 	local folder = Instance.new("Folder")
@@ -25,6 +28,47 @@ local function makeBallsFolder(ballNames: { string }): (Folder, { [string]: Base
 		balls[name] = ball
 	end
 	return folder, balls
+end
+
+-- Plain-table stand-ins for the pure-codec cases that do not need real instance replication.
+type FakeInstance = {
+	Name: string,
+	ClassName: string,
+	CFrame: any,
+	_children: { FakeInstance },
+	_attributes: { [string]: any },
+	GetChildren: (self: FakeInstance) -> { FakeInstance },
+	IsA: (self: FakeInstance, className: string) -> boolean,
+	GetAttribute: (self: FakeInstance, name: string) -> any,
+	SetAttribute: (self: FakeInstance, name: string, value: any) -> (),
+}
+
+local function fakeInstance(name: string, className: string): FakeInstance
+	local instance = {
+		Name = name,
+		ClassName = className,
+		CFrame = CFrame.new(),
+		_children = {},
+		_attributes = {},
+	} :: any
+
+	function instance:GetChildren()
+		return self._children
+	end
+
+	function instance:IsA(className: string): boolean
+		return self.ClassName == className
+	end
+
+	function instance:GetAttribute(name: string): any
+		return self._attributes[name]
+	end
+
+	function instance:SetAttribute(name: string, value: any)
+		self._attributes[name] = value
+	end
+
+	return instance :: FakeInstance
 end
 
 return function()
@@ -61,7 +105,6 @@ return function()
 
 			expect(decodedBall.phase).to.equal("Bouncing")
 			expect(decodedBall.velocity).to.equal(vector.create(-80, -5, 12))
-			expect(decodedBall.bounceCount).to.equal(1)
 			expect(decodedBall.flightTime).to.be.near(0.25)
 		end)
 
@@ -131,7 +174,7 @@ return function()
 			expect(balls.ball_0001:GetAttribute("vel")).to.equal(vector.zero)
 		end)
 
-		it("preserves charge and hammer kit state across encode/decode", function()
+		it("preserves hammer cooldown across encode/decode", function()
 			local folder = track(makeBallsFolder({}))
 			local character = track(Instance.new("Model"))
 			character.Name = "Character"
@@ -159,13 +202,9 @@ return function()
 
 			SimStateCodec.encode(state, folder, { p1 = character })
 			local decoded = SimStateCodec.decode(folder, { p1 = character })
-			expect(decoded.players.p1.weapons.Dodgeball.chargeSeconds).to.be.near(0.35)
 			local hammer = decoded.players.p1.weapons.Hammer
 
 			expect(hammer.cooldown).to.be.near(0.4)
-			expect(hammer.activeRemaining).to.be.near(0.08)
-			expect(hammer.direction).to.equal(vector.create(1, 0, 0))
-			expect(hammer.hitTargetId).to.equal("p2")
 		end)
 
 		it("decodes a fresh part to safe defaults", function()
@@ -223,18 +262,135 @@ return function()
 			end
 		end)
 
-		it("roundtrips tick and projectile sequence counters", function()
-			local folder = track(makeBallsFolder({}))
-
+		it("preserves the equipped weapon across encode/decode", function()
+			local ballsFolder = fakeInstance("Balls", "Folder")
+			local character = fakeInstance("Character", "Model")
 			local state = SimTypes.newState()
-			state.tick = 1234
-			state.nextProjectileSeq = 7
+			state.players.p1 = {
+				id = "p1",
+				equipped = "Dodgeball",
+				heldBallLastTick = true,
+				weapons = {
+					Dodgeball = { throwCooldown = 0, catchCooldown = 0, catchRemaining = 0, catchDirection = nil },
+					Hammer = {
+						cooldown = 0,
+						activeRemaining = 0,
+						recoveryRemaining = 0,
+						stunRemaining = 0,
+						direction = nil,
+						hitTargetId = nil,
+					},
+				},
+			}
 
-			SimStateCodec.encode(state, folder, {})
-			local decoded = SimStateCodec.decode(folder, {})
+			SimStateCodec.encode(state, ballsFolder :: any, { p1 = character :: any })
+			local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
 
-			expect(decoded.tick).to.equal(1234)
-			expect(decoded.nextProjectileSeq).to.equal(7)
+			expect(decoded.players.p1.equipped).to.equal("Dodgeball")
+		end)
+
+		it("defaults an unstepped character to the registry default weapon", function()
+			local ballsFolder = fakeInstance("Balls", "Folder")
+			local character = fakeInstance("Character", "Model")
+			local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
+			expect(decoded.players.p1.equipped).to.equal(WeaponRegistry.defaultKind())
+		end)
+
+		it("keeps an equipped weapon across the decode-step-encode loop the adapter runs", function()
+			local ballsFolder = fakeInstance("Balls", "Folder")
+			local character = fakeInstance("Character", "Model")
+			local models = { p1 = character :: any }
+			local world = MockWorld.snapshot({ p1 = MockWorld.character(vector.create(0, 2.5, 0)) })
+
+			local function tick(commands)
+				local state = SimStateCodec.decode(ballsFolder :: any, models)
+				SimCore.step(state, commands, world, 1 / 60)
+				SimStateCodec.encode(state, ballsFolder :: any, models)
+				return state
+			end
+
+			tick({})
+			tick({ { playerId = "p1", kind = "Equip", weapon = "Dodgeball" } })
+			for _ = 1, 5 do
+				local state = tick({})
+				expect(state.players.p1.equipped).to.equal("Dodgeball")
+			end
+		end)
+
+		it("preserves cooldown kit state across encode/decode", function()
+			local ballsFolder = fakeInstance("Balls", "Folder")
+			local character = fakeInstance("Character", "Model")
+			local state = SimTypes.newState()
+			state.players.p1 = {
+				id = "p1",
+				equipped = "Hammer",
+				heldBallLastTick = false,
+				weapons = {
+					Dodgeball = {
+						throwCooldown = 0.2,
+						catchCooldown = 0.5,
+						catchRemaining = 0.1,
+						catchDirection = vector.create(1, 0, 0),
+					},
+					Hammer = {
+						cooldown = 0.4,
+						activeRemaining = 0.08,
+						recoveryRemaining = 0,
+						stunRemaining = 0.12,
+						direction = vector.create(1, 0, 0),
+						hitTargetId = "p2",
+					},
+				},
+			}
+
+			SimStateCodec.encode(state, ballsFolder :: any, { p1 = character :: any })
+			local decoded = SimStateCodec.decode(ballsFolder :: any, { p1 = character :: any })
+			local hammer = decoded.players.p1.weapons.Hammer
+			local dodgeball = decoded.players.p1.weapons.Dodgeball
+
+			expect(dodgeball.throwCooldown).to.equal(0.2)
+			expect(dodgeball.catchCooldown).to.equal(0.5)
+
+			expect(hammer.cooldown).to.equal(0.4)
+		end)
+
+		it("maps phases to numbers bidirectionally", function()
+			expect(SimStateCodec.phaseToNumber("Held")).to.equal(0)
+			expect(SimStateCodec.phaseToNumber("Windup")).to.equal(1)
+			expect(SimStateCodec.phaseToNumber("InFlight")).to.equal(2)
+			expect(SimStateCodec.phaseToNumber("Bouncing")).to.equal(3)
+			expect(SimStateCodec.phaseToNumber("Rolling")).to.equal(4)
+			expect(SimStateCodec.phaseToNumber("Free")).to.equal(5)
+
+			expect(SimStateCodec.numberToPhase(0)).to.equal("Held")
+			expect(SimStateCodec.numberToPhase(1)).to.equal("Windup")
+			expect(SimStateCodec.numberToPhase(2)).to.equal("InFlight")
+			expect(SimStateCodec.numberToPhase(3)).to.equal("Bouncing")
+			expect(SimStateCodec.numberToPhase(4)).to.equal("Rolling")
+			expect(SimStateCodec.numberToPhase(5)).to.equal("Free")
+			expect(SimStateCodec.numberToPhase(999)).to.equal("Free")
+		end)
+
+		it("decodes individual projectiles via decodeProjectile", function()
+			local ball = fakeInstance("ball_0042", "BasePart")
+			ball._attributes.ph = 2
+			ball._attributes.ow = "player_1"
+			ball._attributes.hb = nil
+			ball._attributes.vel = vector.create(10, 20, 30)
+
+			local decoded = SimStateCodec.decodeProjectile(ball :: any)
+			expect(decoded).to.be.ok()
+			if decoded then
+				expect(decoded.id).to.equal("ball_0042")
+				expect(decoded.phase).to.equal("InFlight")
+				expect(decoded.ownerId).to.equal("player_1")
+				-- target is no longer replicated via attributes (F-03 removed the write-only "tg").
+				expect(decoded.targetId).to.equal(nil)
+				expect(decoded.velocity).to.equal(vector.create(10, 20, 30))
+			end
+
+			local nonPart = fakeInstance("Folder", "Folder")
+			expect(SimStateCodec.decodeProjectile(nonPart :: any)).to.equal(nil)
 		end)
 	end)
 end

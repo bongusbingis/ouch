@@ -1,4 +1,4 @@
--- Description: In-place port of the crate roll spec, pinning the weighted rarity distribution, zero-weight exclusion, dupe refunds, and empty-pool rejection with a scripted random source.
+-- Description: In-place port of the crate roll spec, pinning the weighted rarity distribution, zero-weight exclusion, dupe refunds, the pity guarantee bounding the worst-case streak, and empty-pool rejection with a scripted random source.
 
 --!nonstrict
 
@@ -88,6 +88,94 @@ return function()
 			expect(function()
 				CrateRolls.roll(emptyCrate, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0 }, { 1 }))
 			end).to.throw()
+		end)
+
+		it("leaves crates without a Pity block rolling exactly as before", function()
+			local result = CrateRolls.roll(CRATE, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0.5 }, { 1 }))
+			expect(result.rarity).to.equal("Common")
+			expect(result.pityTriggered).to.equal(nil)
+			expect(next(result.pity)).to.equal(nil)
+		end)
+
+		it("forces the guaranteed rarity once its threshold comes due", function()
+			local pityCrate = { ItemPool = CRATE.ItemPool, Pity = { Rare = 5, Legendary = 25 } }
+			local result = CrateRolls.roll(
+				pityCrate,
+				ITEMS,
+				RARITIES,
+				{},
+				ScriptedRandom.new({ 0.5 }, { 1 }),
+				{ Rare = 4 }
+			)
+			expect(result.rarity).to.equal("Rare")
+			expect(result.pityTriggered).to.equal("Rare")
+			expect(result.pity.Rare).to.equal(0)
+		end)
+
+		it("counts up to the guarantee and resets on a natural hit", function()
+			local pityCrate = { ItemPool = CRATE.ItemPool, Pity = { Rare = 5, Legendary = 25 } }
+
+			local counters = {}
+			for open = 1, 3 do
+				local result =
+					CrateRolls.roll(pityCrate, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0.5 }, { 1 }), counters)
+				expect(result.rarity).to.equal("Common")
+				expect(result.pity.Rare).to.equal(open)
+				counters = result.pity
+			end
+
+			local natural =
+				CrateRolls.roll(pityCrate, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0.99 }, { 1 }), counters)
+			expect(natural.rarity).to.equal("Rare")
+			expect(natural.pityTriggered).to.equal(nil)
+			expect(natural.pity.Rare).to.equal(0)
+			expect(natural.pity.Legendary).to.equal(4)
+		end)
+
+		it("treats a rarer drop as satisfying the weaker guarantee", function()
+			local pityCrate = { ItemPool = CRATE.ItemPool, Pity = { Rare = 5, Legendary = 25 } }
+			local result = CrateRolls.roll(
+				pityCrate,
+				ITEMS,
+				RARITIES,
+				{},
+				ScriptedRandom.new({ 0.75 }, { 1 }),
+				{ Rare = 3 }
+			)
+			expect(result.rarity).to.equal("Legendary")
+			expect(result.pity.Rare).to.equal(0)
+			expect(result.pity.Legendary).to.equal(0)
+		end)
+
+		it("prefers the rarest guarantee when two come due together", function()
+			local pityCrate = { ItemPool = CRATE.ItemPool, Pity = { Rare = 5, Legendary = 25 } }
+			local result = CrateRolls.roll(
+				pityCrate,
+				ITEMS,
+				RARITIES,
+				{},
+				ScriptedRandom.new({ 0.5 }, { 1 }),
+				{ Rare = 4, Legendary = 24 }
+			)
+			expect(result.rarity).to.equal("Legendary")
+			expect(result.pityTriggered).to.equal("Legendary")
+		end)
+
+		it("bounds the worst-case streak to the configured thresholds", function()
+			local pityCrate = { ItemPool = CRATE.ItemPool, Pity = { Rare = 5, Legendary = 25 } }
+			local counters = {}
+			local sinceRare = 0
+			local sinceLegendary = 0
+
+			for _ = 1, 200 do
+				local result =
+					CrateRolls.roll(pityCrate, ITEMS, RARITIES, {}, ScriptedRandom.new({ 0.5 }, { 1 }), counters)
+				counters = result.pity
+				sinceRare = if RARITIES[result.rarity].Weight <= RARITIES.Rare.Weight then 0 else sinceRare + 1
+				sinceLegendary = if result.rarity == "Legendary" then 0 else sinceLegendary + 1
+				expect(sinceRare < 5).to.equal(true)
+				expect(sinceLegendary < 25).to.equal(true)
+			end
 		end)
 	end)
 end

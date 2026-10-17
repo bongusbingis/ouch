@@ -55,6 +55,8 @@ export type ItemDef = {
 	DisplayName: string,
 	Description: string?,
 	Contents: { string }?,
+	-- Replace outfits hide the body parts they cover; Layer outfits sit over a visible body.
+	Coverage: string?,
 	CostumePiece: string?,
 	InventoryVisible: boolean?,
 	Equippable: boolean?,
