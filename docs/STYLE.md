@@ -207,9 +207,10 @@ The [Shop review gallery](.review/candy-shop/index.html) contains real Studio ca
 Fixture rendering was blocked by the Studio tool's React capability restriction. Single/batch reveals, transaction notifications, and pending/claim failure variants are implemented and source-reviewed but were not visually validated in this session. Physical touch/gamepad and expanded preferred-text-size coverage also remain unverified. Do not treat those states as visually approved merely because this style guide exists.
 
 
-## Splashdown onboarding
+## Onboarding
 
+- Onboarding is combat-first: throw, cross, bonk, charge, brawl. The three mandatory mechanics are the combat ones, and the crossing is one extra lesson in avoiding an obstacle. Do not rebuild it as an obstacle course.
 - Retain the authored TutorialArena, approach bridge, waypoint arrow and short lesson flow.
-- Use the exact Splashdown/arena mesh assets in `assets/SplashdownTraining.rbxm`; the server clones them at the Splashdown authoring scale and uses the shared rotating-platform and shove kits. Do not replace them with generated primitive obstacles or add a new training map.
+- The obstacle lesson uses one authored sweeper from `assets/SplashdownTraining.rbxm`, cloned at the Splashdown authoring scale and driven by the shared rotating-platform and shove kits, and it exists only while that step is live. Do not replace it with a generated primitive, add more hazards, or add a new training map.
 - The instruction surface is a compact cream candy prompt with upright Fredoka/BuilderSans text. Skip remains a separate yellow 44 px target. Use `Tokens.Onboarding`, `CandySurface` and `PuffyButton`.
 - Validation is recorded in `.review/candy-onboarding/VALIDATION.md`. Visual review must use the actual Lobby Studio window.

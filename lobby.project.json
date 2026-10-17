@@ -22,6 +22,8 @@
     },
 
     "ReplicatedStorage": {
+      "SplashdownTraining": { "$path": "assets/SplashdownTraining.rbxm" },
+
       "Shared": {
         "$path": "src/shared",
 

@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cosmetics = require(ReplicatedStorage:WaitForChild("Config"):WaitForChild("Cosmetics"):WaitForChild("Cosmetics"))
 local CostumeVisualFactory = {}
+local COMPONENT_TIMEOUT_SECONDS = 10
 
 CostumeVisualFactory.BodyParts = table.freeze({
 	Head = true,
@@ -24,6 +25,20 @@ CostumeVisualFactory.BodyParts = table.freeze({
 	RightFoot = true,
 })
 
+-- A Replace outfit must hide exactly these; the limbs stay bare so sleeves and
+-- gaiters can layer over them. Shared with the costume spec so the authored
+-- geometry and the invariant cannot drift apart.
+CostumeVisualFactory.CoveredBody = table.freeze({
+	"UpperTorso",
+	"LowerTorso",
+	"LeftUpperLeg",
+	"LeftLowerLeg",
+	"LeftFoot",
+	"RightUpperLeg",
+	"RightLowerLeg",
+	"RightFoot",
+})
+
 function CostumeVisualFactory.prepare(outfitId: string?): { Model }?
 	local outfit = if outfitId then Cosmetics.Items[outfitId] else nil
 	if not outfit or outfit.Category ~= "CostumeAssets" or not outfit.Contents then
@@ -34,7 +49,11 @@ function CostumeVisualFactory.prepare(outfitId: string?): { Model }?
 	local templates = {}
 	local coveredTargets = {}
 	for _, componentId in outfit.Contents do
-		local template = assets:WaitForChild(componentId)
+		-- Component ids come from the catalog, so a published outfit can name a model
+		-- that was never authored. Wait long enough to cover replication, then fail
+		-- loudly: an untimed wait would hang a preview build forever with no error.
+		local template = assets:WaitForChild(componentId, COMPONENT_TIMEOUT_SECONDS)
+		assert(template, `[CostumeVisualFactory] {outfitId} names missing component {componentId}`)
 		assert(template:IsA("Model"), `[CostumeVisualFactory] {componentId} must be a Model`)
 		local count = 0
 		for _, descendant in template:GetDescendants() do
@@ -90,6 +109,19 @@ function CostumeVisualFactory.prepare(outfitId: string?): { Model }?
 		end
 		assert(count > 0, `[CostumeVisualFactory] {componentId} has no render parts`)
 		table.insert(templates, template)
+	end
+	local coverage = outfit.Coverage
+	assert(
+		coverage == "Replace" or coverage == "Layer",
+		`[CostumeVisualFactory] {outfitId} must declare Replace or Layer coverage`
+	)
+	if coverage == "Replace" then
+		for _, name in CostumeVisualFactory.CoveredBody do
+			assert(coveredTargets[name], `[CostumeVisualFactory] {outfitId} must cover {name}`)
+		end
+	else
+		local extra = next(coveredTargets)
+		assert(extra == nil, `[CostumeVisualFactory] layered {outfitId} cannot cover {extra}`)
 	end
 	return templates
 end

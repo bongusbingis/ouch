@@ -1,0 +1,68 @@
+{
+  "fbxRoundTrip": "PASS",
+  "pieceCount": 10,
+  "checks": [
+    {
+      "mesh": "CA_Head",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_UpperTorso",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_RightUpperArm",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_RightLowerArm",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_LeftUpperArm",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_LeftLowerArm",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_RightLowerLeg",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_RightFoot",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_LeftLowerLeg",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    },
+    {
+      "mesh": "CA_LeftFoot",
+      "dimensions": "PASS",
+      "center": "PASS",
+      "uv": "PASS"
+    }
+  ],
+  "studioAnimationTest": "NOT RUN",
+  "exactSurfaceFit": "Source geometry used; Studio animation check outstanding"
+}

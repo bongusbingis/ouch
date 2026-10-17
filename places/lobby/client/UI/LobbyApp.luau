@@ -105,10 +105,12 @@ end
 
 local QUEUE_OPTIONS = {}
 for _, queueId in Queues.Order do
-	table.insert(
-		QUEUE_OPTIONS,
-		{ id = queueId, title = Queues.Queues[queueId].Title, description = Queues.Queues[queueId].Description }
-	)
+	table.insert(QUEUE_OPTIONS, {
+		id = queueId,
+		title = Queues.Queues[queueId].Title,
+		description = Queues.Queues[queueId].Description,
+		comingSoon = queueId == "Splashdown",
+	})
 end
 
 local function useParty(client, notifications)
@@ -515,9 +517,23 @@ local function LobbyContent(props)
 	end
 	local teleportStatus = partyClient:getTeleportStatus()
 	local confirmedQueueId = LobbyViewModel.selectedQueueId(snapshot, Players.LocalPlayer.UserId, queueChoice)
-	local selectedQueueId = if Queues.isEnabled(confirmedQueueId) then confirmedQueueId else nil
+	local selectedQueueId = if Queues.isEnabled(confirmedQueueId) and confirmedQueueId ~= "Splashdown"
+		then confirmedQueueId
+		else nil
 	local presentation =
 		LobbyViewModel.partyPresentation(snapshot, Players.LocalPlayer.UserId, requestBusy, selectedQueueId)
+	React.useEffect(function()
+		if
+			snapshot
+			and snapshot.leaderUserId == Players.LocalPlayer.UserId
+			and snapshot.queueId == "Splashdown"
+			and presentation.canPickQueue
+		then
+			task.spawn(function()
+				partyClient:setQueue("Arena")
+			end)
+		end
+	end, { snapshot and snapshot.queueId, snapshot and snapshot.leaderUserId, presentation.canPickQueue })
 	React.useEffect(function()
 		focusRevision.current += 1
 		local revision = focusRevision.current
@@ -976,7 +992,7 @@ local function LobbyContent(props)
 									current,
 									Players.LocalPlayer.UserId,
 									partyClient:isBusy(),
-									if Queues.isEnabled(selected) then selected else nil
+									if Queues.isEnabled(selected) and selected ~= "Splashdown" then selected else nil
 								)
 								if action.playEnabled then
 									task.spawn(partyClient.toggleMatchmaking, partyClient)
@@ -1162,7 +1178,12 @@ local function LobbyContent(props)
 							setModeOpen(false)
 						end,
 						OnSelect = function(queueId)
-							if not presentation.canPickQueue or not snapshot or not Queues.isEnabled(queueId) then
+							if
+								not presentation.canPickQueue
+								or not snapshot
+								or not Queues.isEnabled(queueId)
+								or queueId == "Splashdown"
+							then
 								return
 							end
 							task.spawn(function()

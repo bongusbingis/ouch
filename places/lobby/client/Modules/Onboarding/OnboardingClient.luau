@@ -40,8 +40,6 @@ export type Snapshot = {
 	cue: string,
 	trackTargets: boolean,
 	retrying: boolean,
-	checkpoint: number,
-	checkpointCount: number,
 	deviceClass: string,
 	hintLevel: number,
 	succeeded: boolean,
@@ -67,11 +65,9 @@ local state: Snapshot = {
 	active = false,
 	resolved = false,
 	step = "Intro",
-	cue = "Intro",
+	cue = "Ready",
 	trackTargets = false,
 	retrying = false,
-	checkpoint = 0,
-	checkpointCount = 1,
 	deviceClass = "Mouse",
 	hintLevel = 0,
 	succeeded = false,
@@ -121,6 +117,29 @@ function OnboardingClient.skip()
 		return
 	end
 	Network.fireServer("OnboardingAction", "Skip")
+end
+
+local function reportAttempt(escalated: boolean?)
+	lastAttemptAt = os.clock()
+	Network.fireServer("OnboardingAction", "Attempt", if escalated then "escalated" else nil)
+end
+
+-- An intent is an attempt, never a completion. Lessons are finished by the
+-- server when the player actually connects with a target, so trying and missing
+-- reads as effort here rather than as progress.
+local function onIntent(intent: string)
+	if not state.active then
+		return
+	end
+	if
+		intent == "NormalThrow"
+		or intent == "ReleaseCharge"
+		or intent == "BeginCharge"
+		or intent == "CancelCharge"
+		or intent == "HammerAttack"
+	then
+		reportAttempt()
+	end
 end
 
 local function tickHints()
@@ -187,22 +206,23 @@ local function onServerState(packet: any)
 		resolved = true,
 		step = packet.step,
 		cue = packet.cue or packet.step,
-		trackTargets = false,
+		trackTargets = packet.trackTargets == true,
 		retrying = packet.retrying == true,
-		checkpoint = packet.checkpoint or 0,
-		checkpointCount = packet.checkpointCount or 1,
 		succeeded = packet.succeeded == true,
 		hintLevel = 0,
 		celebrating = packet.step == "Celebration",
 		waypoint = packet.waypoint or CLEAR,
 	})
 
-	if packet.reason == "success" or packet.reason == "checkpoint" then
+	if packet.reason == "hit" or packet.reason == "crossed" then
 		playCue("OnboardingStepSuccess")
 		UIFeedback.haptic("Notification")
-		if packet.step == "TimeHammer" then
+		if packet.step == "ChargedThrow" then
 			playCue("OnboardingCoreComplete")
 		end
+	elseif packet.reason == "shoved" then
+		playCue("OnboardingHint")
+		UIFeedback.haptic("Click")
 	elseif entering or changedStep then
 		if packet.step == "Celebration" then
 			playCue("OnboardingCelebration")
@@ -212,26 +232,23 @@ local function onServerState(packet: any)
 		end
 	end
 
-	-- Keep Splashdown's movement camera, while combat gestures and weapon
-	-- presentation remain disabled. Native movement/jump controls stay active.
-	Combat.setWeaponLocked(true)
-	Combat.setCameraEnabled(true)
-	Combat.setInputEnabled(false)
-	if entering or packet.reason == "recovered" then
-		local camera = Workspace.CurrentCamera
-		local character = Players.LocalPlayer.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if camera and humanoid and root and root:IsA("BasePart") then
-			camera.CameraSubject = humanoid
-			camera.CameraType = Enum.CameraType.Custom
-			local facing = if typeof(packet.facing) == "Vector3" then packet.facing else root.CFrame.LookVector
-			camera.CFrame = CFrame.lookAt(
-				root.Position - facing * 16 + Vector3.new(0, 8, 0),
-				root.Position + facing * 12 + Vector3.new(0, 2, 0)
-			)
-		end
+	-- Every lesson before the free-for-all teaches one thing, so the player is
+	-- handed the weapon it needs and their own equip controls stay inert until
+	-- the mini-fight. The crossing teaches no weapon at all.
+	Combat.setWeaponLocked(packet.step ~= "Practice")
+
+	if changedStep and packet.step == "Hammer" then
+		Combat.equipHammer()
+	elseif
+		changedStep and (packet.step == "NormalThrow" or packet.step == "ChargedThrow" or packet.step == "Practice")
+	then
+		Combat.equipDodgeball()
 	end
+
+	-- Training runs the same combat camera the arena uses, so aim, charge and
+	-- the trajectory preview behave identically to a real match.
+	Combat.setCameraEnabled(true)
+	Combat.setInputEnabled(true)
 end
 
 function OnboardingClient.start()
@@ -240,7 +257,7 @@ function OnboardingClient.start()
 	end
 	started = true
 	ThrowUXClient.setHintGate(function()
-		return not state.active
+		return not state.active or (state.step ~= "Intro" and state.step ~= "NormalThrow")
 	end)
 	local inputContext = Players.LocalPlayer:WaitForChild(InputConfig.ContextName)
 	assert(inputContext:IsA("InputContext"), `[OnboardingClient] {InputConfig.ContextName} must be an InputContext`)
@@ -248,6 +265,7 @@ function OnboardingClient.start()
 	assert(skipAction:IsA("InputAction"), "[OnboardingClient] CombatInput.OnboardingSkip must be an InputAction")
 
 	table.insert(connections, Network.on("OnboardingState", onServerState))
+	table.insert(disposers, Combat.onIntent(onIntent))
 	table.insert(
 		connections,
 		skipAction.Pressed:Connect(function()
@@ -294,10 +312,15 @@ function OnboardingClient.start()
 			return
 		end
 		accumulator = 0
-		local character = Players.LocalPlayer.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if state.active and humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
-			lastAttemptAt = os.clock()
+		-- The crossing has no combat intent to count, so running is the attempt
+		-- there. Every other lesson escalates on a player who is not trying the
+		-- mechanic, however much they move around.
+		if state.active and state.step == "Dodge" then
+			local character = Players.LocalPlayer.Character
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
+				lastAttemptAt = os.clock()
+			end
 		end
 		tickHints()
 	end)

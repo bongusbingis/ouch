@@ -40,6 +40,10 @@ function CosmeticsLogic.validate(items: { [string]: ItemDef })
 				seen[componentId], roles[component.CostumePiece] = true, true
 			end
 			assert(roles.Head and roles.Body and roles.Feet, `[Cosmetics] {itemId} is incomplete`)
+			assert(
+				item.Coverage == "Replace" or item.Coverage == "Layer",
+				`[Cosmetics] {itemId} must declare Replace or Layer coverage`
+			)
 		end
 	end
 end

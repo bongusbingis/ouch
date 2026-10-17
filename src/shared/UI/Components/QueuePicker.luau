@@ -12,7 +12,13 @@ local Icon = require(script.Parent.Icon)
 local Text = require(script.Parent.LobbyText)
 local c, C, S = React.createElement, T.Colors, T.ModePicker
 
-export type Option = { id: string, title: string, description: string?, artwork: string? }
+export type Option = {
+	id: string,
+	title: string,
+	description: string?,
+	artwork: string?,
+	comingSoon: boolean?,
+}
 export type Props = {
 	Options: { Option },
 	SelectedId: string?,
@@ -36,13 +42,16 @@ local DESCRIPTION_GAP = 8
 
 local function ModeCard(props)
 	local option, selected, compact, z = props.Option, props.Selected, props.Compact, props.ZIndex
+	local comingSoon = option.comingSoon == true
+	local cardSelected = selected and not comingSoon
+	local cardEnabled = props.Enabled and not comingSoon
 	local reduced = useReducedMotion()
 	local styles, api = Spring.useSpring(function()
-		return { Selected = if selected then 1 else 0 }
+		return { Selected = if cardSelected then 1 else 0 }
 	end)
 	React.useEffect(function()
-		api.start({ Selected = if selected then 1 else 0, config = Motion.Control, immediate = reduced })
-	end, { selected, reduced })
+		api.start({ Selected = if cardSelected then 1 else 0, config = Motion.Control, immediate = reduced })
+	end, { cardSelected, reduced })
 	React.useEffect(function()
 		return function()
 			api.stop()
@@ -54,6 +63,9 @@ local function ModeCard(props)
 	local line = styles.Selected:map(function(value)
 		return C.Ink:Lerp(C.Pink, math.clamp(value, 0, 1))
 	end)
+	local cardFill = if comingSoon then C.SurfaceWarm:Lerp(C.WellLine, 0.4) else fill
+	local cardLine = if comingSoon then C.WellLine else line
+	local lipColor = if comingSoon then C.WellLine else if cardSelected then C.PinkLip else C.WellLine
 	local artHeight = props.ArtHeight or math.floor(props.Height * 0.46)
 	local textX = if compact then UDim.new(0.39, 0) else UDim.new(0, 18)
 	local textWidth = if compact then UDim.new(0.61, -16) else UDim.new(1, -36)
@@ -64,21 +76,21 @@ local function ModeCard(props)
 	local pillTextSize = if compact then T.Type.Minimum else T.Type.TileLabel
 	return c(AnimatedButton, {
 		ButtonRef = props.ButtonRef,
-		Enabled = props.Enabled,
+		Enabled = cardEnabled,
 		Style = "Primary",
 		HoverRotation = false,
 		SelectionRadius = UDim.new(0, T.Shape.RadiusCard),
 		Native = { BackgroundTransparency = 1, Image = "", LayoutOrder = props.Order, Size = props.Size, ZIndex = z },
 		Visual = c(Surface, {
-			Color = fill,
-			LipColor = if selected then C.PinkLip else C.WellLine,
-			StrokeColor = line,
+			Color = cardFill,
+			LipColor = lipColor,
+			StrokeColor = cardLine,
 			Radius = T.Shape.RadiusCard,
 			Shadow = false,
 			ZIndex = z,
 		}),
 		OnActivated = function()
-			if props.Enabled then
+			if cardEnabled then
 				props.OnSelect(option.id)
 			end
 		end,
@@ -86,7 +98,11 @@ local function ModeCard(props)
 		Artwork = c("ImageLabel", {
 			Image = option.artwork or S.PlaceholderArt,
 			ScaleType = Enum.ScaleType.Crop,
-			BackgroundColor3 = if option.id == "Arena" then C.Cyan else C.Grape,
+			BackgroundColor3 = if comingSoon
+				then C.WellLine
+				elseif option.id == "Arena" then C.Cyan
+				else C.Grape,
+			ImageColor3 = if comingSoon then Color3.fromRGB(160, 160, 160) else Color3.new(1, 1, 1),
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(8, 8),
 			Size = if compact then UDim2.new(0.36, 0, 1, -16) else UDim2.new(1, -16, 0, artHeight),
@@ -96,6 +112,7 @@ local function ModeCard(props)
 		Title = c(Text, {
 			Text = option.title,
 			Font = T.Type.Display,
+			TextColor3 = if comingSoon then C.InkSoft else C.Ink,
 			TextSize = if compact then 22 else 28,
 			Position = UDim2.new(textX, UDim.new(0, titleTop)),
 			Size = UDim2.new(textWidth, UDim.new(0, 34)),
@@ -105,7 +122,7 @@ local function ModeCard(props)
 			Text = option.description or option.title,
 			Font = T.Type.Label,
 			TextSize = props.DescriptionSize or T.Type.Minimum,
-			TextColor3 = C.InkSoft,
+			TextColor3 = if comingSoon then C.WellLine:Lerp(C.InkSoft, 0.7) else C.InkSoft,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			Position = UDim2.new(textX, UDim.new(0, descriptionTop)),
 			Size = UDim2.new(textWidth, UDim.new(0, descriptionHeight)),
@@ -118,27 +135,34 @@ local function ModeCard(props)
 			Size = UDim2.new(textWidth, UDim.new(0, PILL_HEIGHT)),
 			ZIndex = z + 6,
 		}, {
-			-- The same candy pill as every button: pink once chosen, cream while it is still an offer.
+			-- The same candy pill as every button: pink once chosen, cream while it is still an offer, grey when coming soon.
 			Pill = c(Surface, {
-				Color = if selected then C.Pink else C.SurfaceWarm,
-				LipColor = if selected then C.PinkLip else C.WellLine,
+				Color = if comingSoon
+					then C.WellLine
+					elseif cardSelected then C.Pink
+					else C.SurfaceWarm,
+				LipColor = if comingSoon
+					then C.WellLine:Lerp(C.Ink, 0.15)
+					elseif cardSelected then C.PinkLip
+					else C.WellLine,
+				StrokeColor = if comingSoon then C.WellLine:Lerp(C.Ink, 0.15) else nil,
 				Shadow = false,
 				ZIndex = z + 6,
 			}),
 			Label = c("TextLabel", {
 				BackgroundTransparency = 1,
 				Font = T.Type.Display,
-				Text = if selected then "SELECTED" else "SELECT MODE",
+				Text = if comingSoon then "COMING SOON" elseif cardSelected then "SELECTED" else "SELECT MODE",
 				TextSize = pillTextSize,
-				TextColor3 = if selected then C.Surface else C.Ink,
+				TextColor3 = if comingSoon then C.InkSoft elseif cardSelected then C.Surface else C.Ink,
 				TextXAlignment = Enum.TextXAlignment.Center,
-				Position = UDim2.fromOffset(if selected then 20 else 0, 0),
-				Size = UDim2.new(1, if selected then -20 else 0, 1, -T.Shape.LipHeight),
+				Position = UDim2.fromOffset(if cardSelected then 20 else 0, 0),
+				Size = UDim2.new(1, if cardSelected then -20 else 0, 1, -T.Shape.LipHeight),
 				ZIndex = z + 10,
 			}, {
-				Outline = if selected then c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }) else nil,
+				Outline = if cardSelected then c("UIStroke", { Color = C.Ink, Thickness = T.Type.Outline }) else nil,
 			}),
-			Check = if selected
+			Check = if cardSelected
 				then c(Icon, {
 					Name = "Check",
 					Color = C.Surface,
@@ -178,9 +202,9 @@ return function(props: Props)
 			DescriptionSize = props.DescriptionSize,
 			DescriptionHeight = props.DescriptionHeight,
 			ZIndex = native.ZIndex or 1,
-			ButtonRef = if option.id == props.SelectedId
+			ButtonRef = if option.id == props.SelectedId and not option.comingSoon
 				then props.SelectedButtonRef
-				elseif index == 1 then props.FirstButtonRef
+				elseif index == 1 and not option.comingSoon then props.FirstButtonRef
 				else nil,
 			Size = if props.Stacked
 				then UDim2.new(1, 0, 0, props.CardHeight or S.CompactCardMinHeight)

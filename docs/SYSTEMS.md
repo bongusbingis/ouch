@@ -219,6 +219,8 @@ All systems serve the four highest product priorities: **monetization, engagemen
 **Key invariants:**
 - Onboarding state is append-only; a player can never un-learn a completed tutorial step.
 - The service must safely handle players who join mid-flow or have legacy data shapes.
+- The flow is combat-first (throw, hammer, charged throw) with one obstacle lesson between the first two; `CoreComplete` means the three combat mechanics and never the obstacle. A step completes only when the server observes the player perform it.
+- Being hit by the obstacle is feedback, not failure: the shared shove applies, recovery returns the player to the spawn side, and the lesson stays open. Nothing in onboarding blocks play or match entry.
 **Depends on:** PlayerData, Network.
 **Consumers:** Client UI overlays, Matchmaker (to gate modes behind tutorials).
 

@@ -1,39 +1,43 @@
 --!strict
 local T = require(script.Parent.Parent.Tokens)
 local Model = {}
-local LESSONS = { "AvoidBumpers", "JumpSweepers", "TimeHammer", "Practice" }
+local LESSONS = { "NormalThrow", "Dodge", "Hammer", "ChargedThrow", "Practice" }
 
 function Model.build(snapshot)
 	local step = snapshot.step or "Intro"
 	local device = snapshot.deviceClass
-	local jump = if device == "Touch" then "Tap Jump" elseif device == "Gamepad" then "Press A" else "Press Space"
+	local jump = if device == "Touch" then "Tap jump" elseif device == "Gamepad" then "Press A" else "Press Space"
 	local copy = {
-		Intro = { "WELCOME TO TRAINING!", "Follow the arrow. Let's practise avoiding obstacles." },
-		AvoidBumpers = { "DODGE THE BUMPERS", "Move around them and follow the arrow." },
-		JumpSweepers = { "JUMP OVER THE BAR", jump .. " as the spinning bar comes towards you." },
-		TimeHammer = { "TIME YOUR RUN", "Wait for the hammer to swing away, then pass." },
-		Practice = { "ONE MORE GO!", "Head back across the bridge. Dodge, jump and time it!" },
-		Celebration = { "YOU'RE READY!", "Take those skills into Splashdown!" },
+		Intro = { "WELCOME TO TRAINING!", "Let's learn to throw, swing and dodge." },
+		NormalThrow = { "THROW!", "Aim at the dummy, then throw your ball." },
+		Dodge = { "GET ACROSS!", "The spinning bar will knock you off. Jump it or time it." },
+		Hammer = { "BONK!", "Get close to the dummy, then swing your hammer." },
+		ChargedThrow = { "HOLD FOR POWER!", "Hold to charge your throw, then release." },
+		Practice = { "KNOCK 'EM OUT!", "Ball and hammer are both yours. Clear the ring!" },
+		Celebration = { "YOU'RE READY!", "Take those skills into a real match!" },
 	}
 	local hints = {
-		AvoidBumpers = "Give each bumper room as you pass on its open side.",
-		JumpSweepers = jump .. " near the bar, then land by the arrow.",
-		TimeHammer = "Watch one swing. Move through while the hammer is up.",
-		Practice = "Follow the arrow back. Each stop saves your progress.",
+		NormalThrow = "Point at the red dummy and throw; your first throw curves in.",
+		Dodge = jump .. " as the bar sweeps past, then follow the arrow across.",
+		Hammer = "Walk right up to the dummy before you swing.",
+		ChargedThrow = "Hold until the ball glows, then let go.",
+		Practice = "Any weapon, any dummy. Knock all four down.",
 	}
 	local entry = copy[step] or copy.Intro
 	local index = table.find(LESSONS, step) or 0
 	return {
-		title = if snapshot.retrying then "TRY AGAIN!" elseif snapshot.succeeded then "NICE WORK!" else entry[1],
+		title = if snapshot.retrying then "TRY AGAIN!" elseif snapshot.succeeded then "NICE!" else entry[1],
 		detail = if snapshot.retrying
-			then "Watch the obstacle and give it another go."
+			then "Watch the bar for one swing, then go."
 			elseif snapshot.succeeded then "Keep going!"
 			elseif (snapshot.hintLevel or 0) > 0 then hints[step] or entry[2]
 			else entry[2],
 		-- The key/glyph is drawn by InputHint ("[X] SKIP"), so the copy stays one word.
 		skip = "SKIP",
 		celebrating = step == "Celebration",
-		done = if step == "Celebration" then 4 else math.max(0, index - 1) + (if snapshot.succeeded then 1 else 0),
+		done = if step == "Celebration"
+			then #LESSONS
+			else math.max(0, index - 1) + (if snapshot.succeeded then 1 else 0),
 	}
 end
 

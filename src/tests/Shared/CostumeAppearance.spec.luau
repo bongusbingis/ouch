@@ -11,6 +11,12 @@ local Appearance = require(
 local EmoteRig = require(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("Services"):WaitForChild("EmoteRig")
 )
+local CostumeVisualFactory = require(
+	ReplicatedStorage:WaitForChild("Shared")
+		:WaitForChild("Game")
+		:WaitForChild("Cosmetics")
+		:WaitForChild("CostumeVisualFactory")
+)
 local TestAssets = require(script.Parent.Parent.Helpers.TestAssets)
 local CharacterFixture = require(script.Parent.Parent.Helpers.CharacterFixture)
 
@@ -53,19 +59,13 @@ return function()
 						end
 					end
 				end
-				for _, name in
-					{
-						"UpperTorso",
-						"LowerTorso",
-						"LeftUpperLeg",
-						"LeftLowerLeg",
-						"LeftFoot",
-						"RightUpperLeg",
-						"RightLowerLeg",
-						"RightFoot",
-					}
-				do
-					expect(covered[name]).to.equal(true)
+				if item.Coverage == "Replace" then
+					for _, name in CostumeVisualFactory.CoveredBody do
+						expect(covered[name]).to.equal(true)
+					end
+				else
+					expect(item.Coverage).to.equal("Layer")
+					expect(next(covered)).to.equal(nil)
 				end
 				local world = Instance.new("WorldModel")
 				table.insert(roots, world)

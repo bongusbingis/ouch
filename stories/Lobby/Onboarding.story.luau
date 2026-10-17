@@ -1,9 +1,9 @@
 --[[
-    The training-course prompt (OnboardingOverlay): the candy card at the top of the screen with
-    the lesson title and instruction, the lesson progress, and the separate SKIP button. Its copy
+    The training prompt (OnboardingOverlay): the candy card at the top of the screen with the
+    lesson title and instruction, the lesson progress, and the separate SKIP button. Its copy
     comes from OnboardingViewModel, which words the jump instruction and SKIP per input device, so
-    the jump lesson is shown on Touch, Keyboard and Gamepad side by side, then every other step of
-    the lesson list (Intro -> AvoidBumpers -> JumpSweepers -> TimeHammer -> Practice ->
+    the one obstacle lesson is shown on Touch, Keyboard and Gamepad side by side, then every other
+    step of the lesson list (Intro -> NormalThrow -> Dodge -> Hammer -> ChargedThrow -> Practice ->
     Celebration) and the retry / success / hint variants.
 
     The overlay positions itself on the safe area of the viewport, so every state is a Screen
@@ -41,16 +41,17 @@ return StoryRoot.story({
 	Title = "Onboarding",
 	Summary = "OnboardingOverlay per input device and per lesson step, plus retry, success and hint copy.",
 	States = {
-		state("Jump — touch", "Tap Jump / SKIP.", overlay("JumpSweepers", "Touch")),
-		state("Jump — keyboard", "Press Space / X SKIP.", overlay("JumpSweepers", "Keyboard")),
-		state("Jump — gamepad", "Press A / B SKIP.", overlay("JumpSweepers", "Gamepad")),
+		state("Dodge — touch", "Tap jump / SKIP.", overlay("Dodge", "Touch", { hintLevel = 1 })),
+		state("Dodge — keyboard", "Press Space / X SKIP.", overlay("Dodge", "Keyboard", { hintLevel = 1 })),
+		state("Dodge — gamepad", "Press A / B SKIP.", overlay("Dodge", "Gamepad", { hintLevel = 1 })),
 		state("Intro", nil, overlay("Intro", "Keyboard")),
-		state("Avoid bumpers", nil, overlay("AvoidBumpers", "Keyboard")),
-		state("Time the hammer", nil, overlay("TimeHammer", "Keyboard")),
+		state("Throw", nil, overlay("NormalThrow", "Keyboard")),
+		state("Hammer", nil, overlay("Hammer", "Keyboard")),
+		state("Charged throw", nil, overlay("ChargedThrow", "Keyboard")),
 		state("Practice", nil, overlay("Practice", "Keyboard")),
-		state("Celebration", "All four lessons done.", overlay("Celebration", "Keyboard")),
-		state("Retrying", "TRY AGAIN!", overlay("TimeHammer", "Touch", { retrying = true })),
-		state("Succeeded", "NICE WORK!", overlay("AvoidBumpers", "Touch", { succeeded = true })),
-		state("Hint", "After a stall: hint copy.", overlay("AvoidBumpers", "Touch", { hintLevel = 2 })),
+		state("Celebration", "All five lessons done.", overlay("Celebration", "Keyboard")),
+		state("Retrying", "TRY AGAIN!", overlay("Dodge", "Touch", { retrying = true })),
+		state("Succeeded", "NICE!", overlay("NormalThrow", "Touch", { succeeded = true })),
+		state("Hint", "After a stall: hint copy.", overlay("Hammer", "Touch", { hintLevel = 2 })),
 	},
 })

@@ -7,30 +7,23 @@
 -- Version gates re-entry: bumping it does NOT force old players back through
 -- onboarding. Migration is deliberate -- OnboardingState.eligibility only ever
 -- reads Status, never Version, so raising this is safe by default.
-local CURRENT_VERSION = 2
+local CURRENT_VERSION = 3
 
 return {
 	Version = CURRENT_VERSION,
 
-	-- Encounters on the original TutorialArena approach. Asset scale and mover
-	-- attributes match author-splashdown-courses; no new map is generated.
-	Course = {
+	-- The one obstacle lesson. A single authored Splashdown sweeper is turned on
+	-- across the bridge, and only while that step is live, so no combat lesson
+	-- ever shares its lane. Scale and mover attributes match
+	-- author-splashdown-courses; no new map is generated.
+	Obstacle = {
+		Asset = "obstacle_6_001",
 		AssetScale = 0.55,
-		CheckpointRadius = 7,
-		CheckpointHeight = 8,
-		RetrySeconds = 0.65,
-		RecoveryGraceSeconds = 0.8,
-		SweeperSpeed = 45,
-		HammerPeriod = 3.2,
-		BumperPositions = { { 150, -6 }, { 137, 6 } },
 		SweeperDistance = 105,
-		HammerDistance = 65,
-		Lessons = {
-			AvoidBumpers = { start = 163, checkpoints = { 125 } },
-			JumpSweepers = { start = 125, checkpoints = { 82 }, jumpAt = 105 },
-			TimeHammer = { start = 82, checkpoints = { 50 } },
-			Practice = { start = 50, checkpoints = { 82, 125, 163 }, jumpAt = 105 },
-		},
+		SweeperSpeed = 45,
+		-- Breathing room after a shove or a respawn before the bar can catch the
+		-- player again, so a bad landing is never an instant second hit.
+		RecoveryGraceSeconds = 0.8,
 	},
 
 	-- Projected by the server onto a live training dummy, carrying the id of the
@@ -48,7 +41,7 @@ return {
 	},
 
 	Timing = {
-		IntroSeconds = 2.4,
+		IntroSeconds = 1.1,
 		PromptDelaySeconds = 0.25,
 		SuccessHoldSeconds = 0.7,
 		InactivityHintSeconds = 6,
@@ -173,14 +166,15 @@ return {
 	},
 
 	Analytics = {
-		Funnel = "SplashdownOnboarding",
+		Funnel = "Onboarding",
 		Steps = {
 			Started = { step = 1, name = "Started" },
-			AvoidBumpers = { step = 2, name = "AvoidBumpers" },
-			JumpSweepers = { step = 3, name = "JumpSweepers" },
-			TimeHammer = { step = 4, name = "TimeHammer" },
-			Practice = { step = 5, name = "Practice" },
-			Completed = { step = 6, name = "Completed" },
+			NormalThrow = { step = 2, name = "NormalThrow" },
+			Dodge = { step = 3, name = "Dodge" },
+			Hammer = { step = 4, name = "Hammer" },
+			ChargedThrow = { step = 5, name = "ChargedThrow" },
+			Practice = { step = 6, name = "Practice" },
+			Completed = { step = 7, name = "Completed" },
 		},
 	},
 }
