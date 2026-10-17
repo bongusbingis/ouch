@@ -105,10 +105,12 @@ end
 
 local QUEUE_OPTIONS = {}
 for _, queueId in Queues.Order do
+	local queue = Queues.Queues[queueId]
 	table.insert(QUEUE_OPTIONS, {
 		id = queueId,
-		title = Queues.Queues[queueId].Title,
-		description = Queues.Queues[queueId].Description,
+		title = queue.Title,
+		description = queue.Description,
+		artwork = if queueId == "Splashdown" then "rbxassetid://92740768807013" else queue.Artwork,
 		comingSoon = queueId == "Splashdown",
 	})
 end

@@ -306,6 +306,7 @@ return table.freeze({
 	}),
 	ModePicker = table.freeze({
 		PlaceholderArt = "rbxassetid://87184300931227",
+		SplashdownArt = "rbxassetid://92740768807013",
 		MaxWidth = 860,
 		MaxHeight = 520,
 		Edge = 24,

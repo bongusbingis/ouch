@@ -28,6 +28,7 @@ local queues = {
 		Enabled = true,
 		Title = "SPLASHDOWN",
 		Description = "Race three obstacle courses. Fastest to the finish wins.",
+		Artwork = "rbxassetid://92740768807013",
 		SortOrder = 2,
 		MatchCapacity = 30,
 		MinPlayers = 1,
