@@ -96,7 +96,7 @@ local function ModeCard(props)
 		end,
 	}, {
 		Artwork = c("ImageLabel", {
-			Image = option.artwork or S.PlaceholderArt,
+			Image = option.artwork or (if option.id == "Splashdown" then S.SplashdownArt else S.PlaceholderArt),
 			ScaleType = Enum.ScaleType.Crop,
 			BackgroundColor3 = if comingSoon
 				then C.WellLine
